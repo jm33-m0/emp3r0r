@@ -1,6 +1,6 @@
 [
   {
-    "name": "staged_loader_windows",
+    "name": "loader_windows",
     "build": "bash ./build.sh",
     "author": "jm33-ng",
     "date": "2026-09-08",

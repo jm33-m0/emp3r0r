@@ -1,4 +1,4 @@
-# staged_loader_windows
+# loader_windows
 
 A **local (C2-side) module** that turns a Donut sRDI shellcode blob (e.g. the
 `agent.exe.bin` produced by `agent generate --type exe`) into a
@@ -43,7 +43,7 @@ module-stomping a spawned sacrificial is not feasible for the real payload.
 On the C2 console:
 
 ```
-staged_loader --shellcode /path/to/agent.exe.bin [--format service|exe|dll]
+loader_windows --shellcode /path/to/agent.exe.bin [--format service|exe|dll]
            [--output out] [--process svchost.exe] [--process-args ""]
            [--arch x64] [--key <hex>] [--smw on|off] [--verify-ms 5000]
 ```

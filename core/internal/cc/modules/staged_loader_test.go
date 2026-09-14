@@ -28,7 +28,7 @@ func stagedLoaderModulesRoot(t *testing.T) string {
 
 func stagedLoaderDir(t *testing.T) string {
 	t.Helper()
-	return filepath.Join(stagedLoaderModulesRoot(t), "staged_loader_windows")
+	return filepath.Join(stagedLoaderModulesRoot(t), "loader_windows")
 }
 
 func stagedLoaderFindConfig(t *testing.T, configs []*def.ModuleConfig, name string) *def.ModuleConfig {
@@ -51,7 +51,7 @@ func stagedLoaderHostCC(t *testing.T) string {
 			return p
 		}
 	}
-	t.Skip("staged_loader_windows pack test: no host C compiler (cc/gcc/clang) in PATH")
+	t.Skip("loader_windows pack test: no host C compiler (cc/gcc/clang) in PATH")
 	return ""
 }
 
@@ -72,7 +72,7 @@ func TestSharedModuleDirsMirrored(t *testing.T) {
 	if err := os.WriteFile(marker, []byte("shared-marker"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// staged_loader_windows also pulls the SilentMoonwalk sources from common/smw; the
+	// loader_windows also pulls the SilentMoonwalk sources from common/smw; the
 	// mirror must recurse into subdirectories for that to reach the workspace.
 	smwMarker := filepath.Join(searchDir, "common", "smw", "smw.h")
 	if err := os.MkdirAll(filepath.Dir(smwMarker), 0o755); err != nil {
@@ -103,7 +103,7 @@ func TestSharedModuleDirsMirrored(t *testing.T) {
 
 // TestStagedLoaderSmwVendoredInSync locks the SilentMoonwalk sources vendored
 // into modules/common/smw to the canonical core/lib/syscall/smw/csrc copy.
-// staged_loader_windows cannot depend on lib/ (it is not mirrored to the operator
+// loader_windows cannot depend on lib/ (it is not mirrored to the operator
 // workspace), so the spoofer is duplicated; this test turns drift into a
 // concrete failure instead of a stale spoofer at build time.
 func TestStagedLoaderSmwVendoredInSync(t *testing.T) {
@@ -136,22 +136,22 @@ func TestStagedLoaderConfigParse(t *testing.T) {
 		t.Fatalf("readModConfigs: %v", err)
 	}
 
-	cfg := stagedLoaderFindConfig(t, configs, "staged_loader_windows")
+	cfg := stagedLoaderFindConfig(t, configs, "loader_windows")
 	if !cfg.IsLocal {
-		t.Fatalf("staged_loader_windows should be a local (C2-side) module, got IsLocal=%v", cfg.IsLocal)
+		t.Fatalf("loader_windows should be a local (C2-side) module, got IsLocal=%v", cfg.IsLocal)
 	}
 	if cfg.Build != "bash ./build.sh" {
-		t.Fatalf("staged_loader_windows build = %q, want %q", cfg.Build, "bash ./build.sh")
+		t.Fatalf("loader_windows build = %q, want %q", cfg.Build, "bash ./build.sh")
 	}
 	if !strings.EqualFold(cfg.Platform, "windows") {
-		t.Fatalf("staged_loader_windows platform = %q, want Windows", cfg.Platform)
+		t.Fatalf("loader_windows platform = %q, want Windows", cfg.Platform)
 	}
 
 	mustOption := func(name string) *def.ModOption {
 		t.Helper()
 		opt := cfg.Options[name]
 		if opt == nil {
-			t.Fatalf("parameter %q missing from staged_loader_windows config", name)
+			t.Fatalf("parameter %q missing from loader_windows config", name)
 		}
 		return opt
 	}
