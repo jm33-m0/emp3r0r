@@ -1,5 +1,20 @@
 # Changelog
 
+## [4.19.1](https://github.com/jm33-m0/emp3r0r/compare/v4.19.0...v4.19.1) (2026-09-14)
+
+
+### Bug Fixes
+
+* **crystal_kit:** type the SilentMoonwalk stub as a function for linkfunc ([9082852](https://github.com/jm33-m0/emp3r0r/commit/9082852b223c9b4819946f107ab98777ef7aa32c))
+* **crystal-kit:** crystalpalace fails to resolve symbols ([28c6a4e](https://github.com/jm33-m0/emp3r0r/commit/28c6a4e68b64eccc6f39292a4bf6cecfa08008fb))
+* **install:** install zig from the operator kit ([b9d8fa0](https://github.com/jm33-m0/emp3r0r/commit/b9d8fa02cf766d2aba0cb84bb6ce3d1055133e13))
+* **loader_windows:** protect sections before running TLS callbacks ([39c87d3](https://github.com/jm33-m0/emp3r0r/commit/39c87d3866df34a8dc2c3da2994e1a12a8e29179))
+* **loader_windows:** read syscall numbers from the Nt stub ([a044306](https://github.com/jm33-m0/emp3r0r/commit/a044306c81f0bb8246dc2faf2d7253e8c493227d))
+* **loader_windows:** report a child crash from the loader itself ([df0f7b2](https://github.com/jm33-m0/emp3r0r/commit/df0f7b2e656d313bdf39100ac02adf2915ace127))
+* **modules:** keep a config edit that races a reconcile ([1a46e08](https://github.com/jm33-m0/emp3r0r/commit/1a46e089a6d60367811b18f53a33492a657b2eb6))
+* **staged_loader:** fix x86 APC injection and i386 stage symbols ([76844ff](https://github.com/jm33-m0/emp3r0r/commit/76844ff3a38db499a29e1c50c8a7feb8cdee1a32))
+* **ui:** stop truncating lines ([26abb78](https://github.com/jm33-m0/emp3r0r/commit/26abb784a499ed466ad6c711fa6b58503c2bd21f))
+
 ## [4.19.0](https://github.com/jm33-m0/emp3r0r/compare/v4.18.0...v4.19.0) (2026-09-12)
 
 
