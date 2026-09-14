@@ -372,28 +372,37 @@ fi
 ./"$PACK_OUT" stage.dll stage.bin stage_key.bin
 
 # ---- embed the packed artifacts as a data section (.incbin) ----
+# The C side refers to the plain C names, but 32-bit PE/COFF decorates C
+# symbols with a leading underscore. GCC preprocesses this .S, so pick the
+# right spelling per target; otherwise the i686 host link fails with
+# "undefined reference to staged_loader_stage_start".
 cat >stage_data.S <<'EOF'
+#if defined(__i386__)
+#define SYM(x) _##x
+#else
+#define SYM(x) x
+#endif
 .section .rdata,"dr"
-.global staged_loader_stage_start
-staged_loader_stage_start:
+.global SYM(staged_loader_stage_start)
+SYM(staged_loader_stage_start):
 .incbin "stage.bin"
-.global staged_loader_stage_end
-staged_loader_stage_end:
-.global staged_loader_stage_key_start
-staged_loader_stage_key_start:
+.global SYM(staged_loader_stage_end)
+SYM(staged_loader_stage_end):
+.global SYM(staged_loader_stage_key_start)
+SYM(staged_loader_stage_key_start):
 .incbin "stage_key.bin"
-.global staged_loader_stage_key_end
-staged_loader_stage_key_end:
-.global staged_loader_payload_start
-staged_loader_payload_start:
+.global SYM(staged_loader_stage_key_end)
+SYM(staged_loader_stage_key_end):
+.global SYM(staged_loader_payload_start)
+SYM(staged_loader_payload_start):
 .incbin "payload.bin"
-.global staged_loader_payload_end
-staged_loader_payload_end:
-.global staged_loader_key_start
-staged_loader_key_start:
+.global SYM(staged_loader_payload_end)
+SYM(staged_loader_payload_end):
+.global SYM(staged_loader_key_start)
+SYM(staged_loader_key_start):
 .incbin "key.bin"
-.global staged_loader_key_end
-staged_loader_key_end:
+.global SYM(staged_loader_key_end)
+SYM(staged_loader_key_end):
 EOF
 "$CC" -c stage_data.S -o stage_data.o
 

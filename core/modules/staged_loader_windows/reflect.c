@@ -428,14 +428,49 @@ static int force_any_base(void) {
   return n == 1 && buf[0] == '1';
 }
 
+/* reflect_map_image runs the mapping steps against an already-reserved base.
+ * Split out so reflect_load has a single cleanup point without gotos. */
+static int reflect_map_image(unsigned char *base, SIZE_T image_size,
+                             const unsigned char *image, size_t image_len,
+                             IMAGE_NT_HEADERS *nt) {
+  ULONG_PTR delta;
+  int tls_index;
+  reflect_dllmain_fn entry;
+
+  if (!map_sections(image, image_len, base, image_size, nt)) {
+    return 0;
+  }
+  delta = (ULONG_PTR)base - (ULONG_PTR)nt->OptionalHeader.ImageBase;
+  if (!apply_relocations(base, image_size, nt, delta)) {
+    return 0;
+  }
+  if (!resolve_imports(base, image_size, nt)) {
+    return 0;
+  }
+  if (!setup_tls(base, image_size, nt, &tls_index)) {
+    return 0;
+  }
+  if (!protect_sections(base, image_size, nt)) {
+    return 0;
+  }
+  FlushInstructionCache(GetCurrentProcess(), base, image_size);
+
+  if (nt->OptionalHeader.AddressOfEntryPoint >= image_size) {
+    return 0;
+  }
+  entry = (reflect_dllmain_fn)(base +
+                               nt->OptionalHeader.AddressOfEntryPoint);
+  if (!entry((HINSTANCE)base, DLL_PROCESS_ATTACH, NULL)) {
+    return 0;
+  }
+  return 1;
+}
+
 void *reflect_load(const unsigned char *image, size_t image_len) {
   IMAGE_NT_HEADERS *nt;
   SIZE_T image_size;
   SIZE_T header_size;
   unsigned char *base;
-  ULONG_PTR delta;
-  int tls_index;
-  reflect_dllmain_fn entry;
 
   nt = nt_headers(image, image_len);
   if (nt == NULL) {
@@ -463,38 +498,11 @@ void *reflect_load(const unsigned char *image, size_t image_len) {
     return NULL;
   }
 
-  if (!map_sections(image, image_len, base, image_size, nt)) {
-    goto fail;
-  }
-
-  delta = (ULONG_PTR)base - (ULONG_PTR)nt->OptionalHeader.ImageBase;
-  if (!apply_relocations(base, image_size, nt, delta)) {
-    goto fail;
-  }
-  if (!resolve_imports(base, image_size, nt)) {
-    goto fail;
-  }
-  if (!setup_tls(base, image_size, nt, &tls_index)) {
-    goto fail;
-  }
-  if (!protect_sections(base, image_size, nt)) {
-    goto fail;
-  }
-  FlushInstructionCache(GetCurrentProcess(), base, image_size);
-
-  if (nt->OptionalHeader.AddressOfEntryPoint >= image_size) {
-    goto fail;
-  }
-  entry = (reflect_dllmain_fn)(base +
-                               nt->OptionalHeader.AddressOfEntryPoint);
-  if (!entry((HINSTANCE)base, DLL_PROCESS_ATTACH, NULL)) {
-    goto fail;
+  if (!reflect_map_image(base, image_size, image, image_len, nt)) {
+    VirtualFree(base, 0, MEM_RELEASE);
+    return NULL;
   }
   return base;
-
-fail:
-  VirtualFree(base, 0, MEM_RELEASE);
-  return NULL;
 }
 
 void *reflect_export(void *base, const char *name) {
