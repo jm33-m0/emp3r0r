@@ -17,7 +17,27 @@
 DECLSPEC_IMPORT HMODULE WINAPI KERNEL32$GetModuleHandleA(LPCSTR);
 DECLSPEC_IMPORT FARPROC WINAPI KERNEL32$GetProcAddress(HMODULE, LPCSTR);
 
-extern PVOID silentmoonwalk_spoof_call(PSPOOFER config);
+extern PVOID silentmoonwalk_spoof_call(PSPOOFER config) __asm__("smw_desync_entry");
+/*
+ * Crystal Palace's `linkfunc` links the raw DesyncSpoofer blob as
+ * silentmoonwalk_spoof_call and requires that symbol to already exist as an
+ * undefined *function*. Some COFF compilers emit undefined functions with
+ * COFF type 0 (NOTYPE), which linkfunc rejects with "is not a function", so
+ * the C call is routed through an assembler-named thunk and the stub symbol
+ * is declared here with an explicit .type 32. COFF-only sources (Windows x64).
+ */
+__asm__(".text\n"
+        ".def silentmoonwalk_spoof_call\n"
+        ".scl 2\n"
+        ".type 32\n"
+        ".endef\n"
+        ".globl smw_desync_entry\n"
+        ".def smw_desync_entry\n"
+        ".scl 2\n"
+        ".type 32\n"
+        ".endef\n"
+        "smw_desync_entry:\n"
+        "  jmp silentmoonwalk_spoof_call\n");
 
 static int rand_value(unsigned long int *next) {
   *next = *next * 1103515245 + 12345;
