@@ -46,6 +46,7 @@ On the C2 console:
 loader_windows --shellcode /path/to/agent.exe.bin [--format service|exe|dll]
            [--output out] [--process svchost.exe] [--process-args ""]
            [--arch x64] [--key <hex>] [--smw on|off] [--verify-ms 5000]
+           [--inject apc|ct] [--debug] [--debug-child]
 ```
 
 * `--shellcode` — the Donut sRDI blob (`*.bin`) to embed (required).
@@ -94,12 +95,21 @@ loader_windows --shellcode /path/to/agent.exe.bin [--format service|exe|dll]
   production builds all diagnostic output is compiled out (`LOG()` expands to
   nothing, the help text and installer messages are not built), so the shipped
   `.exe` carries no descriptive strings. Use `--debug` only for lab builds.
+* `--debug-child` — lab builds only: create the sacrificial process as a
+  debuggee so the loader itself reports the child's first exception (code,
+  fault address, access type, and whether the fault is inside the injected
+  region) and its exit code. This is how to see why a short-lived child dies
+  when it cannot be attached to in time (implies `--debug`).
 
 ### Build dependencies
 
 The module is built on the C2 host, so it needs:
 
-* a MinGW-w64 cross compiler matching `--arch`:
+* [zig](https://ziglang.org/download) — the default cross compiler, invoked as
+  `zig cc` (`core/build.py` installs the pinned release automatically). One
+  pinned toolchain across hosts keeps the generated loader consistent, which
+  matters because the reflective stage is sensitive to compiler/linker layout.
+  `--cc` overrides it with any other cross compiler, e.g. a MinGW-w64 gcc:
   * Linux: `apt install gcc-mingw-w64-x86-64` (or `gcc-mingw-w64-i686`)
   * Windows/msys2: `pacman -S mingw-w64-x86_64-gcc` (or `mingw-w64-i686-gcc`)
 * a native C compiler (`cc`/`gcc`/`clang`) for the small RC4 pack helper.
