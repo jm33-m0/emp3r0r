@@ -241,3 +241,51 @@ func TestStagedLoaderAPCInjectionX86(t *testing.T) {
 		t.Fatalf("x86 loader failed (APC fallback regression?): %v", err)
 	}
 }
+
+// TestStagedLoaderRebuildPicksUpNewShellcode is a regression for the Zig
+// global build cache. build.sh regenerates stage_data.S and pulls the real
+// stage/payload/key in with .incbin, which Zig does not treat as a cache
+// input; before build.sh stamped stage_data.S with a per-build marker, a
+// second build reused the first build's stage_data.o and embedded the old
+// shellcode. Two builds with the same RC4 key and different shellcode must
+// therefore produce different hosts.
+func TestStagedLoaderRebuildPicksUpNewShellcode(t *testing.T) {
+	if _, err := exec.LookPath("zig"); err != nil {
+		t.Skip("skipping: zig not on PATH (regression is specific to the Zig cache)")
+	}
+	for _, tool := range []string{"bash", "cc"} {
+		if _, err := exec.LookPath(tool); err != nil {
+			t.Skipf("skipping: %s not found in PATH", tool)
+		}
+	}
+	dir := stagedLoaderDir(t)
+	tmp := t.TempDir()
+
+	sc1 := filepath.Join(tmp, "one.bin")
+	sc2 := filepath.Join(tmp, "two.bin")
+	if err := os.WriteFile(sc1, bytes.Repeat([]byte{0x11}, 4096), 0o600); err != nil {
+		t.Fatalf("write first shellcode: %v", err)
+	}
+	if err := os.WriteFile(sc2, bytes.Repeat([]byte{0x22}, 8192), 0o600); err != nil {
+		t.Fatalf("write second shellcode: %v", err)
+	}
+
+	// Same key so a stale cache reproduces the first host byte-for-byte.
+	const key = "000102030405060708090a0b0c0d0e0f"
+	out1 := filepath.Join(tmp, "one.exe")
+	out2 := filepath.Join(tmp, "two.exe")
+	stagedLoaderBuild(t, dir, sc1, out1, "--format", "exe", "--smw", "off", "--key", key)
+	stagedLoaderBuild(t, dir, sc2, out2, "--format", "exe", "--smw", "off", "--key", key)
+
+	b1, err := os.ReadFile(out1)
+	if err != nil {
+		t.Fatalf("read first host: %v", err)
+	}
+	b2, err := os.ReadFile(out2)
+	if err != nil {
+		t.Fatalf("read second host: %v", err)
+	}
+	if bytes.Equal(b1, b2) {
+		t.Fatalf("second build reused the first build's embedded shellcode; stage_data.o hit a stale Zig cache")
+	}
+}

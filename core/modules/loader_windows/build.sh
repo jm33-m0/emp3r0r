@@ -422,7 +422,13 @@ fi
 # symbols with a leading underscore. GCC preprocesses this .S, so pick the
 # right spelling per target; otherwise the i686 host link fails with
 # "undefined reference to staged_loader_stage_start".
-cat >stage_data.S <<'EOF'
+# Zig's global cache is keyed on the source text, not on the .incbin inputs,
+# so a byte-identical stage_data.S would make it silently reuse a previous
+# build's stage_data.o (old stage/payload/key). Emit a per-build unique
+# comment to force a cache miss while everything else still hits the cache.
+{
+  printf '/* build %s */\n' "$BUILDDIR"
+  cat <<'EOF'
 #if defined(__i386__)
 #define SYM(x) _##x
 #else
@@ -450,6 +456,7 @@ SYM(staged_loader_key_start):
 .global SYM(staged_loader_key_end)
 SYM(staged_loader_key_end):
 EOF
+} >stage_data.S
 "${CC_CMD[@]}" -c stage_data.S -o stage_data.o
 
 # ---- build the host container ----
