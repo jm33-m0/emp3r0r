@@ -21,7 +21,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import time
 
 DONUT_URL = "https://github.com/TheWover/donut/releases/download/v1.1/donut_v1.1.tar.gz"
 DONUT_ARCHIVE_NAME = "donut_v1.1.tar.gz"
@@ -77,9 +76,9 @@ def run_cmd(
         )
     except subprocess.CalledProcessError as e:
         if not check:
-            raise e
+            raise
         log_error(f"Command failed (exit code {e.returncode}): {cmd_str}")
-        raise e
+        raise
 
 
 def write_text_atomic(path: pathlib.Path, content: str) -> None:
@@ -118,6 +117,22 @@ def copy2_atomic(src: pathlib.Path, dst: pathlib.Path) -> None:
 # ===========================================================================
 # Mode 1: Operator Kit Direct Installer
 # ===========================================================================
+def link_usr_local_bin(target: pathlib.Path) -> None:
+    """Point /usr/local/bin/<name> at target (best effort)."""
+    if not target.exists():
+        return
+    usr_local_bin = pathlib.Path("/usr/local/bin")
+    usr_local_bin.mkdir(parents=True, exist_ok=True)
+    symlink = usr_local_bin / target.name
+    if symlink.is_symlink() or symlink.exists():
+        symlink.unlink(missing_ok=True)
+    try:
+        symlink.symlink_to(target)
+        log_info(f"Linked {target.name} to /usr/local/bin/{target.name}")
+    except OSError as e:
+        log_warn(f"Could not symlink /usr/local/bin/{target.name}: {e}")
+
+
 def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> None:
     if (
         not IS_DRY_RUN
@@ -189,13 +204,16 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
         (data_dir / "emp3r0r-cc").chmod(0o755)
         (data_dir / "emp3r0r-cat").chmod(0o755)
 
-        for d in ["build", "modules", "tmux"]:
+        for d in ["build", "modules", "tmux", "zig"]:
             src_d = kit_dir / "lib" / "emp3r0r" / d
             if src_d.is_dir():
                 shutil.copytree(
                     src_d, data_dir / d, dirs_exist_ok=True, copy_function=copy2_atomic
                 )
                 log_info(f"Installed {d}")
+
+        # zig is used as the C module cross compiler; point it at /usr/local/bin.
+        link_usr_local_bin(data_dir / "zig" / "zig")
 
     donut_src = kit_dir / "lib" / "emp3r0r" / "bin" / "donut"
     if donut_src.is_file():
@@ -205,16 +223,7 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
             donut_dst.parent.mkdir(parents=True, exist_ok=True)
             copy2_atomic(donut_src, donut_dst)
             donut_dst.chmod(0o755)
-            usr_local_bin = pathlib.Path("/usr/local/bin")
-            usr_local_bin.mkdir(parents=True, exist_ok=True)
-            symlink = usr_local_bin / "donut"
-            if symlink.is_symlink() or symlink.exists():
-                symlink.unlink(missing_ok=True)
-            try:
-                symlink.symlink_to(donut_dst)
-                log_info("Linked donut executable to /usr/local/bin/donut")
-            except Exception as e:
-                log_warn(f"Could not symlink /usr/local/bin/donut: {e}")
+            link_usr_local_bin(donut_dst)
     else:
         log_warn("Donut not found in kit; skipping donut installation")
 
@@ -231,8 +240,8 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
             wg_dir.mkdir(parents=True, exist_ok=True)
             wg_dir.chmod(0o755)
             shutil.chown(wg_dir, user=install_user, group=install_user)
-        except Exception:
-            pass
+        except (OSError, LookupError) as e:
+            log_warn(f"Could not prepare {wg_dir}: {e}")
 
     cc_bin = data_dir / "emp3r0r-cc"
     # Refresh shell completions from the freshly installed binary. Writing the
@@ -281,13 +290,13 @@ def detect_container_engine() -> str:
                 run_cmd(["sudo", "apt-get", "update", "-qq"])
                 run_cmd(["sudo", "apt-get", "install", "-y", "podman"])
                 engine = "podman"
-            except Exception:
+            except (OSError, subprocess.CalledProcessError):
                 log_error("Failed to install podman via apt-get")
         elif shutil.which("yum"):
             try:
                 run_cmd(["sudo", "yum", "install", "-y", "podman"])
                 engine = "podman"
-            except Exception:
+            except (OSError, subprocess.CalledProcessError):
                 log_error("Failed to install podman via yum")
         else:
             log_error(
@@ -310,12 +319,12 @@ def check_host_deps(repo_root: pathlib.Path) -> None:
             try:
                 run_cmd(["sudo", "apt-get", "update", "-qq"])
                 run_cmd(["sudo", "apt-get", "install", "-y"] + missing)
-            except Exception:
+            except (OSError, subprocess.CalledProcessError):
                 log_error(f"Failed to install host tools: {' '.join(missing)}")
         elif shutil.which("yum"):
             try:
                 run_cmd(["sudo", "yum", "install", "-y"] + missing)
-            except Exception:
+            except (OSError, subprocess.CalledProcessError):
                 log_error(f"Failed to install host tools via yum: {' '.join(missing)}")
         else:
             log_error(
@@ -447,6 +456,8 @@ def install_from_operator_kit(cached_kit: pathlib.Path, prefix: str) -> None:
             cmd.append("--dry-run")
 
         res = run_cmd(cmd, env=env, check=False)
+        if res.returncode != 0:
+            log_warn("Operator kit installer reported an error")
 
 
 def parse_args() -> argparse.Namespace:
