@@ -92,9 +92,18 @@ uintptr_t ntsys_export(uintptr_t base, const char *name) {
 }
 
 /*
- * SSN cache: the first resolution walks the whole export table and ranks
- * every Zw* export by address (their index equals the SSN - Nt* and Zw*
- * stubs share one syscall table); results are cached per name.
+ * SSN resolution. The preferred method reads the number straight out of the
+ * Nt* stub:
+ *
+ *   4C 8B D1          mov r10, rcx
+ *   B8 xx xx xx xx    mov eax, SSN
+ *   0F 05             syscall
+ *
+ * Ranking Zw* exports by stub address (the fallback below) assumes the
+ * address-sorted export list matches SSN order; that can be off by a constant
+ * on builds that omit, add or reorder stubs, and a wrong SSN makes the kernel
+ * run an unrelated service with the caller's arguments (corrupting memory
+ * instead of failing cleanly).
  */
 static struct {
   char name[64];
@@ -104,7 +113,26 @@ static int ntsys_ssn_cache_n = 0;
 static uintptr_t ntsys_zw_addrs[512];
 static int ntsys_zw_n = -1; /* -1 = Zw table not collected yet */
 
-unsigned int ntsys_ssn(const char *nt_name) {
+static unsigned int ntsys_ssn_from_stub(uintptr_t addr) {
+  const unsigned char *p = (const unsigned char *)addr;
+  int off;
+
+  if (addr == 0) {
+    return NTSYS_SSN_INVALID;
+  }
+  /* Tolerate a short hotpatch prefix before the standard stub. */
+  for (off = 0; off <= 8; off++) {
+    if (p[off] == 0x4C && p[off + 1] == 0x8B && p[off + 2] == 0xD1 &&
+        p[off + 3] == 0xB8 && p[off + 8] == 0x0F && p[off + 9] == 0x05) {
+      return (unsigned int)p[off + 4] | ((unsigned int)p[off + 5] << 8) |
+             ((unsigned int)p[off + 6] << 16) |
+             ((unsigned int)p[off + 7] << 24);
+    }
+  }
+  return NTSYS_SSN_INVALID;
+}
+
+static unsigned int ntsys_ssn_cache_get(const char *nt_name) {
   int i;
 
   for (i = 0; i < ntsys_ssn_cache_n; i++) {
@@ -112,9 +140,41 @@ unsigned int ntsys_ssn(const char *nt_name) {
       return ntsys_ssn_cache[i].ssn;
     }
   }
+  return NTSYS_SSN_INVALID;
+}
 
+static void ntsys_ssn_cache_put(const char *nt_name, unsigned int ssn) {
+  if (ntsys_ssn_cache_n <
+      (int)(sizeof(ntsys_ssn_cache) / sizeof(ntsys_ssn_cache[0]))) {
+    strcpy(ntsys_ssn_cache[ntsys_ssn_cache_n].name, nt_name);
+    ntsys_ssn_cache[ntsys_ssn_cache_n].ssn = ssn;
+    ntsys_ssn_cache_n++;
+  }
+}
+
+unsigned int ntsys_ssn(const char *nt_name) {
+  int i;
+  uintptr_t ntdll;
+  unsigned int ssn;
+
+  ssn = ntsys_ssn_cache_get(nt_name);
+  if (ssn != NTSYS_SSN_INVALID) {
+    return ssn;
+  }
+
+  ntdll = ntsys_module_base(L"ntdll.dll");
+  if (ntdll == 0) {
+    return NTSYS_SSN_INVALID;
+  }
+
+  ssn = ntsys_ssn_from_stub(ntsys_export(ntdll, nt_name));
+  if (ssn != NTSYS_SSN_INVALID) {
+    ntsys_ssn_cache_put(nt_name, ssn);
+    return ssn;
+  }
+
+  /* Fallback: rank the Zw* twin among the address-sorted Zw* exports. */
   if (ntsys_zw_n < 0) {
-    uintptr_t ntdll = ntsys_module_base(L"ntdll.dll");
     IMAGE_DOS_HEADER *dos;
     IMAGE_NT_HEADERS *nt;
     IMAGE_EXPORT_DIRECTORY *dir;
@@ -122,9 +182,6 @@ unsigned int ntsys_ssn(const char *nt_name) {
     uint16_t *ords;
     uint32_t k;
     int j;
-    if (ntdll == 0) {
-      return NTSYS_SSN_INVALID;
-    }
     dos = (IMAGE_DOS_HEADER *)ntdll;
     if (dos->e_magic != IMAGE_DOS_SIGNATURE) {
       return NTSYS_SSN_INVALID;
@@ -174,7 +231,7 @@ unsigned int ntsys_ssn(const char *nt_name) {
     twin[0] = 'Z';
     twin[1] = 'w';
     strcpy(twin + 2, nt_name + 2);
-    twin_addr = ntsys_export(ntsys_module_base(L"ntdll.dll"), twin);
+    twin_addr = ntsys_export(ntdll, twin);
     if (twin_addr != 0) {
       for (i = 0; i < ntsys_zw_n; i++) {
         if (ntsys_zw_addrs[i] == twin_addr) {
@@ -183,12 +240,7 @@ unsigned int ntsys_ssn(const char *nt_name) {
         }
       }
     }
-    if (ntsys_ssn_cache_n < (int)(sizeof(ntsys_ssn_cache) /
-                                  sizeof(ntsys_ssn_cache[0]))) {
-      strcpy(ntsys_ssn_cache[ntsys_ssn_cache_n].name, nt_name);
-      ntsys_ssn_cache[ntsys_ssn_cache_n].ssn = ssn;
-      ntsys_ssn_cache_n++;
-    }
+    ntsys_ssn_cache_put(nt_name, ssn);
     return ssn;
   }
 }
@@ -202,6 +254,7 @@ uintptr_t ntsys_gadget(void) {
   uint32_t i;
   unsigned char *p;
   size_t k, size;
+  SIZE_T image_size;
   uintptr_t ntdll;
 
   if (searched) {
@@ -215,16 +268,30 @@ uintptr_t ntsys_gadget(void) {
   dos = (IMAGE_DOS_HEADER *)ntdll;
   nt = (IMAGE_NT_HEADERS *)(ntdll + dos->e_lfanew);
   sec = IMAGE_FIRST_SECTION(nt);
+  image_size = nt->OptionalHeader.SizeOfImage;
   for (i = 0; i < nt->FileHeader.NumberOfSections; i++) {
-    if ((sec[i].Characteristics & IMAGE_SCN_MEM_EXECUTE) != 0 &&
-        sec[i].SizeOfRawData > 3) {
-      p = (unsigned char *)(ntdll + sec[i].VirtualAddress);
-      size = sec[i].SizeOfRawData;
-      for (k = 0; k + 2 < size; k++) {
-        if (p[k] == 0x0F && p[k + 1] == 0x05 && p[k + 2] == 0xC3) {
-          gadget = (uintptr_t)(p + k);
-          return gadget;
-        }
+    SIZE_T va = sec[i].VirtualAddress;
+
+    if ((sec[i].Characteristics & IMAGE_SCN_MEM_EXECUTE) == 0) {
+      continue;
+    }
+    /* Bound the scan by the mapped size, not the file size: SizeOfRawData
+     * can exceed VirtualSize and reading past the image would fault. */
+    if (va >= image_size) {
+      continue;
+    }
+    size = sec[i].Misc.VirtualSize;
+    if (size < 4) {
+      continue;
+    }
+    if (size > image_size - va) {
+      size = image_size - va;
+    }
+    p = (unsigned char *)(ntdll + va);
+    for (k = 0; k + 2 < size; k++) {
+      if (p[k] == 0x0F && p[k + 1] == 0x05 && p[k + 2] == 0xC3) {
+        gadget = (uintptr_t)(p + k);
+        return gadget;
       }
     }
   }
