@@ -447,10 +447,13 @@ static int reflect_map_image(unsigned char *base, SIZE_T image_size,
   if (!resolve_imports(base, image_size, nt)) {
     return 0;
   }
-  if (!setup_tls(base, image_size, nt, &tls_index)) {
+  /* Protect before running TLS callbacks: MinGW's CRT can register callbacks
+   * that live in .text, and executing them while the mapping is still
+   * PAGE_READWRITE (VirtualAlloc default) faults with an execute violation. */
+  if (!protect_sections(base, image_size, nt)) {
     return 0;
   }
-  if (!protect_sections(base, image_size, nt)) {
+  if (!setup_tls(base, image_size, nt, &tls_index)) {
     return 0;
   }
   FlushInstructionCache(GetCurrentProcess(), base, image_size);
