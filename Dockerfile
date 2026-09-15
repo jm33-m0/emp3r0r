@@ -22,6 +22,7 @@ ARG GARBLE_VERSION=v0.17.0
 # installed below.
 RUN yum install -y epel-release \
   && yum install -y --setopt=tsflags=nodocs \
+    aria2 \
     ca-certificates \
     clang \
     curl \
@@ -39,7 +40,13 @@ RUN yum install -y epel-release \
   && ln -sf /usr/local/bin/python3.12 /usr/local/bin/python3
 
 # Zig toolchain (static build, so it runs on the glibc 2.17 base image).
-RUN curl -fsSL --retry 3 -o /tmp/zig.tar.xz \
+# Fetched with aria2 over many parallel connections: the single-stream zig
+# download is slow and frequently stalls. The digest is still verified before
+# anything is extracted.
+RUN aria2c -x 16 -s 16 -k 1M \
+      --max-tries=3 --retry-wait=3 --file-allocation=none \
+      --console-log-level=warn --summary-interval=0 \
+      --dir=/tmp --out=zig.tar.xz \
       "https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz" \
   && echo "${ZIG_SHA256}  /tmp/zig.tar.xz" | sha256sum -c - \
   && mkdir -p /opt/zig \
