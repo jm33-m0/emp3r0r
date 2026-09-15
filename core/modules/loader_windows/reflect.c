@@ -416,16 +416,16 @@ static int protect_sections(unsigned char *mapped, SIZE_T image_size,
 }
 
 static int force_any_base(void) {
-  /*
-   * Test hook: when set, skip the preferred-base allocation so the
-   * relocation path runs even on a process where the linked base happens to
-   * be free. Only affects where this image is mapped; it is never derived
-   * from remote input.
-   */
+#ifdef DEBUG
+  /* Lab-only test hook: force the relocation path even when the linked base
+   * is free. Compiled out of release images so neither the code nor its
+   * environment-variable name ships. */
   char buf[8];
-  DWORD n = GetEnvironmentVariableA("STAGED_LOADER_FORCE_RELOC", buf,
-                                    sizeof(buf));
+  DWORD n = GetEnvironmentVariableA("DLL_FORCE_RELOC", buf, sizeof(buf));
   return n == 1 && buf[0] == '1';
+#else
+  return 0;
+#endif
 }
 
 /* reflect_map_image runs the mapping steps against an already-reserved base.
