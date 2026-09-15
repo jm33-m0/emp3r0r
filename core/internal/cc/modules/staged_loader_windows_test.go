@@ -16,18 +16,38 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// stagedLoaderRequireTools skips the build test when the MinGW-w64 toolchain
-// and nasm are not on PATH (the msys2 module-integration CI step has them).
+// stagedLoaderRequireTools skips the build tests when the basic toolchain is
+// not on PATH. The cross compiler itself is resolved by stagedLoaderCC.
 func stagedLoaderRequireTools(t *testing.T) {
 	t.Helper()
-	for _, tool := range []string{"bash", "x86_64-w64-mingw32-gcc", "cc", "nasm"} {
+	for _, tool := range []string{"bash", "cc", "nasm"} {
 		if _, err := exec.LookPath(tool); err != nil {
 			t.Skipf("skipping: %s not found in PATH", tool)
 		}
 	}
 }
 
-// stagedLoaderRequireX86 skips when the 32-bit MinGW toolchain is absent.
+// stagedLoaderCC returns the --cc arguments that pin build.sh to a cross
+// compiler available here, or nil to keep its default (`zig cc`). CI only has
+// the mingw shims, so the tests use them there instead of pulling zig; a host
+// that has zig exercises the production default.
+func stagedLoaderCC(t *testing.T, arch string) []string {
+	t.Helper()
+	if _, err := exec.LookPath("zig"); err == nil {
+		return nil
+	}
+	name := "x86_64-w64-mingw32-gcc"
+	if arch == "x86" {
+		name = "i686-w64-mingw32-gcc"
+	}
+	if _, err := exec.LookPath(name); err != nil {
+		t.Skipf("skipping: neither zig nor %s is on PATH", name)
+	}
+	return []string{"--cc", name}
+}
+
+// stagedLoaderRequireX86 skips when the 32-bit MinGW toolchain is absent. The
+// APC-injection test compiles a native 32-bit victim with it directly.
 func stagedLoaderRequireX86(t *testing.T) {
 	t.Helper()
 	if _, err := exec.LookPath("i686-w64-mingw32-gcc"); err != nil {
@@ -39,7 +59,9 @@ func stagedLoaderRequireX86(t *testing.T) {
 // pins --arch x64, so 32-bit regressions need their own entry point.
 func stagedLoaderBuildArch(t *testing.T, dir, arch, scPath, out string, extra ...string) {
 	t.Helper()
-	args := append([]string{"./build.sh", "--shellcode", scPath, "--output", out, "--arch", arch}, extra...)
+	args := []string{"./build.sh", "--shellcode", scPath, "--output", out, "--arch", arch}
+	args = append(args, stagedLoaderCC(t, arch)...)
+	args = append(args, extra...)
 	cmd := exec.Command("bash", args...)
 	cmd.Dir = dir
 	if o, err := cmd.CombinedOutput(); err != nil {
@@ -51,7 +73,9 @@ func stagedLoaderBuildArch(t *testing.T, dir, arch, scPath, out string, extra ..
 // test on error. scPath/out are the required --shellcode/--output values.
 func stagedLoaderBuild(t *testing.T, dir, scPath, out string, extra ...string) {
 	t.Helper()
-	args := append([]string{"./build.sh", "--shellcode", scPath, "--output", out, "--arch", "x64"}, extra...)
+	args := []string{"./build.sh", "--shellcode", scPath, "--output", out, "--arch", "x64"}
+	args = append(args, stagedLoaderCC(t, "x64")...)
+	args = append(args, extra...)
 	cmd := exec.Command("bash", args...)
 	cmd.Dir = dir
 	if o, err := cmd.CombinedOutput(); err != nil {
