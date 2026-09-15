@@ -80,6 +80,8 @@ Everything that ships to a target (agent, shellcode, stagers, loaders, BOFs, DLL
 
 ## Deliverables
 
+- Report what you have done.
+- List your assumptions and rationales.
 - Prefer small, focused commits with descriptive messages.
 - Do not commit unless asked.
 - Commits have to be signed. If your environment doesn't support signing, provide `git` commands so users can commit manually.
