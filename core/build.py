@@ -47,6 +47,7 @@ import argparse
 import hashlib
 import os
 import pathlib
+import platform
 import re
 import shutil
 import subprocess
@@ -69,6 +70,25 @@ CRYSTALPALACE_SHA256 = (
 )
 REQUIRED_GO_VERSION = "1.26.2"
 REQUIRED_ZIG_VERSION = "0.16.0"
+# zig is the explicit cross compiler for the Windows loader (and backs the
+# mingw shims in the builder image), so the build host needs it too. The
+# release is pinned per host platform and SHA-256 verified before extraction;
+# builds never consume an unverified toolchain.
+ZIG_URL_TEMPLATE = "https://ziglang.org/download/{v}/zig-{zig_platform}-{v}.tar.xz"
+ZIG_SHA256 = {
+    "x86_64-linux": (
+        "70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00"
+    ),
+    "aarch64-linux": (
+        "ea4b09bfb22ec6f6c6ceac57ab63efb6b46e17ab08d21f69f3a48b38e1534f17"
+    ),
+    "x86_64-macos": (
+        "0387557ed1877bc6a2e1802c8391953baddba76081876301c522f52977b52ba7"
+    ),
+    "aarch64-macos": (
+        "b23d70deaa879b5c2d486ed3316f7eaa53e84acf6fc9cc747de152450d401489"
+    ),
+}
 REQUIRED_FREE_KB = 10 * 1024 * 1024  # 10 GB
 
 USE_COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
@@ -295,18 +315,99 @@ def check_disk_space(core_dir: pathlib.Path) -> None:
     log_info("Disk space check passed: at least 10GB free for build and temp files")
 
 
-def check_zig() -> None:
-    if not shutil.which("zig"):
-        msg = (
-            "zig not found. Please run build inside the builder container, "
-            f"or install zig {REQUIRED_ZIG_VERSION} manually on the host."
+def zig_platform() -> str | None:
+    """Return zig's release platform tag for this host (e.g. x86_64-linux)."""
+    os_name = {"linux": "linux", "darwin": "macos"}.get(platform.system().lower())
+    arch = {
+        "x86_64": "x86_64",
+        "amd64": "x86_64",
+        "aarch64": "aarch64",
+        "arm64": "aarch64",
+    }.get(platform.machine().lower())
+    if os_name and arch:
+        return f"{arch}-{os_name}"
+    return None
+
+
+def install_zig(target_dir: pathlib.Path | None = None) -> pathlib.Path | None:
+    """Install the pinned zig toolchain under ``target_dir/zig``.
+
+    ``zig cc`` is the explicit cross compiler for the Windows loader, so zig is
+    installed next to emp3r0r (and copied into the operator kit). With no
+    explicit ``target_dir`` an existing zig on PATH is accepted; otherwise the
+    toolchain lands in ``<prefix>/lib/emp3r0r``. The archive is SHA-256
+    verified before extraction and ``/usr/local/bin/zig`` points at the
+    installed binary. Returns the executable path, or None on failure.
+    """
+    if target_dir is None:
+        existing = shutil.which("zig")
+        if existing:
+            log_info(f"zig is already installed: {existing}")
+            return pathlib.Path(existing)
+        target_dir = (
+            pathlib.Path(os.environ.get("PREFIX", "/usr/local")) / "lib" / "emp3r0r"
         )
-        if IS_DRY_RUN:
-            log_warn(f"[DRY-RUN] {msg}")
-        else:
-            log_error(msg)
+    zig_dir = target_dir / "zig"
+    zig_bin = zig_dir / "zig"
+    if zig_bin.is_file():
+        log_info(f"zig is already installed: {zig_bin}")
+        return zig_bin
+
+    host_platform = zig_platform()
+    if host_platform is None:
+        log_warn(
+            f"no pinned zig {REQUIRED_ZIG_VERSION} for "
+            f"{platform.system()}/{platform.machine()}; install zig manually"
+        )
+        return None
+
+    log_info(f"Installing zig {REQUIRED_ZIG_VERSION} ({host_platform})...")
+    if IS_DRY_RUN:
+        log_warn("[DRY-RUN] would download and install zig")
+        return None
+    url = ZIG_URL_TEMPLATE.format(v=REQUIRED_ZIG_VERSION, zig_platform=host_platform)
+    archive = (
+        pathlib.Path(tempfile.gettempdir())
+        / f"zig-{host_platform}-{REQUIRED_ZIG_VERSION}.tar.xz"
+    )
+    if not download_file(url, archive, ZIG_SHA256[host_platform]):
+        log_warn("zig archive could not be obtained")
+        return None
+    zig_dir.mkdir(parents=True, exist_ok=True)
+    res = run_cmd(
+        ["tar", "-xJf", str(archive), "-C", str(zig_dir), "--strip-components=1"],
+        check=False,
+    )
+    archive.unlink(missing_ok=True)
+    if res.returncode != 0 or not zig_bin.is_file():
+        log_warn(f"Failed to extract the zig archive for {host_platform}")
+        return None
+
+    usr_local_bin = pathlib.Path("/usr/local/bin")
+    usr_local_bin.mkdir(parents=True, exist_ok=True)
+    symlink = usr_local_bin / "zig"
+    try:
+        if symlink.is_symlink() or symlink.exists():
+            symlink.unlink(missing_ok=True)
+        symlink.symlink_to(zig_bin)
+        log_info(f"Linked zig executable to {symlink}")
+    except OSError as e:
+        log_warn(f"Could not symlink {symlink}: {e}")
+    return zig_bin
+
+
+def check_zig() -> None:
+    if install_zig() is not None:
+        return
+    msg = (
+        f"zig {REQUIRED_ZIG_VERSION} is required but could not be installed "
+        "automatically. Install it manually, or run the build inside the "
+        "builder container."
+    )
+    if IS_DRY_RUN:
+        log_warn(f"[DRY-RUN] {msg}")
     else:
-        log_info("zig is already installed")
+        log_error(msg)
 
 
 def check_build_toolchain() -> None:
@@ -1180,7 +1281,7 @@ def package_operator_bundle(prefix: str, core_dir: pathlib.Path) -> None:
         else:
             log_warn(f"emp3r0r-listener not found at {listener_src}; skipping")
 
-        for d in ["build", "modules", "tmux"]:
+        for d in ["build", "modules", "tmux", "zig"]:
             src_dir = lib_src / d
             if src_dir.is_dir():
                 shutil.copytree(
@@ -1306,6 +1407,8 @@ def do_install(prefix: str, temp_dir: pathlib.Path, core_dir: pathlib.Path) -> N
             (data_dir / "emp3r0r-cat").chmod(0o755)
 
     install_donut(data_dir, search_dir=temp_dir)
+    # zig ships with emp3r0r so the C2 can build the C modules on the host.
+    install_zig(data_dir)
 
     is_container = (
         pathlib.Path("/.dockerenv").exists()
