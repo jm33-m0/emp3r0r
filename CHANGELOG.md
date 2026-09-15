@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.19.2](https://github.com/jm33-m0/emp3r0r/compare/v4.19.1...v4.19.2) (2026-09-15)
+
+
+### Bug Fixes
+
+* **loader_windows:** bust stale Zig cache when embedding packed blobs ([ea794aa](https://github.com/jm33-m0/emp3r0r/commit/ea794aafa5d8102c3618bbea3f71ee15f4ab9fff))
+
 ## [4.19.1](https://github.com/jm33-m0/emp3r0r/compare/v4.19.0...v4.19.1) (2026-09-14)
 
 
