@@ -40,6 +40,16 @@ Try not to `grep` from `stdout` of a command. Always prefer writing logs to disk
 - Use `crypto/rand` (or the project's crypto-backed helpers) for anything security-relevant; do not introduce `math/rand` for keys, nonces, or names.
 - Use I/O functions such as `WriteFileAgent` for agent side file I/O, utilizing `memfs`. No file write except disk spillage by `memfs`. No spawning subprocess on agent side unless explicitly allowed.
 
+## Payload Sanitization
+
+Everything that ships to a target (agent, shellcode, stagers, loaders, BOFs, DLLs, service executables) must read like a generic Windows/POSIX program when inspected. Assume a defender runs `strings`, dumps the exports, and greps for well-known names; the artifact must give them nothing to key on.
+
+- Never embed project-identifying strings in a shipped artifact: no `emp3r0r`, `staged_loader`, module/tool names, technique names, or author handles. This includes service/mutex/event/pipe names and environment-variable names.
+- Do not hardcode a fallback name that identifies the project. Derive names from the host binary/module path, from build-time input, or from `crypto/rand` bytes; if none is available, fail instead of inventing a branded default.
+- Export and symbol names that a loader must resolve are part of the string table. Keep them generic (e.g. `Run`) or resolve by ordinal; do not name them after the module or technique.
+- Debug/logging text stays behind the release guard (`DEBUG` in C, the `lib/logging` release switch in Go); a string that only exists in debug builds must still not name the project.
+- Build scripts, module metadata, and C2-side log text may describe the module, but anything copied into an operator or target artifact must not.
+
 ## Compatibility
 
 - No legacy/back-compat code: all binaries (agent, CC/operator, tools) must come from the same build batch. If wire format or a scheme changes, migrate everything in one change — do not keep old-path shims or "legacy" aliases.
