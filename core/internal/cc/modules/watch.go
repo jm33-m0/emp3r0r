@@ -292,6 +292,9 @@ func (w *moduleWatch) reconcileOnce() []string {
 	w.mu.Unlock()
 
 	restore := make(map[string]bool) // module names to look up elsewhere
+	// dirs passed to loadModuleDir in this pass; their workspace copy (if any)
+	// is our own side effect and must not be reported as a second change
+	touched := make([]string, 0, len(removedDirs)+len(disk))
 	for _, dir := range removedDirs {
 		names := unregisterModuleConfigs(dir)
 		if len(names) > 0 {
@@ -331,6 +334,7 @@ func (w *moduleWatch) reconcileOnce() []string {
 			if _, err := loadModuleDir(dir); err != nil {
 				errs = append(errs, fmt.Sprintf("%s: %v", dir, err))
 			}
+			touched = append(touched, dir)
 			break
 		}
 	}
@@ -347,6 +351,7 @@ func (w *moduleWatch) reconcileOnce() []string {
 			unregisterModuleConfigs(a.dir)
 		}
 		names, err := loadModuleDir(a.dir)
+		touched = append(touched, a.dir)
 		if err != nil {
 			errs = append(errs, fmt.Sprintf("%s: %v", a.dir, err))
 			continue
@@ -354,12 +359,30 @@ func (w *moduleWatch) reconcileOnce() []string {
 		loaded = append(loaded, loadedMod{a: a, names: names})
 	}
 
-	// re-sync the state map with the disk. Doing this wholesale (rather than
-	// only for the dirs we touched) also absorbs side effects of our own
-	// actions — copying a buildable module's sources into the workspace fires
-	// fsnotify events that must not be reported as module changes on the next
-	// reconcile.
-	w.seedState()
+	// Publish the state we actually processed — the pre-action snapshot — not
+	// a fresh disk read. An edit that lands while we are mid-reconcile (e.g.
+	// the operator fixing a config we just failed to parse) must stay
+	// "unseen" so the next event reloads it; re-reading the disk here would
+	// absorb the edit and the module would never come back.
+	w.mu.Lock()
+	w.state = disk
+	w.mu.Unlock()
+
+	// Absorb our own side effects: loading a local/buildable module copies its
+	// sources (including config.json) into the workspace, which is itself a
+	// module dir. Absorbing exactly those copies stops them being reported as
+	// a second change (and reloading forever), while edits to any other dir —
+	// including one that races this reconcile — stay pending for the next pass.
+	for _, dir := range touched {
+		copied := filepath.Join(live.EmpWorkSpace, "modules", filepath.Base(dir))
+		abs, err := filepath.Abs(copied)
+		if err != nil {
+			continue
+		}
+		w.mu.Lock()
+		w.state[abs] = fingerprintConfig(abs)
+		w.mu.Unlock()
+	}
 
 	// log only what actually changed: a config that was edited or added is
 	// reported with the module names it declares; failures are always logged.
