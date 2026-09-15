@@ -8,7 +8,6 @@ import (
 	"math/big"
 	"runtime"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -105,43 +104,6 @@ func ReverseString(s string) string {
 		rns[i], rns[j] = rns[j], rns[i]
 	}
 	return string(rns)
-}
-
-// Truncate shortens s to at most max bytes, appending an ellipsis when it
-// actually truncates. It counts whole runes, so a multi-byte character is
-// never split into invalid UTF-8. max is the total byte budget including the
-// ellipsis; a max of 3 or less yields only the ellipsis that fits, and a
-// non-positive max yields "".
-func Truncate(s string, max int) string {
-	if max <= 0 {
-		return ""
-	}
-	// A string cannot need truncation if its byte length is within budget,
-	// since rune count is always <= byte count.
-	if len(s) <= max {
-		return s
-	}
-
-	const ellipsis = "..."
-	if max <= len(ellipsis) {
-		return ellipsis[:max]
-	}
-
-	// Fill max-ellipsis bytes on rune boundaries; the remainder is the suffix.
-	limit := max - len(ellipsis)
-	var b strings.Builder
-	b.Grow(max)
-	used := 0
-	for _, r := range s {
-		w := utf8.RuneLen(r)
-		if used+w > limit {
-			break
-		}
-		b.WriteRune(r)
-		used += w
-	}
-	b.WriteString(ellipsis)
-	return b.String()
 }
 
 // RandInt returns a uniformly random integer in the half-open interval

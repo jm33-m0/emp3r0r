@@ -11,7 +11,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
-	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
 )
 
@@ -101,17 +100,17 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 		}
 		ips := strings.Join(target.IPs, ", ")
 		infoMap := map[string]string{
-			"OS":      util.Truncate(target.OS, 20),
-			"Process": util.Truncate(procInfo, 20),
-			"User":    util.Truncate(target.User, 20),
+			"OS":      target.OS,
+			"Process": procInfo,
+			"User":    target.User,
 			"From":    target.From,
-			"C2":      util.Truncate(target.Transport, 20),
-			"Mesh":    util.Truncate(target.MeshRoute, 18),
+			"C2":      target.Transport,
+			"Mesh":    target.MeshRoute,
 			"IPs":     ips,
 		}
 		row := []string{
 			target.ShortID,
-			util.Truncate(target.Tag, 15),
+			target.Tag,
 			infoMap["OS"], infoMap["Process"], infoMap["User"], infoMap["IPs"], infoMap["From"], infoMap["C2"], infoMap["Mesh"],
 			agentLastSeen(target),
 		}

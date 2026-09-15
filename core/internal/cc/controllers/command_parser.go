@@ -42,9 +42,6 @@ func ParsePSOutput(data []byte) (*ParsedCommandOutput, error) {
 	}
 
 	for _, p := range procs {
-		pname := util.Truncate(p.Name, 20)
-		cmdline := util.Truncate(p.Cmdline, 35)
-
 		row := []string{
 			strconv.Itoa(p.PID),
 			strconv.Itoa(p.PPID),
@@ -54,7 +51,7 @@ func ParsePSOutput(data []byte) (*ParsedCommandOutput, error) {
 		if hasNamespace {
 			row = append(row, p.Namespace)
 		}
-		row = append(row, pname, cmdline)
+		row = append(row, p.Name, p.Cmdline)
 		result.Rows = append(result.Rows, row)
 	}
 
@@ -74,9 +71,8 @@ func ParseLSOutput(data []byte) (*ParsedCommandOutput, error) {
 	}
 
 	for _, d := range dents {
-		dname := util.Truncate(d.Name, 20)
 		result.Rows = append(result.Rows, []string{
-			dname,
+			d.Name,
 			d.Ftype,
 			d.Size,
 			d.Date,

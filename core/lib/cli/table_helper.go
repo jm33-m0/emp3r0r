@@ -6,7 +6,6 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
-	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // BuildTable creates a simple formatted list instead of a complex table
@@ -43,13 +42,9 @@ func AdaptiveTable(tableString string) {
 // CliPrettyPrint prints two-column help info using simple formatting
 func CliPrettyPrint(header1, header2 string, map2write *map[string]string) {
 	for c1, c2 := range *map2write {
-		// Split long lines to fit better
-		c1_split := util.Truncate(c1, 40)
-		c2_split := util.Truncate(c2, 60)
-
 		logging.Infof("%s: %s\n",
-			color.HiCyanString("%-40s", c1_split),
-			color.WhiteString(c2_split))
+			color.HiCyanString("%-40s", c1),
+			color.WhiteString(c2))
 	}
 	logging.Infof("\n")
 }
