@@ -11,6 +11,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/coffloader"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/modconfig"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -93,12 +94,5 @@ func fetchDependencyDLL(name string) ([]byte, error) {
 // coffArgsFromInvocation converts resolved COFF args into the coffloader
 // representation used by the DLL loader.
 func coffArgsFromInvocation(invocation def.ResolvedInvocation) []coffloader.CoffArg {
-	if invocation.Coff == nil {
-		return nil
-	}
-	args := make([]coffloader.CoffArg, 0, len(invocation.Coff.Args))
-	for _, a := range invocation.Coff.Args {
-		args = append(args, coffloader.CoffArg{WireType: a.WireType, Value: a.Value})
-	}
-	return args
+	return modconfig.CoffArgsFromResolved(invocation.Coff)
 }
