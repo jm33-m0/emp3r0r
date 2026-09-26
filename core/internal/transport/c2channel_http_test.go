@@ -249,3 +249,92 @@ func TestAuthenticatedBodyReadUnbounded(t *testing.T) {
 		t.Fatalf("expected the client-side deadline to fire, got %v", err)
 	}
 }
+
+// TestHTTPPollTimingJitter guards the grammar fix: neither the long-poll hold
+// nor the client re-poll delay may be a fixed constant.
+func TestHTTPPollTimingJitter(t *testing.T) {
+	holds := map[time.Duration]bool{}
+	for range 32 {
+		h := randomPollHold()
+		if h < httpPollHoldMin || h >= httpPollHoldMax {
+			t.Fatalf("poll hold %v outside [%v, %v)", h, httpPollHoldMin, httpPollHoldMax)
+		}
+		holds[h] = true
+	}
+	if len(holds) < 2 {
+		t.Fatalf("poll hold not jittered: %v", holds)
+	}
+
+	blinks := map[time.Duration]bool{}
+	for range 32 {
+		b := randomBlink()
+		if b < httpBlinkMin || b >= httpBlinkMax {
+			t.Fatalf("blink %v outside [%v, %v)", b, httpBlinkMin, httpBlinkMax)
+		}
+		blinks[b] = true
+	}
+	if len(blinks) < 2 {
+		t.Fatalf("blink not jittered: %v", blinks)
+	}
+}
+
+// TestHTTPServerSessionClosesViaConfiguredHeader verifies teardown works over
+// the configured header/cookie rather than a distinctive DELETE method.
+func TestHTTPServerSessionClosesViaConfiguredHeader(t *testing.T) {
+	const sessionID = "c2channel-http-close-header"
+	defer serverSessions.Delete(sessionID)
+
+	config := &def.MalleableHTTPConfig{
+		SessionHeader: "Cookie",
+		SessionValue:  "sessionID=%s",
+		InitHeader:    "Cookie",
+		InitValue:     "init=1",
+		CloseHeader:   "Cookie",
+		CloseValue:    "close=1",
+	}
+	stream := newHTTPServerStream(sessionID)
+	defer stream.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	req.Header.Set("Cookie", "sessionID="+sessionID+"; close=1")
+
+	rec := httptest.NewRecorder()
+	if _, err := HandleHTTPServerSession(rec, req, config); err != ErrPollingRequest {
+		t.Fatalf("close request returned %v, want ErrPollingRequest", err)
+	}
+	val, ok := serverSessions.Load(sessionID)
+	if !ok {
+		return // reaped immediately is also acceptable
+	}
+	s, ok := val.(*HTTPServerStream)
+	if !ok || s == nil {
+		t.Fatalf("unexpected session value %T", val)
+	}
+	if !s.isClosing() {
+		t.Fatal("session was not marked closing by the close header")
+	}
+}
+
+// TestHTTPServerSessionCloseRequiresToken verifies a bare DELETE (no close
+// token) no longer tears a session down, so the method is not a magic close.
+func TestHTTPServerSessionCloseRequiresToken(t *testing.T) {
+	const sessionID = "c2channel-http-close-requires-token"
+	defer serverSessions.Delete(sessionID)
+
+	config := &def.MalleableHTTPConfig{
+		SessionHeader: "Cookie",
+		SessionValue:  "sessionID=%s",
+		CloseHeader:   "Cookie",
+		CloseValue:    "close=1",
+	}
+	stream := newHTTPServerStream(sessionID)
+	defer stream.Close()
+
+	req := httptest.NewRequest(http.MethodDelete, "/", nil)
+	req.Header.Set("Cookie", "sessionID="+sessionID)
+	rec := httptest.NewRecorder()
+	_, _ = HandleHTTPServerSession(rec, req, config)
+	if stream.isClosing() {
+		t.Fatal("DELETE without the configured close token must not close the session")
+	}
+}
