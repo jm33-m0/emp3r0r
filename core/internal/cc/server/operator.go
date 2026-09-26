@@ -476,17 +476,34 @@ func RegisterOperatorConn(session string, conn net.Conn) {
 	if session == "" {
 		session = "test-operator"
 	}
-	OPERATORS.Store(session, &operator_t{sessionID: session, conn: conn})
+	op := &operator_t{sessionID: session, conn: conn}
+	OPERATORS.Store(session, op)
 	touchOperatorCommand()
 	go func() {
 		defer func() {
-			OPERATORS.Delete(session)
-			cleanupOperatorOwnedJobs(session)
-			StopSocks5ProxiesForOperator(session)
+			// Only tear down our own registration. While we were blocked in
+			// readOperatorTunnel a newer connection for the same session name
+			// may have replaced us; deleting it would drop a live operator.
+			unregisterOperatorConn(session, op)
 			_ = conn.Close()
 		}()
 		readOperatorTunnel(context.Background(), conn, session)
 	}()
+}
+
+// unregisterOperatorConn removes session from the operator registry only if it
+// is still the entry registered by op, then tears down the session-scoped jobs
+// and pivots. It reports whether the entry was actually removed. A stale
+// teardown (op was replaced by a newer connection for the same session name)
+// returns false and must not touch the newer operator's state.
+func unregisterOperatorConn(session string, op *operator_t) bool {
+	if !OPERATORS.CompareAndDelete(session, op) {
+		return false
+	}
+	cleanupOperatorOwnedJobs(session)
+	// SOCKS5 pivots are owned by the operator that started them.
+	StopSocks5ProxiesForOperator(session)
+	return true
 }
 
 // handleOperatorConn handles operator connections, this connection will be used to relay the message tunnel
@@ -556,21 +573,20 @@ func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 	}()
 	defer func() {
 		logging.Debugf("handleOperatorConn exiting")
-		OPERATORS.Delete(operator_session)
-		cleanupOperatorOwnedJobs(operator_session)
-		// SOCKS5 pivots are owned by the operator that started them.
-		StopSocks5ProxiesForOperator(operator_session)
+		// Guarded teardown: a newer connection may have replaced this operator
+		// for the same session name, in which case we must leave it alone.
+		if unregisterOperatorConn(operator_session, operator) {
+			// If this was the last operator, disconnect all agents
+			lastOperator := true
+			OPERATORS.Range(func(key, value any) bool {
+				lastOperator = false
+				return false // stop iteration
+			})
 
-		// If this was the last operator, disconnect all agents
-		lastOperator := true
-		OPERATORS.Range(func(key, value any) bool {
-			lastOperator = false
-			return false // stop iteration
-		})
-
-		if lastOperator {
-			logging.Infof("Last operator disconnected, closing all agent connections")
-			agents.DisconnectAllAgents()
+			if lastOperator {
+				logging.Infof("Last operator disconnected, closing all agent connections")
+				agents.DisconnectAllAgents()
+			}
 		}
 
 		_ = conn.Close()
