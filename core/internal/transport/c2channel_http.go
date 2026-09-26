@@ -354,6 +354,10 @@ type HTTPServerStream struct {
 	lastActivity time.Time
 	activityMu   sync.Mutex
 	closing      int32
+	// authState records the verified C2 handshake. The session id is chosen by
+	// the client, so only an authenticated session may bypass the HTTP
+	// connection rate limiter.
+	authState
 }
 
 func newHTTPServerStream(sessionID string) *HTTPServerStream {
@@ -646,8 +650,15 @@ func IsActiveHTTPServerSession(req *http.Request, config *def.MalleableHTTPConfi
 	if sessionID == "" {
 		return false
 	}
-	_, exists := serverSessions.Load(sessionID)
-	return exists
+	val, exists := serverSessions.Load(sessionID)
+	if !exists {
+		return false
+	}
+	// The session id is client-chosen and registered before the C2 handshake,
+	// so an unauthenticated caller could otherwise mint a session and flood
+	// requests that skip the rate limiters. Only exempt verified sessions.
+	s, ok := val.(Authenticatable)
+	return ok && s != nil && s.IsAuthenticated()
 }
 
 func init() {

@@ -234,6 +234,11 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 	// Stop the handshake timer now that we have successfully verified the agent
 	// and are about to transition to a potentially persistent service handler.
 	timer.Stop()
+	// The identity token and pinned key are verified; only now may this
+	// transport's session bypass the connection rate limiters.
+	if m, ok := t.(transport.Authenticatable); ok {
+		m.MarkAuthenticated()
+	}
 	logging.Debugf("cborProtocolDispatch: handshake complete, timer stopped for %s", strconv.Quote(msgAuth.AgentUUID))
 
 	// ── Ephemeral PFS re-key for auxiliary routes ──────────────────────────

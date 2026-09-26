@@ -8,8 +8,33 @@ import (
 	"net/http"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 )
+
+// Authenticatable is implemented by a transport/session that records whether
+// the C2 handshake verified the peer. Rate-limit exemptions must be gated on
+// this, never on a client-supplied session identifier.
+type Authenticatable interface {
+	MarkAuthenticated()
+	IsAuthenticated() bool
+}
+
+// authState is the shared verified-handshake flag. Embed it in transports that
+// need to expose authentication state.
+type authState struct {
+	authenticated int32
+}
+
+// MarkAuthenticated records that the C2 handshake for this stream succeeded.
+func (a *authState) MarkAuthenticated() {
+	atomic.StoreInt32(&a.authenticated, 1)
+}
+
+// IsAuthenticated reports whether the C2 handshake for this stream succeeded.
+func (a *authState) IsAuthenticated() bool {
+	return atomic.LoadInt32(&a.authenticated) == 1
+}
 
 // StreamTransport defines a protocol-agnostic byte-stream wrapper.
 // Higher protocol layers should only rely on Read/Write/Close semantics.
@@ -94,6 +119,7 @@ func AllC2ChannelModesDetailed() []string {
 type GenericStreamTransport struct {
 	Conn io.ReadWriteCloser
 	addr string
+	authState
 }
 
 // NewStreamTransport creates a protocol-agnostic stream adapter for C2 traffic.
@@ -105,6 +131,16 @@ func (t *GenericStreamTransport) Read(p []byte) (int, error)  { return t.Conn.Re
 func (t *GenericStreamTransport) Write(p []byte) (int, error) { return t.Conn.Write(p) }
 func (t *GenericStreamTransport) Close() error                { return t.Conn.Close() }
 func (t *GenericStreamTransport) RemoteAddrString() string    { return t.addr }
+
+// MarkAuthenticated records the verified handshake on the wrapper and forwards
+// it to the wrapped connection when that connection tracks its own state (the
+// HTTP poll session does).
+func (t *GenericStreamTransport) MarkAuthenticated() {
+	t.authState.MarkAuthenticated()
+	if m, ok := t.Conn.(Authenticatable); ok {
+		m.MarkAuthenticated()
+	}
+}
 
 // net.Conn implementation stubs
 func (t *GenericStreamTransport) LocalAddr() net.Addr              { return nil }
