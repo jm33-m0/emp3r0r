@@ -1,0 +1,17 @@
+#author Cornelis de Plaa
+#@outflank.nl
+
+beacon_command_register("Domaininfo", "Using Active Directory Domain Services to enumerate domain information.",
+	"Using Active Directory Domain Services to enumerate domain information.\n\n" .
+	"Synopsis: Domaininfo\n\n");
+
+alias Domaininfo {
+    $bid = $1;
+
+    # Read in the right BOF file
+    $handle = openf(script_resource("Domaininfo." . barch($bid) . ".o"));
+    $data   = readb($handle, -1);
+    closef($handle);
+
+    beacon_inline_execute($bid, $data, "go", $null);
+}

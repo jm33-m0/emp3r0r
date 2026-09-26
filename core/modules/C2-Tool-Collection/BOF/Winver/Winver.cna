@@ -1,0 +1,17 @@
+#author Cornelis de Plaa
+#@outflank.nl
+
+beacon_command_register("Winver", "Display the version of Windows that is running, the build number and patch release (Update Build Revision).",
+	"Synopsis: Winver\n\n" .
+	"Display Windows version info.\n\n");    
+
+alias Winver {
+    $bid = $1;
+
+    # Read in the right BOF file
+    $handle = openf(script_resource("Winver." . barch($bid) . ".o"));
+    $data   = readb($handle, -1);
+    closef($handle);
+
+    beacon_inline_execute($bid, $data, "go", $null);
+}

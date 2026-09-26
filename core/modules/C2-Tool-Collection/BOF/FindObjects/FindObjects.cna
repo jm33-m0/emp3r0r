@@ -1,0 +1,59 @@
+#author Cornelis de Plaa
+#@outflank.nl
+
+#Find process handles en modules
+
+#register help
+beacon_command_register("FindProcHandle", "Find specific process handles.",
+		"Synopsis: FindProcHandle lsass.exe\n\n" .
+		"Use Direct System Calls to find processes with specific process handles.\n");
+
+beacon_command_register("FindModule", "Find loaded modules.",
+		"Synopsis: FindModule clr.dll\n\n" .
+		"Use Direct System Calls to find processes with specific modules loaded.\n");
+
+alias FindProcHandle {
+	$bid = $1;
+
+  	$input = substr($0, 15);
+	@args = split(' ', $input);
+
+	$proc = @args[0];
+
+	if ($proc eq "") {
+		berror($bid, "Specify a process handle (e.g. lsass.exe).");
+		return;
+	}
+
+	# Read in the right BOF file
+	$handle = openf(script_resource("FindProcHandle." . barch($bid) . ".o"));
+	$data   = readb($handle, -1);
+	closef($handle);
+
+	# Pack our arguments
+	$arg_data   = bof_pack($bid, "Z", $proc);
+	beacon_inline_execute($bid, $data, "go", $arg_data);
+}
+
+alias FindModule {
+	$bid = $1;
+
+	$input = substr($0, 11);
+	@args = split(' ', $input);
+
+	$mod = @args[0];
+
+	if ($mod eq "") {
+		berror($bid, "Specify a module (e.g. clr.dll).");
+		return;
+	}
+
+	# Read in the right BOF file
+	$handle = openf(script_resource("FindModule." . barch($bid) . ".o"));
+	$data   = readb($handle, -1);
+	closef($handle);
+
+	# Pack our arguments
+	$arg_data   = bof_pack($bid, "Z", $mod);
+	beacon_inline_execute($bid, $data, "go", $arg_data);
+}

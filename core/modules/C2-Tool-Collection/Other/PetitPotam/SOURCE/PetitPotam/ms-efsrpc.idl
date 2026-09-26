@@ -1,0 +1,307 @@
+ import "ms-dtyp.idl";
+  
+ [
+ uuid(c681d488-d850-11d0-8c52-00c04fd90f7e),
+ version(1.0),
+ ]
+ interface efsrpc
+ {
+  
+  
+ typedef [context_handle] void * PEXIMPORT_CONTEXT_HANDLE;
+  
+ typedef pipe unsigned char EFS_EXIM_PIPE;
+  
+ typedef struct _EFS_RPC_BLOB {
+    [range(0,266240)]    DWORD            cbData;
+    [size_is(cbData)]    unsigned char  * bData;
+ } EFS_RPC_BLOB,
+  *PEFS_RPC_BLOB;
+  
+ typedef struct {
+   DWORD EfsVersion;
+ } EFS_COMPATIBILITY_INFO;
+  
+ typedef unsigned int ALG_ID;
+  
+ typedef struct _EFS_HASH_BLOB {
+     [range(0,100)]      DWORD            cbData;
+     [size_is(cbData)]   unsigned char  * bData;
+ } EFS_HASH_BLOB;
+  
+  
+ typedef struct _ENCRYPTION_CERTIFICATE_HASH {
+                 DWORD           cbTotalLength;
+                 RPC_SID       * UserSid;
+                 EFS_HASH_BLOB * Hash;
+     [string]    wchar_t       * lpDisplayInformation;
+ } ENCRYPTION_CERTIFICATE_HASH;
+  
+  
+ typedef struct _ENCRYPTION_CERTIFICATE_HASH_LIST {
+     [range(0,500)]          DWORD                          nCert_Hash;
+     [size_is(nCert_Hash , )]   ENCRYPTION_CERTIFICATE_HASH ** Users;
+ } ENCRYPTION_CERTIFICATE_HASH_LIST;
+  
+  
+ typedef struct _CERTIFICATE_BLOB {
+     DWORD                                dwCertEncodingType;
+     [range(0,32768)]    DWORD            cbData;
+     [size_is(cbData)]   unsigned char  * bData;
+ } EFS_CERTIFICATE_BLOB;
+  
+  
+ typedef struct _ENCRYPTION_CERTIFICATE {
+     DWORD                   cbTotalLength;
+     RPC_SID               * UserSid;
+     EFS_CERTIFICATE_BLOB  * CertBlob;
+ } ENCRYPTION_CERTIFICATE;
+  
+  
+ typedef struct _ENCRYPTION_CERTIFICATE_LIST {    
+     [range(0,500)]         DWORD nUsers;
+     [size_is(nUsers , )]   ENCRYPTION_CERTIFICATE ** Users;
+ } ENCRYPTION_CERTIFICATE_LIST;
+  
+  
+ typedef struct _ENCRYPTED_FILE_METADATA_SIGNATURE { 
+     DWORD                  dwEfsAccessType;
+     ENCRYPTION_CERTIFICATE_HASH_LIST  * CertificatesAdded;
+     ENCRYPTION_CERTIFICATE  * EncryptionCertificate;
+     EFS_RPC_BLOB    * EfsStreamSignature;
+ } ENCRYPTED_FILE_METADATA_SIGNATURE;
+  
+ typedef struct {
+   DWORD dwVersion;
+   unsigned long Entropy;
+   ALG_ID Algorithm;
+   unsigned long KeyLength;
+ } EFS_KEY_INFO;
+  
+ typedef struct {
+   DWORD dwDecryptionError;
+   DWORD dwHashOffset;
+   DWORD cbHash;
+ } EFS_DECRYPTION_STATUS_INFO;
+  
+ typedef struct {
+   BOOL bHasCurrentKey;
+   DWORD dwEncryptionError;
+ } EFS_ENCRYPTION_STATUS_INFO;
+  
+ typedef struct _ENCRYPTION_PROTECTOR {
+ DWORD cbTotalLength;
+ RPC_SID* UserSid;
+ [string] wchar_t* lpProtectorDescriptor;
+ } ENCRYPTION_PROTECTOR, * PENCRYPTION_PROTECTOR;
+    
+ typedef struct _ENCRYPTION_PROTECTOR_LIST {
+ DWORD nProtectors;
+ [size_is(nProtectors)] PENCRYPTION_PROTECTOR* pProtectors;
+} ENCRYPTION_PROTECTOR_LIST, *PENCRYPTION_PROTECTOR_LIST;
+ long EfsRpcOpenFileRaw(
+     [in]            handle_t                   binding_h,
+     [out]           PEXIMPORT_CONTEXT_HANDLE * hContext,
+     [in, string]    wchar_t                  * FileName,
+     [in]            long                       Flags
+     );
+  
+ long EfsRpcReadFileRaw(
+     [in]            PEXIMPORT_CONTEXT_HANDLE   hContext,
+     [out]           EFS_EXIM_PIPE            * EfsOutPipe
+     );
+  
+ long EfsRpcWriteFileRaw(
+     [in]            PEXIMPORT_CONTEXT_HANDLE   hContext,
+     [in]            EFS_EXIM_PIPE            * EfsInPipe
+     );
+  
+ void EfsRpcCloseRaw(
+     [in, out]       PEXIMPORT_CONTEXT_HANDLE * hContext
+     );
+  
+ long EfsRpcEncryptFileSrv(
+     [in]            handle_t    binding_h,
+     [in, string]    wchar_t   * FileName
+     );
+  
+ long EfsRpcDecryptFileSrv(
+     [in]            handle_t        binding_h,
+     [in, string]    wchar_t       * FileName,
+     [in]            unsigned long   OpenFlag
+     );
+  
+ DWORD EfsRpcQueryUsersOnFile(
+     [in]            handle_t                        binding_h,
+     [in, string]    wchar_t                        * FileName,
+     [out]           ENCRYPTION_CERTIFICATE_HASH_LIST ** Users
+     );
+  
+ DWORD EfsRpcQueryRecoveryAgents(
+     [in]            handle_t                            binding_h,
+     [in, string]    wchar_t                           * FileName,
+     [out]           ENCRYPTION_CERTIFICATE_HASH_LIST ** RecoveryAgents
+     );
+  
+ DWORD EfsRpcRemoveUsersFromFile(
+     [in]            handle_t                            binding_h,
+     [in, string]    wchar_t                           * FileName,
+     [in]            ENCRYPTION_CERTIFICATE_HASH_LIST  * Users
+     );
+  
+ DWORD EfsRpcAddUsersToFile(
+     [in]         handle_t                      binding_h,
+     [in, string] wchar_t                     * FileName,
+     [in]         ENCRYPTION_CERTIFICATE_LIST * EncryptionCertificates
+     );
+  
+ //local only method
+ void Opnum10NotUsedOnWire(void);
+  
+ DWORD EfsRpcNotSupported(
+     [in]            handle_t        binding_h,
+     [in, string]    wchar_t       * Reserved1,
+     [in, string]    wchar_t       * Reserved2,
+     [in]            DWORD           dwReserved1,
+     [in]            DWORD           dwReserved2,
+     [in, unique]    EFS_RPC_BLOB  * Reserved,
+     [in]            BOOL         bReserved
+     );
+     
+ DWORD EfsRpcFileKeyInfo(
+     [in]            handle_t        binding_h,
+     [in, string]    wchar_t       * FileName,
+     [in]            DWORD           InfoClass,
+     [out]           EFS_RPC_BLOB ** KeyInfo
+     );
+     
+ DWORD EfsRpcDuplicateEncryptionInfoFile(
+     [in]            handle_t        binding_h,
+     [in, string]    wchar_t       * SrcFileName,
+     [in, string]    wchar_t       * DestFileName,
+     [in]            DWORD           dwCreationDisposition,
+     [in]            DWORD           dwAttributes,
+     [in, unique]    EFS_RPC_BLOB  * RelativeSD,
+     [in]            BOOL         bInheritHandle
+     );
+  
+ //local only method
+ void Opnum14NotUsedOnWire(void);
+  
+ DWORD EfsRpcAddUsersToFileEx(
+     [in]            handle_t                        binding_h,
+     [in]            DWORD                           dwFlags, 
+     [in, unique]    EFS_RPC_BLOB                  * Reserved, 
+     [in, string]    wchar_t                       * FileName,
+     [in]    ENCRYPTION_CERTIFICATE_LIST   * EncryptionCertificates
+     );
+  
+ DWORD EfsRpcFileKeyInfoEx(
+     [in]            handle_t        binding_h,
+     [in]            DWORD           dwFileKeyInfoFlags, 
+     [in, unique]    EFS_RPC_BLOB  * Reserved, 
+     [in, string]    wchar_t       * FileName,
+     [in]            DWORD           InfoClass,
+     [out]           EFS_RPC_BLOB ** KeyInfo
+     );
+  
+ //local only method
+ void Opnum17NotUsedOnWire(void);
+  
+ DWORD EfsRpcGetEncryptedFileMetadata(
+     [in]                handle_t        binding_h,
+     [in, string, ref]   wchar_t       * FileName, 
+     [out, ref]          EFS_RPC_BLOB ** EfsStreamBlob
+     ); 
+  
+ DWORD EfsRpcSetEncryptedFileMetadata(
+     [in]              handle_t                       binding_h,
+     [in, string, ref] wchar_t                      * FileName, 
+     [in, unique]      EFS_RPC_BLOB                * OldEfsStreamBlob, 
+     [in, ref]         EFS_RPC_BLOB                * NewEfsStreamBlob, 
+     [in, unique] ENCRYPTED_FILE_METADATA_SIGNATURE * NewEfsSignature
+     ); 
+  
+ DWORD EfsRpcFlushEfsCache(
+     [in]    handle_t    binding_h
+     );
+  
+ long EfsRpcEncryptFileExSrv(
+     [in] handle_t binding_h,
+     [in, string] wchar_t* FileName,
+     [in, string, unique] wchar_t* ProtectorDescriptor, 
+     [in] unsigned long Flags
+     );
+    
+ DWORD EfsRpcQueryProtectors(
+     [in] handle_t binding_h,
+     [in, string] wchar_t* FileName,
+     [out] PENCRYPTION_PROTECTOR_LIST **ppProtectorList 
+     );
+  
+ //local only method
+ void Opnum23NotUsedOnWire(void);
+  
+ //local only method
+ void Opnum24NotUsedOnWire(void);
+  
+ //local only method
+ void Opnum25NotUsedOnWire(void);
+  
+ //local only method
+ void Opnum26NotUsedOnWire(void);
+  
+ //local only method
+ void Opnum27NotUsedOnWire(void);
+  
+ //local only method
+ void Opnum28NotUsedOnWire(void);
+  
+ //local only method
+ void Opnum29NotUsedOnWire(void);
+  
+ //local only method
+ void Opnum30NotUsedOnWire(void);
+  
+ //local only method
+ void Opnum31NotUsedOnWire(void);
+  
+ //local only method
+ void Opnum32NotUsedOnWire(void);
+  
+ //local only method
+ void Opnum33NotUsedOnWire(void);
+  
+ //local only method
+ void Opnum34NotUsedOnWire(void);
+  
+ //local only method
+ void Opnum35NotUsedOnWire(void);
+  
+ //local only method
+ void Opnum36NotUsedOnWire(void);
+  
+ //local only method
+ void Opnum37NotUsedOnWire(void);
+  
+ //local only method
+ void Opnum38NotUsedOnWire(void);
+  
+ //local only method
+ void Opnum39NotUsedOnWire(void);
+  
+ //local only method
+ void Opnum40NotUsedOnWire(void);
+  
+ //local only method
+ void Opnum41NotUsedOnWire(void);
+  
+ //local only method
+ void Opnum42NotUsedOnWire(void);
+  
+ //local only method
+ void Opnum43NotUsedOnWire(void);
+  
+ //local only method
+ void Opnum44NotUsedOnWire(void);
+ }

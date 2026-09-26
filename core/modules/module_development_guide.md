@@ -450,3 +450,6 @@ Pair with `scshell` to execute an uploaded file on the target.
 | `kkyum/` | Multi-file Starlark module loading a kernel driver from a companion `.sys` cached in memfs. |
 | `injection/` | Remote thread injection under an operator-selected token. |
 | `loader_windows/` | A local C2 module that builds a self-unpacking loader. |
+| `CS-Situational-Awareness-BOF/` | A large third-party BOF suite imported as-is; every command is a top-level console command with one flag per BOF argument. |
+| `C2-Tool-Collection/` | Outflank BOF suite with `choices`/`required` flags and a `make_all.sh` that builds a nested `BOF/` tree. |
+| `SQL-BOF/` | SQL Server BOF suite; demonstrates fixed-value wrapper commands over a shared `togglemodule` BOF and a `binary` (base64) parameter. |

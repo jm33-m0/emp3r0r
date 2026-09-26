@@ -1,0 +1,124 @@
+#author Cornelis de Plaa
+#@outflank.nl
+
+beacon_command_register("ReconAD", "Use ADSI to query Active Directory objects and attributes.",
+	"Use Active Directory Service Interfaces (ADSI) to query for AD objects and corresponding attributes.\n\n" .
+	"Synopsis: ReconAD (custom ldap filter) [opt: comma separated ldap attributes (or -all)] [opt: max results (or -max)] [opt: -usegc (or -ldap)] [opt: server:port]\n" .
+	"          ReconAD (&(objectClass=user)(objectCategory=person)(sAMAccountName=*admin*)) displayName,sAMAccountName 10\n" .
+	"          ReconAD \"(&(objectCategory=group)sAMAccountName=Domain Admins)\" -all -max -usegc\n");
+
+beacon_command_register("ReconAD-Users", "Use ADSI to query Active Directory user objects and attributes.",
+	"Use Active Directory Service Interfaces (ADSI) to query user objects and corresponding attributes.\n\n" .
+	"Synopsis: ReconAD-Users username [opt: comma separated ldap attributes (or -all)] [opt: max results (or -max)] [opt: -usegc (or -ldap)] [opt: server:port]\n" .
+	"          ReconAD-Users *admin* displayName,sAMAccountName 10\n" .
+	"          ReconAD-Users serveradmin -all -max -usegc\n");
+
+beacon_command_register("ReconAD-Computers", "Use ADSI to query Active Directory computer objects and attributes.",
+	"Use Active Directory Service Interfaces (ADSI) to query computer objects and corresponding attributes.\n\n" .
+	"Synopsis: ReconAD-Computers computername [opt: comma separated ldap attributes (or -all)] [opt: max results (or -max)] [opt: -usegc (or -ldap) [opt: server:port]\n" .
+	"          ReconAD-Computers *dc* -all -max -usegc\n" .
+	"          ReconAD-Computers *srv* name,operatingSystemVersion 20\n");
+
+beacon_command_register("ReconAD-Groups", "Use ADSI to query Active Directory group objects and attributes.",
+	"Use Active Directory Service Interfaces (ADSI) to query group objects and corresponding attributes.\n\n" .
+	"Synopsis: ReconAD-Groups groupname [opt: comma separated ldap attributes (or -all)] [opt: max results (or -max)] [opt: -usegc (or -ldap)] [opt: server:port]\n" .
+	"          ReconAD-Groups \"Domain Admins\" -all -max -usegc\n" .
+	"          ReconAD-Groups *server* displayName,sAMAccountName 10\n");
+
+alias ReconAD {
+	$bid = $1;
+	$filter = $2;
+	
+	$attr = iff(-istrue $3, $3, "-all");
+	$count = iff($4 eq "-max", 0, $4);
+	$usegc = iff($5 eq "-usegc", 1, 0);
+	$server = iff(-istrue $6, $6, "-noserver");
+
+	if ($filter eq "") {
+		berror($bid, "Please specify a LDAP filter.");
+		return;
+	}
+
+	# Read in the right BOF file
+    $handle = openf(script_resource("ReconAD." . barch($bid) . ".o"));
+    $data   = readb($handle, -1);
+    closef($handle);
+
+	$arg_data  = bof_pack($bid, "ZZZiiZ", "custom", $filter, $attr, $count, $usegc, $server);
+	beacon_inline_execute($bid, $data, "go", $arg_data);
+}
+
+alias ReconAD-Users {
+	$bid = $1;
+	$object = $2;
+	
+	$attr = iff(-istrue $3, $3, "-all");
+	$count = iff($4 eq "-max", 0, $4);
+	$usegc = iff($5 eq "-usegc", 1, 0);
+	$server = iff(-istrue $6, $6, "-noserver");
+
+	if ($object eq "") {
+		berror($bid, "Please specify a username.");
+		return;
+	}
+
+	# Read in the right BOF file
+    $handle = openf(script_resource("ReconAD." . barch($bid) . ".o"));
+    $data   = readb($handle, -1);
+    closef($handle);
+	
+	blog($bid, "Let's enumerate user(s): " . $object . "\n");
+	
+	$arg_data  = bof_pack($bid, "ZZZiiZ", "users", $object, $attr, $count, $usegc, $server);
+	beacon_inline_execute($bid, $data, "go", $arg_data);
+}
+
+alias ReconAD-Groups {
+	$bid = $1;
+	$object = $2;
+	
+	$attr = iff(-istrue $3, $3, "-all");
+	$count = iff($4 eq "-max", 0, $4);
+	$usegc = iff($5 eq "-usegc", 1, 0);
+	$server = iff(-istrue $6, $6, "-noserver");
+
+	if ($object eq "") {
+		berror($bid, "Please specify a groupname.");
+		return;
+	}
+
+	# Read in the right BOF file
+    $handle = openf(script_resource("ReconAD." . barch($bid) . ".o"));
+    $data   = readb($handle, -1);
+    closef($handle);
+	
+	blog($bid, "Let's enumerate group(s): " . $object . "\n");
+	
+	$arg_data  = bof_pack($bid, "ZZZiiZ", "groups", $object, $attr, $count, $usegc, $server);
+	beacon_inline_execute($bid, $data, "go", $arg_data);
+}
+
+alias ReconAD-Computers {
+	$bid = $1;
+	$object = $2;
+	
+	$attr = iff(-istrue $3, $3, "-all");
+	$count = iff($4 eq "-max", 0, $4);
+	$usegc = iff($5 eq "-usegc", 1, 0);
+	$server = iff(-istrue $6, $6, "-noserver");
+
+	if ($object eq "") {
+		berror($bid, "Please specify a computername.");
+		return;
+	}
+
+	# Read in the right BOF file
+    $handle = openf(script_resource("ReconAD." . barch($bid) . ".o"));
+    $data   = readb($handle, -1);
+    closef($handle);
+	
+	blog($bid, "Let's enumerate computer(s): " . $object . "\n");
+	
+	$arg_data  = bof_pack($bid, "ZZZiiZ", "computers", $object, $attr, $count, $usegc, $server);
+	beacon_inline_execute($bid, $data, "go", $arg_data);
+}

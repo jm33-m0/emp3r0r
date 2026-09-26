@@ -1,0 +1,41 @@
+#author Cornelis de Plaa
+#@outflank.nl
+
+#register help
+beacon_command_register("psx", "Show information from all processes running on the system.",
+	"Synopsis: psx\n\n" .
+	"Shows a list of all processes running on the system.\n");
+
+beacon_command_register("psxx", "Show more detailed information from all processes running on the system.",
+	"Synopsis: psxx\n\n" .
+	"Shows a more detailed list of all processes running on the system.\n");
+
+alias psx {
+    $bid = $1;
+
+    # Read in the right BOF file
+    $handle = openf(script_resource("Psx." . barch($bid) . ".o"));
+    $data   = readb($handle, -1);
+    closef($handle);
+
+    # pack our arguments
+    $args   = bof_pack($bid, "s", 00);
+
+    blog($bid, "Tasked beacon to list detailed process information");
+    beacon_inline_execute($bid, $data, "go", $args);
+}
+
+alias psxx {
+    $bid = $1;
+
+    # Read in the right BOF file
+    $handle = openf(script_resource("Psx." . barch($bid) . ".o"));
+    $data   = readb($handle, -1);
+    closef($handle);
+
+    # pack our arguments
+    $args   = bof_pack($bid, "s", 11);
+
+    blog($bid, "Tasked beacon to list detailed process information");
+    beacon_inline_execute($bid, $data, "go", $args);
+}

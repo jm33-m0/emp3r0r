@@ -1,0 +1,17 @@
+#author Cornelis de Plaa
+#@outflank.nl
+
+beacon_command_register("psw", "Show Window titles from processes with active Windows.",
+	"Synopsis: psw\n\n" .
+	"Show Window titles from processes with active Windows.\n\n");    
+
+alias psw {
+    $bid = $1;
+
+    # Read in the right BOF file
+    $handle = openf(script_resource("Psw." . barch($bid) . ".o"));
+    $data   = readb($handle, -1);
+    closef($handle);
+
+    beacon_inline_execute($bid, $data, "go", $null);
+}

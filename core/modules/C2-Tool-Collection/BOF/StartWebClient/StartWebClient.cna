@@ -1,0 +1,18 @@
+#author Cornelis de Plaa, Stan Hegt
+#@outflank.nl
+#Code based on https://www.tiraniddo.dev/2015/03/starting-webclient-service.html
+
+beacon_command_register("StartWebClient", "Starting WebClient Service Programmatically.",
+    "Synopsis: StartWebClient\n\n" .
+    "Starting WebClient Service Programmatically\n\n");
+
+alias StartWebClient {
+    $bid = $1;
+
+    # Read in the right BOF file
+    $handle = openf(script_resource("StartWebClient." . barch($bid) . ".o"));
+    $data   = readb($handle, -1);
+    closef($handle);
+
+    beacon_inline_execute($bid, $data, "go", $null);
+}

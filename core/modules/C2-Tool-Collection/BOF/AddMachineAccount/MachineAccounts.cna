@@ -1,0 +1,79 @@
+#author Cornelis de Plaa
+#@outflank.nl
+
+beacon_command_register("GetMachineAccountQuota", "Read the MachineAccountQuota value from the Active Directory domain.",
+    "Synopsis: GetMachineAccountQuota\n\n" .
+    "Use Active Directory Service Interfaces (ADSI) to read the ms-DS-MachineAccountQuota value from AD.\n");
+
+beacon_command_register("AddMachineAccount", "Add a computer account to the Active Directory domain.",
+    "Synopsis: AddMachineAccount [Computername] [Password <Optional>]\n\n" .
+    "Use Active Directory Service Interfaces (ADSI) to add a computer account to AD.\n");
+
+beacon_command_register("DelMachineAccount", "Remove a computer account from the Active Directory domain.",
+    "Synopsis: DelMachineAccount [Computername]\n\n" .
+    "Use Active Directory Service Interfaces (ADSI) to delete a computer account from AD.\n");
+
+alias GetMachineAccountQuota {
+    $bid = $1;
+
+    # Read in the right BOF file
+    $handle = openf(script_resource("GetMachineAccountQuota." . barch($bid) . ".o"));
+    $data   = readb($handle, -1);
+    closef($handle);
+
+    beacon_inline_execute($bid, $data, "go", $null);
+}
+
+alias AddMachineAccount {
+    $bid = $1;
+
+    $input = substr($0, 18);
+    @args = split(' ', $input);
+
+    $accountname = @args[0];
+    $password = @args[1];
+
+    if ($accountname eq "") {
+        berror($bid, "Specify a computeraccount name");
+        return;
+    }
+
+    # Read in the right BOF file
+    $handle = openf(script_resource("AddMachineAccount." . barch($bid) . ".o"));
+    $data   = readb($handle, -1);
+    closef($handle);
+
+    # Pack our arguments
+    if ($password eq "") {
+        $arg_data  = bof_pack($bid, "Z", $accountname);
+    }
+    else{
+        $arg_data  = bof_pack($bid, "ZZ", $accountname, $password);
+    }
+
+    beacon_inline_execute($bid, $data, "go", $arg_data);
+}
+
+alias DelMachineAccount {
+    $bid = $1;
+
+    $input = substr($0, 18);
+    @args = split(' ', $input);
+
+    $accountname = @args[0];
+
+    if ($accountname eq "") {
+        berror($bid, "Specify a computeraccount name");
+        return;
+    }
+
+    # Read in the right BOF file
+    $handle = openf(script_resource("DelMachineAccount." . barch($bid) . ".o"));
+    $data   = readb($handle, -1);
+    closef($handle);
+
+    # Pack our arguments
+    $arg_data  = bof_pack($bid, "Z", $accountname);
+
+    beacon_inline_execute($bid, $data, "go", $arg_data);
+}

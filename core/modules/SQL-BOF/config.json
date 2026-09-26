@@ -1,0 +1,1688 @@
+[
+  {
+    "name": "sql-1434udp",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Query the SQL Server Browser service over UDP/1434 for connection information",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/1434udp/1434udp.x64.o",
+        "SQL/1434udp/1434udp.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "SQL Server IP address; the browser service does not accept hostnames",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-adsi",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Dump ADSI linked-server credentials and configuration",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/adsi/adsi.x64.o",
+        "SQL/adsi/adsi.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "link",
+        "description": "Linked server to route the query through (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "impersonate",
+        "description": "SQL login to impersonate on the target server (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "adsi_server",
+        "description": "Linked server that has ADSI configured (the ADSI link target)",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "port",
+        "description": "TCP port opened on the SQL Server to receive the ADSI payload. Default: 4444",
+        "default": "4444",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-agentcmd",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Execute a system command through a SQL Server Agent job (output is not returned)",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/agentcmd/agentcmd.x64.o",
+        "SQL/agentcmd/agentcmd.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "link",
+        "description": "Linked server to route the query through (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "impersonate",
+        "description": "SQL login to impersonate on the target server (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "command",
+        "description": "Operating-system command to execute",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-agentstatus",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Enumerate SQL Server Agent status and jobs",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/agentstatus/agentstatus.x64.o",
+        "SQL/agentstatus/agentstatus.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "link",
+        "description": "Linked server to route the query through (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "impersonate",
+        "description": "SQL login to impersonate on the target server (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-checkrpc",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Enumerate the RPC and RPC-out status of linked SQL servers",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/checkrpc/checkrpc.x64.o",
+        "SQL/checkrpc/checkrpc.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "link",
+        "description": "Linked server to route the query through (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "impersonate",
+        "description": "SQL login to impersonate on the target server (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-clr",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Load and execute a .NET assembly through a SQL Server CLR stored procedure",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/clr/clr.x64.o",
+        "SQL/clr/clr.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "link",
+        "description": "Linked server to route the query through (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "impersonate",
+        "description": "SQL login to impersonate on the target server (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "function",
+        "description": "Entry-point function exported by the assembly, e.g. CreateProcess",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "hash",
+        "description": "SHA-512 hash of the assembly (uppercase hex), used for the sys.trusted_assemblies entry",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "dll",
+        "description": "Base64-encoded .NET assembly bytes",
+        "default": "",
+        "type": "binary",
+        "required": true
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-columns",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Enumerate the columns of a table on the SQL server",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/columns/columns.x64.o",
+        "SQL/columns/columns.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "table",
+        "description": "Table to enumerate (optionally schema-qualified)",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "link",
+        "description": "Linked server to route the query through (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "impersonate",
+        "description": "SQL login to impersonate on the target server (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-databases",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Enumerate databases on a SQL server",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/databases/databases.x64.o",
+        "SQL/databases/databases.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "link",
+        "description": "Linked server to route the query through (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "impersonate",
+        "description": "SQL login to impersonate on the target server (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-enablerpc",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Enable RPC and RPC-out on a linked SQL server",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/togglemodule/togglemodule.x64.o",
+        "SQL/togglemodule/togglemodule.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "link",
+        "description": "Linked server to route the query through (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "impersonate",
+        "description": "SQL login to impersonate on the target server (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "module",
+        "description": "SQL configuration option to change",
+        "default": "rpc",
+        "type": "cstr",
+        "required": false,
+        "choices": [
+          "rpc"
+        ]
+      },
+      {
+        "name": "value",
+        "description": "New value for the configuration option",
+        "default": "TRUE",
+        "type": "cstr",
+        "required": false,
+        "choices": [
+          "TRUE"
+        ]
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-disablerpc",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Disable RPC and RPC-out on a linked SQL server",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/togglemodule/togglemodule.x64.o",
+        "SQL/togglemodule/togglemodule.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "link",
+        "description": "Linked server to route the query through (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "impersonate",
+        "description": "SQL login to impersonate on the target server (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "module",
+        "description": "SQL configuration option to change",
+        "default": "rpc",
+        "type": "cstr",
+        "required": false,
+        "choices": [
+          "rpc"
+        ]
+      },
+      {
+        "name": "value",
+        "description": "New value for the configuration option",
+        "default": "FALSE",
+        "type": "cstr",
+        "required": false,
+        "choices": [
+          "FALSE"
+        ]
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-enableclr",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Enable CLR integration on a SQL server",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/togglemodule/togglemodule.x64.o",
+        "SQL/togglemodule/togglemodule.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "link",
+        "description": "Linked server to route the query through (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "impersonate",
+        "description": "SQL login to impersonate on the target server (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "module",
+        "description": "SQL configuration option to change",
+        "default": "clr enabled",
+        "type": "cstr",
+        "required": false,
+        "choices": [
+          "clr enabled"
+        ]
+      },
+      {
+        "name": "value",
+        "description": "New value for the configuration option",
+        "default": "1",
+        "type": "cstr",
+        "required": false,
+        "choices": [
+          "1"
+        ]
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-disableclr",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Disable CLR integration on a SQL server",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/togglemodule/togglemodule.x64.o",
+        "SQL/togglemodule/togglemodule.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "link",
+        "description": "Linked server to route the query through (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "impersonate",
+        "description": "SQL login to impersonate on the target server (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "module",
+        "description": "SQL configuration option to change",
+        "default": "clr enabled",
+        "type": "cstr",
+        "required": false,
+        "choices": [
+          "clr enabled"
+        ]
+      },
+      {
+        "name": "value",
+        "description": "New value for the configuration option",
+        "default": "0",
+        "type": "cstr",
+        "required": false,
+        "choices": [
+          "0"
+        ]
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-enablexp",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Enable the xp_cmdshell extended procedure",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/togglemodule/togglemodule.x64.o",
+        "SQL/togglemodule/togglemodule.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "link",
+        "description": "Linked server to route the query through (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "impersonate",
+        "description": "SQL login to impersonate on the target server (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "module",
+        "description": "SQL configuration option to change",
+        "default": "xp_cmdshell",
+        "type": "cstr",
+        "required": false,
+        "choices": [
+          "xp_cmdshell"
+        ]
+      },
+      {
+        "name": "value",
+        "description": "New value for the configuration option",
+        "default": "1",
+        "type": "cstr",
+        "required": false,
+        "choices": [
+          "1"
+        ]
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-disablexp",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Disable the xp_cmdshell extended procedure",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/togglemodule/togglemodule.x64.o",
+        "SQL/togglemodule/togglemodule.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "link",
+        "description": "Linked server to route the query through (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "impersonate",
+        "description": "SQL login to impersonate on the target server (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "module",
+        "description": "SQL configuration option to change",
+        "default": "xp_cmdshell",
+        "type": "cstr",
+        "required": false,
+        "choices": [
+          "xp_cmdshell"
+        ]
+      },
+      {
+        "name": "value",
+        "description": "New value for the configuration option",
+        "default": "0",
+        "type": "cstr",
+        "required": false,
+        "choices": [
+          "0"
+        ]
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-enableole",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Enable OLE Automation Procedures",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/togglemodule/togglemodule.x64.o",
+        "SQL/togglemodule/togglemodule.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "link",
+        "description": "Linked server to route the query through (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "impersonate",
+        "description": "SQL login to impersonate on the target server (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "module",
+        "description": "SQL configuration option to change",
+        "default": "Ole Automation Procedures",
+        "type": "cstr",
+        "required": false,
+        "choices": [
+          "Ole Automation Procedures"
+        ]
+      },
+      {
+        "name": "value",
+        "description": "New value for the configuration option",
+        "default": "1",
+        "type": "cstr",
+        "required": false,
+        "choices": [
+          "1"
+        ]
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-disableole",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Disable OLE Automation Procedures",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/togglemodule/togglemodule.x64.o",
+        "SQL/togglemodule/togglemodule.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "link",
+        "description": "Linked server to route the query through (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "impersonate",
+        "description": "SQL login to impersonate on the target server (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "module",
+        "description": "SQL configuration option to change",
+        "default": "Ole Automation Procedures",
+        "type": "cstr",
+        "required": false,
+        "choices": [
+          "Ole Automation Procedures"
+        ]
+      },
+      {
+        "name": "value",
+        "description": "New value for the configuration option",
+        "default": "0",
+        "type": "cstr",
+        "required": false,
+        "choices": [
+          "0"
+        ]
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-impersonate",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Enumerate SQL logins the current user is allowed to impersonate",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/impersonate/impersonate.x64.o",
+        "SQL/impersonate/impersonate.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-info",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Gather version, edition, and configuration information from a SQL server",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/info/info.x64.o",
+        "SQL/info/info.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-links",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Enumerate linked servers reachable from a SQL server",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/links/links.x64.o",
+        "SQL/links/links.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "link",
+        "description": "Linked server to route the query through (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "impersonate",
+        "description": "SQL login to impersonate on the target server (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-olecmd",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Execute a system command through SQL OLE Automation Procedures",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/olecmd/olecmd.x64.o",
+        "SQL/olecmd/olecmd.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "link",
+        "description": "Linked server to route the query through (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "impersonate",
+        "description": "SQL login to impersonate on the target server (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "command",
+        "description": "Operating-system command to execute",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-query",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Execute a custom SQL query and print the results",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/query/query.x64.o",
+        "SQL/query/query.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "link",
+        "description": "Linked server to route the query through (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "impersonate",
+        "description": "SQL login to impersonate on the target server (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "query",
+        "description": "SQL query to execute",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-rows",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Count the rows in a table",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/rows/rows.x64.o",
+        "SQL/rows/rows.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "table",
+        "description": "Table to count rows in (optionally schema-qualified)",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "link",
+        "description": "Linked server to route the query through (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "impersonate",
+        "description": "SQL login to impersonate on the target server (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-search",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Search the tables of a database for a column name",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/search/search.x64.o",
+        "SQL/search/search.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "link",
+        "description": "Linked server to route the query through (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "impersonate",
+        "description": "SQL login to impersonate on the target server (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "keyword",
+        "description": "Column-name fragment to search for",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-smb",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Coerce NetNTLM authentication to a listener through xp_dirtree",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/smb/smb.x64.o",
+        "SQL/smb/smb.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "link",
+        "description": "Linked server to route the query through (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "impersonate",
+        "description": "SQL login to impersonate on the target server (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "listener",
+        "description": "Listener UNC path or IP, e.g. \\\\10.0.0.5\\share or 10.0.0.5",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-tables",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Enumerate the tables in a database",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/tables/tables.x64.o",
+        "SQL/tables/tables.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "link",
+        "description": "Linked server to route the query through (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "impersonate",
+        "description": "SQL login to impersonate on the target server (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-users",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Enumerate the users with access to a SQL server",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/users/users.x64.o",
+        "SQL/users/users.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "link",
+        "description": "Linked server to route the query through (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "impersonate",
+        "description": "SQL login to impersonate on the target server (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-whoami",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Show the logged-in, mapped, and impersonated SQL users and their roles",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/whoami/whoami.x64.o",
+        "SQL/whoami/whoami.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "link",
+        "description": "Linked server to route the query through (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "impersonate",
+        "description": "SQL login to impersonate on the target server (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sql-xpcmd",
+    "author": "Tw1sm",
+    "date": "2026-09-26",
+    "comment": "Execute a system command through xp_cmdshell",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "SQL/xpcmd/xpcmd.x64.o",
+        "SQL/xpcmd/xpcmd.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "server",
+        "description": "Target SQL Server host, optionally host\\instance. Use 'localhost' for the local server.",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "database",
+        "description": "Initial database to connect to (empty = master)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "link",
+        "description": "Linked server to route the query through (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "impersonate",
+        "description": "SQL login to impersonate on the target server (empty = none)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "command",
+        "description": "Operating-system command to execute",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  }
+]

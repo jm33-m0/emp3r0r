@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -16,17 +15,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
-
-// modulesRootFromTest resolves the <repo>/core/modules directory relative to
-// this test file (core/internal/cc/modules).
-func modulesRootFromTest(t *testing.T) string {
-	t.Helper()
-	_, thisFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("unable to resolve caller path")
-	}
-	return filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(filepath.Dir(thisFile)))), "modules")
-}
 
 // readOrSkip reads a fixture and skips the test when it is missing. The
 // COFFLoader DLL and BOF object files are gitignored build artifacts.

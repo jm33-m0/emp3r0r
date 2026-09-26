@@ -1,0 +1,19 @@
+#author Cornelis de Plaa
+#@outflank.nl
+
+#register help
+beacon_command_register("psc", "Show detailed information from processes with established TCP and RDP connections.",
+	"Synopsis: psc\n\n" .
+	"Shows a detailed list of all processes with established TCP and RDP connections.\n");
+
+alias psc {
+    $bid = $1;
+
+    # Read in the right BOF file
+    $handle = openf(script_resource("Psc." . barch($bid) . ".o"));
+    $data   = readb($handle, -1);
+    closef($handle);
+
+    blog($bid, "Tasked beacon to enumerate processes with established TCP and RDP connections.");
+    beacon_inline_execute($bid, $data, "go", $null);
+}

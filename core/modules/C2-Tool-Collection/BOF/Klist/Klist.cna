@@ -1,0 +1,43 @@
+#author Cornelis de Plaa
+#@outflank.nl
+
+beacon_command_register("klist", "Displays a list of currently cached Kerberos tickets.",
+    "Synopsis: klist [optional purge]\n" .
+	"          klist [optional get] [SPN]\n");
+
+alias klist {
+    $bid = $1;
+
+    $input = substr($0, 6);
+    @args = split(' ', $input);
+
+    $command = @args[0];
+    $spn = @args[1];
+
+    # Read in the right BOF file
+    $handle = openf(script_resource("Klist." . barch($bid) . ".o"));
+    $data   = readb($handle, -1);
+    closef($handle);
+
+    # Pack our arguments
+    if ($command eq "get") {
+        blog($bid, "Requesting a service ticket (tgs).");
+
+        if ($spn eq "") {
+            berror($bid, "Please specify a SPN.");
+            return;
+        }
+
+        $arg_data  = bof_pack($bid, "ZZ", $command, $spn);
+        beacon_inline_execute($bid, $data, "go", $arg_data);
+    }
+    else if ($command eq "purge") {
+        blog($bid, "Purging all Kerberos tickets.");
+        $arg_data  = bof_pack($bid, "Z", $command);
+        beacon_inline_execute($bid, $data, "go", $arg_data);
+    }
+    else {
+        blog($bid, "Enumerating Kerberos tickets.");
+        beacon_inline_execute($bid, $data, "go", $null);
+    }
+}

@@ -1,0 +1,34 @@
+#author cedric
+#@outflank.nl
+
+#register help
+beacon_command_register("remotepipelist", "List the named pipes on a remote system",
+	"Synopsis:\n" .
+	"    remotepipelist <targetIP> <username> <password>\n" .
+	"    remotepipelist 127.0.0.1 DOMAIN\\domainuser Password123\n\n" .
+	"List the named pipes on a remote system\n");
+
+alias remotepipelist {
+	inline(&RemotePipeList_invoke)
+}
+
+alias RemotePipeList {
+	inline(&RemotePipeList_invoke)
+}
+
+sub RemotePipeList_invoke {
+	if ($2 eq "") {
+		blog($1, "\n" . beacon_command_detail("remotepipelist"));
+		return;
+	}
+
+    if (-is64 $1) {
+		blog($1, "RemotePipeList by @outflanknl");
+		bexecute_assembly($1, script_resource("RemotePipeList.exe"), "$2 $3 $4");
+        return;
+    }else{
+        berror($1, "RemotePipeList is x64 only.");
+        return;
+    }
+
+}

@@ -1,0 +1,19 @@
+#author Cornelis de Plaa
+#@outflank.nl
+
+#register help
+beacon_command_register("psk", "Show detailed information from the windows kernel and loaded driver modules.",
+	"Synopsis: psk\n\n" .
+	"Shows a detailed list of the windows kernel and all loaded kernel modules.\n");
+
+alias psk {
+    $bid = $1;
+
+    # Read in the right BOF file
+    $handle = openf(script_resource("Psk." . barch($bid) . ".o"));
+    $data   = readb($handle, -1);
+    closef($handle);
+
+    blog($bid, "Enumerating the windows kernel and loaded driver modules.");
+    beacon_inline_execute($bid, $data, "go", $null);
+}

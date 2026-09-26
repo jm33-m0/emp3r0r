@@ -1,0 +1,35 @@
+#KerbHash
+#author Cornelis de Plaa
+#@outflank.nl
+
+#register help
+beacon_command_register("KerbHash", "Hash passwords to kerberos keys.",
+	"Calculate rc4_hmac, aes128_cts_hmac_sha1, aes256_cts_hmac_sha1, and des_cbc_md5 hashes.\n\n" .
+	"Synopsis: KerbHash [password] [username] [domain.fqdn]\n\n");
+
+alias KerbHash {
+	$bid = $1;
+
+	$input = substr($0, 9);
+	@args = split(' ', $input);
+
+	$password = @args[0];
+	$username = @args[1];
+	$domain = @args[2];
+
+	if ($password eq "" || $username eq "" || $domain eq "") {
+		berror($bid, "Please specify password, username and domain.");
+		return;
+	}
+
+	# Read in the right BOF file
+	$handle = openf(script_resource("KerbHash." . barch($bid) . ".o"));
+	$data   = readb($handle, -1);
+	closef($handle);
+
+	# Pack our arguments
+	$arg_data  = bof_pack($bid, "ZZZ", $password, $username, $domain);
+
+	blog($bid, "KerbHash BOF by Outflank");
+	beacon_inline_execute($bid, $data, "go", $arg_data);
+}

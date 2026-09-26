@@ -1,0 +1,30 @@
+#author Cornelis de Plaa
+#@outflank.nl
+
+beacon_command_register("Smbinfo", "Gather remote system version info.",
+    "Synopsis: Smbinfo [target]\n\n" .
+    "Use NetWkstaGetInfo API to gather remote system version info.\n");
+
+alias Smbinfo {
+    $bid = $1;
+
+    $input = substr($0, 8);
+    @args = split(' ', $input);
+
+    $target = @args[0];
+
+    if ($target eq "") {
+	berror($bid, "Specify an ip or hostname");
+	return;
+    }
+
+    # Read in the right BOF file
+    $handle = openf(script_resource("Smbinfo." . barch($bid) . ".o"));
+    $data   = readb($handle, -1);
+    closef($handle);
+
+    # Pack our arguments
+    $arg_data  = bof_pack($bid, "Z", $target);
+
+    beacon_inline_execute($bid, $data, "go", $arg_data);
+}

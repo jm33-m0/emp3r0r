@@ -1,0 +1,1063 @@
+[
+  {
+    "name": "getmachineaccountquota",
+    "author": "Cornelis de Plaa (Outflank)",
+    "date": "2026-09-26",
+    "comment": "Read the ms-DS-MachineAccountQuota value from Active Directory via ADSI",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/AddMachineAccount/GetMachineAccountQuota.x64.o",
+        "BOF/AddMachineAccount/GetMachineAccountQuota.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "addmachineaccount",
+    "author": "Cornelis de Plaa (Outflank)",
+    "date": "2026-09-26",
+    "comment": "Add a rogue machine account to Active Directory via ADSI",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/AddMachineAccount/AddMachineAccount.x64.o",
+        "BOF/AddMachineAccount/AddMachineAccount.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "computername",
+        "description": "SAM account name for the new computer, without the trailing '$'",
+        "default": "",
+        "type": "wstr",
+        "required": true
+      },
+      {
+        "name": "password",
+        "description": "Password for the new machine account. Leave empty to generate a random 32-character password.",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "delmachineaccount",
+    "author": "Cornelis de Plaa (Outflank)",
+    "date": "2026-09-26",
+    "comment": "Delete a computer account from Active Directory via ADSI",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/AddMachineAccount/DelMachineAccount.x64.o",
+        "BOF/AddMachineAccount/DelMachineAccount.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "computername",
+        "description": "SAM account name of the computer to delete, without the trailing '$'",
+        "default": "",
+        "type": "wstr",
+        "required": true
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "askcreds",
+    "author": "Cornelis de Plaa (Outflank)",
+    "date": "2026-09-26",
+    "comment": "Prompt the logged-on user for credentials with a Windows credential dialog",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/Askcreds/Askcreds.x64.o",
+        "BOF/Askcreds/Askcreds.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "reason",
+        "description": "Reason shown in the credential prompt. Defaults to 'Restore Network Connection'.",
+        "default": "Restore Network Connection",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "cve-2022-26923",
+    "author": "Cornelis de Plaa (Outflank)",
+    "date": "2026-09-26",
+    "comment": "ADCS privilege escalation (CVE-2022-26923): add a machine account with a spoofed dNSHostName",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/CVE-2022-26923/CVE-2022-26923.x64.o",
+        "BOF/CVE-2022-26923/CVE-2022-26923.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "computername",
+        "description": "SAM account name for the new computer, without the trailing '$'",
+        "default": "",
+        "type": "wstr",
+        "required": true
+      },
+      {
+        "name": "password",
+        "description": "Password for the new machine account. Leave empty to generate a random 32-character password.",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "domaininfo",
+    "author": "Cornelis de Plaa (Outflank)",
+    "date": "2026-09-26",
+    "comment": "Enumerate Active Directory domain information (name, GUID, SID, DCs, FSMO roles) via ADSI",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/Domaininfo/Domaininfo.x64.o",
+        "BOF/Domaininfo/Domaininfo.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "findprochandle",
+    "author": "Cornelis de Plaa (Outflank)",
+    "date": "2026-09-26",
+    "comment": "Find processes holding a handle to the named process using direct system calls",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/FindObjects/FindProcHandle.x64.o",
+        "BOF/FindObjects/FindProcHandle.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "process",
+        "description": "Target process name, e.g. lsass.exe",
+        "default": "",
+        "type": "wstr",
+        "required": true
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "findmodule",
+    "author": "Cornelis de Plaa (Outflank)",
+    "date": "2026-09-26",
+    "comment": "Find processes with a specific module loaded using direct system calls",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/FindObjects/FindModule.x64.o",
+        "BOF/FindObjects/FindModule.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "module",
+        "description": "Module name to search for, e.g. clr.dll",
+        "default": "",
+        "type": "wstr",
+        "required": true
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "kerbhash",
+    "author": "Cornelis de Plaa (Outflank)",
+    "date": "2026-09-26",
+    "comment": "Hash a password into Kerberos keys (RC4-HMAC, AES128/256-CTS-HMAC-SHA1, DES-CBC-MD5)",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/KerbHash/KerbHash.x64.o",
+        "BOF/KerbHash/KerbHash.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "password",
+        "description": "Cleartext password to hash",
+        "default": "",
+        "type": "wstr",
+        "required": true
+      },
+      {
+        "name": "username",
+        "description": "sAMAccountName the password belongs to",
+        "default": "",
+        "type": "wstr",
+        "required": true
+      },
+      {
+        "name": "domain",
+        "description": "Fully qualified domain name, e.g. corp.local",
+        "default": "",
+        "type": "wstr",
+        "required": true
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "kerberoast",
+    "author": "Cornelis de Plaa (Outflank)",
+    "date": "2026-09-26",
+    "comment": "Enumerate SPN-enabled accounts or request crackable TGS-REP service tickets",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/Kerberoast/Kerberoast.x64.o",
+        "BOF/Kerberoast/Kerberoast.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "action",
+        "description": "list = enumerate SPN-enabled accounts, roast = request TGS tickets. The -no-aes variants skip AES-only accounts.",
+        "default": "",
+        "type": "wstr",
+        "required": true,
+        "choices": [
+          "list",
+          "list-no-aes",
+          "roast",
+          "roast-no-aes"
+        ]
+      },
+      {
+        "name": "filter",
+        "description": "sAMAccountName filter (wildcards allowed). Default: * (all accounts). Roasting without a filter is OPSEC-unsafe.",
+        "default": "*",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "klist",
+    "author": "Cornelis de Plaa (Outflank)",
+    "date": "2026-09-26",
+    "comment": "List, purge, or request Kerberos tickets from the current logon session",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/Klist/Klist.x64.o",
+        "BOF/Klist/Klist.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "command",
+        "description": "empty = list cached tickets, purge = delete all tickets, get = request a service ticket for the SPN below",
+        "default": "",
+        "type": "wstr",
+        "required": false,
+        "choices": [
+          "",
+          "purge",
+          "get"
+        ]
+      },
+      {
+        "name": "spn",
+        "description": "Service principal name to request when command=get, e.g. cifs/dc01.corp.local",
+        "default": "",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "lapsdump",
+    "author": "Cornelis de Plaa (Outflank)",
+    "date": "2026-09-26",
+    "comment": "Dump the LAPS password stored on a computer object in Active Directory",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/Lapsdump/Lapsdump.x64.o",
+        "BOF/Lapsdump/Lapsdump.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "target",
+        "description": "Hostname or IP of the computer whose LAPS password to read",
+        "default": "",
+        "type": "wstr",
+        "required": true
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "petitpotam",
+    "author": "Cornelis de Plaa, b4rtik (Outflank)",
+    "date": "2026-09-26",
+    "comment": "Coerce a Windows host into authenticating via MS-EFSRPC (PetitPotam)",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/PetitPotam/PetitPotam.x64.o",
+        "BOF/PetitPotam/PetitPotam.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "capture_server",
+        "description": "IP address or hostname of the listener that receives the coerced authentication",
+        "default": "",
+        "type": "wstr",
+        "required": true
+      },
+      {
+        "name": "target_server",
+        "description": "Host to coerce (IP address or hostname)",
+        "default": "",
+        "type": "wstr",
+        "required": true
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "psc",
+    "author": "Cornelis de Plaa (Outflank)",
+    "date": "2026-09-26",
+    "comment": "Show processes with established TCP or RDP connections",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/Psc/Psc.x64.o",
+        "BOF/Psc/Psc.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "psk",
+    "author": "Cornelis de Plaa (Outflank)",
+    "date": "2026-09-26",
+    "comment": "Enumerate the Windows kernel and loaded driver modules, flagging security products",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/Psk/Psk.x64.o",
+        "BOF/Psk/Psk.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "psm",
+    "author": "Cornelis de Plaa (Outflank)",
+    "date": "2026-09-26",
+    "comment": "Show detailed information about one process (modules, handles, TCP connections)",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/Psm/Psm.x64.o",
+        "BOF/Psm/Psm.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "pid",
+        "description": "Process ID to inspect",
+        "default": "",
+        "type": "int",
+        "required": true
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "psw",
+    "author": "Cornelis de Plaa (Outflank)",
+    "date": "2026-09-26",
+    "comment": "Show window titles of processes with active windows",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/Psw/Psw.x64.o",
+        "BOF/Psw/Psw.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "psx",
+    "author": "Cornelis de Plaa (Outflank)",
+    "date": "2026-09-26",
+    "comment": "List all running processes with a summary of installed security products",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/Psx/Psx.x64.o",
+        "BOF/Psx/Psx.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "extended",
+        "description": "0 = summary (default), 1 = detailed output",
+        "default": "0",
+        "type": "short",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "psxx",
+    "author": "Cornelis de Plaa (Outflank)",
+    "date": "2026-09-26",
+    "comment": "List all running processes with detailed module and security product information",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/Psx/Psx.x64.o",
+        "BOF/Psx/Psx.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "extended",
+        "description": "0 = summary, 1 = detailed output (default)",
+        "default": "1",
+        "type": "short",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "reconad",
+    "author": "Cornelis de Plaa (Outflank)",
+    "date": "2026-09-26",
+    "comment": "Run a custom LDAP filter against Active Directory via ADSI and print selected attributes",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/ReconAD/ReconAD.x64.o",
+        "BOF/ReconAD/ReconAD.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "object_type",
+        "description": "Query selector; always 'custom' for this command (the reconad-* variants fix it internally)",
+        "default": "custom",
+        "type": "wstr",
+        "required": false,
+        "choices": [
+          "custom"
+        ]
+      },
+      {
+        "name": "filter",
+        "description": "LDAP filter, e.g. (&(objectClass=user)(objectCategory=person)(sAMAccountName=*admin*))",
+        "default": "",
+        "type": "wstr",
+        "required": true
+      },
+      {
+        "name": "attributes",
+        "description": "Comma-separated LDAP attributes to return, or -all for every attribute",
+        "default": "-all",
+        "type": "wstr",
+        "required": false
+      },
+      {
+        "name": "max_results",
+        "description": "Maximum number of results; 0 means no limit",
+        "default": "0",
+        "type": "int",
+        "required": false
+      },
+      {
+        "name": "usegc",
+        "description": "1 = query the Global Catalog (GC), 0 = query the domain (LDAP)",
+        "default": "0",
+        "type": "int",
+        "required": false
+      },
+      {
+        "name": "server",
+        "description": "server:port to query; -noserver uses the DC discovered from the current domain",
+        "default": "-noserver",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "reconad-users",
+    "author": "Cornelis de Plaa (Outflank)",
+    "date": "2026-09-26",
+    "comment": "Query Active Directory user objects via ADSI and print selected attributes",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/ReconAD/ReconAD.x64.o",
+        "BOF/ReconAD/ReconAD.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "object_type",
+        "description": "Query selector; fixed to 'users'",
+        "default": "users",
+        "type": "wstr",
+        "required": false,
+        "choices": [
+          "users"
+        ]
+      },
+      {
+        "name": "object",
+        "description": "Username or wildcard pattern, e.g. *admin*",
+        "default": "",
+        "type": "wstr",
+        "required": true
+      },
+      {
+        "name": "attributes",
+        "description": "Comma-separated LDAP attributes to return, or -all for every attribute",
+        "default": "-all",
+        "type": "wstr",
+        "required": false
+      },
+      {
+        "name": "max_results",
+        "description": "Maximum number of results; 0 means no limit",
+        "default": "0",
+        "type": "int",
+        "required": false
+      },
+      {
+        "name": "usegc",
+        "description": "1 = query the Global Catalog (GC), 0 = query the domain (LDAP)",
+        "default": "0",
+        "type": "int",
+        "required": false
+      },
+      {
+        "name": "server",
+        "description": "server:port to query; -noserver uses the current domain DC",
+        "default": "-noserver",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "reconad-groups",
+    "author": "Cornelis de Plaa (Outflank)",
+    "date": "2026-09-26",
+    "comment": "Query Active Directory group objects via ADSI and print selected attributes",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/ReconAD/ReconAD.x64.o",
+        "BOF/ReconAD/ReconAD.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "object_type",
+        "description": "Query selector; fixed to 'groups'",
+        "default": "groups",
+        "type": "wstr",
+        "required": false,
+        "choices": [
+          "groups"
+        ]
+      },
+      {
+        "name": "object",
+        "description": "Group name or wildcard pattern, e.g. *admin*",
+        "default": "",
+        "type": "wstr",
+        "required": true
+      },
+      {
+        "name": "attributes",
+        "description": "Comma-separated LDAP attributes to return, or -all for every attribute",
+        "default": "-all",
+        "type": "wstr",
+        "required": false
+      },
+      {
+        "name": "max_results",
+        "description": "Maximum number of results; 0 means no limit",
+        "default": "0",
+        "type": "int",
+        "required": false
+      },
+      {
+        "name": "usegc",
+        "description": "1 = query the Global Catalog (GC), 0 = query the domain (LDAP)",
+        "default": "0",
+        "type": "int",
+        "required": false
+      },
+      {
+        "name": "server",
+        "description": "server:port to query; -noserver uses the current domain DC",
+        "default": "-noserver",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "reconad-computers",
+    "author": "Cornelis de Plaa (Outflank)",
+    "date": "2026-09-26",
+    "comment": "Query Active Directory computer objects via ADSI and print selected attributes",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/ReconAD/ReconAD.x64.o",
+        "BOF/ReconAD/ReconAD.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "object_type",
+        "description": "Query selector; fixed to 'computers'",
+        "default": "computers",
+        "type": "wstr",
+        "required": false,
+        "choices": [
+          "computers"
+        ]
+      },
+      {
+        "name": "object",
+        "description": "Computer name or wildcard pattern, e.g. *srv*",
+        "default": "",
+        "type": "wstr",
+        "required": true
+      },
+      {
+        "name": "attributes",
+        "description": "Comma-separated LDAP attributes to return, or -all for every attribute",
+        "default": "-all",
+        "type": "wstr",
+        "required": false
+      },
+      {
+        "name": "max_results",
+        "description": "Maximum number of results; 0 means no limit",
+        "default": "0",
+        "type": "int",
+        "required": false
+      },
+      {
+        "name": "usegc",
+        "description": "1 = query the Global Catalog (GC), 0 = query the domain (LDAP)",
+        "default": "0",
+        "type": "int",
+        "required": false
+      },
+      {
+        "name": "server",
+        "description": "server:port to query; -noserver uses the current domain DC",
+        "default": "-noserver",
+        "type": "wstr",
+        "required": false
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "smbinfo",
+    "author": "Cornelis de Plaa (Outflank)",
+    "date": "2026-09-26",
+    "comment": "Get remote system version information with NetWkstaGetInfo (no SMB port scan)",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/Smbinfo/Smbinfo.x64.o",
+        "BOF/Smbinfo/Smbinfo.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "target",
+        "description": "Remote IP address or hostname",
+        "default": "",
+        "type": "wstr",
+        "required": true
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sprayad",
+    "author": "Cornelis de Plaa (Outflank)",
+    "date": "2026-09-26",
+    "comment": "Password-spray Active Directory accounts over Kerberos or LDAP",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/SprayAD/SprayAD.x64.o",
+        "BOF/SprayAD/SprayAD.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [
+      {
+        "name": "password",
+        "description": "Password to spray against every candidate account",
+        "default": "",
+        "type": "wstr",
+        "required": true
+      },
+      {
+        "name": "filter",
+        "description": "sAMAccountName filter for targeted accounts (wildcards allowed). Default: *",
+        "default": "*",
+        "type": "wstr",
+        "required": false
+      },
+      {
+        "name": "authservice",
+        "description": "empty = authenticate with Kerberos, ldap = use an LDAP bind",
+        "default": "",
+        "type": "wstr",
+        "required": false,
+        "choices": [
+          "",
+          "ldap"
+        ]
+      }
+    ],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "startwebclient",
+    "author": "Cornelis de Plaa, Stan Hegt (Outflank)",
+    "date": "2026-09-26",
+    "comment": "Start the WebClient service in the current user context through a service trigger",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/StartWebClient/StartWebClient.x64.o",
+        "BOF/StartWebClient/StartWebClient.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "wdtoggle",
+    "author": "Cornelis de Plaa (Outflank)",
+    "date": "2026-09-26",
+    "comment": "Patch LSASS to enable WDigest credential caching and bypass Credential Guard",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/WdToggle/WdToggle.x64.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "winver",
+    "author": "Cornelis de Plaa (Outflank)",
+    "date": "2026-09-26",
+    "comment": "Display the Windows version, build number, and update build revision",
+    "is_local": false,
+    "platform": "Windows",
+    "path": "",
+    "fileless": true,
+    "agent_config": {
+      "exec": "",
+      "files": [
+        "BOF/Winver/Winver.x64.o",
+        "BOF/Winver/Winver.x86.o"
+      ],
+      "in_memory": true,
+      "type": "coff",
+      "interactive": false
+    },
+    "parameters": [],
+    "invocation": {
+      "coff_export": "go"
+    }
+  }
+]
