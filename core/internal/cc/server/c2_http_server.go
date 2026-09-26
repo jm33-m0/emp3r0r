@@ -40,6 +40,16 @@ var (
 	ipLimiter     = &ipRateLimiter{}
 )
 
+// allowClientRequest applies the shared per-IP and global rate limiters. It
+// returns false when the request must be rejected with 429.
+func allowClientRequest(req *http.Request) bool {
+	ip, _, err := net.SplitHostPort(req.RemoteAddr)
+	if err != nil {
+		ip = req.RemoteAddr
+	}
+	return ipLimiter.getLimiter(ip).Allow() && globalLimiter.Allow()
+}
+
 // StartC2HTTPServer starts the plain HTTP transport server.
 func StartC2HTTPServer() {
 	if live.RuntimeConfig.CCHTTPPort == "" {
@@ -60,14 +70,8 @@ func StartC2HTTPServer() {
 		c2Path = "/"
 	}
 	mux.HandleFunc(c2Path, func(w http.ResponseWriter, req *http.Request) {
-		// Rate limiting
-		ip, _, err := net.SplitHostPort(req.RemoteAddr)
-		if err != nil {
-			ip = req.RemoteAddr
-		}
-
 		if !transport.IsActiveHTTPServerSession(req, &live.RuntimeConfig.MalleableC2) {
-			if !ipLimiter.getLimiter(ip).Allow() || !globalLimiter.Allow() {
+			if !allowClientRequest(req) {
 				logging.Warningf("C2 HTTP Server: rate limit exceeded for %s", req.RemoteAddr)
 				http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 				return

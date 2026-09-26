@@ -24,6 +24,12 @@ func registerPreflightFeature(mux *http.ServeMux) {
 
 	logging.Infof("Registering preflight endpoint at %s", u.Path)
 	mux.HandleFunc(u.Path, func(w http.ResponseWriter, req *http.Request) {
+		if !allowClientRequest(req) {
+			logging.Warningf("Preflight: rate limit exceeded for %s", req.RemoteAddr)
+			http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+			return
+		}
+
 		if req.Method != live.RuntimeConfig.PreflightMethod {
 			http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 			return

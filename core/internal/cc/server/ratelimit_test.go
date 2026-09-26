@@ -1,9 +1,13 @@
 package server
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"golang.org/x/time/rate"
+
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
 )
 
 func TestRateLimiterDirect(t *testing.T) {
@@ -46,5 +50,43 @@ func TestRateLimiterDirect(t *testing.T) {
 	}
 	if lim2.Allow() {
 		t.Errorf("expected IP limiter to block after 20 requests")
+	}
+}
+
+// TestPreflightRateLimited verifies the preflight endpoint shares the same
+// per-IP and global limiters as the C2 transport handlers.
+func TestPreflightRateLimited(t *testing.T) {
+	origGlobal := globalLimiter
+	origIP := ipLimiter
+	origEnabled := live.RuntimeConfig.PreflightEnabled
+	origURL := live.RuntimeConfig.PreflightURL
+	origMethod := live.RuntimeConfig.PreflightMethod
+	t.Cleanup(func() {
+		globalLimiter = origGlobal
+		ipLimiter = origIP
+		live.RuntimeConfig.PreflightEnabled = origEnabled
+		live.RuntimeConfig.PreflightURL = origURL
+		live.RuntimeConfig.PreflightMethod = origMethod
+	})
+
+	// Consume the only global token so the request is rejected before any
+	// preflight crypto runs.
+	globalLimiter = rate.NewLimiter(rate.Limit(1), 1)
+	globalLimiter.Allow()
+	ipLimiter = &ipRateLimiter{}
+	live.RuntimeConfig.PreflightEnabled = true
+	live.RuntimeConfig.PreflightURL = "http://example.com/preflight"
+	live.RuntimeConfig.PreflightMethod = http.MethodPost
+
+	mux := http.NewServeMux()
+	registerPreflightFeature(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/preflight", nil)
+	req.RemoteAddr = "1.2.3.4:1234"
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("preflight endpoint should be rate limited, got %d", rec.Code)
 	}
 }

@@ -2,7 +2,6 @@ package server
 
 import (
 	"fmt"
-	"net"
 	"net/http"
 	"time"
 
@@ -49,13 +48,7 @@ func StartC2H2StreamServer() {
 
 func registerC2H2StreamAcceptHandler(mux *http.ServeMux, channelWrapper transport.C2ChannelWrapper) {
 	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
-		// Rate limiting
-		ip, _, err := net.SplitHostPort(req.RemoteAddr)
-		if err != nil {
-			ip = req.RemoteAddr
-		}
-
-		if !ipLimiter.getLimiter(ip).Allow() || !globalLimiter.Allow() {
+		if !allowClientRequest(req) {
 			logging.Warningf("C2 H2 stream server: rate limit exceeded for %s", req.RemoteAddr)
 			http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
 			return
