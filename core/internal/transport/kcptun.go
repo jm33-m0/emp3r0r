@@ -93,7 +93,7 @@ func NewConfig(remote_addr, target, port, password, salt string) *Config {
 	config.Key = password      // pre-shared secret between client and server
 	config.Crypt = "aes"       // encryption method, e.g., aes, aes-128, aes-192, salsa20, blowfish, twofish, etc.
 	config.Mode = "fast3"      // Performance profile, e.g., fast, fast2, fast3, normal, or manual
-	config.QPP = false         // Quantum Permutation Pads (QPP) for added encryption security
+	config.QPP = true          // Quantum Permutation Pads (QPP) obfuscation, on by default
 	config.QPPCount = 67       // Number of pads to use for QPP (must be a prime number)
 	config.Conn = 1            // Number of UDP connections to the server
 	config.AutoExpire = 0      // Auto expiration time (in seconds) for a single UDP connection, 0 disables auto-expire
