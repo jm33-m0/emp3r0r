@@ -4,7 +4,6 @@ package shellcode_stager
 
 import (
 	"bytes"
-	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/sha256"
@@ -128,6 +127,110 @@ func signUUID(uuidStr, keyFile string) (string, error) {
 		return "", err
 	}
 	return base64.URLEncoding.EncodeToString(sig), nil
+}
+
+// waitForC2Listener blocks until a TCP listener accepts connections on addr, or
+// fails the test. The stager-run agent exits on the first failed preflight (by
+// design, so the Go runtime is torn down for the supervisor), so the C2 must be
+// reachable before the stub is launched; a fixed sleep is not enough on slow or
+// loaded runners.
+func waitForC2Listener(t *testing.T, addr string) {
+	t.Helper()
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		conn, err := net.DialTimeout("tcp", addr, time.Second)
+		if err == nil {
+			_ = conn.Close()
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	t.Fatalf("C2 listener on %s did not become ready within 30s", addr)
+}
+
+// startRunnerAndWaitCheckin launches the stager runner and waits for a full
+// agent check-in.
+//
+// A stager-run agent exits on the first failed C2 operation by design, so the
+// supervising stager can tear down its Go runtime and re-exec it. This test has
+// no supervisor, so a runner that exits before check-in is relaunched a bounded
+// number of times, mirroring the stager's recycle behavior. The returned
+// command is the runner still alive after a successful check-in.
+func startRunnerAndWaitCheckin(t *testing.T, runnerBin, artifact, homeDir, agentUUID string) (*exec.Cmd, *def.Emp3r0rAgent, *bytes.Buffer, *bytes.Buffer, <-chan error) {
+	t.Helper()
+	const (
+		maxAttempts    = 3
+		checkinTimeout = 60 * time.Second
+	)
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		var stdout, stderr bytes.Buffer
+		cmdRunner := exec.Command(runnerBin, artifact)
+		logging.Infof("Running stager runner (attempt %d/%d)...", attempt, maxAttempts)
+		cmdRunner.Stdout = &stdout
+		cmdRunner.Stderr = &stderr
+		cmdRunner.Env = append(os.Environ(),
+			fmt.Sprintf("HOME=%s", homeDir),
+			"STAGER_TEST=1",
+		)
+		if err := cmdRunner.Start(); err != nil {
+			t.Fatalf("Failed to start stager: %v", err)
+		}
+		doneChan := make(chan error, 1)
+		go func() { doneChan <- cmdRunner.Wait() }()
+
+		var agent *def.Emp3r0rAgent
+		start := time.Now()
+		exited := false
+		for time.Since(start) <= checkinTimeout {
+			live.RangeAgents(func(rec *live.AgentRecord) bool {
+				if rec.Agent.Tag != "" && rec.Control != nil && rec.Control.Conn != nil {
+					agent = rec.Agent
+					return false
+				}
+				return true
+			})
+			if agent != nil {
+				logging.Successf("Agent checked in! Tag: %s", agent.Tag)
+				return cmdRunner, agent, &stdout, &stderr, doneChan
+			}
+			select {
+			case err := <-doneChan:
+				logging.Warningf("Stager runner attempt %d exited before check-in: %v", attempt, err)
+				exited = true
+			default:
+			}
+			if exited {
+				break
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+
+		// A runner that is still alive but never checked in is a hard failure,
+		// not a transient exit worth retrying, so fail without burning the
+		// check-in timeout again.
+		if !exited {
+			fmt.Printf("Runner Stdout:\n%s\n", stdout.String())
+			fmt.Printf("Runner Stderr:\n%s\n", stderr.String())
+			t.Fatalf("Timeout waiting for agent checkin")
+		}
+
+		// Only surface the runner output once every attempt is exhausted, so a
+		// recovered transient does not hide the state behind a hard failure.
+		if attempt == maxAttempts {
+			fmt.Printf("Runner Stdout:\n%s\n", stdout.String())
+			fmt.Printf("Runner Stderr:\n%s\n", stderr.String())
+			t.Fatalf("Stager runner exited before agent checkin after %d attempts", maxAttempts)
+		}
+
+		// A partial attempt may have left a session, registry entry, or pinned
+		// TOFU key behind; clear it so the same identity can enroll cleanly on
+		// the retry. Absence is fine, so the errors are ignored.
+		_ = agents.EndSession(agentUUID)
+		_ = agents.RemoveAgent(agentUUID)
+		live.ForgetAgent(agentUUID)
+	}
+	return nil, nil, nil, nil, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -439,11 +542,22 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 		go server.StartC2HTTPServer()
 	}
 	defer func() {
-		if network.EmpTLSServer != nil {
-			network.EmpTLSServer.Shutdown(network.EmpTLSServerCtx)
+		network.StopEmpServers()
+		if network.EmpKCPCancel != nil {
+			network.EmpKCPCancel()
 		}
 	}()
-	time.Sleep(2 * time.Second)
+
+	// Wait until the endpoint the agent actually dials is accepting
+	// connections: for http_poll that is the plain-HTTP port, for h2conn the
+	// TLS/h2 port. Starting a new stack shuts the previous one down first, so
+	// the old listener closing and the new one binding is not instantaneous.
+	// The stager-run agent exits on the first failed preflight, so this must be
+	// true before the runner is launched.
+	waitForC2Listener(t, fmt.Sprintf("127.0.0.1:%s", c2PortStr))
+	if mode == "http_poll" {
+		waitForC2Listener(t, fmt.Sprintf("127.0.0.1:%s", c2HttpPortStr))
+	}
 
 	// -----------------------------------------------------------------------
 	// 7. Build the stager shellcode via build.sh.
@@ -586,6 +700,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	if !listenerReady {
 		t.Fatalf("Stager listener failed to start on port %s", stagerPortStr)
 	}
+	defer listener.StopHTTP()
 
 	// -----------------------------------------------------------------------
 	// 9. Build a thin C runner that mmap's the stager shellcode and jumps to
@@ -622,56 +737,11 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 		t.Fatalf("Failed to build stager runner: %v\nOutput: %s", err, string(out))
 	}
 
-	var stdout, stderr bytes.Buffer
-	cmdRunner := exec.Command(runnerBin, stagerArtifact)
-	logging.Infof("Running stager runner (format=%s unpacker=%s transport=%s)...",
-		opts.format, opts.unpacker, opts.transport)
-
-	cmdRunner.Stdout = &stdout
-	cmdRunner.Stderr = &stderr
-	cmdRunner.Env = append(
-		os.Environ(),
-		fmt.Sprintf("HOME=%s", tmpDir),
-		"STAGER_TEST=1",
-	)
-	if err := cmdRunner.Start(); err != nil {
-		t.Fatalf("Failed to start stager: %v", err)
-	}
-	doneChan := make(chan error, 1)
-	go func() { doneChan <- cmdRunner.Wait() }()
-
 	// -----------------------------------------------------------------------
-	// 10. Wait for agent check-in.
+	// 10. Launch the runner and wait for agent check-in.
 	// -----------------------------------------------------------------------
-	timeout := 60 * time.Second
-	start := time.Now()
-	var agent *def.Emp3r0rAgent
-	for {
-		if time.Since(start) > timeout {
-			fmt.Printf("Runner Stdout:\n%s\n", stdout.String())
-			fmt.Printf("Runner Stderr:\n%s\n", stderr.String())
-			t.Fatalf("Timeout waiting for agent checkin")
-		}
-		live.RangeAgents(func(rec *live.AgentRecord) bool {
-			if rec.Agent.Tag != "" && rec.Control != nil && rec.Control.Conn != nil {
-				agent = rec.Agent
-				return false
-			}
-			return true
-		})
-		if agent != nil {
-			logging.Successf("Agent checked in! Tag: %s", agent.Tag)
-			break
-		}
-		select {
-		case err := <-doneChan:
-			fmt.Printf("Runner Stdout:\n%s\n", stdout.String())
-			fmt.Printf("Runner Stderr:\n%s\n", stderr.String())
-			t.Fatalf("Stager runner exited before agent checkin: %v", err)
-		default:
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
+	cmdRunner, agent, stdout, stderr, doneChan := startRunnerAndWaitCheckin(t, runnerBin, stagerArtifact, tmpDir, agentUUID)
+	defer func() { _ = cmdRunner.Process.Kill() }()
 
 	// -----------------------------------------------------------------------
 	// 11. Verify command execution.
@@ -823,19 +893,4 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 
 	logging.Successf("runAgentEndToEndLifecycle PASSED (format=%s unpacker=%s mode=%s transport=%s)",
 		opts.format, opts.unpacker, mode, opts.transport)
-
-	// -----------------------------------------------------------------------
-	// Cleanup
-	// -----------------------------------------------------------------------
-	cmdRunner.Process.Kill()
-	listener.StopHTTP()
-	if network.EmpTLSServer != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		network.EmpTLSServer.Shutdown(ctx)
-		network.EmpTLSServerCancel()
-	}
-	if network.EmpKCPCancel != nil {
-		network.EmpKCPCancel()
-	}
 }
