@@ -400,6 +400,12 @@ func (s *HTTPServerStream) isClosing() bool {
 	return atomic.LoadInt32(&s.closing) == 1
 }
 
+// anonymousBodyReadTimeout bounds how long an unauthenticated session may take
+// to send a request body. Anonymous sessions exist before the C2 handshake and
+// must not be able to pin a handler goroutine by dribbling a body; verified
+// sessions keep the unbounded read so large transfers over slow links work.
+var anonymousBodyReadTimeout = 10 * time.Second
+
 func HandleHTTPServerSession(w http.ResponseWriter, req *http.Request, config *def.MalleableHTTPConfig) (stream *HTTPServerStream, err error) {
 	if config == nil {
 		return nil, errors.New("HandleHTTPServerSession: missing malleable config")
@@ -537,6 +543,12 @@ func HandleHTTPServerSession(w http.ResponseWriter, req *http.Request, config *d
 		}
 	case http.MethodPost:
 		// Client is writing to us
+		// A pre-auth session must not hold the handler open by dribbling a
+		// body; verified sessions keep the unbounded read so large transfers
+		// over slow links still work.
+		if !stream.IsAuthenticated() {
+			_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(anonymousBodyReadTimeout))
+		}
 		limitReader := http.MaxBytesReader(w, req.Body, 50*1024*1024)
 		data, err := io.ReadAll(limitReader)
 		if err != nil {

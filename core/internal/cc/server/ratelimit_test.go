@@ -3,6 +3,8 @@ package server
 import (
 	"net/http"
 	"net/http/httptest"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"golang.org/x/time/rate"
@@ -88,5 +90,42 @@ func TestPreflightRateLimited(t *testing.T) {
 
 	if rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("preflight endpoint should be rate limited, got %d", rec.Code)
+	}
+}
+
+// TestAllowClientRequestConcurrent stresses the shared limiter from many
+// goroutines and checks the per-IP bucket still bounds them.
+func TestAllowClientRequestConcurrent(t *testing.T) {
+	origGlobal := globalLimiter
+	origIP := ipLimiter
+	t.Cleanup(func() {
+		globalLimiter = origGlobal
+		ipLimiter = origIP
+	})
+
+	// Lift the global limit so the per-IP bucket (10 rps, burst 20) is the
+	// only constraint.
+	globalLimiter = rate.NewLimiter(rate.Limit(1000000), 1000000)
+	ipLimiter = &ipRateLimiter{}
+
+	var allowed int64
+	var wg sync.WaitGroup
+	for i := 0; i < 500; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			req.RemoteAddr = "9.9.9.9:1234"
+			if allowClientRequest(req) {
+				atomic.AddInt64(&allowed, 1)
+			}
+		}()
+	}
+	wg.Wait()
+
+	// Burst is 20; allow generous headroom for a scheduling stall long enough
+	// to refill a few tokens, but the flood must not pass wholesale.
+	if allowed < 1 || allowed > 64 {
+		t.Fatalf("concurrent allowance out of bounds: %d", allowed)
 	}
 }
