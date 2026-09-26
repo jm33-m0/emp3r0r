@@ -447,6 +447,48 @@ func handleGetCA(wrt http.ResponseWriter, _ *http.Request) {
 	wrt.Write(data)
 }
 
+// readOperatorTunnel decodes and dispatches operator relay frames until the
+// connection fails or ctx is cancelled. It is shared by the websocket operator
+// handler and RegisterOperatorConn.
+func readOperatorTunnel(ctx context.Context, conn net.Conn, session string) {
+	decoder := cbor.NewDecoder(conn)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+		msg := new(def.MsgTunData)
+		if err := decoder.Decode(msg); err != nil {
+			return
+		}
+		touchOperatorCommand()
+		handleOperatorRelayFrame(session, msg)
+	}
+}
+
+// RegisterOperatorConn registers an already-connected operator message tunnel
+// and serves its relay frames. It is for embedders and tests that own the
+// operator transport (e.g. an in-process pipe) instead of the websocket
+// handler. The session is removed and its jobs/pivots cleaned up when conn
+// closes.
+func RegisterOperatorConn(session string, conn net.Conn) {
+	if session == "" {
+		session = "test-operator"
+	}
+	OPERATORS.Store(session, &operator_t{sessionID: session, conn: conn})
+	touchOperatorCommand()
+	go func() {
+		defer func() {
+			OPERATORS.Delete(session)
+			cleanupOperatorOwnedJobs(session)
+			StopSocks5ProxiesForOperator(session)
+			_ = conn.Close()
+		}()
+		readOperatorTunnel(context.Background(), conn, session)
+	}()
+}
+
 // handleOperatorConn handles operator connections, this connection will be used to relay the message tunnel
 func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 	defer func() {
@@ -510,20 +552,7 @@ func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 	readDone := make(chan struct{})
 	go func() {
 		defer close(readDone)
-		decoder := cbor.NewDecoder(conn)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
-			msg := new(def.MsgTunData)
-			if err := decoder.Decode(msg); err != nil {
-				return
-			}
-			touchOperatorCommand()
-			handleOperatorRelayFrame(operator_session, msg)
-		}
+		readOperatorTunnel(ctx, conn, operator_session)
 	}()
 	defer func() {
 		logging.Debugf("handleOperatorConn exiting")

