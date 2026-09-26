@@ -348,7 +348,7 @@ helpers above are convenience wrappers.
 
 | Function | Description |
 | --- | --- |
-| `read_file(path)` | Read a file as a string. `memfs:///` paths hit encrypted memfs. |
+| `read_file(path, default=...)` | Read a file as a string. `memfs:///` paths hit encrypted memfs. If `default` is given, it is returned instead of raising on a read error, which is useful for best-effort reads (Starlark has no `try`/`except`). |
 | `write_file(path, content)` | Write a text file (mode `0644`). |
 | `write_bytes(path, data)` | Write string/bytes; returns the number of bytes written. |
 | `list_dir(path)` | List a real directory merged with memfs keys under the path. |

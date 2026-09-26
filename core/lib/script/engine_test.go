@@ -692,6 +692,39 @@ func (m *testMockAgentProxy) FetchFile(peer, fileToDownload, path, checksum stri
 	return []byte("fetched:" + fileToDownload), nil
 }
 
+func TestReadFileDefault(t *testing.T) {
+	dir := t.TempDir()
+	existing := filepath.Join(dir, "exists.txt")
+	if err := os.WriteFile(existing, []byte("hello"), 0o644); err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+	missing := filepath.Join(dir, "missing.txt")
+
+	script := `
+def main(*args):
+    if read_file(argv[0]) != "hello":
+        return "Fail: existing file content mismatch"
+    if read_file(argv[1], default="fallback") != "fallback":
+        return "Fail: default not returned for missing file"
+    if read_file(argv[1], default=None) != None:
+        return "Fail: explicit None default not honored"
+    return "OK"
+`
+	out, err := Run([]byte(script), []string{existing, missing}, nil, 0)
+	if err != nil {
+		t.Fatalf("Run read_file default script failed: %v", err)
+	}
+	if !strings.Contains(out, "OK") {
+		t.Errorf("expected OK, got: %q", out)
+	}
+
+	// Without a default, a read failure must still surface as an error.
+	_, err = Run([]byte("def main(*args):\n    return read_file(argv[0])\n"), []string{missing}, nil, 0)
+	if err == nil {
+		t.Errorf("expected error reading %s without a default, got nil", missing)
+	}
+}
+
 func TestCustomAgentProxy(t *testing.T) {
 	origProxy := GetAgentProxy()
 	defer SetAgentProxy(origProxy)

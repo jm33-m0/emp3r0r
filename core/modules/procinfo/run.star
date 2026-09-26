@@ -87,10 +87,10 @@ def main(*args):
     print("==================================================")
 
     procfs_prefix = "/proc/" + pid
-    cmdline = read_file(procfs_prefix + "/cmdline").strip("\x00").replace("\x00", " ")
+    cmdline = read_file(procfs_prefix + "/cmdline", default="").strip("\x00").replace("\x00", " ")
     print("Cmdline:    %s" % (cmdline or "N/A"))
 
-    status_text = read_file(procfs_prefix + "/status")
+    status_text = read_file(procfs_prefix + "/status", default="")
     status = parse_status(status_text)
 
     print("\n--- Identity & Privileges ---")
@@ -111,7 +111,7 @@ def main(*args):
     print("NoNewPrivs: %s" % status.get("NoNewPrivs", "N/A"))
 
     print("\n--- Cgroups ---")
-    cgroup_text = read_file(procfs_prefix + "/cgroup")
+    cgroup_text = read_file(procfs_prefix + "/cgroup", default="")
     for line in cgroup_text.split("\n"):
         if line:
             parts = line.split(":")
@@ -127,7 +127,7 @@ def main(*args):
         print("%s %s" % (k_padded, namespaces[k]))
 
     print("\n--- Environment ---")
-    environ = read_file(procfs_prefix + "/environ")
+    environ = read_file(procfs_prefix + "/environ", default="")
     env_vars = [e for e in environ.split("\x00") if e]
     print("%d environment variables loaded." % len(env_vars))
 

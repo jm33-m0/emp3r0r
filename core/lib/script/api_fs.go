@@ -41,9 +41,16 @@ func runWithToken(thread *starlark.Thread, fn func() error) error {
 	return fn()
 }
 
+// starlarkReadFile reads path as a string. When the optional default is
+// supplied it is returned instead of raising on a read error, which lets
+// scripts read best-effort files (e.g. /proc/<pid>/environ, unreadable for
+// other users' processes) without try/except, which Starlark lacks.
 func starlarkReadFile(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	var path string
-	if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "path", &path); err != nil {
+	var (
+		path       string
+		defaultVal starlark.Value
+	)
+	if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "path", &path, "default?", &defaultVal); err != nil {
 		return starlark.None, err
 	}
 	var content []byte
@@ -53,6 +60,9 @@ func starlarkReadFile(thread *starlark.Thread, fn *starlark.Builtin, args starla
 		return e
 	})
 	if err != nil {
+		if defaultVal != nil {
+			return defaultVal, nil
+		}
 		return starlark.None, fmt.Errorf("read_file %s: %w", path, err)
 	}
 	return starlark.String(string(content)), nil
