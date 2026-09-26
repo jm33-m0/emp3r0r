@@ -1,5 +1,18 @@
 # Changelog
 
+## [4.20.1](https://github.com/jm33-m0/emp3r0r/compare/v4.20.0...v4.20.1) (2026-09-26)
+
+
+### Bug Fixes
+
+* **c2:** c2 frame padding ([c65324e](https://github.com/jm33-m0/emp3r0r/commit/c65324ebc0956fa5d2880fdc3702fcb37d6045cb))
+* **c2:** randomize http defaults; strip http error messages ([cf6a353](https://github.com/jm33-m0/emp3r0r/commit/cf6a3536c91cbafd098edcaf0a6e99be2020264b))
+* **http c2:** randomize http long poll behavior ([56a92aa](https://github.com/jm33-m0/emp3r0r/commit/56a92aa002b83853b24c6de705d6c72297c9eb19))
+* **kcp:** enable QPP ([78696d3](https://github.com/jm33-m0/emp3r0r/commit/78696d3375f3bcc45082346ca515c32b36ef0a46))
+* **p2p:** sanitize smb transport ([fb2336e](https://github.com/jm33-m0/emp3r0r/commit/fb2336e584a1d66ed8c4c708e6803dc2fce95152))
+* **tls c2:** SNI configuration ([825cc06](https://github.com/jm33-m0/emp3r0r/commit/825cc061cfe92260317ae036e22017b933b8b68c))
+* **tls:** TLS cert fingerprints ([2f0b61c](https://github.com/jm33-m0/emp3r0r/commit/2f0b61cf84517deffd95438122ee7496fd160a49))
+
 ## [4.20.0](https://github.com/jm33-m0/emp3r0r/compare/v4.19.2...v4.20.0) (2026-09-26)
 
 
