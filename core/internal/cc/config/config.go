@@ -167,6 +167,7 @@ func InitConfigFile(cc_host string) (err error) {
 	if live.RuntimeConfig.PaddingMax == 0 {
 		live.RuntimeConfig.PaddingMax = 10240
 	}
+	transport.SetC2Padding(live.RuntimeConfig.PaddingMin, live.RuntimeConfig.PaddingMax)
 	if live.RuntimeConfig.Jitter == 0 {
 		live.RuntimeConfig.Jitter = 20
 	}
@@ -207,7 +208,12 @@ func ReadJSONConfig(jsonData []byte, config_to_write *def.Config) error {
 		config_to_write = live.RuntimeConfig
 	}
 
-	return readJSONConfig(jsonData, config_to_write)
+	if err := readJSONConfig(jsonData, config_to_write); err != nil {
+		return err
+	}
+	// Keep the sender-side padding range in sync with the loaded config.
+	transport.SetC2Padding(config_to_write.PaddingMin, config_to_write.PaddingMax)
+	return nil
 }
 
 // InitCertsAndConfig generate certs if not found, then generate config file

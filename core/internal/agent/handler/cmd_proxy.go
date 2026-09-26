@@ -21,6 +21,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/spf13/cobra"
 )
@@ -61,6 +62,9 @@ func runProxyRelay(cmd *cobra.Command, token, target string) {
 		return
 	}
 	defer cancel()
+	// Bulk relay: skip control-frame padding on the C2 stream so the tunneled
+	// traffic is not inflated. Reads are unchanged.
+	stream = transport.NewBulkWriter(stream)
 	logging.Debugf("proxy relay %s -> %s established", token, target)
 
 	// 3. Pure relay: block until one leg finishes, then close both so the other

@@ -144,6 +144,7 @@ func MakeConfig(opts AgentConfig) error {
 	if live.RuntimeConfig.PaddingMax == 0 {
 		live.RuntimeConfig.PaddingMax = 10240
 	}
+	transport.SetC2Padding(live.RuntimeConfig.PaddingMin, live.RuntimeConfig.PaddingMax)
 	if opts.PollInterval != nil {
 		live.RuntimeConfig.PollInterval = *opts.PollInterval
 	}

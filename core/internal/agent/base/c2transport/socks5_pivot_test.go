@@ -82,6 +82,11 @@ func TestSocks5PivotCONNECTRefused(t *testing.T) {
 func runSocks5PivotE2E(t *testing.T, mode string, expectRefused bool) {
 	t.Helper()
 
+	// Force plaintext padding on so this E2E exercises the padded control
+	// frames and the unpadded bulk relay path (fingerprint resistance).
+	transport.SetC2Padding(64, 1024)
+	t.Cleanup(func() { transport.SetC2Padding(0, 0) })
+
 	// A previous full-stack test may still have server goroutines (both the
 	// TLS/h2 and the plain-HTTP C2 endpoints) draining. Stop and drain every
 	// endpoint so their tunnel/session/PFS teardown cannot race the fresh

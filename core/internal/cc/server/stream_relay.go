@@ -13,6 +13,7 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
@@ -138,6 +139,10 @@ func handleProxyRelayStream(conn io.ReadWriteCloser, agentUUID, streamID, remote
 // the surrounding bookkeeping (pending entry etc.) and calls teardown after
 // this returns.
 func relaySOCKS5Stream(sock net.Conn, stream io.ReadWriteCloser, token string) {
+	// Bulk relay: skip control-frame padding so the tunnel does not inflate
+	// large transfers. Reads are unchanged.
+	stream = transport.NewBulkWriter(stream)
+
 	var lastActivity atomic.Int64
 	lastActivity.Store(time.Now().UnixNano())
 	touch := func() { lastActivity.Store(time.Now().UnixNano()) }
@@ -193,6 +198,8 @@ func handleWWWRelayStream(conn io.ReadWriteCloser, agentUUID, streamID, remoteAd
 		conn.Close()
 		return
 	}
+	// Bulk relay: files pushed to the agent skip control-frame padding.
+	conn = transport.NewBulkWriter(conn)
 	streamID = strings.TrimSpace(streamID)
 	if streamID == "" {
 		logging.Errorf("CRITICAL: www relay: empty stream id from %s", remoteAddr)

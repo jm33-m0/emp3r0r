@@ -244,7 +244,7 @@ func SendFile2CC(filepath string, offset int64, token string) (err error) {
 	defer secureConn.Close()
 
 	// open compressor
-	compressor := gzip.NewWriter(secureConn)
+	compressor := gzip.NewWriter(transport.NewBulkWriter(secureConn))
 	if err != nil {
 		err = fmt.Errorf("failed to open compressor: %v", err)
 		return err
