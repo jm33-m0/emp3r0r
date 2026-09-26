@@ -8,14 +8,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "uptime.star",
       "files": ["uptime.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -28,14 +25,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "locale.star",
       "files": ["locale.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -48,14 +42,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "env.star",
       "files": ["env.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -68,14 +59,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "arp.star",
       "files": ["arp.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -88,14 +76,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "whoami.star",
       "files": ["whoami.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -108,14 +93,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "netstat.star",
       "files": ["netstat.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -128,7 +110,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "filter",
@@ -183,9 +164,7 @@
     "agent_config": {
       "exec": "ldapsearch.star",
       "files": ["ldapsearch.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -198,7 +177,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "server",
@@ -211,9 +189,7 @@
     "agent_config": {
       "exec": "nettime.star",
       "files": ["nettime.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -226,14 +202,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "useridletime.star",
       "files": ["useridletime.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -246,7 +219,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "server",
@@ -266,9 +238,7 @@
     "agent_config": {
       "exec": "netshares.star",
       "files": ["netshares.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -281,7 +251,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "cmd",
@@ -322,9 +291,7 @@
     "agent_config": {
       "exec": "netuse.star",
       "files": ["netuse.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -337,14 +304,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "ipconfig.star",
       "files": ["ipconfig.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -357,14 +321,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "tasklist.star",
       "files": ["tasklist.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -377,7 +338,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "username",
@@ -397,9 +357,7 @@
     "agent_config": {
       "exec": "netuser.star",
       "files": ["netuser.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -412,7 +370,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "all_windows",
@@ -425,9 +382,7 @@
     "agent_config": {
       "exec": "windowlist.star",
       "files": ["windowlist.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -440,14 +395,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "routeprint.star",
       "files": ["routeprint.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -460,14 +412,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "sc_query.star",
       "files": ["sc_query.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -480,7 +429,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "algo",
@@ -500,9 +448,7 @@
     "agent_config": {
       "exec": "hash.star",
       "files": ["hash.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -515,7 +461,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "server",
@@ -528,9 +473,7 @@
     "agent_config": {
       "exec": "netuserenum.star",
       "files": ["netuserenum.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -543,7 +486,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "group",
@@ -563,9 +505,7 @@
     "agent_config": {
       "exec": "netlocalgroup.star",
       "files": ["netlocalgroup.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -578,7 +518,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "group",
@@ -598,9 +537,7 @@
     "agent_config": {
       "exec": "netgroup.star",
       "files": ["netgroup.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -613,7 +550,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "hive",
@@ -640,9 +576,7 @@
     "agent_config": {
       "exec": "reg_query.star",
       "files": ["reg_query.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -655,7 +589,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "domain",
@@ -668,9 +601,7 @@
     "agent_config": {
       "exec": "netview.star",
       "files": ["netview.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -683,7 +614,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "server",
@@ -696,9 +626,7 @@
     "agent_config": {
       "exec": "netloggedon.star",
       "files": ["netloggedon.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -711,7 +639,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "hostname",
@@ -724,9 +651,7 @@
     "agent_config": {
       "exec": "nslookup.star",
       "files": ["nslookup.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -739,7 +664,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "path",
@@ -752,9 +676,7 @@
     "agent_config": {
       "exec": "dir.star",
       "files": ["dir.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -767,7 +689,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "server",
@@ -780,9 +701,7 @@
     "agent_config": {
       "exec": "get_password_policy.star",
       "files": ["get_password_policy.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -795,14 +714,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "aadjoininfo.star",
       "files": ["aadjoininfo.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -815,7 +731,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "path",
@@ -828,9 +743,7 @@
     "agent_config": {
       "exec": "cacls.star",
       "files": ["cacls.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -843,7 +756,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "pid",
@@ -856,9 +768,7 @@
     "agent_config": {
       "exec": "listmods.star",
       "files": ["listmods.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -871,7 +781,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "server",
@@ -884,9 +793,7 @@
     "agent_config": {
       "exec": "schtasks.star",
       "files": ["schtasks.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -899,14 +806,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "driver_enum.star",
       "files": ["driver_enum.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -919,14 +823,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "adv_audit_policies.star",
       "files": ["adv_audit_policies.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -939,7 +840,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "host",
@@ -959,9 +859,7 @@
     "agent_config": {
       "exec": "probe.star",
       "files": ["probe.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -974,14 +872,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "resources.star",
       "files": ["resources.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -994,7 +889,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "query",
@@ -1021,9 +915,7 @@
     "agent_config": {
       "exec": "wmi_query.star",
       "files": ["wmi_query.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1036,7 +928,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "hostname",
@@ -1056,9 +947,7 @@
     "agent_config": {
       "exec": "vssenum.star",
       "files": ["vssenum.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1071,14 +960,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "firewall.star",
       "files": ["firewall.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1091,14 +977,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "dpapi.star",
       "files": ["dpapi.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1111,7 +994,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "text",
@@ -1124,9 +1006,7 @@
     "agent_config": {
       "exec": "notepad.star",
       "files": ["notepad.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1139,14 +1019,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "adcs_enum.star",
       "files": ["adcs_enum.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1159,14 +1036,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "adcs_enum_com.star",
       "files": ["adcs_enum_com.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1179,14 +1053,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "adcs_enum_com2.star",
       "files": ["adcs_enum_com2.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1199,14 +1070,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "driversigs.star",
       "files": ["driversigs.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1219,14 +1087,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "enumLocalSessions.star",
       "files": ["enumLocalSessions.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1239,14 +1104,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "enum_filter_driver.star",
       "files": ["enum_filter_driver.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1259,14 +1121,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "findLoadedModule.star",
       "files": ["findLoadedModule.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1279,14 +1138,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "get-netsession.star",
       "files": ["get-netsession.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1299,14 +1155,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "get-netsession2.star",
       "files": ["get-netsession2.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1319,14 +1172,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "get_dpapi_system.star",
       "files": ["get_dpapi_system.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1339,14 +1189,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "get_session_info.star",
       "files": ["get_session_info.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1359,14 +1206,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "ldapsecuritycheck.star",
       "files": ["ldapsecuritycheck.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1379,14 +1223,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "list_firewall_rules.star",
       "files": ["list_firewall_rules.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1399,14 +1240,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "listdns.star",
       "files": ["listdns.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1419,14 +1257,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "md5.star",
       "files": ["md5.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1439,14 +1274,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "netlocalgroup2.star",
       "files": ["netlocalgroup2.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1459,14 +1291,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "netloggedon2.star",
       "files": ["netloggedon2.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1479,14 +1308,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "netuptime.star",
       "files": ["netuptime.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1499,14 +1325,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "nonpagedldapsearch.star",
       "files": ["nonpagedldapsearch.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1519,14 +1342,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "regsession.star",
       "files": ["regsession.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1539,14 +1359,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "sc_enum.star",
       "files": ["sc_enum.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1559,14 +1376,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "sc_qc.star",
       "files": ["sc_qc.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1579,14 +1393,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "sc_qdescription.star",
       "files": ["sc_qdescription.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1599,14 +1410,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "sc_qfailure.star",
       "files": ["sc_qfailure.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1619,14 +1427,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "sc_qtriggerinfo.star",
       "files": ["sc_qtriggerinfo.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1639,14 +1444,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "schtasksenum.star",
       "files": ["schtasksenum.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1659,14 +1461,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "schtasksquery.star",
       "files": ["schtasksquery.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1679,14 +1478,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "sha1.star",
       "files": ["sha1.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   },
@@ -1699,14 +1495,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [],
     "agent_config": {
       "exec": "sha256.star",
       "files": ["sha256.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   }

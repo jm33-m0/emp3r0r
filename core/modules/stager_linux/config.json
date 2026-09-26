@@ -44,8 +44,7 @@
       "name": "download-key",
       "description": "The key to decrypt the payload",
       "default": "",
-      "type": "cstr",
-      "secret": true
+      "type": "cstr"
     },
     {
       "name": "unpacker",

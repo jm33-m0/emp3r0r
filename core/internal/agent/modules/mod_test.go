@@ -2,13 +2,11 @@ package modules
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -202,55 +200,13 @@ def main(*args):
 	util.RemoveFileAgent("memfs:///test_multi/data.txt")
 }
 
-func TestModuleHandler_Bash(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Bash is unix-specific")
-	}
-	shell := agentutils.DefaultShell()
-	if shell == "" {
-		t.Skip("no shell available for bash module test")
-	}
-
-	script := "echo 'hello bash'"
-	path, checksum := createTestModule(t, []byte(script))
-
-	inv := def.ResolvedInvocation{
-		Argv: []string{}, // Stdin is used, no extra args needed for shell
-	}
-
-	out := ModuleHandler("", path, "bash", "test_bash", checksum, inv)
-	if !strings.Contains(out, "hello bash") {
-		t.Errorf("bash output mismatch: got %q", out)
-	}
-}
-
-func TestModuleHandler_Python(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("Python paths tricky on Windows in this test")
-	}
-	py3, err := exec.LookPath("python3")
-	if err != nil {
-		t.Skip("python3 not found")
-	}
-
-	// Setup 'python' symlink in PATH
-	binDir := filepath.Join(t.TempDir(), "bin")
-	os.MkdirAll(binDir, 0o755)
-	os.Symlink(py3, filepath.Join(binDir, "python"))
-	oldPath := os.Getenv("PATH")
-	os.Setenv("PATH", binDir+":"+oldPath)
-	defer os.Setenv("PATH", oldPath)
-
-	script := "import sys; print('hello python')"
-	path, checksum := createTestModule(t, []byte(script))
-
-	inv := def.ResolvedInvocation{
-		Argv: []string{}, // Python reads from stdin by default if no file is given
-	}
-
-	out := ModuleHandler("", path, "python", "test_python", checksum, inv)
-	if !strings.Contains(out, "hello python") {
-		t.Errorf("python output mismatch: got %q", out)
+func TestModuleHandlerRejectsForkRunPayloads(t *testing.T) {
+	for _, payloadType := range []string{"bash", "python", "powershell", "elf", "exe", "so"} {
+		path, checksum := createTestModule(t, []byte("payload"))
+		out := ModuleHandler("", path, payloadType, "test_"+payloadType, checksum, def.ResolvedInvocation{})
+		if !strings.Contains(out, "unsupported payload type") {
+			t.Errorf("type %q: expected unsupported-type error, got %q", payloadType, out)
+		}
 	}
 }
 

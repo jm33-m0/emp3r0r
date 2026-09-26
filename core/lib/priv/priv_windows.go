@@ -15,13 +15,10 @@ import (
 
 var (
 	// modadvapi32 / procLookupPrivilegeName are kept for LookupPrivilegeNameW
-	// (display helper with no NT syscall equivalent) and for
-	// CreateProcessWithTokenW (NtCreateUserProcess requires complex
-	// RTL_USER_PROCESS_PARAMETERS plumbing not yet implemented).
-	modadvapi32                 = windows.NewLazySystemDLL("advapi32.dll")
-	procLookupPrivilegeName     = modadvapi32.NewProc("LookupPrivilegeNameW")
-	procLookupPrivilegeValue    = modadvapi32.NewProc("LookupPrivilegeValueW")
-	procCreateProcessWithTokenW = modadvapi32.NewProc("CreateProcessWithTokenW")
+	// (display helper with no NT syscall equivalent).
+	modadvapi32              = windows.NewLazySystemDLL("advapi32.dll")
+	procLookupPrivilegeName  = modadvapi32.NewProc("LookupPrivilegeNameW")
+	procLookupPrivilegeValue = modadvapi32.NewProc("LookupPrivilegeValueW")
 
 	TokenMap = &sync.Map{} // cached stolen tokens (SID → windows.Handle)
 
@@ -444,46 +441,4 @@ func Whoami() (string, error) {
 	defer windows.CloseHandle(hToken)
 
 	return GetTokenFriendlyName(hToken), nil
-}
-
-// ---------------------------------------------------------------------------
-// Child process creation with token
-// ---------------------------------------------------------------------------
-
-// CreateProcessWithToken spawns a child process under hToken via
-// CreateProcessWithTokenW (advapi32).
-//
-// TODO: convert to NtCreateUserProcess once RTL_USER_PROCESS_PARAMETERS
-// plumbing is implemented.
-func CreateProcessWithToken(hToken windows.Handle, commandLine string) error {
-	var si windows.StartupInfo
-	si.Cb = uint32(unsafe.Sizeof(si))
-	var pi windows.ProcessInformation
-
-	cmdUTF16, err := windows.UTF16PtrFromString(commandLine)
-	if err != nil {
-		return fmt.Errorf("UTF16PtrFromString: %w", err)
-	}
-
-	const logonFlags uint32 = 1 // LOGON_WITH_PROFILE
-
-	r1, _, e1 := procCreateProcessWithTokenW.Call(
-		uintptr(hToken),
-		uintptr(logonFlags),
-		0,
-		uintptr(unsafe.Pointer(cmdUTF16)),
-		0x04000000, // CREATE_NO_WINDOW
-		0, 0,
-		uintptr(unsafe.Pointer(&si)),
-		uintptr(unsafe.Pointer(&pi)),
-	)
-	if r1 == 0 {
-		err := fmt.Errorf("CreateProcessWithTokenW: %v", e1)
-		logging.Warningf("CreateProcessWithToken: %v (SeImpersonatePrivilege may be required)", err)
-		return err
-	}
-
-	windows.CloseHandle(windows.Handle(pi.Process))
-	windows.CloseHandle(windows.Handle(pi.Thread))
-	return nil
 }

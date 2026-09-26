@@ -14,10 +14,6 @@ type AgentProxy interface {
 	GetUserAndGroups() (string, string)
 	GetContainerName() string
 	HasRoot() bool
-	ExecuteShell(scriptBytes []byte, argv, env []string) (string, error)
-	ExecutePython(scriptBytes []byte, argv, env []string) (string, error)
-	ExecutePowerShell(scriptBytes []byte, argv, env []string) (string, error)
-	ExecuteBatch(scriptBytes []byte, argv, env []string) (string, error)
 	SignWithAgentKey(data []byte) ([]byte, error)
 	GetTag() string
 	GetUUID() string
@@ -69,22 +65,18 @@ func GetAgentProxy() AgentProxy {
 }
 
 var agentAPIs = map[string]StarlarkAPI{
-	"sys_info":        starlarkAgentSysInfo,
-	"sysinfo":         starlarkAgentSysInfo,
-	"uptime":          starlarkAgentUptime,
-	"user":            starlarkAgentUser,
-	"container":       starlarkAgentContainer,
-	"has_root":        starlarkAgentHasRoot,
-	"is_root":         starlarkAgentHasRoot,
-	"exec_shell":      starlarkAgentExecShell,
-	"exec_python":     starlarkAgentExecPython,
-	"exec_powershell": starlarkAgentExecPowerShell,
-	"exec_batch":      starlarkAgentExecBatch,
-	"sign":            starlarkAgentSign,
-	"tag":             starlarkAgentTag,
-	"uuid":            starlarkAgentUUID,
-	"touch_file":      starlarkAgentTouchFile,
-	"fetch_file":      starlarkAgentFetchFile,
+	"sys_info":   starlarkAgentSysInfo,
+	"sysinfo":    starlarkAgentSysInfo,
+	"uptime":     starlarkAgentUptime,
+	"user":       starlarkAgentUser,
+	"container":  starlarkAgentContainer,
+	"has_root":   starlarkAgentHasRoot,
+	"is_root":    starlarkAgentHasRoot,
+	"sign":       starlarkAgentSign,
+	"tag":        starlarkAgentTag,
+	"uuid":       starlarkAgentUUID,
+	"touch_file": starlarkAgentTouchFile,
+	"fetch_file": starlarkAgentFetchFile,
 }
 
 func getAgentModuleDict() starlark.StringDict {
@@ -196,51 +188,6 @@ func starlarkAgentHasRoot(_ *starlark.Thread, _ *starlark.Builtin, _ starlark.Tu
 		return starlark.Bool(false), nil
 	}
 	return starlark.Bool(currentAgentProxy.HasRoot()), nil
-}
-
-func starlarkAgentExecHelper(fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple, execFn func([]byte, []string, []string) (string, error)) (starlark.Value, error) {
-	if currentAgentProxy == nil {
-		return starlark.None, fmt.Errorf("%s: agent proxy is not registered", fn.Name())
-	}
-	var scriptStr string
-	var argsList, envList *starlark.List
-	if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "script", &scriptStr, "args?", &argsList, "env?", &envList); err != nil {
-		return starlark.None, err
-	}
-	out, err := execFn([]byte(scriptStr), starlarkListToStrings(argsList), starlarkListToStrings(envList))
-	if err != nil {
-		return starlark.String(out), fmt.Errorf("%s: %w (output: %s)", fn.Name(), err, out)
-	}
-	return starlark.String(out), nil
-}
-
-func starlarkListToStrings(list *starlark.List) []string {
-	if list == nil {
-		return nil
-	}
-	res := make([]string, 0, list.Len())
-	for i := 0; i < list.Len(); i++ {
-		if s, ok := starlark.AsString(list.Index(i)); ok {
-			res = append(res, s)
-		}
-	}
-	return res
-}
-
-func starlarkAgentExecShell(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	return starlarkAgentExecHelper(fn, args, kwargs, currentAgentProxy.ExecuteShell)
-}
-
-func starlarkAgentExecPython(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	return starlarkAgentExecHelper(fn, args, kwargs, currentAgentProxy.ExecutePython)
-}
-
-func starlarkAgentExecPowerShell(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	return starlarkAgentExecHelper(fn, args, kwargs, currentAgentProxy.ExecutePowerShell)
-}
-
-func starlarkAgentExecBatch(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	return starlarkAgentExecHelper(fn, args, kwargs, currentAgentProxy.ExecuteBatch)
 }
 
 func starlarkAgentSign(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {

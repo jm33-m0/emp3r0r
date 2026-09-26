@@ -64,9 +64,6 @@ func run() int {
 		return priv.ImpersonateThread(windows.Handle(token))
 	}
 	script.RevertFn = func() { priv.RevertThread() }
-	script.ExecWithToken = func(token uintptr, commandLine string) error {
-		return priv.CreateProcessWithToken(windows.Handle(token), commandLine)
-	}
 
 	var token uintptr
 	if *stealPid != 0 {

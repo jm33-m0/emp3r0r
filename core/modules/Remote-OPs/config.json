@@ -7,16 +7,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/sc_description/sc_description.x64.o",
         "src/Remote/sc_description/sc_description.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -53,16 +50,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/ProcessDestroy/ProcessDestroy.x64.o",
         "src/Remote/ProcessDestroy/ProcessDestroy.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -92,16 +86,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/sc_start/sc_start.x64.o",
         "src/Remote/sc_start/sc_start.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -131,16 +122,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/schtasksdelete/schtasksdelete.x64.o",
         "src/Remote/schtasksdelete/schtasksdelete.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -177,16 +165,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/sc_create/sc_create.x64.o",
         "src/Remote/sc_create/sc_create.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -258,16 +243,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/ProcessListHandles/ProcessListHandles.x64.o",
         "src/Remote/ProcessListHandles/ProcessListHandles.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -290,16 +272,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/sc_stop/sc_stop.x64.o",
         "src/Remote/sc_stop/sc_stop.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -329,16 +308,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/disableuser/disableuser.x64.o",
         "src/Remote/disableuser/disableuser.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -368,16 +344,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/get_priv/get_priv.x64.o",
         "src/Remote/get_priv/get_priv.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -400,16 +373,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/adcs_request_on_behalf/adcs_request_on_behalf.x64.o",
         "src/Remote/adcs_request_on_behalf/adcs_request_on_behalf.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -453,16 +423,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/make_token_cert/make_token_cert.x64.o",
         "src/Remote/make_token_cert/make_token_cert.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -492,16 +459,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/adduser/adduser.x64.o",
         "src/Remote/adduser/adduser.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -538,16 +502,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/reg_delete/reg_delete.x64.o",
         "src/Remote/reg_delete/reg_delete.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -598,16 +559,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/ask_mfa/ask_mfa.x64.o",
         "src/Remote/ask_mfa/ask_mfa.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -630,16 +588,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/suspendresume/suspendresume.x64.o",
         "src/Remote/suspendresume/suspendresume.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -669,16 +624,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/adcs_request/adcs_request.x64.o",
         "src/Remote/adcs_request/adcs_request.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -757,16 +709,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/sc_delete/sc_delete.x64.o",
         "src/Remote/sc_delete/sc_delete.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -796,16 +745,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/schtasksrun/schtasksrun.x64.o",
         "src/Remote/schtasksrun/schtasksrun.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -835,16 +781,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/office_tokens/office_tokens.x64.o",
         "src/Remote/office_tokens/office_tokens.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -867,16 +810,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/unexpireuser/unexpireuser.x64.o",
         "src/Remote/unexpireuser/unexpireuser.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -906,16 +846,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/schtasksstop/schtasksstop.x64.o",
         "src/Remote/schtasksstop/schtasksstop.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -945,16 +882,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/reg_set/reg_set.x64.o",
         "src/Remote/reg_set/reg_set.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1012,16 +946,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/sc_config/sc_config.x64.o",
         "src/Remote/sc_config/sc_config.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1072,16 +1003,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/shspawnas/shspawnas.x64.o",
         "src/Remote/shspawnas/shspawnas.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1125,16 +1053,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/enableuser/enableuser.x64.o",
         "src/Remote/enableuser/enableuser.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1164,16 +1089,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/shutdown/shutdown.x64.o",
         "src/Remote/shutdown/shutdown.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1224,16 +1146,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/addusertogroup/addusertogroup.x64.o",
         "src/Remote/addusertogroup/addusertogroup.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1277,16 +1196,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/get_azure_token/get_azure_token.x64.o",
         "src/Remote/get_azure_token/get_azure_token.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1337,16 +1253,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/reg_save/reg_save.x64.o",
         "src/Remote/reg_save/reg_save.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1383,16 +1296,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/sc_failure/sc_failure.x64.o",
         "src/Remote/sc_failure/sc_failure.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1457,16 +1367,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/schtaskscreate/schtaskscreate.x64.o",
         "src/Remote/schtaskscreate/schtaskscreate.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1531,16 +1438,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Remote/procdump/procdump.x64.o",
         "src/Remote/procdump/procdump.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1570,16 +1474,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Injection/setthreadcontext/setthreadcontext.x64.o",
         "src/Injection/setthreadcontext/setthreadcontext.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1609,16 +1510,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Injection/conhost/conhost.x64.o",
         "src/Injection/conhost/conhost.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1648,16 +1546,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Injection/ntcreatethread/ntcreatethread.x64.o",
         "src/Injection/ntcreatethread/ntcreatethread.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1687,16 +1582,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Injection/ctray/ctray.x64.o",
         "src/Injection/ctray/ctray.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1719,16 +1611,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Injection/createremotethread/createremotethread.x64.o",
         "src/Injection/createremotethread/createremotethread.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1758,16 +1647,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Injection/clipboard/clipboard.x64.o",
         "src/Injection/clipboard/clipboard.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1797,16 +1683,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Injection/tooltip/tooltip.x64.o",
         "src/Injection/tooltip/tooltip.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1836,16 +1719,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Injection/kernelcallbacktable/kernelcallbacktable.x64.o",
         "src/Injection/kernelcallbacktable/kernelcallbacktable.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1875,16 +1755,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Injection/ntqueueapcthread/ntqueueapcthread.x64.o",
         "src/Injection/ntqueueapcthread/ntqueueapcthread.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1914,16 +1791,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Injection/uxsubclassinfo/uxsubclassinfo.x64.o",
         "src/Injection/uxsubclassinfo/uxsubclassinfo.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1946,13 +1820,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["src/Injection/dde/dde.x64.o", "src/Injection/dde/dde.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1975,16 +1846,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "src/Injection/svcctrl/svcctrl.x64.o",
         "src/Injection/svcctrl/svcctrl.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {

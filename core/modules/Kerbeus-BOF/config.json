@@ -6,13 +6,10 @@
     "comment": "Perform AS-REP roasting",
     "is_local": false,
     "platform": "Windows",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["_bin/asreproasting.x64.o", "_bin/asreproasting.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -35,13 +32,10 @@
     "comment": "Retrieve a TGT",
     "is_local": false,
     "platform": "Windows",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["_bin/asktgt.x64.o", "_bin/asktgt.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -64,13 +58,10 @@
     "comment": "Retrieve a TGS",
     "is_local": false,
     "platform": "Windows",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["_bin/asktgs.x64.o", "_bin/asktgs.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -93,13 +84,10 @@
     "comment": "Reset a user's password from a supplied TGT",
     "is_local": false,
     "platform": "Windows",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["_bin/changepw.x64.o", "_bin/changepw.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -122,13 +110,10 @@
     "comment": "Parse and describe a ticket",
     "is_local": false,
     "platform": "Windows",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["_bin/describe.x64.o", "_bin/describe.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -151,13 +136,10 @@
     "comment": "Dump tickets",
     "is_local": false,
     "platform": "Windows",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["_bin/dump.x64.o", "_bin/dump.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -180,13 +162,10 @@
     "comment": "Calculate rc4_hmac, aes128_cts_hmac_sha1, aes256_cts_hmac_sha1 hashes",
     "is_local": false,
     "platform": "Windows",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["_bin/hash.x64.o", "_bin/hash.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -209,13 +188,10 @@
     "comment": "Perform Kerberoasting",
     "is_local": false,
     "platform": "Windows",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["_bin/kerberoasting.x64.o", "_bin/kerberoasting.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -238,13 +214,10 @@
     "comment": "List tickets",
     "is_local": false,
     "platform": "Windows",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["_bin/klist.x64.o", "_bin/klist.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -267,13 +240,10 @@
     "comment": "Submit a TGT",
     "is_local": false,
     "platform": "Windows",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["_bin/ptt.x64.o", "_bin/ptt.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -296,13 +266,10 @@
     "comment": "Purge tickets",
     "is_local": false,
     "platform": "Windows",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["_bin/purge.x64.o", "_bin/purge.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -325,13 +292,10 @@
     "comment": "Renew a TGT",
     "is_local": false,
     "platform": "Windows",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["_bin/renew.x64.o", "_bin/renew.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -354,13 +318,10 @@
     "comment": "Perform S4U constrained delegation abuse",
     "is_local": false,
     "platform": "Windows",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["_bin/s4u.x64.o", "_bin/s4u.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -383,13 +344,10 @@
     "comment": "Perform S4U constrained delegation abuse across domains",
     "is_local": false,
     "platform": "Windows",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["_bin/cross_s4u.x64.o", "_bin/cross_s4u.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -412,13 +370,10 @@
     "comment": "Retrieve a usable TGT for the current user without elevation by abusing the Kerberos GSS-API",
     "is_local": false,
     "platform": "Windows",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["_bin/tgtdeleg.x64.o", "_bin/tgtdeleg.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -441,13 +396,10 @@
     "comment": "List tickets in table format",
     "is_local": false,
     "platform": "Windows",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["_bin/triage.x64.o", "_bin/triage.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {

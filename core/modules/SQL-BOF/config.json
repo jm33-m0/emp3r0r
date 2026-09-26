@@ -7,16 +7,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/1434udp/1434udp.x64.o",
         "SQL/1434udp/1434udp.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -39,16 +36,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/adsi/adsi.x64.o",
         "SQL/adsi/adsi.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -106,16 +100,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/agentcmd/agentcmd.x64.o",
         "SQL/agentcmd/agentcmd.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -166,16 +157,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/agentstatus/agentstatus.x64.o",
         "SQL/agentstatus/agentstatus.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -219,16 +207,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/checkrpc/checkrpc.x64.o",
         "SQL/checkrpc/checkrpc.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -272,16 +257,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/clr/clr.x64.o",
         "SQL/clr/clr.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -346,16 +328,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/columns/columns.x64.o",
         "SQL/columns/columns.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -406,16 +385,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/databases/databases.x64.o",
         "SQL/databases/databases.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -459,16 +435,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/togglemodule/togglemodule.x64.o",
         "SQL/togglemodule/togglemodule.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -532,16 +505,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/togglemodule/togglemodule.x64.o",
         "SQL/togglemodule/togglemodule.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -605,16 +575,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/togglemodule/togglemodule.x64.o",
         "SQL/togglemodule/togglemodule.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -678,16 +645,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/togglemodule/togglemodule.x64.o",
         "SQL/togglemodule/togglemodule.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -751,16 +715,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/togglemodule/togglemodule.x64.o",
         "SQL/togglemodule/togglemodule.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -824,16 +785,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/togglemodule/togglemodule.x64.o",
         "SQL/togglemodule/togglemodule.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -897,16 +855,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/togglemodule/togglemodule.x64.o",
         "SQL/togglemodule/togglemodule.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -970,16 +925,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/togglemodule/togglemodule.x64.o",
         "SQL/togglemodule/togglemodule.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1043,16 +995,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/impersonate/impersonate.x64.o",
         "SQL/impersonate/impersonate.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1082,16 +1031,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/info/info.x64.o",
         "SQL/info/info.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1121,16 +1067,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/links/links.x64.o",
         "SQL/links/links.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1174,16 +1117,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/olecmd/olecmd.x64.o",
         "SQL/olecmd/olecmd.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1234,16 +1174,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/query/query.x64.o",
         "SQL/query/query.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1294,16 +1231,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/rows/rows.x64.o",
         "SQL/rows/rows.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1354,16 +1288,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/search/search.x64.o",
         "SQL/search/search.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1414,16 +1345,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/smb/smb.x64.o",
         "SQL/smb/smb.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1474,16 +1402,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/tables/tables.x64.o",
         "SQL/tables/tables.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1527,16 +1452,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/users/users.x64.o",
         "SQL/users/users.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1580,16 +1502,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/whoami/whoami.x64.o",
         "SQL/whoami/whoami.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1633,16 +1552,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SQL/xpcmd/xpcmd.x64.o",
         "SQL/xpcmd/xpcmd.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {

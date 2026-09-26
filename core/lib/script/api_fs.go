@@ -3,18 +3,11 @@ package script
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"go.starlark.net/starlark"
 )
-
-// ExecWithToken is an optional hook that, when set on Windows, uses
-// CreateProcessWithTokenW so the child process runs under the impersonation
-// token instead of the primary process token.
-var ExecWithToken func(token uintptr, commandLine string) error
 
 // ImpersonateFn is an optional hook that locks the calling goroutine to its
 // OS thread and impersonates the given token via NtSetInformationThread.
@@ -191,43 +184,21 @@ func starlarkRemove(thread *starlark.Thread, fn *starlark.Builtin, args starlark
 	return starlark.None, nil
 }
 
-func starlarkExecCmd(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	var command string
-	var cmdArgs *starlark.List
-	if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "cmd", &command, "args?", &cmdArgs); err != nil {
+// starlarkReadLink returns the target of a symbolic link. It is a
+// non-forking replacement for shelling out to `ls -l`, so scripts can
+// inspect /proc/<pid>/ns entries and similar links in-process.
+func starlarkReadLink(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var path string
+	if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "path", &path); err != nil {
 		return starlark.None, err
 	}
-	var goArgs []string
-	if cmdArgs != nil {
-		for i := 0; i < cmdArgs.Len(); i++ {
-			v := cmdArgs.Index(i)
-			s, ok := starlark.AsString(v)
-			if !ok {
-				return starlark.None, fmt.Errorf("exec_cmd argument at index %d is not a string", i)
-			}
-			goArgs = append(goArgs, s)
-		}
+	var target string
+	if err := runWithToken(thread, func() error {
+		var e error
+		target, e = os.Readlink(path)
+		return e
+	}); err != nil {
+		return starlark.None, fmt.Errorf("read_link %s: %w", path, err)
 	}
-
-	// If a token is set (ExecuteAsToken is active), use CreateProcessWithTokenW
-	// so the child process runs as the impersonated user.
-	if tokenVal := thread.Local("token"); tokenVal != nil {
-		if token, ok := tokenVal.(uintptr); ok && token != 0 && ExecWithToken != nil {
-			cmdLine := command
-			if len(goArgs) > 0 {
-				cmdLine += " " + strings.Join(goArgs, " ")
-			}
-			if err := ExecWithToken(token, cmdLine); err != nil {
-				return starlark.None, fmt.Errorf("exec_cmd with token: %w", err)
-			}
-			return starlark.String("started (token)"), nil
-		}
-	}
-
-	c := exec.Command(command, goArgs...)
-	out, err := c.CombinedOutput()
-	if err != nil {
-		return starlark.String(string(out)), fmt.Errorf("exec_cmd %s: %w (output: %s)", command, err, string(out))
-	}
-	return starlark.String(string(out)), nil
+	return starlark.String(target), nil
 }

@@ -61,7 +61,6 @@ func addModuleCommands(rootCmd *cobra.Command) {
 					runModuleByName(cmd, mod.Name)
 				},
 			}
-			cmd.Flags().Bool("force", false, "Force execution without confirmation")
 
 			keys := make([]string, 0, len(mod.Options))
 			for key := range mod.Options {
@@ -108,12 +107,6 @@ func runModuleByName(cmd *cobra.Command, modName string) {
 
 	if agents.MustGetActiveAgent() == nil && !mod.IsLocal {
 		logging.Errorf("No active agent")
-		return
-	}
-	force, _ := cmd.Flags().GetBool("force")
-	if !mod.Fileless && !mod.IsLocal && !force {
-		logging.Warningf("Module %s is not fileless and may drop files or modify system configuration.", mod.Name)
-		logging.Infof("Run with: %s --force ...", mod.Name)
 		return
 	}
 

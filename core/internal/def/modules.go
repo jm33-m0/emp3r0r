@@ -33,9 +33,7 @@ const (
 // COFFLoader wire-packing token.
 //
 // Starlark modules are dynamically typed: their parameters are passed to
-// main(*args) as positional strings without type coercion. Other non-COFF
-// types (bash, python, elf, …) use only the validation semantics; the
-// wire-packing semantics are silently ignored.
+// main(*args) as positional strings without type coercion.
 //
 // Type vocabulary
 // ───────────────
@@ -62,20 +60,17 @@ const (
 // list, e.g. "-p" produces ["-p", "<value>"].  Ignored for COFF modules
 // (COFF args are passed via the Coff sub-invocation, not argv).
 type ModOption struct {
-	Name     string   `cbor:"1,keyasint"`  // option name
-	Desc     string   `cbor:"2,keyasint"`  // option description
-	Val      string   `cbor:"3,keyasint"`  // option value (current / default)
-	Vals     []string `cbor:"4,keyasint"`  // allowed values for enum-like options
-	Type     string   `cbor:"5,keyasint"`  // unified type (see above)
-	Required bool     `cbor:"6,keyasint"`  // whether the option is required
-	Pattern  string   `cbor:"7,keyasint"`  // optional regex validation for strings
-	Encoding string   `cbor:"8,keyasint"`  // encoding hint (utf8/utf16le) for string/binary
-	Secret   bool     `cbor:"9,keyasint"`  // mark sensitive values (avoid logging)
-	Min      *float64 `cbor:"10,keyasint"` // numeric lower bound
-	Max      *float64 `cbor:"11,keyasint"` // numeric upper bound
+	Name     string   `cbor:"1,keyasint"` // option name
+	Desc     string   `cbor:"2,keyasint"` // option description
+	Val      string   `cbor:"3,keyasint"` // option value (current / default)
+	Vals     []string `cbor:"4,keyasint"` // allowed values for enum-like options
+	Type     string   `cbor:"5,keyasint"` // unified type (see above)
+	Required bool     `cbor:"6,keyasint"` // whether the option is required
+	Min      *float64 `cbor:"7,keyasint"` // numeric lower bound (int/uint/short)
+	Max      *float64 `cbor:"8,keyasint"` // numeric upper bound (int/uint/short)
 	// ArgvFlag, when non-empty, prefixes the value in the argv list.
 	// e.g. "-p" produces ["-p", "<value>"].
-	ArgvFlag string `cbor:"12,keyasint"`
+	ArgvFlag string `cbor:"9,keyasint"`
 }
 
 // ModOptions represents multiple module options
@@ -91,8 +86,7 @@ type InvocationArg struct {
 
 // CoffArgSpec defines a COFF argument derived from a parameter.
 type CoffArgSpec struct {
-	Param    string
-	Encoding string
+	Param string
 }
 
 // CoffInvocation defines how to invoke a COFF/BOF export
@@ -105,24 +99,21 @@ type CoffInvocation struct {
 //
 // The parameter list drives argv ordering and COFF argument packing.
 type InvocationSpec struct {
-	CoffExport     string
-	Argv           []InvocationArg
-	StdinParam     string
-	TimeoutSeconds int
-	Coff           *CoffInvocation // populated internally from parameters
+	CoffExport string
+	Argv       []InvocationArg
+	Coff       *CoffInvocation // populated internally from parameters
 
-	// DLL module invocation (agent_config.type == "dll").
-	DllExport    string // exported symbol to call after loading the DLL
-	DllEntry     string // BOF entry function name packed for the DLL loader
-	DllFileParam string // parameter that names the BOF file to execute
+	// DLL module invocation (agent_config.type == "dll"). The in-memory loader
+	// always calls the DLL's LoadAndRun export; DllEntry names the BOF entry
+	// point and DllFileParam names the parameter holding the BOF path.
+	DllEntry     string
+	DllFileParam string
 }
 
 // ResolvedInvocation is the rendered form sent to the agent
 type ResolvedInvocation struct {
-	Argv           []string                `cbor:"1,keyasint"`
-	Stdin          string                  `cbor:"2,keyasint"`
-	TimeoutSeconds int                     `cbor:"3,keyasint"`
-	Coff           *ResolvedCoffInvocation `cbor:"4,keyasint"`
+	Argv []string                `cbor:"1,keyasint"`
+	Coff *ResolvedCoffInvocation `cbor:"4,keyasint"`
 	// Token is the SID string key into priv.TokenMap for token impersonation.
 	// When non-empty on Windows, module execution runs under that token context.
 	// It may also be a netlogon session name (sessions are registered in
@@ -132,7 +123,6 @@ type ResolvedInvocation struct {
 	// Windows COFF modules use the "coffloader" DLL dependency automatically.
 	Dependencies []string `cbor:"6,keyasint"`
 	// DLL invocation fields (agent_config.type == "dll").
-	DllExport    string `cbor:"7,keyasint"` // exported symbol to call
 	DllEntry     string `cbor:"8,keyasint"` // BOF entry function name
 	DllFileValue string `cbor:"9,keyasint"` // resolved BOF file path (agent local/memfs)
 
@@ -174,18 +164,18 @@ type ResolvedCoffInvocation struct {
 type ResolvedCoffArg struct {
 	WireType string `cbor:"1,keyasint"`
 	Value    any    `cbor:"2,keyasint"`
-	Encoding string `cbor:"3,keyasint"`
 }
 
-// AgentModuleConfig stores configuration data for the agent side
+// AgentModuleConfig stores configuration data for the agent side.
+//
+// Only in-process payload kinds are supported: coff (BOF), starlark and dll.
+// Built-in Go modules (listener, file_downloader, ...) use Type "go" with
+// Exec "built-in" and are registered internally, never loaded from config.json.
+// Everything is executed in memory; there is no on-disk/fork-and-run mode.
 type AgentModuleConfig struct {
-	Exec          string   `cbor:"1,keyasint"` // Run this executable file on agent
-	Files         []string `cbor:"2,keyasint"` // Files to be uploaded to agent
-	InMemory      bool     `cbor:"3,keyasint"` // run this module in memory
-	Type          string   `cbor:"4,keyasint"` // "go", "python", "powershell", "bash", "exe", "elf", "dll", "so", "coff"
-	IsInteractive bool     `cbor:"5,keyasint"` // whether run as a shell or not, eg. python, bettercap
-	WorkDir       string   `cbor:"6,keyasint"` // optional working directory
-	NeedsRoot     bool     `cbor:"7,keyasint"` // hint for privilege requirements
+	Exec  string   `cbor:"1,keyasint"` // "built-in" for Go modules; unused by payload modules
+	Files []string `cbor:"2,keyasint"` // Files to be uploaded to agent
+	Type  string   `cbor:"3,keyasint"` // "coff", "starlark", "dll", or "go" (built-in)
 }
 
 // ModuleConfig stores the complete module config data
@@ -196,12 +186,11 @@ type ModuleConfig struct {
 	Date         string            `cbor:"4,keyasint"`  // when did you write it
 	Comment      string            `cbor:"5,keyasint"`  // describe your module in one line
 	IsLocal      bool              `cbor:"6,keyasint"`  // If true, this module is a C2 plugin and doesn't run on agent, use `Build` to specify the command to run
-	Platform     string            `cbor:"7,keyasint"`  // targeting which OS? Linux/Windows
+	Platform     string            `cbor:"7,keyasint"`  // targeting which OS? Linux/Windows/Generic
 	Path         string            `cbor:"8,keyasint"`  // Path to the module directory
-	Fileless     bool              `cbor:"9,keyasint"`  // If true, this module doesn't drop files to disk
-	Options      ModOptions        `cbor:"10,keyasint"` // module options, will be passed as environment variables to the module, either on C2 or agent side
+	Options      ModOptions        `cbor:"10,keyasint"` // module options (console flags)
 	AgentConfig  AgentModuleConfig `cbor:"11,keyasint"` // Configuration for agent side
-	Invocation   InvocationSpec    `cbor:"12,keyasint"` // how to run the module without run.sh/env
+	Invocation   InvocationSpec    `cbor:"12,keyasint"` // how to turn options into argv/BOF/DLL arguments
 	Dependencies []string          `cbor:"13,keyasint"` // module names that must be loaded before this one (e.g. "coffloader")
 
 	// ModuleFilesMemFS uploads and caches every module file in encrypted
@@ -263,7 +252,6 @@ func populateModules() {
 			IsLocal:  false,
 			Platform: "Generic",
 			Path:     "",
-			Fileless: true,
 			Options: ModOptions{
 				"action": &ModOption{
 					Name: "action",
@@ -293,11 +281,9 @@ func populateModules() {
 				},
 			},
 			AgentConfig: AgentModuleConfig{
-				Exec:          "built-in",
-				Files:         []string{},
-				InMemory:      false,
-				Type:          "go",
-				IsInteractive: false,
+				Exec:  "built-in",
+				Files: []string{},
+				Type:  "go",
 			},
 		},
 		ModSSHHarvester: {
@@ -308,7 +294,6 @@ func populateModules() {
 			IsLocal:  false,
 			Platform: "Linux",
 			Path:     "",
-			Fileless: true,
 			Options: ModOptions{
 				"code_pattern": &ModOption{
 					Name: "code_pattern",
@@ -329,11 +314,9 @@ func populateModules() {
 				},
 			},
 			AgentConfig: AgentModuleConfig{
-				Exec:          "built-in",
-				Files:         []string{},
-				InMemory:      false,
-				Type:          "go",
-				IsInteractive: false,
+				Exec:  "built-in",
+				Files: []string{},
+				Type:  "go",
 			},
 		},
 		ModDownloader: {
@@ -344,7 +327,6 @@ func populateModules() {
 			IsLocal:  false,
 			Platform: "Generic",
 			Path:     "",
-			Fileless: true,
 			Options: ModOptions{
 				"peer": &ModOption{
 					Name: "peer",
@@ -363,11 +345,9 @@ func populateModules() {
 				},
 			},
 			AgentConfig: AgentModuleConfig{
-				Exec:          "built-in",
-				Files:         []string{},
-				InMemory:      false,
-				Type:          "go",
-				IsInteractive: false,
+				Exec:  "built-in",
+				Files: []string{},
+				Type:  "go",
 			},
 		},
 	}
@@ -381,7 +361,6 @@ func populateModules() {
 		IsLocal:  false,
 		Platform: "Windows",
 		Path:     "",
-		Fileless: true,
 		Options: ModOptions{
 			"pid": &ModOption{
 				Name:     "pid",
@@ -392,11 +371,9 @@ func populateModules() {
 			},
 		},
 		AgentConfig: AgentModuleConfig{
-			Exec:          "built-in",
-			Files:         []string{},
-			InMemory:      false,
-			Type:          "go",
-			IsInteractive: false,
+			Exec:  "built-in",
+			Files: []string{},
+			Type:  "go",
 		},
 	}
 
@@ -409,14 +386,11 @@ func populateModules() {
 		IsLocal:  false,
 		Platform: "Windows",
 		Path:     "",
-		Fileless: true,
 		Options:  ModOptions{},
 		AgentConfig: AgentModuleConfig{
-			Exec:          "built-in",
-			Files:         []string{},
-			InMemory:      false,
-			Type:          "go",
-			IsInteractive: false,
+			Exec:  "built-in",
+			Files: []string{},
+			Type:  "go",
 		},
 	}
 
@@ -430,14 +404,11 @@ func populateModules() {
 		IsLocal:  false,
 		Platform: "Windows",
 		Path:     "",
-		Fileless: true,
 		Options:  ModOptions{},
 		AgentConfig: AgentModuleConfig{
-			Exec:          "built-in",
-			Files:         []string{},
-			InMemory:      false,
-			Type:          "go",
-			IsInteractive: false,
+			Exec:  "built-in",
+			Files: []string{},
+			Type:  "go",
 		},
 	}
 
@@ -467,9 +438,7 @@ func populateModules() {
 //     Windows-only agent-side machinery, so non-Windows modules get nothing.
 //   - Among Windows agent modules, only the kinds the agent executes inside
 //     its own process under the impersonated token (starlark, coff, dll)
-//     receive the options. Child-process kinds (powershell/bash/python/exe…)
-//     spawn interpreters as the agent's own user and would silently ignore
-//     the token, so injecting it would just be noise.
+//     receive the options.
 //
 // The Windows token-management built-ins declare their own dedicated flags
 // and runners instead: steal_token keeps the universal "token" option (an
@@ -529,9 +498,7 @@ func IsWindowsPlatform(platform string) bool {
 // agent's ModuleHandler actually honors the universal token context.
 // Starlark builtins impersonate around individual syscalls, COFF/BOF payloads
 // and DLL modules run through the in-memory loader with a PreExecHook
-// impersonation. Child-process kinds (powershell/bash/python/…) inherit the
-// agent's process token, never the impersonation token, so they cannot make
-// use of it.
+// impersonation.
 func tokenContextType(t string) bool {
 	switch strings.ToLower(strings.TrimSpace(t)) {
 	case "starlark", "coff", "dll":

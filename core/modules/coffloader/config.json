@@ -8,7 +8,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "file",
@@ -24,12 +23,9 @@
         "COFFLoader.x64.dll",
         "COFFLoader.x86.dll"
       ],
-      "in_memory": true,
-      "type": "dll",
-      "interactive": false
+      "type": "dll"
     },
     "invocation": {
-      "dll_export": "LoadAndRun",
       "dll_entry": "go",
       "dll_file_param": "file"
     }

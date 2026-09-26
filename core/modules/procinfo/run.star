@@ -71,22 +71,17 @@ def parse_status(status_text):
     return info
 
 
-def format_ns(ns_ls_output):
+def format_ns(ns_dir):
     ns_dict = {}
-    for line in ns_ls_output.split("\n"):
-        if " -> " in line:
-            parts = line.split(" -> ")
-            if len(parts) == 2:
-                name = parts[0].split(" ")[-1]
-                target = parts[1].strip()
-                ns_dict[name] = target
+    for name in list_dir(ns_dir):
+        ns_dict[name] = read_link(ns_dir + "/" + name)
     return ns_dict
 
 
 def main(*args):
     pid = "self"
-    if len(args) == 2:
-        pid = args[1]
+    if args and args[0]:
+        pid = args[0]
     print("==================================================")
     print(" Process Info of %s" % pid)
     print("==================================================")
@@ -124,8 +119,7 @@ def main(*args):
                 print(parts[2])
 
     print("\n--- Namespaces ---")
-    ns_info = exec_cmd("ls", ["-l", procfs_prefix + "/ns"])
-    namespaces = format_ns(ns_info)
+    namespaces = format_ns(procfs_prefix + "/ns")
     for k in sorted(namespaces.keys()):
         k_padded = k + ":"
         if len(k_padded) < 12:

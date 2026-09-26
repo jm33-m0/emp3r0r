@@ -7,7 +7,6 @@
   "is_local": false,
   "platform": "Windows",
   "path": "",
-  "fileless": true,
   "module_files_memfs": true,
   "parameters": [
     {
@@ -28,9 +27,7 @@
   "agent_config": {
     "exec": "kkyum.star",
     "files": ["kkyum.star", "8516410b49bb79c08c19a37c516dad72.sys"],
-    "in_memory": true,
-    "type": "starlark",
-    "interactive": false
+    "type": "starlark"
   },
   "invocation": {}
 }

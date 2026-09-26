@@ -44,9 +44,6 @@ func ReadConfigs(file string) (configs []*def.ModuleConfig, err error) {
 		Vals     []string `json:"choices"`
 		Type     string   `json:"type"`
 		Required bool     `json:"required"`
-		Pattern  string   `json:"pattern"`
-		Encoding string   `json:"encoding"`
-		Secret   bool     `json:"secret"`
 		Min      *float64 `json:"min"`
 		Max      *float64 `json:"max"`
 		ArgvFlag string   `json:"argv_flag"`
@@ -58,23 +55,16 @@ func ReadConfigs(file string) (configs []*def.ModuleConfig, err error) {
 	}
 
 	type invocationJSON struct {
-		Argv           []invocationArgJSON `json:"argv"`
-		StdinParam     string              `json:"stdin_param"`
-		TimeoutSeconds int                 `json:"timeout_seconds"`
-		CoffExport     string              `json:"coff_export"`
-		DllExport      string              `json:"dll_export"`
-		DllEntry       string              `json:"dll_entry"`
-		DllFileParam   string              `json:"dll_file_param"`
+		Argv         []invocationArgJSON `json:"argv"`
+		CoffExport   string              `json:"coff_export"`
+		DllEntry     string              `json:"dll_entry"`
+		DllFileParam string              `json:"dll_file_param"`
 	}
 
 	type agentConfigJSON struct {
-		Exec          string   `json:"exec"`
-		Files         []string `json:"files"`
-		InMemory      bool     `json:"in_memory"`
-		Type          string   `json:"type"`
-		IsInteractive bool     `json:"interactive"`
-		WorkDir       string   `json:"work_dir"`
-		NeedsRoot     bool     `json:"needs_root"`
+		Exec  string   `json:"exec"`
+		Files []string `json:"files"`
+		Type  string   `json:"type"`
 	}
 
 	type moduleConfigJSON struct {
@@ -86,7 +76,6 @@ func ReadConfigs(file string) (configs []*def.ModuleConfig, err error) {
 		IsLocal      bool            `json:"is_local"`
 		Platform     string          `json:"platform"`
 		Path         string          `json:"path"`
-		Fileless     bool            `json:"fileless"`
 		AgentConfig  agentConfigJSON `json:"agent_config"`
 		Parameters   []optionJSON    `json:"parameters"`
 		Invocation   invocationJSON  `json:"invocation"`
@@ -121,27 +110,32 @@ func ReadConfigs(file string) (configs []*def.ModuleConfig, err error) {
 			IsLocal:  raw.IsLocal,
 			Platform: raw.Platform,
 			Path:     raw.Path,
-			Fileless: raw.Fileless,
 			Options:  def.ModOptions{},
 			AgentConfig: def.AgentModuleConfig{
-				Exec:          raw.AgentConfig.Exec,
-				Files:         raw.AgentConfig.Files,
-				InMemory:      raw.AgentConfig.InMemory,
-				Type:          raw.AgentConfig.Type,
-				IsInteractive: raw.AgentConfig.IsInteractive,
-				WorkDir:       raw.AgentConfig.WorkDir,
-				NeedsRoot:     raw.AgentConfig.NeedsRoot,
+				Exec:  raw.AgentConfig.Exec,
+				Files: raw.AgentConfig.Files,
+				Type:  raw.AgentConfig.Type,
 			},
 			ModuleFilesMemFS: raw.ModuleFilesMemFS,
 		}
 
-		config.Invocation.TimeoutSeconds = raw.Invocation.TimeoutSeconds
-		config.Invocation.StdinParam = raw.Invocation.StdinParam
 		config.Invocation.CoffExport = raw.Invocation.CoffExport
-		config.Invocation.DllExport = raw.Invocation.DllExport
 		config.Invocation.DllEntry = raw.Invocation.DllEntry
 		config.Invocation.DllFileParam = raw.Invocation.DllFileParam
 		config.Dependencies = raw.Dependencies
+
+		// Reject payload kinds the agent cannot run in-process. Only coff,
+		// starlark and dll are loadable from config.json; built-in Go modules
+		// are registered internally in def.populateModules and never parsed
+		// from a manifest. Local C2 plugins carry no agent payload, so they are
+		// exempt.
+		if !config.IsLocal {
+			switch strings.ToLower(strings.TrimSpace(config.AgentConfig.Type)) {
+			case "coff", "starlark", "dll":
+			default:
+				return nil, fmt.Errorf("module %q: unsupported agent_config.type %q (supported: coff, starlark, dll)", config.Name, config.AgentConfig.Type)
+			}
+		}
 
 		seenParams := make(map[string]bool)
 		for _, p := range raw.Parameters {
@@ -154,8 +148,8 @@ func ReadConfigs(file string) (configs []*def.ModuleConfig, err error) {
 			seenParams[p.Name] = true
 
 			// Check for conflicts with reserved command-line flags
-			if p.Name == "force" || p.Name == "help" {
-				logging.Warningf("Module '%s' config warning: parameter '%s' conflicts with reserved command-line flags (Cobra/pflag built-in)", raw.Name, p.Name)
+			if p.Name == "help" {
+				logging.Warningf("Module '%s' config warning: parameter '%s' conflicts with the reserved --help flag", raw.Name, p.Name)
 			}
 
 			config.Options[p.Name] = &def.ModOption{
@@ -165,9 +159,6 @@ func ReadConfigs(file string) (configs []*def.ModuleConfig, err error) {
 				Vals:     p.Vals,
 				Type:     p.Type,
 				Required: p.Required,
-				Pattern:  p.Pattern,
-				Encoding: p.Encoding,
-				Secret:   p.Secret,
 				Min:      p.Min,
 				Max:      p.Max,
 				ArgvFlag: p.ArgvFlag,
@@ -179,9 +170,6 @@ func ReadConfigs(file string) (configs []*def.ModuleConfig, err error) {
 
 		// DLL defaults (in-memory DLL loader convention)
 		if isDLL {
-			if config.Invocation.DllExport == "" {
-				config.Invocation.DllExport = "LoadAndRun"
-			}
 			if config.Invocation.DllEntry == "" {
 				config.Invocation.DllEntry = "go"
 			}
@@ -228,8 +216,7 @@ func ReadConfigs(file string) (configs []*def.ModuleConfig, err error) {
 					continue
 				}
 				coff.Args = append(coff.Args, def.CoffArgSpec{
-					Param:    p.Name,
-					Encoding: p.Encoding,
+					Param: p.Name,
 				})
 			}
 			config.Invocation.Coff = &coff
@@ -324,7 +311,7 @@ func coffArgZeroValue(wireTyp string) any {
 // For COFF modules the WireType on each ResolvedCoffArg is derived from the
 // parameter's unified "type" field via typeToWireToken.
 func ResolveInvocation(config *def.ModuleConfig, flags map[string]string) (def.ResolvedInvocation, error) {
-	resolved := def.ResolvedInvocation{TimeoutSeconds: config.Invocation.TimeoutSeconds}
+	resolved := def.ResolvedInvocation{}
 
 	// ── token (Windows impersonation) ─────────────────────────────────────
 	// The "token" option is special: it is not passed as argv but wired
@@ -351,7 +338,6 @@ func ResolveInvocation(config *def.ModuleConfig, flags map[string]string) (def.R
 
 	// ── dependencies & DLL invocation ─────────────────────────────────────
 	resolved.Dependencies = config.Dependencies
-	resolved.DllExport = config.Invocation.DllExport
 	resolved.DllEntry = config.Invocation.DllEntry
 
 	lookupOpt := func(name string) (*def.ModOption, string, error) {
@@ -429,15 +415,6 @@ func ResolveInvocation(config *def.ModuleConfig, flags map[string]string) (def.R
 		}
 	}
 
-	// ── stdin ─────────────────────────────────────────────────────────────
-	if config.Invocation.StdinParam != "" {
-		stdinVal, _, err := coerceVal(config.Invocation.StdinParam)
-		if err != nil {
-			return resolved, err
-		}
-		resolved.Stdin = stdinVal
-	}
-
 	// ── COFF packing ─────────────────────────────────────────────────────
 	// Wire type comes from the parameter's unified "type" field.
 	// Every declared BOF argument is always packed, even when the operator
@@ -459,7 +436,6 @@ func ResolveInvocation(config *def.ModuleConfig, flags map[string]string) (def.R
 			coffInv.Args = append(coffInv.Args, def.ResolvedCoffArg{
 				WireType: wireTyp,
 				Value:    typed,
-				Encoding: arg.Encoding,
 			})
 		}
 		resolved.Coff = coffInv
@@ -547,6 +523,12 @@ func renderOptionValue(opt *def.ModOption, val string) (string, any, error) {
 		num, err := strconv.ParseInt(val, 10, 16)
 		if err != nil {
 			return "", nil, fmt.Errorf("option %s expects int16: %w", opt.Name, err)
+		}
+		if opt.Min != nil && float64(num) < *opt.Min {
+			return "", nil, fmt.Errorf("option %s below min", opt.Name)
+		}
+		if opt.Max != nil && float64(num) > *opt.Max {
+			return "", nil, fmt.Errorf("option %s above max", opt.Name)
 		}
 		return fmt.Sprintf("%d", num), float64(num), nil
 

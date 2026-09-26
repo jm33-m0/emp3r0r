@@ -8,7 +8,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "pid",
@@ -35,9 +34,7 @@
     "agent_config": {
       "exec": "thread_inject.star",
       "files": ["thread_inject.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {}
   }

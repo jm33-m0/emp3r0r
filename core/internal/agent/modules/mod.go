@@ -6,7 +6,6 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -60,56 +59,10 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 	}
 	invocation.Token = tokenKey
 
-	// switch on payload type, in memory execution
+	// switch on payload type, in memory execution. Only in-process payloads
+	// are supported: coff (BOF), starlark and dll. Everything that would
+	// fork-and-run an interpreter or an on-disk executable was removed.
 	switch payload_type {
-	case "powershell":
-		err = executeWithToken(invocation.Token, func(tok uintptr) error {
-			if tok != 0 {
-				logging.Warningf("powershell module: token provided but child process cannot use thread impersonation; use a starlark module for token-aware execution")
-			}
-			var execErr error
-			out, execErr = agentutils.ExecutePowerShell(payload_data, invocation.Argv, nil)
-			if execErr != nil {
-				out = logging.Sprintf("running powershell script: %s (%v)", out, execErr)
-			}
-			return nil // output already captured; don't mask with token error
-		})
-		if err != nil {
-			return logging.Sprintf("token impersonation failed: %v", err)
-		}
-		return out
-	case "bash":
-		err = executeWithToken(invocation.Token, func(tok uintptr) error {
-			if tok != 0 {
-				logging.Warningf("bash module: token provided but child process cannot use thread impersonation; use a starlark module for token-aware execution")
-			}
-			var execErr error
-			out, execErr = agentutils.ExecuteShell(payload_data, invocation.Argv, nil)
-			if execErr != nil {
-				out = logging.Sprintf("running shell script: %s (%v)", out, execErr)
-			}
-			return nil
-		})
-		if err != nil {
-			return logging.Sprintf("token impersonation failed: %v", err)
-		}
-		return out
-	case "python":
-		err = executeWithToken(invocation.Token, func(tok uintptr) error {
-			if tok != 0 {
-				logging.Warningf("python module: token provided but child process cannot use thread impersonation; use a starlark module for token-aware execution")
-			}
-			var execErr error
-			out, execErr = agentutils.ExecutePython(payload_data, invocation.Argv, nil)
-			if execErr != nil {
-				out = logging.Sprintf("running python script: %s (%v)", out, execErr)
-			}
-			return nil
-		})
-		if err != nil {
-			return logging.Sprintf("token impersonation failed: %v", err)
-		}
-		return out
 	case "starlark":
 		err = executeWithToken(invocation.Token, func(token uintptr) error {
 			var execErr error
@@ -156,7 +109,7 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 		}
 		return out
 	default:
-		return logging.Sprintf("unknown payload type %s or custom loader not available", payload_type)
+		return logging.Sprintf("unsupported payload type %s (supported: coff, starlark, dll)", payload_type)
 	}
 }
 

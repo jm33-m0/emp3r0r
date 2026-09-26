@@ -6,13 +6,10 @@
     "comment": "Lateral movement via ChangeServiceConfigA (SCShell BOF): point a service at a command line, start it, then restore the original binary path. Use --token/--user/--ticket to authenticate to the target with stolen or created credentials.",
     "is_local": false,
     "platform": "Windows",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["CS-BOF/scshellbof.x64.o", "CS-BOF/scshellbof.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {

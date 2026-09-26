@@ -39,9 +39,8 @@ const simpleMod = `{
 	"name": "%s",
 	"comment": "hot reload test %s",
 	"is_local": false,
-	"fileless": true,
 	"platform": "Linux",
-	"agent_config": {"exec": "echo", "type": "elf", "files": []},
+	"agent_config": {"exec": "run.star", "type": "starlark", "files": []},
 	"parameters": [
 		{"name": "arg", "description": "arg for %s", "default": "hello", "type": "string"}
 	],
@@ -260,9 +259,8 @@ func TestModuleWatchLocalModuleReloadNoLoop(t *testing.T) {
 		"name": "watch_local",
 		"comment": "local hot reload test %s",
 		"is_local": true,
-		"fileless": false,
 		"platform": "Linux",
-		"agent_config": {"exec": "x.sh", "type": "bash", "files": ["x.sh"]},
+		"agent_config": {"exec": "", "files": []},
 		"parameters": [],
 		"invocation": {"argv": [{"literal": "x.sh"}]}
 	}`

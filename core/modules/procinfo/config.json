@@ -7,7 +7,6 @@
   "is_local": false,
   "platform": "Linux",
   "path": "",
-  "fileless": true,
   "parameters": [
     {
       "name": "pid",
@@ -20,9 +19,7 @@
   "agent_config": {
     "exec": "run.star",
     "files": ["run.star"],
-    "in_memory": true,
-    "type": "starlark",
-    "interactive": false
+    "type": "starlark"
   },
   "invocation": {}
 }

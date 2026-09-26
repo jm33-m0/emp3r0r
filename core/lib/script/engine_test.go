@@ -111,6 +111,38 @@ def main(*args):
 	}
 }
 
+func TestReadLink(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "target.txt")
+	if err := os.WriteFile(target, []byte("x"), 0o600); err != nil {
+		t.Fatalf("write target: %v", err)
+	}
+	link := filepath.Join(dir, "link.txt")
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("symlink unsupported: %v", err)
+	}
+
+	out, err := Run([]byte(`
+def main(*args):
+    return read_link(argv[0])
+`), []string{link}, nil, 0)
+	if err != nil {
+		t.Fatalf("read_link script failed: %v", err)
+	}
+	if !strings.Contains(out, target) {
+		t.Fatalf("read_link output %q does not contain target %q", out, target)
+	}
+
+	// A non-symlink must surface an error rather than silently returning "".
+	if _, err := Run([]byte(`
+def main(*args):
+    read_link(argv[0])
+    return "Fail: expected error"
+`), []string{target}, nil, 0); err == nil {
+		t.Fatal("expected error for non-symlink read_link")
+	}
+}
+
 func TestEngineRegisterCustomAPI(t *testing.T) {
 	// Register a new custom API function
 	RegisterAPI("custom_multiply", func(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -596,15 +628,6 @@ def main(*args):
         return "Fail: root status mismatch"
     print("IsRoot: " + str(is_root))
 
-    # Test exec_shell
-    out = agent.exec_shell("echo hello_agent_proxy")
-    if "hello_agent_proxy" not in out:
-        return "Fail: exec_shell output mismatch: " + out
-    
-    out2 = agent_exec_shell("echo hello_top_level")
-    if "hello_top_level" not in out2:
-        return "Fail: agent_exec_shell output mismatch: " + out2
-
     return "OK"
 `
 	out, err := Run([]byte(script), nil, nil, 0)
@@ -640,22 +663,6 @@ func (m *testMockAgentProxy) GetContainerName() string {
 
 func (m *testMockAgentProxy) HasRoot() bool {
 	return false
-}
-
-func (m *testMockAgentProxy) ExecuteShell(scriptBytes []byte, argv, env []string) (string, error) {
-	return "mock shell: " + string(scriptBytes), nil
-}
-
-func (m *testMockAgentProxy) ExecutePython(scriptBytes []byte, argv, env []string) (string, error) {
-	return "mock python: " + string(scriptBytes), nil
-}
-
-func (m *testMockAgentProxy) ExecutePowerShell(scriptBytes []byte, argv, env []string) (string, error) {
-	return "mock powershell: " + string(scriptBytes), nil
-}
-
-func (m *testMockAgentProxy) ExecuteBatch(scriptBytes []byte, argv, env []string) (string, error) {
-	return "mock batch: " + string(scriptBytes), nil
 }
 
 func (m *testMockAgentProxy) SignWithAgentKey(data []byte) ([]byte, error) {
@@ -708,10 +715,6 @@ def main(*args):
     sig = agent.sign("hello")
     if str(sig) != "SIGNED:hello":
         return "Fail: custom sign mismatch: " + str(sig)
-
-    sh = agent.exec_shell("echo hello_agent_proxy")
-    if sh != "mock shell: echo hello_agent_proxy":
-        return "Fail: custom exec_shell mismatch: " + sh
 
     fetched = agent.fetch_file("test.bin")
     if str(fetched) != "fetched:test.bin":

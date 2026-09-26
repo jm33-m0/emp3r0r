@@ -31,13 +31,10 @@ func TestReadModConfig(t *testing.T) {
 		"is_local": true,
 		"platform": "Linux",
 		"path": "/tmp/test_module",
-		"fileless": false,
 		"agent_config": {
 			"exec": "test_exec",
 			"files": ["file1", "file2"],
-			"in_memory": true,
-			"type": "go",
-			"interactive": false
+			"type": "go"
 		},
 		"parameters": [
 			{
@@ -85,9 +82,6 @@ func TestReadModConfig(t *testing.T) {
 	if len(config.AgentConfig.Files) != 2 {
 		t.Errorf("Expected 2 files, got %d", len(config.AgentConfig.Files))
 	}
-	if !config.AgentConfig.InMemory {
-		t.Errorf("Expected AgentConfig.InMemory true, got false")
-	}
 
 	opt, ok := config.Options["option1"]
 	if !ok {
@@ -107,6 +101,7 @@ func TestReadModConfigPartial(t *testing.T) {
 
 	jsonConfig := `{
 		"name": "test_module_partial",
+		"agent_config": {"type": "starlark"},
 		"parameters": [],
 		"invocation": {"argv": []}
 	}`
@@ -131,6 +126,28 @@ func TestReadModConfigPartial(t *testing.T) {
 	if config.IsLocal {
 		t.Errorf("Expected IsLocal false, got true")
 	}
+	if config.AgentConfig.Type != "starlark" {
+		t.Errorf("Expected AgentConfig.Type 'starlark', got '%s'", config.AgentConfig.Type)
+	}
+}
+
+func TestReadModConfigRejectsForkRunPayloads(t *testing.T) {
+	for _, payloadType := range []string{"bash", "python", "powershell", "elf", "exe", "so", "go", ""} {
+		t.Run(payloadType, func(t *testing.T) {
+			jsonConfig := `{
+				"name": "bad_mod",
+				"is_local": false,
+				"agent_config": {"type": "` + payloadType + `"}
+			}`
+			cfgFile := filepath.Join(t.TempDir(), "config.json")
+			if err := os.WriteFile(cfgFile, []byte(jsonConfig), 0o644); err != nil {
+				t.Fatalf("write config: %v", err)
+			}
+			if _, err := readModCondig(cfgFile); err == nil {
+				t.Fatalf("expected payload type %q to be rejected", payloadType)
+			}
+		})
+	}
 }
 
 func TestResolveInvocation(t *testing.T) {
@@ -142,15 +159,13 @@ func TestResolveInvocation(t *testing.T) {
 				{Literal: "runner"},
 				{Flag: "-p", Param: "port"},
 			},
-			StdinParam: "message",
 			Coff: &def.CoffInvocation{
 				Export: "Run",
 				Args:   []def.CoffArgSpec{{Param: "port"}},
 			},
 		},
 		Options: def.ModOptions{
-			"port":    {Name: "port", Val: "8080", Type: "uint", Required: true},
-			"message": {Name: "message", Val: "hello", Type: "string"},
+			"port": {Name: "port", Val: "8080", Type: "uint", Required: true},
 		},
 	}
 
@@ -163,10 +178,6 @@ func TestResolveInvocation(t *testing.T) {
 		t.Fatalf("unexpected argv: %v", inv.Argv)
 	}
 
-	if inv.Stdin != "hello" {
-		t.Fatalf("stdin mismatch: %q", inv.Stdin)
-	}
-
 	if inv.Coff == nil || len(inv.Coff.Args) != 1 {
 		t.Fatalf("expected one COFF arg")
 	}
@@ -177,7 +188,7 @@ func TestResolveInvocation(t *testing.T) {
 
 func TestResolveInvocationMissingRequired(t *testing.T) {
 	config := &def.ModuleConfig{
-		AgentConfig: def.AgentModuleConfig{Type: "elf"},
+		AgentConfig: def.AgentModuleConfig{Type: "coff"},
 		Invocation:  def.InvocationSpec{Argv: []def.InvocationArg{{Param: "must"}}},
 		Options: def.ModOptions{
 			"must": {Name: "must", Type: "string", Required: true, Val: ""},
@@ -391,15 +402,10 @@ func TestReadModConfigFullInvocationAndAgentConfig(t *testing.T) {
 		"is_local": false,
 		"platform": "Windows",
 		"path": "",
-		"fileless": true,
 		"agent_config": {
 			"exec": "mod.exe",
 			"files": ["mod.exe"],
-			"in_memory": false,
-			"type": "coff",
-			"interactive": false,
-			"work_dir": "C:/tmp",
-			"needs_root": true
+			"type": "coff"
 		},
 		"parameters": [
 			{
@@ -409,9 +415,6 @@ func TestReadModConfigFullInvocationAndAgentConfig(t *testing.T) {
 				"choices": ["on", "off"],
 				"type": "cstr",
 				"required": true,
-				"pattern": "on|off",
-				"encoding": "utf8",
-				"secret": false,
 				"min": 0,
 				"max": 1
 			}
@@ -420,8 +423,6 @@ func TestReadModConfigFullInvocationAndAgentConfig(t *testing.T) {
 			"argv": [
 				{"literal": "runner"}
 			],
-			"stdin_param": "flagged",
-			"timeout_seconds": 42,
 			"coff_export": "Run"
 		}
 	}`
@@ -436,21 +437,12 @@ func TestReadModConfigFullInvocationAndAgentConfig(t *testing.T) {
 		t.Fatalf("readModCondig: %v", err)
 	}
 
-	if got := config.Invocation.TimeoutSeconds; got != 42 {
-		t.Fatalf("timeout mismatch: %d", got)
-	}
-	if config.Invocation.StdinParam != "flagged" {
-		t.Fatalf("stdin param mismatch: %s", config.Invocation.StdinParam)
-	}
 	if config.Invocation.Coff == nil || config.Invocation.Coff.Export != "Run" || len(config.Invocation.Coff.Args) != 1 {
 		t.Fatalf("coff invocation parsed incorrectly: %+v", config.Invocation.Coff)
 	}
 	opt := config.Options["flagged"]
-	if opt == nil || opt.Required != true || opt.Pattern == "" || opt.Encoding != "utf8" || opt.Min == nil || opt.Max == nil {
+	if opt == nil || opt.Required != true || opt.Min == nil || opt.Max == nil {
 		t.Fatalf("option metadata missing: %+v", opt)
-	}
-	if config.AgentConfig.WorkDir != "C:/tmp" || !config.AgentConfig.NeedsRoot {
-		t.Fatalf("agent config fields not parsed: %+v", config.AgentConfig)
 	}
 }
 
@@ -493,7 +485,7 @@ func TestInitModulesLoadsLocalModule(t *testing.T) {
 	jsonConfig := `{
 		"name": "foo",
 		"is_local": true,
-		"agent_config": {"exec": "foo.sh", "type": "bash"},
+		"agent_config": {"exec": "", "files": []},
 		"invocation": {"argv": []}
 	}`
 	configFile := filepath.Join(moduleDir, "foo", "config.json")
@@ -691,13 +683,10 @@ func TestReadModConfigsMultiple(t *testing.T) {
 			"is_local": true,
 			"platform": "Linux",
 			"path": "/tmp/test_module",
-			"fileless": false,
 			"agent_config": {
 				"exec": "exec1",
 				"files": ["file1"],
-				"in_memory": true,
-				"type": "go",
-				"interactive": false
+				"type": "go"
 			},
 			"parameters": [
 				{
@@ -724,13 +713,10 @@ func TestReadModConfigsMultiple(t *testing.T) {
 			"is_local": false,
 			"platform": "Windows",
 			"path": "/tmp/test_module",
-			"fileless": true,
 			"agent_config": {
 				"exec": "exec2",
 				"files": ["file2"],
-				"in_memory": false,
-				"type": "coff",
-				"interactive": false
+				"type": "coff"
 			},
 			"parameters": [
 				{
@@ -843,13 +829,10 @@ func TestReadModConfigUnifiedCOFF(t *testing.T) {
 		"comment": "unified COFF module",
 		"is_local": false,
 		"platform": "Linux",
-		"fileless": true,
 		"agent_config": {
 			"exec": "",
 			"files": ["unified.o"],
-			"in_memory": true,
-			"type": "coff",
-			"interactive": false
+			"type": "coff"
 		},
 		"parameters": [
 			{
@@ -936,13 +919,10 @@ func TestReadModConfigUnifiedStarlark(t *testing.T) {
 		"comment": "unified starlark module",
 		"is_local": false,
 		"platform": "Windows",
-		"fileless": true,
 		"agent_config": {
 			"exec": "search.star",
 			"files": ["search.star"],
-			"in_memory": true,
-			"type": "starlark",
-			"interactive": false
+			"type": "starlark"
 		},
 		"parameters": [
 			{
@@ -1001,13 +981,10 @@ func TestReadModConfigUnifiedArgvFlag(t *testing.T) {
 		"comment": "unified module with argv_flag",
 		"is_local": false,
 		"platform": "Linux",
-		"fileless": true,
 		"agent_config": {
-			"exec": "tool",
-			"files": ["tool"],
-			"in_memory": false,
-			"type": "elf",
-			"interactive": false
+			"exec": "tool.star",
+			"files": ["tool.star"],
+			"type": "starlark"
 		},
 		"parameters": [
 			{
@@ -1083,16 +1060,13 @@ func TestReadModConfigDLL(t *testing.T) {
 		"agent_config": {
 			"exec": "",
 			"files": ["COFFLoader.x64.dll"],
-			"in_memory": true,
-			"type": "dll",
-			"interactive": false
+			"type": "dll"
 		},
 		"parameters": [
 			{"name": "file", "description": "BOF file to run", "default": "", "type": "string", "required": true},
 			{"name": "priv", "description": "Privilege to enable", "default": "SeShutdownPrivilege", "type": "string", "required": false}
 		],
 		"invocation": {
-			"dll_export": "LoadAndRun",
 			"dll_entry": "go",
 			"dll_file_param": "file"
 		},
@@ -1111,9 +1085,6 @@ func TestReadModConfigDLL(t *testing.T) {
 
 	if !strings.EqualFold(config.AgentConfig.Type, "dll") {
 		t.Fatalf("expected type dll, got %s", config.AgentConfig.Type)
-	}
-	if config.Invocation.DllExport != "LoadAndRun" {
-		t.Fatalf("expected DllExport LoadAndRun, got %s", config.Invocation.DllExport)
 	}
 	if config.Invocation.DllEntry != "go" {
 		t.Fatalf("expected DllEntry go, got %s", config.Invocation.DllEntry)
@@ -1161,9 +1132,7 @@ func TestReadModConfigWindowsCOFFAutoDependency(t *testing.T) {
 		"platform": "Windows",
 		"agent_config": {
 			"files": ["get_priv.x64.o"],
-			"in_memory": true,
-			"type": "coff",
-			"interactive": false
+			"type": "coff"
 		},
 		"parameters": [
 			{"name": "priv", "description": "Privilege to enable", "default": "", "type": "string", "required": true}
@@ -1204,7 +1173,6 @@ func TestReadModConfigModuleFilesMemFS(t *testing.T) {
 		"module_files_memfs": true,
 		"agent_config": {
 			"files": ["run.star", "data.txt"],
-			"in_memory": true,
 			"type": "starlark"
 		},
 		"parameters": [],

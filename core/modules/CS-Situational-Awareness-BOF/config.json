@@ -7,16 +7,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/windowlist/windowlist.x64.o",
         "SA/windowlist/windowlist.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -39,16 +36,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/aadjoininfo/aadjoininfo.x64.o",
         "SA/aadjoininfo/aadjoininfo.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {
@@ -63,13 +57,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/dir/dir.x64.o", "SA/dir/dir.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -99,13 +90,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/listdns/listdns.x64.o", "SA/listdns/listdns.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {
@@ -120,16 +108,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/get-netsession2/get-netsession2.x64.o",
         "SA/get-netsession2/get-netsession2.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -166,16 +151,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/routeprint/routeprint.x64.o",
         "SA/routeprint/routeprint.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {
@@ -190,16 +172,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/netlocalgroup2/netlocalgroup2.x64.o",
         "SA/netlocalgroup2/netlocalgroup2.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -229,13 +208,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/resources/resources.x64.o", "SA/resources/resources.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {
@@ -250,16 +226,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/netloggedon/netloggedon.x64.o",
         "SA/netloggedon/netloggedon.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -282,13 +255,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/arp/arp.x64.o", "SA/arp/arp.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {
@@ -303,16 +273,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/sc_qfailure/sc_qfailure.x64.o",
         "SA/sc_qfailure/sc_qfailure.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -342,13 +309,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/tasklist/tasklist.x64.o", "SA/tasklist/tasklist.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -371,16 +335,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/netloggedon2/netloggedon2.x64.o",
         "SA/netloggedon2/netloggedon2.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -403,16 +364,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/nonpagedldapsearch/nonpagedldapsearch.x64.o",
         "SA/nonpagedldapsearch/nonpagedldapsearch.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -463,13 +421,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/notepad/notepad.x64.o", "SA/notepad/notepad.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {
@@ -484,13 +439,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/listmods/listmods.x64.o", "SA/listmods/listmods.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -513,13 +465,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/nettime/nettime.x64.o", "SA/nettime/nettime.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -542,13 +491,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/netuser/netuser.x64.o", "SA/netuser/netuser.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -578,16 +524,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/adcs_enum_com2/adcs_enum_com2.x64.o",
         "SA/adcs_enum_com2/adcs_enum_com2.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {
@@ -602,16 +545,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/get-netsession/get-netsession.x64.o",
         "SA/get-netsession/get-netsession.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -634,13 +574,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/netview/netview.x64.o", "SA/netview/netview.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -663,16 +600,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/regsession/regsession.x64.o",
         "SA/regsession/regsession.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -695,16 +629,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/useridletime/useridletime.x64.o",
         "SA/useridletime/useridletime.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {
@@ -719,13 +650,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/probe/probe.x64.o", "SA/probe/probe.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -762,13 +690,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/netuse/netuse.x64.o", "SA/netuse/netuse.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -833,13 +758,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/netuse/netuse.x64.o", "SA/netuse/netuse.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -869,13 +791,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/netuse/netuse.x64.o", "SA/netuse/netuse.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -919,13 +838,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/wmi_query/wmi_query.x64.o", "SA/wmi_query/wmi_query.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -969,16 +885,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/ldapsearch/ldapsearch.x64.o",
         "SA/ldapsearch/ldapsearch.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1043,13 +956,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/ipconfig/ipconfig.x64.o", "SA/ipconfig/ipconfig.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {
@@ -1064,16 +974,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/schtasksquery/schtasksquery.x64.o",
         "SA/schtasksquery/schtasksquery.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1103,13 +1010,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/sc_enum/sc_enum.x64.o", "SA/sc_enum/sc_enum.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1132,13 +1036,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/reg_query/reg_query.x64.o", "SA/reg_query/reg_query.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1189,16 +1090,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/get_session_info/get_session_info.x64.o",
         "SA/get_session_info/get_session_info.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {
@@ -1213,13 +1111,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/adcs_enum/adcs_enum.x64.o", "SA/adcs_enum/adcs_enum.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1242,16 +1137,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/sc_qdescription/sc_qdescription.x64.o",
         "SA/sc_qdescription/sc_qdescription.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1281,16 +1173,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/findLoadedModule/findLoadedModule.x64.o",
         "SA/findLoadedModule/findLoadedModule.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1320,16 +1209,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/sc_qtriggerinfo/sc_qtriggerinfo.x64.o",
         "SA/sc_qtriggerinfo/sc_qtriggerinfo.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1359,16 +1245,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/netuserenum/netuserenum.x64.o",
         "SA/netuserenum/netuserenum.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1398,13 +1281,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/sc_qc/sc_qc.x64.o", "SA/sc_qc/sc_qc.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1434,16 +1314,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/adcs_enum_com/adcs_enum_com.x64.o",
         "SA/adcs_enum_com/adcs_enum_com.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {
@@ -1458,13 +1335,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/sc_query/sc_query.x64.o", "SA/sc_query/sc_query.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1494,16 +1368,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/get_password_policy/get_password_policy.x64.o",
         "SA/get_password_policy/get_password_policy.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1526,13 +1397,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/vssenum/vssenum.x64.o", "SA/vssenum/vssenum.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1562,16 +1430,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/adv_audit_policies/adv_audit_policies.x64.o",
         "SA/adv_audit_policies/adv_audit_policies.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1594,13 +1459,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/env/env.x64.o", "SA/env/env.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {
@@ -1615,13 +1477,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/netstat/netstat.x64.o", "SA/netstat/netstat.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1644,13 +1503,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/netgroup/netgroup.x64.o", "SA/netgroup/netgroup.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1687,16 +1543,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/netlocalgroup/netlocalgroup.x64.o",
         "SA/netlocalgroup/netlocalgroup.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1733,13 +1586,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/whoami/whoami.x64.o", "SA/whoami/whoami.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {
@@ -1754,16 +1604,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/enumLocalSessions/enumLocalSessions.x64.o",
         "SA/enumLocalSessions/enumLocalSessions.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {
@@ -1778,13 +1625,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/locale/locale.x64.o", "SA/locale/locale.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {
@@ -1799,13 +1643,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/sha1/sha1.x64.o", "SA/sha1/sha1.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1828,16 +1669,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/enum_filter_driver/enum_filter_driver.x64.o",
         "SA/enum_filter_driver/enum_filter_driver.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1860,16 +1698,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/driversigs/driversigs.x64.o",
         "SA/driversigs/driversigs.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {
@@ -1884,13 +1719,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/sha256/sha256.x64.o", "SA/sha256/sha256.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1913,16 +1745,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/ldapsecuritycheck/ldapsecuritycheck.x64.o",
         "SA/ldapsecuritycheck/ldapsecuritycheck.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1945,16 +1774,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/list_firewall_rules/list_firewall_rules.x64.o",
         "SA/list_firewall_rules/list_firewall_rules.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {
@@ -1969,13 +1795,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/md5/md5.x64.o", "SA/md5/md5.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -1998,13 +1821,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/netuptime/netuptime.x64.o", "SA/netuptime/netuptime.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -2027,16 +1847,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/schtasksenum/schtasksenum.x64.o",
         "SA/schtasksenum/schtasksenum.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -2059,13 +1876,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/netshares/netshares.x64.o", "SA/netshares/netshares.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -2095,13 +1909,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/nslookup/nslookup.x64.o", "SA/nslookup/nslookup.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -2138,13 +1949,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/uptime/uptime.x64.o", "SA/uptime/uptime.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {
@@ -2159,16 +1967,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "SA/get_dpapi_system/get_dpapi_system.x64.o",
         "SA/get_dpapi_system/get_dpapi_system.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {
@@ -2183,13 +1988,10 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": ["SA/cacls/cacls.x64.o", "SA/cacls/cacls.x86.o"],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {

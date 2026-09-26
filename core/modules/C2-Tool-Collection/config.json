@@ -7,16 +7,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/AddMachineAccount/GetMachineAccountQuota.x64.o",
         "BOF/AddMachineAccount/GetMachineAccountQuota.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {
@@ -31,16 +28,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/AddMachineAccount/AddMachineAccount.x64.o",
         "BOF/AddMachineAccount/AddMachineAccount.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -70,16 +64,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/AddMachineAccount/DelMachineAccount.x64.o",
         "BOF/AddMachineAccount/DelMachineAccount.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -102,16 +93,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/Askcreds/Askcreds.x64.o",
         "BOF/Askcreds/Askcreds.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -134,16 +122,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/CVE-2022-26923/CVE-2022-26923.x64.o",
         "BOF/CVE-2022-26923/CVE-2022-26923.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -173,16 +158,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/Domaininfo/Domaininfo.x64.o",
         "BOF/Domaininfo/Domaininfo.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {
@@ -197,16 +179,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/FindObjects/FindProcHandle.x64.o",
         "BOF/FindObjects/FindProcHandle.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -229,16 +208,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/FindObjects/FindModule.x64.o",
         "BOF/FindObjects/FindModule.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -261,16 +237,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/KerbHash/KerbHash.x64.o",
         "BOF/KerbHash/KerbHash.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -307,16 +280,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/Kerberoast/Kerberoast.x64.o",
         "BOF/Kerberoast/Kerberoast.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -352,16 +322,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/Klist/Klist.x64.o",
         "BOF/Klist/Klist.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -396,16 +363,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/Lapsdump/Lapsdump.x64.o",
         "BOF/Lapsdump/Lapsdump.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -428,16 +392,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/PetitPotam/PetitPotam.x64.o",
         "BOF/PetitPotam/PetitPotam.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -467,16 +428,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/Psc/Psc.x64.o",
         "BOF/Psc/Psc.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {
@@ -491,16 +449,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/Psk/Psk.x64.o",
         "BOF/Psk/Psk.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {
@@ -515,16 +470,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/Psm/Psm.x64.o",
         "BOF/Psm/Psm.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -547,16 +499,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/Psw/Psw.x64.o",
         "BOF/Psw/Psw.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {
@@ -571,16 +520,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/Psx/Psx.x64.o",
         "BOF/Psx/Psx.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -603,16 +549,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/Psx/Psx.x64.o",
         "BOF/Psx/Psx.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -635,16 +578,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/ReconAD/ReconAD.x64.o",
         "BOF/ReconAD/ReconAD.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -705,16 +645,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/ReconAD/ReconAD.x64.o",
         "BOF/ReconAD/ReconAD.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -775,16 +712,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/ReconAD/ReconAD.x64.o",
         "BOF/ReconAD/ReconAD.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -845,16 +779,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/ReconAD/ReconAD.x64.o",
         "BOF/ReconAD/ReconAD.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -915,16 +846,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/Smbinfo/Smbinfo.x64.o",
         "BOF/Smbinfo/Smbinfo.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -947,16 +875,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/SprayAD/SprayAD.x64.o",
         "BOF/SprayAD/SprayAD.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [
       {
@@ -997,16 +922,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/StartWebClient/StartWebClient.x64.o",
         "BOF/StartWebClient/StartWebClient.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {
@@ -1021,15 +943,12 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/WdToggle/WdToggle.x64.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {
@@ -1044,16 +963,13 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "agent_config": {
       "exec": "",
       "files": [
         "BOF/Winver/Winver.x64.o",
         "BOF/Winver/Winver.x86.o"
       ],
-      "in_memory": true,
-      "type": "coff",
-      "interactive": false
+      "type": "coff"
     },
     "parameters": [],
     "invocation": {

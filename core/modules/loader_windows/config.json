@@ -8,7 +8,6 @@
     "is_local": true,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "shellcode",
@@ -59,8 +58,7 @@
         "description": "RC4 key as hex (1..256 bytes); leave empty to generate a fresh random key per build",
         "default": "",
         "type": "string",
-        "required": false,
-        "secret": true
+        "required": false
       },
       {
         "name": "inject",

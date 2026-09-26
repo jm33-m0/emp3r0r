@@ -59,19 +59,17 @@ func C2Commands() *cobra.Command {
 	customModuleCmd := &cobra.Command{
 		Use:     def.C2CmdCustomModule,
 		Short:   "Load a custom module",
-		Example: "!custom_module --mod_name <name> --invocation <base64> --checksum <checksum> --in_mem <bool> --type <payload_type> --file_to_download <file> --peer <ip>",
+		Example: "!custom_module --mod_name <name> --invocation <base64> --checksum <checksum> --type <payload_type> --file_to_download <file> --peer <ip>",
 		GroupID: "generic",
 		Run:     runCustomModule,
 	}
 	customModuleCmd.Flags().StringP("mod_name", "m", "", "Module name")
 	customModuleCmd.Flags().StringP("invocation", "v", "", "Base64-encoded invocation payload")
 	customModuleCmd.Flags().StringP("checksum", "c", "", "Checksum")
-	customModuleCmd.Flags().BoolP("in_mem", "i", false, "Load module in memory")
 	customModuleCmd.Flags().StringP("type", "t", "", "Payload type")
 	customModuleCmd.Flags().StringP("file_to_download", "f", "", "File to download")
 	customModuleCmd.RegisterFlagCompletionFunc("file_to_download", memFileCompletion)
 	customModuleCmd.Flags().StringP("peer", "d", "", "Peer agent IP")
-	customModuleCmd.Flags().StringP("token", "k", "", "SID of cached token, or netlogon session name, to impersonate (Windows only)")
 	rootCmd.AddCommand(customModuleCmd)
 
 	// C2 Listener command

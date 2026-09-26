@@ -24,9 +24,6 @@ func init() {
 	script.RevertFn = func() {
 		priv.RevertThread()
 	}
-	script.ExecWithToken = func(token uintptr, commandLine string) error {
-		return priv.CreateProcessWithToken(windows.Handle(token), commandLine)
-	}
 
 	// ---- coffloader hooks ----
 	// COFF/BOF payloads are executed on a dedicated goroutine inside
@@ -50,8 +47,8 @@ func init() {
 // is responsible for its own impersonation:
 //   - starlark builtins use runWithToken (ImpersonateThread / RevertThread)
 //     around individual syscalls.
-//   - shell/python/… child processes ignore the thread token; use
-//     CreateProcessWithTokenW when a child must run under the stolen identity.
+//   - COFF/BOF and DLL payloads run through the in-memory loader with the
+//     PreExecHook impersonating the dedicated loader goroutine.
 func executeWithToken(sid string, action func(token uintptr) error) error {
 	if sid == "" {
 		return action(0)

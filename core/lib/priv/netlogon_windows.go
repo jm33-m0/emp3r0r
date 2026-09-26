@@ -196,8 +196,7 @@ func logonOnce(user, domain, password string, logonType uint32) (*LogonSession, 
 	}
 
 	// Duplicate into an impersonation token (same pattern as StealToken) so
-	// the handle works with NtSetInformationThread impersonation and
-	// CreateProcessWithTokenW.
+	// the handle works with NtSetInformationThread impersonation.
 	if syscall.RuntimeSyscallTable == nil {
 		return nil, fmt.Errorf("MakeToken: syscall table not initialized")
 	}

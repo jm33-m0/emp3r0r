@@ -88,6 +88,11 @@ func normalizeCoffValue(arg CoffArg) (string, error) {
 
 func formatInt(val any, prefix string) (string, error) {
 	switch v := val.(type) {
+	case bool:
+		if v {
+			return prefix + "1", nil
+		}
+		return prefix + "0", nil
 	case int:
 		return prefix + strconv.FormatInt(int64(v), 10), nil
 	case int32:

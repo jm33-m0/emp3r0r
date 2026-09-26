@@ -83,22 +83,6 @@ func (p *AgentProxyImpl) HasRoot() bool {
 	return sysinfo.HasRoot()
 }
 
-func (p *AgentProxyImpl) ExecuteShell(scriptBytes []byte, argv, env []string) (string, error) {
-	return ExecuteShell(scriptBytes, argv, env)
-}
-
-func (p *AgentProxyImpl) ExecutePython(scriptBytes []byte, argv, env []string) (string, error) {
-	return ExecutePython(scriptBytes, argv, env)
-}
-
-func (p *AgentProxyImpl) ExecutePowerShell(scriptBytes []byte, argv, env []string) (string, error) {
-	return ExecutePowerShell(scriptBytes, argv, env)
-}
-
-func (p *AgentProxyImpl) ExecuteBatch(scriptBytes []byte, argv, env []string) (string, error) {
-	return ExecuteBatch(scriptBytes, argv, env)
-}
-
 func (p *AgentProxyImpl) SignWithAgentKey(data []byte) ([]byte, error) {
 	return SignWithAgentKey(data)
 }

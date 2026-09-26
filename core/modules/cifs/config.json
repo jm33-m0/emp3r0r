@@ -8,7 +8,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "src",
@@ -42,9 +41,7 @@
     "agent_config": {
       "exec": "cifs.star",
       "files": ["cifs.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {
       "argv": [
@@ -63,7 +60,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "src",
@@ -104,9 +100,7 @@
     "agent_config": {
       "exec": "cifs.star",
       "files": ["cifs.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {
       "argv": [{ "literal": "upload" }]
@@ -121,7 +115,6 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
-    "fileless": true,
     "parameters": [
       {
         "name": "dest",
@@ -141,9 +134,7 @@
     "agent_config": {
       "exec": "cifs.star",
       "files": ["cifs.star"],
-      "in_memory": true,
-      "type": "starlark",
-      "interactive": false
+      "type": "starlark"
     },
     "invocation": {
       "argv": [{ "literal": "delete" }]

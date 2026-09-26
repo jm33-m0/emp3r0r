@@ -251,3 +251,68 @@ func TestTypeToWireToken(t *testing.T) {
 		}
 	}
 }
+
+// TestResolveInvocationShortBounds verifies that numeric bounds apply to the
+// short wire type, not only to int/uint.
+func TestResolveInvocationShortBounds(t *testing.T) {
+	path := writeConfig(t, `{
+		"name": "short_bounds",
+		"platform": "Windows",
+		"agent_config": {"type": "coff", "files": ["a.x64.o"]},
+		"parameters": [
+			{"name": "mask", "description": "short", "type": "short", "min": 1, "max": 10, "default": "5"}
+		],
+		"invocation": {"coff_export": "go"}
+	}`)
+	configs, err := ReadConfigs(path)
+	if err != nil {
+		t.Fatalf("ReadConfigs: %v", err)
+	}
+	cfg := configs[0]
+
+	if _, err := ResolveInvocation(cfg, map[string]string{"mask": "0"}); err == nil {
+		t.Fatal("expected below-min error for short")
+	}
+	if _, err := ResolveInvocation(cfg, map[string]string{"mask": "11"}); err == nil {
+		t.Fatal("expected above-max error for short")
+	}
+	inv, err := ResolveInvocation(cfg, map[string]string{"mask": "7"})
+	if err != nil {
+		t.Fatalf("in-range short rejected: %v", err)
+	}
+	if inv.Coff == nil || len(inv.Coff.Args) != 1 || inv.Coff.Args[0].WireType != "s" {
+		t.Fatalf("unexpected coff args: %+v", inv.Coff)
+	}
+}
+
+// TestResolveInvocationStarlarkOnlyRequires locks in the documented split:
+// Starlark parameters are passed through as raw strings, so choices/type/min
+// are not enforced; only required is.
+func TestResolveInvocationStarlarkOnlyRequires(t *testing.T) {
+	path := writeConfig(t, `{
+		"name": "star_val",
+		"platform": "Windows",
+		"agent_config": {"type": "starlark", "files": ["run.star"]},
+		"parameters": [
+			{"name": "mode", "description": "mode", "type": "string", "choices": ["a", "b"], "default": "a", "required": true},
+			{"name": "num", "description": "num", "type": "int", "min": 10, "default": "5"}
+		]
+	}`)
+	configs, err := ReadConfigs(path)
+	if err != nil {
+		t.Fatalf("ReadConfigs: %v", err)
+	}
+	cfg := configs[0]
+
+	inv, err := ResolveInvocation(cfg, map[string]string{"mode": "zzz", "num": "not-a-number"})
+	if err != nil {
+		t.Fatalf("starlark must not enforce choices/type/min: %v", err)
+	}
+	if len(inv.Argv) != 2 || inv.Argv[0] != "zzz" || inv.Argv[1] != "not-a-number" {
+		t.Fatalf("unexpected argv: %v", inv.Argv)
+	}
+
+	if _, err := ResolveInvocation(cfg, map[string]string{"mode": "", "num": "1"}); err == nil {
+		t.Fatal("expected required error for empty starlark parameter")
+	}
+}

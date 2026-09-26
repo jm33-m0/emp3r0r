@@ -7,7 +7,6 @@
   "is_local": false,
   "platform": "Linux",
   "path": "",
-  "fileless": true,
   "parameters": [
     {
       "name": "who",
@@ -20,9 +19,7 @@
   "agent_config": {
     "exec": "",
     "files": ["hello_linux.o"],
-    "in_memory": true,
-    "type": "coff",
-    "interactive": false
+    "type": "coff"
   },
   "invocation": {
     "coff_export": "go"
