@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -28,6 +29,12 @@ func StartC2H2StreamServer() {
 	network.EmpTLSServer = &http.Server{
 		Addr:    fmt.Sprintf(":%s", live.RuntimeConfig.CCH2Port),
 		Handler: mux,
+		// Bound slow-header (slowloris) and idle keep-alive connections. Do
+		// not set ReadTimeout/WriteTimeout: the h2 transport holds a
+		// full-duplex stream open for the life of the session and Go maps
+		// both fields to per-stream deadlines.
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	logging.Successf("🚀 Starting C2 h2 stream server with TLS at port %s", live.RuntimeConfig.CCH2Port)

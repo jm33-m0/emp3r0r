@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	"golang.org/x/time/rate"
 
@@ -92,6 +93,11 @@ func StartC2HTTPServer() {
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%s", live.RuntimeConfig.CCHTTPPort),
 		Handler: mux,
+		// Bound slow-header (slowloris) and idle keep-alive connections. Do
+		// not set ReadTimeout/WriteTimeout: this transport long-polls for up
+		// to 50s and reads bodies up to 50MB.
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 	// Publish the server so StopEmpHTTPServer / StopEmpServers can shut it
 	// down. Do NOT nil it out after Serve returns: that write would race a
