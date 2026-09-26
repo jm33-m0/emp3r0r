@@ -81,6 +81,14 @@ func applyMalleableConfig(req *http.Request, config *def.MalleableHTTPConfig, se
 	setMalleableHeader(req.Header, config.SessionHeader, config.SessionValue, sessionID)
 }
 
+// WriteBareStatus sends a response carrying only a status code and no body.
+// Protocol errors must not include descriptive text: a fixed message makes the
+// endpoint trivially fingerprintable and lets a scanner probe internal state
+// (known/unknown session, body limits, shutdown) from the response body.
+func WriteBareStatus(w http.ResponseWriter, status int) {
+	w.WriteHeader(status)
+}
+
 func (h HTTPChannelWrapper) Dial(ctx context.Context, client *http.Client, url string) (io.ReadWriteCloser, *http.Response, error) {
 	sessionID := uuid.NewString()
 
@@ -463,7 +471,7 @@ func HandleHTTPServerSession(w http.ResponseWriter, req *http.Request, config *d
 		logging.Debugf("HandleHTTPServerSession: closing session %s", sessionID)
 		if val, ok := serverSessions.Load(sessionID); ok {
 			if stream, ok = val.(*HTTPServerStream); !ok || stream == nil {
-				http.Error(w, "invalid session", http.StatusNotFound)
+				WriteBareStatus(w, http.StatusNotFound)
 				return nil, ErrPollingRequest
 			}
 			stream.Close()
@@ -475,16 +483,16 @@ func HandleHTTPServerSession(w http.ResponseWriter, req *http.Request, config *d
 	// It's a polling request
 	val, ok := serverSessions.Load(sessionID)
 	if !ok {
-		http.Error(w, "invalid session", http.StatusNotFound)
+		WriteBareStatus(w, http.StatusNotFound)
 		return nil, ErrPollingRequest
 	}
 	stream, ok = val.(*HTTPServerStream)
 	if !ok || stream == nil {
-		http.Error(w, "invalid session", http.StatusNotFound)
+		WriteBareStatus(w, http.StatusNotFound)
 		return nil, ErrPollingRequest
 	}
 	if stream.isClosing() && req.Method != http.MethodGet {
-		http.Error(w, "invalid session", http.StatusNotFound)
+		WriteBareStatus(w, http.StatusNotFound)
 		return nil, ErrPollingRequest
 	}
 
@@ -496,7 +504,7 @@ func HandleHTTPServerSession(w http.ResponseWriter, req *http.Request, config *d
 	case http.MethodGet:
 		if stream.isClosing() && len(stream.writeCh) == 0 {
 			serverSessions.Delete(stream.sessionID)
-			http.Error(w, "invalid session", http.StatusNotFound)
+			WriteBareStatus(w, http.StatusNotFound)
 			return nil, ErrPollingRequest
 		}
 		// Client is reading from us
@@ -534,7 +542,7 @@ func HandleHTTPServerSession(w http.ResponseWriter, req *http.Request, config *d
 		case <-time.After(pollTimeout):
 			if stream.isClosing() {
 				serverSessions.Delete(stream.sessionID)
-				http.Error(w, "invalid session", http.StatusNotFound)
+				WriteBareStatus(w, http.StatusNotFound)
 				return nil, ErrPollingRequest
 			}
 			// Timeout, return empty 200 OK so client polls again
@@ -553,7 +561,7 @@ func HandleHTTPServerSession(w http.ResponseWriter, req *http.Request, config *d
 		data, err := io.ReadAll(limitReader)
 		if err != nil {
 			logging.Warningf("HandleHTTPServerSession POST: read body: %v", err)
-			http.Error(w, "request too large or read failed", http.StatusRequestEntityTooLarge)
+			WriteBareStatus(w, http.StatusRequestEntityTooLarge)
 			return nil, ErrPollingRequest
 		}
 		if len(data) > 0 {
@@ -561,7 +569,7 @@ func HandleHTTPServerSession(w http.ResponseWriter, req *http.Request, config *d
 			case stream.readCh <- data:
 				w.WriteHeader(http.StatusOK)
 			case <-time.After(5 * time.Second):
-				http.Error(w, "buffer full", http.StatusServiceUnavailable)
+				WriteBareStatus(w, http.StatusServiceUnavailable)
 			}
 		} else {
 			w.WriteHeader(http.StatusOK)

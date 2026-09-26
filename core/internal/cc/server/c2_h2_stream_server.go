@@ -50,20 +50,20 @@ func registerC2H2StreamAcceptHandler(mux *http.ServeMux, channelWrapper transpor
 	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		if !allowClientRequest(req) {
 			logging.Warningf("C2 H2 stream server: rate limit exceeded for %s", req.RemoteAddr)
-			http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+			transport.WriteBareStatus(w, http.StatusTooManyRequests)
 			return
 		}
 
 		if req.Method != http.MethodPost {
 			logging.Debugf("cborStreamAccept: rejecting non-stream request method=%s path=%s from %s", req.Method, req.URL.Path, req.RemoteAddr)
-			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+			transport.WriteBareStatus(w, http.StatusMethodNotAllowed)
 			return
 		}
 
 		conn, err := channelWrapper.Accept(w, req)
 		if err != nil {
 			logging.Errorf("cborStreamAccept: channel accept failed from %s: %v", req.RemoteAddr, err)
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			transport.WriteBareStatus(w, http.StatusInternalServerError)
 			return
 		}
 		stream := transport.NewStreamTransport(conn, req.RemoteAddr)

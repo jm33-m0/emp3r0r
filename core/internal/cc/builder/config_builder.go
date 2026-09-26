@@ -266,6 +266,12 @@ func MakeConfig(opts AgentConfig) error {
 		logging.Infof("Agent is built for stager")
 	}
 
+	// A partial/legacy HTTP profile would let the agent and CC disagree on the
+	// session carrier, so replace it with a fresh random one when incomplete.
+	// MakeConfig persists the result below, so the server keeps using the same
+	// profile for the agents built from this run.
+	live.RuntimeConfig.MalleableC2 = transport.NormalizeMalleableHTTPConfig(live.RuntimeConfig.MalleableC2)
+
 	// save JSON
 	return config.SaveConfigJSON()
 }

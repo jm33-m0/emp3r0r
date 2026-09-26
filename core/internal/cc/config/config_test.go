@@ -105,6 +105,35 @@ func TestInitConfigFile(t *testing.T) {
 	if live.RuntimeConfig.AgentUUIDSig == "" {
 		t.Error("AgentUUIDSig is empty")
 	}
+
+	// The HTTP profile must be generated, not the old static default that
+	// every deployment shared (a fixed path/cookie/UA is a network signature).
+	if live.RuntimeConfig.MalleableC2.C2Path == "" {
+		t.Error("MalleableC2.C2Path is empty")
+	}
+	if live.RuntimeConfig.MalleableC2.C2Path == "/api/v1/telemetry" {
+		t.Error("MalleableC2 still uses the static default path")
+	}
+	if live.RuntimeConfig.MalleableC2.SessionValue == "" ||
+		live.RuntimeConfig.MalleableC2.CustomHeaders["User-Agent"] == "" {
+		t.Error("MalleableC2 profile is incomplete")
+	}
+
+	// The generated profile must round-trip through the config file so the
+	// agent and CC keep agreeing after a restart.
+	data, err := os.ReadFile(live.EmpConfigFile)
+	if err != nil {
+		t.Fatalf("read saved config: %v", err)
+	}
+	reloaded := &def.Config{}
+	if err := readJSONConfig(data, reloaded); err != nil {
+		t.Fatalf("reload saved config: %v", err)
+	}
+	if reloaded.MalleableC2.C2Path != live.RuntimeConfig.MalleableC2.C2Path ||
+		reloaded.MalleableC2.SessionValue != live.RuntimeConfig.MalleableC2.SessionValue ||
+		reloaded.MalleableC2.InitValue != live.RuntimeConfig.MalleableC2.InitValue {
+		t.Errorf("MalleableC2 did not round-trip: saved=%+v loaded=%+v", live.RuntimeConfig.MalleableC2, reloaded.MalleableC2)
+	}
 }
 
 func TestSaveConfigJSON(t *testing.T) {

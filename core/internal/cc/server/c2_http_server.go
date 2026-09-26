@@ -63,7 +63,7 @@ func StartC2HTTPServer() {
 	network.StopEmpHTTPServer()
 
 	mux := http.NewServeMux()
-	registerPreflightFeature(mux)
+	preflightPath := registerPreflightFeature(mux)
 
 	c2Path := live.RuntimeConfig.MalleableC2.C2Path
 	if c2Path == "" {
@@ -73,7 +73,7 @@ func StartC2HTTPServer() {
 		if !transport.IsActiveHTTPServerSession(req, &live.RuntimeConfig.MalleableC2) {
 			if !allowClientRequest(req) {
 				logging.Warningf("C2 HTTP Server: rate limit exceeded for %s", req.RemoteAddr)
-				http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
+				transport.WriteBareStatus(w, http.StatusTooManyRequests)
 				return
 			}
 		}
@@ -93,6 +93,15 @@ func StartC2HTTPServer() {
 			go cborStreamAccept(transport.NewStreamTransport(stream, req.RemoteAddr))
 		}
 	})
+
+	// Hide the Go net/http default 404 ("404 page not found"): unregistered
+	// paths must not advertise that a Go server is behind this port. The C2 and
+	// preflight patterns are longer and therefore win over this catch-all.
+	if c2Path != "/" && preflightPath != "/" {
+		mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+			transport.WriteBareStatus(w, http.StatusNotFound)
+		})
+	}
 
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%s", live.RuntimeConfig.CCHTTPPort),

