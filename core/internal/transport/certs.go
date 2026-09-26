@@ -17,7 +17,6 @@ import (
 	"math/big"
 	"net"
 	"os"
-	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
@@ -66,13 +65,15 @@ func GenCerts(
 	if err != nil {
 		return nil, fmt.Errorf("GenerateKey: %v", err)
 	}
+	notBefore, notAfter := randomCertValidity(isCA)
 	template := x509.Certificate{
-		SerialNumber: big.NewInt(1),
+		SerialNumber: randomCertSerial(),
 		Subject: pkix.Name{
-			Organization: []string{"Acme Co"},
+			Organization: []string{randomCertOrg()},
+			CommonName:   randomCertCN(),
 		},
-		NotBefore: time.Now(),
-		NotAfter:  time.Now().Add(time.Hour * 24 * 3650),
+		NotBefore: notBefore,
+		NotAfter:  notAfter,
 
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
@@ -88,7 +89,8 @@ func GenCerts(
 	if isCA {
 		// generate CA cert
 		template.Subject = pkix.Name{
-			Organization: []string{"ACME CA Co"},
+			Organization: []string{randomCertOrg()},
+			CommonName:   randomCertCN(),
 		}
 		template.IsCA = true
 		template.KeyUsage |= x509.KeyUsageCertSign
@@ -104,6 +106,10 @@ func GenCerts(
 			} else {
 				template.DNSNames = append(template.DNSNames, h)
 			}
+		}
+
+		if len(hosts) > 0 {
+			template.Subject.CommonName = hosts[0]
 		}
 
 		// ca key file

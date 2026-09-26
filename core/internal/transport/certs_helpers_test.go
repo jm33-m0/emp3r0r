@@ -6,10 +6,13 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
+	"math/big"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -164,6 +167,92 @@ func TestSSHKeyHelpers(t *testing.T) {
 
 	if _, err := SSHPublicKey([]byte("not-a-key")); err == nil {
 		t.Fatal("SSHPublicKey on garbage should error")
+	}
+}
+
+// TestGenCertsRandomizedIdentity guards the certificate-fingerprint fix:
+// generated CA and leaf certificates must not share a constant serial,
+// organization or validity window.
+func TestGenCertsRandomizedIdentity(t *testing.T) {
+	dir := t.TempDir()
+
+	serials := map[string]bool{}
+	orgs := map[string]bool{}
+	for i := range 12 {
+		caCert := filepath.Join(dir, fmt.Sprintf("ca-%d.pem", i))
+		caKey := filepath.Join(dir, fmt.Sprintf("ca-key-%d.pem", i))
+		if _, err := GenCerts(nil, caCert, caKey, "", "", true); err != nil {
+			t.Fatalf("GenCerts CA: %v", err)
+		}
+		cert, err := ParseCertPemFile(caCert)
+		if err != nil {
+			t.Fatalf("parse CA cert: %v", err)
+		}
+		serials[cert.SerialNumber.String()] = true
+		if len(cert.Subject.Organization) == 0 || cert.Subject.CommonName == "" {
+			t.Fatalf("CA cert subject not populated: %+v", cert.Subject)
+		}
+		orgs[cert.Subject.Organization[0]] = true
+		if cert.SerialNumber.Cmp(big.NewInt(1)) == 0 {
+			t.Fatal("CA cert still uses the constant serial 1")
+		}
+		lifetime := cert.NotAfter.Sub(cert.NotBefore)
+		if lifetime < 365*24*time.Hour || lifetime > 6*365*24*time.Hour {
+			t.Fatalf("unexpected CA lifetime %v", lifetime)
+		}
+	}
+	if len(serials) < 2 {
+		t.Fatalf("all CA serials identical: %v", serials)
+	}
+	if len(orgs) < 2 {
+		t.Fatalf("all CA organizations identical: %v", orgs)
+	}
+
+	// Leaf cert CN should follow the requested host, not a constant.
+	caCert := filepath.Join(dir, "leaf-ca.pem")
+	caKey := filepath.Join(dir, "leaf-ca-key.pem")
+	if _, err := GenCerts(nil, caCert, caKey, "", "", true); err != nil {
+		t.Fatalf("GenCerts CA: %v", err)
+	}
+	serverCert := filepath.Join(dir, "leaf.pem")
+	serverKey := filepath.Join(dir, "leaf-key.pem")
+	if _, err := GenCerts([]string{"example.test"}, serverCert, serverKey, caKey, caCert, false); err != nil {
+		t.Fatalf("GenCerts leaf: %v", err)
+	}
+	leaf, err := ParseCertPemFile(serverCert)
+	if err != nil {
+		t.Fatalf("parse leaf cert: %v", err)
+	}
+	if leaf.Subject.CommonName != "example.test" {
+		t.Fatalf("leaf CN = %q, want example.test", leaf.Subject.CommonName)
+	}
+}
+
+// TestGenerateEphemeralCertRandomized verifies the mesh/mTLS self-signed certs
+// are randomized rather than sharing a fixed organization list and serial.
+func TestGenerateEphemeralCertRandomized(t *testing.T) {
+	serials := map[string]bool{}
+	orgs := map[string]bool{}
+	for range 12 {
+		cert, err := GenerateEphemeralCert("", "")
+		if err != nil {
+			t.Fatalf("GenerateEphemeralCert: %v", err)
+		}
+		parsed, err := x509.ParseCertificate(cert.Certificate[0])
+		if err != nil {
+			t.Fatalf("parse ephemeral cert: %v", err)
+		}
+		if parsed.Subject.CommonName == "" || len(parsed.Subject.Organization) == 0 {
+			t.Fatalf("ephemeral cert subject not populated: %+v", parsed.Subject)
+		}
+		if parsed.SerialNumber.Cmp(big.NewInt(1)) == 0 {
+			t.Fatal("ephemeral cert uses the constant serial 1")
+		}
+		serials[parsed.SerialNumber.String()] = true
+		orgs[parsed.Subject.Organization[0]] = true
+	}
+	if len(serials) < 2 || len(orgs) < 2 {
+		t.Fatalf("ephemeral certs not randomized: serials=%v orgs=%v", serials, orgs)
 	}
 }
 
