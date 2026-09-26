@@ -1,5 +1,20 @@
 # Changelog
 
+## [4.20.0](https://github.com/jm33-m0/emp3r0r/compare/v4.19.2...v4.20.0) (2026-09-26)
+
+
+### Features
+
+* **BOF:** add SQL-BOF and C2-Tool-Collection ([9a4491d](https://github.com/jm33-m0/emp3r0r/commit/9a4491dd6305e85dd7d72b8ad72c831bfa62a5c2))
+
+
+### Bug Fixes
+
+* **c2 transport:** add timeouts to c2 transports ([ae354b7](https://github.com/jm33-m0/emp3r0r/commit/ae354b77a253713e8aaaa0124d4fe01be1da5da9))
+* **c2 transport:** apply the shared rate limiter to preflight ([311effa](https://github.com/jm33-m0/emp3r0r/commit/311effa41006926ce32f9b84d144e2b9be8a2679))
+* **c2 transport:** only exempt authenticated sessions from rate limiting ([69af9af](https://github.com/jm33-m0/emp3r0r/commit/69af9af7a266eb526c4219a35ce8e031ff6b80b3))
+* **c2 transport:** only exempt authenticated sessions from rate limiting ([11127de](https://github.com/jm33-m0/emp3r0r/commit/11127de19282d879781d1e5cb208135b65f1c39c))
+
 ## [4.19.2](https://github.com/jm33-m0/emp3r0r/compare/v4.19.1...v4.19.2) (2026-09-15)
 
 
