@@ -190,13 +190,16 @@ func HandleFTPStream(conn io.ReadWriteCloser, token, remoteAddr string, cancel c
 		sh.Cancel()
 		return
 	}
-	_, err := os.Create(lock)
+	lockFile, err := os.Create(lock)
 	if err != nil {
 		logging.Errorf("Create lock file error: %v", err)
 		sh.Close()
 		sh.Cancel()
 		return
 	}
+	// Close the handle immediately: on Windows an open handle blocks the
+	// cleanup os.Remove(lock).
+	_ = lockFile.Close()
 	if !util.IsExist(live.FileGetDir) {
 		err = os.MkdirAll(live.FileGetDir, 0o700)
 		if err != nil {
@@ -229,6 +232,11 @@ func HandleFTPStream(conn io.ReadWriteCloser, token, remoteAddr string, cancel c
 
 	// On-exit cleanup.
 	cleanup := func() {
+		// Close the write handle before measuring and renaming: Windows refuses
+		// to rename a file that is still open, and the size/checksum must be
+		// taken after the data is flushed.
+		_ = f.Close()
+
 		if sh != nil {
 			err = sh.Close()
 			if err != nil {

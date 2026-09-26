@@ -76,6 +76,13 @@ func startTestC2Server(t *testing.T) {
 		// Allow in-flight stream handlers to observe shutdown and exit.
 		time.Sleep(150 * time.Millisecond)
 	})
+	// Wait until the listener actually accepts connections. A fixed sleep is
+	// racy on slow/loaded CI runners (notably Windows), where the bind can
+	// take longer than the sleep and the first dial is refused.
+	addr := fmt.Sprintf("127.0.0.1:%s", live.RuntimeConfig.CCH2Port)
+	if err := waitForPort(addr, time.Now().Add(15*time.Second)); err != nil {
+		t.Fatalf("C2 TLS server did not start on %s: %v", addr, err)
+	}
 }
 
 func TestEstablishC2Connection(t *testing.T) {
