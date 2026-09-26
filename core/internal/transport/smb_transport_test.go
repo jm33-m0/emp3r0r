@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -13,6 +14,11 @@ func TestSMBPipeBaseDeterministicAndUnique(t *testing.T) {
 	}
 	if strings.ContainsAny(base, `\/: `) {
 		t.Fatalf("pipe base %q contains path/space characters", base)
+	}
+	// Opaque, fixed-shape name: a single lowercase prefix plus 32 hex chars.
+	// This also guards against reintroducing a human-readable technique name.
+	if !regexp.MustCompile(`^p[0-9a-f]{32}$`).MatchString(base) {
+		t.Fatalf("pipe base %q is not the opaque p+32hex form", base)
 	}
 	if got := smbPipeBase("password", "salt", 4000); got != base {
 		t.Fatalf("not deterministic: %q != %q", got, base)

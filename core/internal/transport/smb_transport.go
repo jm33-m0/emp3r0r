@@ -31,8 +31,8 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
-	"fmt"
 	"net"
 	"runtime"
 	"strconv"
@@ -93,19 +93,18 @@ func (t SMBTransport) Accept(ctx context.Context, l net.Listener) (net.Conn, err
 }
 
 func init() {
-	RegisterTransport(
-		smbTransportName,
-		`Windows SMB named-pipe transport (AES-GCM), cross-host via \\host\pipe`,
-		SMBTransport{},
-	)
+	RegisterTransport(smbTransportName, SMBTransport{})
 }
 
 // smbPipeBase derives an opaque, per-agent pipe base name. It is deterministic
 // for a given (password, salt, port) so the dialer can reconstruct it from the
-// peer's advertised P2P port, yet it reveals nothing about the build.
+// peer's advertised P2P port, yet it reveals nothing about the build. The port
+// is HMAC'd as raw bytes so no technique-naming string lands in the binary.
 func smbPipeBase(password, salt string, port int) string {
 	mac := hmac.New(sha256.New, meshKey(password, salt))
-	fmt.Fprintf(mac, "smb-pipe\x00%d", port)
+	var portBuf [4]byte
+	binary.LittleEndian.PutUint32(portBuf[:], uint32(port))
+	mac.Write(portBuf[:])
 	return "p" + hex.EncodeToString(mac.Sum(nil)[:16])
 }
 

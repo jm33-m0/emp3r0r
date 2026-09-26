@@ -146,18 +146,19 @@ type MeshTransport interface {
 var Transports sync.Map
 
 // TransportDescriptor holds metadata and implementation for a mesh transport.
+// There is deliberately no human-readable description here: the agent binary
+// links this table in, and transport/technique names would be a static string
+// signature. Operators only need the name.
 type TransportDescriptor struct {
-	Name        string
-	Description string
-	Transport   MeshTransport
+	Name      string
+	Transport MeshTransport
 }
 
 // RegisterTransport adds a new transport to the registry.
-func RegisterTransport(name, desc string, t MeshTransport) {
+func RegisterTransport(name string, t MeshTransport) {
 	Transports.Store(name, &TransportDescriptor{
-		Name:        name,
-		Description: desc,
-		Transport:   t,
+		Name:      name,
+		Transport: t,
 	})
 }
 
@@ -175,8 +176,8 @@ func AllTransportNames() []string {
 }
 
 func init() {
-	RegisterTransport("kcp", "Reliable UDP transport via KCP", KCPTransport{})
-	RegisterTransport("mtls", "Camouflage mTLS transport with AES-GCM", CamouflageMTLS{})
+	RegisterTransport("kcp", KCPTransport{})
+	RegisterTransport("mtls", CamouflageMTLS{})
 }
 
 // KCPTransport wraps the existing KCP implementation.
