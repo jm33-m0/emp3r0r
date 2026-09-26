@@ -85,7 +85,13 @@ func Run(src []byte, argv []string, customGlobals map[string]any, token uintptr)
 				return buf.String(), fmt.Errorf("calling main function: %w", err)
 			}
 			if resVal != starlark.None {
-				buf.WriteString(resVal.String())
+				// A string result is a value, not a repr: emit it verbatim so
+				// paths and other strings are not quoted or backslash-escaped.
+				if s, ok := starlark.AsString(resVal); ok {
+					buf.WriteString(s)
+				} else {
+					buf.WriteString(resVal.String())
+				}
 				buf.WriteString("\n")
 			}
 		}

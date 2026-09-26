@@ -111,6 +111,36 @@ def main(*args):
 	}
 }
 
+func TestRunReturnValueFormatting(t *testing.T) {
+	// A returned string is a value, not a repr: it must be emitted verbatim
+	// (no surrounding quotes, no doubled backslashes). Non-string values keep
+	// their standard starlark representation.
+	out, err := Run([]byte(`
+def main(*args):
+    return "dir\\file.txt"
+`), nil, nil, 0)
+	if err != nil {
+		t.Fatalf("Run string return failed: %v", err)
+	}
+	if !strings.Contains(out, `dir\file.txt`) {
+		t.Errorf("expected raw string return, got: %q", out)
+	}
+	if strings.Contains(out, `"dir`) || strings.Contains(out, `\\`) {
+		t.Errorf("string return must not be quoted or escaped, got: %q", out)
+	}
+
+	out, err = Run([]byte(`
+def main(*args):
+    return 42
+`), nil, nil, 0)
+	if err != nil {
+		t.Fatalf("Run int return failed: %v", err)
+	}
+	if !strings.Contains(out, "42") {
+		t.Errorf("expected int return, got: %q", out)
+	}
+}
+
 func TestReadLink(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "target.txt")
