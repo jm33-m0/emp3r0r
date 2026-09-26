@@ -436,3 +436,23 @@ func TestReadJSONConfigAppliesDefaultsAndIgnoresLegacyKeys(t *testing.T) {
 		}
 	})
 }
+
+// TestReadJSONConfigLoadsSNI guards the C2 TLS SNI override field.
+func TestReadJSONConfigLoadsSNI(t *testing.T) {
+	cfg := &def.Config{}
+	if err := readJSONConfig([]byte(`{"cc_address":"127.0.0.1","sni":"cdn.example.net"}`), cfg); err != nil {
+		t.Fatalf("readJSONConfig: %v", err)
+	}
+	if cfg.SNI != "cdn.example.net" {
+		t.Fatalf("SNI = %q, want cdn.example.net", cfg.SNI)
+	}
+
+	// Absent SNI preserves whatever the caller seeded.
+	seeded := &def.Config{SNI: "keep.example.net"}
+	if err := readJSONConfig([]byte(`{"cc_address":"127.0.0.1"}`), seeded); err != nil {
+		t.Fatalf("readJSONConfig: %v", err)
+	}
+	if seeded.SNI != "keep.example.net" {
+		t.Fatalf("SNI = %q, want seeded value preserved", seeded.SNI)
+	}
+}

@@ -86,6 +86,7 @@ func SaveConfigJSON() (err error) {
 			CloseValue:    live.RuntimeConfig.MalleableC2.CloseValue,
 			CustomHeaders: live.RuntimeConfig.MalleableC2.CustomHeaders,
 		},
+		SNI: live.RuntimeConfig.SNI,
 	}
 
 	w_data, err := json.MarshalIndent(jCfg, "", "  ")
@@ -168,6 +169,8 @@ func InitConfigFile(cc_host string) (err error) {
 		live.RuntimeConfig.PaddingMax = 10240
 	}
 	transport.SetC2Padding(live.RuntimeConfig.PaddingMin, live.RuntimeConfig.PaddingMax)
+	transport.SetC2ServerName(live.RuntimeConfig.SNI)
+	transport.SetMeshCamouflageIdentity(live.RuntimeConfig.CamouflageCertOrg, live.RuntimeConfig.CamouflageCertCN)
 	if live.RuntimeConfig.Jitter == 0 {
 		live.RuntimeConfig.Jitter = 20
 	}
@@ -213,6 +216,8 @@ func ReadJSONConfig(jsonData []byte, config_to_write *def.Config) error {
 	}
 	// Keep the sender-side padding range in sync with the loaded config.
 	transport.SetC2Padding(config_to_write.PaddingMin, config_to_write.PaddingMax)
+	transport.SetC2ServerName(config_to_write.SNI)
+	transport.SetMeshCamouflageIdentity(config_to_write.CamouflageCertOrg, config_to_write.CamouflageCertCN)
 	return nil
 }
 

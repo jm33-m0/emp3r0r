@@ -102,9 +102,10 @@ func ServeRelay(ctx context.Context) {
 		logging.Errorf("Mesh ServeRelay: %v — P2P relay disabled", err)
 		return
 	}
-	if camo, ok := t.(*transport.CamouflageMTLS); ok {
+	if camo, ok := t.(transport.CamouflageMTLS); ok {
 		camo.CertOrg = common.RuntimeConfig.CamouflageCertOrg
 		camo.CertCN = common.RuntimeConfig.CamouflageCertCN
+		t = camo
 	}
 
 	listenPortStr := common.RuntimeConfig.P2PRelayPort

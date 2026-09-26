@@ -75,6 +75,9 @@ func setupC2TLSListener() net.Listener {
 		},
 		NextProtos: []string{"h2", "http/1.1"},
 		MinVersion: tls.VersionTLS12,
+		// This single certificate is presented regardless of the client's SNI:
+		// agents may send a cover SNI and pin the C2 CA instead of matching a
+		// hostname, and a mismatch must not abort the handshake.
 	}
 
 	listener, err := tls.Listen("tcp", fmt.Sprintf(":%s", live.RuntimeConfig.CCH2Port), tlsCfg)

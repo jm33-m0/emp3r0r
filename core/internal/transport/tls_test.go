@@ -171,6 +171,63 @@ func TestCreateEmp3r0rHTTPClient(t *testing.T) {
 	})
 }
 
+// TestCreateEmp3r0rHTTPClientCustomSNI verifies the operator can send an
+// arbitrary cover SNI while the server certificate is still verified against
+// the real C2 host. The C2 listener presents its cert regardless of SNI.
+func TestCreateEmp3r0rHTTPClientCustomSNI(t *testing.T) {
+	caPEM, serverCert := generateCerts(t)
+
+	originalCACrtPEM := CACrtPEM
+	CACrtPEM = caPEM
+	defer func() { CACrtPEM = originalCACrtPEM }()
+
+	sniCh := make(chan string, 1)
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	server.TLS = &tls.Config{
+		Certificates: []tls.Certificate{serverCert},
+		NextProtos:   []string{"h2"},
+		MinVersion:   tls.VersionTLS12,
+		GetConfigForClient: func(chi *tls.ClientHelloInfo) (*tls.Config, error) {
+			select {
+			case sniCh <- chi.ServerName:
+			default:
+			}
+			return nil, nil
+		},
+	}
+	server.StartTLS()
+	defer server.Close()
+
+	SetC2ServerName("cover.example.net")
+	defer SetC2ServerName("")
+
+	client := CreateEmp3r0rHTTPClient(server.URL, "")
+	if client == nil {
+		t.Fatal("CreateEmp3r0rHTTPClient returned nil")
+	}
+	client.Timeout = 5 * time.Second
+
+	resp, err := client.Get(server.URL)
+	if err != nil {
+		t.Fatalf("request with custom SNI failed (CA verification against the real host must still pass): %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+
+	select {
+	case sni := <-sniCh:
+		if sni != "cover.example.net" {
+			t.Fatalf("server saw SNI %q, want cover.example.net", sni)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("server never observed a ClientHello")
+	}
+}
+
 func TestCreatePreflightHTTPClient(t *testing.T) {
 	// Generate certs
 	caPEM, serverCert := generateCerts(t)

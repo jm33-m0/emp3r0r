@@ -17,6 +17,7 @@ import (
 	"net"
 	"sort"
 	"sync"
+	"sync/atomic"
 
 	"golang.org/x/crypto/pbkdf2"
 
@@ -209,17 +210,51 @@ type CamouflageMTLS struct {
 	CertCN  string
 }
 
+// Mesh camouflage identity defaults. They are process-wide because the mesh
+// dialer resolves the transport from a registry and cannot carry per-call
+// identity; config load sets them once. The SNI is deliberately stable (the
+// configured service name), never randomized per connection.
+var (
+	meshCamoOrg atomic.Value // string
+	meshCamoCN  atomic.Value // string
+)
+
+// SetMeshCamouflageIdentity sets the default organization and common name used
+// for mesh mTLS certificates and SNI. An empty cn means no SNI is sent.
+func SetMeshCamouflageIdentity(org, cn string) {
+	meshCamoOrg.Store(org)
+	meshCamoCN.Store(cn)
+}
+
+// identity resolves the certificate/SNI identity for this transport, preferring
+// per-instance values and falling back to the configured defaults.
+func (t CamouflageMTLS) identity() (org, cn string) {
+	org, cn = t.CertOrg, t.CertCN
+	if org == "" {
+		org, _ = meshCamoOrg.Load().(string)
+	}
+	if cn == "" {
+		cn, _ = meshCamoCN.Load().(string)
+	}
+	return org, cn
+}
+
 func (t CamouflageMTLS) Supported() bool { return true }
 
 // Dial connects to a peer, performs a "Fake mTLS" handshake, and upgrades to AES-GCM.
 func (t CamouflageMTLS) Dial(addr, password, salt string) (net.Conn, error) {
+	org, cn := t.identity()
+
 	// 1. Generate Ephemeral Client Cert
-	clientCert, err := GenerateEphemeralCert(t.CertOrg, t.CertCN)
+	clientCert, err := GenerateEphemeralCert(org, cn)
 	if err != nil {
 		return nil, fmt.Errorf("gen ephemeral cert: %v", err)
 	}
 
-	// 2. Configure TLS to ignore server cert CA (Camouflage: accept any cert)
+	// 2. Configure TLS to ignore server cert CA (Camouflage: accept any cert).
+	// No SNI is sent: internal peers have no domain names and SNI is obsolete
+	// for this link, so a name here would only be a stable fingerprint. The
+	// camouflage CN still names the ephemeral certificate.
 	conf := &tls.Config{
 		Certificates:       []tls.Certificate{clientCert},
 		InsecureSkipVerify: true,
@@ -238,8 +273,10 @@ func (t CamouflageMTLS) Dial(addr, password, salt string) (net.Conn, error) {
 
 // Listen creates a TLS listener that enforces the "Look" of mTLS.
 func (t CamouflageMTLS) Listen(port, password, salt string) (net.Listener, error) {
+	org, cn := t.identity()
+
 	// 1. Generate Ephemeral Server Cert
-	serverCert, err := GenerateEphemeralCert(t.CertOrg, t.CertCN)
+	serverCert, err := GenerateEphemeralCert(org, cn)
 	if err != nil {
 		return nil, err
 	}
@@ -414,13 +451,14 @@ func P2PTunServer(target, listenPortStr, password, salt, p2pTransport, certOrg, 
 	if err != nil {
 		return fmt.Errorf("P2PTunServer: %w", err)
 	}
-	if camo, ok := t.(*CamouflageMTLS); ok {
+	if camo, ok := t.(CamouflageMTLS); ok {
 		if certOrg != "" {
 			camo.CertOrg = certOrg
 		}
 		if certCN != "" {
 			camo.CertCN = certCN
 		}
+		t = camo
 	}
 	listener, err := t.Listen(listenPortStr, password, salt)
 	if err != nil {
@@ -482,13 +520,14 @@ func P2PTunClient(remoteAddr, localPortStr, password, salt, p2pTransport, certOr
 	if err != nil {
 		return fmt.Errorf("P2PTunClient: %w", err)
 	}
-	if camo, ok := t.(*CamouflageMTLS); ok {
+	if camo, ok := t.(CamouflageMTLS); ok {
 		if certOrg != "" {
 			camo.CertOrg = certOrg
 		}
 		if certCN != "" {
 			camo.CertCN = certCN
 		}
+		t = camo
 	}
 
 	for ctx.Err() == nil {

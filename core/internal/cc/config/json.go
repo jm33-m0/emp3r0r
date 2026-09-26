@@ -80,6 +80,7 @@ type jsonConfig struct {
 	C2ChannelMode             string                  `json:"c2_channel_mode"`
 	CCHTTPPort                string                  `json:"cc_http_port"`
 	MalleableC2               jsonMalleableHTTPConfig `json:"malleable_c2"`
+	SNI                       string                  `json:"sni"`
 }
 
 // applyIfSet copies src into *dst when src is non-zero, preserving a default the
@@ -183,6 +184,8 @@ func readJSONConfig(jsonData []byte, cfg *def.Config) error {
 	if len(jCfg.MalleableC2.CustomHeaders) > 0 {
 		cfg.MalleableC2.CustomHeaders = jCfg.MalleableC2.CustomHeaders
 	}
+
+	applyIfSet(&cfg.SNI, jCfg.SNI)
 
 	// Derived defaults. These run last so a value from the document always wins.
 	if _, ok := present["operator_idle_timeout"]; ok {

@@ -157,6 +157,12 @@ type Config struct {
 	// Malleable HTTP C2 profile
 	MalleableC2 MalleableHTTPConfig `cbor:"78,keyasint"`
 
+	// SNI to present on C2 TLS connections. Empty means use the C2 address
+	// host. The C2 listener does not select a certificate by SNI, so this can
+	// be an arbitrary cover name while the server cert is still verified
+	// against the real C2 host.
+	SNI string `cbor:"81,keyasint"`
+
 	// Runtime state (not persisted in config file)
 	MyAgentToken *AgentToken `cbor:"-"` // Current AgentToken issued by C2
 }
