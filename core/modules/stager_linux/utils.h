@@ -4,6 +4,14 @@
 #include <stddef.h>
 #include <stdint.h>
 
+// Page size for mmap/mprotect alignment (4 KiB on all supported targets).
+#ifndef PAGE_SIZE
+#define PAGE_SIZE 0x1000
+#endif
+
+// Round a byte length up to a whole number of pages.
+#define PAGE_ALIGN_UP(x) (((x) + PAGE_SIZE - 1) & ~(size_t)(PAGE_SIZE - 1))
+
 // Memory protection
 #define PROT_NONE 0x0
 #define PROT_READ 0x1

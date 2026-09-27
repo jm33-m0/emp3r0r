@@ -8,10 +8,6 @@
 #include "supervise.h"
 #endif
 
-#ifndef PAGE_SIZE
-#define PAGE_SIZE 0x1000
-#endif
-
 /*
  * The stub is the only stage that stays resident for the whole agent
  * lifecycle. It runs the downloader from a separate mapping so that, as soon
@@ -33,7 +29,7 @@ static void stub_main(void) {
   size_t blob_len = downloader_bin_len;
   /* Anonymous mappings are zero-filled, so any .bss the downloader relies on
    * is covered by the page-aligned length. */
-  size_t map_len = (blob_len + PAGE_SIZE - 1) & ~(size_t)(PAGE_SIZE - 1);
+  size_t map_len = PAGE_ALIGN_UP(blob_len);
   void *dl_exec = mmap(NULL, map_len, PROT_READ | PROT_WRITE,
                        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (dl_exec == MAP_FAILED)

