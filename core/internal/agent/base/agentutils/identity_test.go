@@ -24,7 +24,6 @@ import (
 func resetIdentityForTest() {
 	agentKeyOnce = sync.Once{}
 	AgentKey = nil
-	supervised.Store(false)
 }
 
 // withStager configures the package as if a launcher started the agent.

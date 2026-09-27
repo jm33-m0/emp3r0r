@@ -56,8 +56,8 @@ type stagerOpts struct {
 	// echConfig is the base64 ECHConfigList embedded when ech is set.
 	echConfig string
 	// supervised enables the stager's sacrificial-child supervision mode: the
-	// agent PIC runs in a forked child that the parent kills and restarts while
-	// caching the agent's ephemeral identity key.
+	// agent PIC runs in a forked child that exits cleanly when idle and is
+	// restarted by the parent while caching the agent's ephemeral identity key.
 	supervised bool
 }
 
@@ -273,7 +273,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	})
 
 	// Exercise the supervision mode: the agent runs in a sacrificial child and
-	// the parent must terminate/restart it with the cached identity key.
+	// the parent restarts it with the cached identity key when it is recycled.
 	t.Run(def.C2ChannelModeH2Conn+"/supervised", func(t *testing.T) {
 		opts := stagerOpts{
 			format:     "shellcode",
