@@ -1,5 +1,16 @@
 # Changelog
 
+## [4.20.2](https://github.com/jm33-m0/emp3r0r/compare/v4.20.1...v4.20.2) (2026-09-28)
+
+
+### Bug Fixes
+
+* **stager_linux:** `mprotect` flips the whole download buffer instead of the actual payload ([f4f2211](https://github.com/jm33-m0/emp3r0r/commit/f4f2211596c8bb9904a9cb1ea4ea2eedbb252ad7))
+* **stager_linux:** eliminate `SIGSTOP` and use `exit` to clean up agent process ([9bd65f7](https://github.com/jm33-m0/emp3r0r/commit/9bd65f770812ee77c047016bc595e58aa500bb1c))
+* **stager_linux:** keep supervised parent ciphertext `RW`, decrypt in child ([e7060f7](https://github.com/jm33-m0/emp3r0r/commit/e7060f7eab16760ba4250c2dbc35f0caabf5fec2))
+* **stager_linux:** map only malasada stage0 executable, record its size at build time ([bd6b61c](https://github.com/jm33-m0/emp3r0r/commit/bd6b61cbd8272859645944a810c0a0bebd7cabcc))
+* **starlark:** do not escape returned strings ([1cf9965](https://github.com/jm33-m0/emp3r0r/commit/1cf99654f7979662339c9284999bc052c62b12c5))
+
 ## [4.20.1](https://github.com/jm33-m0/emp3r0r/compare/v4.20.0...v4.20.1) (2026-09-26)
 
 
