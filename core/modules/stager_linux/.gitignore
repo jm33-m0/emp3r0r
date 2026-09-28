@@ -7,4 +7,5 @@ downloader.bin
 downloader_blob.h
 unpack_stub.elf
 unpack_stub.bin
+malasada_stage0_len.mk
 *.o

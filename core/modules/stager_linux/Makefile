@@ -3,6 +3,16 @@ COMMON_CFLAGS = -Wall -Wextra -Os -fno-builtin -fno-stack-protector -fPIC -nostd
 								-fno-toplevel-reorder -s -fno-ident -ffunction-sections -fdata-sections \
 								-fno-asynchronous-unwind-tables -fvisibility=hidden -ffixed-r15
 
+# The malasada builder prepends a fixed stage0 shellcode blob to the agent
+# payload. Only that prefix needs to be executable; the appended payload stays
+# read-only. core/build.py records the pinned stage0 size next to this Makefile
+# because the installed operator bundle does not ship vendor/. A source
+# checkout may instead read the vendored binary directly.
+MALASADA_STAGE0_BIN ?= ../../vendor/github.com/sliverarmory/malasada/internal/stage0/stage0_linux_amd64.bin
+-include malasada_stage0_len.mk
+MALASADA_STAGE0_LEN ?= $(shell wc -c < $(MALASADA_STAGE0_BIN) 2>/dev/null || echo 0)
+COMMON_CFLAGS += -DMALASADA_STAGE0_LEN=$(MALASADA_STAGE0_LEN)
+
 # Debug support
 ifdef DEBUG
 	COMMON_CFLAGS += -DDEBUG

