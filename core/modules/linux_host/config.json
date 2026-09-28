@@ -1,0 +1,115 @@
+[
+  {
+    "name": "linux_time_stomp",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-09-28",
+    "comment": "Set a file's atime/mtime (now, zero, or an explicit epoch) via utimensat(2)",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "parameters": [
+      {
+        "name": "mode",
+        "description": "now (current time), zero (unix epoch), or set (use --epoch)",
+        "default": "now",
+        "type": "cstr",
+        "choices": ["now", "zero", "set"],
+        "required": false
+      },
+      {
+        "name": "path",
+        "description": "File or directory to touch",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "epoch",
+        "description": "Unix seconds to stamp when mode=set",
+        "default": "0",
+        "type": "int",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "time_stomp.star",
+      "files": ["time_stomp.star"],
+      "type": "starlark"
+    },
+    "invocation": {}
+  },
+  {
+    "name": "linux_oom_cage",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-09-28",
+    "comment": "Inspect or set a process's OOM killer score (protect self, expose a target) via /proc/<pid>/oom_score_adj",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "parameters": [
+      {
+        "name": "action",
+        "description": "show, protect (oom_score_adj=-1000), expose (=1000), or set (use --value)",
+        "default": "show",
+        "type": "cstr",
+        "choices": ["show", "protect", "expose", "set"],
+        "required": false
+      },
+      {
+        "name": "pid",
+        "description": "Target PID (empty or 'self' for the agent itself)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "value",
+        "description": "Score in [-1000,1000] when action=set",
+        "default": "",
+        "type": "int",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "oom_cage.star",
+      "files": ["oom_cage.star"],
+      "type": "starlark"
+    },
+    "invocation": {}
+  },
+  {
+    "name": "linux_cgroup_freeze",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-09-28",
+    "comment": "Report, freeze or thaw the cgroup v2 of a process; refuses the agent's own cgroup",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "parameters": [
+      {
+        "name": "action",
+        "description": "show, freeze, or thaw",
+        "default": "show",
+        "type": "cstr",
+        "choices": ["show", "freeze", "thaw"],
+        "required": false
+      },
+      {
+        "name": "pid",
+        "description": "Target PID (empty or 'self' for the agent itself)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "cgroup_freeze.star",
+      "files": ["cgroup_freeze.star"],
+      "type": "starlark"
+    },
+    "invocation": {}
+  }
+]
