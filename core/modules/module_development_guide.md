@@ -355,7 +355,7 @@ helpers above are convenience wrappers.
 | `exists(path)` | Whether a path exists. |
 | `mkdir(path)` | Create directories on the real filesystem (no memfs equivalent). |
 | `remove(path)` | Delete a file/directory (memfs-aware). |
-| `read_link(path)` | Target of a symlink, e.g. a `/proc/<pid>/ns` entry. |
+| `read_link(path, default=...)` | Target of a symlink, e.g. a `/proc/<pid>/ns` entry. With `default`, a vanished or racy symlink returns the default instead of raising (Starlark has no `try`/`except`). |
 | `http_get(url)` | HTTP GET, returns the response body as a string. |
 | `http_post(url, content_type, body)` | HTTP POST with a string body, returns the response body. |
 | `crypto_hash(algo, data)` | Hex digest; `algo` is `md5`, `sha1`, or `sha256`. |

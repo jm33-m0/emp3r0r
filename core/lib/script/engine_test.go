@@ -171,6 +171,19 @@ def main(*args):
 `), []string{target}, nil, 0); err == nil {
 		t.Fatal("expected error for non-symlink read_link")
 	}
+
+	// With a default, the same failure yields the default instead of aborting;
+	// /proc symlinks can vanish between list_dir and read_link.
+	out, err = Run([]byte(`
+def main(*args):
+    return read_link(argv[0], default="GONE")
+`), []string{target}, nil, 0)
+	if err != nil {
+		t.Fatalf("read_link default script failed: %v", err)
+	}
+	if !strings.Contains(out, "GONE") {
+		t.Fatalf("read_link default output %q does not contain %q", out, "GONE")
+	}
 }
 
 func TestEngineRegisterCustomAPI(t *testing.T) {

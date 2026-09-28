@@ -198,16 +198,26 @@ func starlarkRemove(thread *starlark.Thread, fn *starlark.Builtin, args starlark
 // non-forking replacement for shelling out to `ls -l`, so scripts can
 // inspect /proc/<pid>/ns entries and similar links in-process.
 func starlarkReadLink(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	var path string
-	if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "path", &path); err != nil {
+	var (
+		path       string
+		defaultVal starlark.Value
+	)
+	if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "path", &path, "default?", &defaultVal); err != nil {
 		return starlark.None, err
 	}
 	var target string
-	if err := runWithToken(thread, func() error {
+	err := runWithToken(thread, func() error {
 		var e error
 		target, e = os.Readlink(path)
 		return e
-	}); err != nil {
+	})
+	if err != nil {
+		// Like read_file, a supplied default lets scripts treat a vanished or
+		// racy symlink (common under /proc) as empty instead of aborting, which
+		// matters because Starlark has no try/except.
+		if defaultVal != nil {
+			return defaultVal, nil
+		}
 		return starlark.None, fmt.Errorf("read_link %s: %w", path, err)
 	}
 	return starlark.String(target), nil
