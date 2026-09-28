@@ -1,0 +1,108 @@
+[
+  {
+    "name": "linux_edr_recon",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-09-28",
+    "comment": "Audit local Linux EDR/kernel telemetry: processes, filesystem artifacts, kernel modules, tracefs kprobes/ftrace, LSM stack, perf-attached BPF",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "parameters": [
+      {
+        "name": "section",
+        "description": "Comma-separated sections: all, procs, arts, mods, kprobes, ftrace, lsm, perf, avail. 'avail' reads available_filter_functions and can be large; it is excluded from 'all'",
+        "default": "all",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "edr_recon.star",
+      "files": ["edr_recon.star"],
+      "type": "starlark"
+    },
+    "invocation": {}
+  },
+  {
+    "name": "linux_env_scrape",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-09-28",
+    "comment": "Harvest secrets and SSH agent sockets from /proc/<pid>/environ",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "parameters": [
+      {
+        "name": "mode",
+        "description": "secrets (values with a secret-looking key), ssh (SSH_AUTH_SOCK only), or all",
+        "default": "secrets",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "scope",
+        "description": "own (only processes with the agent's uid) or all (every readable process)",
+        "default": "own",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "env_scrape.star",
+      "files": ["env_scrape.star"],
+      "type": "starlark"
+    },
+    "invocation": {}
+  },
+  {
+    "name": "linux_proc_fd_scan",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-09-28",
+    "comment": "Find processes holding credential/secret files open by scanning /proc/<pid>/fd symlinks",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "parameters": [
+      {
+        "name": "filter",
+        "description": "Only report fd targets containing this substring (empty = built-in credential path list)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "pid",
+        "description": "Scan a single PID instead of every process",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "proc_fd_scan.star",
+      "files": ["proc_fd_scan.star"],
+      "type": "starlark"
+    },
+    "invocation": {}
+  },
+  {
+    "name": "linux_sysctl_audit",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-09-28",
+    "comment": "Show security-relevant kernel sysctls (dmesg/kptr restrict, perf_event_paranoid, ptrace_scope, BPF JIT/disable, modules_disabled)",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "parameters": [],
+    "agent_config": {
+      "exec": "sysctl_audit.star",
+      "files": ["sysctl_audit.star"],
+      "type": "starlark"
+    },
+    "invocation": {}
+  }
+]
