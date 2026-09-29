@@ -40,7 +40,7 @@
     "invocation": {}
   },
   {
-    "name": "linux_oom_cage",
+    "name": "oom_cage",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-09-28",
@@ -80,7 +80,7 @@
     "invocation": {}
   },
   {
-    "name": "linux_cgroup_freeze",
+    "name": "cgroup_freeze",
     "build": "",
     "author": "jm33-ng",
     "date": "2026-09-28",
@@ -108,6 +108,45 @@
     "agent_config": {
       "exec": "cgroup_freeze.star",
       "files": ["cgroup_freeze.star"],
+      "type": "starlark"
+    },
+    "invocation": {}
+  },
+  {
+    "name": "pidfd_steal",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-09-28",
+    "comment": "Duplicate another process's open file descriptor with pidfd_getfd and read it, without opening the path ourselves",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "parameters": [
+      {
+        "name": "pid",
+        "description": "PID that holds the target fd",
+        "default": "",
+        "type": "int",
+        "required": true
+      },
+      {
+        "name": "fd",
+        "description": "File descriptor number in the target process (see proc_fd_scan)",
+        "default": "",
+        "type": "int",
+        "required": true
+      },
+      {
+        "name": "cap",
+        "description": "Maximum bytes to read from the stolen fd",
+        "default": "65536",
+        "type": "int",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "pidfd_steal.star",
+      "files": ["pidfd_steal.star"],
       "type": "starlark"
     },
     "invocation": {}

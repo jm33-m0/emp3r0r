@@ -185,6 +185,18 @@ func init() {
 		"bpf":                    unix.SYS_BPF,
 		"execveat":               unix.SYS_EXECVEAT,
 		"copy_file_range":        unix.SYS_COPY_FILE_RANGE,
+		"pidfd_open":             unix.SYS_PIDFD_OPEN,
+		"pidfd_getfd":            unix.SYS_PIDFD_GETFD,
+		"openat2":                unix.SYS_OPENAT2,
+		"setns":                  unix.SYS_SETNS,
+		"syslog":                 unix.SYS_SYSLOG,
+		// Userspace control primitives used by the modules/linux_blind suite and
+		// available on every supported Linux architecture.
+		"process_vm_writev": unix.SYS_PROCESS_VM_WRITEV,
+		"delete_module":     unix.SYS_DELETE_MODULE,
+		"perf_event_open":   unix.SYS_PERF_EVENT_OPEN,
+		"inotify_init1":     unix.SYS_INOTIFY_INIT1,
+		"inotify_add_watch": unix.SYS_INOTIFY_ADD_WATCH,
 	})
 
 	// Register architecture-specific syscalls

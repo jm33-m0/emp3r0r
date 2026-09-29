@@ -212,7 +212,7 @@ func TestSysctlAuditMatchesKernel(t *testing.T) {
 			}
 		}
 		if line == "" {
-			t.Errorf("sysctl_audit did not report %s:\n%s", name, out)
+			t.Errorf("linux_sysctl_audit did not report %s:\n%s", name, out)
 			continue
 		}
 		b, err := os.ReadFile("/proc/sys/" + name)

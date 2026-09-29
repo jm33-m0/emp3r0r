@@ -1,0 +1,466 @@
+[
+  {
+    "name": "kprobe_clear",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-09-28",
+    "comment": "List and clear kprobe/uprobe events and ftrace state through tracefs, removing the kernel-side hooks an EDR installs",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "parameters": [
+      {
+        "name": "action",
+        "description": "list, clear-kprobes, clear-uprobes, or tracing-off",
+        "default": "list",
+        "type": "cstr",
+        "choices": ["list", "clear-kprobes", "clear-uprobes", "tracing-off"],
+        "required": false
+      },
+      {
+        "name": "tracefs",
+        "description": "Tracefs root override (empty = auto-detect /sys/kernel/tracing then /sys/kernel/debug/tracing)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "dry_run",
+        "description": "Report what clear-kprobes/clear-uprobes would remove without writing",
+        "default": "false",
+        "type": "bool",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "kprobe_clear.star",
+      "files": ["kprobe_clear.star"],
+      "type": "starlark"
+    },
+    "invocation": {}
+  },
+  {
+    "name": "linux_sysctl_blind",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-09-28",
+    "comment": "Show or set security-relevant kernel sysctls (blind/open/set) to restrict the information sources EDRs rely on",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "parameters": [
+      {
+        "name": "action",
+        "description": "show, blind (restrict), open (restore permissive), or set (use --name/--value)",
+        "default": "show",
+        "type": "cstr",
+        "choices": ["show", "blind", "open", "set"],
+        "required": false
+      },
+      {
+        "name": "name",
+        "description": "Sysctl key for set, e.g. kernel.kptr_restrict or a full /proc/sys path",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "value",
+        "description": "Value to write when action=set",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "dry_run",
+        "description": "Report blind/open changes without writing them",
+        "default": "false",
+        "type": "bool",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "sysctl_blind.star",
+      "files": ["sysctl_blind.star"],
+      "type": "starlark"
+    },
+    "invocation": {}
+  },
+  {
+    "name": "dmesg_wipe",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-09-28",
+    "comment": "Read, grep, or clear the kernel ring buffer via the syslog(2) syscall",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "parameters": [
+      {
+        "name": "action",
+        "description": "show, grep (use --pattern), or wipe",
+        "default": "show",
+        "type": "cstr",
+        "choices": ["show", "grep", "wipe"],
+        "required": false
+      },
+      {
+        "name": "pattern",
+        "description": "Substring to match when action=grep",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "dmesg_wipe.star",
+      "files": ["dmesg_wipe.star"],
+      "type": "starlark"
+    },
+    "invocation": {}
+  },
+  {
+    "name": "linux_log_wipe",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-09-28",
+    "comment": "Truncate or pattern-scrub text logs, shell history and lastlog without spawning shred/rm",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "parameters": [
+      {
+        "name": "action",
+        "description": "wipe (one file or the standard log set), hist (shell history), or lastlog",
+        "default": "wipe",
+        "type": "cstr",
+        "choices": ["wipe", "hist", "lastlog"],
+        "required": false
+      },
+      {
+        "name": "path",
+        "description": "Specific file to wipe (empty = the standard text log list)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "pattern",
+        "description": "Remove only lines containing this substring (empty = truncate the whole file)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "home",
+        "description": "Home directory whose shell history to truncate when action=hist (empty = $HOME)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "dry_run",
+        "description": "Report what would be removed without writing",
+        "default": "false",
+        "type": "bool",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "log_wipe.star",
+      "files": ["log_wipe.star"],
+      "type": "starlark"
+    },
+    "invocation": {}
+  },
+  {
+    "name": "linux_coredump_block",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-09-28",
+    "comment": "Suppress core dumps and memory-scanner access via prctl/prlimit64/coredump_filter (self, pid, madv or system-wide)",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "parameters": [
+      {
+        "name": "action",
+        "description": "show, self, pid, madv, or system",
+        "default": "show",
+        "type": "cstr",
+        "choices": ["show", "self", "pid", "madv", "system"],
+        "required": false
+      },
+      {
+        "name": "pid",
+        "description": "Target PID when action=pid",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "coredump_block.star",
+      "files": ["coredump_block.star"],
+      "type": "starlark"
+    },
+    "invocation": {}
+  },
+  {
+    "name": "linux_vma_hide",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-09-28",
+    "comment": "Mark an anonymous mapping MADV_DONTDUMP or give it a non-revealing VMA name",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "parameters": [
+      {
+        "name": "action",
+        "description": "dontdump (exclude an anonymous mapping from core dumps) or name (set a benign VMA name)",
+        "default": "dontdump",
+        "type": "cstr",
+        "choices": ["dontdump", "name"],
+        "required": false
+      },
+      {
+        "name": "name",
+        "description": "VMA name to apply when action=name (e.g. [heap])",
+        "default": "[heap]",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "vma_hide.star",
+      "files": ["vma_hide.star"],
+      "type": "starlark"
+    },
+    "invocation": {}
+  },
+  {
+    "name": "linux_self_delete",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-09-28",
+    "comment": "Unlink a running binary (default /proc/self/exe) so it disappears from disk while the process keeps running",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "parameters": [
+      {
+        "name": "path",
+        "description": "File to unlink (empty = /proc/self/exe, the agent's own image)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "self_delete.star",
+      "files": ["self_delete.star"],
+      "type": "starlark"
+    },
+    "invocation": {}
+  },
+  {
+    "name": "linux_mount_over",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-09-28",
+    "comment": "Bind-mount, tmpfs-mount, remount read-only, hide a file, or unmount paths; list current mounts",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "parameters": [
+      {
+        "name": "action",
+        "description": "list, bind, tmpfs, ro, umount, or hide",
+        "default": "list",
+        "type": "cstr",
+        "choices": ["list", "bind", "tmpfs", "ro", "umount", "hide"],
+        "required": false
+      },
+      {
+        "name": "src",
+        "description": "Source path for bind, or the file to shadow for hide",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "dst",
+        "description": "Mount target (or prefix filter for list)",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "size",
+        "description": "tmpfs size option, e.g. 10m",
+        "default": "10m",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "mount_over.star",
+      "files": ["mount_over.star"],
+      "type": "starlark"
+    },
+    "invocation": {}
+  },
+  {
+    "name": "linux_proc_hide",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-09-28",
+    "comment": "Hide a PID from /proc with a bind-mounted empty directory, find PIDs by comm name, or list/restore hidden PIDs",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "parameters": [
+      {
+        "name": "action",
+        "description": "hide, unhide, name (all PIDs matching a comm substring), or list",
+        "default": "list",
+        "type": "cstr",
+        "choices": ["hide", "unhide", "name", "list"],
+        "required": false
+      },
+      {
+        "name": "pid",
+        "description": "Target PID for hide/unhide",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "name",
+        "description": "comm substring to match when action=name",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "proc_hide.star",
+      "files": ["proc_hide.star"],
+      "type": "starlark"
+    },
+    "invocation": {}
+  },
+  {
+    "name": "tetragon_blind",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-09-28",
+    "comment": "Scan for Tetragon/Falco/Cilium eBPF security processes, then freeze, thaw or kill one by PID",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "parameters": [
+      {
+        "name": "action",
+        "description": "scan, freeze, thaw, or kill",
+        "default": "scan",
+        "type": "cstr",
+        "choices": ["scan", "freeze", "thaw", "kill"],
+        "required": false
+      },
+      {
+        "name": "pid",
+        "description": "Target PID for freeze/thaw/kill",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "pattern",
+        "description": "Process-name substring to search for during scan",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "tetragon_blind.star",
+      "files": ["tetragon_blind.star"],
+      "type": "starlark"
+    },
+    "invocation": {}
+  },
+  {
+    "name": "lkm_unload",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-09-28",
+    "comment": "List, hunt and unload kernel modules through delete_module(2), removing the LSM/kprobe hooks they carry",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "parameters": [
+      {
+        "name": "action",
+        "description": "list, hunt (known EDR modules), info, or unload",
+        "default": "list",
+        "type": "cstr",
+        "choices": ["list", "hunt", "info", "unload"],
+        "required": false
+      },
+      {
+        "name": "name",
+        "description": "Module name for info/unload",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "force",
+        "description": "Pass O_TRUNC to delete_module (force unload; may panic if hooks are active)",
+        "default": "false",
+        "type": "bool",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "lkm_unload.star",
+      "files": ["lkm_unload.star"],
+      "type": "starlark"
+    },
+    "invocation": {}
+  },
+  {
+    "name": "linux_mmap_read",
+    "build": "",
+    "author": "jm33-ng",
+    "date": "2026-09-28",
+    "comment": "Read a file through mmap(2), so no read(2) syscall is issued and file-read kprobes never fire",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "parameters": [
+      {
+        "name": "path",
+        "description": "File to read",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "cap",
+        "description": "Maximum bytes to map and return",
+        "default": "1048576",
+        "type": "int",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "mmap_read.star",
+      "files": ["mmap_read.star"],
+      "type": "starlark"
+    },
+    "invocation": {}
+  }
+]

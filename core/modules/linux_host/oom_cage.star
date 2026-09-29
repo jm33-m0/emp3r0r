@@ -1,4 +1,4 @@
-# linux_oom_cage - inspect or set a process's OOM killer score.
+# oom_cage - inspect or set a process's OOM killer score.
 #
 # Ported to Starlark from Furtex's edrs/oom_cage.c.
 # Upstream project: https://github.com/MatheuZSecurity/Furtex (MIT License,

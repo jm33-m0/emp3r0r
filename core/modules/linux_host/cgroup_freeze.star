@@ -1,4 +1,4 @@
-# linux_cgroup_freeze - report, freeze or thaw a process's cgroup v2.
+# cgroup_freeze - report, freeze or thaw a process's cgroup v2.
 #
 # Ported to Starlark from Furtex's edrs/cgroup_freeze.c.
 # Upstream project: https://github.com/MatheuZSecurity/Furtex (MIT License,

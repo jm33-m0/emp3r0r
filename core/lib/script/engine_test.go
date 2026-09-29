@@ -418,6 +418,12 @@ def main(*args):
         return "Fail: sys_read_mem failed"
 
     sys_free(addr)
+
+    # Newly registered names must resolve; bogus args just return an errno.
+    for name in ["pidfd_open", "pidfd_getfd", "openat2", "setns", "syslog",
+                 "process_vm_writev", "delete_module", "perf_event_open",
+                 "inotify_init1", "inotify_add_watch", "mmap"]:
+        sys_call(name)
     return "OK"
 `
 	out, err := Run([]byte(linuxScript), nil, nil, 0)

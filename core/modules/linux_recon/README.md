@@ -72,7 +72,7 @@ Read-only. It reports where the target sits on `dmesg_restrict`,
 
 ## Differences from upstream
 
-- **No `bpf(2)` enumeration.** Furtex's `edr_recon` also walks BPF programs,
+- **No `bpf(2)` enumeration.** Furtex's `linux_edr_recon` also walks BPF programs,
   links and maps via raw `bpf(2)` commands. Driving `union bpf_attr` and the
   `bpf_prog_info`/`bpf_map_info` layouts from Starlark is error-prone and
   version-sensitive; it belongs in Go (or a Linux BOF), not a script.
@@ -82,9 +82,10 @@ Read-only. It reports where the target sits on `dmesg_restrict`,
 - **Discovery only, no content dump.** `linux_proc_fd_scan` lists matching fd
   targets but does not read them: a blocking read of a pipe, socket or device
   would stall the agent.
-- **Read-only sysctls.** `sysctl_blind`'s `blind`/`open`/`set` modes are not
-  ported; changing sysctls (especially `modules_disabled`) is an explicit
-  operator action, not recon.
+- **Read-only sysctls.** This suite only reads the values; the write-capable
+  `blind`/`open`/`set` actions live in the `linux_blind` suite
+  (`linux_sysctl_blind`). Changing sysctls (especially `modules_disabled`) is
+  an explicit operator action, not recon.
 
 ## Notes
 
