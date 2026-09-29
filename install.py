@@ -307,6 +307,17 @@ def detect_container_engine() -> str:
     return engine
 
 
+def needs_selinux_relabel() -> bool:
+    """Return True when bind mounts must be relabeled for SELinux.
+
+    The kernel exposes /sys/fs/selinux only while SELinux is enabled
+    (enforcing or permissive). On such hosts a bind mount keeps its host
+    label and the container is denied access to /src unless the engine
+    relabels it.
+    """
+    return pathlib.Path("/sys/fs/selinux/enforce").exists()
+
+
 def check_host_deps(repo_root: pathlib.Path) -> None:
     missing = []
     for tool in ["tar", "zstd"]:
@@ -411,12 +422,19 @@ def docker_build(
         'echo "Build complete."\n'
     )
 
+    # ':z' asks the engine to relabel the source tree as shared container
+    # content; without it SELinux hosts get "permission denied" on /src.
+    mount_opts = ""
+    if needs_selinux_relabel():
+        mount_opts = ":z"
+        log_info("SELinux detected; relabeling the bind mount (:z)")
+
     run_args = [
         container_engine,
         "run",
         "--rm",
         "-v",
-        f"{repo_root}:/src",
+        f"{repo_root}:/src{mount_opts}",
         *build_env,
         builder_image,
         "/bin/bash",
