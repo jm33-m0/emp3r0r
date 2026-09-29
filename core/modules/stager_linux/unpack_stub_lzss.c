@@ -6,8 +6,9 @@
 
 #include "unpack.h"
 
-/* In .data; pack_lzss.py patches unpacked_size/packed_size (key unused). */
-static struct unpack_header hdr = {1, 1, {0}};
+/* Header is emitted into the read-only .unpack_header section; pack_lzss.py
+ * patches unpacked_size/packed_size (key unused). */
+UNPACK_HEADER();
 
 /* LZSS: 8 flag bits per byte (LSB first). 0 = literal byte, 1 = match.
  * Match = 2 bytes: offset-1 (12 bits: low 8 in b0, high 4 in b1[0..3]) and
@@ -39,7 +40,7 @@ static void do_unpack_lzss(const uint8_t *src, const struct unpack_header *h,
 }
 
 __attribute__((noreturn, used)) void unpack_and_run(void) {
-  unpack_run_stub(&hdr, do_unpack_lzss);
+  unpack_run_stub(&unpack_header, do_unpack_lzss);
 }
 
 UNPACK_ENTRY();

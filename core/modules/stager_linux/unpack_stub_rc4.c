@@ -7,8 +7,9 @@
 #include "rc4.h"
 #include "unpack.h"
 
-/* In .data; pack_rc4.py patches unpacked_size/packed_size/key. */
-static struct unpack_header hdr = {1, 1, {0}};
+/* Header is emitted into the read-only .unpack_header section; pack_rc4.py
+ * patches unpacked_size/packed_size/key in the flat blob. */
+UNPACK_HEADER();
 
 static void do_unpack_rc4(const uint8_t *src, const struct unpack_header *h,
                           uint8_t *dst) {
@@ -20,7 +21,7 @@ static void do_unpack_rc4(const uint8_t *src, const struct unpack_header *h,
 }
 
 __attribute__((noreturn, used)) void unpack_and_run(void) {
-  unpack_run_stub(&hdr, do_unpack_rc4);
+  unpack_run_stub(&unpack_header, do_unpack_rc4);
 }
 
 UNPACK_ENTRY();

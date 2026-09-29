@@ -9,7 +9,7 @@
  *
  * A packed stager is laid out as:
  *
- *   [stub .init: _start][stub .text][stub .data: header][packed payload]
+ *   [stub .init: _start][stub .text][stub .unpack_header: header][packed payload]
  *
  * `_start` (extracted first, sitting at offset 0 of the packed blob) calls
  * the stub's unpack_and_run(), which transforms the packed payload back into
@@ -35,6 +35,36 @@ struct unpack_header {
   uint32_t packed_size;
   uint8_t key[16];
 };
+
+/*
+ * Emit the build-time-patched header in a dedicated read-only section.
+ *
+ * A top-level asm statement is used instead of a C object for two reasons:
+ *   1. the section stays read-only, so the stub links as a single RX segment
+ *      and never needs a writable (RWX) LOAD segment; and
+ *   2. GCC cannot constant-fold the placeholder values, which the packer
+ *      overwrites in the flat blob after linking.
+ * The placeholder fields (unpacked_size, packed_size, key) are in the order
+ * of struct unpack_header; unpack_stub.ld places the section last so that
+ * `h + 1` points at the packed payload appended after the stub.
+ */
+#define UNPACK_HEADER()                                                        \
+  __asm__(".section .unpack_header,\"a\",@progbits\n"                          \
+          ".p2align 3\n"                                                       \
+          ".globl unpack_header\n"                                             \
+          ".hidden unpack_header\n"                                            \
+          "unpack_header:\n"                                                   \
+          "  .long 1\n"                                                        \
+          "  .long 1\n"                                                        \
+          "  .zero 16\n"                                                       \
+          "  .size unpack_header, 24\n"                                        \
+          ".previous")
+
+/* Hidden visibility makes GCC emit a PC-relative reference (`lea sym(%rip)`)
+ * instead of a GOT load that the linker would relax to an absolute address.
+ * The stub is position-independent shellcode loaded at an arbitrary base. */
+extern struct unpack_header unpack_header
+    __attribute__((visibility("hidden")));
 
 /* Minimal mmap (SYS_mmap = 9). One raw syscall per stub; the unpacked stager
  * resolves the vDSO gadget for all of its own syscalls afterwards. */

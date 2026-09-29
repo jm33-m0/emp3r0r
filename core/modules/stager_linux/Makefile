@@ -28,8 +28,10 @@ SUPERVISE_SLEEP_MIN ?= 5
 SUPERVISE_SLEEP_MAX ?= 30
 COMMON_CFLAGS += -DSUPERVISE_SLEEP_MIN=$(SUPERVISE_SLEEP_MIN) -DSUPERVISE_SLEEP_MAX=$(SUPERVISE_SLEEP_MAX)
 
-# Common linker flags
-LDFLAGS_COMMON = -static -Wl,--gc-sections -Wl,-N -Wl,--build-id=none
+# Common linker flags. -Wl,-N (--omagic) marks .text writable and produces
+# RWX LOAD segments; -Wl,-n (--nmagic) keeps sections tightly packed (the
+# flat blob layout depends on it) while leaving code/rodata read-only.
+LDFLAGS_COMMON = -static -Wl,--gc-sections -Wl,-n -Wl,--build-id=none
 
 # Specific linker flags
 STAGE0_LDFLAGS = $(LDFLAGS_COMMON) -Wl,-Ttext-segment=0x10000000
@@ -37,6 +39,11 @@ STAGE1_LDFLAGS = $(LDFLAGS_COMMON) -Wl,-Ttext-segment=0x0
 # The downloader is a position-independent blob mapped at an arbitrary address
 # by the stub, so it links as its own stage at virtual address 0.
 DL_LDFLAGS = $(STAGE1_LDFLAGS)
+# A shared object carries a writable .dynamic section, so --nmagic's single
+# packed segment would fold RW data into the RX text segment and yield RWX.
+# Use the default page-aligned multi-segment layout (distinct RX/RW LOADs)
+# instead; sections no longer need to be contiguous for a real shared object.
+SO_LDFLAGS = -static -Wl,--gc-sections -Wl,--build-id=none -Wl,-Ttext-segment=0x10000000
 
 # Default configuration (can be overridden by environment variables)
 DOWNLOAD_HOST ?= 127.0.0.1
@@ -206,7 +213,7 @@ $(STAGE0_TARGET): $(STUB_SRCS) $(DL_BLOB_H)
 so: $(SHARED_LIB)
 
 $(SHARED_LIB): $(STUB_SRCS) $(DL_BLOB_H)
-	$(CC) $(COMMON_CFLAGS) -shared $(STAGE0_LDFLAGS) -o $@ $(STUB_SRCS)
+	$(CC) $(COMMON_CFLAGS) -shared $(SO_LDFLAGS) -o $@ $(STUB_SRCS)
 	@echo "Shared library generated at $(PWD)/$@"
 	@echo "[+] Exported symbols in $(SHARED_LIB):"
 	@nm -D $@ 2>/dev/null | grep ' [T|g] ' || nm $@ 2>/dev/null | grep ' [T|g] ' || readelf -W -s $@ 2>/dev/null | grep ' FUNC ' || true
@@ -215,13 +222,13 @@ $(SHARED_LIB): $(STUB_SRCS) $(DL_BLOB_H)
 packed: $(PACKED)
 
 $(STUB_ELF): $(UNPACK_SRCS) unpack_stub.ld
-	$(CC) $(COMMON_CFLAGS) -static -Wl,--gc-sections -Wl,-N -Wl,--build-id=none -Wl,-e,_start -Wl,-T,unpack_stub.ld -o $@ $(UNPACK_SRCS)
+	$(CC) $(COMMON_CFLAGS) $(LDFLAGS_COMMON) -Wl,-e,_start -Wl,-T,unpack_stub.ld -o $@ $(UNPACK_SRCS)
 
 # Extract the stub as a single flat binary, preserving the vaddr layout
 # (including alignment padding between sections).  The old approach of
 # extracting each section individually with -j and concatenating with cat
-# silently dropped inter-section alignment gaps, which corrupted the .data
-# header offset when .rodata was absent or differently-sized.
+# silently dropped inter-section alignment gaps, which corrupted the
+# .unpack_header offset when .rodata was absent or differently-sized.
 $(STUB_BIN): $(STUB_ELF)
 	objcopy -O binary $(STUB_ELF) $@
 

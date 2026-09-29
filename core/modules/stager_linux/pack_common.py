@@ -8,8 +8,8 @@ import sys
 HEADER_SIZE = 24
 
 
-def get_data_vaddr(elf_path):
-    """Return the vaddr of the .data section from the ELF, or raise on failure."""
+def get_header_vaddr(elf_path):
+    """Return the vaddr of the .unpack_header section from the ELF, or raise."""
     result = subprocess.run(
         ["readelf", "-S", "--wide", elf_path],
         capture_output=True,
@@ -20,13 +20,13 @@ def get_data_vaddr(elf_path):
         parts = line.split()
         # readelf -S --wide line format (one section per line):
         #   [ Nr] Name  Type  Addr  Off  Size  ES  Flg  Lk  Inf  Al
-        # The Name field may have a leading '[' index; find '.data' token.
-        if ".data" in parts:
-            idx = parts.index(".data")
-            # The address field follows the type field (two after '.data').
+        # The Name field may have a leading '[' index; find the name token.
+        if ".unpack_header" in parts:
+            idx = parts.index(".unpack_header")
+            # The address field follows the type field (two after the name).
             vaddr_hex = parts[idx + 2]
             return int(vaddr_hex, 16)
-    raise ValueError(f"No .data section found in {elf_path}")
+    raise ValueError(f"No .unpack_header section found in {elf_path}")
 
 
 def parse_args():
@@ -44,7 +44,7 @@ def patch_and_write_packed(
     stub_path, elf_path, payload, packed_payload, out_path, key=b"", algo_name="packer"
 ):
     """Patch the unpack header in the stub and output the final packed stager."""
-    hdr_off = get_data_vaddr(elf_path)
+    hdr_off = get_header_vaddr(elf_path)
     stub = bytearray(open(stub_path, "rb").read())
     stub[hdr_off : hdr_off + 8] = struct.pack("<II", len(payload), len(packed_payload))
     if key:
