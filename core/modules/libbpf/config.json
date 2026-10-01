@@ -1,0 +1,16 @@
+{
+  "name": "libbpf",
+  "build": "sh build.sh",
+  "author": "jm33-ng",
+  "date": "2026-10-01",
+  "comment": "libbpf shared-library dependency backing the ebpf_* Linux Starlark builtins. Not runnable directly; declare it in another module's dependencies.",
+  "is_local": false,
+  "platform": "Linux",
+  "parameters": [],
+  "agent_config": {
+    "exec": "",
+    "files": ["libbpf.so"],
+    "type": "so"
+  },
+  "invocation": {}
+}

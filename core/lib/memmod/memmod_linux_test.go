@@ -41,7 +41,8 @@ func skipUnderRaceLinux(t *testing.T) {
 }
 
 // buildLinuxFixture compiles linuxFixtureSource with zig cc into a shared
-// object for the current architecture.
+// object for the current architecture, pinned to the glibc 2.17 baseline that
+// the shipped libraries use.
 func buildLinuxFixture(t *testing.T) []byte {
 	t.Helper()
 
@@ -52,11 +53,11 @@ func buildLinuxFixture(t *testing.T) []byte {
 	var target string
 	switch runtime.GOARCH {
 	case "386":
-		target = "x86-linux-gnu"
+		target = "x86-linux-gnu.2.17"
 	case "amd64":
-		target = "x86_64-linux-gnu"
+		target = "x86_64-linux-gnu.2.17"
 	case "arm64":
-		target = "aarch64-linux-gnu"
+		target = "aarch64-linux-gnu.2.17"
 	default:
 		t.Skipf("no zig target mapping for GOARCH %s", runtime.GOARCH)
 	}

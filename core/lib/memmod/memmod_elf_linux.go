@@ -32,6 +32,9 @@ type linuxDynAPI struct {
 	dlclose       uintptr
 	dlerror       uintptr
 	defaultHandle uintptr
+	// internal is true when the entry points are the glibc-internal
+	// __libc_* set rather than the public dl* set. See memmod_elf_dynapi_linux.go.
+	internal bool
 }
 
 var (
@@ -1146,9 +1149,11 @@ func commonLinuxDependencies() []string {
 		}
 	}
 
+	// libdl.so.2 is deliberately absent: the dl* entry points are resolved
+	// either from libc (public since glibc 2.34) or from the glibc-internal
+	// __libc_* set, never by loading libdl.
 	deps := []string{
 		"libc.so.6",
-		"libdl.so.2",
 		"libpthread.so.0",
 	}
 	switch runtime.GOARCH {
@@ -1345,10 +1350,10 @@ func (resolver *symbolResolver) Resolve(name string) (uintptr, error) {
 
 	if resolver.api != nil {
 		// Prefer the native loader once dlsym has been bootstrapped. In addition
-		// to honoring loader scope and interposition, dlsym evaluates GNU
-		// IFUNC resolvers. Returning base+st_value for an IFUNC would bind its
-		// resolver as the callable symbol and crash on the first invocation.
-		if addr, err := resolveWithDLSym(resolver.api, name); err == nil && addr != 0 {
+		// to honoring loader scope and interposition, the public dlsym evaluates
+		// GNU IFUNC resolvers. The glibc-internal __libc_dlsym does not, so
+		// resolveWithLoader finishes that resolution when needed.
+		if addr, err := resolver.resolveWithLoader(name); err == nil && addr != 0 {
 			resolver.resolved[name] = addr
 			return addr, nil
 		}
@@ -1363,7 +1368,7 @@ func (resolver *symbolResolver) Resolve(name string) (uintptr, error) {
 		for _, dep := range commonLinuxDependencies() {
 			_ = resolver.ensureLibraryLoaded(dep)
 		}
-		if addr, err := resolveWithDLSym(resolver.api, name); err == nil && addr != 0 {
+		if addr, err := resolver.resolveWithLoader(name); err == nil && addr != 0 {
 			resolver.resolved[name] = addr
 			return addr, nil
 		}
@@ -1468,6 +1473,65 @@ func runtimeModules() ([]runtimeELFModule, error) {
 		return modules[i].path < modules[j].path
 	})
 	return modules, nil
+}
+
+// resolveWithLoader resolves name through the native loader and, in
+// glibc-internal mode, finishes IFUNC resolution that __libc_dlsym leaves
+// half-done (it returns the resolver, not the selected implementation).
+func (resolver *symbolResolver) resolveWithLoader(name string) (uintptr, error) {
+	addr, err := resolveWithDLSym(resolver.api, name)
+	if err != nil || addr == 0 {
+		return addr, err
+	}
+	if resolver.api.internal {
+		addr = finishInternalIFUNC(resolver.modules, name, addr)
+	}
+	return addr, nil
+}
+
+// ifuncOffsets caches, per module path, the link-time st_value of every
+// STT_GNU_IFUNC dynamic symbol. Parsing each module once keeps the per-import
+// IFUNC check to a map lookup; the stored map is an immutable snapshot.
+var ifuncOffsets sync.Map // map[string]map[string]uintptr
+
+func loadIFUNCOffsets(path string) map[string]uintptr {
+	if cached, ok := ifuncOffsets.Load(path); ok {
+		return cached.(map[string]uintptr)
+	}
+	offsets := make(map[string]uintptr)
+	f, err := elf.Open(path)
+	if err != nil {
+		// Do not cache an open failure: the module might be readable later.
+		return offsets
+	}
+	defer f.Close()
+	if syms, err := f.DynamicSymbols(); err == nil {
+		for _, s := range syms {
+			if s.Value == 0 || elf.ST_TYPE(s.Info) != elf.STT_GNU_IFUNC {
+				continue
+			}
+			offsets[s.Name] = uintptr(s.Value)
+			if at := strings.IndexByte(s.Name, '@'); at > 0 {
+				offsets[s.Name[:at]] = uintptr(s.Value)
+			}
+		}
+	}
+	ifuncOffsets.Store(path, offsets)
+	return offsets
+}
+
+// finishInternalIFUNC works around __libc_dlsym's lack of IFUNC support: when
+// name resolves to the resolver of a GNU IFUNC in one of the loaded modules,
+// invoke that resolver to obtain the callable implementation. The public dlsym
+// does exactly this internally (elf_ifunc_invoke).
+func finishInternalIFUNC(modules []runtimeELFModule, name string, addr uintptr) uintptr {
+	for _, module := range modules {
+		off, ok := loadIFUNCOffsets(module.path)[name]
+		if ok && module.base+off == addr {
+			return callExportFunction(addr)
+		}
+	}
+	return addr
 }
 
 func resolveWithDLSym(api *linuxDynAPI, name string) (uintptr, error) {
