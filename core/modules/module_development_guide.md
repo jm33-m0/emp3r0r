@@ -404,17 +404,18 @@ Aliases: `lin_syscall`/`linux_syscall`, `lin_alloc`/`linux_alloc`,
 
 These are only available on Linux; on other platforms they return an error.
 
-### In-memory DLLs (Windows)
+### In-memory shared libraries (Windows and Linux)
 
 | Function | Description |
 | --- | --- |
-| `mem_load_library(data)` / `mem_load(data)` | Map a DLL image into the current process; returns its base address as a handle. |
+| `mem_load_library(data)` / `mem_load(data)` | Map a shared library image into the current process; returns its base address as a handle. Accepts a PE DLL on Windows and an ELF `.so` on Linux. |
 | `mem_proc_address(module, name)` | Address of a named export. |
-| `mem_proc_ordinal(module, ordinal)` | Address of an export by ordinal. |
+| `mem_proc_ordinal(module, ordinal)` | Address of an export by ordinal (Windows only; ELF libraries have no ordinal table). |
 | `mem_base_addr(module)` | Base address of a loaded module. |
 | `mem_free(module)` | Unload a module and drop its handle. |
 
-On non-Windows platforms these return an "only supported on Windows" error.
+On Linux the loader supports `386`, `amd64`, and `arm64`. Other platforms return a
+"not supported on this platform" error.
 
 ### Signed kernel drivers (Windows)
 

@@ -1,4 +1,4 @@
-//go:build !windows
+//go:build !windows && !(linux && !android && (386 || amd64 || arm64))
 
 package script
 
@@ -8,9 +8,9 @@ import (
 	"go.starlark.net/starlark"
 )
 
-// Non-Windows stubs for the core/lib/memmod bindings. memmod only exists on
-// Windows, so these builtins fail with a descriptive error instead of being
-// undefined.
+// Stubs for platforms where core/lib/memmod has no loader backend. The
+// builtins stay defined so scripts get a descriptive error instead of an
+// undefined-name failure.
 
 func init() {
 	RegisterAPI("mem_load_library", starlarkMemLoadLibrary)
@@ -21,22 +21,26 @@ func init() {
 	RegisterAPI("mem_base_addr", starlarkMemBaseAddr)
 }
 
+func memLoadUnsupported(name string) error {
+	return fmt.Errorf("%s is not supported on this platform", name)
+}
+
 func starlarkMemLoadLibrary(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	return starlark.None, fmt.Errorf("mem_load_library is only supported on Windows")
+	return starlark.None, memLoadUnsupported(fn.Name())
 }
 
 func starlarkMemProcAddress(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	return starlark.None, fmt.Errorf("mem_proc_address is only supported on Windows")
+	return starlark.None, memLoadUnsupported(fn.Name())
 }
 
 func starlarkMemProcOrdinal(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	return starlark.None, fmt.Errorf("mem_proc_ordinal is only supported on Windows")
+	return starlark.None, memLoadUnsupported(fn.Name())
 }
 
 func starlarkMemFree(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	return starlark.None, fmt.Errorf("mem_free is only supported on Windows")
+	return starlark.None, memLoadUnsupported(fn.Name())
 }
 
 func starlarkMemBaseAddr(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	return starlark.None, fmt.Errorf("mem_base_addr is only supported on Windows")
+	return starlark.None, memLoadUnsupported(fn.Name())
 }

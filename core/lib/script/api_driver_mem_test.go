@@ -74,23 +74,64 @@ def main(*args):
 }
 
 func TestMemAPIs(t *testing.T) {
-	if runtime.GOOS != "windows" {
+	linuxSupported := runtime.GOOS == "linux" && (runtime.GOARCH == "386" || runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64")
+
+	if runtime.GOOS != "windows" && !linuxSupported {
 		// mem_* must fail with a descriptive error instead of being undefined.
 		_, err := Run([]byte(`
 def main(*args):
     mem_load_library("deadbeef")
-    return "Fail: mem_load_library succeeded on non-Windows"
+    return "Fail: mem_load_library succeeded on an unsupported platform"
 `), nil, nil, 0)
 		if err == nil {
-			t.Errorf("expected error when calling mem_load_library on non-Windows, but got none")
-		} else if !strings.Contains(err.Error(), "mem_load_library is only supported on Windows") {
-			t.Errorf("expected 'only supported on Windows' error, got: %v", err)
+			t.Errorf("expected error when calling mem_load_library on an unsupported platform, but got none")
+		} else if !strings.Contains(err.Error(), "not supported on this platform") {
+			t.Errorf("expected 'not supported on this platform' error, got: %v", err)
 		}
 		return
 	}
 
 	skipUnderRace(t)
 
+	if runtime.GOOS == "windows" {
+		testWindowsMemAPIs(t)
+		return
+	}
+	testLinuxMemAPIWiring(t)
+}
+
+// testLinuxMemAPIWiring verifies that the Linux mem_* builtins are wired to
+// core/lib/memmod rather than the unsupported-platform stubs. The ELF loader
+// itself is covered by core/lib/memmod's own tests; here we only assert the
+// script layer reaches it.
+func testLinuxMemAPIWiring(t *testing.T) {
+	// Loading garbage must surface the ELF loader's error, proving the real
+	// implementation is registered on this platform.
+	_, err := Run([]byte(`
+def main(*args):
+    mem_load_library("this is not an ELF image")
+    return "Fail: mem_load_library accepted garbage"
+`), nil, nil, 0)
+	if err == nil {
+		t.Errorf("expected error when loading garbage, but got none")
+	} else if !strings.Contains(err.Error(), "mem_load_library") || strings.Contains(err.Error(), "not supported") {
+		t.Errorf("expected mem_load_library ELF error, got: %v", err)
+	}
+
+	// Freeing an unregistered handle must error.
+	_, err = Run([]byte(`
+def main(*args):
+    mem_free(0x1234)
+    return "Fail: mem_free on unknown handle succeeded"
+`), nil, nil, 0)
+	if err == nil {
+		t.Errorf("expected error from mem_free on unknown handle, but got none")
+	} else if !strings.Contains(err.Error(), "unknown module handle") {
+		t.Errorf("expected 'unknown module handle' error, got: %v", err)
+	}
+}
+
+func testWindowsMemAPIs(t *testing.T) {
 	systemRoot := os.Getenv("SystemRoot")
 	if systemRoot == "" {
 		systemRoot = os.Getenv("WINDIR")
