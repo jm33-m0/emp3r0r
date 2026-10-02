@@ -70,10 +70,16 @@ const testECHConfigList = "AD7+DQA65wAgACA8wVN2BtscOl3vQheUzHeIkVmKIiydUhDCliA4i
 
 // artifactName returns the filename that build.sh produces for these options.
 func (o stagerOpts) artifactName() string {
-	if o.format == "packed" {
+	switch o.format {
+	case "packed":
 		return "stager-packed.bin"
+	case "executable", "elf":
+		return "stager"
+	case "so", "shared":
+		return "stager.so"
+	default:
+		return "stager.bin"
 	}
-	return "stager.bin"
 }
 
 // hostDynloadMode picks the stager's --dynload-mode for the host glibc. Both
@@ -357,6 +363,16 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 			supervised: true,
 		}
 		runAgentEndToEndLifecycle(t, def.C2ChannelModeH2Conn, opts)
+	})
+
+	// Every artifact format must launch and check in. The executable is a
+	// normal ELF run directly and the shared object is dlopen'd, so this also
+	// covers their ELF segment permissions, not just the flat-blob layout.
+	t.Run(def.C2ChannelModeH2Conn+"/executable", func(t *testing.T) {
+		runAgentEndToEndLifecycle(t, def.C2ChannelModeH2Conn, stagerOpts{format: "executable", transport: "http"})
+	})
+	t.Run(def.C2ChannelModeH2Conn+"/shared-object", func(t *testing.T) {
+		runAgentEndToEndLifecycle(t, def.C2ChannelModeH2Conn, stagerOpts{format: "so", transport: "http"})
 	})
 }
 
@@ -756,9 +772,11 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	defer listener.StopHTTP()
 
 	// -----------------------------------------------------------------------
-	// 9. Build a thin C runner that mmap's the stager shellcode and jumps to
-	// it.  Both raw and packed stagers have _start at offset 0 of the blob,
-	// so the runner is format-agnostic.
+	// 9. Build a launcher for the selected format.
+	//
+	// raw/packed are flat shellcode with _start at offset 0, so a thin C runner
+	// mmaps and jumps to them. The executable is a normal ELF and runs directly.
+	// The .so exports main and is loaded with dlopen.
 	// -----------------------------------------------------------------------
 	runnerSrc := filepath.Join(tmpDir, "stager_runner.c")
 	runnerBin := filepath.Join(tmpDir, "stager_runner")
@@ -783,11 +801,37 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 		"    ((void(*)(void))buf)();\n" +
 		"    return 0;\n" +
 		"}\n"
-	if err := os.WriteFile(runnerSrc, []byte(runnerCode), 0o644); err != nil {
-		t.Fatalf("Failed to write runner source: %v", err)
-	}
-	if out, err := exec.Command("gcc", "-rdynamic", "-o", runnerBin, runnerSrc, "-ldl").CombinedOutput(); err != nil {
-		t.Fatalf("Failed to build stager runner: %v\nOutput: %s", err, string(out))
+	switch opts.format {
+	case "executable", "elf":
+		// Self-contained ELF: run it directly. startRunnerAndWaitCheckin passes
+		// the artifact path as argv[1], which the stager ignores.
+		runnerBin = stagerArtifact
+	case "so", "shared":
+		soRunnerSrc := filepath.Join(tmpDir, "stager_so_runner.c")
+		soRunnerCode := "#define _GNU_SOURCE\n" +
+			"#include <stdio.h>\n" +
+			"#include <dlfcn.h>\n" +
+			"int main(int argc, char **argv) {\n" +
+			"    if (argc < 2) { fprintf(stderr, \"Usage: %s <stager.so>\\n\", argv[0]); return 1; }\n" +
+			"    void *h = dlopen(argv[1], RTLD_NOW);\n" +
+			"    if (!h) { fprintf(stderr, \"dlopen: %s\\n\", dlerror()); return 1; }\n" +
+			"    int (*entry)(void) = (int (*)(void))dlsym(h, \"main\");\n" +
+			"    if (!entry) { fprintf(stderr, \"dlsym(main): %s\\n\", dlerror()); return 1; }\n" +
+			"    return entry();\n" +
+			"}\n"
+		if err := os.WriteFile(soRunnerSrc, []byte(soRunnerCode), 0o644); err != nil {
+			t.Fatalf("Failed to write .so runner source: %v", err)
+		}
+		if out, err := exec.Command("gcc", "-rdynamic", "-o", runnerBin, soRunnerSrc, "-ldl").CombinedOutput(); err != nil {
+			t.Fatalf("Failed to build .so runner: %v\nOutput: %s", err, string(out))
+		}
+	default:
+		if err := os.WriteFile(runnerSrc, []byte(runnerCode), 0o644); err != nil {
+			t.Fatalf("Failed to write runner source: %v", err)
+		}
+		if out, err := exec.Command("gcc", "-rdynamic", "-o", runnerBin, runnerSrc, "-ldl").CombinedOutput(); err != nil {
+			t.Fatalf("Failed to build stager runner: %v\nOutput: %s", err, string(out))
+		}
 	}
 
 	// -----------------------------------------------------------------------
