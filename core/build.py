@@ -732,11 +732,14 @@ def build_shared_object(
     # compiler-rt (the only provider of that helper); zig 0.13 always linked
     # compiler-rt regardless. Link it back explicitly with -lgcc, which resolves
     # to zig's bundled compiler_rt.lib, or lld-link fails on the undefined
-    # symbol. -lgcc adds only compiler builtins, not libc. Linux objects contain
-    # no such reference, so the flag is Windows-only.
-    extldflags = "-nostdlib -nodefaultlibs -Wl,--gc-sections"
+    # symbol. The mingw DLL is therefore built with no default runtime. Linux
+    # c-shared objects are loaded by ld-linux and must keep libc: the Go cgo
+    # runtime and memmod reference libc symbols such as `environ`, and
+    # -nostdlib leaves them undefined so the payload dies with a symbol lookup
+    # error before Go ever starts.
+    extldflags = "-Wl,--gc-sections"
     if os_name == "windows":
-        extldflags = "-lgcc " + extldflags
+        extldflags = "-lgcc -nostdlib -nodefaultlibs " + extldflags
     if arg1 != "--debug":
         extldflags = f"-s {extldflags}"
 
@@ -775,6 +778,10 @@ def build_shared_object(
         if zig_target:
             env["CC"] = f"zig cc -target {zig_target}"
 
+    # The agent c-shared object is linked by zig/lld so it stays pinned to
+    # glibc 2.17. lld leaves R_*_RELATIVE addends out of the init-array section
+    # on disk; tools.materializeInitArray() resolves them before malasada reads
+    # the array, so no host linker is needed here.
     cmd_str = (
         f'{gobuild_cmd} {build_opt} -trimpath -buildvcs=false -tags "{tags}" '
         f'-o "{out_file}" -buildmode c-shared -ldflags="{win_gui_flag}{ldflags} -linkmode external -extldflags \'{extldflags}\'"'
