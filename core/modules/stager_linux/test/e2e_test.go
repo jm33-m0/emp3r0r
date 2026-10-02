@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -127,6 +128,71 @@ func signUUID(uuidStr, keyFile string) (string, error) {
 		return "", err
 	}
 	return base64.URLEncoding.EncodeToString(sig), nil
+}
+
+var (
+	// The agent shared object is config-agnostic: it embeds a fixed placeholder
+	// for the runtime config that each subtest patches with its own encrypted
+	// blob. Building and linking the ~20MB object once per test binary instead
+	// of once per subtest removes a redundant compile/link from every variant.
+	agentSOOnce sync.Once
+	agentSODir  string
+	agentSOPath string
+	agentSOErr  error
+)
+
+// buildAgentSharedLibrary returns the path to the agent c-shared object,
+// building it on first use and reusing it for the rest of the test binary's
+// run.
+func buildAgentSharedLibrary(t *testing.T) string {
+	t.Helper()
+	agentSOOnce.Do(func() {
+		dir, err := os.MkdirTemp("", "stager_agent_so_*")
+		if err != nil {
+			agentSOErr = fmt.Errorf("create agent build dir: %w", err)
+			return
+		}
+		outPath := filepath.Join(dir, "agent.so")
+		// Parameters mirror build.sh's build_shared_object() for linux/amd64:
+		//   - tags:       "release emp3r0r_so"
+		//   - -buildmode c-shared
+		//   - ldflags:    -s -w -linkmode external
+		//   - extldflags: -Wl,--gc-sections -s
+		// "emp3r0r_so" activates main_cgo_shared.go which exports the `main`
+		// symbol that malasada's stage0 calls after reflective loading.
+		cmdBuildAgent := exec.Command(
+			"go", "build",
+			"-buildmode=c-shared",
+			"-tags", "release emp3r0r_so",
+			"-trimpath",
+			"-buildvcs=false",
+			"-ldflags", "-s -w -linkmode external -extldflags '-Wl,--gc-sections -s'",
+			"-o", outPath,
+			"../../../cmd/agent",
+		)
+		cmdBuildAgent.Env = append(os.Environ(), "CGO_ENABLED=1")
+		buildOut, err := cmdBuildAgent.CombinedOutput()
+		if err != nil {
+			agentSOErr = fmt.Errorf("build agent shared library: %w\nOutput: %s", err, buildOut)
+			return
+		}
+		agentSODir = dir
+		agentSOPath = outPath
+		logging.Successf("Agent shared library built at %s", outPath)
+	})
+	if agentSOErr != nil {
+		t.Fatalf("%v", agentSOErr)
+	}
+	return agentSOPath
+}
+
+// TestMain removes the cached agent shared object once every test has run.
+func TestMain(m *testing.M) {
+	code := m.Run()
+	if agentSODir != "" {
+		_ = os.RemoveAll(agentSODir)
+	}
+	os.Exit(code)
 }
 
 // waitForC2Listener blocks until a TCP listener accepts connections on addr, or
@@ -335,34 +401,10 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	logging.Infof("Test workspace: %s", tmpDir)
 
 	// -----------------------------------------------------------------------
-	// 2. Build agent as ELF shared library (-buildmode=c-shared).
-	//
-	// Parameters mirror build.sh's build_shared_object() for linux/amd64:
-	//   - tags:       "release emp3r0r_so"  (netgo is not added for linux in build.sh)
-	//   - -buildvcs=false, -trimpath
-	//   - -buildmode c-shared
-	//   - ldflags:    -s -w -linkmode external
-	//   - extldflags: -Wl,--gc-sections -s
-	// "emp3r0r_so" activates main_cgo_shared.go which exports the `main`
-	// symbol that malasada's stage0 calls after reflective loading.
+	// 2. Build agent as ELF shared library (-buildmode=c-shared), cached for
+	//    the whole test binary. The raw object is patched per subtest below.
 	// -----------------------------------------------------------------------
-	agentSOPath := filepath.Join(tmpDir, "agent.so")
-	cmdBuildAgent := exec.Command(
-		"go", "build",
-		"-buildmode=c-shared",
-		"-tags", "release emp3r0r_so",
-		"-trimpath",
-		"-buildvcs=false",
-		"-ldflags", "-s -w -linkmode external -extldflags '-Wl,--gc-sections -s'",
-		"-o", agentSOPath,
-		"../../../cmd/agent",
-	)
-	cmdBuildAgent.Env = append(os.Environ(), "CGO_ENABLED=1")
-	out, err := cmdBuildAgent.CombinedOutput()
-	if err != nil {
-		t.Fatalf("Failed to build agent shared library: %v\nOutput: %s", err, string(out))
-	}
-	logging.Successf("Agent shared library built at %s", agentSOPath)
+	agentSOPath := buildAgentSharedLibrary(t)
 
 	// -----------------------------------------------------------------------
 	// 3. Setup C2 server config and certs.
@@ -469,6 +511,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 		AgentTag:         agentTag,
 		ModulePath:       "",
 		CCTimeout:        1000,
+		Jitter:           1,
 		PreflightEnabled: true,
 		PreflightURL:     preflightURL,
 		PreflightMethod:  "GET",
@@ -608,9 +651,9 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	buildCmd := exec.Command("./build.sh", buildArgs...)
 	buildCmd.Dir = ".."
 	buildCmd.Env = append(os.Environ(), "CGO_ENABLED=0")
-	out, err = buildCmd.CombinedOutput()
+	buildOut, err := buildCmd.CombinedOutput()
 	if err != nil {
-		t.Fatalf("build.sh failed: %v\nOutput: %s", err, string(out))
+		t.Fatalf("build.sh failed: %v\nOutput: %s", err, string(buildOut))
 	}
 	logging.Successf("Stager compiled (%s format, %s unpacker, %s transport)",
 		opts.format, opts.unpacker, opts.transport)

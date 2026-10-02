@@ -30,7 +30,38 @@ const (
 	// c2BackoffMax caps the exponential backoff so agents still poll often
 	// enough to notice newly queued operator commands.
 	c2BackoffMax = 10 * time.Minute
+
+	// initialBeaconJitterMinSec and initialBeaconJitterMaxSec bound the random
+	// delay before the first check-in. The window is derived from the configured
+	// poll interval and jitter so it scales with the operator's beaconing
+	// profile instead of being a fixed penalty on every launch.
+	initialBeaconJitterMinSec = 3
+	initialBeaconJitterMaxSec = 10
 )
+
+// initialCheckinDelay returns how long to wait before the first check-in so a
+// fleet of agents does not beacon in lockstep. The window is the configured
+// poll interval scaled by the jitter percentage, clamped to
+// [initialBeaconJitterMinSec, initialBeaconJitterMaxSec]. A zero-length window
+// (a tiny interval/jitter, or no config at all) skips the delay so
+// latency-sensitive launches and tests can check in immediately.
+func initialCheckinDelay(config *def.Config) time.Duration {
+	if config == nil || config.PollInterval <= 0 || config.Jitter <= 0 {
+		return 0
+	}
+	window := int64(config.PollInterval) * int64(config.Jitter) / 100
+	if window > initialBeaconJitterMaxSec {
+		window = initialBeaconJitterMaxSec
+	}
+	if window <= 0 {
+		return 0
+	}
+	minDelay := int64(initialBeaconJitterMinSec)
+	if minDelay > window {
+		minDelay = window
+	}
+	return time.Duration(util.RandInt(int(minDelay), int(window)+1)) * time.Second
+}
 
 // c2Backoff is the current reconnect backoff. It increases on every failed
 // tunnel and is reset once a tunnel stays alive long enough to be considered
@@ -81,7 +112,9 @@ func agent_main() {
 	util.SetFileCryptoKey([]byte(common.RuntimeConfig.Password))
 
 	// Spread out check-ins so a fleet of agents does not beacon in lockstep.
-	time.Sleep(time.Duration(util.RandInt(3, 10)) * time.Second)
+	if delay := initialCheckinDelay(common.RuntimeConfig); delay > 0 {
+		time.Sleep(delay)
+	}
 
 	// Normalize PATH and HOME so modules and spawned tools resolve correctly,
 	// regardless of what environment the loader handed us.
