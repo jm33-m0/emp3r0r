@@ -166,7 +166,7 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 		}
 	}
 	if ctx.Target != nil && archVariants &&
-		(strings.EqualFold(payload_type, "dll") || strings.EqualFold(payload_type, "coff")) {
+		(strings.EqualFold(payload_type, "dll") || strings.EqualFold(payload_type, "coff") || strings.EqualFold(payload_type, "so")) {
 		arch := agentArch(ctx)
 		payloadFile = selectArchPayload(config.AgentConfig.Files, arch)
 		hostedName = fmt.Sprintf("%s.%s", strings.ToLower(live.ActiveModule.Name), arch)
@@ -366,6 +366,15 @@ func ensureModuleDependencyHosted(ctx *c2context.C2Context, depName string) erro
 	if fileArch := payloadArch(payloadFile); fileArch != "" && fileArch != arch {
 		return fmt.Errorf("dependency module %q ships no %s payload (found %s)", depName, arch, fileArch)
 	}
+
+	// Dependencies that build from source (e.g. libbpf) may not have their
+	// payload yet; build it now with empty flags.
+	if !util.IsFileExist(filepath.Join(config.Path, payloadFile)) && config.Build != "" {
+		if _, err := build_module(config, nil); err != nil {
+			return fmt.Errorf("building dependency %q: %w", depName, err)
+		}
+	}
+
 	_, err := hostModulePayload(config, payloadFile, arch)
 	return err
 }

@@ -4,11 +4,10 @@
 # Upstream project: https://github.com/MatheuZSecurity/Furtex (MIT License,
 # Copyright (c) 2026 MatheuZ). See README.md in this directory for attribution.
 #
-# File-based detection only. The upstream BPF program/link/map enumeration and
-# the available_filter_functions scan are deliberately not included in the
-# default path: the first needs raw bpf(2) struct handling that is a poor fit
-# for Starlark, and the second can read tens of megabytes on a full kernel.
-# Run `--section avail` explicitly if you accept that cost.
+# The upstream BPF program/link/map enumeration is now driven through the
+# bundled libbpf loader (`ebpf_*` builtins). The available_filter_functions scan
+# is still opt-in because it can read tens of megabytes on a full kernel; run
+# `--section avail` explicitly if you accept that cost.
 
 # EDR vendor fingerprints. Keys mirror the upstream profile struct:
 #   procs   - /proc/<pid>/comm substrings
@@ -125,7 +124,7 @@ EDR_PROFILES = [
 ]
 
 # Sections included by the default "all". "avail" is intentionally opt-in.
-SECTIONS_DEFAULT = ["procs", "arts", "mods", "kprobes", "ftrace", "lsm", "perf"]
+SECTIONS_DEFAULT = ["procs", "arts", "mods", "kprobes", "ftrace", "lsm", "perf", "bpf"]
 
 KPROBE_EVENTS = [
     "/sys/kernel/tracing/kprobe_events",
@@ -326,6 +325,46 @@ def recon_perf(scores):
     return total
 
 
+def recon_bpf(scores):
+    print("=== BPF programs / links / maps ===")
+    progs = ebpf_progs()
+    links = ebpf_links()
+    maps = ebpf_maps()
+    err = progs["error"] or links["error"] or maps["error"]
+    if err:
+        print("  [!] libbpf unavailable: %s" % err)
+        return 0
+
+    names = {}
+    total = 0
+    for p in progs["progs"]:
+        names[p["id"]] = p["name"]
+        vendor = _vendor_for(p["name"], "bpf")
+        if vendor:
+            print(sprintf("  [!] prog id=%-5d type=%-3d name=%-24s vendor=%s",
+                          p["id"], p["type"], p["name"], vendor))
+            _add_score(scores, vendor, 3)
+        total += 1
+    for l in links["links"]:
+        pname = names.get(l["prog_id"], "")
+        vendor = _vendor_for(pname, "bpf")
+        if vendor:
+            print(sprintf("  [!] link id=%-5d prog_id=%-5d prog=%-24s vendor=%s",
+                          l["id"], l["prog_id"], pname, vendor))
+            _add_score(scores, vendor, 3)
+        total += 1
+    for m in maps["maps"]:
+        vendor = _vendor_for(m["name"], "bpf")
+        if vendor:
+            print(sprintf("  [!] map  id=%-5d name=%-24s key=%-4d value=%-4d max=%-6d vendor=%s",
+                          m["id"], m["name"], m["key_size"], m["value_size"], m["max_entries"], vendor))
+            _add_score(scores, vendor, 2)
+        total += 1
+    if total == 0:
+        print("  [*] no BPF objects visible (need CAP_BPF/CAP_SYS_ADMIN)")
+    return total
+
+
 def recon_avail(scores):
     print("=== Available filter functions (EDR module symbols) ===")
     content, path = _read_first(AVAIL_FUNCS)
@@ -400,6 +439,8 @@ def main(*args):
         recon_lsm()
     if "perf" in wanted:
         recon_perf(scores)
+    if "bpf" in wanted:
+        recon_bpf(scores)
     if "avail" in wanted:
         recon_avail(scores)
     print_summary(scores)

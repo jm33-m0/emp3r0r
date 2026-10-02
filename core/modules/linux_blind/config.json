@@ -356,17 +356,17 @@
     "build": "",
     "author": "jm33-ng",
     "date": "2026-09-28",
-    "comment": "Scan for Tetragon/Falco/Cilium eBPF security processes, then freeze, thaw or kill one by PID",
+    "comment": "Scan for Tetragon/Falco/Cilium eBPF security processes, then freeze/thaw/kill one by PID, or enumerate and detach their kernel BPF links via the bundled libbpf loader",
     "is_local": false,
     "platform": "Linux",
     "path": "",
     "parameters": [
       {
         "name": "action",
-        "description": "scan, freeze, thaw, or kill",
+        "description": "scan, ebpf (list kernel BPF objects), detach (drop matching BPF links), freeze, thaw, or kill",
         "default": "scan",
         "type": "cstr",
-        "choices": ["scan", "freeze", "thaw", "kill"],
+        "choices": ["scan", "ebpf", "detach", "freeze", "thaw", "kill"],
         "required": false
       },
       {
@@ -389,7 +389,8 @@
       "files": ["tetragon_blind.star"],
       "type": "starlark"
     },
-    "invocation": {}
+    "invocation": {},
+    "dependencies": ["libbpf"]
   },
   {
     "name": "lkm_unload",

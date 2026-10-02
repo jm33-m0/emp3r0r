@@ -39,7 +39,10 @@ linux_edr_recon --section avail       # opt-in; see caveat below
 ```
 
 Sections: `procs`, `arts` (files/devices), `mods`, `kprobes`, `ftrace`, `lsm`,
-`perf`, and `avail`. Default `all` runs every section except `avail`.
+`perf`, `bpf`, and `avail`. Default `all` runs every section except `avail`.
+The `bpf` section enumerates kernel BPF programs, links and maps through the
+bundled libbpf loader (`ebpf_*` builtins; this module declares
+`dependencies: ["libbpf"]`).
 
 Matches are scored per vendor (processes 10, modules 10, devices 8, artifacts 5,
 kprobe/ftrace hits 2-3), then summarised as LOW / MEDIUM / HIGH confidence.
@@ -72,10 +75,12 @@ Read-only. It reports where the target sits on `dmesg_restrict`,
 
 ## Differences from upstream
 
-- **No `bpf(2)` enumeration.** Furtex's `linux_edr_recon` also walks BPF programs,
-  links and maps via raw `bpf(2)` commands. Driving `union bpf_attr` and the
-  `bpf_prog_info`/`bpf_map_info` layouts from Starlark is error-prone and
-  version-sensitive; it belongs in Go (or a Linux BOF), not a script.
+- **BPF enumeration via libbpf.** Furtex's `linux_edr_recon` walks BPF
+  programs, links and maps via raw `bpf(2)` commands. Here that is done through
+  the bundled libbpf loader (`ebpf_progs()`/`ebpf_links()`/`ebpf_maps()`, backed
+  by `core/lib/libbpf`), so the version-sensitive `union bpf_attr` and
+  `bpf_*_info` layouts live in Go. Needs `CAP_BPF`/`CAP_SYS_ADMIN`, otherwise
+  the section reports an empty set.
 - **No `available_filter_functions` in the default run.** On a full kernel that
   file is tens of megabytes, and `read_file` loads it whole. It is available as
   `--section avail` when the operator accepts the memory cost.

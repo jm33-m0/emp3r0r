@@ -168,10 +168,11 @@ type ResolvedCoffArg struct {
 
 // AgentModuleConfig stores configuration data for the agent side.
 //
-// Only in-process payload kinds are supported: coff (BOF), starlark and dll.
-// Built-in Go modules (listener, file_downloader, ...) use Type "go" with
-// Exec "built-in" and are registered internally, never loaded from config.json.
-// Everything is executed in memory; there is no on-disk/fork-and-run mode.
+// Only in-process payload kinds are supported: coff (BOF), starlark, dll and
+// so (Linux shared-library dependency). Built-in Go modules (listener,
+// file_downloader, ...) use Type "go" with Exec "built-in" and are registered
+// internally, never loaded from config.json. Everything is executed in memory;
+// there is no on-disk/fork-and-run mode.
 type AgentModuleConfig struct {
 	Exec  string   `cbor:"1,keyasint"` // "built-in" for Go modules; unused by payload modules
 	Files []string `cbor:"2,keyasint"` // Files to be uploaded to agent

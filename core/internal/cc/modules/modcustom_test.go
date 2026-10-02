@@ -132,7 +132,7 @@ func TestReadModConfigPartial(t *testing.T) {
 }
 
 func TestReadModConfigRejectsForkRunPayloads(t *testing.T) {
-	for _, payloadType := range []string{"bash", "python", "powershell", "elf", "exe", "so", "go", ""} {
+	for _, payloadType := range []string{"bash", "python", "powershell", "elf", "exe", "go", ""} {
 		t.Run(payloadType, func(t *testing.T) {
 			jsonConfig := `{
 				"name": "bad_mod",

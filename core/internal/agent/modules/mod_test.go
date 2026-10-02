@@ -201,13 +201,22 @@ def main(*args):
 }
 
 func TestModuleHandlerRejectsForkRunPayloads(t *testing.T) {
-	for _, payloadType := range []string{"bash", "python", "powershell", "elf", "exe", "so"} {
+	for _, payloadType := range []string{"bash", "python", "powershell", "elf", "exe"} {
 		path, checksum := createTestModule(t, []byte("payload"))
 		out := ModuleHandler("", path, payloadType, "test_"+payloadType, checksum, def.ResolvedInvocation{})
 		if !strings.Contains(out, "unsupported payload type") {
 			t.Errorf("type %q: expected unsupported-type error, got %q", payloadType, out)
 		}
 	}
+}
+
+func TestModuleHandlerSOIsDependency(t *testing.T) {
+	path, checksum := createTestModule(t, []byte("shared-object-bytes"))
+	out := ModuleHandler("", path, "so", "libbpf", checksum, def.ResolvedInvocation{})
+	if !strings.Contains(out, "shared-library dependency") {
+		t.Errorf("expected shared-library dependency message, got %q", out)
+	}
+	util.RemoveFileAgent("memfs:///libbpf.so")
 }
 
 func TestDownloadAndVerifyModuleRetryLimit(t *testing.T) {

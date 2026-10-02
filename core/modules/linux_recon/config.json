@@ -4,7 +4,7 @@
     "build": "",
     "author": "jm33-ng",
     "date": "2026-09-28",
-    "comment": "Audit local Linux EDR/kernel telemetry: processes, filesystem artifacts, kernel modules, tracefs kprobes/ftrace, LSM stack, perf-attached BPF",
+    "comment": "Audit local Linux EDR/kernel telemetry: processes, filesystem artifacts, kernel modules, tracefs kprobes/ftrace, LSM stack, perf-attached BPF, and kernel BPF programs/links/maps",
     "is_local": false,
     "platform": "Linux",
     "path": "",
@@ -22,7 +22,8 @@
       "files": ["edr_recon.star"],
       "type": "starlark"
     },
-    "invocation": {}
+    "invocation": {},
+    "dependencies": ["libbpf"]
   },
   {
     "name": "linux_env_scrape",

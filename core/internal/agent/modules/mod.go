@@ -60,8 +60,9 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 	invocation.Token = tokenKey
 
 	// switch on payload type, in memory execution. Only in-process payloads
-	// are supported: coff (BOF), starlark and dll. Everything that would
-	// fork-and-run an interpreter or an on-disk executable was removed.
+	// are supported: coff (BOF), starlark, dll and so (Linux shared-library
+	// dependency). Everything that would fork-and-run an interpreter or an
+	// on-disk executable was removed.
 	switch payload_type {
 	case "starlark":
 		err = executeWithToken(invocation.Token, func(token uintptr) error {
@@ -108,8 +109,13 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 			return logging.Sprintf("token impersonation failed: %v", err)
 		}
 		return out
+	case "so":
+		// Shared-library dependency (e.g. libbpf). Cache it under the name the
+		// ebpf_* builtins fetch, but do not try to run it.
+		_ = util.WriteFileAgent("memfs:///"+modName+".so", payload_data, 0o600)
+		return logging.Sprintf("%s is a shared-library dependency; use the ebpf_* script builtins", modName)
 	default:
-		return logging.Sprintf("unsupported payload type %s (supported: coff, starlark, dll)", payload_type)
+		return logging.Sprintf("unsupported payload type %s (supported: coff, starlark, dll, so)", payload_type)
 	}
 }
 

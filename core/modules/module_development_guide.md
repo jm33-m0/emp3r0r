@@ -188,8 +188,8 @@ A manifest is a single module object or an array of module objects.
 
 | Field | Meaning |
 | --- | --- |
-| `type` | `coff`, `starlark`, or `dll`. A manifest with any other type (or an empty type on a non-local module) is rejected at load time. |
-| `files` | Payload files, relative to the module directory. For `starlark`, `files[0]` is the entry script. For `coff`/`dll`, list per-architecture variants (`.x64.o`/`.x86.o`, `x64.dll`/`x86.dll`); the C2 selects by the agent's architecture. |
+| `type` | `coff`, `starlark`, `dll`, or `so`. A manifest with any other type (or an empty type on a non-local module) is rejected at load time. |
+| `files` | Payload files, relative to the module directory. For `starlark`, `files[0]` is the entry script. For `coff`/`dll`/`so`, list per-architecture variants (`.x64.o`/`.x86.o`, `x64.dll`/`x86.dll`, `libbpf.so`); the C2 selects by the agent's architecture. |
 | `exec` | Only meaningful for built-in Go modules, which use `"built-in"`. Custom modules may omit it; the entry is `files[0]`. |
 
 ### `parameters`
@@ -314,6 +314,9 @@ On the agent (`ModuleHandler`):
      Windows, native loader on Linux).
    - `dll` — cache the DLL in memfs, map it, and call its `LoadAndRun` export
      for the BOF named by `dll_entry`.
+   - `so` — a Linux shared-library dependency (e.g. `libbpf`). It is built and
+     hosted for the target architecture and fetched on demand by the `ebpf_*`
+     builtins; invoking it directly reports that it is a dependency.
 
 The agent never extracts a module to disk and never spawns a child process.
 
@@ -415,7 +418,23 @@ These are only available on Linux; on other platforms they return an error.
 | `mem_free(module)` | Unload a module and drop its handle. |
 
 On Linux the loader supports `386`, `amd64`, and `arm64`. Other platforms return a
-"not supported on this platform" error.
+"not supported on this platform" error. Resolving a `.so`'s dynamic dependencies
+(libc, libelf, libz, ...) requires the **shared-object agent** (`stub-<arch>.so`)
+loaded into a process that provides them; the standalone `-static-pie` agent
+does not support dynamic loading.
+
+### eBPF (Linux shared-object agents)
+
+Backed by `core/lib/libbpf`, which maps the `libbpf.so` dependency in memory
+through memmod. Enumeration needs `CAP_BPF`/`CAP_SYS_ADMIN`; without it the
+lists come back empty.
+
+| Function | Description |
+| --- | --- |
+| `ebpf_progs()` | List kernel BPF programs as `{id, type, name, load_time}` dicts. |
+| `ebpf_links()` | List kernel BPF links as `{id, type, prog_id}` dicts. |
+| `ebpf_maps()` | List kernel BPF maps as `{id, type, name, key_size, value_size, max_entries}` dicts. |
+| `ebpf_detach(id)` | Detach the BPF link with the given id. |
 
 ### Signed kernel drivers (Windows)
 
@@ -552,6 +571,7 @@ Pair with the `scshell` BOF to execute an uploaded file on the target.
 | `kkyum/` | Multi-file Starlark module loading a kernel driver from a companion `.sys` cached in memfs (`module_files_memfs`). |
 | `injection/` | Remote thread injection under an operator-selected token. |
 | `coffloader/` | The Windows in-memory COFF loader DLL (`dll` module). |
+| `libbpf/` | Builds a self-contained `libbpf.so` (zig) used by the Go `core/lib/libbpf` loader and the `ebpf_*` builtins. |
 | `loader_windows/` | A local C2 module that builds a self-unpacking loader. |
 | `CS-Situational-Awareness-BOF/` | A large third-party BOF suite imported as-is; every command is a top-level console command with one flag per BOF argument. |
 | `C2-Tool-Collection/` | BOF suite with `choices`/`required` flags and a `make_all.sh` that builds a nested `BOF/` tree. |
@@ -565,7 +585,7 @@ Pair with the `scshell` BOF to execute an uploaded file on the target.
 | --- | --- |
 | `missing COFF invocation data` | `invocation.coff_export` is not set on a `coff` module. |
 | Module registered but never runs; "does not support …" | `platform` does not match the agent OS and is not `Generic`. |
-| Manifest fails to load | A parameter has no `description`, or a non-local module's `agent_config.type` is missing or not `coff`/`starlark`/`dll`. |
+| Manifest fails to load | A parameter has no `description`, or a non-local module's `agent_config.type` is missing or not `coff`/`starlark`/`dll`/`so`. |
 | `option X is required` | The flag was empty and the parameter is `required`. |
 | Starlark receives the wrong values | Starlark parameters are positional strings in declaration order; remember that `argv`/`main` include any `invocation.argv` literals first. |
 | `unknown arg prefix` / `unsupported COFF wire type` | A BOF parameter uses a `type` not listed in §5. |

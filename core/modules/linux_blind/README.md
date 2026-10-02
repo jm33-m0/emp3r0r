@@ -36,7 +36,7 @@ The original MIT notice is retained here as required by that license.
 | `linux_self_delete` | Unlink the running binary from disk | owner |
 | `linux_mount_over` | Bind/tmpfs mounts, read-only remount, file shadowing | `CAP_SYS_ADMIN` |
 | `linux_proc_hide` | Hide a PID from `/proc` via bind mount | `CAP_SYS_ADMIN` |
-| `tetragon_blind` | Scan/freeze/thaw/kill Tetragon, Falco, Cilium | root for freeze/kill |
+| `tetragon_blind` | Scan/freeze/thaw/kill Tetragon, Falco, Cilium; enumerate kernel BPF objects and detach their links | root for freeze/kill; `CAP_BPF` to detach |
 | `lkm_unload` | List/hunt/info/unload kernel modules | `CAP_SYS_MODULE` |
 | `linux_mmap_read` | Read a file via `mmap(2)`, no `read(2)` | unprivileged |
 
@@ -69,6 +69,8 @@ linux_proc_hide --action list
 linux_proc_hide --action unhide --pid 1234
 
 tetragon_blind                                  # scan
+tetragon_blind --action ebpf                    # list kernel BPF programs/links/maps
+tetragon_blind --action detach --pattern falco  # detach matching BPF links
 tetragon_blind --action freeze --pid 1234
 tetragon_blind --action kill --pid 1234
 
@@ -88,11 +90,15 @@ linux_mmap_read --path /etc/shadow --cap 65536
 - **No memfd re-exec.** `linux_self_delete` deletes the running image but does not
   re-exec from a memfd: spawning a child process is not part of the agent
   model. The agent stays resident with no image on disk.
-- **No raw BPF.** `tetragon_blind`'s link-detach and program-enumeration half
-  needs `union bpf_attr` handling that belongs in Go, not Starlark; only the
-  process-level scan/freeze/thaw/kill actions are ported. `freeze`/`thaw` act
-  on the target's existing cgroup v2 (unlike upstream, which creates a
-  dedicated cgroup) and refuse the agent's own cgroup.
+- **BPF enumeration/detach via libbpf.** `tetragon_blind`'s upstream
+  link-detach and program-enumeration half is now available through the bundled
+  libbpf loader: `--action ebpf` lists kernel BPF programs/links/maps and
+  `--action detach` drops links whose program name matches an EDR pattern
+  (`CAP_BPF`/`CAP_SYS_ADMIN` required). Forced detach is best-effort: only
+  detachable link types can be dropped, and the EDR may hold its own
+  reference. `freeze`/`thaw` act on the target's existing cgroup v2 (unlike
+  upstream, which creates a dedicated cgroup) and refuse the agent's own
+  cgroup.
 - **No `utmp` rewrite.** `linux_log_wipe` skips the binary `struct utmp` munging;
   text logs, shell history and `lastlog` cover the common case.
 - **`tracefs`/`path` overrides.** `kprobe_clear` accepts a tracefs root

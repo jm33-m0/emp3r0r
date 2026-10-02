@@ -23,6 +23,7 @@ ARG GARBLE_VERSION=v0.17.0
 RUN yum install -y epel-release \
   && yum install -y --setopt=tsflags=nodocs \
     aria2 \
+    bzip2 \
     ca-certificates \
     clang \
     curl \

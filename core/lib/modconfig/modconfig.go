@@ -131,9 +131,9 @@ func ReadConfigs(file string) (configs []*def.ModuleConfig, err error) {
 		// exempt.
 		if !config.IsLocal {
 			switch strings.ToLower(strings.TrimSpace(config.AgentConfig.Type)) {
-			case "coff", "starlark", "dll":
+			case "coff", "starlark", "dll", "so":
 			default:
-				return nil, fmt.Errorf("module %q: unsupported agent_config.type %q (supported: coff, starlark, dll)", config.Name, config.AgentConfig.Type)
+				return nil, fmt.Errorf("module %q: unsupported agent_config.type %q (supported: coff, starlark, dll, so)", config.Name, config.AgentConfig.Type)
 			}
 		}
 

