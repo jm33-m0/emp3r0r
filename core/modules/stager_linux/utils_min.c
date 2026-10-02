@@ -1,9 +1,9 @@
 #include "syscalls.h"
 #include "utils.h"
 
-/* mmap a dedicated read/write page for the stager's mutable state and bind it
- * to %r15 (see state.h). Uses the embedded syscall gadget directly because the
- * cached vDSO gadget is not resolved yet. */
+/* mmap a dedicated read/write page for the stager's mutable state and install
+ * it as the GS base (see state.h). Uses the embedded syscall gadget directly
+ * because the cached vDSO gadget is not resolved yet. */
 void stager_state_init(void) {
   struct stager_state *st;
   long ret;
@@ -22,13 +22,22 @@ void stager_state_init(void) {
     __builtin_trap();
 
   st = (struct stager_state *)ret;
+  st->self = st;
   st->syscall_gadget = _SYSCALL_GADGET_UNRESOLVED;
   st->dl_ready = 1;
   st->dlopen_ = 0;
   st->dlsym_ = 0;
   st->dlclose_ = 0;
 
-  __asm__ __volatile__("mov %0, %%r15" : : "r"(st) : "r15", "memory");
+  /* Install the block as the GS base so get_stager_state() can find it without
+   * reserving a general-purpose register. */
+  __asm__ __volatile__("call *%1"
+                       : "=a"(ret)
+                       : "r"(gadget), "a"((long)SYS_arch_prctl),
+                         "D"((long)ARCH_SET_GS), "S"((long)st)
+                       : "rcx", "r11", "memory");
+  if (ret < 0)
+    __builtin_trap();
 }
 
 void *memcpy(void *dest, const void *src, size_t n) {

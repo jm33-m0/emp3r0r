@@ -162,6 +162,8 @@
 #define SYS_sysctl 156
 #define SYS_prctl 157
 #define SYS_arch_prctl 158
+/* arch_prctl() selector used to install the stager state block as GS base. */
+#define ARCH_SET_GS 0x1001
 #define SYS_adjtimex 159
 #define SYS_setrlimit 160
 #define SYS_chroot 161
@@ -405,7 +407,7 @@ typedef struct {
  *
  * Stored in the writable runtime state block (see state.h), not in .data: the
  * stager image is mapped RX, so mutable globals must live in the state block
- * bound to %r15 by downloader_main().
+ * installed as the GS base by stager_state_init().
  *
  * Before init_indirect_syscalls() is called, syscall_gadget points to 0x1
  * (invalid). After init, it points to either a vDSO gadget or the embedded
