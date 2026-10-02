@@ -17,7 +17,10 @@ emp3r0r:
 1. downloads zlib and elfutils (`libelf`) at pinned versions and verifies their
    SHA-256 sums;
 2. builds zlib and a PIC, TLS-free `libelf` with zig;
-3. clones libbpf at a pinned commit and builds `libbpf.so` against them.
+3. clones libbpf at a pinned commit and builds `libbpf.so` against them;
+4. strips the shipped object (`-Wl,--strip-all`): `.dynsym` is kept because
+   the in-memory loader resolves imports through it, while `.symtab` and any
+   debug sections are dropped.
 
 `ZIG_TARGET` selects the target (default `x86_64-linux-gnu.2.17`, i.e. the
 same glibc baseline as the builder image). Override it to cross-build for

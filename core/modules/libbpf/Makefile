@@ -40,6 +40,10 @@ JOBS      := $(shell nproc 2>/dev/null || echo 2)
 # emp3r0r bundles zig; use it instead of requiring a system toolchain.
 ZIG    ?= zig
 ZIG_TARGET ?= x86_64-linux-gnu.2.17
+# libbpf probes the target arch with `$(CC) -dumpmachine`, but zig rejects the
+# versioned triple there and logs a spurious error. The result only chooses
+# lib/ vs lib64/ for install paths, so derive it from ZIG_TARGET directly.
+HOSTARCH := $(firstword $(subst -, ,$(ZIG_TARGET)))
 CC     := $(ZIG) cc -target $(ZIG_TARGET)
 AR     := $(ZIG) ar
 RANLIB := $(ZIG) ranlib
@@ -122,13 +126,17 @@ $(SRC_DIR):
 		{ echo "libbpf module: commit mismatch for $(LIBBPF_VERSION)"; rm -rf $@; exit 1; }
 
 $(LIBSO): $(SRC_DIR) $(ZLIB_A) $(ELF_A) Makefile
+	# Force a relink so the strip flag below is always honored; libbpf's make
+	# would otherwise treat an existing .so as up to date.
+	rm -f $(SRC_DIR)/src/libbpf.so $(SRC_DIR)/src/libbpf.so.*
 	$(MAKE) -C $(SRC_DIR)/src -j$(JOBS) \
 		CC='$(CC)' \
 		AR='$(AR)' \
+		HOSTARCH='$(HOSTARCH)' \
 		CFLAGS='$(LIBBPF_CFLAGS)' \
 		NO_PKG_CONFIG=1 \
 		EXTRA_CFLAGS='-I$(abspath $(ELF_SRC))/libelf -I$(abspath $(ZLIB_DIR))/include' \
-		LDFLAGS='-L$(abspath $(ZLIB_DIR))/lib -L$(abspath $(ELF_DIR))/lib'
+		LDFLAGS='-L$(abspath $(ZLIB_DIR))/lib -L$(abspath $(ELF_DIR))/lib -Wl,--strip-all'
 	cp "$$(ls $(SRC_DIR)/src/libbpf.so.1.* | head -n 1)" $@
 
 clean:
