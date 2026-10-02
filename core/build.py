@@ -760,7 +760,13 @@ def build_shared_object(
         env["CC"] = f"zig cc -target {zig_target}"
         env["CXX"] = f"zig c++ -target {zig_target}"
     elif os_name == "linux":
+        # Route every Linux target through zig so all artifacts share one
+        # toolchain and the oldest supported ABI (glibc 2.17). amd64 was
+        # previously omitted here and silently fell back to the builder's
+        # system GCC (manylinux2014 / CentOS 7), an old, differently
+        # configured compiler, which broke the c-shared stub.
         zig_target = {
+            "amd64": "x86_64-linux-gnu.2.17",
             "386": "x86-linux-gnu.2.17",
             "arm": "arm-linux-gnueabihf.2.17",
             "arm64": "aarch64-linux-gnu.2.17",
