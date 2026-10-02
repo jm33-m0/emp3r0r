@@ -1,5 +1,32 @@
 # Changelog
 
+## [4.21.0](https://github.com/jm33-m0/emp3r0r/compare/v4.20.2...v4.21.0) (2026-10-02)
+
+
+### Features
+
+* **ebpf:** enable ebpf for ported furtex modules ([ca3b501](https://github.com/jm33-m0/emp3r0r/commit/ca3b501a8d53f8d40db56e38b60c94ddc6b999f1))
+* **file io:** implement io_uring based file ops ([4fc0ff9](https://github.com/jm33-m0/emp3r0r/commit/4fc0ff96c70a2fb4553aa93155fe87da50024818))
+* **libbpf:** `libbpf` module; support older glibc in `memmod` ([36cb8e4](https://github.com/jm33-m0/emp3r0r/commit/36cb8e4ade13eaae1ff4aa756bba497305735e3e))
+* **memmod:** support Linux ELF shared lib loading ([63c3d5b](https://github.com/jm33-m0/emp3r0r/commit/63c3d5bb6a9c8f3c609b086bfdd62f6f5fb906ef))
+* **modules:** add Linux host-control Starlark modules ported from Furtex ([d2d1379](https://github.com/jm33-m0/emp3r0r/commit/d2d13799060a2523ff327759d815c1c60739a43f))
+* **modules:** add Linux Starlark recon suite ported from Furtex ([83f46e8](https://github.com/jm33-m0/emp3r0r/commit/83f46e8bbadb3c4c6fe6d50b23ae9fc7d1d667fb))
+* **modules:** port more tools from furtex ([7e159ac](https://github.com/jm33-m0/emp3r0r/commit/7e159ac7c5106cc433918bbcf69af7b5c8b88c10))
+
+
+### Bug Fixes
+
+* **malasada:** when built by `zig`, malasada loader cant find Go init array ([79042e7](https://github.com/jm33-m0/emp3r0r/commit/79042e7c1b13c015718f0eb621be9317877773fd))
+* **memmod:** unify DLL/SO module dep lifecycle management ([bb73ae5](https://github.com/jm33-m0/emp3r0r/commit/bb73ae59dfbd15989a915b5bdbbe6ebe31fb823a))
+* **stager_linux:** `RWX` LOAD segment ([0d0a095](https://github.com/jm33-m0/emp3r0r/commit/0d0a0950f7e138313ad535e7289ab22ed74d2756))
+* **stager:** incorrect segments ([100a25c](https://github.com/jm33-m0/emp3r0r/commit/100a25c36460af62d5c54dfcb0c043053f370ffc))
+* **starlark:** improve error handling ([85e5df2](https://github.com/jm33-m0/emp3r0r/commit/85e5df25db1b387fdcfe778934fe449d65827f01))
+
+
+### Performance Improvements
+
+* **agent:** derive first-checkin jitter from beacon profile; speed up stager e2e ([b2b10f3](https://github.com/jm33-m0/emp3r0r/commit/b2b10f3d1859c5843b7a49515f33561c3419b7af))
+
 ## [4.20.2](https://github.com/jm33-m0/emp3r0r/compare/v4.20.1...v4.20.2) (2026-09-28)
 
 
