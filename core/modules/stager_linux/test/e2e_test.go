@@ -29,6 +29,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/jobs"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/server"
@@ -39,7 +40,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/listener"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	"github.com/sliverarmory/malasada"
 )
 
 // stagerOpts controls which stager variant build.sh produces.
@@ -153,24 +153,34 @@ func buildAgentSharedLibrary(t *testing.T) string {
 			return
 		}
 		outPath := filepath.Join(dir, "agent.so")
-		// Parameters mirror build.sh's build_shared_object() for linux/amd64:
+		// Build with the same toolchain as core/build.py build_shared_object(),
+		// not the host default compiler: zig cc pinned to glibc 2.17. lld leaves
+		// the amd64 .init_array addend only in the RELA entry, which
+		// tools.ConvertSharedObjectToShellcode materializes before malasada
+		// reads the array. Testing with plain host gcc would miss both.
 		//   - tags:       "release emp3r0r_so"
 		//   - -buildmode c-shared
+		//   - CC:         zig cc -target x86_64-linux-gnu.2.17
 		//   - ldflags:    -s -w -linkmode external
-		//   - extldflags: -Wl,--gc-sections -s
+		//   - extldflags: -s -Wl,--gc-sections  (libc stays linked: the cgo
+		//     runtime and memmod need symbols such as `environ`)
 		// "emp3r0r_so" activates main_cgo_shared.go which exports the `main`
 		// symbol that malasada's stage0 calls after reflective loading.
+		if _, lookErr := exec.LookPath("zig"); lookErr != nil {
+			agentSOErr = fmt.Errorf("zig is required to build the real agent shared object: %w", lookErr)
+			return
+		}
 		cmdBuildAgent := exec.Command(
 			"go", "build",
 			"-buildmode=c-shared",
 			"-tags", "release emp3r0r_so",
 			"-trimpath",
 			"-buildvcs=false",
-			"-ldflags", "-s -w -linkmode external -extldflags '-Wl,--gc-sections -s'",
+			"-ldflags", "-s -w -linkmode external -extldflags '-s -Wl,--gc-sections'",
 			"-o", outPath,
 			"../../../cmd/agent",
 		)
-		cmdBuildAgent.Env = append(os.Environ(), "CGO_ENABLED=1")
+		cmdBuildAgent.Env = append(os.Environ(), "CGO_ENABLED=1", "CC=zig cc -target x86_64-linux-gnu.2.17")
 		buildOut, err := cmdBuildAgent.CombinedOutput()
 		if err != nil {
 			agentSOErr = fmt.Errorf("build agent shared library: %w\nOutput: %s", err, buildOut)
@@ -557,9 +567,9 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	// The stage0 entry convention matches downloader.c:
 	//   typedef void (*stage1_entry)(void *base_addr, size_t total_size);
 	// -----------------------------------------------------------------------
-	malasadaPayload, err := malasada.ConvertSharedObject(patchedSOPath, "main", true)
+	malasadaPayload, err := tools.ConvertSharedObjectToShellcode(patchedSOPath, "main", true)
 	if err != nil {
-		t.Fatalf("malasada.ConvertSharedObject failed: %v", err)
+		t.Fatalf("tools.ConvertSharedObjectToShellcode failed: %v", err)
 	}
 	logging.Infof("Malasada payload size: %d bytes", len(malasadaPayload))
 
