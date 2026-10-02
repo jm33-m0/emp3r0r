@@ -2,6 +2,11 @@
 
 In-memory shared-library loader: PE DLLs on Windows, ELF `.so` on Linux.
 
+Lifetime management for loaded dependency images lives one layer up, in
+[`core/lib/memdeps`](../memdeps/README.md): it maps a dependency, runs the
+operation that needs it, and unmaps before returning, so no DLL/SO stays
+resident after its user has finished.
+
 This package is built on the work of two upstream projects:
 
 - **[WireGuard](https://github.com/WireGuard/wireguard-windows)** — original `memmod` PE loader (MIT).

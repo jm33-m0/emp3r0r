@@ -8,13 +8,16 @@ operator invokes that command the C2 hosts the payload, sends the agent a
 
 There are two kinds of modules:
 
-- **Agent modules** run on the target. `agent_config.type` must be one of:
+- **Agent modules** run on the target. `agent_config.type` is one of:
   - `coff` — a Windows COFF/BOF or Linux relocatable object,
-  - `starlark` — a script for the embedded Starlark engine, or
-  - `dll` — a Windows DLL mapped into the agent process.
+  - `starlark` — a script for the embedded Starlark engine,
+  - `dll` — a Windows DLL mapped into the agent process, or
+  - `so` — a Linux shared-library dependency used by other modules.
 
   The payload is never written to disk and no interpreter or child process is
-  spawned on the target.
+  spawned on the target. DLL/SO modules can also be declared as `dependencies`
+  of another module; see §8.
+
 - **C2 modules** (`"is_local": true`) run on the operator host. They execute
   their `build` command on the C2 and are used to produce payloads
   (`loader_windows`, `stager_linux`, `crystal_pack`). They have no
@@ -115,9 +118,9 @@ hello_linux --who friend
 - `agent_config.files` may list several architecture variants
   (`foo.x64.o`, `foo.x86.o`). The C2 picks the one matching the target agent's
   architecture and hosts it as `<name>.<arch>.gz`.
-- On Windows the agent executes the BOF through the in-memory `coffloader`
-  DLL; `coffloader` is added to `dependencies` automatically for Windows BOFs.
-- On Linux the BOF runs through the native ELF object loader.
+- On Windows the agent runs the BOF through the `coffloader` dependency, which
+  is added to `dependencies` automatically. On Linux it runs through the native
+  ELF object loader. See §8 for how dependencies are mapped and unmapped.
 
 ---
 
@@ -169,56 +172,56 @@ A manifest is a single module object or an array of module objects.
 
 ### Top-level fields
 
-| Field | Required | Meaning |
-| --- | --- | --- |
-| `name` | yes | Console command name. Must be unique. |
-| `comment` | strongly recommended | One-line description shown in module help and `search`. |
-| `author`, `date` | no | Metadata only. |
-| `is_local` | no (default `false`) | `true` runs the module on the C2 instead of dispatching to an agent. |
-| `platform` | yes for agent modules | `Linux`, `Windows`, or `Generic` (case-insensitive). At run time the C2 rejects the module unless it matches the agent's OS or is `Generic`. |
-| `path` | no | Filled in by the C2 with the module's working copy. Leave empty. |
-| `build` | no | Shell command the C2 runs in the module directory on **every invocation**, with the current flags appended as `--name 'value'` (sorted by name). Required for local modules; also usable to rebuild a payload before dispatch. |
-| `dependencies` | no | Module names whose payloads must be hosted for the target architecture before dispatch. Windows `coff` modules get `coffloader` added automatically. |
-| `module_files_memfs` | no | `starlark` only: upload every file in `agent_config.files` except the entry script to encrypted memfs and expose the paths to the script as `module_files`. |
-| `parameters` | no | Command options (see below). |
-| `agent_config` | agent modules | Payload configuration. |
-| `invocation` | no | How parameters become argv / BOF / DLL calls. |
+| Field                | Required              | Meaning                                                                                                                                                                                                                        |
+| -------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `name`               | yes                   | Console command name. Must be unique.                                                                                                                                                                                          |
+| `comment`            | strongly recommended  | One-line description shown in module help and `search`.                                                                                                                                                                        |
+| `author`, `date`     | no                    | Metadata only.                                                                                                                                                                                                                 |
+| `is_local`           | no (default `false`)  | `true` runs the module on the C2 instead of dispatching to an agent.                                                                                                                                                           |
+| `platform`           | yes for agent modules | `Linux`, `Windows`, or `Generic` (case-insensitive). At run time the C2 rejects the module unless it matches the agent's OS or is `Generic`.                                                                                   |
+| `path`               | no                    | Filled in by the C2 with the module's working copy. Leave empty.                                                                                                                                                               |
+| `build`              | no                    | Shell command the C2 runs in the module directory on **every invocation**, with the current flags appended as `--name 'value'` (sorted by name). Required for local modules; also usable to rebuild a payload before dispatch. |
+| `dependencies`       | no                    | Other modules whose DLL/SO payloads must be hosted for the target architecture before dispatch (see §8). Windows `coff` modules get `coffloader` added automatically.                                                          |
+| `module_files_memfs` | no                    | `starlark` only: upload every file in `agent_config.files` except the entry script to encrypted memfs and expose the paths to the script as `module_files`.                                                                    |
+| `parameters`         | no                    | Command options (see below).                                                                                                                                                                                                   |
+| `agent_config`       | agent modules         | Payload configuration.                                                                                                                                                                                                         |
+| `invocation`         | no                    | How parameters become argv / BOF / DLL calls.                                                                                                                                                                                  |
 
 ### `agent_config`
 
-| Field | Meaning |
-| --- | --- |
-| `type` | `coff`, `starlark`, `dll`, or `so`. A manifest with any other type (or an empty type on a non-local module) is rejected at load time. |
+| Field   | Meaning                                                                                                                                                                                                                                                   |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `type`  | `coff`, `starlark`, `dll`, or `so`. A manifest with any other type (or an empty type on a non-local module) is rejected at load time.                                                                                                                     |
 | `files` | Payload files, relative to the module directory. For `starlark`, `files[0]` is the entry script. For `coff`/`dll`/`so`, list per-architecture variants (`.x64.o`/`.x86.o`, `x64.dll`/`x86.dll`, `libbpf.so`); the C2 selects by the agent's architecture. |
-| `exec` | Only meaningful for built-in Go modules, which use `"built-in"`. Custom modules may omit it; the entry is `files[0]`. |
+| `exec`  | Only meaningful for built-in Go modules, which use `"built-in"`. Custom modules may omit it; the entry is `files[0]`.                                                                                                                                     |
 
 ### `parameters`
 
 Each parameter becomes a `--name` flag on the generated console command and a
 value in the module invocation.
 
-| Field | Meaning |
-| --- | --- |
-| `name` | Flag name, used as `--name value`. |
-| `description` | Help text. **Required** — a parameter without a description makes the whole manifest fail to load. |
-| `default` | Value used when the operator omits the flag. |
-| `type` | Value type and, for BOFs, wire format (see §5). For `starlark` this is informational; scripts receive raw strings. |
-| `required` | Reject the invocation when the value is empty. Enforced for every module type. |
-| `choices` | Restrict the value to one of a fixed list. Enforced for `coff`/`dll`, **not** for `starlark`. |
-| `min`, `max` | Numeric bounds, enforced for `int`/`uint`/`short` on `coff`/`dll` modules. Not enforced for `starlark`. |
-| `argv_flag` | Prefix inserted before the value when building the argv list, e.g. `--user`. Only affects `starlark`; BOF arguments are packed from the type, not argv. |
+| Field         | Meaning                                                                                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`        | Flag name, used as `--name value`.                                                                                                                      |
+| `description` | Help text. **Required** — a parameter without a description makes the whole manifest fail to load.                                                      |
+| `default`     | Value used when the operator omits the flag.                                                                                                            |
+| `type`        | Value type and, for BOFs, wire format (see §5). For `starlark` this is informational; scripts receive raw strings.                                      |
+| `required`    | Reject the invocation when the value is empty. Enforced for every module type.                                                                          |
+| `choices`     | Restrict the value to one of a fixed list. Enforced for `coff`/`dll`, **not** for `starlark`.                                                           |
+| `min`, `max`  | Numeric bounds, enforced for `int`/`uint`/`short` on `coff`/`dll` modules. Not enforced for `starlark`.                                                 |
+| `argv_flag`   | Prefix inserted before the value when building the argv list, e.g. `--user`. Only affects `starlark`; BOF arguments are packed from the type, not argv. |
 
 Avoid the name `help` for a parameter: it collides with the built-in
 `--help` flag.
 
 ### `invocation`
 
-| Field | Meaning |
-| --- | --- |
-| `argv` | Literal tokens prepended to the argument list, e.g. `[{"literal": "download"}]` for a script that dispatches on its first argument. Parameters are appended after these in declaration order. `starlark` only. |
-| `coff_export` | BOF entry point. Required for `coff` modules. Use `go` for Beacon-compatible BOFs. |
-| `dll_entry` | BOF entry point used by a `dll` module's loader. Defaults to `go`. |
-| `dll_file_param` | Name of the parameter that holds the BOF file path to run under a `dll` module. Defaults to `file`. |
+| Field            | Meaning                                                                                                                                                                                                        |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `argv`           | Literal tokens prepended to the argument list, e.g. `[{"literal": "download"}]` for a script that dispatches on its first argument. Parameters are appended after these in declaration order. `starlark` only. |
+| `coff_export`    | BOF entry point. Required for `coff` modules. Use `go` for Beacon-compatible BOFs.                                                                                                                             |
+| `dll_entry`      | BOF entry point used by a `dll` module's loader. Defaults to `go`.                                                                                                                                             |
+| `dll_file_param` | Name of the parameter that holds the BOF file path to run under a `dll` module. Defaults to `file`.                                                                                                            |
 
 The in-memory DLL loader always calls the DLL's `LoadAndRun` export; it is not
 configurable.
@@ -231,13 +234,13 @@ For `coff` and `dll` modules the parameter `type` drives both C2-side
 validation and COFF argument packing. Arguments are packed in declaration
 order.
 
-| Type value | Wire token | Packed as |
-| --- | --- | --- |
-| `int`, `int32`, `uint32`, `uint`, `dword`, `port`, `bool` | `i` | 32-bit integer |
-| `short`, `int16`, `word` | `s` | 16-bit integer |
-| `cstr`, `string`, `str`, `lpstr` | `z` | UTF-8 C string |
-| `wstr`, `wstring`, `lpwstr`, `w` | `Z` | UTF-16LE wide string |
-| `binary`, `base64` | `b` | Length-prefixed binary blob (base64-decoded when possible) |
+| Type value                                                | Wire token | Packed as                                                  |
+| --------------------------------------------------------- | ---------- | ---------------------------------------------------------- |
+| `int`, `int32`, `uint32`, `uint`, `dword`, `port`, `bool` | `i`        | 32-bit integer                                             |
+| `short`, `int16`, `word`                                  | `s`        | 16-bit integer                                             |
+| `cstr`, `string`, `str`, `lpstr`                          | `z`        | UTF-8 C string                                             |
+| `wstr`, `wstring`, `lpwstr`, `w`                          | `Z`        | UTF-16LE wide string                                       |
+| `binary`, `base64`                                        | `b`        | Length-prefixed binary blob (base64-decoded when possible) |
 
 The single-character tokens `z`, `Z`, `i`, `s`, `b` are also accepted.
 An unrecognized type is not validated at load time but makes the in-memory
@@ -294,10 +297,15 @@ On the C2 (`moduleCustom`):
 3. Resolve and validate the invocation from the console flags.
 4. Pre-host every `dependencies` payload for the target architecture so a
    missing dependency fails fast.
-5. Compress the selected payload with gzip into `WWWRoot` and send the agent:
-   `!custom_module --mod_name <name> --type <type> \
-   --file_to_download <hosted.gz> --checksum <sha256> \
-   --invocation <base64 CBOR> [--peer <ip>]`.
+5. Compress the selected payload with gzip into `WWWRoot` and send the agent a
+   `!custom_module` job:
+
+   ```text
+   !custom_module --mod_name <name> --type <type> \
+     --file_to_download <hosted.gz> --checksum <sha256> \
+     --invocation <base64 CBOR> [--peer <ip>]
+   ```
+
    For a multi-file Starlark module (`module_files_memfs`), the companion
    files are hosted too and listed in the invocation.
 
@@ -310,19 +318,82 @@ On the agent (`ModuleHandler`):
 4. Resolve `--token` / `--user` / `--ticket` into a token context (Windows).
 5. Dispatch by `--type`:
    - `starlark` — `script.Run(payload, argv, {module_files}, token)`.
-   - `coff` — run the COFF through the in-memory loader (COFFLoader DLL on
-     Windows, native loader on Linux).
-   - `dll` — cache the DLL in memfs, map it, and call its `LoadAndRun` export
-     for the BOF named by `dll_entry`.
-   - `so` — a Linux shared-library dependency (e.g. `libbpf`). It is built and
-     hosted for the target architecture and fetched on demand by the `ebpf_*`
-     builtins; invoking it directly reports that it is a dependency.
+   - `coff` — run the BOF through the in-memory `coffloader` dependency
+     (Windows) or the native ELF loader (Linux).
+   - `dll` — map the DLL and call its `LoadAndRun` export for the BOF named by
+     `dll_entry`.
+   - `so` — a shared-library dependency (e.g. `libbpf`). It is fetched on
+     demand by the `ebpf_*` builtins; invoking it directly reports that it is a
+     dependency.
 
 The agent never extracts a module to disk and never spawns a child process.
+Dependency mapping and teardown are covered in §8.
 
 ---
 
-## 8. Starlark API
+## 8. Dependency modules (DLL/SO)
+
+A module may declare `dependencies`: other modules whose payload is a DLL
+(`.dll`) or shared object (`.so`) rather than something that runs on its own.
+Windows `coff` modules always depend on `coffloader`; Linux eBPF modules depend
+on `libbpf`.
+
+The C2 only builds and hosts each dependency as `<name>.<arch>.gz`; the agent
+decides when to map it. That decision lives in one place — **`core/lib/memdeps`**
+— so every dependency follows the same rule: **map on use, unmap on return.**
+A dependency image is never left resident in cleartext once the operation that
+needed it has finished.
+
+### Resolution
+
+The agent wires the resolver once, in `core/internal/agent/modules/mod.go`:
+
+```go
+func init() {
+	memdeps.SetResolver(fetchDependency)
+}
+```
+
+`fetchDependency` checks the encrypted memfs cache first
+(`memfs:///<name>.dll` on Windows, `memfs:///<name>.so` elsewhere), then
+downloads and decompresses the C2-hosted `<name>.<arch>.gz` and writes it back
+to memfs. The extension comes from `dependencyExt()`. Bytes are never stored in
+the clear.
+
+### Mapping
+
+`memdeps` exposes two entry points:
+
+| Function                | Behavior                                                               |
+| ----------------------- | ---------------------------------------------------------------------- |
+| `memdeps.Use(name, fn)` | Resolve the named dependency, map it, run `fn(*memmod.Module)`, unmap. |
+| `memdeps.Run(data, fn)` | Map caller-supplied bytes, run `fn`, unmap.                            |
+
+Both map with `memmod.LoadLibrary` and **unconditionally** `defer module.Free()`
+around the callback, so the image is released on success, on error, and on
+panic. The `*memmod.Module` passed to `fn` is valid only inside the callback and
+must not escape; the raw bytes stay in memfs and are re-fetched on demand.
+
+Every dependency consumer goes through this layer:
+
+| Consumer                           | Path                                                            |
+| ---------------------------------- | --------------------------------------------------------------- |
+| Windows `coff` modules             | `coffloader.RunCOFFDependency` → `memdeps.Use("coffloader", …)` |
+| `dll` modules / explicit DLL bytes | `coffloader.RunWindowsCOFFViaDLL` → `memdeps.Run(dllData, …)`   |
+| Linux eBPF builtins                | `libbpf.WithLibrary` → `memdeps.Use("libbpf", …)`               |
+
+Scripts that map a library themselves with `mem_load_library` are covered too:
+their handles live in a per-run registry (`runModules` in
+`core/lib/script/api_mem_native.go`), and `script.Run` calls `releaseRunModules`
+before returning, freeing anything the script did not `mem_free`. See
+`core/lib/memdeps/README.md` for the package-level details.
+
+The point of the indirection is that no caller can hold a mapping it might
+cache; a dependency image exists only while its user is executing.
+
+---
+
+## 9. Starlark API
 
 Starlark is a small deterministic Python dialect. The agent embeds the engine,
 so no interpreter is installed on the target. There is no standard library and
@@ -330,39 +401,39 @@ so no interpreter is installed on the target. There is no standard library and
 
 ### Strings
 
-| Function | Description |
-| --- | --- |
-| `sprintf(format, *args)` | `fmt.Sprintf` formatting (`%016x`, `%-30s`, ...). |
-| `hex(value)` | Integer to a `0x...` string. |
-| `str_split(s, sep)` | Split into a list. |
-| `str_join(elements, sep)` | Join any iterable of strings. |
-| `str_replace(s, old, new, n=-1)` | Replace up to `n` occurrences. |
-| `str_contains(s, substr)` | Substring test. |
-| `str_trim(s, cutset="")` | Trim whitespace, or any character in `cutset`. |
-| `str_lower(s)`, `str_upper(s)` | Case conversion. |
-| `str_startswith(s, prefix)`, `str_endswith(s, suffix)` | Prefix/suffix test. |
-| `str_pad(text, width)`, `pad(text, width)` | Pad to a column width; right for positive `width`, left for negative. |
-| `str_index(s, substr)` | Index of a substring, or `-1`. |
+| Function                                               | Description                                                           |
+| ------------------------------------------------------ | --------------------------------------------------------------------- |
+| `sprintf(format, *args)`                               | `fmt.Sprintf` formatting (`%016x`, `%-30s`, ...).                     |
+| `hex(value)`                                           | Integer to a `0x...` string.                                          |
+| `str_split(s, sep)`                                    | Split into a list.                                                    |
+| `str_join(elements, sep)`                              | Join any iterable of strings.                                         |
+| `str_replace(s, old, new, n=-1)`                       | Replace up to `n` occurrences.                                        |
+| `str_contains(s, substr)`                              | Substring test.                                                       |
+| `str_trim(s, cutset="")`                               | Trim whitespace, or any character in `cutset`.                        |
+| `str_lower(s)`, `str_upper(s)`                         | Case conversion.                                                      |
+| `str_startswith(s, prefix)`, `str_endswith(s, suffix)` | Prefix/suffix test.                                                   |
+| `str_pad(text, width)`, `pad(text, width)`             | Pad to a column width; right for positive `width`, left for negative. |
+| `str_index(s, substr)`                                 | Index of a substring, or `-1`.                                        |
 
 Starlark's native `%` string formatting and `"".join(...)` also work; the
 helpers above are convenience wrappers.
 
 ### Files and network
 
-| Function | Description |
-| --- | --- |
-| `read_file(path, default=...)` | Read a file as a string. `memfs:///` paths hit encrypted memfs. If `default` is given, it is returned instead of raising on a read error, which is useful for best-effort reads (Starlark has no `try`/`except`). |
-| `write_file(path, content)` | Write a text file (mode `0644`). |
-| `write_bytes(path, data)` | Write string/bytes; returns the number of bytes written. |
-| `list_dir(path)` | List a real directory merged with memfs keys under the path. |
-| `exists(path)` | Whether a path exists. |
-| `mkdir(path)` | Create directories on the real filesystem (no memfs equivalent). |
-| `remove(path)` | Delete a file/directory (memfs-aware). |
-| `read_link(path, default=...)` | Target of a symlink, e.g. a `/proc/<pid>/ns` entry. With `default`, a vanished or racy symlink returns the default instead of raising (Starlark has no `try`/`except`). |
-| `http_get(url)` | HTTP GET, returns the response body as a string. |
-| `http_post(url, content_type, body)` | HTTP POST with a string body, returns the response body. |
-| `crypto_hash(algo, data)` | Hex digest; `algo` is `md5`, `sha1`, or `sha256`. |
-| `bytes_to_b64(data)` / `b64_to_bytes(b64)` | Binary-safe base64 round trip. |
+| Function                                   | Description                                                                                                                                                                                                       |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `read_file(path, default=...)`             | Read a file as a string. `memfs:///` paths hit encrypted memfs. If `default` is given, it is returned instead of raising on a read error, which is useful for best-effort reads (Starlark has no `try`/`except`). |
+| `write_file(path, content)`                | Write a text file (mode `0644`).                                                                                                                                                                                  |
+| `write_bytes(path, data)`                  | Write string/bytes; returns the number of bytes written.                                                                                                                                                          |
+| `list_dir(path)`                           | List a real directory merged with memfs keys under the path.                                                                                                                                                      |
+| `exists(path)`                             | Whether a path exists.                                                                                                                                                                                            |
+| `mkdir(path)`                              | Create directories on the real filesystem (no memfs equivalent).                                                                                                                                                  |
+| `remove(path)`                             | Delete a file/directory (memfs-aware).                                                                                                                                                                            |
+| `read_link(path, default=...)`             | Target of a symlink, e.g. a `/proc/<pid>/ns` entry. With `default`, a vanished or racy symlink returns the default instead of raising (Starlark has no `try`/`except`).                                           |
+| `http_get(url)`                            | HTTP GET, returns the response body as a string.                                                                                                                                                                  |
+| `http_post(url, content_type, body)`       | HTTP POST with a string body, returns the response body.                                                                                                                                                          |
+| `crypto_hash(algo, data)`                  | Hex digest; `algo` is `md5`, `sha1`, or `sha256`.                                                                                                                                                                 |
+| `bytes_to_b64(data)` / `b64_to_bytes(b64)` | Binary-safe base64 round trip.                                                                                                                                                                                    |
 
 ### Memory reads
 
@@ -385,22 +456,22 @@ holding an encoded NUL-terminated copy of `s` and return its address.
 
 ### Windows interop
 
-| Function | Description |
-| --- | --- |
-| `win_call(dll, function, *args)` | Call an exported DLL function. Arguments may be int, string (passed as a UTF-16 pointer), bool, or `None`. Returns a dict `{r1, r2, err_code, error}`. |
-| `win_alloc(size)` / `win_free(address)` | `VirtualAlloc`/`VirtualFree`; `win_free(0)` is a no-op. |
-| `win_read_mem(address, size)` | Read process memory as a list of byte values. |
-| `current_token()` | Handle to the current effective token (thread token, then process token); `0` on failure. Close it with `win_call("kernel32.dll", "CloseHandle", h)`. |
+| Function                                | Description                                                                                                                                            |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `win_call(dll, function, *args)`        | Call an exported DLL function. Arguments may be int, string (passed as a UTF-16 pointer), bool, or `None`. Returns a dict `{r1, r2, err_code, error}`. |
+| `win_alloc(size)` / `win_free(address)` | `VirtualAlloc`/`VirtualFree`; `win_free(0)` is a no-op.                                                                                                |
+| `win_read_mem(address, size)`           | Read process memory as a list of byte values.                                                                                                          |
+| `current_token()`                       | Handle to the current effective token (thread token, then process token); `0` on failure. Close it with `win_call("kernel32.dll", "CloseHandle", h)`.  |
 
 These are only meaningful on Windows; on other platforms they return an error.
 
 ### Linux syscalls
 
-| Function | Description |
-| --- | --- |
-| `sys_call(number_or_name, *args)` | `syscall.Syscall6`; accepts up to 6 arguments. Strings become C strings, lists become byte buffers. Returns `{r1, r2, errno, error}`. |
-| `sys_alloc(size)` / `sys_free(address)` | Anonymous `mmap`/`munmap`; `sys_free` only frees addresses returned by `sys_alloc`. |
-| `sys_read_mem(address, size)` | Read memory as a list of byte values. |
+| Function                                | Description                                                                                                                           |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `sys_call(number_or_name, *args)`       | `syscall.Syscall6`; accepts up to 6 arguments. Strings become C strings, lists become byte buffers. Returns `{r1, r2, errno, error}`. |
+| `sys_alloc(size)` / `sys_free(address)` | Anonymous `mmap`/`munmap`; `sys_free` only frees addresses returned by `sys_alloc`.                                                   |
+| `sys_read_mem(address, size)`           | Read memory as a list of byte values.                                                                                                 |
 
 Aliases: `lin_syscall`/`linux_syscall`, `lin_alloc`/`linux_alloc`,
 `lin_free`/`linux_free`, `lin_read_mem`/`linux_read_mem`.
@@ -409,13 +480,16 @@ These are only available on Linux; on other platforms they return an error.
 
 ### In-memory shared libraries (Windows and Linux)
 
-| Function | Description |
-| --- | --- |
+| Function                                    | Description                                                                                                                                       |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `mem_load_library(data)` / `mem_load(data)` | Map a shared library image into the current process; returns its base address as a handle. Accepts a PE DLL on Windows and an ELF `.so` on Linux. |
-| `mem_proc_address(module, name)` | Address of a named export. |
-| `mem_proc_ordinal(module, ordinal)` | Address of an export by ordinal (Windows only; ELF libraries have no ordinal table). |
-| `mem_base_addr(module)` | Base address of a loaded module. |
-| `mem_free(module)` | Unload a module and drop its handle. |
+| `mem_proc_address(module, name)`            | Address of a named export.                                                                                                                        |
+| `mem_proc_ordinal(module, ordinal)`         | Address of an export by ordinal (Windows only; ELF libraries have no ordinal table).                                                              |
+| `mem_base_addr(module)`                     | Base address of a loaded module.                                                                                                                  |
+| `mem_free(module)`                          | Unload a module and drop its handle.                                                                                                              |
+
+A library the script does not `mem_free` is released by `releaseRunModules`
+when the run ends (see §8), so a mapped DLL/SO never outlives its user.
 
 On Linux the loader supports `386`, `amd64`, and `arm64`. Other platforms return a
 "not supported on this platform" error. Resolving a `.so`'s dynamic dependencies
@@ -425,26 +499,26 @@ does not support dynamic loading.
 
 ### eBPF (Linux shared-object agents)
 
-Backed by `core/lib/libbpf`, which maps the `libbpf.so` dependency in memory
-through memmod. Enumeration needs `CAP_BPF`/`CAP_SYS_ADMIN`; without it the
-lists come back empty.
+Backed by `core/lib/libbpf`, whose `WithLibrary` maps the `libbpf` dependency
+through `memdeps` for the duration of each builtin call (see §8). Enumeration
+needs `CAP_BPF`/`CAP_SYS_ADMIN`; without it the lists come back empty.
 
-| Function | Description |
-| --- | --- |
-| `ebpf_progs()` | List kernel BPF programs as `{id, type, name, load_time}` dicts. |
-| `ebpf_links()` | List kernel BPF links as `{id, type, prog_id}` dicts. |
-| `ebpf_maps()` | List kernel BPF maps as `{id, type, name, key_size, value_size, max_entries}` dicts. |
-| `ebpf_detach(id)` | Detach the BPF link with the given id. |
+| Function          | Description                                                                          |
+| ----------------- | ------------------------------------------------------------------------------------ |
+| `ebpf_progs()`    | List kernel BPF programs as `{id, type, name, load_time}` dicts.                     |
+| `ebpf_links()`    | List kernel BPF links as `{id, type, prog_id}` dicts.                                |
+| `ebpf_maps()`     | List kernel BPF maps as `{id, type, name, key_size, value_size, max_entries}` dicts. |
+| `ebpf_detach(id)` | Detach the BPF link with the given id.                                               |
 
 ### Signed kernel drivers (Windows)
 
-| Function | Description |
-| --- | --- |
-| `driver_load(path, name)` | Install and start a signed `.sys` from an absolute path. |
+| Function                        | Description                                                          |
+| ------------------------------- | -------------------------------------------------------------------- |
+| `driver_load(path, name)`       | Install and start a signed `.sys` from an absolute path.             |
 | `driver_load_bytes(data, name)` | Drop the image to `System32\drivers`, load it, then delete the file. |
-| `driver_unload(name)` | Stop the driver and remove its service key. |
-| `driver_is_loaded(name)` | Whether the service key exists. |
-| `driver_is_signed(path)` | Offline Authenticode check with `WinVerifyTrust`. |
+| `driver_unload(name)`           | Stop the driver and remove its service key.                          |
+| `driver_is_loaded(name)`        | Whether the service key exists.                                      |
+| `driver_is_signed(path)`        | Offline Authenticode check with `WinVerifyTrust`.                    |
 
 Only signed drivers are supported; no DSE bypass is attempted. On non-Windows
 platforms these return a "not supported" error.
@@ -454,16 +528,16 @@ platforms these return a "not supported" error.
 Every function is available both as `agent.foo()` and as a top-level
 `agent_foo()` alias:
 
-| Function | Description |
-| --- | --- |
-| `sys_info()` | Dictionary of agent details (`tag`, `uuid`, `os`, `goos`, `arch`, `user`, `has_root`, `process`, `cwd`, `ips`, ...). |
-| `uptime()` | Uptime string. |
-| `user()` | Dict `{user, groups}`. |
-| `container()` | Container name, or empty. |
-| `has_root()` | Whether the agent is root/SYSTEM. |
-| `sign(data)` | Sign with the agent's ephemeral key; returns bytes. |
-| `tag()`, `uuid()` | Agent identifiers. |
-| `touch_file(path)` | Sync a file's timestamps with its source. |
+| Function                                                      | Description                                                                                                                           |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `sys_info()`                                                  | Dictionary of agent details (`tag`, `uuid`, `os`, `goos`, `arch`, `user`, `has_root`, `process`, `cwd`, `ips`, ...).                  |
+| `uptime()`                                                    | Uptime string.                                                                                                                        |
+| `user()`                                                      | Dict `{user, groups}`.                                                                                                                |
+| `container()`                                                 | Container name, or empty.                                                                                                             |
+| `has_root()`                                                  | Whether the agent is root/SYSTEM.                                                                                                     |
+| `sign(data)`                                                  | Sign with the agent's ephemeral key; returns bytes.                                                                                   |
+| `tag()`, `uuid()`                                             | Agent identifiers.                                                                                                                    |
+| `touch_file(path)`                                            | Sync a file's timestamps with its source.                                                                                             |
 | `fetch_file(file_to_download, peer="", path="", checksum="")` | Fetch a file through the memfs/P2P/C2 pipeline. Returns bytes, or `None` when `path` is supplied (the file is written there instead). |
 
 ### Globals
@@ -487,25 +561,25 @@ non-`None` return value are sent back to the operator. A script that returns
 
 ---
 
-## 9. Windows identity: tokens, sessions, and tickets
+## 10. Windows identity: tokens, sessions, and tickets
 
 For Windows agent modules of type `starlark`, `coff` or `dll`, the C2 injects
 three universal options (`steal_token` gets only `--token`; `list_tokens` and
 `list_sessions` get none):
 
-| Option | Meaning |
-| --- | --- |
-| `--token <SID\|session>` | Run under a stolen token (`steal_token`/`list_tokens`) or a netlogon session (`list_sessions`). |
-| `--user <DOMAIN/user>` | Create or reuse a netonly netlogon session and run under it. Ignored when `--token` is set. |
-| `--ticket <base64 KRB-CRED>` | Import a `.kirbi` ticket into the module's logon session before running. |
+| Option                       | Meaning                                                                                         |
+| ---------------------------- | ----------------------------------------------------------------------------------------------- |
+| `--token <SID\|session>`     | Run under a stolen token (`steal_token`/`list_tokens`) or a netlogon session (`list_sessions`). |
+| `--user <DOMAIN/user>`       | Create or reuse a netonly netlogon session and run under it. Ignored when `--token` is set.     |
+| `--ticket <base64 KRB-CRED>` | Import a `.kirbi` ticket into the module's logon session before running.                        |
 
 Supporting commands:
 
-| Command | Description |
-| --- | --- |
+| Command                   | Description                                                                                   |
+| ------------------------- | --------------------------------------------------------------------------------------------- |
 | `steal_token --pid <PID>` | Duplicate and cache a process token; enables `SeDebugPrivilege` and `SeImpersonatePrivilege`. |
-| `list_tokens` | List cached tokens and netlogon sessions. |
-| `list_sessions` | List netlogon sessions created via `--user`. |
+| `list_tokens`             | List cached tokens and netlogon sessions.                                                     |
+| `list_sessions`           | List netlogon sessions created via `--user`.                                                  |
 
 There is no separate `make_token` or `import_ticket` command: the session is
 created and the ticket imported as part of the module invocation.
@@ -523,7 +597,7 @@ created and the ticket imported as part of the module invocation.
 ### Netlogon sessions and pass-the-ticket
 
 Kerberos APIs are bound to a logon session in LSASS, not to a token. `--user`
-creates a *netonly* (new-credentials) session — the same primitive as Cobalt
+creates a _netonly_ (new-credentials) session — the same primitive as Cobalt
 Strike's `make_token` or `runas /netonly`. The password is never validated
 (the agent supplies a dummy value), and the session keeps the caller's local
 identity while lending the supplied credentials to outbound network
@@ -560,32 +634,32 @@ Pair with the `scshell` BOF to execute an uploaded file on the target.
 
 ---
 
-## 10. Examples to copy from
+## 11. Examples to copy from
 
-| Module | Demonstrates |
-| --- | --- |
-| `hello_linux` | Minimal Linux BOF and `config.json`. |
-| `procinfo` | Minimal Linux Starlark module that reads `/proc`. |
-| `SA/` | A suite of Windows Starlark modules, including token inspection in `whoami.star`. |
-| `cifs/` | Token/ticket-aware SMB I/O. |
-| `kkyum/` | Multi-file Starlark module loading a kernel driver from a companion `.sys` cached in memfs (`module_files_memfs`). |
-| `injection/` | Remote thread injection under an operator-selected token. |
-| `coffloader/` | The Windows in-memory COFF loader DLL (`dll` module). |
-| `libbpf/` | Builds a self-contained `libbpf.so` (zig) used by the Go `core/lib/libbpf` loader and the `ebpf_*` builtins. |
-| `loader_windows/` | A local C2 module that builds a self-unpacking loader. |
+| Module                          | Demonstrates                                                                                                               |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `hello_linux`                   | Minimal Linux BOF and `config.json`.                                                                                       |
+| `procinfo`                      | Minimal Linux Starlark module that reads `/proc`.                                                                          |
+| `SA/`                           | A suite of Windows Starlark modules, including token inspection in `whoami.star`.                                          |
+| `cifs/`                         | Token/ticket-aware SMB I/O.                                                                                                |
+| `kkyum/`                        | Multi-file Starlark module loading a kernel driver from a companion `.sys` cached in memfs (`module_files_memfs`).         |
+| `injection/`                    | Remote thread injection under an operator-selected token.                                                                  |
+| `coffloader/`                   | The Windows in-memory COFF loader DLL (`dll` module).                                                                      |
+| `libbpf/`                       | Builds a self-contained `libbpf.so` (zig) used by the Go `core/lib/libbpf` loader and the `ebpf_*` builtins.               |
+| `loader_windows/`               | A local C2 module that builds a self-unpacking loader.                                                                     |
 | `CS-Situational-Awareness-BOF/` | A large third-party BOF suite imported as-is; every command is a top-level console command with one flag per BOF argument. |
-| `C2-Tool-Collection/` | BOF suite with `choices`/`required` flags and a `make_all.sh` that builds a nested `BOF/` tree. |
-| `SQL-BOF/` | SQL Server BOF suite; fixed-value wrapper commands over a shared `togglemodule` BOF and a `binary` (base64) parameter. |
+| `C2-Tool-Collection/`           | BOF suite with `choices`/`required` flags and a `make_all.sh` that builds a nested `BOF/` tree.                            |
+| `SQL-BOF/`                      | SQL Server BOF suite; fixed-value wrapper commands over a shared `togglemodule` BOF and a `binary` (base64) parameter.     |
 
 ---
 
-## 11. Troubleshooting
+## 12. Troubleshooting
 
-| Symptom | Likely cause |
-| --- | --- |
-| `missing COFF invocation data` | `invocation.coff_export` is not set on a `coff` module. |
-| Module registered but never runs; "does not support …" | `platform` does not match the agent OS and is not `Generic`. |
-| Manifest fails to load | A parameter has no `description`, or a non-local module's `agent_config.type` is missing or not `coff`/`starlark`/`dll`/`so`. |
-| `option X is required` | The flag was empty and the parameter is `required`. |
-| Starlark receives the wrong values | Starlark parameters are positional strings in declaration order; remember that `argv`/`main` include any `invocation.argv` literals first. |
-| `unknown arg prefix` / `unsupported COFF wire type` | A BOF parameter uses a `type` not listed in §5. |
+| Symptom                                                | Likely cause                                                                                                                               |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `missing COFF invocation data`                         | `invocation.coff_export` is not set on a `coff` module.                                                                                    |
+| Module registered but never runs; "does not support …" | `platform` does not match the agent OS and is not `Generic`.                                                                               |
+| Manifest fails to load                                 | A parameter has no `description`, or a non-local module's `agent_config.type` is missing or not `coff`/`starlark`/`dll`/`so`.              |
+| `option X is required`                                 | The flag was empty and the parameter is `required`.                                                                                        |
+| Starlark receives the wrong values                     | Starlark parameters are positional strings in declaration order; remember that `argv`/`main` include any `invocation.argv` literals first. |
+| `unknown arg prefix` / `unsupported COFF wire type`    | A BOF parameter uses a `type` not listed in §5.                                                                                            |

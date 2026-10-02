@@ -3,7 +3,10 @@
 Builds the self-contained `libbpf.so` dependency used by the Go loader
 `core/lib/libbpf` and the `ebpf_*` Starlark builtins. It is a library, not a
 runnable module: another module declares it in `dependencies`, the C2 builds
-and hosts `libbpf.<arch>.gz`, and the agent maps it in memory on first use.
+and hosts `libbpf.<arch>.gz`, and the agent maps it through `core/lib/memdeps`
+for the duration of each eBPF operation and unmaps it again immediately
+afterwards (see the dependency-lifetime section of
+`module_development_guide.md`).
 
 `libbpf.so` is statically linked against libelf and zlib, so it depends only on
 libc and is loaded by the **shared-object agent** (`stub-<arch>.so`).
@@ -47,3 +50,8 @@ ebpf_detach(links[0]["id"])
 Enumeration needs `CAP_BPF`/`CAP_SYS_ADMIN`; without it the lists are empty.
 The Go package (`core/lib/libbpf`) also exposes `Load`, `OpenMem`, `Object`,
 `Program` and `Link` for callers that want to load and attach an object.
+`WithLibrary(fn)` resolves the `libbpf` dependency through the generic
+`core/lib/memdeps` layer, maps it, runs `fn`, and unmaps it again before
+returning, so the library is never left resident once the callback is done;
+objects obtained inside the callback must not escape it. Every DLL/SO
+dependency (including the Windows `coffloader`) goes through the same lifecycle.

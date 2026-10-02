@@ -9,8 +9,10 @@ import (
 	"go.starlark.net/starlark"
 )
 
-// Starlark bindings for core/lib/libbpf. The library is loaded once, on first
-// use, through the agent-wired fetcher (libbpf.SetFetcher).
+// Starlark bindings for core/lib/libbpf. libbpf.so is mapped only for the
+// duration of each builtin call and unmapped again as soon as it returns, so
+// the dependency is never left resident in cleartext while the script that
+// uses it is idle.
 //
 // Like sys_call, the builtins never abort a script on a runtime failure:
 // they return a dict with the result and an "error" string (empty on success),
@@ -22,68 +24,80 @@ func init() {
 	RegisterAPI("ebpf_detach", starlarkEBPFDetach)
 }
 
+// ebpfCollect maps libbpf, runs collect to build the per-entry dicts, and
+// returns the standard {"<key>": [...], "error": "..."} result. The library is
+// unmapped before this returns.
+func ebpfCollect(key string, collect func(*libbpf.Library) ([]starlark.Value, error)) *starlark.Dict {
+	list := starlark.NewList(nil)
+	err := libbpf.WithLibrary(func(lib *libbpf.Library) error {
+		values, err := collect(lib)
+		if err != nil {
+			return err
+		}
+		for _, v := range values {
+			list.Append(v)
+		}
+		return nil
+	})
+	return ebpfResult(key, list, err)
+}
+
 func starlarkEBPFProgs(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	progs := starlark.NewList(nil)
-	lib, err := libbpf.Default()
-	if err != nil {
-		return ebpfResult("progs", progs, err), nil
-	}
-	list, err := lib.ProgList()
-	if err != nil {
-		return ebpfResult("progs", progs, err), nil
-	}
-	for _, p := range list {
-		d := starlark.NewDict(4)
-		d.SetKey(starlark.String("id"), starlark.MakeInt(int(p.ID)))
-		d.SetKey(starlark.String("type"), starlark.MakeInt(int(p.Type)))
-		d.SetKey(starlark.String("name"), starlark.String(p.Name))
-		d.SetKey(starlark.String("load_time"), starlark.MakeUint64(p.LoadTime))
-		progs.Append(d)
-	}
-	return ebpfResult("progs", progs, nil), nil
+	return ebpfCollect("progs", func(lib *libbpf.Library) ([]starlark.Value, error) {
+		infos, err := lib.ProgList()
+		if err != nil {
+			return nil, err
+		}
+		out := make([]starlark.Value, 0, len(infos))
+		for _, p := range infos {
+			d := starlark.NewDict(4)
+			d.SetKey(starlark.String("id"), starlark.MakeInt(int(p.ID)))
+			d.SetKey(starlark.String("type"), starlark.MakeInt(int(p.Type)))
+			d.SetKey(starlark.String("name"), starlark.String(p.Name))
+			d.SetKey(starlark.String("load_time"), starlark.MakeUint64(p.LoadTime))
+			out = append(out, d)
+		}
+		return out, nil
+	}), nil
 }
 
 func starlarkEBPFLinks(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	links := starlark.NewList(nil)
-	lib, err := libbpf.Default()
-	if err != nil {
-		return ebpfResult("links", links, err), nil
-	}
-	list, err := lib.LinkList()
-	if err != nil {
-		return ebpfResult("links", links, err), nil
-	}
-	for _, l := range list {
-		d := starlark.NewDict(3)
-		d.SetKey(starlark.String("id"), starlark.MakeInt(int(l.ID)))
-		d.SetKey(starlark.String("type"), starlark.MakeInt(int(l.Type)))
-		d.SetKey(starlark.String("prog_id"), starlark.MakeInt(int(l.ProgID)))
-		links.Append(d)
-	}
-	return ebpfResult("links", links, nil), nil
+	return ebpfCollect("links", func(lib *libbpf.Library) ([]starlark.Value, error) {
+		infos, err := lib.LinkList()
+		if err != nil {
+			return nil, err
+		}
+		out := make([]starlark.Value, 0, len(infos))
+		for _, l := range infos {
+			d := starlark.NewDict(3)
+			d.SetKey(starlark.String("id"), starlark.MakeInt(int(l.ID)))
+			d.SetKey(starlark.String("type"), starlark.MakeInt(int(l.Type)))
+			d.SetKey(starlark.String("prog_id"), starlark.MakeInt(int(l.ProgID)))
+			out = append(out, d)
+		}
+		return out, nil
+	}), nil
 }
 
 func starlarkEBPFMaps(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
-	maps := starlark.NewList(nil)
-	lib, err := libbpf.Default()
-	if err != nil {
-		return ebpfResult("maps", maps, err), nil
-	}
-	list, err := lib.MapList()
-	if err != nil {
-		return ebpfResult("maps", maps, err), nil
-	}
-	for _, m := range list {
-		d := starlark.NewDict(6)
-		d.SetKey(starlark.String("id"), starlark.MakeInt(int(m.ID)))
-		d.SetKey(starlark.String("type"), starlark.MakeInt(int(m.Type)))
-		d.SetKey(starlark.String("name"), starlark.String(m.Name))
-		d.SetKey(starlark.String("key_size"), starlark.MakeInt(int(m.KeySize)))
-		d.SetKey(starlark.String("value_size"), starlark.MakeInt(int(m.ValueSize)))
-		d.SetKey(starlark.String("max_entries"), starlark.MakeInt(int(m.MaxEntries)))
-		maps.Append(d)
-	}
-	return ebpfResult("maps", maps, nil), nil
+	return ebpfCollect("maps", func(lib *libbpf.Library) ([]starlark.Value, error) {
+		infos, err := lib.MapList()
+		if err != nil {
+			return nil, err
+		}
+		out := make([]starlark.Value, 0, len(infos))
+		for _, m := range infos {
+			d := starlark.NewDict(6)
+			d.SetKey(starlark.String("id"), starlark.MakeInt(int(m.ID)))
+			d.SetKey(starlark.String("type"), starlark.MakeInt(int(m.Type)))
+			d.SetKey(starlark.String("name"), starlark.String(m.Name))
+			d.SetKey(starlark.String("key_size"), starlark.MakeInt(int(m.KeySize)))
+			d.SetKey(starlark.String("value_size"), starlark.MakeInt(int(m.ValueSize)))
+			d.SetKey(starlark.String("max_entries"), starlark.MakeInt(int(m.MaxEntries)))
+			out = append(out, d)
+		}
+		return out, nil
+	}), nil
 }
 
 func starlarkEBPFDetach(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -94,11 +108,10 @@ func starlarkEBPFDetach(_ *starlark.Thread, fn *starlark.Builtin, args starlark.
 	if id <= 0 {
 		return starlark.None, fmt.Errorf("ebpf_detach: id must be positive")
 	}
-	lib, err := libbpf.Default()
+	err := libbpf.WithLibrary(func(lib *libbpf.Library) error {
+		return lib.LinkDetach(uint32(id))
+	})
 	if err != nil {
-		return ebpfErrorDict(err), nil
-	}
-	if err := lib.LinkDetach(uint32(id)); err != nil {
 		return ebpfErrorDict(err), nil
 	}
 	return ebpfResult("id", starlark.MakeInt(id), nil), nil

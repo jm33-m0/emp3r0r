@@ -25,6 +25,9 @@ func memLoadUnsupported(name string) error {
 	return fmt.Errorf("%s is not supported on this platform", name)
 }
 
+// releaseRunModules is a no-op where no in-memory loader backend exists.
+func releaseRunModules(*starlark.Thread) {}
+
 func starlarkMemLoadLibrary(thread *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
 	return starlark.None, memLoadUnsupported(fn.Name())
 }

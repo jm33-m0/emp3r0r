@@ -47,6 +47,9 @@ func unsupported() error {
 	return fmt.Errorf("libbpf in-memory loader is unsupported on this platform")
 }
 
+// WithLibrary is unsupported off Linux.
+func WithLibrary(func(*Library) error) error { return unsupported() }
+
 // Load is unsupported off Linux.
 func Load([]byte) (*Library, error) { return nil, unsupported() }
 

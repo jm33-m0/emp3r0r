@@ -66,7 +66,7 @@ func hostBOFFile(t *testing.T, bof []byte) (path, checksum string) {
 }
 
 // cacheCoffLoaderDLL seeds the agent memfs with the COFFLoader DLL, matching
-// the cache key produced by ModuleHandler's dll branch / fetchDependencyDLL.
+// the cache key produced by ModuleHandler's dll branch / fetchDependency.
 func cacheCoffLoaderDLL(t *testing.T, dll []byte) {
 	t.Helper()
 	if err := util.WriteFileAgent("memfs:///coffloader.dll", dll, 0o600); err != nil {
@@ -91,7 +91,7 @@ func TestBOFFullLifecycle(t *testing.T) {
 	dll := readOrSkip(t, dllPath)
 
 	// Every BOF in this test runs through the cached coffloader DLL
-	// (memfs:///coffloader.dll). To prove fetchDependencyDLL really uses that
+	// (memfs:///coffloader.dll). To prove fetchDependency really uses that
 	// cache, evict the hosted .gz and chdir into an empty scratch dir so no
 	// download fallback can satisfy the dependency.
 	cacheCoffLoaderDLL(t, dll)
@@ -209,7 +209,7 @@ func TestBOFDependencyDownloadLifecycle(t *testing.T) {
 	}
 
 	// Build the hosted <name>.<arch>.gz dependency and place it in a scratch
-	// working directory. fetchDependencyDLL asks FetchFile for
+	// working directory. fetchDependency asks FetchFile for
 	// "coffloader.amd64.gz", which resolves against the process CWD.
 	compressedDLL, err := util.Compress(dll)
 	if err != nil {

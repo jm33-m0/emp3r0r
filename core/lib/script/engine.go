@@ -34,6 +34,11 @@ func Run(src []byte, argv []string, customGlobals map[string]any, token uintptr)
 		},
 	}
 
+	// Any DLL/SO the script maps with mem_load_library that it does not free
+	// itself is released when the run ends, so no library is left resident
+	// after its user has finished.
+	defer releaseRunModules(thread)
+
 	// Store the impersonation token in thread-local data so runWithToken can
 	// impersonate around each token-aware builtin call.
 	if token != 0 {

