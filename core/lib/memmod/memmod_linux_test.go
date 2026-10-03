@@ -31,6 +31,10 @@ __attribute__((visibility("default"))) uintptr_t FixtureAdd(uintptr_t a, uintptr
 __attribute__((visibility("default"))) uintptr_t FixtureZero(void) {
 	return ctor_bias;
 }
+
+__attribute__((visibility("default"))) uintptr_t FixtureSum5(uintptr_t a, uintptr_t b, uintptr_t c, uintptr_t d, uintptr_t e) {
+	return a + b + c + d + e + ctor_bias;
+}
 `
 
 func skipUnderRaceLinux(t *testing.T) {
@@ -122,6 +126,16 @@ func TestLoadLibraryELF(t *testing.T) {
 		t.Fatalf("FixtureAdd(1, 2) = 0x%x, want 0x%x", got, want)
 	}
 
+	// Five arguments exercise the widened export trampoline used by the eBPF
+	// uprobe attach path.
+	got, err = module.CallExportWithArgs("FixtureSum5", 1, 2, 3, 4, 5)
+	if err != nil {
+		t.Fatalf("CallExportWithArgs(FixtureSum5): %v", err)
+	}
+	if want := uintptr(1 + 2 + 3 + 4 + 5 + 0x1234); got != want {
+		t.Fatalf("FixtureSum5(1..5) = 0x%x, want 0x%x", got, want)
+	}
+
 	if err := module.CallExport("FixtureZero"); err != nil {
 		t.Fatalf("CallExport(FixtureZero): %v", err)
 	}
@@ -146,7 +160,7 @@ func TestLoadLibraryELFErrors(t *testing.T) {
 	if _, err := module.ProcAddressByName("NoSuchExport"); err == nil {
 		t.Fatal("ProcAddressByName(missing) succeeded, want error")
 	}
-	if _, err := module.CallExportWithArgs("FixtureAdd", 1, 2, 3, 4); err == nil || !strings.Contains(err.Error(), "maximum is 3") {
+	if _, err := module.CallExportWithArgs("FixtureAdd", 1, 2, 3, 4, 5, 6); err == nil || !strings.Contains(err.Error(), "maximum is 5") {
 		t.Fatalf("CallExportWithArgs with too many args = %v, want argument-limit error", err)
 	}
 	if _, err := module.ProcAddressByOrdinal(1); err == nil {

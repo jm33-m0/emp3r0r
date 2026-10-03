@@ -16,6 +16,12 @@ func cCall2(fn, a0, a1 uintptr) uintptr
 //go:noescape
 func cCall3(fn, a0, a1, a2 uintptr) uintptr
 
+//go:noescape
+func cCall4(fn, a0, a1, a2, a3 uintptr) uintptr
+
+//go:noescape
+func cCall5(fn, a0, a1, a2, a3, a4 uintptr) uintptr
+
 func cCallVoid0(fn uintptr) {
 	_ = callExportFunction(fn)
 }

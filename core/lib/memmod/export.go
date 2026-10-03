@@ -6,8 +6,9 @@ import (
 )
 
 // MaxExportArguments is the maximum number of machine-word arguments accepted
-// by CallExportWithArgs on every supported platform.
-const MaxExportArguments = 3
+// by CallExportWithArgs on every supported platform. It covers the first five
+// integer argument registers of the amd64/arm64 C ABIs.
+const MaxExportArguments = 5
 
 // ErrGoExportArgumentsUnsupported reports that CallExportWithArgs was used on
 // a Go c-shared image. Use CallExport for its zero-argument exports instead.

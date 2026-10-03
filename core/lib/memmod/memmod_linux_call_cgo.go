@@ -12,6 +12,8 @@ typedef uintptr_t (*memmod_fn0)(void);
 typedef uintptr_t (*memmod_fn1)(uintptr_t);
 typedef uintptr_t (*memmod_fn2)(uintptr_t, uintptr_t);
 typedef uintptr_t (*memmod_fn3)(uintptr_t, uintptr_t, uintptr_t);
+typedef uintptr_t (*memmod_fn4)(uintptr_t, uintptr_t, uintptr_t, uintptr_t);
+typedef uintptr_t (*memmod_fn5)(uintptr_t, uintptr_t, uintptr_t, uintptr_t, uintptr_t);
 typedef void (*memmod_void_fn0)(void);
 typedef void (*memmod_init_fn)(int, char **, char **);
 
@@ -29,6 +31,14 @@ static uintptr_t memmod_call2(uintptr_t fn, uintptr_t a0, uintptr_t a1) {
 
 static uintptr_t memmod_call3(uintptr_t fn, uintptr_t a0, uintptr_t a1, uintptr_t a2) {
 	return ((memmod_fn3)fn)(a0, a1, a2);
+}
+
+static uintptr_t memmod_call4(uintptr_t fn, uintptr_t a0, uintptr_t a1, uintptr_t a2, uintptr_t a3) {
+	return ((memmod_fn4)fn)(a0, a1, a2, a3);
+}
+
+static uintptr_t memmod_call5(uintptr_t fn, uintptr_t a0, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4) {
+	return ((memmod_fn5)fn)(a0, a1, a2, a3, a4);
 }
 
 static void memmod_call_void0(uintptr_t fn) {
@@ -141,6 +151,14 @@ func cCall3(fn, a0, a1, a2 uintptr) uintptr {
 	return uintptr(C.memmod_call3(C.uintptr_t(fn), C.uintptr_t(a0), C.uintptr_t(a1), C.uintptr_t(a2)))
 }
 
+func cCall4(fn, a0, a1, a2, a3 uintptr) uintptr {
+	return uintptr(C.memmod_call4(C.uintptr_t(fn), C.uintptr_t(a0), C.uintptr_t(a1), C.uintptr_t(a2), C.uintptr_t(a3)))
+}
+
+func cCall5(fn, a0, a1, a2, a3, a4 uintptr) uintptr {
+	return uintptr(C.memmod_call5(C.uintptr_t(fn), C.uintptr_t(a0), C.uintptr_t(a1), C.uintptr_t(a2), C.uintptr_t(a3), C.uintptr_t(a4)))
+}
+
 //go:uintptrescapes
 func callExportFunction(fn uintptr, args ...uintptr) uintptr {
 	switch len(args) {
@@ -152,6 +170,10 @@ func callExportFunction(fn uintptr, args ...uintptr) uintptr {
 		return cCall2(fn, args[0], args[1])
 	case 3:
 		return cCall3(fn, args[0], args[1], args[2])
+	case 4:
+		return cCall4(fn, args[0], args[1], args[2], args[3])
+	case 5:
+		return cCall5(fn, args[0], args[1], args[2], args[3], args[4])
 	default:
 		panic("validated ELF export argument count is out of range")
 	}
