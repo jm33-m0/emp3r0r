@@ -1,5 +1,6 @@
 stager
 stager.bin
+stager-raw.elf
 stager.so
 stager-packed.bin
 downloader

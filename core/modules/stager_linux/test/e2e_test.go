@@ -375,6 +375,13 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	t.Run(def.C2ChannelModeH2Conn+"/executable", func(t *testing.T) {
 		runAgentEndToEndLifecycle(t, def.C2ChannelModeH2Conn, stagerOpts{format: "executable", transport: "http"})
 	})
+	// The executable is a hosted ELF that links glibc, so a transport that
+	// loads a library at runtime exercises dynload.c resolving dlopen from the
+	// mapped libc. A freestanding executable leaves no libc in /proc/self/maps
+	// and makes dynload_open() fail, which this guards against.
+	t.Run(def.C2ChannelModeH2Conn+"/executable-libcurl", func(t *testing.T) {
+		runAgentEndToEndLifecycle(t, def.C2ChannelModeH2Conn, stagerOpts{format: "executable", transport: "libcurl"})
+	})
 	t.Run(def.C2ChannelModeH2Conn+"/shared-object", func(t *testing.T) {
 		runAgentEndToEndLifecycle(t, def.C2ChannelModeH2Conn, stagerOpts{format: "so", transport: "http"})
 	})

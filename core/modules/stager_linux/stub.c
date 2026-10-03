@@ -122,6 +122,10 @@ __attribute__((visibility("default"))) int main(void) {
   return 0;
 }
 
+/* The raw shellcode enters at offset 0, so it carries its own _start. The
+ * hosted SO/EXE formats use the C runtime startup instead (glibc _start ->
+ * main), where a second _start would clash with crt1.o. */
+#ifndef STAGER_LINKED_LIBC
 __asm__(".section .init,\"ax\",@progbits\n"
         ".global _start\n"
         "_start:\n"
@@ -131,3 +135,4 @@ __asm__(".section .init,\"ax\",@progbits\n"
         "mov $60, %rax\n"
         "xor %rdi, %rdi\n"
         "syscall\n");
+#endif
