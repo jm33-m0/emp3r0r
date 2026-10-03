@@ -126,6 +126,27 @@ EDR_PROFILES = [
 # Sections included by the default "all". "avail" is intentionally opt-in.
 SECTIONS_DEFAULT = ["procs", "arts", "mods", "kprobes", "ftrace", "lsm", "perf", "bpf"]
 
+# Furtex classifies BPF objects by UAPI type. Program type -> label.
+PROG_TYPE_NAMES = {
+    1: "socket_filter", 2: "kprobe", 5: "tracepoint", 6: "xdp",
+    7: "perf_event", 17: "raw_tracepoint", 24: "raw_tp_writable",
+    26: "tracing(fentry/fexit)", 29: "lsm",
+}
+# Program types an EDR uses for monitoring (Furtex is_monitoring_prog).
+MONITORING_PROG_TYPES = [2, 5, 7, 17, 24, 26, 29]
+# Link type -> label (Furtex recon_bpf_links).
+LINK_TYPE_NAMES = {
+    1: "raw_tracepoint", 2: "tracing(kp/tp/lsm/fentry)", 3: "cgroup",
+    4: "iter", 5: "netns", 6: "xdp", 7: "perf_event",
+    8: "kprobe_multi", 12: "uprobe_multi",
+}
+# Map types -> label, and the set Furtex reports as monitoring-relevant.
+MAP_TYPE_NAMES = {
+    1: "hash", 2: "array", 3: "prog_array", 4: "perf_event_array",
+    5: "percpu_hash", 6: "percpu_array", 9: "lru_hash", 27: "ringbuf",
+}
+MONITORING_MAP_TYPES = [4, 27, 1, 6]
+
 KPROBE_EVENTS = [
     "/sys/kernel/tracing/kprobe_events",
     "/sys/kernel/debug/tracing/kprobe_events",
@@ -149,6 +170,11 @@ def _is_pid(name):
 
 def _add_score(scores, vendor, delta):
     scores[vendor] = scores.get(vendor, 0) + delta
+
+
+def _has_bpf_cap():
+    # eBPF enumeration needs CAP_BPF, or CAP_SYS_ADMIN on pre-5.8 kernels.
+    return has_cap("CAP_BPF") or has_cap("CAP_SYS_ADMIN")
 
 
 def _vendor_for(text, field):
@@ -186,7 +212,7 @@ def recon_processes(scores):
     for pid in list_dir("/proc"):
         if not _is_pid(pid):
             continue
-        comm = read_file("/proc/%s/comm" % pid, default="").strip()
+        comm = read_file(sprintf("/proc/%s/comm", pid), default="").strip()
         if not comm:
             continue
         vendor = _vendor_for(comm, "procs")
@@ -209,7 +235,7 @@ def recon_artifacts(scores):
                 _add_score(scores, prof["vendor"], 5)
                 found += 1
         for dev in prof.get("devs", []):
-            path = "/dev/%s" % dev
+            path = sprintf("/dev/%s", dev)
             if exists(path):
                 print(sprintf("  [!] %-44s vendor=%s", path, prof["vendor"]))
                 _add_score(scores, prof["vendor"], 8)
@@ -249,7 +275,7 @@ def recon_kprobes(scores):
     if not content:
         print("  [!] tracefs not accessible (need root and tracefs mounted)")
         return 0
-    print("  [source: %s]" % path)
+    print(sprintf("  [source: %s]", path))
     total = 0
     edr = 0
     for line in content.splitlines():
@@ -259,13 +285,13 @@ def recon_kprobes(scores):
         if not vendor:
             vendor = _vendor_for(line, "bpf")
         if vendor:
-            print("  [!EDR!] %s" % line)
+            print(sprintf("  [!EDR!] %s", line))
             _add_score(scores, vendor, 2)
             edr += 1
         else:
-            print("  %s" % line)
+            print(sprintf("  %s", line))
         total += 1
-    print("  total=%d edr_pattern=%d" % (total, edr))
+    print(sprintf("  total=%d edr_pattern=%d", total, edr))
     return total
 
 
@@ -276,30 +302,53 @@ def recon_ftrace(scores):
         print("  [!] enabled_functions not accessible")
         print("  [*] LKM ftrace hooks appear here and cannot be removed via tracefs")
         return 0
-    print("  [source: %s]" % path)
+    print(sprintf("  [source: %s]", path))
     total = 0
     for line in content.splitlines():
         if not line:
             continue
         vendor = _vendor_for(line, "modules")
         if vendor:
-            print("  [!EDR!] %s" % line)
+            print(sprintf("  [!EDR!] %s", line))
             _add_score(scores, vendor, 3)
         else:
-            print("  %s" % line)
+            print(sprintf("  %s", line))
         total += 1
-    print("  total=%d" % total)
+    print(sprintf("  total=%d", total))
     return total
 
 
-def recon_lsm():
+def recon_lsm(scores):
     print("=== Active LSM Stack ===")
     stack = read_file("/sys/kernel/security/lsm", default="").strip()
     if stack:
-        print("  lsm stack: %s" % stack)
+        print(sprintf("  lsm stack: %s", stack))
     else:
         print("  [!] /sys/kernel/security/lsm not readable")
-    print("  [*] BPF LSM programs are not visible from userspace without bpf(2)")
+
+    # BPF LSM programs are ordinary kernel BPF programs of type 29; enumerate
+    # them through the same libbpf loader instead of leaving them invisible.
+    if not _has_bpf_cap():
+        print("  [!] missing CAP_BPF/CAP_SYS_ADMIN; skipping BPF LSM enumeration")
+        return 0
+    progs = ebpf_progs()
+    if progs["error"]:
+        print(sprintf("  [!] BPF LSM enumeration unavailable: %s", progs["error"]))
+        return 0
+    found = 0
+    for p in progs["progs"]:
+        if p["type"] != 29:
+            continue
+        vendor = _vendor_for(p["name"], "bpf")
+        if vendor:
+            _add_score(scores, vendor, 3)
+        print(sprintf("  [!] BPF LSM prog id=%-5d name=%-16s jit=%-6d%s",
+                      p["id"], p["name"], p["jited_len"],
+                      "  vendor=" + vendor if vendor else ""))
+        found += 1
+    if found == 0:
+        print("  [*] no BPF LSM programs loaded")
+    return found
 
 
 def recon_perf(scores):
@@ -308,9 +357,9 @@ def recon_perf(scores):
     for pid in list_dir("/proc"):
         if not _is_pid(pid):
             continue
-        fdinfo = "/proc/%s/fdinfo" % pid
+        fdinfo = sprintf("/proc/%s/fdinfo", pid)
         for fd in list_dir(fdinfo):
-            data = read_file("%s/%s" % (fdinfo, fd), default="")
+            data = read_file(sprintf("%s/%s", fdinfo, fd), default="")
             if not data:
                 continue
             for line in data.splitlines():
@@ -321,45 +370,72 @@ def recon_perf(scores):
     if total == 0:
         print("  [*] none found")
     else:
-        print("  [!] %d perf-attached BPF programs (not removable via BPF_LINK)" % total)
+        print(sprintf("  [!] %d perf-attached BPF programs (not removable via BPF_LINK)", total))
     return total
 
 
 def recon_bpf(scores):
     print("=== BPF programs / links / maps ===")
+    if not _has_bpf_cap():
+        print("  [!] missing CAP_BPF/CAP_SYS_ADMIN; skipping BPF enumeration")
+        return 0
     progs = ebpf_progs()
     links = ebpf_links()
     maps = ebpf_maps()
     err = progs["error"] or links["error"] or maps["error"]
     if err:
-        print("  [!] libbpf unavailable: %s" % err)
+        print(sprintf("  [!] libbpf unavailable: %s", err))
         return 0
 
     names = {}
     total = 0
+    monitoring = 0
+    print(sprintf("  %-6s %-16s %-22s %-8s %s", "id", "name", "type", "jit", "flags"))
     for p in progs["progs"]:
         names[p["id"]] = p["name"]
+        ptype = PROG_TYPE_NAMES.get(p["type"], "other")
+        is_mon = p["type"] in MONITORING_PROG_TYPES
+        if is_mon:
+            monitoring += 1
         vendor = _vendor_for(p["name"], "bpf")
         if vendor:
-            print(sprintf("  [!] prog id=%-5d type=%-3d name=%-24s vendor=%s",
-                          p["id"], p["type"], p["name"], vendor))
             _add_score(scores, vendor, 3)
+        flags = ""
+        if is_mon:
+            flags += " [monitoring]"
+        if vendor:
+            flags += " [!EDR!]"
+        print(sprintf("  %-6d %-16s %-22s jit=%-5d%s",
+                      p["id"], p["name"], ptype, p["jited_len"], flags))
         total += 1
+    print(sprintf("  total=%d monitoring_type=%d", total, monitoring))
+
+    print("  --- links ---")
     for l in links["links"]:
         pname = names.get(l["prog_id"], "")
+        ltype = LINK_TYPE_NAMES.get(l["type"], "other")
+        ptype = PROG_TYPE_NAMES.get(l["prog_type"], "other")
         vendor = _vendor_for(pname, "bpf")
         if vendor:
-            print(sprintf("  [!] link id=%-5d prog_id=%-5d prog=%-24s vendor=%s",
-                          l["id"], l["prog_id"], pname, vendor))
             _add_score(scores, vendor, 3)
+        print(sprintf("  link=%-5d prog=%-5d link_type=%-26s prog_type=%-22s%s",
+                      l["id"], l["prog_id"], ltype, ptype,
+                      "  [!EDR!]" if vendor else ""))
         total += 1
+
+    print("  --- monitoring maps ---")
     for m in maps["maps"]:
+        if m["type"] not in MONITORING_MAP_TYPES or m["max_entries"] < 16:
+            continue
+        mtype = MAP_TYPE_NAMES.get(m["type"], "other")
         vendor = _vendor_for(m["name"], "bpf")
         if vendor:
-            print(sprintf("  [!] map  id=%-5d name=%-24s key=%-4d value=%-4d max=%-6d vendor=%s",
-                          m["id"], m["name"], m["key_size"], m["value_size"], m["max_entries"], vendor))
             _add_score(scores, vendor, 2)
+        print(sprintf("  map=%-5d %-16s %-20s max_entries=%-6d%s",
+                      m["id"], m["name"], mtype, m["max_entries"],
+                      "  [!EDR!]" if vendor else ""))
         total += 1
+
     if total == 0:
         print("  [*] no BPF objects visible (need CAP_BPF/CAP_SYS_ADMIN)")
     return total
@@ -371,7 +447,7 @@ def recon_avail(scores):
     if not content:
         print("  [!] available_filter_functions not accessible (need root)")
         return 0
-    print("  [source: %s]" % path)
+    print(sprintf("  [source: %s]", path))
     hits = {}
     total = 0
     for line in content.splitlines():
@@ -389,7 +465,7 @@ def recon_avail(scores):
         if n < 5:
             print(sprintf("  [!] %-56s [%s] vendor=%s", line.strip(), modname, vendor))
         elif n == 5:
-            print("  [!] ... more %s symbols from [%s]" % (vendor, modname))
+            print(sprintf("  [!] ... more %s symbols from [%s]", vendor, modname))
         hits[vendor] = n + 1
         total += 1
         _add_score(scores, vendor, 1)
@@ -423,7 +499,7 @@ def main(*args):
     else:
         wanted = section.split(",")
 
-    print("[*] Linux EDR recon - %d vendor profiles" % len(EDR_PROFILES))
+    print(sprintf("[*] Linux EDR recon - %d vendor profiles", len(EDR_PROFILES)))
     scores = {}
     if "procs" in wanted:
         recon_processes(scores)
@@ -436,7 +512,7 @@ def main(*args):
     if "ftrace" in wanted:
         recon_ftrace(scores)
     if "lsm" in wanted:
-        recon_lsm()
+        recon_lsm(scores)
     if "perf" in wanted:
         recon_perf(scores)
     if "bpf" in wanted:

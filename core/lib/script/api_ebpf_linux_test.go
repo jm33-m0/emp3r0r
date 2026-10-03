@@ -29,6 +29,11 @@ def main(*args):
     d = ebpf_detach(7)
     if d["error"] == "":
         return "fail: ebpf_detach unexpectedly succeeded"
+    w = ebpf_map_wipe(9)
+    if w["error"] == "":
+        return "fail: ebpf_map_wipe unexpectedly succeeded"
+    if w["deleted"] != 0:
+        return "fail: ebpf_map_wipe deleted entries alongside an error"
     return "OK"
 `
 	out, err := Run([]byte(script), nil, nil, 0)

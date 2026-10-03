@@ -46,31 +46,6 @@ type Link struct {
 	ptr uintptr
 }
 
-// ProgInfo summarises one kernel BPF program.
-type ProgInfo struct {
-	ID       uint32
-	Type     uint32
-	Name     string
-	LoadTime uint64
-}
-
-// MapInfo summarises one kernel BPF map.
-type MapInfo struct {
-	ID         uint32
-	Type       uint32
-	Name       string
-	KeySize    uint32
-	ValueSize  uint32
-	MaxEntries uint32
-}
-
-// LinkInfo summarises one kernel BPF link.
-type LinkInfo struct {
-	ID     uint32
-	Type   uint32
-	ProgID uint32
-}
-
 const (
 	infoBufSize = 256
 	maxIDIter   = 8192
@@ -282,6 +257,20 @@ func (l *Library) fdByID(kind string, id uint32) (int, error) {
 	return fd, nil
 }
 
+// progType returns the kernel type of a loaded program.
+func (l *Library) progType(progID uint32) (uint32, error) {
+	fd, err := l.fdByID("prog", progID)
+	if err != nil {
+		return 0, err
+	}
+	defer unix.Close(fd)
+	buf, err := l.objInfo(fd)
+	if err != nil {
+		return 0, err
+	}
+	return binary.LittleEndian.Uint32(buf[0:]), nil
+}
+
 func (l *Library) objInfo(fd int) ([]byte, error) {
 	buf := make([]byte, infoBufSize)
 	infoLen := uint32(len(buf))
@@ -321,6 +310,8 @@ func (l *Library) ProgList() ([]ProgInfo, error) {
 			Type:     binary.LittleEndian.Uint32(buf[0:]),
 			Name:     cStringBytes(buf[64:80]),
 			LoadTime: binary.LittleEndian.Uint64(buf[40:]),
+			JitedLen: binary.LittleEndian.Uint32(buf[16:]),
+			NrMaps:   binary.LittleEndian.Uint32(buf[52:]),
 		})
 	}
 	return out, nil
@@ -345,10 +336,13 @@ func (l *Library) LinkList() ([]LinkInfo, error) {
 			out = append(out, LinkInfo{ID: id})
 			continue
 		}
+		progID := binary.LittleEndian.Uint32(buf[8:])
+		progType, _ := l.progType(progID)
 		out = append(out, LinkInfo{
-			ID:     id,
-			Type:   binary.LittleEndian.Uint32(buf[0:]),
-			ProgID: binary.LittleEndian.Uint32(buf[8:]),
+			ID:       id,
+			Type:     binary.LittleEndian.Uint32(buf[0:]),
+			ProgID:   progID,
+			ProgType: progType,
 		})
 	}
 	return out, nil
@@ -383,6 +377,69 @@ func (l *Library) MapList() ([]MapInfo, error) {
 		})
 	}
 	return out, nil
+}
+
+// MapDeleteAll removes every element from the map with the given kernel id,
+// returning the number of successful deletions. It mirrors Furtex's
+// wipe_maps: key iteration is best-effort and per-element failures do not stop
+// the sweep. Types that do not support key iteration (arrays, ringbufs) yield
+// zero deletions without an error.
+func (l *Library) MapDeleteAll(id uint32) (int, error) {
+	fd, err := l.fdByID("map", id)
+	if err != nil {
+		return 0, err
+	}
+	defer unix.Close(fd)
+
+	buf, err := l.objInfo(fd)
+	if err != nil {
+		return 0, err
+	}
+	keySize := binary.LittleEndian.Uint32(buf[8:])
+	if keySize == 0 || keySize > 256 {
+		return 0, fmt.Errorf("libbpf: map %d has invalid key size %d", id, keySize)
+	}
+
+	key := make([]byte, keySize)
+	next := make([]byte, keySize)
+	if err := l.mapNextKey(fd, nil, next); err != nil {
+		return 0, nil // empty map or a type that has no keys
+	}
+
+	deleted := 0
+	for i := 0; i < maxIDIter; i++ {
+		copy(key, next)
+		rc, err := l.call("bpf_map_delete_elem", uintptr(fd), uintptr(unsafe.Pointer(&key[0])))
+		runtime.KeepAlive(key)
+		if err != nil {
+			return deleted, fmt.Errorf("libbpf: bpf_map_delete_elem: %w", err)
+		}
+		if int32(uint32(rc)) == 0 {
+			deleted++
+		}
+		if err := l.mapNextKey(fd, key, next); err != nil {
+			break
+		}
+	}
+	return deleted, nil
+}
+
+// mapNextKey fetches the key following key (NULL for the first key) into next.
+func (l *Library) mapNextKey(fd int, key, next []byte) error {
+	var keyPtr uintptr
+	if len(key) > 0 {
+		keyPtr = uintptr(unsafe.Pointer(&key[0]))
+	}
+	rc, err := l.call("bpf_map_get_next_key", uintptr(fd), keyPtr, uintptr(unsafe.Pointer(&next[0])))
+	runtime.KeepAlive(key)
+	runtime.KeepAlive(next)
+	if err != nil {
+		return fmt.Errorf("libbpf: bpf_map_get_next_key: %w", err)
+	}
+	if int32(uint32(rc)) != 0 {
+		return unix.Errno(int32(uint32(rc)))
+	}
+	return nil
 }
 
 // LinkDetach detaches the link with the given kernel id and drops our

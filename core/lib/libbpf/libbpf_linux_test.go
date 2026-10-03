@@ -104,7 +104,9 @@ __attribute__((visibility("default"))) int bpf_obj_get_info_by_fd(int fd, void *
 	if (fd == 100) {
 		*(uint32_t *)(p + 0) = 1;
 		*(uint32_t *)(p + 4) = 10;
+		*(uint32_t *)(p + 16) = 7;
 		*(uint64_t *)(p + 40) = 12345;
+		*(uint32_t *)(p + 52) = 3;
 		const char *n = "mock_prog";
 		for (int i = 0; n[i] != 0 && i < 16; i++) p[64 + i] = (uint8_t)n[i];
 	} else if (fd == 101) {
@@ -126,6 +128,17 @@ __attribute__((visibility("default"))) int bpf_obj_get_info_by_fd(int fd, void *
 
 __attribute__((visibility("default"))) int bpf_link_detach(int fd) {
 	return fd == 101 ? 0 : -1;
+}
+
+__attribute__((visibility("default"))) int bpf_map_get_next_key(int fd, const void *key, void *next) {
+	(void)fd;
+	if (key == 0) { *(uint32_t *)next = 1; return 0; }
+	if (*(const uint32_t *)key == 1) { *(uint32_t *)next = 2; return 0; }
+	return -2; /* ENOENT */
+}
+
+__attribute__((visibility("default"))) int bpf_map_delete_elem(int fd, const void *key) {
+	(void)fd; (void)key; return 0;
 }
 `
 
@@ -234,6 +247,9 @@ func TestKernelEnumeration(t *testing.T) {
 	if progs[0].Name != "mock_prog" || progs[0].LoadTime != 12345 || progs[0].Type != 1 {
 		t.Fatalf("ProgList first = %+v", progs[0])
 	}
+	if progs[0].JitedLen != 7 || progs[0].NrMaps != 3 {
+		t.Fatalf("ProgList program metadata = %+v", progs[0])
+	}
 
 	links, err := lib.LinkList()
 	if err != nil {
@@ -241,6 +257,9 @@ func TestKernelEnumeration(t *testing.T) {
 	}
 	if len(links) != 1 || links[0].ID != 30 || links[0].ProgID != 10 {
 		t.Fatalf("LinkList = %+v", links)
+	}
+	if links[0].ProgType != 1 {
+		t.Fatalf("LinkList program type = %d, want 1", links[0].ProgType)
 	}
 
 	maps, err := lib.MapList()
@@ -253,6 +272,31 @@ func TestKernelEnumeration(t *testing.T) {
 
 	if err := lib.LinkDetach(30); err != nil {
 		t.Fatalf("LinkDetach: %v", err)
+	}
+
+	deleted, err := lib.MapDeleteAll(40)
+	if err != nil {
+		t.Fatalf("MapDeleteAll: %v", err)
+	}
+	if deleted != 2 {
+		t.Fatalf("MapDeleteAll deleted %d, want 2", deleted)
+	}
+}
+
+// TestMonitoringProgType mirrors Furtex's is_monitoring_prog classification.
+func TestMonitoringProgType(t *testing.T) {
+	for _, pt := range []uint32{
+		ProgTypeKprobe, ProgTypeTracepoint, ProgTypePerfEvent,
+		ProgTypeRawTracepoint, ProgTypeRawTracepointWritable, ProgTypeTracing, ProgTypeLSM,
+	} {
+		if !MonitoringProgType(pt) {
+			t.Errorf("MonitoringProgType(%d) = false, want true", pt)
+		}
+	}
+	for _, pt := range []uint32{0, 1, 3, 6, 9, 28} {
+		if MonitoringProgType(pt) {
+			t.Errorf("MonitoringProgType(%d) = true, want false", pt)
+		}
 	}
 }
 

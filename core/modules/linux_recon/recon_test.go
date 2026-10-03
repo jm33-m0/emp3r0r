@@ -107,6 +107,7 @@ func TestModulesSmoke(t *testing.T) {
 		argv []string
 	}{
 		{"edr_recon.star", []string{"procs,arts,mods,lsm"}},
+		{"edr_recon.star", []string{"bpf"}},
 		{"env_scrape.star", []string{"secrets", "own"}},
 		{"proc_fd_scan.star", []string{"", ""}},
 		{"sysctl_audit.star", nil},

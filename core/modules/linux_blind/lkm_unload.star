@@ -91,6 +91,11 @@ def _unload(name, force):
     if not name:
         print("[!] unload requires --name")
         return "ERROR: name required"
+    if not has_cap("CAP_SYS_MODULE"):
+        # delete_module always requires CAP_SYS_MODULE; report the missing
+        # capability instead of a generic EPERM from the syscall.
+        print("[!] missing CAP_SYS_MODULE; skipping delete_module(%s)" % name)
+        return "OK"
     flags = O_NONBLOCK | O_TRUNC if force else O_NONBLOCK
     print("[*] delete_module(%s, flags=%d)%s" % (name, flags, " FORCE" if force else ""))
     res = sys_call("delete_module", name, flags)

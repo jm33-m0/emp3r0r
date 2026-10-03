@@ -356,31 +356,45 @@
     "build": "",
     "author": "jm33-ng",
     "date": "2026-09-28",
-    "comment": "Scan for Tetragon/Falco/Cilium eBPF security processes, then freeze/thaw/kill one by PID, or enumerate and detach their kernel BPF links via the bundled libbpf loader",
+    "comment": "Scan for Tetragon/Falco/Cilium eBPF security processes, then freeze/thaw/kill one by PID, or enumerate/detach/wipe their kernel BPF objects via the bundled libbpf loader",
     "is_local": false,
     "platform": "Linux",
     "path": "",
     "parameters": [
       {
         "name": "action",
-        "description": "scan, ebpf (list kernel BPF objects), detach (drop matching BPF links), freeze, thaw, or kill",
+        "description": "scan, ebpf (list kernel BPF objects), detach (drop BPF links), wipe (clear BPF event maps), blind (freeze + detach + wipe [+ kill]), freeze, thaw, or kill",
         "default": "scan",
         "type": "cstr",
-        "choices": ["scan", "ebpf", "detach", "freeze", "thaw", "kill"],
+        "choices": ["scan", "ebpf", "detach", "wipe", "blind", "freeze", "thaw", "kill"],
         "required": false
       },
       {
         "name": "pid",
-        "description": "Target PID for freeze/thaw/kill",
+        "description": "Target PID for freeze/thaw/kill/blind",
         "default": "",
         "type": "cstr",
         "required": false
       },
       {
         "name": "pattern",
-        "description": "Process-name substring to search for during scan",
+        "description": "Process/BPF-name substring; detach/wipe/blind default to all monitoring objects when empty",
         "default": "",
         "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "dry_run",
+        "description": "Preview detach/wipe/blind without changing the kernel",
+        "default": "false",
+        "type": "bool",
+        "required": false
+      },
+      {
+        "name": "kill",
+        "description": "For blind: SIGKILL the frozen target after detach/wipe",
+        "default": "false",
+        "type": "bool",
         "required": false
       }
     ],

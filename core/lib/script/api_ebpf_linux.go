@@ -22,6 +22,7 @@ func init() {
 	RegisterAPI("ebpf_links", starlarkEBPFLinks)
 	RegisterAPI("ebpf_maps", starlarkEBPFMaps)
 	RegisterAPI("ebpf_detach", starlarkEBPFDetach)
+	RegisterAPI("ebpf_map_wipe", starlarkEBPFMapWipe)
 }
 
 // ebpfCollect maps libbpf, runs collect to build the per-entry dicts, and
@@ -50,11 +51,13 @@ func starlarkEBPFProgs(_ *starlark.Thread, fn *starlark.Builtin, args starlark.T
 		}
 		out := make([]starlark.Value, 0, len(infos))
 		for _, p := range infos {
-			d := starlark.NewDict(4)
+			d := starlark.NewDict(6)
 			d.SetKey(starlark.String("id"), starlark.MakeInt(int(p.ID)))
 			d.SetKey(starlark.String("type"), starlark.MakeInt(int(p.Type)))
 			d.SetKey(starlark.String("name"), starlark.String(p.Name))
 			d.SetKey(starlark.String("load_time"), starlark.MakeUint64(p.LoadTime))
+			d.SetKey(starlark.String("jited_len"), starlark.MakeInt(int(p.JitedLen)))
+			d.SetKey(starlark.String("nr_maps"), starlark.MakeInt(int(p.NrMaps)))
 			out = append(out, d)
 		}
 		return out, nil
@@ -69,10 +72,11 @@ func starlarkEBPFLinks(_ *starlark.Thread, fn *starlark.Builtin, args starlark.T
 		}
 		out := make([]starlark.Value, 0, len(infos))
 		for _, l := range infos {
-			d := starlark.NewDict(3)
+			d := starlark.NewDict(4)
 			d.SetKey(starlark.String("id"), starlark.MakeInt(int(l.ID)))
 			d.SetKey(starlark.String("type"), starlark.MakeInt(int(l.Type)))
 			d.SetKey(starlark.String("prog_id"), starlark.MakeInt(int(l.ProgID)))
+			d.SetKey(starlark.String("prog_type"), starlark.MakeInt(int(l.ProgType)))
 			out = append(out, d)
 		}
 		return out, nil
@@ -115,6 +119,25 @@ func starlarkEBPFDetach(_ *starlark.Thread, fn *starlark.Builtin, args starlark.
 		return ebpfErrorDict(err), nil
 	}
 	return ebpfResult("id", starlark.MakeInt(id), nil), nil
+}
+
+func starlarkEBPFMapWipe(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
+	var id int
+	if err := starlark.UnpackArgs(fn.Name(), args, kwargs, "id", &id); err != nil {
+		return starlark.None, err
+	}
+	if id <= 0 {
+		return starlark.None, fmt.Errorf("ebpf_map_wipe: id must be positive")
+	}
+	deleted := 0
+	err := libbpf.WithLibrary(func(lib *libbpf.Library) error {
+		n, e := lib.MapDeleteAll(uint32(id))
+		deleted = n
+		return e
+	})
+	d := ebpfResult("id", starlark.MakeInt(id), err)
+	d.SetKey(starlark.String("deleted"), starlark.MakeInt(deleted))
+	return d, nil
 }
 
 func ebpfErrorDict(err error) *starlark.Dict {

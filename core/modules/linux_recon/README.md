@@ -79,8 +79,9 @@ Read-only. It reports where the target sits on `dmesg_restrict`,
   programs, links and maps via raw `bpf(2)` commands. Here that is done through
   the bundled libbpf loader (`ebpf_progs()`/`ebpf_links()`/`ebpf_maps()`, backed
   by `core/lib/libbpf`), so the version-sensitive `union bpf_attr` and
-  `bpf_*_info` layouts live in Go. Needs `CAP_BPF`/`CAP_SYS_ADMIN`, otherwise
-  the section reports an empty set.
+  `bpf_*_info` layouts live in Go. The section checks for `CAP_BPF` (or
+  `CAP_SYS_ADMIN`) with `has_cap()` and skips cleanly when it is absent instead
+  of reporting an empty set.
 - **No `available_filter_functions` in the default run.** On a full kernel that
   file is tens of megabytes, and `read_file` loads it whole. It is available as
   `--section avail` when the operator accepts the memory cost.

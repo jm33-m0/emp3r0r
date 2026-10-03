@@ -454,6 +454,9 @@ func TestLkmUnloadInfo(t *testing.T) {
 // rather than raising; a nonexistent module must never be unloaded.
 func TestLkmUnloadMissingModule(t *testing.T) {
 	out := runModule(t, "lkm_unload.star", []string{"unload", "emp3r0r_no_such_module", "false"})
+	if strings.Contains(out, "missing CAP_SYS_MODULE") {
+		t.Skipf("environment lacks CAP_SYS_MODULE: %s", strings.TrimSpace(out))
+	}
 	if !strings.Contains(out, "delete_module failed") && !strings.Contains(out, "unloaded") {
 		t.Fatalf("unload did not report a result:\n%s", out)
 	}
@@ -654,5 +657,39 @@ func TestTetragonBlindKillExitedPid(t *testing.T) {
 	out := runModule(t, "tetragon_blind.star", []string{"kill", fmt.Sprintf("%d", pid), ""})
 	if !strings.Contains(out, "errno=3") && !strings.Contains(out, "SIGKILL sent") {
 		t.Fatalf("unexpected kill result:\n%s", out)
+	}
+}
+
+// TestTetragonBlindDryRun drives the Furtex-derived blind sequence without
+// touching the kernel. With no libbpf resolver the eBPF half degrades to a
+// reported error, the freeze is skipped and no kill is sent.
+func TestTetragonBlindDryRun(t *testing.T) {
+	out := runModule(t, "tetragon_blind.star", []string{"blind", "self", "", "true", "false"})
+	if !strings.Contains(out, "tetragon_blind sequence (dry-run)") {
+		t.Fatalf("blind did not announce the sequence:\n%s", out)
+	}
+	if !strings.Contains(out, "[1] freezing pid self") {
+		t.Fatalf("blind did not plan a freeze:\n%s", out)
+	}
+	if !strings.Contains(out, "[2] detaching monitoring BPF links") {
+		t.Fatalf("blind did not plan detach:\n%s", out)
+	}
+	if !strings.Contains(out, "CAP_BPF") && !strings.Contains(out, "libbpf unavailable") {
+		t.Fatalf("blind did not report the eBPF capability/dependency state:\n%s", out)
+	}
+	if !strings.Contains(out, "[+] done") {
+		t.Fatalf("blind did not finish:\n%s", out)
+	}
+}
+
+// TestTetragonBlindWipe checks the wipe action runs its map sweep and reports
+// libbpf unavailability rather than raising when the dependency is absent.
+func TestTetragonBlindWipe(t *testing.T) {
+	out := runModule(t, "tetragon_blind.star", []string{"wipe", "", "", "true", "false"})
+	if !strings.Contains(out, "wiping BPF event maps") {
+		t.Fatalf("wipe did not run:\n%s", out)
+	}
+	if !strings.Contains(out, "CAP_BPF") && !strings.Contains(out, "libbpf unavailable") {
+		t.Fatalf("wipe did not report the eBPF capability/dependency state:\n%s", out)
 	}
 }

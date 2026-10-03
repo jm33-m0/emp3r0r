@@ -18,31 +18,6 @@ type Program struct{}
 // Link wraps a struct bpf_link *.
 type Link struct{}
 
-// ProgInfo summarises one kernel BPF program.
-type ProgInfo struct {
-	ID       uint32
-	Type     uint32
-	Name     string
-	LoadTime uint64
-}
-
-// MapInfo summarises one kernel BPF map.
-type MapInfo struct {
-	ID         uint32
-	Type       uint32
-	Name       string
-	KeySize    uint32
-	ValueSize  uint32
-	MaxEntries uint32
-}
-
-// LinkInfo summarises one kernel BPF link.
-type LinkInfo struct {
-	ID     uint32
-	Type   uint32
-	ProgID uint32
-}
-
 func unsupported() error {
 	return fmt.Errorf("libbpf in-memory loader is unsupported on this platform")
 }
@@ -94,3 +69,6 @@ func (l *Library) MapList() ([]MapInfo, error) { return nil, unsupported() }
 
 // LinkDetach is unsupported off Linux.
 func (l *Library) LinkDetach(uint32) error { return unsupported() }
+
+// MapDeleteAll is unsupported off Linux.
+func (l *Library) MapDeleteAll(uint32) (int, error) { return 0, unsupported() }

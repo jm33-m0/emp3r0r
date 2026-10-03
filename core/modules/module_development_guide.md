@@ -478,6 +478,20 @@ Aliases: `lin_syscall`/`linux_syscall`, `lin_alloc`/`linux_alloc`,
 
 These are only available on Linux; on other platforms they return an error.
 
+### Capabilities
+
+Linux scripts check what the process is actually allowed to do instead of
+assuming root, so a privileged task is attempted when its capability is held
+and skipped when it is not (running as root simply means every capability is
+held). Both builtins read `/proc/self/status`.
+
+| Function        | Description                                                                                                                       |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `get_caps()`    | Process capability sets as `{inheritable, permitted, effective, bounding, ambient}` lists of `CAP_*` names.                       |
+| `has_cap(name)` | `True` when `name` (e.g. `"CAP_BPF"`, `"CAP_SYS_ADMIN"`, `"CAP_SYS_MODULE"`) is in the effective set. Unknown names are an error. |
+
+Only available on Linux; on other platforms they return an error.
+
 ### In-memory shared libraries (Windows and Linux)
 
 | Function                                    | Description                                                                                                                                       |
@@ -503,12 +517,13 @@ Backed by `core/lib/libbpf`, whose `WithLibrary` maps the `libbpf` dependency
 through `memdeps` for the duration of each builtin call (see §8). Enumeration
 needs `CAP_BPF`/`CAP_SYS_ADMIN`; without it the lists come back empty.
 
-| Function          | Description                                                                          |
-| ----------------- | ------------------------------------------------------------------------------------ |
-| `ebpf_progs()`    | List kernel BPF programs as `{id, type, name, load_time}` dicts.                     |
-| `ebpf_links()`    | List kernel BPF links as `{id, type, prog_id}` dicts.                                |
-| `ebpf_maps()`     | List kernel BPF maps as `{id, type, name, key_size, value_size, max_entries}` dicts. |
-| `ebpf_detach(id)` | Detach the BPF link with the given id.                                               |
+| Function            | Description                                                                                               |
+| ------------------- | --------------------------------------------------------------------------------------------------------- |
+| `ebpf_progs()`      | List kernel BPF programs as `{id, type, name, load_time, jited_len, nr_maps}` dicts.                      |
+| `ebpf_links()`      | List kernel BPF links as `{id, type, prog_id, prog_type}` dicts.                                          |
+| `ebpf_maps()`       | List kernel BPF maps as `{id, type, name, key_size, value_size, max_entries}` dicts.                      |
+| `ebpf_detach(id)`   | Detach the BPF link with the given id.                                                                    |
+| `ebpf_map_wipe(id)` | Delete every element of the BPF map with the given id; returns `{id, deleted, error}` (Furtex wipe_maps). |
 
 ### Signed kernel drivers (Windows)
 
