@@ -1,5 +1,18 @@
 # Changelog
 
+## [4.22.0](https://github.com/jm33-m0/emp3r0r/compare/v4.21.1...v4.22.0) (2026-10-03)
+
+
+### Features
+
+* **ebpf:** `uprobe` support ([fa32b5b](https://github.com/jm33-m0/emp3r0r/commit/fa32b5b3387da49778cc50cc3c45148209ec128d))
+* **elf:** ELF parsing and code searching ([35990ae](https://github.com/jm33-m0/emp3r0r/commit/35990ae9e68f7c786c4a5b8a920a2f7fd86a01af))
+
+
+### Bug Fixes
+
+* **memmod:** support 5 args ([1d6469f](https://github.com/jm33-m0/emp3r0r/commit/1d6469fa515873e03bcdd5fa489d5bbcc50f6adb))
+
 ## [4.21.1](https://github.com/jm33-m0/emp3r0r/compare/v4.21.0...v4.21.1) (2026-10-03)
 
 
