@@ -64,9 +64,14 @@ type UprobeEvent struct {
 }
 
 // ArgRegisters lists the x86_64 registers a uprobe can read an argument from,
-// in the order the BPF config map expects. The module is amd64-only because the
-// kernel's struct pt_regs layout (and therefore this order) differs per arch.
-var ArgRegisters = []string{"RAX", "RDI", "RSI", "RDX", "RCX", "R8", "R9", "RBP", "RSP"}
+// in the order the BPF config map expects. The argument registers come first,
+// followed by the general-purpose registers (including callee-saved ones) a
+// caller may leave the value in. The module is amd64-only because the kernel's
+// struct pt_regs layout (and therefore this order) differs per arch.
+var ArgRegisters = []string{
+	"RAX", "RDI", "RSI", "RDX", "RCX", "R8", "R9", "RBP", "RSP",
+	"RBX", "R12", "R13", "R14", "R15",
+}
 
 // ArgRegisterIndex maps a register name (case-insensitive) to its position in
 // ArgRegisters, or -1 when unknown.

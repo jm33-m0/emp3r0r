@@ -59,6 +59,7 @@ func TestArgRegisterIndex(t *testing.T) {
 	want := map[string]int{
 		"RAX": 0, "RDI": 1, "RSI": 2, "RDX": 3, "RCX": 4,
 		"R8": 5, "R9": 6, "RBP": 7, "RSP": 8,
+		"RBX": 9, "R12": 10, "R13": 11, "R14": 12, "R15": 13,
 	}
 	for name, idx := range want {
 		if got := ArgRegisterIndex(name); got != idx {
