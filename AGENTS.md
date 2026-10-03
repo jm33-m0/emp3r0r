@@ -5,6 +5,42 @@
 - Try not to `grep` from `stdout` of a command. Always prefer writing logs to disk before `grep`.
 - `install.py` and `build.py` are used to build release tarballs. Do NOT use them for testing as it would take too long to finish.
 
+## Build standards (C and payloads)
+
+- **`zig` is the project's compiler.** emp3r0r ships a pinned zig toolchain
+  (`core/build.py`: `REQUIRED_ZIG_VERSION`, `install_zig`). It is installed
+  under `<prefix>/lib/emp3r0r/zig`, symlinked to `/usr/local/bin/zig`, copied
+  into the operator kit (`package_operator_bundle`) and installed by
+  `install.py`, so the C2 can build C modules on any host. Prefer `zig cc`
+  (and `zig c++`/`zig ar`/`zig ranlib`) over a system toolchain, and keep the
+  version in sync with `Dockerfile` and `.github/workflows/test.yml`.
+- **All agent payloads that link C are built with zig.** `core/build.py` sets
+  `CC="zig cc -target ..."` per target:
+  - cgo Linux stubs (amd64/386/arm64/riscv64): `*-linux-musl`, statically
+    linked with musl.
+  - Linux shared objects: `*-linux-gnu.2.17` (`riscv64-linux-musl`), pinned to
+    the oldest supported glibc.
+  - Windows shared objects (DLLs): `*-windows-gnu`.
+  - Pure-Go stubs (`build_agent_pure`, `CGO_ENABLED=0`) and the C2 binaries do
+    not need a C compiler.
+  The builder image replaces mingw-w64 with `zig cc` shims, so anything that
+  expects `*-w64-mingw32-gcc` transparently uses zig as well.
+- **C modules use zig too**: the Linux stager, `libbpf`, `hello_linux`, and the
+  Windows loader default to `zig cc -target ...`.
+- **Freestanding, position-independent stages** (raw shellcode, embedded
+  downloader/blob stages, unpacker stubs) compile and link with `-nostdlib` and
+  pin no libc target: no runtime, no dynamic linker, no ABI dependency.
+- **Hosted artifacts that need a runtime** (Linux `SO`/`EXE` stagers, the agent
+  `c-shared` object) link glibc **dynamically**; never link glibc statically.
+  Pin the oldest ABI that provides the symbols the artifact uses, via a zig
+  target:
+  - `<arch>-linux-gnu.2.17` when relying on the pre-2.34 ABI (for example the
+    glibc-internal `__libc_dlopen_mode`).
+  - `<arch>-linux-gnu.2.34` when relying on `dlopen`/`dlsym`/`dlclose`, which
+    moved from `libdl.so.2` into `libc.so.6` in glibc 2.34.
+  Use the per-arch targets from `core/build.py` (`x86_64-linux-gnu.2.17`,
+  `aarch64-linux-gnu.2.17`, ...).
+
 ## Code style
 
 - Run `gofumpt -w` and `goimports -w` on every changed `.go` file. `gofmt` alone is not sufficient: the project expects the stricter gofumpt formatting and goimports group/ordering.
