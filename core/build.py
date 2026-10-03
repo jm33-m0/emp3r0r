@@ -19,6 +19,17 @@ Commands:
   --release           Build and package full release tarball (emp3r0r.tar.zst)
   --uninstall         Remove installed files and completions from install prefix
   --package-operator  Package existing installed files into emp3r0r-operator-kit.tar.zst
+  --build-payload     Build exactly one agent payload (see single payload options)
+
+Single payload options (only with --build-payload):
+  --payload-kind TYPE     shared (c-shared object), cgo (cgo exe), or pure (pure Go exe)
+  --payload-os OS         linux or windows (default: linux)
+  --payload-arch ARCH     target arch (default: amd64)
+  --payload-output PATH   output file path (required)
+  --payload-debug         build without garble/stripping
+  --payload-magic-string S
+                          MagicString to embed so the payload interoperates
+                          with an already-built C2 (random when omitted)
 
 Target selection options (combinable with any build command):
   --lightweight       Build only linux/amd64 and windows/amd64 exe/dll targets.
@@ -273,9 +284,19 @@ def check_required_go() -> str:
         log_warn(f"Go {REQUIRED_GO_VERSION} is recommended, found {current_ver}")
 
     goroot = pathlib.Path("/usr/local/go")
+    official_go = goroot / "bin" / "go"
     gopath = pathlib.Path(os.environ.get("GOPATH", pathlib.Path.home() / "go"))
 
-    os.environ["GOROOT"] = str(goroot)
+    # Only pin GOROOT when the canonical /usr/local/go is a real toolchain.
+    # Hosts where Go lives elsewhere (e.g. actions/setup-go under
+    # /opt/hostedtoolcache) would otherwise export a nonexistent GOROOT and
+    # every subsequent go invocation would fail; respect the toolchain's own
+    # GOROOT in that case.
+    if official_go.is_file() and os.access(official_go, os.X_OK):
+        os.environ["GOROOT"] = str(goroot)
+        actual_go = str(official_go)
+    else:
+        actual_go = go_bin
     os.environ["GOTOOLCHAIN"] = "local"
 
     path_entries = os.environ.get("PATH", "").split(os.path.pathsep)
@@ -289,12 +310,6 @@ def check_required_go() -> str:
             new_paths.append(p)
     os.environ["PATH"] = os.path.pathsep.join(new_paths)
 
-    official_go = goroot / "bin" / "go"
-    actual_go = (
-        str(official_go)
-        if official_go.is_file() and os.access(official_go, os.X_OK)
-        else go_bin
-    )
     log_info(f"Using Go toolchain: {actual_go} (version {current_ver})")
     return actual_go
 
@@ -639,7 +654,7 @@ def build_agent_pure(
     if extra_extldflags:
         current_ldflags += f" -extldflags '{extra_extldflags}'"
 
-    out_file = temp_dir / output
+    out_file = resolve_output_path(output, temp_dir)
     env = os.environ.copy()
     env["CGO_ENABLED"] = "0"
     env["GOARCH"] = arch
@@ -691,7 +706,7 @@ def build_agent_cgo(
     if extra_extldflags:
         extldflags += f" {extra_extldflags}"
 
-    out_file = temp_dir / output
+    out_file = resolve_output_path(output, temp_dir)
     env = os.environ.copy()
     env["CGO_ENABLED"] = "1"
     env["CC"] = cc_cmd
@@ -746,7 +761,7 @@ def build_shared_object(
     win_gui_flag = (
         "-H=windowsgui " if (arg1 != "--debug" and os_name == "windows") else ""
     )
-    out_file = temp_dir / output
+    out_file = resolve_output_path(output, temp_dir)
 
     env = os.environ.copy()
     env["CGO_ENABLED"] = "1"
@@ -865,6 +880,82 @@ def resolve_target_filter(args: "argparse.Namespace") -> frozenset[str]:
     return frozenset()  # build all
 
 
+def resolve_output_path(output: str, temp_dir: pathlib.Path) -> pathlib.Path:
+    """Resolve a build output path against the temporary staging directory.
+
+    Callers may pass a bare filename (staged under temp_dir, as the full build
+    does) or an absolute path (used by --build-payload to drop exactly one
+    artefact where the caller asked for it).
+    """
+    out_file = pathlib.Path(output)
+    if not out_file.is_absolute():
+        out_file = temp_dir / out_file
+    return out_file
+
+
+def resolve_mod_opt(
+    core_dir: pathlib.Path, go_bin: str, auto_vendor: bool = True
+) -> str:
+    """Return the ``-mod`` flag for a Go build.
+
+    Uses the existing vendor/ tree when present. When it is absent and
+    ``auto_vendor`` is set (the full build) the dependencies are vendored so
+    the resulting tree is self-contained; a targeted --build-payload build
+    passes ``auto_vendor=False`` and falls back to the module cache instead of
+    rewriting the source tree for a single artefact.
+    """
+    vendor_dir = core_dir / "vendor"
+    mod_txt = vendor_dir / "modules.txt"
+
+    if vendor_dir.is_dir() and mod_txt.is_file():
+        log_info("Using existing vendor/ directory for local modules")
+        return "-mod=vendor"
+
+    if not auto_vendor:
+        log_info("vendor/ directory not found; using the Go module cache")
+        return ""
+
+    log_info(
+        "vendor/ directory missing or incomplete, attempting to vendor dependencies..."
+    )
+    res = run_cmd([go_bin, "mod", "vendor"], check=False, cwd=core_dir)
+    if res.returncode == 0:
+        log_info("Successfully vendored modules")
+        return "-mod=vendor"
+    log_warn("go mod vendor failed; falling back to default Go module resolution")
+    return ""
+
+
+def resolve_gobuild(
+    go_bin: str, mod_opt: str, debug: bool, ldflags: str
+) -> tuple[str, str, str]:
+    """Resolve the Go build command and ldflags for the requested mode.
+
+    Release builds are obfuscated with garble unless ``EMP3R0R_DISABLE_GARBLE``
+    is set; debug builds (and garble-disabled release builds) use plain go and
+    keep their symbols. Returns ``(gobuild_cmd, build_opt, ldflags)``.
+    """
+    if debug:
+        return go_bin, f"build {mod_opt}".strip(), ldflags
+
+    disable_garble = os.environ.get("EMP3R0R_DISABLE_GARBLE", "0").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+    ldflags += " -s -w"
+    if disable_garble:
+        log_info("Garble disabled by EMP3R0R_DISABLE_GARBLE, using plain go build")
+        return go_bin, f"build {mod_opt}".strip(), ldflags
+
+    log_info("Using garble for obfuscation")
+    if not shutil.which("garble"):
+        log_error(
+            "garble not found. It should be installed in the builder container."
+        )
+    return "garble", f"-tiny -seed=random build {mod_opt}".strip(), ldflags
+
+
 # ---------------------------------------------------------------------------
 # Core build function
 # ---------------------------------------------------------------------------
@@ -893,25 +984,7 @@ def build(
     go_bin = check_required_go()
     check_disk_space(core_dir)
 
-    vendor_dir = core_dir / "vendor"
-    mod_txt = vendor_dir / "modules.txt"
-
-    if vendor_dir.is_dir() and mod_txt.is_file():
-        log_info("Using existing vendor/ directory for local modules")
-        mod_opt = "-mod=vendor"
-    else:
-        log_info(
-            "vendor/ directory missing or incomplete, attempting to vendor dependencies..."
-        )
-        res = run_cmd([go_bin, "mod", "vendor"], check=False, cwd=core_dir)
-        if res.returncode == 0:
-            log_info("Successfully vendored modules")
-            mod_opt = "-mod=vendor"
-        else:
-            log_warn(
-                "go mod vendor failed; falling back to default Go module resolution"
-            )
-            mod_opt = ""
+    mod_opt = resolve_mod_opt(core_dir, go_bin)
 
     check_zig()
     assemble_smw(core_dir)
@@ -929,30 +1002,9 @@ def build(
         f"-X 'github.com/jm33-m0/emp3r0r/core/internal/def.Version={version}'"
     )
 
-    disable_garble = os.environ.get("EMP3R0R_DISABLE_GARBLE", "0").lower() in (
-        "1",
-        "true",
-        "yes",
+    gobuild_cmd, build_opt, ldflags = resolve_gobuild(
+        go_bin, mod_opt, arg1 == "--debug", ldflags
     )
-
-    if arg1 == "--debug":
-        gobuild_cmd = go_bin
-        build_opt = f"build {mod_opt}".strip()
-    else:
-        if disable_garble:
-            gobuild_cmd = go_bin
-            build_opt = f"build {mod_opt}".strip()
-            ldflags += " -s -w"
-            log_info("Garble disabled by EMP3R0R_DISABLE_GARBLE, using plain go build")
-        else:
-            gobuild_cmd = "garble"
-            build_opt = f"-tiny -seed=random build {mod_opt}".strip()
-            ldflags += " -s -w"
-            log_info("Using garble for obfuscation")
-            if not shutil.which("garble"):
-                log_error(
-                    "garble not found. It should be installed in the builder container."
-                )
 
     if target_filter:
         log_info(
@@ -1594,6 +1646,101 @@ def create_tar(core_dir: pathlib.Path, temp_dir: pathlib.Path) -> None:
     log_success("Packaged emp3r0r")
 
 
+# Payload kinds --build-payload can produce. Each maps to the same helper the
+# full build uses for that artefact, so a single payload keeps the full
+# build's toolchain, tags, ldflags, and per-build MagicString/Version.
+PAYLOAD_KINDS = ("shared", "cgo", "pure")
+
+
+def build_single_payload(args: argparse.Namespace) -> None:
+    """Build exactly one agent payload to ``--payload-output``.
+
+    Mirrors the full build flags for the requested artefact: the same Go
+    toolchain/garble policy, the same zig cross-compiler (Linux glibc 2.17),
+    tags, buildmode, and the ``MagicString``/``Version`` ldflags. Pass
+    ``--payload-magic-string`` to match an already-built C2; otherwise a fresh
+    per-build string is generated, exactly like the full build does.
+    """
+    core_dir = pathlib.Path(__file__).resolve().parent
+
+    if not args.payload_output:
+        log_error("--payload-output is required with --build-payload")
+
+    go_bin = check_required_go()
+    mod_opt = resolve_mod_opt(core_dir, go_bin, auto_vendor=False)
+
+    kind = args.payload_kind
+    if kind in ("shared", "cgo"):
+        # These link against libc through zig; pure Go does not need a C compiler.
+        check_zig()
+
+    magic_str = args.payload_magic_string or hashlib.sha256(
+        os.urandom(32)
+    ).hexdigest()
+    version = get_version(core_dir)
+    ldflags = (
+        f"-v -X 'github.com/jm33-m0/emp3r0r/core/internal/def.MagicString={magic_str}' "
+        f"-X 'github.com/jm33-m0/emp3r0r/core/internal/def.Version={version}'"
+    )
+    gobuild_cmd, build_opt, ldflags = resolve_gobuild(
+        go_bin, mod_opt, args.payload_debug, ldflags
+    )
+    if not args.payload_debug:
+        ldflags += " -buildid="
+
+    arg1 = "--debug" if args.payload_debug else "--build"
+    output = args.payload_output
+
+    with tempfile.TemporaryDirectory(prefix="emp3r0r-payload-") as tmp_dir:
+        temp_dir = pathlib.Path(tmp_dir)
+        if kind == "shared":
+            build_shared_object(
+                args.payload_arch,
+                args.payload_os,
+                output,
+                arg1,
+                ldflags,
+                temp_dir,
+                core_dir,
+                gobuild_cmd,
+                build_opt,
+            )
+        elif kind == "cgo":
+            build_agent_cgo(
+                args.payload_arch,
+                args.payload_os,
+                output,
+                "-buildmode=pie",
+                "-static-pie",
+                arg1,
+                ldflags,
+                temp_dir,
+                core_dir,
+                gobuild_cmd,
+                build_opt,
+            )
+        elif kind == "pure":
+            build_agent_pure(
+                args.payload_arch,
+                args.payload_os,
+                output,
+                "",
+                "",
+                arg1,
+                ldflags,
+                temp_dir,
+                core_dir,
+                gobuild_cmd,
+                build_opt,
+            )
+        else:
+            log_error(f"Unknown payload kind: {kind}")
+
+    log_success(
+        f"Built {kind} payload for {args.payload_os}/{args.payload_arch} at {output}"
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="emp3r0r Core Build and Installation Script",
@@ -1633,6 +1780,14 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Package existing install into operator kit",
     )
+    group.add_argument(
+        "--build-payload",
+        action="store_true",
+        help=(
+            "Build a single agent payload to --payload-output, using the same "
+            "toolchain, tags, and ldflags as the full build"
+        ),
+    )
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -1668,6 +1823,47 @@ def parse_args() -> argparse.Namespace:
         ),
     )
 
+    # ── Single payload ───────────────────────────────────────────────────────
+    pay_group = parser.add_argument_group(
+        "single payload",
+        "Options for --build-payload. Builds exactly one agent artefact.",
+    )
+    pay_group.add_argument(
+        "--payload-kind",
+        choices=PAYLOAD_KINDS,
+        default="shared",
+        help="Artefact kind: shared=c-shared object, cgo=cgo executable, pure=pure Go executable",
+    )
+    pay_group.add_argument(
+        "--payload-os",
+        choices=["linux", "windows"],
+        default="linux",
+        help="Target OS for the payload (default: linux)",
+    )
+    pay_group.add_argument(
+        "--payload-arch",
+        default="amd64",
+        help="Target arch for the payload (default: amd64)",
+    )
+    pay_group.add_argument(
+        "--payload-output",
+        default="",
+        help="Output path (absolute) for the payload; required with --build-payload",
+    )
+    pay_group.add_argument(
+        "--payload-debug",
+        action="store_true",
+        help="Build the payload without garble/stripping",
+    )
+    pay_group.add_argument(
+        "--payload-magic-string",
+        default="",
+        help=(
+            "MagicString to embed via ldflags so the payload interoperates with "
+            "an already-built C2; random when omitted"
+        ),
+    )
+
     return parser.parse_args()
 
 
@@ -1688,6 +1884,10 @@ def main() -> None:
 
     if args.package_operator:
         package_operator_bundle(prefix, core_dir)
+        return
+
+    if args.build_payload:
+        build_single_payload(args)
         return
 
     mode = "--install"

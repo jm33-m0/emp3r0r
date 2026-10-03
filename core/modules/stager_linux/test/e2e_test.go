@@ -159,37 +159,41 @@ func buildAgentSharedLibrary(t *testing.T) string {
 			return
 		}
 		outPath := filepath.Join(dir, "agent.so")
-		// Build with the same toolchain as core/build.py build_shared_object(),
-		// not the host default compiler: zig cc pinned to glibc 2.17. lld leaves
-		// the amd64 .init_array addend only in the RELA entry, which
-		// tools.ConvertSharedObjectToShellcode materializes before malasada
-		// reads the array. Testing with plain host gcc would miss both.
-		//   - tags:       "release emp3r0r_so"
-		//   - -buildmode c-shared
-		//   - CC:         zig cc -target x86_64-linux-gnu.2.17
-		//   - ldflags:    -s -w -linkmode external
-		//   - extldflags: -s -Wl,--gc-sections  (libc stays linked: the cgo
-		//     runtime and memmod need symbols such as `environ`)
-		// "emp3r0r_so" activates main_cgo_shared.go which exports the `main`
-		// symbol that malasada's stage0 calls after reflective loading.
+		// Build the agent through the project's real build entry point
+		// (core/build.py) instead of a hand-rolled go build, so the test
+		// exercises exactly the shared object users ship: zig cc pinned to
+		// glibc 2.17, the "release emp3r0r_so" tags and c-shared buildmode (the
+		// latter activates main_cgo_shared.go, which exports the `main` symbol
+		// malasada's stage0 calls after reflective loading), and the same
+		// MagicString/Version ldflags. lld leaves the amd64 .init_array addend
+		// only in the RELA entry, which tools.ConvertSharedObjectToShellcode
+		// materializes; testing with the host gcc would miss that.
+		//
+		// This test binary is the C2, so it must share the payload's
+		// MagicString (the static PSK used for check-in): pass its embedded
+		// def.MagicString through --payload-magic-string. EMP3R0R_DISABLE_GARBLE
+		// keeps the build on plain go, since CI installs zig but not garble.
 		if _, lookErr := exec.LookPath("zig"); lookErr != nil {
 			agentSOErr = fmt.Errorf("zig is required to build the real agent shared object: %w", lookErr)
 			return
 		}
 		cmdBuildAgent := exec.Command(
-			"go", "build",
-			"-buildmode=c-shared",
-			"-tags", "release emp3r0r_so",
-			"-trimpath",
-			"-buildvcs=false",
-			"-ldflags", "-s -w -linkmode external -extldflags '-s -Wl,--gc-sections'",
-			"-o", outPath,
-			"../../../cmd/agent",
+			"python3", filepath.Join("..", "..", "..", "build.py"),
+			"--build-payload",
+			"--payload-kind", "shared",
+			"--payload-os", "linux",
+			"--payload-arch", "amd64",
+			"--payload-output", outPath,
+			"--payload-magic-string", def.MagicString,
 		)
-		cmdBuildAgent.Env = append(os.Environ(), "CGO_ENABLED=1", "CC=zig cc -target x86_64-linux-gnu.2.17")
+		cmdBuildAgent.Env = append(os.Environ(), "EMP3R0R_DISABLE_GARBLE=1")
 		buildOut, err := cmdBuildAgent.CombinedOutput()
 		if err != nil {
-			agentSOErr = fmt.Errorf("build agent shared library: %w\nOutput: %s", err, buildOut)
+			agentSOErr = fmt.Errorf("build agent shared library via build.py: %w\nOutput: %s", err, buildOut)
+			return
+		}
+		if !util.IsFileExist(outPath) {
+			agentSOErr = fmt.Errorf("build.py reported success but %s was not produced", outPath)
 			return
 		}
 		agentSODir = dir
