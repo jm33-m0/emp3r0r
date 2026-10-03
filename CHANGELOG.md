@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.21.1](https://github.com/jm33-m0/emp3r0r/compare/v4.21.0...v4.21.1) (2026-10-03)
+
+
+### Bug Fixes
+
+* **ebpf:** enable ebpf features of linux modules ([8572b03](https://github.com/jm33-m0/emp3r0r/commit/8572b03f190caba7db1c889e226d22e1060610d8))
+* **stager_linux:** link EXE/SO against glibc so dynload works ([475e094](https://github.com/jm33-m0/emp3r0r/commit/475e094925fa7e1037b8b0d3d268c18427ec4604))
+
 ## [4.21.0](https://github.com/jm33-m0/emp3r0r/compare/v4.20.2...v4.21.0) (2026-10-02)
 
 
