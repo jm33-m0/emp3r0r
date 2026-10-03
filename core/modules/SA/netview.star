@@ -82,21 +82,21 @@ def netview(domain=None):
         buf = read_ptr(buf_ptr, 0)
         count = read_uint32(read_ptr_mem, 0)
 
-        print("Domain Computers (%s):" % (domain if domain else "Local Domain"))
+        print(sprintf("Domain Computers (%s):", domain if domain else "Local Domain"))
         print("----------------------------------------")
         # SERVER_INFO_101 size on x64 is 24 bytes: sv101_platform_id(0), sv101_name(8), sv101_version_major(16), etc.
         for i in range(count):
             entry_addr = buf + i * 24
             name_ptr = read_ptr(entry_addr, 8)
             name = read_wstring(name_ptr)
-            print("\\\\%s" % name)
+            print(sprintf("\\\\%s", name))
 
         if buf != 0:
             win_call("netapi32.dll", "NetApiBufferFree", buf)
     else:
         err_code = res.get("err_code", 0)
         err_msg = res.get("error", "")
-        print("[-] NetServerEnum failed: status %d (Error %d: %s)" % (stat, err_code, err_msg))
+        print(sprintf("[-] NetServerEnum failed: status %d (Error %d: %s)", stat, err_code, err_msg))
 
     win_free(buf_ptr)
     win_free(read_ptr_mem)

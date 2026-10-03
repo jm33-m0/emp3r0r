@@ -14,7 +14,7 @@ def adv_audit_policies():
         err_code = res.get("err_code", 0)
         err_msg = res.get("error", "")
         win_free(policy_ptr_ptr)
-        print("[-] AuditQuerySystemPolicy status %d (Error %d: %s)" % (res["r1"], err_code, err_msg))
+        print(sprintf("[-] AuditQuerySystemPolicy status %d (Error %d: %s)", res["r1"], err_code, err_msg))
         return "Fail"
 
     p_policy = read_ptr(policy_ptr_ptr, 0)

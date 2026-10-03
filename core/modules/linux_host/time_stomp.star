@@ -58,7 +58,7 @@ def main(*args):
 
     errno = _set_times(path, sec, 0)
     if errno != 0:
-        print("[!] utimensat %s failed (errno=%d)" % (path, errno))
-        return "ERROR: utimensat errno=%d" % errno
-    print("[+] %s: atime=mtime=%d (%s)" % (path, sec, mode))
+        print(sprintf("[!] utimensat %s failed (errno=%d)", path, errno))
+        return sprintf("ERROR: utimensat errno=%d", errno)
+    print(sprintf("[+] %s: atime=mtime=%d (%s)", path, sec, mode))
     return "OK"

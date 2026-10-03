@@ -97,7 +97,7 @@ def net_use_add(device_name, share_name, password, username, persist=False, priv
     else:
         err_code = res.get("err_code", 0)
         err_msg = res.get("error", "")
-        print("Unable to map share: status %d (Error %d: %s)" % (res["r1"], err_code, err_msg))
+        print(sprintf("Unable to map share: status %d (Error %d: %s)", res["r1"], err_code, err_msg))
         return "Fail"
 
 def net_use_delete(target, persist=False, force=False):
@@ -109,12 +109,12 @@ def net_use_delete(target, persist=False, force=False):
     if p_target: win_free(p_target)
 
     if res["r1"] == 0:
-        print("%s was deleted successfully." % target)
+        print(sprintf("%s was deleted successfully.", target))
         return "OK"
     else:
         err_code = res.get("err_code", 0)
         err_msg = res.get("error", "")
-        print("Unable to delete share: status %d (Error %d: %s)" % (res["r1"], err_code, err_msg))
+        print(sprintf("Unable to delete share: status %d (Error %d: %s)", res["r1"], err_code, err_msg))
         return "Fail"
 
 def net_use_list(device_name=None):
@@ -127,7 +127,7 @@ def net_use_list(device_name=None):
         err_code = res.get("err_code", 0)
         err_msg = res.get("error", "")
         win_free(h_enum_ptr)
-        print("WNetOpenEnumW failed with status %d (Error %d: %s)" % (res["r1"], err_code, err_msg))
+        print(sprintf("WNetOpenEnumW failed with status %d (Error %d: %s)", res["r1"], err_code, err_msg))
         return "Fail"
 
     h_enum = read_ptr(h_enum_ptr, 0)
@@ -139,7 +139,7 @@ def net_use_list(device_name=None):
     size_ptr = win_alloc(4)
 
     if not device_name:
-        print("%s %s %s %s" % (pad("Status", 12), pad("Local", 8), pad("Remote", 32), "Network"))
+        print(sprintf("%s %s %s %s", pad("Status", 12), pad("Local", 8), pad("Remote", 32), "Network"))
         print("-------------------------------------------------------------------------------------------------")
 
     while True:
@@ -162,9 +162,9 @@ def net_use_list(device_name=None):
             provider = read_wstring(read_ptr(entry_addr, 40))
 
             if not device_name:
-                print("%s %s %s %s" % (pad("OK", 12), pad(local_name, 8), pad(remote_name, 32), provider))
+                print(sprintf("%s %s %s %s", pad("OK", 12), pad(local_name, 8), pad(remote_name, 32), provider))
             elif device_name.lower() in (local_name.lower(), remote_name.lower()):
-                print("Local name        %s\nRemote name       %s\nNetwork           %s\n" % (local_name, remote_name, provider))
+                print(sprintf("Local name        %s\nRemote name       %s\nNetwork           %s\n", local_name, remote_name, provider))
 
     win_free(buf)
     win_free(entries_ptr)

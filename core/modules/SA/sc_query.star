@@ -121,7 +121,7 @@ def enumerate_services():
             state = read_uint32(entry_addr, 20)
             pid = read_uint32(entry_addr, 44)
 
-            print("%s %s %s %s" % (pad(svc_name, 44), pad(display_name, 44), pad(get_state_string(state), 10), str(pid)))
+            print(sprintf("%s %s %s %s", pad(svc_name, 44), pad(display_name, 44), pad(get_state_string(state), 10), str(pid)))
 
     win_free(buf)
     win_free(bytes_needed)

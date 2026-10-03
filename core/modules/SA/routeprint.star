@@ -15,7 +15,7 @@ def format_ip(ip_uint32):
     b2 = (ip_uint32 >> 8) & 0xFF
     b3 = (ip_uint32 >> 16) & 0xFF
     b4 = (ip_uint32 >> 24) & 0xFF
-    return "%d.%d.%d.%d" % (b1, b2, b3, b4)
+    return sprintf("%d.%d.%d.%d", b1, b2, b3, b4)
 
 def routeprint():
     # MIB_IPFORWARDTABLE structure
@@ -36,14 +36,14 @@ def routeprint():
         err_code = res2.get("err_code", 0)
         err_msg = res2.get("error", "")
         win_free(table_buf)
-        print("[-] GetIpForwardTable failed with status %d (Error %d: %s)" % (res2["r1"], err_code, err_msg))
+        print(sprintf("[-] GetIpForwardTable failed with status %d (Error %d: %s)", res2["r1"], err_code, err_msg))
         return "Fail"
 
     num_entries = read_uint32(table_buf, 0)
 
     print("===========================================================================")
     print("Active Routes:")
-    print("%s %s %s %s %s" % (pad("Network Destination", 20), pad("Netmask", 18), pad("Gateway", 18), pad("Interface", 10), "Metric"))
+    print(sprintf("%s %s %s %s %s", pad("Network Destination", 20), pad("Netmask", 18), pad("Gateway", 18), pad("Interface", 10), "Metric"))
     print("===========================================================================")
 
     # MIB_IPFORWARDROW struct size: 56 bytes (x64 / x86)
@@ -58,7 +58,7 @@ def routeprint():
         if_idx = read_uint32(row_addr, 16)
         metric = read_uint32(row_addr, 36)
 
-        print("%s %s %s %s %s" % (pad(dest, 20), pad(mask, 18), pad(nexthop, 18), pad(str(if_idx), 10), str(metric)))
+        print(sprintf("%s %s %s %s %s", pad(dest, 20), pad(mask, 18), pad(nexthop, 18), pad(str(if_idx), 10), str(metric)))
 
     print("===========================================================================")
     win_free(table_buf)

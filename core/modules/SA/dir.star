@@ -15,12 +15,12 @@ def list_dir(search_path="C:\\*"):
         err_code = res.get("err_code", 0)
         err_msg = res.get("error", "")
         win_free(find_data)
-        print("[-] FindFirstFileW failed for %s: error %d (%s)" % (search_path, err_code, err_msg))
+        print(sprintf("[-] FindFirstFileW failed for %s: error %d (%s)", search_path, err_code, err_msg))
         return "Fail"
 
-    print("Directory listing for %s:" % search_path)
+    print(sprintf("Directory listing for %s:", search_path))
     print("===========================================================================")
-    print("%s %s %s" % (pad("Type", 8), pad("Size (bytes)", 16), "Name"))
+    print(sprintf("%s %s %s", pad("Type", 8), pad("Size (bytes)", 16), "Name"))
     print("-------- ---------------- -------------------------------------------------")
 
     for _ in range(4096):
@@ -34,7 +34,7 @@ def list_dir(search_path="C:\\*"):
         type_str = "<DIR>" if is_dir else "<FILE>"
         size_str = "" if is_dir else str(file_size)
 
-        print("%s %s %s" % (pad(type_str, 8), pad(size_str, 16), file_name))
+        print(sprintf("%s %s %s", pad(type_str, 8), pad(size_str, 16), file_name))
 
         res_next = win_call("kernel32.dll", "FindNextFileW", h_find, find_data)
         if res_next["r1"] == 0:

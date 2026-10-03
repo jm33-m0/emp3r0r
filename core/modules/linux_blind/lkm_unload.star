@@ -75,15 +75,15 @@ def _info(name):
         return "ERROR: name required"
     base = "/sys/module/" + name
     if not exists(base):
-        print("[!] module %s not loaded" % name)
+        print(sprintf("[!] module %s not loaded", name))
         return "ERROR: not loaded"
     for field in ("version", "refcnt", "srcversion"):
-        val = read_file("%s/%s" % (base, field), default="").strip()
+        val = read_file(sprintf("%s/%s", base, field), default="").strip()
         if val:
             print(sprintf("  %-11s %s", field + ":", val))
     holders = list_dir(base + "/holders")
     print(sprintf("  %-11s %s", "holders:", " ".join(holders) if holders else "(none)"))
-    print("[*] unloading %s removes the ftrace/kprobe hooks it registered" % name)
+    print(sprintf("[*] unloading %s removes the ftrace/kprobe hooks it registered", name))
     return "OK"
 
 
@@ -94,14 +94,14 @@ def _unload(name, force):
     if not has_cap("CAP_SYS_MODULE"):
         # delete_module always requires CAP_SYS_MODULE; report the missing
         # capability instead of a generic EPERM from the syscall.
-        print("[!] missing CAP_SYS_MODULE; skipping delete_module(%s)" % name)
+        print(sprintf("[!] missing CAP_SYS_MODULE; skipping delete_module(%s)", name))
         return "OK"
     flags = O_NONBLOCK | O_TRUNC if force else O_NONBLOCK
-    print("[*] delete_module(%s, flags=%d)%s" % (name, flags, " FORCE" if force else ""))
+    print(sprintf("[*] delete_module(%s, flags=%d)%s", name, flags, " FORCE" if force else ""))
     res = sys_call("delete_module", name, flags)
     errno = res["errno"]
     if errno == 0:
-        print("[+] module %s unloaded" % name)
+        print(sprintf("[+] module %s unloaded", name))
         return "OK"
     hints = {
         16: "EBUSY: module in use; freeze the EDR first or retry with --force",
@@ -110,8 +110,8 @@ def _unload(name, force):
         2: "ENOENT: module not loaded",
     }
     hint = hints.get(errno, "")
-    print("[!] delete_module failed (errno=%d) %s" % (errno, hint))
-    return "ERROR: errno=%d" % errno
+    print(sprintf("[!] delete_module failed (errno=%d) %s", errno, hint))
+    return sprintf("ERROR: errno=%d", errno)
 
 
 def main(*args):
@@ -127,7 +127,7 @@ def main(*args):
 
     if action == "list":
         n = _list()
-        print("[*] %d module(s)" % n)
+        print(sprintf("[*] %d module(s)", n))
         return "OK"
     if action == "hunt":
         return _hunt()
@@ -135,5 +135,5 @@ def main(*args):
         return _info(name)
     if action == "unload":
         return _unload(name, force)
-    print("[!] unknown action: %s" % action)
+    print(sprintf("[!] unknown action: %s", action))
     return "ERROR: unknown action"

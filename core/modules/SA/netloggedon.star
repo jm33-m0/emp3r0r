@@ -79,7 +79,7 @@ def getnetloggedon(server=None):
         buf = read_ptr(buf_ptr, 0)
         count = read_uint32(read_ptr_mem, 0)
 
-        print("Users logged on to %s:" % (server if server else "Local Machine"))
+        print(sprintf("Users logged on to %s:", server if server else "Local Machine"))
         print("----------------------------------------")
         # WKSTA_USER_INFO_1 size on x64 is 32 bytes:
         # wkui1_username(0), wkui1_logon_domain(8), wkui1_oth_domains(16), wkui1_logon_server(24)
@@ -89,9 +89,9 @@ def getnetloggedon(server=None):
             domain = read_wstring(read_ptr(entry_addr, 8))
             logon_server = read_wstring(read_ptr(entry_addr, 24))
 
-            print("Username:     %s" % username)
-            print("Domain:       %s" % domain)
-            print("Logon server: %s" % logon_server)
+            print(sprintf("Username:     %s", username))
+            print(sprintf("Domain:       %s", domain))
+            print(sprintf("Logon server: %s", logon_server))
             print("----------------------------------------")
 
         if buf != 0:
@@ -99,7 +99,7 @@ def getnetloggedon(server=None):
     else:
         err_code = res.get("err_code", 0)
         err_msg = res.get("error", "")
-        print("[-] NetWkstaUserEnum failed: status %d (Error %d: %s)" % (stat, err_code, err_msg))
+        print(sprintf("[-] NetWkstaUserEnum failed: status %d (Error %d: %s)", stat, err_code, err_msg))
 
     win_free(buf_ptr)
     win_free(read_ptr_mem)

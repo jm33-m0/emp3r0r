@@ -37,7 +37,7 @@ def format_ip(ip_uint32):
     b2 = (ip_uint32 >> 8) & 0xFF
     b3 = (ip_uint32 >> 16) & 0xFF
     b4 = (ip_uint32 >> 24) & 0xFF
-    return "%d.%d.%d.%d" % (b1, b2, b3, b4)
+    return sprintf("%d.%d.%d.%d", b1, b2, b3, b4)
 
 def utf16_ptr(s):
     if not s:
@@ -69,13 +69,13 @@ def nslookup(hostname):
         err_code = res.get("err_code", 0)
         err_msg = res.get("error", "")
         win_free(results_ptr)
-        print("[-] DnsQuery_W failed for %s: status %d (Error %d: %s)" % (hostname, res["r1"], err_code, err_msg))
+        print(sprintf("[-] DnsQuery_W failed for %s: status %d (Error %d: %s)", hostname, res["r1"], err_code, err_msg))
         return "Fail"
 
     record_ptr = read_ptr(results_ptr, 0)
     win_free(results_ptr)
 
-    print("DNS Lookup results for %s:" % hostname)
+    print(sprintf("DNS Lookup results for %s:", hostname))
     print("----------------------------------------")
 
     curr = record_ptr
@@ -88,8 +88,8 @@ def nslookup(hostname):
 
         if rec_type == DNS_TYPE_A:
             ip_val = read_uint32(curr, 32)
-            print("Name: %s" % rec_name)
-            print("IP:   %s" % format_ip(ip_val))
+            print(sprintf("Name: %s", rec_name))
+            print(sprintf("IP:   %s", format_ip(ip_val)))
             print("----------------------------------------")
 
         curr = next_ptr

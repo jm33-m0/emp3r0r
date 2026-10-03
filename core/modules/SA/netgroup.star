@@ -84,8 +84,8 @@ def list_domain_groups(domain=None):
             entry_addr = buf + i * 16
             name = read_wstring(read_ptr(entry_addr, 0))
             comment = read_wstring(read_ptr(entry_addr, 8))
-            print("Name:      %s" % name)
-            print("Comment:   %s" % comment)
+            print(sprintf("Name:      %s", name))
+            print(sprintf("Comment:   %s", comment))
             print("--------------------------------")
 
         if buf != 0:
@@ -93,7 +93,7 @@ def list_domain_groups(domain=None):
     else:
         err_code = res.get("err_code", 0)
         err_msg = res.get("error", "")
-        print("[-] NetGroupEnum failed: status %d (Error %d: %s)" % (stat, err_code, err_msg))
+        print(sprintf("[-] NetGroupEnum failed: status %d (Error %d: %s)", stat, err_code, err_msg))
 
     win_free(buf_ptr)
     win_free(read_ptr_mem)
@@ -137,19 +137,19 @@ def list_group_users(group_name, domain=None):
         buf = read_ptr(buf_ptr, 0)
         count = read_uint32(read_ptr_mem, 0)
 
-        print("Members of Global Group '%s':" % group_name)
+        print(sprintf("Members of Global Group '%s':", group_name))
         print("--------------------------------")
         for i in range(count):
             member_name_ptr = read_ptr(buf, i * 8)
             member = read_wstring(member_name_ptr)
-            print("-- %s" % member)
+            print(sprintf("-- %s", member))
 
         if buf != 0:
             win_call("netapi32.dll", "NetApiBufferFree", buf)
     else:
         err_code = res.get("err_code", 0)
         err_msg = res.get("error", "")
-        print("[-] NetGroupGetUsers failed: status %d (Error %d: %s)" % (stat, err_code, err_msg))
+        print(sprintf("[-] NetGroupGetUsers failed: status %d (Error %d: %s)", stat, err_code, err_msg))
 
     win_free(buf_ptr)
     win_free(read_ptr_mem)

@@ -227,18 +227,15 @@ def do_whoami_user():
 
     print("\nUserName\t\tSID")
     print("====================== ====================================")
-    print("%s\t%s\n" % (full_name, user_sid_str))
+    print(sprintf("%s\t%s\n", full_name, user_sid_str))
 
 
 def do_whoami_groups():
     print(
-        "\n%s%s%s%s"
-        % (
-            pad("GROUP INFORMATION", 50),
+        sprintf("\n%s%s%s%s", pad("GROUP INFORMATION", 50),
             pad("Type", 25),
             pad("SID", 45),
-            pad("Attributes", 25),
-        )
+            pad("Attributes", 25))
     )
     print(
         "================================================= ===================== ============================================= =================================================="
@@ -308,13 +305,10 @@ def do_whoami_groups():
         attr_str = parse_group_attributes(attrs)
 
         print(
-            "%s%s%s%s"
-            % (
-                pad(name_str, 50),
+            sprintf("%s%s%s%s", pad(name_str, 50),
                 pad(type_str, 25),
                 pad(sid_str, 45),
-                pad(attr_str, 25),
-            )
+                pad(attr_str, 25))
         )
 
     win_free(token_groups_buf)
@@ -323,8 +317,7 @@ def do_whoami_groups():
 
 def do_whoami_privs():
     print(
-        "\n%s%s%s"
-        % (pad("Privilege Name", 30), pad("Description", 50), pad("State", 30))
+        sprintf("\n%s%s%s", pad("Privilege Name", 30), pad("Description", 50), pad("State", 30))
     )
     print(
         "============================= ================================================= ==========================="
@@ -374,8 +367,7 @@ def do_whoami_privs():
             state_str = "Enabled"
 
         print(
-            "%s%s%s"
-            % (pad(name, 30), pad("Access token privilege", 50), pad(state_str, 30))
+            sprintf("%s%s%s", pad(name, 30), pad("Access token privilege", 50), pad(state_str, 30))
         )
 
     win_free(token_privs_buf)

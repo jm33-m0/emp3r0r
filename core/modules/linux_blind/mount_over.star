@@ -60,7 +60,7 @@ def _list(prefix):
     if not data:
         print("[!] /proc/mounts not readable")
         return "ERROR: no mounts"
-    print("[*] mounts%s%s:" % (" under " if prefix else "", prefix))
+    print(sprintf("[*] mounts%s%s:", " under " if prefix else "", prefix))
     shown = 0
     for line in data.splitlines():
         fields = line.split()
@@ -71,7 +71,7 @@ def _list(prefix):
             continue
         print(sprintf("  %-24s %-34s %s", fields[0], mountpoint, fields[2]))
         shown += 1
-    print("  (%d entries)" % shown)
+    print(sprintf("  (%d entries)", shown))
     return "OK"
 
 
@@ -81,9 +81,9 @@ def _bind(src, dst):
         return "ERROR: src and dst required"
     errno = _mount(src, dst, 0, MS_BIND, 0)
     if errno != 0:
-        print("[!] bind mount failed (errno=%d; CAP_SYS_ADMIN required)" % errno)
-        return "ERROR: errno=%d" % errno
-    print("[+] bind-mounted %s over %s" % (src, dst))
+        print(sprintf("[!] bind mount failed (errno=%d; CAP_SYS_ADMIN required)", errno))
+        return sprintf("ERROR: errno=%d", errno)
+    print(sprintf("[+] bind-mounted %s over %s", src, dst))
     return "OK"
 
 
@@ -91,12 +91,12 @@ def _tmpfs(dst, size):
     if not dst:
         print("[!] tmpfs requires --dst")
         return "ERROR: dst required"
-    opts = "size=%s,mode=755" % (size if size else "10m")
+    opts = sprintf("size=%s,mode=755", size if size else "10m")
     errno = _mount("tmpfs", dst, "tmpfs", 0, opts)
     if errno != 0:
-        print("[!] tmpfs mount failed (errno=%d; CAP_SYS_ADMIN required)" % errno)
-        return "ERROR: errno=%d" % errno
-    print("[+] tmpfs mounted over %s (%s); real contents are hidden" % (dst, opts))
+        print(sprintf("[!] tmpfs mount failed (errno=%d; CAP_SYS_ADMIN required)", errno))
+        return sprintf("ERROR: errno=%d", errno)
+    print(sprintf("[+] tmpfs mounted over %s (%s); real contents are hidden", dst, opts))
     return "OK"
 
 
@@ -106,13 +106,13 @@ def _ro(target):
         return "ERROR: target required"
     errno = _mount(target, target, 0, MS_BIND, 0)
     if errno != 0:
-        print("[!] bind failed (errno=%d)" % errno)
-        return "ERROR: errno=%d" % errno
+        print(sprintf("[!] bind failed (errno=%d)", errno))
+        return sprintf("ERROR: errno=%d", errno)
     errno = _mount(0, target, 0, MS_BIND | MS_REMOUNT | MS_RDONLY, 0)
     if errno != 0:
-        print("[!] remount ro failed (errno=%d)" % errno)
-        return "ERROR: errno=%d" % errno
-    print("[+] %s remounted read-only" % target)
+        print(sprintf("[!] remount ro failed (errno=%d)", errno))
+        return sprintf("ERROR: errno=%d", errno)
+    print(sprintf("[+] %s remounted read-only", target))
     return "OK"
 
 
@@ -130,14 +130,14 @@ def _hide(src):
     shadow = tmpdir + "/" + base
     errno = _create_file(shadow)
     if errno != 0:
-        print("[!] could not create shadow file (errno=%d)" % errno)
-        return "ERROR: errno=%d" % errno
+        print(sprintf("[!] could not create shadow file (errno=%d)", errno))
+        return sprintf("ERROR: errno=%d", errno)
     errno = _mount(shadow, src, 0, MS_BIND, 0)
     if errno != 0:
-        print("[!] file bind failed (errno=%d; CAP_SYS_ADMIN required)" % errno)
-        return "ERROR: errno=%d" % errno
-    print("[+] %s is now shadowed by an empty file from %s" % (src, tmpdir))
-    print("[*] restore with: linux_mount_over --action umount --dst %s" % src)
+        print(sprintf("[!] file bind failed (errno=%d; CAP_SYS_ADMIN required)", errno))
+        return sprintf("ERROR: errno=%d", errno)
+    print(sprintf("[+] %s is now shadowed by an empty file from %s", src, tmpdir))
+    print(sprintf("[*] restore with: linux_mount_over --action umount --dst %s", src))
     return "OK"
 
 
@@ -169,11 +169,11 @@ def main(*args):
             return "ERROR: dst required"
         errno = _umount(dst)
         if errno != 0:
-            print("[!] umount %s failed (errno=%d)" % (dst, errno))
-            return "ERROR: errno=%d" % errno
-        print("[+] unmounted %s; original contents restored" % dst)
+            print(sprintf("[!] umount %s failed (errno=%d)", dst, errno))
+            return sprintf("ERROR: errno=%d", errno)
+        print(sprintf("[+] unmounted %s; original contents restored", dst))
         return "OK"
     if action == "hide":
         return _hide(src)
-    print("[!] unknown action: %s" % action)
+    print(sprintf("[!] unknown action: %s", action))
     return "ERROR: unknown action"

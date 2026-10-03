@@ -16,7 +16,7 @@ O_WRONLY = 1
 def _base(pid):
     if not pid or pid == "self":
         return "/proc/self"
-    return "/proc/%s" % pid
+    return sprintf("/proc/%s", pid)
 
 
 def _write_ctl(path, data):
@@ -45,7 +45,7 @@ def main(*args):
     base = _base(pid)
     score = read_file(base + "/oom_score", default="?").strip()
     adj = read_file(base + "/oom_score_adj", default="?").strip()
-    print("[*] %s oom_score=%s oom_score_adj=%s" % (base, score, adj))
+    print(sprintf("[*] %s oom_score=%s oom_score_adj=%s", base, score, adj))
 
     if action == "show":
         return "OK"
@@ -54,7 +54,7 @@ def main(*args):
     elif action == "expose":
         value = "1000"
     elif action != "set":
-        print("[!] unknown action: %s" % action)
+        print(sprintf("[!] unknown action: %s", action))
         return "ERROR: unknown action"
     if not value:
         print("[!] 'set' requires a value")
@@ -62,8 +62,8 @@ def main(*args):
 
     errno = _write_ctl(base + "/oom_score_adj", value)
     if errno != 0:
-        print("[!] could not set oom_score_adj=%s (errno=%d; CAP_SYS_RESOURCE needed to lower it)" % (value, errno))
-        return "ERROR: write errno=%d" % errno
+        print(sprintf("[!] could not set oom_score_adj=%s (errno=%d; CAP_SYS_RESOURCE needed to lower it)", value, errno))
+        return sprintf("ERROR: write errno=%d", errno)
     after = read_file(base + "/oom_score_adj", default="?").strip()
-    print("[+] oom_score_adj set to %s (now %s)" % (value, after))
+    print(sprintf("[+] oom_score_adj set to %s (now %s)", value, after))
     return "OK"

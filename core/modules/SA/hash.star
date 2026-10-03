@@ -7,16 +7,16 @@ def hash_file(algorithm, filepath):
 
     algo = algorithm.lower()
     if algo not in ("md5", "sha1", "sha256", "sha512"):
-        print("[-] Unsupported hash algorithm: %s" % algorithm)
+        print(sprintf("[-] Unsupported hash algorithm: %s", algorithm))
         return "Fail"
 
     content = read_file(filepath)
     if content == None:
-        print("[-] Failed to read file: %s" % filepath)
+        print(sprintf("[-] Failed to read file: %s", filepath))
         return "Fail"
 
     digest = crypto_hash(algo, content)
-    print("%s Hash for %s: %s" % (algo.upper(), filepath, digest))
+    print(sprintf("%s Hash for %s: %s", algo.upper(), filepath, digest))
     return "OK"
 
 def main(*args):

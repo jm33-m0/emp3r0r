@@ -58,8 +58,8 @@ def main(*args):
 
     data, errno = _read_mmap(path, cap)
     if data == None:
-        print("[!] mmap read of %s failed (errno=%d)" % (path, errno))
-        return "ERROR: errno=%d" % errno
-    print("--- %s (%d bytes, mmap) ---" % (path, len(data)))
+        print(sprintf("[!] mmap read of %s failed (errno=%d)", path, errno))
+        return sprintf("ERROR: errno=%d", errno)
+    print(sprintf("--- %s (%d bytes, mmap) ---", path, len(data)))
     print(data)
     return "OK"

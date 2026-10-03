@@ -44,7 +44,7 @@ def get_password_policy(server=None):
         err_code = res.get("err_code", 0)
         err_msg = res.get("error", "")
         win_free(buf_ptr)
-        print("[-] NetUserModalsGet failed: status %d (Error %d: %s)" % (res["r1"], err_code, err_msg))
+        print(sprintf("[-] NetUserModalsGet failed: status %d (Error %d: %s)", res["r1"], err_code, err_msg))
         return "Fail"
 
     p0 = read_ptr(buf_ptr, 0)
@@ -63,12 +63,12 @@ def get_password_policy(server=None):
     max_pw_age_days = max_pw_age // 86400 if max_pw_age != 0xFFFFFFFF else "Never"
     min_pw_age_days = min_pw_age // 86400 if min_pw_age != 0xFFFFFFFF else "0"
 
-    print("Password Policy for %s:" % (server if server else "Local Domain"))
+    print(sprintf("Password Policy for %s:", server if server else "Local Domain"))
     print("----------------------------------------")
-    print("Minimum password length:   %d" % min_pw_len)
-    print("Maximum password age:      %s days" % str(max_pw_age_days))
-    print("Minimum password age:      %s days" % str(min_pw_age_days))
-    print("Password history length:   %d" % pw_hist_len)
+    print(sprintf("Minimum password length:   %d", min_pw_len))
+    print(sprintf("Maximum password age:      %s days", str(max_pw_age_days)))
+    print(sprintf("Minimum password age:      %s days", str(min_pw_age_days)))
+    print(sprintf("Password history length:   %d", pw_hist_len))
 
     win_call("netapi32.dll", "NetApiBufferFree", p0)
     return "OK"

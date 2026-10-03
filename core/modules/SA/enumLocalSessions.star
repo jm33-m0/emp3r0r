@@ -12,7 +12,7 @@ def enum_local_sessions():
     if res["r1"] == 0:
         win_free(wts_info_ptr)
         win_free(count_ptr)
-        print("[-] WTSEnumerateSessionsA failed (error %d: %s)" % (res.get("err_code", 0), res.get("error", "")))
+        print(sprintf("[-] WTSEnumerateSessionsA failed (error %d: %s)", res.get("err_code", 0), res.get("error", "")))
         return "Fail"
 
     p_info = read_ptr(wts_info_ptr, 0)
@@ -21,7 +21,7 @@ def enum_local_sessions():
     win_free(wts_info_ptr)
     win_free(count_ptr)
 
-    print("Enumerating sessions for local system (%d entries):" % count)
+    print(sprintf("Enumerating sessions for local system (%d entries):", count))
     print("===========================================================================")
 
     WTSUserName = 5
@@ -54,7 +54,7 @@ def enum_local_sessions():
                     if p_dom != 0:
                         win_call("wtsapi32.dll", "WTSFreeMemory", p_dom)
 
-                print("  - [%d] Session: %s\\%s" % (session_id, domain_str, user_str))
+                print(sprintf("  - [%d] Session: %s\\%s", session_id, domain_str, user_str))
                 users_count += 1
 
     win_free(username_ptr_ptr)
@@ -64,7 +64,7 @@ def enum_local_sessions():
     if p_info != 0:
         win_call("wtsapi32.dll", "WTSFreeMemory", p_info)
 
-    print("\nTotal of %d entries enumerated" % users_count)
+    print(sprintf("\nTotal of %d entries enumerated", users_count))
     return "OK"
 
 def main(*args):

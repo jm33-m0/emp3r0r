@@ -1,7 +1,7 @@
 # Starlark implementation of wmi_query/entry.c
 
 def wmi_query(query="SELECT * FROM Win32_Process", namespace="root\\cimv2", server="."):
-    print("Executing WMI Query: %s (Namespace: %s, Server: %s)" % (query, namespace, server))
+    print(sprintf("Executing WMI Query: %s (Namespace: %s, Server: %s)", query, namespace, server))
     print("===========================================================================")
     print("WMI query execution initialized.")
     return "OK"

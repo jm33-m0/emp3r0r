@@ -10,32 +10,22 @@ import (
 	"go.starlark.net/syntax"
 )
 
-// moduleFormatNeedsSprintf reports whether a Starlark "%" format string uses a
-// conversion the built-in % operator cannot render. go.starlark.net's string
-// interpolation only accepts a bare conversion char (%s, %d, %x, ...), so any
-// flag/width/precision (%-20s, %5d, %+x, %.*f) fails at runtime with "unknown
-// conversion". Those must go through sprintf, which uses Go fmt.
-func moduleFormatNeedsSprintf(format string) bool {
-	for i := 0; i < len(format); i++ {
-		if format[i] != '%' {
-			continue
-		}
-		if i+1 >= len(format) {
-			return true
-		}
-		switch format[i+1] {
-		case 's', 'd', 'i', 'o', 'x', 'X', 'e', 'f', 'g', 'E', 'F', 'G', 'c', '%':
-			i++ // consume the conversion char
-		default:
-			return true // flag/width/precision: % operator rejects it
-		}
+// stringLiteral reports whether e is a string literal, possibly parenthesized.
+func stringLiteral(e syntax.Expr) bool {
+	switch x := e.(type) {
+	case *syntax.Literal:
+		return x.Token == syntax.STRING
+	case *syntax.ParenExpr:
+		return stringLiteral(x.X)
 	}
 	return false
 }
 
-// TestStarlarkModulesUseSprintfForFormatting scans every shipped script and
-// rejects "%" operator interpolations that need sprintf, so the runtime
-// "unknown conversion %-" failure cannot come back.
+// TestStarlarkModulesUseSprintfForFormatting rejects the "%" string operator in
+// every shipped script. go.starlark.net's interpolation is a limited duplicate
+// of sprintf: it rejects flags/width such as %-20s and aborts the whole script,
+// so modules must format with sprintf (Go fmt). Modulo (%) on numbers is not
+// flagged.
 func TestStarlarkModulesUseSprintfForFormatting(t *testing.T) {
 	_, filename, _, _ := runtime.Caller(0)
 	modulesDir := filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(filename))), "modules")
@@ -59,19 +49,11 @@ func TestStarlarkModulesUseSprintfForFormatting(t *testing.T) {
 		}
 		syntax.Walk(file, func(n syntax.Node) bool {
 			bin, ok := n.(*syntax.BinaryExpr)
-			if !ok || bin.Op != syntax.PERCENT {
-				return true
-			}
-			lit, ok := bin.X.(*syntax.Literal)
-			if !ok || lit.Token != syntax.STRING {
-				return true
-			}
-			format, ok := lit.Value.(string)
-			if !ok || !moduleFormatNeedsSprintf(format) {
+			if !ok || bin.Op != syntax.PERCENT || !stringLiteral(bin.X) {
 				return true
 			}
 			start, _ := bin.Span()
-			t.Errorf("%s:%d: use sprintf for %q, the %% operator cannot render flags/width", path, start.Line, format)
+			t.Errorf("%s:%d: use sprintf instead of the %% string operator", path, start.Line)
 			return true
 		})
 		return nil

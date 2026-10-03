@@ -83,32 +83,32 @@ def main(*args):
     if args and args[0]:
         pid = args[0]
     print("==================================================")
-    print(" Process Info of %s" % pid)
+    print(sprintf(" Process Info of %s", pid))
     print("==================================================")
 
     procfs_prefix = "/proc/" + pid
     cmdline = read_file(procfs_prefix + "/cmdline", default="").strip("\x00").replace("\x00", " ")
-    print("Cmdline:    %s" % (cmdline or "N/A"))
+    print(sprintf("Cmdline:    %s", cmdline or "N/A"))
 
     status_text = read_file(procfs_prefix + "/status", default="")
     status = parse_status(status_text)
 
     print("\n--- Identity & Privileges ---")
-    print("Name:       %s" % status.get("Name", "N/A"))
-    print("State:      %s" % status.get("State", "N/A"))
-    print("PID:        %s" % status.get("Pid", "N/A"))
-    print("PPID:       %s" % status.get("PPid", "N/A"))
-    print("UIDs:       %s (Real, Effective, Saved, FS)" % status.get("Uid", "N/A"))
-    print("GIDs:       %s (Real, Effective, Saved, FS)" % status.get("Gid", "N/A"))
-    print("Groups:     %s" % status.get("Groups", "N/A"))
+    print(sprintf("Name:       %s", status.get("Name", "N/A")))
+    print(sprintf("State:      %s", status.get("State", "N/A")))
+    print(sprintf("PID:        %s", status.get("Pid", "N/A")))
+    print(sprintf("PPID:       %s", status.get("PPid", "N/A")))
+    print(sprintf("UIDs:       %s (Real, Effective, Saved, FS)", status.get("Uid", "N/A")))
+    print(sprintf("GIDs:       %s (Real, Effective, Saved, FS)", status.get("Gid", "N/A")))
+    print(sprintf("Groups:     %s", status.get("Groups", "N/A")))
 
     print("\n--- Capabilities ---")
-    print("Inheritable:\n  %s" % decode_caps(status.get("CapInh", "N/A")))
-    print("Permitted:\n  %s" % decode_caps(status.get("CapPrm", "N/A")))
-    print("Effective:\n  %s" % decode_caps(status.get("CapEff", "N/A")))
-    print("Bounding:\n  %s" % decode_caps(status.get("CapBnd", "N/A")))
-    print("Ambient:\n  %s" % decode_caps(status.get("CapAmb", "N/A")))
-    print("NoNewPrivs: %s" % status.get("NoNewPrivs", "N/A"))
+    print(sprintf("Inheritable:\n  %s", decode_caps(status.get("CapInh", "N/A"))))
+    print(sprintf("Permitted:\n  %s", decode_caps(status.get("CapPrm", "N/A"))))
+    print(sprintf("Effective:\n  %s", decode_caps(status.get("CapEff", "N/A"))))
+    print(sprintf("Bounding:\n  %s", decode_caps(status.get("CapBnd", "N/A"))))
+    print(sprintf("Ambient:\n  %s", decode_caps(status.get("CapAmb", "N/A"))))
+    print(sprintf("NoNewPrivs: %s", status.get("NoNewPrivs", "N/A")))
 
     print("\n--- Cgroups ---")
     cgroup_text = read_file(procfs_prefix + "/cgroup", default="")
@@ -124,12 +124,12 @@ def main(*args):
         k_padded = k + ":"
         if len(k_padded) < 12:
             k_padded = k_padded + " " * (12 - len(k_padded))
-        print("%s %s" % (k_padded, namespaces[k]))
+        print(sprintf("%s %s", k_padded, namespaces[k]))
 
     print("\n--- Environment ---")
     environ = read_file(procfs_prefix + "/environ", default="")
     env_vars = [e for e in environ.split("\x00") if e]
-    print("%d environment variables loaded." % len(env_vars))
+    print(sprintf("%d environment variables loaded.", len(env_vars)))
 
     print("==================================================")
     return "OK"

@@ -35,7 +35,7 @@ def get_cacls(path):
         win_free(owner_sid_ptr)
         win_free(dacl_ptr)
         win_free(sd_ptr)
-        print("[-] GetNamedSecurityInfoW failed for %s: status %d (Error %d: %s)" % (path, res["r1"], err_code, err_msg))
+        print(sprintf("[-] GetNamedSecurityInfoW failed for %s: status %d (Error %d: %s)", path, res["r1"], err_code, err_msg))
         return "Fail"
 
     p_owner_sid = read_ptr(owner_sid_ptr, 0)
@@ -54,9 +54,9 @@ def get_cacls(path):
     if p_str != 0:
         win_call("kernel32.dll", "LocalFree", p_str)
 
-    print("Permissions for %s:" % path)
+    print(sprintf("Permissions for %s:", path))
     print("----------------------------------------")
-    print("Owner SID: %s" % sid_str)
+    print(sprintf("Owner SID: %s", sid_str))
 
     if p_sd != 0:
         win_call("kernel32.dll", "LocalFree", p_sd)

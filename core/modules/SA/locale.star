@@ -24,7 +24,7 @@ def main(*args):
     # GetSystemDefaultLocaleName
     res = win_call("kernel32.dll", "GetSystemDefaultLocaleName", name_ptr, BUFFER_SIZE)
     if res["r1"] == 0:
-        print("Error retrieving system locale information: Error %d: %s" % (res.get("err_code", 0), res.get("error", "")))
+        print(sprintf("Error retrieving system locale information: Error %d: %s", res.get("err_code", 0), res.get("error", "")))
         win_free(name_ptr)
         win_free(wc_buffer_ptr)
         win_free(sys_time_ptr)
@@ -37,7 +37,7 @@ def main(*args):
     res = win_call("kernel32.dll", "GetLocaleInfoEx", name_ptr, 0x1001, wc_buffer_ptr, BUFFER_SIZE)
     lang = "Unknown"
     if res["r1"] == 0:
-        print("Error retrieving language: Error %d: %s" % (res.get("err_code", 0), res.get("error", "")))
+        print(sprintf("Error retrieving language: Error %d: %s", res.get("err_code", 0), res.get("error", "")))
     else:
         lang = read_wstring(wc_buffer_ptr, BUFFER_SIZE)
     
@@ -45,13 +45,13 @@ def main(*args):
     res = win_call("kernel32.dll", "LocaleNameToLCID", name_ptr, 0)
     lcid = res["r1"]
     if lcid == 0:
-        print("Error mapping Locale Name to a Locale ID: Error %d: %s" % (res.get("err_code", 0), res.get("error", "")))
+        print(sprintf("Error mapping Locale Name to a Locale ID: Error %d: %s", res.get("err_code", 0), res.get("error", "")))
     
     # GetDateFormatEx for DATE_LONGDATE (0x02)
     res = win_call("kernel32.dll", "GetDateFormatEx", name_ptr, 0x02, 0, 0, sys_time_ptr, BUFFER_SIZE, 0)
     date_str = "Unknown"
     if res["r1"] == 0:
-        print("Error retrieving system date/time: Error %d: %s" % (res.get("err_code", 0), res.get("error", "")))
+        print(sprintf("Error retrieving system date/time: Error %d: %s", res.get("err_code", 0), res.get("error", "")))
     else:
         date_str = read_wstring(sys_time_ptr, BUFFER_SIZE)
         
@@ -59,14 +59,14 @@ def main(*args):
     res = win_call("kernel32.dll", "GetLocaleInfoEx", name_ptr, 0x06, geoid_ptr, BUFFER_SIZE)
     country = "Unknown"
     if res["r1"] == 0:
-        print("Error retrieving geolocation id: Error %d: %s" % (res.get("err_code", 0), res.get("error", "")))
+        print(sprintf("Error retrieving geolocation id: Error %d: %s", res.get("err_code", 0), res.get("error", "")))
     else:
         country = read_wstring(geoid_ptr, BUFFER_SIZE)
         
-    print("Locale: %s (%s)" % (lang, name))
-    print("LCID: %x" % lcid)
-    print("Date: %s" % date_str)
-    print("Country: %s" % country)
+    print(sprintf("Locale: %s (%s)", lang, name))
+    print(sprintf("LCID: %x", lcid))
+    print(sprintf("Date: %s", date_str))
+    print(sprintf("Country: %s", country))
     
     win_free(name_ptr)
     win_free(wc_buffer_ptr)

@@ -26,12 +26,12 @@ def main(*args):
     before = read_link("/proc/self/exe", default="?")
     errno = _unlink(target)
     if errno != 0:
-        print("[!] unlink %s failed (errno=%d)" % (target, errno))
-        return "ERROR: errno=%d" % errno
+        print(sprintf("[!] unlink %s failed (errno=%d)", target, errno))
+        return sprintf("ERROR: errno=%d", errno)
 
     after = read_link("/proc/self/exe", default="?")
-    print("[+] unlinked %s" % target)
-    print("[*] /proc/self/exe before: %s" % before)
-    print("[*] /proc/self/exe after:  %s" % after)
+    print(sprintf("[+] unlinked %s", target))
+    print(sprintf("[*] /proc/self/exe before: %s", before))
+    print(sprintf("[*] /proc/self/exe after:  %s", after))
     print("[*] the process keeps running with no image on disk")
     return "OK"

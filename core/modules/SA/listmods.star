@@ -15,7 +15,7 @@ def listmods(pid=0):
         h_proc = res_open["r1"]
 
     if h_proc == 0:
-        print("[-] OpenProcess failed for PID %d (error %d: %s)" % (target_pid, res_open.get("err_code", 0), res_open.get("error", "")))
+        print(sprintf("[-] OpenProcess failed for PID %d (error %d: %s)", target_pid, res_open.get("err_code", 0), res_open.get("error", "")))
         return "Fail"
 
     # Allocate module array (1024 module pointers = 8192 bytes)
@@ -27,7 +27,7 @@ def listmods(pid=0):
         win_free(mods_buf)
         win_free(cb_needed_ptr)
         win_call("kernel32.dll", "CloseHandle", h_proc)
-        print("[-] EnumProcessModules failed for PID %d (error %d: %s)" % (target_pid, res.get("err_code", 0), res.get("error", "")))
+        print(sprintf("[-] EnumProcessModules failed for PID %d (error %d: %s)", target_pid, res.get("err_code", 0), res.get("error", "")))
         return "Fail"
 
     needed = read_uint32(cb_needed_ptr, 0)
@@ -36,9 +36,9 @@ def listmods(pid=0):
     count = needed // 8
     if count > 1024:
         count = 1024
-    print("Loaded modules for PID %d (%d modules):" % (target_pid, count))
+    print(sprintf("Loaded modules for PID %d (%d modules):", target_pid, count))
     print("===========================================================================")
-    print("%s %s" % (pad("Base Address", 18), "Module Path"))
+    print(sprintf("%s %s", pad("Base Address", 18), "Module Path"))
     print("------------------ --------------------------------------------------------")
 
     name_buf = win_alloc(512)
@@ -47,7 +47,7 @@ def listmods(pid=0):
         if h_mod != 0:
             win_call("psapi.dll", "GetModuleFileNameExW", h_proc, h_mod, name_buf, 255)
             mod_path = read_wstring(name_buf)
-            print("%s %s" % (sprintf("0x%016x", h_mod), mod_path))
+            print(sprintf("%s %s", sprintf("0x%016x", h_mod), mod_path))
 
     win_free(mods_buf)
     win_free(name_buf)

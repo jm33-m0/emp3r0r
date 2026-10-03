@@ -78,7 +78,7 @@ def _event_id(line):
 def _remove_events(path, label, dry_run):
     data = read_file(path, default="")
     if not data:
-        print("  [*] %s: empty or not readable" % label)
+        print(sprintf("  [*] %s: empty or not readable", label))
         return 0
     count = 0
     for line in data.splitlines():
@@ -88,15 +88,15 @@ def _remove_events(path, label, dry_run):
         eid = _event_id(line)
         if not eid:
             continue
-        cmd = "-:%s\n" % eid
+        cmd = sprintf("-:%s\n", eid)
         if dry_run:
-            print("  [dry-run] %s -> %s" % (line, cmd.strip()))
+            print(sprintf("  [dry-run] %s -> %s", line, cmd.strip()))
         else:
             errno = _append(path, cmd)
             if errno != 0:
-                print("  [!] removing %s failed (errno=%d)" % (eid, errno))
+                print(sprintf("  [!] removing %s failed (errno=%d)", eid, errno))
             else:
-                print("  [+] removed %s" % eid)
+                print(sprintf("  [+] removed %s", eid))
         count += 1
     return count
 
@@ -105,13 +105,13 @@ def _list(root):
     for name in LIST_FILES:
         path = root + "/" + name
         data = read_file(path, default="")
-        print("=== %s (%s) ===" % (name, path))
+        print(sprintf("=== %s (%s) ===", name, path))
         if not data:
             print("  (empty or unreadable)")
             continue
         for line in data.splitlines():
             if line.strip():
-                print("  %s" % line)
+                print(sprintf("  %s", line))
 
 
 def main(*args):
@@ -135,18 +135,18 @@ def main(*args):
         return "OK"
     if action == "clear-kprobes":
         n = _remove_events(root + "/kprobe_events", "kprobe_events", dry_run)
-        print("[*] %d kprobe event(s) %s" % (n, "would be removed" if dry_run else "processed"))
+        print(sprintf("[*] %d kprobe event(s) %s", n, "would be removed" if dry_run else "processed"))
         return "OK"
     if action == "clear-uprobes":
         n = _remove_events(root + "/uprobe_events", "uprobe_events", dry_run)
-        print("[*] %d uprobe event(s) %s" % (n, "would be removed" if dry_run else "processed"))
+        print(sprintf("[*] %d uprobe event(s) %s", n, "would be removed" if dry_run else "processed"))
         return "OK"
     if action == "tracing-off":
         errno = _write_ctl(root + "/tracing_on", "0")
         if errno != 0:
-            print("[!] tracing_on write failed (errno=%d)" % errno)
-            return "ERROR: errno=%d" % errno
+            print(sprintf("[!] tracing_on write failed (errno=%d)", errno))
+            return sprintf("ERROR: errno=%d", errno)
         print("[+] tracing disabled (tracing_on=0)")
         return "OK"
-    print("[!] unknown action: %s" % action)
+    print(sprintf("[!] unknown action: %s", action))
     return "ERROR: unknown action"

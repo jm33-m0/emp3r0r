@@ -32,7 +32,7 @@ def utf16_ptr(s):
     return p
 
 def vssenum(hostname="localhost", sharename="C$"):
-    target = "\\\\%s\\%s" % (hostname, sharename)
+    target = sprintf("\\\\%s\\%s", hostname, sharename)
     target_ptr = utf16_ptr(target)
 
     GENERIC_READ = 0x80000000
@@ -57,7 +57,7 @@ def vssenum(hostname="localhost", sharename="C$"):
 
     h_file = res["r1"]
     if h_file == 0 or h_file == 0xFFFFFFFFFFFFFFFF:
-        print("[-] Could not open target folder %s for VSS enumeration (error %d: %s)" % (target, res.get("err_code", 0), res.get("error", "")))
+        print(sprintf("[-] Could not open target folder %s for VSS enumeration (error %d: %s)", target, res.get("err_code", 0), res.get("error", "")))
         return "Fail"
 
     FSCTL_SRV_ENUMERATE_SNAPSHOTS = 0x00144064
@@ -102,9 +102,9 @@ def vssenum(hostname="localhost", sharename="C$"):
                 full_len,
             )
             if res_full["r1"] == 0:
-                print("VSS Snapshots for %s:" % target)
+                print(sprintf("VSS Snapshots for %s:", target))
                 print("===========================================================================")
-                print("Found and enumerated %d snapshots" % vols_returned)
+                print(sprintf("Found and enumerated %d snapshots", vols_returned))
 
             win_free(full_buf)
     else:

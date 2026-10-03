@@ -22,7 +22,7 @@ def sc_enum():
         res = win_call("advapi32.dll", "EnumServicesStatusExW", h_scm, 0, SERVICE_WIN32, SERVICE_STATE_ALL, buf, needed, bytes_needed, services_returned, 0, 0)
         count = read_uint32(services_returned, 0)
 
-        print("Service Controller Enumeration (%d services):" % count)
+        print(sprintf("Service Controller Enumeration (%d services):", count))
         print("===========================================================================")
 
         states = ["STOPPED", "START_PENDING", "STOP_PENDING", "RUNNING", "CONTINUE_PENDING", "PAUSE_PENDING", "PAUSED"]

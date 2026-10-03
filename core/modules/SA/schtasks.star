@@ -84,9 +84,9 @@ def enumerate_tasks(server=None):
         buf = read_ptr(buf_ptr, 0)
         count = read_uint32(read_ptr_mem, 0)
 
-        print("Scheduled Jobs on %s:" % (server if server else "Local Machine"))
+        print(sprintf("Scheduled Jobs on %s:", server if server else "Local Machine"))
         print("===========================================================================")
-        print("%s %s %s" % (pad("Job ID", 8), pad("Exec Time (ms)", 16), "Command"))
+        print(sprintf("%s %s %s", pad("Job ID", 8), pad("Exec Time (ms)", 16), "Command"))
         print("-------- ---------------- -------------------------------------------------")
 
         # AT_INFO struct size on x64 is 24 bytes: ExecTime(0), DaysOfMonth(4), DaysOfWeek(8), Flags(12), Command(16)
@@ -95,14 +95,14 @@ def enumerate_tasks(server=None):
             exec_time = read_uint32(entry_addr, 0)
             cmd_ptr = read_ptr(entry_addr, 16)
             cmd = read_wstring(cmd_ptr)
-            print("%s %s %s" % (pad(str(i + 1), 8), pad(str(exec_time), 16), cmd))
+            print(sprintf("%s %s %s", pad(str(i + 1), 8), pad(str(exec_time), 16), cmd))
 
         if buf != 0:
             win_call("netapi32.dll", "NetApiBufferFree", buf)
     else:
         err_code = res.get("err_code", 0)
         err_msg = res.get("error", "")
-        print("[-] NetScheduleJobEnum failed: status %d (Error %d: %s)" % (stat, err_code, err_msg))
+        print(sprintf("[-] NetScheduleJobEnum failed: status %d (Error %d: %s)", stat, err_code, err_msg))
 
     win_free(buf_ptr)
     win_free(read_ptr_mem)

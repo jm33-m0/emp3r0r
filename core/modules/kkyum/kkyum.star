@@ -29,30 +29,30 @@ def main(*args):
 
     if action == "status":
         if driver_is_loaded(service):
-            return "OK: %s is loaded" % service
-        return "OK: %s is not loaded" % service
+            return sprintf("OK: %s is loaded", service)
+        return sprintf("OK: %s is not loaded", service)
 
     if action == "unload":
         if not driver_is_loaded(service):
-            return "OK: %s is not loaded" % service
+            return sprintf("OK: %s is not loaded", service)
         driver_unload(service)
-        return "OK: %s unloaded" % service
+        return sprintf("OK: %s unloaded", service)
 
     if action != "load":
-        return "Fail: unknown action %s (use load, unload or status)" % action
+        return sprintf("Fail: unknown action %s (use load, unload or status)", action)
 
     if len(module_files) == 0:
         return "Fail: no companion files uploaded (is module_files_memfs enabled in config.json?)"
 
     if driver_is_loaded(service):
-        return "OK: %s is already loaded" % service
+        return sprintf("OK: %s is already loaded", service)
 
     image = find_driver_image()
     if image == None:
         return "Fail: no .sys driver image found in module_files"
 
-    print("Loading driver %s from memfs (%d bytes)" % (service, len(image)))
+    print(sprintf("Loading driver %s from memfs (%d bytes)", service, len(image)))
     driver_load_bytes(image, service)
     if not driver_is_loaded(service):
-        return "Fail: %s did not load (driver must be signed and privileges held)" % service
-    return "OK: %s loaded" % service
+        return sprintf("Fail: %s did not load (driver must be signed and privileges held)", service)
+    return sprintf("OK: %s loaded", service)

@@ -60,7 +60,7 @@ def _home_dir():
 def _wipe_file(path, pattern, dry_run):
     data = read_file(path, default=None)
     if data == None:
-        print("  [!] %s: not readable" % path)
+        print(sprintf("  [!] %s: not readable", path))
         return False
 
     if pattern:
@@ -70,38 +70,38 @@ def _wipe_file(path, pattern, dry_run):
             if str_contains(line, pattern):
                 removed += 1
                 if dry_run:
-                    print("    [would remove] %s" % line)
+                    print(sprintf("    [would remove] %s", line))
             else:
                 kept.append(line)
         if dry_run:
-            print("  [dry-run] %s: would remove %d/%d line(s)" % (path, removed, len(data.splitlines())))
+            print(sprintf("  [dry-run] %s: would remove %d/%d line(s)", path, removed, len(data.splitlines())))
             return True
         errno = _write_trunc(path, str_join(kept, "\n") + ("\n" if kept else ""))
         if errno != 0:
-            print("  [!] %s: write failed (errno=%d)" % (path, errno))
+            print(sprintf("  [!] %s: write failed (errno=%d)", path, errno))
             return False
-        print("  [+] %s: removed %d line(s)" % (path, removed))
+        print(sprintf("  [+] %s: removed %d line(s)", path, removed))
         return True
 
     if dry_run:
-        print("  [dry-run] %s: would truncate entirely" % path)
+        print(sprintf("  [dry-run] %s: would truncate entirely", path))
         return True
     errno = _truncate(path)
     if errno != 0:
-        print("  [!] %s: truncate failed (errno=%d)" % (path, errno))
+        print(sprintf("  [!] %s: truncate failed (errno=%d)", path, errno))
         return False
-    print("  [+] %s: truncated" % path)
+    print(sprintf("  [+] %s: truncated", path))
     return True
 
 
 def _do_wipe(path, pattern, dry_run):
     if path:
         if not exists(path):
-            print("[!] %s does not exist" % path)
+            print(sprintf("[!] %s does not exist", path))
             return "ERROR: not found"
         _wipe_file(path, pattern, dry_run)
         return "OK"
-    print("[*] wiping the standard text logs%s" % (" (dry-run)" if dry_run else ""))
+    print(sprintf("[*] wiping the standard text logs%s", " (dry-run)" if dry_run else ""))
     for log in TEXT_LOGS:
         if exists(log):
             _wipe_file(log, pattern, dry_run)
@@ -114,19 +114,19 @@ def _do_hist(home, dry_run):
     if not home:
         print("[!] could not determine home directory")
         return "ERROR: no home"
-    print("[*] shell history in %s%s" % (home, " (dry-run)" if dry_run else ""))
+    print(sprintf("[*] shell history in %s%s", home, " (dry-run)" if dry_run else ""))
     for name in HIST_FILES:
         path = home + "/" + name
         if not exists(path):
             continue
         if dry_run:
-            print("  [dry-run] %s: would truncate" % path)
+            print(sprintf("  [dry-run] %s: would truncate", path))
             continue
         errno = _truncate(path)
         if errno != 0:
-            print("  [!] %s: truncate failed (errno=%d)" % (path, errno))
+            print(sprintf("  [!] %s: truncate failed (errno=%d)", path, errno))
         else:
-            print("  [+] %s: truncated" % path)
+            print(sprintf("  [+] %s: truncated", path))
     return "OK"
 
 
@@ -136,8 +136,8 @@ def _do_lastlog(dry_run):
         return "OK"
     errno = _truncate("/var/log/lastlog")
     if errno != 0:
-        print("[!] /var/log/lastlog: truncate failed (errno=%d)" % errno)
-        return "ERROR: errno=%d" % errno
+        print(sprintf("[!] /var/log/lastlog: truncate failed (errno=%d)", errno))
+        return sprintf("ERROR: errno=%d", errno)
     print("[+] /var/log/lastlog: truncated")
     return "OK"
 
@@ -165,5 +165,5 @@ def main(*args):
         return _do_hist(home, dry_run)
     if action == "lastlog":
         return _do_lastlog(dry_run)
-    print("[!] unknown action: %s" % action)
+    print(sprintf("[!] unknown action: %s", action))
     return "ERROR: unknown action"

@@ -11,7 +11,7 @@ def net_sessions_2(hostname=None, resolve_method=1):
 
     MAX_PREFERRED_LENGTH = 0xFFFFFFFF
 
-    print("[*] Enumerating sessions for system: %s" % (hostname if hostname else "Local Host"))
+    print(sprintf("[*] Enumerating sessions for system: %s", hostname if hostname else "Local Host"))
     print("[*] Resolving client IPs to hostnames using NetWkstaGetInfo")
 
     res = win_call("netapi32.dll", "NetSessionEnum", server_ptr, 0, 0, 10, buf_ptr, MAX_PREFERRED_LENGTH, read_ptr_mem, total_ptr_mem, resume_ptr)
@@ -31,7 +31,7 @@ def net_sessions_2(hostname=None, resolve_method=1):
             idle_val = read_uint32(entry_addr, 20)
 
             print("---------------Session--------------")
-            print("Client: %s" % cname)
+            print(sprintf("Client: %s", cname))
 
             # Query NetWkstaGetInfo for client workstation info
             clean_cname = cname.lstrip("\\")
@@ -45,17 +45,17 @@ def net_sessions_2(hostname=None, resolve_method=1):
                 p_wksta = read_ptr(wksta_buf_ptr, 0)
                 comp_name = read_wstring(read_ptr(p_wksta, 8))
                 comp_dom = read_wstring(read_ptr(p_wksta, 16))
-                print("ComputerName:   %s" % comp_name)
-                print("ComputerDomain: %s" % comp_dom)
+                print(sprintf("ComputerName:   %s", comp_name))
+                print(sprintf("ComputerDomain: %s", comp_dom))
                 win_call("netapi32.dll", "NetApiBufferFree", p_wksta)
             else:
-                print("ComputerName:   NetWkstaGetInfo Failed; status %d" % stat_wksta["r1"])
+                print(sprintf("ComputerName:   NetWkstaGetInfo Failed; status %d", stat_wksta["r1"]))
 
             win_free(wksta_buf_ptr)
 
-            print("User:   %s" % uname)
-            print("Active: %d" % time_val)
-            print("Idle:   %d" % idle_val)
+            print(sprintf("User:   %s", uname))
+            print(sprintf("Active: %d", time_val))
+            print(sprintf("Idle:   %d", idle_val))
             print("-------------End Session------------\n")
             total_count += 1
 
@@ -67,7 +67,7 @@ def net_sessions_2(hostname=None, resolve_method=1):
     win_free(total_ptr_mem)
     win_free(resume_ptr)
 
-    print("\nTotal of %d entries enumerated" % total_count)
+    print(sprintf("\nTotal of %d entries enumerated", total_count))
     return "OK"
 
 def main(*args):

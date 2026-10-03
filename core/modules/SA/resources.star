@@ -26,7 +26,7 @@ def get_resources():
     res = win_call("kernel32.dll", "GlobalMemoryStatusEx", mem_stat)
     if res["r1"] == 0:
         win_free(mem_stat)
-        print("[-] GlobalMemoryStatusEx failed (error %d: %s)" % (res.get("err_code", 0), res.get("error", "")))
+        print(sprintf("[-] GlobalMemoryStatusEx failed (error %d: %s)", res.get("err_code", 0), res.get("error", "")))
         return "Fail"
 
     mem_load = read_uint32(mem_stat, 4)
@@ -39,11 +39,11 @@ def get_resources():
 
     print("System Resources & Memory Status:")
     print("===========================================================================")
-    print("Memory Load:           %d%%" % mem_load)
-    print("Total Physical Memory: %d MB" % total_phys)
-    print("Avail Physical Memory: %d MB" % avail_phys)
-    print("Total Page File:       %d MB" % total_page)
-    print("Avail Page File:       %d MB" % avail_page)
+    print(sprintf("Memory Load:           %d%%", mem_load))
+    print(sprintf("Total Physical Memory: %d MB", total_phys))
+    print(sprintf("Avail Physical Memory: %d MB", avail_phys))
+    print(sprintf("Total Page File:       %d MB", total_page))
+    print(sprintf("Avail Page File:       %d MB", avail_page))
 
     return "OK"
 

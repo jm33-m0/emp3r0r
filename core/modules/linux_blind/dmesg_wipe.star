@@ -45,15 +45,15 @@ def main(*args):
     if action == "wipe":
         res = sys_call("syslog", SYSLOG_ACTION_CLEAR, 0, 0)
         if res["errno"] != 0:
-            print("[!] clearing the ring buffer failed (errno=%d; need CAP_SYSLOG/root and dmesg_restrict=0)" % res["errno"])
-            return "ERROR: errno=%d" % res["errno"]
+            print(sprintf("[!] clearing the ring buffer failed (errno=%d; need CAP_SYSLOG/root and dmesg_restrict=0)", res["errno"]))
+            return sprintf("ERROR: errno=%d", res["errno"])
         print("[+] kernel ring buffer cleared")
         return "OK"
 
     data, errno = _read_all()
     if data == None:
-        print("[!] reading the ring buffer failed (errno=%d; need CAP_SYSLOG/root and dmesg_restrict=0)" % errno)
-        return "ERROR: errno=%d" % errno
+        print(sprintf("[!] reading the ring buffer failed (errno=%d; need CAP_SYSLOG/root and dmesg_restrict=0)", errno))
+        return sprintf("ERROR: errno=%d", errno)
 
     if action == "grep":
         if not pattern:
@@ -64,7 +64,7 @@ def main(*args):
             if str_contains(line, pattern):
                 print(line)
                 hits += 1
-        print("[*] %d matching line(s)" % hits)
+        print(sprintf("[*] %d matching line(s)", hits))
         return "OK"
 
     print(data)

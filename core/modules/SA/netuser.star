@@ -63,7 +63,7 @@ def netuserinfo(username, server=None):
         err_code = res.get("err_code", 0)
         err_msg = res.get("error", "")
         win_free(buf_ptr)
-        print("Failed to get user info: status %d (Error %d: %s)" % (res["r1"], err_code, err_msg))
+        print(sprintf("Failed to get user info: status %d (Error %d: %s)", res["r1"], err_code, err_msg))
         return "Fail"
 
     p4 = read_ptr(buf_ptr, 0)
@@ -86,17 +86,17 @@ def netuserinfo(username, server=None):
     UF_PASSWD_NOTREQD = 0x0020
     UF_PASSWD_CANT_CHANGE = 0x0040
 
-    print("User name:              %s" % name)
-    print("Full Name:              %s" % full_name)
-    print("User's comment:         %s" % comment)
-    print("Flags (account hex):    0x%x" % flags)
-    print("Account enabled:        %s" % ("No" if (flags & UF_ACCOUNTDISABLE) else "Yes"))
-    print("Password required:      %s" % ("No" if (flags & UF_PASSWD_NOTREQD) else "Yes"))
-    print("User may change pw:     %s" % ("No" if (flags & UF_PASSWD_CANT_CHANGE) else "Yes"))
-    print("Workstations allowed:   %s" % (workstations if workstations else "ALL"))
-    print("Script path:            %s" % script_path)
-    print("User profile:           %s" % profile)
-    print("Home directory:         %s" % home_dir)
+    print(sprintf("User name:              %s", name))
+    print(sprintf("Full Name:              %s", full_name))
+    print(sprintf("User's comment:         %s", comment))
+    print(sprintf("Flags (account hex):    0x%x", flags))
+    print(sprintf("Account enabled:        %s", "No" if (flags & UF_ACCOUNTDISABLE) else "Yes"))
+    print(sprintf("Password required:      %s", "No" if (flags & UF_PASSWD_NOTREQD) else "Yes"))
+    print(sprintf("User may change pw:     %s", "No" if (flags & UF_PASSWD_CANT_CHANGE) else "Yes"))
+    print(sprintf("Workstations allowed:   %s", workstations if workstations else "ALL"))
+    print(sprintf("Script path:            %s", script_path))
+    print(sprintf("User profile:           %s", profile))
+    print(sprintf("Home directory:         %s", home_dir))
 
     win_call("netapi32.dll", "NetApiBufferFree", p4)
     return "OK"

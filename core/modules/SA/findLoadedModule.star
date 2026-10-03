@@ -15,7 +15,7 @@ def find_loaded_module(mod_name="", pid=0):
         h_proc = res_open["r1"]
 
     if h_proc == 0:
-        print("[-] OpenProcess failed for PID %d (error %d: %s)" % (target_pid, res_open.get("err_code", 0), res_open.get("error", "")))
+        print(sprintf("[-] OpenProcess failed for PID %d (error %d: %s)", target_pid, res_open.get("err_code", 0), res_open.get("error", "")))
         return "Fail"
 
     mods_buf = win_alloc(8192)
@@ -26,7 +26,7 @@ def find_loaded_module(mod_name="", pid=0):
         win_free(mods_buf)
         win_free(cb_needed_ptr)
         win_call("kernel32.dll", "CloseHandle", h_proc)
-        print("[-] EnumProcessModules failed for PID %d (error %d: %s)" % (target_pid, res.get("err_code", 0), res.get("error", "")))
+        print(sprintf("[-] EnumProcessModules failed for PID %d (error %d: %s)", target_pid, res.get("err_code", 0), res.get("error", "")))
         return "Fail"
 
     needed = read_uint32(cb_needed_ptr, 0)
@@ -38,7 +38,7 @@ def find_loaded_module(mod_name="", pid=0):
     name_buf = win_alloc(512)
     found = False
 
-    print("Searching for module '%s' in PID %d:" % (mod_name, target_pid))
+    print(sprintf("Searching for module '%s' in PID %d:", mod_name, target_pid))
     print("===========================================================================")
 
     for i in range(count):
@@ -47,11 +47,11 @@ def find_loaded_module(mod_name="", pid=0):
             win_call("psapi.dll", "GetModuleFileNameExW", h_proc, h_mod, name_buf, 255)
             path = read_wstring(name_buf)
             if not mod_name or mod_name.lower() in path.lower():
-                print("FOUND: %s -> %s" % (sprintf("0x%016x", h_mod), path))
+                print(sprintf("FOUND: %s -> %s", sprintf("0x%016x", h_mod), path))
                 found = True
 
     if not found:
-        print("[-] Module '%s' not found in process %d" % (mod_name, target_pid))
+        print(sprintf("[-] Module '%s' not found in process %d", mod_name, target_pid))
 
     win_free(mods_buf)
     win_free(name_buf)

@@ -14,7 +14,7 @@ def nettime(server=None):
         err_code = res.get("err_code", 0)
         err_msg = res.get("error", "")
         win_free(buf_ptr)
-        print("Unable to retrieve remote time: status %d (Error %d: %s)" % (res["r1"], err_code, err_msg))
+        print(sprintf("Unable to retrieve remote time: status %d (Error %d: %s)", res["r1"], err_code, err_msg))
         return "OK"
 
     tod_ptr = read_ptr(buf_ptr, 0)

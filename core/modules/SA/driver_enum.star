@@ -13,7 +13,7 @@ def enum_filter_drivers():
         win_free(buf)
         win_free(bytes_returned)
         win_free(h_filter_ptr)
-        print("[-] FilterFindFirst failed (status %d, error %d: %s)" % (res["r1"], res.get("err_code", 0), res.get("error", "")))
+        print(sprintf("[-] FilterFindFirst failed (status %d, error %d: %s)", res["r1"], res.get("err_code", 0), res.get("error", "")))
         return "Fail"
 
     h_filter = read_ptr(h_filter_ptr, 0)
@@ -28,7 +28,7 @@ def enum_filter_drivers():
         length = (name_len[0] | (name_len[1] << 8)) // 2
         name = read_wstring(buf + 14, length)
 
-        print("-- %s" % name)
+        print(sprintf("-- %s", name))
 
         res_next = win_call("fltlib.dll", "FilterFindNext", h_filter, FilterFullInformation, buf, buf_size, bytes_returned)
         if res_next["r1"] != 0:

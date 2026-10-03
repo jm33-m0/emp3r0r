@@ -12,7 +12,7 @@ def main(*args):
     hours = minutes // 60
     days = hours // 24
     
-    print("Uptime: %d days, %d hours, %d minutes, %d seconds" % (days, hours % 24, minutes % 60, seconds % 60))
+    print(sprintf("Uptime: %d days, %d hours, %d minutes, %d seconds", days, hours % 24, minutes % 60, seconds % 60))
     
     cur_time_ptr = win_alloc(16)  # sizeof(SYSTEMTIME)
     cur_ftime_ptr = win_alloc(8)  # sizeof(FILETIME)

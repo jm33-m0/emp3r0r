@@ -19,7 +19,7 @@ def get_netsession(server=None):
         buf = read_ptr(buf_ptr, 0)
         count = read_uint32(read_ptr_mem, 0)
 
-        print("Network Sessions on %s (%d sessions):" % (server if server else "Local Host", count))
+        print(sprintf("Network Sessions on %s (%d sessions):", server if server else "Local Host", count))
         print("===========================================================================")
 
         # SESSION_INFO_10 struct on x64 is 32 bytes: cname(0), username(8), time(16), idle(20)
@@ -29,12 +29,12 @@ def get_netsession(server=None):
             uname = read_wstring(read_ptr(entry_addr, 8))
             time_val = read_uint32(entry_addr, 16)
             idle_val = read_uint32(entry_addr, 20)
-            print("  - Computer: %s | User: %s | Active Time: %ds | Idle Time: %ds" % (cname, uname, time_val, idle_val))
+            print(sprintf("  - Computer: %s | User: %s | Active Time: %ds | Idle Time: %ds", cname, uname, time_val, idle_val))
 
         if buf != 0:
             win_call("netapi32.dll", "NetApiBufferFree", buf)
     else:
-        print("[-] NetSessionEnum failed: status %d" % stat)
+        print(sprintf("[-] NetSessionEnum failed: status %d", stat))
 
     win_free(buf_ptr)
     win_free(read_ptr_mem)

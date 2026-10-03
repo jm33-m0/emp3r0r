@@ -6,6 +6,6 @@ def main(*args):
         print("[-] Usage: sha1 <filepath>")
         return "Fail"
     res = crypto_hash("sha1", filepath)
-    print("SHA1 (%s) = %s" % (filepath, res))
+    print(sprintf("SHA1 (%s) = %s", filepath, res))
     return "OK"
 

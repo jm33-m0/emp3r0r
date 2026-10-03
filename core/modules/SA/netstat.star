@@ -35,7 +35,7 @@ def get_ip6_host_name(addr_bytes):
         b1 = addr_bytes[i*2]
         b2 = addr_bytes[i*2+1]
         val = (b1 << 8) | b2
-        parts.append("%x" % val)
+        parts.append(sprintf("%x", val))
     return ":".join(parts)
 
 def get_port_name(port_addr):
@@ -93,7 +93,7 @@ def show_tcp_table():
     if res["r1"] != 0:
         err_code = res.get("err_code", 0)
         err_msg = res.get("error", "")
-        print("GetExtendedTcpTable (TCP) failed with status %d (Error %d: %s)" % (res["r1"], err_code, err_msg))
+        print(sprintf("GetExtendedTcpTable (TCP) failed with status %d (Error %d: %s)", res["r1"], err_code, err_msg))
         win_free(table_ptr)
         win_free(size_ptr)
         return
@@ -158,7 +158,7 @@ def show_tcp6_table():
     if res["r1"] != 0:
         err_code = res.get("err_code", 0)
         err_msg = res.get("error", "")
-        print("GetExtendedTcpTable (TCP6) failed with status %d (Error %d: %s)" % (res["r1"], err_code, err_msg))
+        print(sprintf("GetExtendedTcpTable (TCP6) failed with status %d (Error %d: %s)", res["r1"], err_code, err_msg))
         win_free(table_ptr)
         win_free(size_ptr)
         return
@@ -225,7 +225,7 @@ def show_udp_table():
     if res["r1"] != 0:
         err_code = res.get("err_code", 0)
         err_msg = res.get("error", "")
-        print("GetExtendedUdpTable (UDP) failed with status %d (Error %d: %s)" % (res["r1"], err_code, err_msg))
+        print(sprintf("GetExtendedUdpTable (UDP) failed with status %d (Error %d: %s)", res["r1"], err_code, err_msg))
         win_free(table_ptr)
         win_free(size_ptr)
         return
@@ -280,7 +280,7 @@ def show_udp6_table():
     if res["r1"] != 0:
         err_code = res.get("err_code", 0)
         err_msg = res.get("error", "")
-        print("GetExtendedUdpTable (UDP6) failed with status %d (Error %d: %s)" % (res["r1"], err_code, err_msg))
+        print(sprintf("GetExtendedUdpTable (UDP6) failed with status %d (Error %d: %s)", res["r1"], err_code, err_msg))
         win_free(table_ptr)
         win_free(size_ptr)
         return

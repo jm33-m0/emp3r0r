@@ -42,7 +42,7 @@ def sc_qc(service_name, hostname=None):
     res_scm = win_call("advapi32.dll", "OpenSCManagerA", 0, 0, SC_MANAGER_CONNECT | GENERIC_READ)
     h_scm = res_scm["r1"]
     if h_scm == 0:
-        print("[-] OpenSCManagerA failed for service %s (error %d: %s)" % (service_name, res_scm.get("err_code", 0), res_scm.get("error", "")))
+        print(sprintf("[-] OpenSCManagerA failed for service %s (error %d: %s)", service_name, res_scm.get("err_code", 0), res_scm.get("error", "")))
         return "Fail"
 
     # Convert service_name to ASCII ptr
@@ -57,7 +57,7 @@ def sc_qc(service_name, hostname=None):
 
     if h_service == 0:
         win_call("advapi32.dll", "CloseServiceHandle", h_scm)
-        print("[-] OpenServiceA failed for service %s (error %d: %s)" % (service_name, res_svc.get("err_code", 0), res_svc.get("error", "")))
+        print(sprintf("[-] OpenServiceA failed for service %s (error %d: %s)", service_name, res_svc.get("err_code", 0), res_svc.get("error", "")))
         return "Fail"
 
     bytes_needed = win_alloc(4)
@@ -81,14 +81,14 @@ def sc_qc(service_name, hostname=None):
             start_types = ["BOOT_DRIVER", "SYSTEM_START_DRIVER", "AUTO_START", "DEMAND_START", "DISABLED"]
             start_str = start_types[start_type] if start_type < len(start_types) else "UNKNOWN"
 
-            print("SERVICE_NAME: %s" % service_name)
-            print("        TYPE               : %x" % srv_type)
-            print("        START_TYPE         : %d (%s)" % (start_type, start_str))
-            print("        ERROR_CONTROL      : %d" % err_control)
-            print("        BINARY_PATH_NAME   : %s" % bin_path)
-            print("        LOAD_ORDER_GROUP   : %s" % group)
-            print("        DISPLAY_NAME       : %s" % disp_name)
-            print("        SERVICE_START_NAME : %s" % start_name)
+            print(sprintf("SERVICE_NAME: %s", service_name))
+            print(sprintf("        TYPE               : %x", srv_type))
+            print(sprintf("        START_TYPE         : %d (%s)", start_type, start_str))
+            print(sprintf("        ERROR_CONTROL      : %d", err_control))
+            print(sprintf("        BINARY_PATH_NAME   : %s", bin_path))
+            print(sprintf("        LOAD_ORDER_GROUP   : %s", group))
+            print(sprintf("        DISPLAY_NAME       : %s", disp_name))
+            print(sprintf("        SERVICE_START_NAME : %s", start_name))
 
         win_free(config_buf)
 

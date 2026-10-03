@@ -30,7 +30,7 @@ def reg_query(hive_str="HKLM", subkey="", value_name=None):
         err_msg = res.get("error", "")
         win_free(h_key_ptr)
         if val_ptr: win_free(val_ptr)
-        print("[-] RegOpenKeyExW failed: status %d (Error %d: %s)" % (res["r1"], err_code, err_msg))
+        print(sprintf("[-] RegOpenKeyExW failed: status %d (Error %d: %s)", res["r1"], err_code, err_msg))
         return "OK"
 
     h_key = read_ptr(h_key_ptr, 0)
@@ -52,12 +52,12 @@ def reg_query(hive_str="HKLM", subkey="", value_name=None):
             if res_val["r1"] == 0:
                 if val_type in (1, 2):  # REG_SZ, REG_EXPAND_SZ
                     str_val = read_wstring(data_buf)
-                    print("%s\\%s" % (hive_str, subkey))
-                    print("    %s    REG_SZ    %s" % (value_name, str_val))
+                    print(sprintf("%s\\%s", hive_str, subkey))
+                    print(sprintf("    %s    REG_SZ    %s", value_name, str_val))
                 elif val_type == 4:  # REG_DWORD
                     dword_val = read_uint32(data_buf, 0)
-                    print("%s\\%s" % (hive_str, subkey))
-                    print("    %s    REG_DWORD    0x%x (%d)" % (value_name, dword_val, dword_val))
+                    print(sprintf("%s\\%s", hive_str, subkey))
+                    print(sprintf("    %s    REG_DWORD    0x%x (%d)", value_name, dword_val, dword_val))
             win_free(data_buf)
 
         win_free(type_ptr)
@@ -71,7 +71,7 @@ def reg_query(hive_str="HKLM", subkey="", value_name=None):
         data_buf = win_alloc(1024)
         data_len_ptr = win_alloc(4)
 
-        print("%s\\%s" % (hive_str, subkey))
+        print(sprintf("%s\\%s", hive_str, subkey))
         print("----------------------------------------------------------------")
 
         for idx in range(256):
@@ -99,10 +99,10 @@ def reg_query(hive_str="HKLM", subkey="", value_name=None):
 
             if v_type in (1, 2):
                 v_str = read_wstring(data_buf)
-                print("    %s    REG_SZ    %s" % (v_name if v_name else "(Default)", v_str))
+                print(sprintf("    %s    REG_SZ    %s", v_name if v_name else "(Default)", v_str))
             elif v_type == 4:
                 v_dw = read_uint32(data_buf, 0)
-                print("    %s    REG_DWORD    0x%x (%d)" % (v_name if v_name else "(Default)", v_dw, v_dw))
+                print(sprintf("    %s    REG_DWORD    0x%x (%d)", v_name if v_name else "(Default)", v_dw, v_dw))
 
         win_free(val_name_buf)
         win_free(val_name_len_ptr)

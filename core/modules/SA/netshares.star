@@ -69,11 +69,11 @@ def list_shares(server=None, as_admin=False):
 
     target_name = server if server else "(Local)"
     if as_admin:
-        print("%s %s %s %s" % (pad("Share:", 20), pad("Local Path:", 30), pad("Uses:", 8), "Descriptor:"))
-        print("---------------------%s----------------------------------" % target_name)
+        print(sprintf("%s %s %s %s", pad("Share:", 20), pad("Local Path:", 30), pad("Uses:", 8), "Descriptor:"))
+        print(sprintf("---------------------%s----------------------------------", target_name))
     else:
-        print("%s %s" % (pad("Share:", 20), "Remark:"))
-        print("---------------------%s----------------------------------" % target_name)
+        print(sprintf("%s %s", pad("Share:", 20), "Remark:"))
+        print(sprintf("---------------------%s----------------------------------", target_name))
 
     res = win_call(
         "netapi32.dll",
@@ -104,16 +104,16 @@ def list_shares(server=None, as_admin=False):
             if as_admin:
                 path = read_wstring(read_ptr(entry_addr, 40))
                 uses = read_uint32(entry_addr, 32)
-                print("%s%s%s %s" % (pad(netname, 20), pad(path, 30), pad(str(uses), 8), remark))
+                print(sprintf("%s%s%s %s", pad(netname, 20), pad(path, 30), pad(str(uses), 8), remark))
             else:
-                print("%s%s" % (pad(netname, 20), remark))
+                print(sprintf("%s%s", pad(netname, 20), remark))
 
         if buf != 0:
             win_call("netapi32.dll", "NetApiBufferFree", buf)
     else:
         err_code = res.get("err_code", 0)
         err_msg = res.get("error", "")
-        print("Unable to list shares: status %d (Error %d: %s)" % (stat, err_code, err_msg))
+        print(sprintf("Unable to list shares: status %d (Error %d: %s)", stat, err_code, err_msg))
 
     win_free(buf_ptr)
     win_free(entries_ptr)

@@ -35,13 +35,13 @@ def userIdletime():
         hours = (idleTime // 3600) % 24
         days = idleTime // 86400
 
-        print("Current User idle time: %d days, %d hours, %d minutes, %d seconds" % (days, hours, minutes, seconds))
+        print(sprintf("Current User idle time: %d days, %d hours, %d minutes, %d seconds", days, hours, minutes, seconds))
         return "OK"
     else:
         err_code = res.get("err_code", 0)
         err_msg = res.get("error", "")
         win_free(lii)
-        print("Failed to retrieve last user idle time. Error %d: %s" % (err_code, err_msg))
+        print(sprintf("Failed to retrieve last user idle time. Error %d: %s", err_code, err_msg))
         return "Fail"
 
 def main(*args):

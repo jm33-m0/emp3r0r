@@ -26,9 +26,9 @@ def _dontdump():
     res = sys_call("madvise", buf, PAGE, MADV_DONTDUMP)
     if res["errno"] != 0:
         sys_free(buf)
-        print("[!] MADV_DONTDUMP failed (errno=%d)" % res["errno"])
-        return "ERROR: errno=%d" % res["errno"]
-    print("[+] MADV_DONTDUMP set on an anonymous mapping (0x%x, %d bytes)" % (buf, PAGE))
+        print(sprintf("[!] MADV_DONTDUMP failed (errno=%d)", res["errno"]))
+        return sprintf("ERROR: errno=%d", res["errno"])
+    print(sprintf("[+] MADV_DONTDUMP set on an anonymous mapping (0x%x, %d bytes)", buf, PAGE))
     print("[*] the mapping is excluded from core dumps; MADV_DODUMP would restore it")
     sys_call("madvise", buf, PAGE, MADV_DODUMP)
     sys_free(buf)
@@ -46,9 +46,9 @@ def _name(name):
     res = sys_call("prctl", PR_SET_VMA, PR_SET_VMA_ANON_NAME, buf, PAGE, name_ptr)
     sys_free(buf)
     if res["errno"] != 0:
-        print("[!] PR_SET_VMA failed (errno=%d)" % res["errno"])
-        return "ERROR: errno=%d" % res["errno"]
-    print("[+] anonymous mapping named %s" % name)
+        print(sprintf("[!] PR_SET_VMA failed (errno=%d)", res["errno"]))
+        return sprintf("ERROR: errno=%d", res["errno"])
+    print(sprintf("[+] anonymous mapping named %s", name))
     return "OK"
 
 
@@ -64,5 +64,5 @@ def main(*args):
         return _dontdump()
     if action == "name":
         return _name(name)
-    print("[!] unknown action: %s" % action)
+    print(sprintf("[!] unknown action: %s", action))
     return "ERROR: unknown action"

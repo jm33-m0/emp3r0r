@@ -53,10 +53,10 @@ def ipconfig():
                 dhcp_enabled = read_uint32(curr + 512, 0)       # DhcpEnabled at 512
                 dhcp_server = read_ansi_string(curr + 524, 16)  # DhcpServer.IpAddress at 524
 
-                print("\nEthernet adapter %s:\n" % desc)
+                print(sprintf("\nEthernet adapter %s:\n", desc))
                 print("   Description . . . . . . . . . . . : " + desc)
                 print("   Physical Address. . . . . . . . . : " + mac_str)
-                print("   DHCP Enabled. . . . . . . . . . . : %s" % ("Yes" if dhcp_enabled else "No"))
+                print(sprintf("   DHCP Enabled. . . . . . . . . . . : %s", "Yes" if dhcp_enabled else "No"))
                 print("   IPv4 Address. . . . . . . . . . . : " + ip_str)
                 print("   Subnet Mask . . . . . . . . . . . : " + mask_str)
                 print("   Default Gateway . . . . . . . . . : " + gateway_str)

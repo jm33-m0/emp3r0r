@@ -81,20 +81,20 @@ def netuserenum(server=None):
         buf = read_ptr(buf_ptr, 0)
         count = read_uint32(entries_read_ptr, 0)
 
-        print("User Accounts on %s:" % (server if server else "Local Machine"))
+        print(sprintf("User Accounts on %s:", server if server else "Local Machine"))
         print("----------------------------------------")
         # USER_INFO_0 contains usri0_name (LPWSTR pointer at offset 0, 8 bytes)
         for i in range(count):
             name_ptr = read_ptr(buf, i * 8)
             name = read_wstring(name_ptr)
-            print("-- %s" % name)
+            print(sprintf("-- %s", name))
 
         if buf != 0:
             win_call("netapi32.dll", "NetApiBufferFree", buf)
     else:
         err_code = res.get("err_code", 0)
         err_msg = res.get("error", "")
-        print("Failed to query user accounts: status %d (Error %d: %s)" % (stat, err_code, err_msg))
+        print(sprintf("Failed to query user accounts: status %d (Error %d: %s)", stat, err_code, err_msg))
 
     win_free(buf_ptr)
     win_free(entries_read_ptr)

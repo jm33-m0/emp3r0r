@@ -45,28 +45,28 @@ def _show():
     filt = read_file("/proc/self/coredump_filter", default="?")
     if not filt:
         filt = "?"
-    print("  coredump_filter: %s" % filt.strip())
+    print(sprintf("  coredump_filter: %s", filt.strip()))
     dump = sys_call("prctl", PR_GET_DUMPABLE, 0, 0, 0, 0)
-    print("  dumpable:        %d" % dump["r1"])
+    print(sprintf("  dumpable:        %d", dump["r1"]))
     pat = read_file("/proc/sys/kernel/core_pattern", default="?")
-    print("  core_pattern:    %s" % (pat or "?").strip())
+    print(sprintf("  core_pattern:    %s", (pat or "?").strip()))
     uses = read_file("/proc/sys/kernel/core_uses_pid", default="?")
-    print("  core_uses_pid:   %s" % (uses or "?").strip())
+    print(sprintf("  core_uses_pid:   %s", (uses or "?").strip()))
 
 
 def _self_block():
     errno = _write("/proc/self/coredump_filter", "0\n")
-    print("  coredump_filter=0: %s" % ("ok" if errno == 0 else "errno=%d" % errno))
+    print(sprintf("  coredump_filter=0: %s", "ok" if errno == 0 else sprintf("errno=%d", errno)))
     d = sys_call("prctl", PR_SET_DUMPABLE, 0, 0, 0, 0)
-    print("  PR_SET_DUMPABLE=0: %s" % ("ok" if d["errno"] == 0 else "errno=%d" % d["errno"]))
+    print(sprintf("  PR_SET_DUMPABLE=0: %s", "ok" if d["errno"] == 0 else sprintf("errno=%d", d["errno"])))
     p = sys_call("prctl", PR_SET_PTRACER, 0, 0, 0, 0)
-    print("  PR_SET_PTRACER=0:  %s" % ("ok" if p["errno"] == 0 else "errno=%d" % p["errno"]))
+    print(sprintf("  PR_SET_PTRACER=0:  %s", "ok" if p["errno"] == 0 else sprintf("errno=%d", p["errno"])))
     rl = sys_alloc(16)
     write_u64(rl, 0, 0)
     write_u64(rl, 8, 0)
     r = sys_call("prlimit64", 0, RLIMIT_CORE, rl, 0)
     sys_free(rl)
-    print("  RLIMIT_CORE=0:     %s" % ("ok" if r["errno"] == 0 else "errno=%d" % r["errno"]))
+    print(sprintf("  RLIMIT_CORE=0:     %s", "ok" if r["errno"] == 0 else sprintf("errno=%d", r["errno"])))
     print("[+] process is now resistant to core dumps and /proc/self/mem reads")
 
 
@@ -74,11 +74,11 @@ def _pid_block(pid):
     if not pid:
         print("[!] action=pid requires --pid")
         return "ERROR: pid required"
-    errno = _write("/proc/%s/coredump_filter" % pid, "0\n")
+    errno = _write(sprintf("/proc/%s/coredump_filter", pid), "0\n")
     if errno != 0:
-        print("[!] /proc/%s/coredump_filter write failed (errno=%d)" % (pid, errno))
-        return "ERROR: errno=%d" % errno
-    print("[+] PID %s coredump_filter=0" % pid)
+        print(sprintf("[!] /proc/%s/coredump_filter write failed (errno=%d)", pid, errno))
+        return sprintf("ERROR: errno=%d", errno)
+    print(sprintf("[+] PID %s coredump_filter=0", pid))
     return "OK"
 
 
@@ -95,7 +95,7 @@ def _madv():
         res = sys_call("madvise", start, end - start, MADV_DONTDUMP)
         if res["errno"] == 0:
             count += 1
-    print("[+] MADV_DONTDUMP applied to %d VMA(s)" % count)
+    print(sprintf("[+] MADV_DONTDUMP applied to %d VMA(s)", count))
     return "OK"
 
 
@@ -104,11 +104,11 @@ def _system():
     for path, value in (("/proc/sys/kernel/core_pattern", "|/bin/false\n"), ("/proc/sys/fs/suid_dumpable", "0\n")):
         errno = _write(path, value)
         if errno != 0:
-            print("  [!] %s write failed (errno=%d)" % (path, errno))
+            print(sprintf("  [!] %s write failed (errno=%d)", path, errno))
             failures += 1
         else:
-            print("  [+] %s updated" % path)
-    print("[*] system-wide core dump suppression%s" % ("" if failures == 0 else " (partial)"))
+            print(sprintf("  [+] %s updated", path))
+    print(sprintf("[*] system-wide core dump suppression%s", "" if failures == 0 else " (partial)"))
     return "OK"
 
 
@@ -132,5 +132,5 @@ def main(*args):
         return _madv()
     if action == "system":
         return _system()
-    print("[!] unknown action: %s" % action)
+    print(sprintf("[!] unknown action: %s", action))
     return "ERROR: unknown action"

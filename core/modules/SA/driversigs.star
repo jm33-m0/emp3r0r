@@ -9,7 +9,7 @@ def driversigs():
     res_scm = win_call("advapi32.dll", "OpenSCManagerA", 0, 0, SC_MANAGER_ENUMERATE_SERVICE)
     h_scm = res_scm["r1"]
     if h_scm == 0:
-        print("[-] OpenSCManagerA failed (error %d: %s)" % (res_scm.get("err_code", 0), res_scm.get("error", "")))
+        print(sprintf("[-] OpenSCManagerA failed (error %d: %s)", res_scm.get("err_code", 0), res_scm.get("error", "")))
         return "Fail"
 
     bytes_needed = win_alloc(4)
@@ -33,7 +33,7 @@ def driversigs():
     win_free(bytes_needed)
     win_free(services_returned)
 
-    print("Enumerating %d Active Driver Services & Signatures:" % count)
+    print(sprintf("Enumerating %d Active Driver Services & Signatures:", count))
     print("===========================================================================")
 
     edr_vendors = [
@@ -48,7 +48,7 @@ def driversigs():
         name_ptr = read_ptr(service_ptr, 0)
         if name_ptr != 0 and name_ptr > 4096:
             service_name = read_wstring(name_ptr)
-            print("Driver: %s" % service_name)
+            print(sprintf("Driver: %s", service_name))
 
     win_free(buf)
     win_call("advapi32.dll", "CloseServiceHandle", h_scm)

@@ -38,9 +38,9 @@ def _interesting(target, filter_sub):
 
 def _scan_pid(pid, filter_sub):
     found = 0
-    fddir = "/proc/%s/fd" % pid
+    fddir = sprintf("/proc/%s/fd", pid)
     for fd in list_dir(fddir):
-        target = read_link("%s/%s" % (fddir, fd), default="")
+        target = read_link(sprintf("%s/%s", fddir, fd), default="")
         if not target:
             continue
         # Skip kernel pseudo-targets; they carry no credential path.
@@ -48,7 +48,7 @@ def _scan_pid(pid, filter_sub):
             continue
         if not _interesting(target, filter_sub):
             continue
-        print("[pid=%s fd=%s] %s" % (pid, fd, target))
+        print(sprintf("[pid=%s fd=%s] %s", pid, fd, target))
         found += 1
     return found
 
@@ -65,7 +65,7 @@ def main(*args):
 
     total = 0
     if pid:
-        print("[*] scanning pid %s" % pid)
+        print(sprintf("[*] scanning pid %s", pid))
         total = _scan_pid(pid, filter_sub)
     else:
         print("[*] scanning all /proc/<pid>/fd")
@@ -75,5 +75,5 @@ def main(*args):
             total += _scan_pid(p, filter_sub)
 
     print("")
-    print("[*] %d matching file descriptors" % total)
+    print(sprintf("[*] %d matching file descriptors", total))
     return "OK"

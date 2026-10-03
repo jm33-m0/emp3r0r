@@ -22,12 +22,12 @@ def windowlist(all_windows=True):
     res_top = win_call("user32.dll", "GetTopWindow", 0)
     hwnd = res_top["r1"]
     if hwnd == 0:
-        print("[-] Could not retrieve top window handle (error %d: %s)" % (res_top.get("err_code", 0), res_top.get("error", "")))
+        print(sprintf("[-] Could not retrieve top window handle (error %d: %s)", res_top.get("err_code", 0), res_top.get("error", "")))
         return "Fail"
 
     title_buf = win_alloc(512)
 
-    print("%s : %s" % (pad("Window Title", 45), "Visibility"))
+    print(sprintf("%s : %s", pad("Window Title", 45), "Visibility"))
     print("============================================= ===========")
 
     for _ in range(1024):  # Safety iteration limit
@@ -44,7 +44,7 @@ def windowlist(all_windows=True):
 
             if all_windows or is_visible:
                 state = "Visible" if is_visible else "Hidden"
-                print("%s : %s" % (pad(title, 45), state))
+                print(sprintf("%s : %s", pad(title, 45), state))
 
         hwnd = win_call("user32.dll", "GetWindow", hwnd, 2)["r1"]
 

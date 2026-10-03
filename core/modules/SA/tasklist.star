@@ -36,14 +36,14 @@ def tasklist():
     res_snap = win_call("kernel32.dll", "CreateToolhelp32Snapshot", TH32CS_SNAPPROCESS, 0)
     h_snap = res_snap["r1"]
     if h_snap == 0 or h_snap == 0xFFFFFFFFFFFFFFFF:
-        print("[-] CreateToolhelp32Snapshot failed (error %d: %s)" % (res_snap.get("err_code", 0), res_snap.get("error", "")))
+        print(sprintf("[-] CreateToolhelp32Snapshot failed (error %d: %s)", res_snap.get("err_code", 0), res_snap.get("error", "")))
         return "Fail"
 
     # PROCESSENTRY32W size (x64) is 560 bytes
     entry = win_alloc(560)
     write_uint32(entry, 0, 560)
 
-    print("%s %s %s %s" % (pad("Image Name", 32), pad("PID", 10), pad("PPID", 10), pad("Threads", 10)))
+    print(sprintf("%s %s %s %s", pad("Image Name", 32), pad("PID", 10), pad("PPID", 10), pad("Threads", 10)))
     print("================================ ========== ========== ==========")
 
     res = win_call("kernel32.dll", "Process32FirstW", h_snap, entry)
@@ -55,7 +55,7 @@ def tasklist():
         ppid = read_uint32(entry, 24)
         exe_name = read_wstring(entry + 44)
 
-        print("%s %s %s %s" % (pad(exe_name, 32), pad(str(pid), 10), pad(str(ppid), 10), pad(str(cnt_threads), 10)))
+        print(sprintf("%s %s %s %s", pad(exe_name, 32), pad(str(pid), 10), pad(str(ppid), 10), pad(str(cnt_threads), 10)))
 
         res = win_call("kernel32.dll", "Process32NextW", h_snap, entry)
 

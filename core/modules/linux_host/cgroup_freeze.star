@@ -15,7 +15,7 @@ O_WRONLY = 1
 def _proc_dir(pid):
     if not pid or pid == "self":
         return "/proc/self"
-    return "/proc/%s" % pid
+    return sprintf("/proc/%s", pid)
 
 
 def _cgroup_rel(pid):
@@ -57,27 +57,27 @@ def main(*args):
 
     target = _cgroup_dir(pid)
     if not target:
-        print("[!] cgroup v2 (unified) not found for pid %s" % (pid or "self"))
+        print(sprintf("[!] cgroup v2 (unified) not found for pid %s", pid or "self"))
         return "ERROR: cgroup v2 required"
 
     self_cg = _cgroup_dir("")
     freeze = read_file(target + "/cgroup.freeze", default="?").strip()
     ctype = read_file(target + "/cgroup.type", default="?").strip()
-    print("[*] cgroup=%s type=%s frozen=%s" % (target, ctype, freeze))
+    print(sprintf("[*] cgroup=%s type=%s frozen=%s", target, ctype, freeze))
 
     if action == "show":
         return "OK"
     if action != "freeze" and action != "thaw":
-        print("[!] unknown action: %s" % action)
+        print(sprintf("[!] unknown action: %s", action))
         return "ERROR: unknown action"
     if target == self_cg:
-        print("[!] refusing to %s the agent's own cgroup (%s)" % (action, target))
+        print(sprintf("[!] refusing to %s the agent's own cgroup (%s)", action, target))
         return "ERROR: refusing own cgroup"
 
     value = "1" if action == "freeze" else "0"
     errno = _write_ctl(target + "/cgroup.freeze", value)
     if errno != 0:
-        print("[!] could not write cgroup.freeze=%s (errno=%d)" % (value, errno))
-        return "ERROR: write errno=%d" % errno
-    print("[+] %s: %s/cgroup.freeze=%s" % (action, target, value))
+        print(sprintf("[!] could not write cgroup.freeze=%s (errno=%d)", value, errno))
+        return sprintf("ERROR: write errno=%d", errno)
+    print(sprintf("[+] %s: %s/cgroup.freeze=%s", action, target, value))
     return "OK"

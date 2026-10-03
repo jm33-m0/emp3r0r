@@ -95,17 +95,17 @@ def _apply(which, dry_run):
     for ctl in CTLS:
         value = ctl[which]
         if not value:
-            print("  [*] %s: skipping (no %s value on record)" % (ctl["key"], which))
+            print(sprintf("  [*] %s: skipping (no %s value on record)", ctl["key"], which))
             continue
         if dry_run:
-            print("  [dry-run] %s = %s" % (ctl["key"], value))
+            print(sprintf("  [dry-run] %s = %s", ctl["key"], value))
             continue
         errno = _write(_path(ctl["key"]), value)
         if errno != 0:
-            print("  [!] %s = %s failed (errno=%d)" % (ctl["key"], value, errno))
+            print(sprintf("  [!] %s = %s failed (errno=%d)", ctl["key"], value, errno))
             failures += 1
         else:
-            print("  [+] %s = %s" % (ctl["key"], value))
+            print(sprintf("  [+] %s = %s", ctl["key"], value))
     return failures
 
 
@@ -127,11 +127,11 @@ def main(*args):
         _show()
         return "OK"
     if action == "blind":
-        print("[*] restricting EDR information sources%s" % (" (dry-run)" if dry_run else ""))
+        print(sprintf("[*] restricting EDR information sources%s", " (dry-run)" if dry_run else ""))
         _apply("blind", dry_run)
         return "OK"
     if action == "open":
-        print("[*] restoring permissive sysctls%s" % (" (dry-run)" if dry_run else ""))
+        print(sprintf("[*] restoring permissive sysctls%s", " (dry-run)" if dry_run else ""))
         _apply("open", dry_run)
         print("[*] note: modules_disabled=1, once set, is irreversible without a reboot")
         return "OK"
@@ -139,14 +139,14 @@ def main(*args):
         if not name or not value:
             print("[!] set requires --name and --value")
             return "ERROR: name and value required"
-        print("[*] setting %s = %s" % (name, value))
+        print(sprintf("[*] setting %s = %s", name, value))
         if dry_run:
             return "OK"
         errno = _write(_path(name), value)
         if errno != 0:
-            print("[!] write failed (errno=%d; root/CAP_SYS_ADMIN required)" % errno)
-            return "ERROR: errno=%d" % errno
-        print("[+] %s = %s" % (name, read_file(_path(name), default="?").strip()))
+            print(sprintf("[!] write failed (errno=%d; root/CAP_SYS_ADMIN required)", errno))
+            return sprintf("ERROR: errno=%d", errno)
+        print(sprintf("[+] %s = %s", name, read_file(_path(name), default="?").strip()))
         return "OK"
-    print("[!] unknown action: %s" % action)
+    print(sprintf("[!] unknown action: %s", action))
     return "ERROR: unknown action"

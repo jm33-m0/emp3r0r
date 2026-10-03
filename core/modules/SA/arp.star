@@ -56,7 +56,7 @@ def arp():
     if ret != 0 and ret != 234: # ERROR_MORE_DATA
         err_code = res.get("err_code", 0)
         err_msg = res.get("error", "")
-        print("Error code: %d, sys error: %d (%s)" % (ret, err_code, err_msg))
+        print(sprintf("Error code: %d, sys error: %d (%s)", ret, err_code, err_msg))
         print("Could not get ipnet table info")
         win_free(table_ptr)
         win_free(len_ptr)
@@ -79,7 +79,7 @@ def arp():
         
         if last_if_index != dwIndex:
             last_if_index = dwIndex
-            print("\nInterface  --- 0x%X" % dwIndex)
+            print(sprintf("\nInterface  --- 0x%X", dwIndex))
             print(pad("Internet Address", 24) + pad("Physical Address", 24) + pad("Type", 24))
             
         ip_str = print_ip_from_int(dwAddr)
