@@ -40,6 +40,12 @@ type Program struct {
 	ptr uintptr
 }
 
+// Map wraps a struct bpf_map * owned by an Object.
+type Map struct {
+	obj *Object
+	ptr uintptr
+}
+
 // Link wraps a struct bpf_link *.
 type Link struct {
 	lib *Library
@@ -184,6 +190,189 @@ func (o *Object) FindProgram(name string) (*Program, error) {
 		return nil, fmt.Errorf("libbpf: program %q not found", name)
 	}
 	return &Program{obj: o, ptr: ptr}, nil
+}
+
+// FindMap returns the named map inside the object.
+func (o *Object) FindMap(name string) (*Map, error) {
+	if name == "" {
+		return nil, errors.New("libbpf: map name is empty")
+	}
+	buf := append([]byte(name), 0)
+	ptr, err := o.lib.call("bpf_object__find_map_by_name", o.ptr, uintptr(unsafe.Pointer(&buf[0])))
+	runtime.KeepAlive(buf)
+	if err != nil {
+		return nil, fmt.Errorf("libbpf: bpf_object__find_map_by_name: %w", err)
+	}
+	if ptr == 0 {
+		return nil, fmt.Errorf("libbpf: map %q not found", name)
+	}
+	return &Map{obj: o, ptr: ptr}, nil
+}
+
+// AttachUprobe attaches the program to the executable at path/offset. A
+// negative pid attaches to every process that maps the binary, which lets one
+// probe cover all current and future sessions; a non-negative pid restricts the
+// probe to that process.
+//
+// offset is a file offset, not a virtual address. Use elfutil.FindCodePattern
+// to derive it from a byte pattern.
+func (l *Library) AttachUprobe(prog *Program, pid int, path string, offset uint64, retprobe bool) (*Link, error) {
+	if path == "" {
+		return nil, errors.New("libbpf: uprobe path is empty")
+	}
+	buf := append([]byte(path), 0)
+	var rp uintptr
+	if retprobe {
+		rp = 1
+	}
+	ptr, err := l.call("bpf_program__attach_uprobe", prog.ptr, rp,
+		uintptr(int64(pid)), uintptr(unsafe.Pointer(&buf[0])), uintptr(offset))
+	runtime.KeepAlive(buf)
+	if err != nil {
+		return nil, fmt.Errorf("libbpf: bpf_program__attach_uprobe: %w", err)
+	}
+	if e := l.getError(ptr); e != 0 {
+		return nil, fmt.Errorf("libbpf: bpf_program__attach_uprobe: %w", unix.Errno(-e))
+	}
+	if ptr == 0 {
+		return nil, errors.New("libbpf: bpf_program__attach_uprobe returned NULL")
+	}
+	return &Link{lib: l, ptr: ptr}, nil
+}
+
+// FD returns the kernel file descriptor backing the map. It stays valid until
+// the owning Object is closed.
+func (m *Map) FD() (int, error) {
+	rc, err := m.obj.lib.call("bpf_map__fd", m.ptr)
+	if err != nil {
+		return -1, fmt.Errorf("libbpf: bpf_map__fd: %w", err)
+	}
+	return int(int32(uint32(rc))), nil
+}
+
+// KeySize returns the map's key size in bytes.
+func (m *Map) KeySize() (uint32, error) {
+	rc, err := m.obj.lib.call("bpf_map__key_size", m.ptr)
+	if err != nil {
+		return 0, fmt.Errorf("libbpf: bpf_map__key_size: %w", err)
+	}
+	return uint32(rc), nil
+}
+
+// ValueSize returns the map's value size in bytes.
+func (m *Map) ValueSize() (uint32, error) {
+	rc, err := m.obj.lib.call("bpf_map__value_size", m.ptr)
+	if err != nil {
+		return 0, fmt.Errorf("libbpf: bpf_map__value_size: %w", err)
+	}
+	return uint32(rc), nil
+}
+
+// Update inserts or replaces value under key. It mirrors bpf_map_update_elem
+// with BPF_ANY semantics.
+func (m *Map) Update(key, value []byte) error {
+	if len(key) == 0 || len(value) == 0 {
+		return errors.New("libbpf: map update needs a non-empty key and value")
+	}
+	rc, err := m.obj.lib.call("bpf_map_update_elem", uintptr(mustFD(m)),
+		uintptr(unsafe.Pointer(&key[0])), uintptr(unsafe.Pointer(&value[0])), 0)
+	runtime.KeepAlive(key)
+	runtime.KeepAlive(value)
+	if err != nil {
+		return fmt.Errorf("libbpf: bpf_map_update_elem: %w", err)
+	}
+	if int32(uint32(rc)) != 0 {
+		return unix.Errno(int32(uint32(rc)))
+	}
+	return nil
+}
+
+// Lookup returns a copy of the value stored under key. A missing key is
+// reported as the kernel's ENOENT so callers can distinguish "absent" from a
+// real failure.
+func (m *Map) Lookup(key []byte) ([]byte, error) {
+	if len(key) == 0 {
+		return nil, errors.New("libbpf: map lookup needs a non-empty key")
+	}
+	vsize, err := m.ValueSize()
+	if err != nil {
+		return nil, err
+	}
+	if vsize == 0 || vsize > 1<<20 {
+		return nil, fmt.Errorf("libbpf: map has invalid value size %d", vsize)
+	}
+	value := make([]byte, vsize)
+	rc, err := m.obj.lib.call("bpf_map_lookup_elem", uintptr(mustFD(m)),
+		uintptr(unsafe.Pointer(&key[0])), uintptr(unsafe.Pointer(&value[0])))
+	runtime.KeepAlive(key)
+	runtime.KeepAlive(value)
+	if err != nil {
+		return nil, fmt.Errorf("libbpf: bpf_map_lookup_elem: %w", err)
+	}
+	if int32(uint32(rc)) != 0 {
+		return nil, unix.Errno(int32(uint32(rc)))
+	}
+	return value, nil
+}
+
+// Delete removes key from the map. Missing keys report ENOENT.
+func (m *Map) Delete(key []byte) error {
+	if len(key) == 0 {
+		return errors.New("libbpf: map delete needs a non-empty key")
+	}
+	rc, err := m.obj.lib.call("bpf_map_delete_elem", uintptr(mustFD(m)), uintptr(unsafe.Pointer(&key[0])))
+	runtime.KeepAlive(key)
+	if err != nil {
+		return fmt.Errorf("libbpf: bpf_map_delete_elem: %w", err)
+	}
+	if int32(uint32(rc)) != 0 {
+		return unix.Errno(int32(uint32(rc)))
+	}
+	return nil
+}
+
+// NextKey returns the key following prev (nil for the first key). It returns
+// the kernel's ENOENT when the map is empty or prev is the last key.
+func (m *Map) NextKey(prev []byte) ([]byte, error) {
+	ksize, err := m.KeySize()
+	if err != nil {
+		return nil, err
+	}
+	if ksize == 0 || ksize > 256 {
+		return nil, fmt.Errorf("libbpf: map has invalid key size %d", ksize)
+	}
+	next := make([]byte, ksize)
+	var keyPtr uintptr
+	if len(prev) > 0 {
+		keyPtr = uintptr(unsafe.Pointer(&prev[0]))
+	}
+	rc, err := m.obj.lib.call("bpf_map_get_next_key", uintptr(mustFD(m)),
+		keyPtr, uintptr(unsafe.Pointer(&next[0])))
+	runtime.KeepAlive(prev)
+	runtime.KeepAlive(next)
+	if err != nil {
+		return nil, fmt.Errorf("libbpf: bpf_map_get_next_key: %w", err)
+	}
+	if int32(uint32(rc)) != 0 {
+		return nil, unix.Errno(int32(uint32(rc)))
+	}
+	return next, nil
+}
+
+// mustFD returns a map's fd, ignoring the error because a live Map obtained
+// from a loaded Object always has one.
+func mustFD(m *Map) int {
+	fd, _ := m.FD()
+	return fd
+}
+
+// FD returns the kernel file descriptor backing the link.
+func (l *Link) FD() (int, error) {
+	rc, err := l.lib.call("bpf_link__fd", l.ptr)
+	if err != nil {
+		return -1, fmt.Errorf("libbpf: bpf_link__fd: %w", err)
+	}
+	return int(int32(uint32(rc))), nil
 }
 
 // Attach attaches the program using libbpf's default attachment strategy.

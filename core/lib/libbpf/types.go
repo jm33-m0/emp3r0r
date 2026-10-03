@@ -1,5 +1,7 @@
 package libbpf
 
+import "strings"
+
 // ProgInfo summarises one kernel BPF program.
 type ProgInfo struct {
 	ID       uint32
@@ -49,6 +51,33 @@ const (
 	MapTypeLruHash        uint32 = 9
 	MapTypeRingbuf        uint32 = 27
 )
+
+// UprobeEvent is one captured invocation of a probed function, produced by the
+// shipped eBPF uprobe program. Its binary layout is defined by that program's
+// `struct event` and must stay in sync.
+type UprobeEvent struct {
+	PID    uint32
+	UID    uint32
+	Retval int64
+	Comm   string
+	Arg    string
+}
+
+// ArgRegisters lists the x86_64 registers a uprobe can read an argument from,
+// in the order the BPF config map expects. The module is amd64-only because the
+// kernel's struct pt_regs layout (and therefore this order) differs per arch.
+var ArgRegisters = []string{"RAX", "RDI", "RSI", "RDX", "RCX", "R8", "R9", "RBP", "RSP"}
+
+// ArgRegisterIndex maps a register name (case-insensitive) to its position in
+// ArgRegisters, or -1 when unknown.
+func ArgRegisterIndex(name string) int {
+	for i, r := range ArgRegisters {
+		if strings.EqualFold(r, name) {
+			return i
+		}
+	}
+	return -1
+}
 
 // MonitoringProgType reports whether t is a tracing/LSM program type that an
 // EDR uses to observe system activity. It mirrors Furtex's is_monitoring_prog.

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"go.starlark.net/starlark"
 )
 
@@ -106,5 +107,135 @@ func TestEBPFModuleFormatting(t *testing.T) {
 		if !strings.Contains(out, "falcon_probe") {
 			t.Fatalf("%s %s did not report the supplied program:\n%s", mod.file, mod.action, out)
 		}
+	}
+}
+
+// withFakeSSHHarvest shadows the builtins ssh_harvest.star depends on and
+// returns the supplied BPF events, so the module's orchestration and output
+// formatting run against representative kernel data.
+func withFakeSSHHarvest(t *testing.T, events []*starlark.Dict) {
+	t.Helper()
+	saved := make(map[string]StarlarkAPI)
+	for _, name := range []string{"has_cap", "ebpf_code_offset", "ebpf_uprobe_capture"} {
+		saved[name] = apis[name]
+	}
+	RegisterAPI("has_cap", func(*starlark.Thread, *starlark.Builtin, starlark.Tuple, []starlark.Tuple) (starlark.Value, error) {
+		return starlark.True, nil
+	})
+	RegisterAPI("ebpf_code_offset", func(*starlark.Thread, *starlark.Builtin, starlark.Tuple, []starlark.Tuple) (starlark.Value, error) {
+		d := starlark.NewDict(3)
+		d.SetKey(starlark.String("offset"), starlark.MakeUint64(0x1234))
+		d.SetKey(starlark.String("vaddr"), starlark.MakeUint64(0x401234))
+		d.SetKey(starlark.String("error"), starlark.String(""))
+		return d, nil
+	})
+	RegisterAPI("ebpf_uprobe_capture", func(*starlark.Thread, *starlark.Builtin, starlark.Tuple, []starlark.Tuple) (starlark.Value, error) {
+		list := starlark.NewList(nil)
+		for _, ev := range events {
+			list.Append(ev)
+		}
+		d := starlark.NewDict(2)
+		d.SetKey(starlark.String("events"), list)
+		d.SetKey(starlark.String("error"), starlark.String(""))
+		return d, nil
+	})
+	t.Cleanup(func() {
+		for name, fn := range saved {
+			apis[name] = fn
+		}
+	})
+}
+
+func harvestEvent(pid int, retval int, comm, arg string) *starlark.Dict {
+	d := starlark.NewDict(5)
+	d.SetKey(starlark.String("pid"), starlark.MakeInt(pid))
+	d.SetKey(starlark.String("uid"), starlark.MakeInt(0))
+	d.SetKey(starlark.String("retval"), starlark.MakeInt(retval))
+	d.SetKey(starlark.String("comm"), starlark.String(comm))
+	d.SetKey(starlark.String("arg"), starlark.String(arg))
+	return d
+}
+
+// TestSSHHarvestModule runs the real core/modules/ssh_harvest/ssh_harvest.star
+// against fake uprobe events and checks the filtering and formatting it is
+// responsible for: printable-only values, sshd-only comms, de-duplication, and
+// the success annotation from the probed function's return value.
+func TestSSHHarvestModule(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	repoRoot := filepath.Dir(filepath.Dir(filepath.Dir(thisFile)))
+	starPath := filepath.Join(repoRoot, "modules", "ssh_harvest", "ssh_harvest.star")
+	src, err := os.ReadFile(starPath)
+	if err != nil {
+		t.Fatalf("read ssh_harvest.star: %v", err)
+	}
+
+	// Seed a companion file so the module's BPF-object presence check passes;
+	// the shadowed capture ignores the bytes.
+	const memPath = "memfs:///ssh_harvest_test/probe.bpf.o"
+	if err := util.WriteFileAgent(memPath, []byte("BPFfake-object"), 0o600); err != nil {
+		t.Fatalf("seed memfs: %v", err)
+	}
+	defer util.RemoveFileAgent(memPath)
+
+	events := []*starlark.Dict{
+		harvestEvent(100, 1, "sshd", "supersecret"),
+		harvestEvent(101, 0, "sshd", "wrongpass"),
+		harvestEvent(100, 1, "sshd", "supersecret"), // duplicate
+		harvestEvent(102, 1, "bash", "notssh"),      // wrong comm
+		harvestEvent(103, 1, "sshd", "bin\x01ary"),  // non-printable
+	}
+	withFakeSSHHarvest(t, events)
+
+	out, err := Run(src, []string{"RSI", "", "5", "/usr/sbin/sshd"}, map[string]any{
+		"module_files": []string{memPath},
+	}, 0)
+	if err != nil {
+		t.Fatalf("ssh_harvest run: %v\n%s", err, out)
+	}
+
+	for _, want := range []string{"supersecret", "wrongpass", "valid=yes", "valid=no", "0x1234", "2 credential(s) captured", "OK"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+	for _, unwanted := range []string{"notssh", "bin\x01ary"} {
+		if strings.Contains(out, unwanted) {
+			t.Errorf("output leaked %q:\n%s", unwanted, out)
+		}
+	}
+}
+
+// TestSSHHarvestModuleGuards checks the module refuses to probe without the
+// required capability or with an unknown register, before calling capture.
+func TestSSHHarvestModuleGuards(t *testing.T) {
+	_, thisFile, _, _ := runtime.Caller(0)
+	repoRoot := filepath.Dir(filepath.Dir(filepath.Dir(thisFile)))
+	src, err := os.ReadFile(filepath.Join(repoRoot, "modules", "ssh_harvest", "ssh_harvest.star"))
+	if err != nil {
+		t.Fatalf("read ssh_harvest.star: %v", err)
+	}
+
+	// No capability: capture must not be reached.
+	saved := apis["has_cap"]
+	t.Cleanup(func() { apis["has_cap"] = saved })
+	RegisterAPI("has_cap", func(*starlark.Thread, *starlark.Builtin, starlark.Tuple, []starlark.Tuple) (starlark.Value, error) {
+		return starlark.False, nil
+	})
+	out, err := Run(src, []string{"RSI", "", "5", "/usr/sbin/sshd"}, nil, 0)
+	if err != nil {
+		t.Fatalf("run: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "CAP_BPF") {
+		t.Fatalf("missing capability guard not reported:\n%s", out)
+	}
+
+	// Unknown register is rejected before any probe.
+	withFakeSSHHarvest(t, nil)
+	out, err = Run(src, []string{"RIP", "", "5", "/usr/sbin/sshd"}, nil, 0)
+	if err != nil {
+		t.Fatalf("run: %v\n%s", err, out)
+	}
+	if !strings.Contains(out, "unknown register") {
+		t.Fatalf("unknown register not rejected:\n%s", out)
 	}
 }

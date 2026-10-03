@@ -4,6 +4,7 @@ package libbpf
 
 import (
 	"fmt"
+	"time"
 )
 
 // Library is a mapped libbpf.so.
@@ -14,6 +15,9 @@ type Object struct{}
 
 // Program wraps a struct bpf_program *.
 type Program struct{}
+
+// Map wraps a struct bpf_map *.
+type Map struct{}
 
 // Link wraps a struct bpf_link *.
 type Link struct{}
@@ -48,6 +52,43 @@ func (o *Object) Close() {}
 
 // FindProgram is unsupported off Linux.
 func (o *Object) FindProgram(string) (*Program, error) { return nil, unsupported() }
+
+// FindMap is unsupported off Linux.
+func (o *Object) FindMap(string) (*Map, error) { return nil, unsupported() }
+
+// AttachUprobe is unsupported off Linux.
+func (l *Library) AttachUprobe(*Program, int, string, uint64, bool) (*Link, error) {
+	return nil, unsupported()
+}
+
+// FD is unsupported off Linux.
+func (m *Map) FD() (int, error) { return -1, unsupported() }
+
+// KeySize is unsupported off Linux.
+func (m *Map) KeySize() (uint32, error) { return 0, unsupported() }
+
+// ValueSize is unsupported off Linux.
+func (m *Map) ValueSize() (uint32, error) { return 0, unsupported() }
+
+// Update is unsupported off Linux.
+func (m *Map) Update([]byte, []byte) error { return unsupported() }
+
+// Lookup is unsupported off Linux.
+func (m *Map) Lookup([]byte) ([]byte, error) { return nil, unsupported() }
+
+// Delete is unsupported off Linux.
+func (m *Map) Delete([]byte) error { return unsupported() }
+
+// NextKey is unsupported off Linux.
+func (m *Map) NextKey([]byte) ([]byte, error) { return nil, unsupported() }
+
+// FD is unsupported off Linux.
+func (l *Link) FD() (int, error) { return -1, unsupported() }
+
+// CaptureUprobe is unsupported off Linux.
+func CaptureUprobe([]byte, string, string, string, string, int, uint64, uint32, time.Duration) ([]UprobeEvent, error) {
+	return nil, unsupported()
+}
 
 // Attach is unsupported off Linux.
 func (p *Program) Attach() (*Link, error) { return nil, unsupported() }

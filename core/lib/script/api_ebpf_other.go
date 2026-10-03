@@ -17,12 +17,15 @@ func init() {
 	RegisterAPI("ebpf_maps", starlarkEBPFUnsupported)
 	RegisterAPI("ebpf_detach", starlarkEBPFUnsupported)
 	RegisterAPI("ebpf_map_wipe", starlarkEBPFUnsupported)
+	RegisterAPI("ebpf_code_offset", starlarkEBPFUnsupported)
+	RegisterAPI("ebpf_uprobe_capture", starlarkEBPFUnsupported)
 }
 
 var ebpfResultKeys = map[string]string{
-	"ebpf_progs": "progs",
-	"ebpf_links": "links",
-	"ebpf_maps":  "maps",
+	"ebpf_progs":          "progs",
+	"ebpf_links":          "links",
+	"ebpf_maps":           "maps",
+	"ebpf_uprobe_capture": "events",
 }
 
 func starlarkEBPFUnsupported(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -34,6 +37,10 @@ func starlarkEBPFUnsupported(_ *starlark.Thread, fn *starlark.Builtin, args star
 		// Mirror the supported builtin's shape so scripts can read the same keys.
 		d.SetKey(starlark.String("id"), starlark.MakeInt(0))
 		d.SetKey(starlark.String("deleted"), starlark.MakeInt(0))
+	}
+	if fn.Name() == "ebpf_code_offset" {
+		d.SetKey(starlark.String("offset"), starlark.MakeInt(0))
+		d.SetKey(starlark.String("vaddr"), starlark.MakeInt(0))
 	}
 	d.SetKey(starlark.String("error"), starlark.String(fmt.Sprintf("%s is only supported on Linux shared-object agents", fn.Name())))
 	return d, nil

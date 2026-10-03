@@ -3,6 +3,7 @@
 package libbpf
 
 import (
+	"encoding/binary"
 	"errors"
 	"os"
 	"os/exec"
@@ -139,6 +140,50 @@ __attribute__((visibility("default"))) int bpf_map_get_next_key(int fd, const vo
 
 __attribute__((visibility("default"))) int bpf_map_delete_elem(int fd, const void *key) {
 	(void)fd; (void)key; return 0;
+}
+
+__attribute__((visibility("default"))) uintptr_t bpf_object__find_map_by_name(uintptr_t obj, const char *name) {
+	(void)obj;
+	return (name != 0 && name[0] != 0) ? (uintptr_t)0x5000 : 0;
+}
+
+__attribute__((visibility("default"))) int bpf_map__fd(uintptr_t map) { (void)map; return 200; }
+__attribute__((visibility("default"))) uint32_t bpf_map__key_size(uintptr_t map) { (void)map; return 4; }
+__attribute__((visibility("default"))) uint32_t bpf_map__value_size(uintptr_t map) { (void)map; return 96; }
+
+/* Only accepts the exact attach request the test makes, so a mistranslated
+   argument cannot silently pass. */
+__attribute__((visibility("default"))) uintptr_t bpf_program__attach_uprobe(
+	uintptr_t prog, int retprobe, int pid, const char *path, size_t offset) {
+	(void)prog;
+	if (retprobe != 0 || pid != -1 || offset != 0x1234) return 0;
+	if (path == 0 || path[0] == 0) return 0;
+	return (uintptr_t)0x6000;
+}
+
+__attribute__((visibility("default"))) int bpf_link__fd(uintptr_t link) {
+	return link == (uintptr_t)0x6000 ? 201 : -1;
+}
+
+__attribute__((visibility("default"))) int bpf_map_update_elem(int fd, const void *key, const void *value, uint64_t flags) {
+	(void)fd; (void)flags;
+	if (key == 0 || value == 0) return -1;
+	return 0;
+}
+
+__attribute__((visibility("default"))) int bpf_map_lookup_elem(int fd, const void *key, void *value) {
+	(void)key;
+	if (fd != 200) return -1;
+	unsigned char *p = (unsigned char *)value;
+	for (int i = 0; i < 96; i++) p[i] = 0;
+	*(uint32_t *)(p + 0) = 4242;   /* pid */
+	*(uint32_t *)(p + 4) = 1000;   /* uid */
+	*(uint64_t *)(p + 8) = 1;      /* retval */
+	const char *comm = "sshd";
+	for (int i = 0; comm[i] != 0; i++) p[16 + i] = (unsigned char)comm[i];
+	const char *arg = "hunter2";
+	for (int i = 0; arg[i] != 0; i++) p[32 + i] = (unsigned char)arg[i];
+	return 0;
 }
 `
 
@@ -296,6 +341,103 @@ func TestMonitoringProgType(t *testing.T) {
 	for _, pt := range []uint32{0, 1, 3, 6, 9, 28} {
 		if MonitoringProgType(pt) {
 			t.Errorf("MonitoringProgType(%d) = true, want false", pt)
+		}
+	}
+}
+
+// TestFindMapAndAttachUprobe exercises the libbpf surface the eBPF uprobe
+// builtins depend on: map lookup by name, map element access, uprobe attach,
+// and link fd extraction. The mock rejects any argument mistranslation.
+func TestFindMapAndAttachUprobe(t *testing.T) {
+	lib, err := Load(buildMockLibbpf(t))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	t.Cleanup(lib.Close)
+
+	obj, err := lib.OpenMem([]byte("BPFfake-object"))
+	if err != nil {
+		t.Fatalf("OpenMem: %v", err)
+	}
+	t.Cleanup(obj.Close)
+	if err := obj.Load(); err != nil {
+		t.Fatalf("Object.Load: %v", err)
+	}
+
+	m, err := obj.FindMap("events")
+	if err != nil {
+		t.Fatalf("FindMap: %v", err)
+	}
+	if _, err := obj.FindMap(""); err == nil {
+		t.Fatal("FindMap accepted an empty name")
+	}
+	if fd, err := m.FD(); err != nil || fd != 200 {
+		t.Fatalf("Map.FD = %d, %v, want 200", fd, err)
+	}
+	if ks, err := m.KeySize(); err != nil || ks != 4 {
+		t.Fatalf("Map.KeySize = %d, %v, want 4", ks, err)
+	}
+	if vs, err := m.ValueSize(); err != nil || vs != 96 {
+		t.Fatalf("Map.ValueSize = %d, %v, want 96", vs, err)
+	}
+
+	key := []byte{0, 0, 0, 0}
+	value, err := m.Lookup(key)
+	if err != nil {
+		t.Fatalf("Map.Lookup: %v", err)
+	}
+	if len(value) != 96 || binary.LittleEndian.Uint32(value[0:]) != 4242 {
+		t.Fatalf("Map.Lookup = %x, want a 96-byte event for pid 4242", value)
+	}
+	if err := m.Update(key, make([]byte, 16)); err != nil {
+		t.Fatalf("Map.Update: %v", err)
+	}
+	if err := m.Delete(key); err != nil {
+		t.Fatalf("Map.Delete: %v", err)
+	}
+	if _, err := m.NextKey(nil); err != nil {
+		t.Fatalf("Map.NextKey: %v", err)
+	}
+
+	prog, err := obj.FindProgram("probe")
+	if err != nil {
+		t.Fatalf("FindProgram: %v", err)
+	}
+	link, err := lib.AttachUprobe(prog, -1, "/usr/sbin/sshd", 0x1234, false)
+	if err != nil {
+		t.Fatalf("AttachUprobe: %v", err)
+	}
+	if fd, err := link.FD(); err != nil || fd != 201 {
+		t.Fatalf("Link.FD = %d, %v, want 201", fd, err)
+	}
+	link.Destroy()
+
+	// A request the mock considers invalid must surface as an error, not a
+	// nil link.
+	if _, err := lib.AttachUprobe(prog, 1, "/usr/sbin/sshd", 0, false); err == nil {
+		t.Fatal("AttachUprobe accepted an invalid request")
+	}
+}
+
+// TestCaptureUprobe drives the whole Go orchestration against the mock libbpf:
+// config-map update, uprobe attach, map drain, event decode, and teardown. The
+// mock's map yields two entries, each a complete event.
+func TestCaptureUprobe(t *testing.T) {
+	data := buildMockLibbpf(t)
+	memdeps.SetResolver(func(string) ([]byte, error) { return data, nil })
+	t.Cleanup(func() { memdeps.SetResolver(nil) })
+
+	events, err := CaptureUprobe([]byte("BPFfake-object"), "probe", "events", "cfg",
+		"/usr/sbin/sshd", -1, 0x1234, 2, 0)
+	if err != nil {
+		t.Fatalf("CaptureUprobe: %v", err)
+	}
+	if len(events) != 2 {
+		t.Fatalf("CaptureUprobe returned %d events, want 2", len(events))
+	}
+	for _, ev := range events {
+		if ev.PID != 4242 || ev.UID != 1000 || ev.Retval != 1 || ev.Comm != "sshd" || ev.Arg != "hunter2" {
+			t.Fatalf("unexpected event %+v", ev)
 		}
 	}
 }
