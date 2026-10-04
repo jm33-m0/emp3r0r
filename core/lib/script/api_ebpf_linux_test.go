@@ -52,6 +52,21 @@ def main(*args):
     bad = ebpf_uprobe_capture(image="x", path="/bin/true", offset=0, reg="RIP")
     if bad["error"] == "":
         return "fail: ebpf_uprobe_capture accepted an unknown register"
+    started = ebpf_uprobe_start(image="x", path="/bin/true", offset=0)
+    if started["error"] == "":
+        return "fail: ebpf_uprobe_start unexpectedly succeeded without libbpf"
+    if started["id"] != "" or started["out_path"] != "":
+        return "fail: ebpf_uprobe_start reported a session alongside an error"
+    stopped = ebpf_uprobe_stop()
+    if stopped["error"] == "":
+        return "fail: ebpf_uprobe_stop unexpectedly succeeded with no session"
+    if len(stopped["events"]) != 0 or len(stopped["out_paths"]) != 0:
+        return "fail: ebpf_uprobe_stop returned data alongside an error"
+    sessions = ebpf_uprobe_sessions()
+    if sessions["error"] != "":
+        return "fail: ebpf_uprobe_sessions: " + sessions["error"]
+    if len(sessions["sessions"]) != 0:
+        return "fail: ebpf_uprobe_sessions listed a session with none active"
     return "OK"
 `
 	out, err := Run([]byte(script), nil, nil, 0)

@@ -111,12 +111,12 @@ func TestEBPFModuleFormatting(t *testing.T) {
 }
 
 // withFakeSSHHarvest shadows the builtins ssh_harvest.star depends on and
-// returns the supplied BPF events, so the module's orchestration and output
-// formatting run against representative kernel data.
+// returns the supplied BPF events from a simulated stop, so the module's
+// orchestration and output formatting run against representative kernel data.
 func withFakeSSHHarvest(t *testing.T, events []*starlark.Dict) {
 	t.Helper()
 	saved := make(map[string]StarlarkAPI)
-	for _, name := range []string{"has_cap", "ebpf_code_offset", "ebpf_uprobe_capture"} {
+	for _, name := range []string{"has_cap", "ebpf_code_offset", "ebpf_uprobe_start", "ebpf_uprobe_stop"} {
 		saved[name] = apis[name]
 	}
 	RegisterAPI("has_cap", func(*starlark.Thread, *starlark.Builtin, starlark.Tuple, []starlark.Tuple) (starlark.Value, error) {
@@ -129,13 +129,23 @@ func withFakeSSHHarvest(t *testing.T, events []*starlark.Dict) {
 		d.SetKey(starlark.String("error"), starlark.String(""))
 		return d, nil
 	})
-	RegisterAPI("ebpf_uprobe_capture", func(*starlark.Thread, *starlark.Builtin, starlark.Tuple, []starlark.Tuple) (starlark.Value, error) {
+	RegisterAPI("ebpf_uprobe_start", func(*starlark.Thread, *starlark.Builtin, starlark.Tuple, []starlark.Tuple) (starlark.Value, error) {
+		d := starlark.NewDict(3)
+		d.SetKey(starlark.String("id"), starlark.String("test-session"))
+		d.SetKey(starlark.String("out_path"), starlark.String("memfs:///ssh_harvest_test/out.log"))
+		d.SetKey(starlark.String("error"), starlark.String(""))
+		return d, nil
+	})
+	RegisterAPI("ebpf_uprobe_stop", func(*starlark.Thread, *starlark.Builtin, starlark.Tuple, []starlark.Tuple) (starlark.Value, error) {
 		list := starlark.NewList(nil)
 		for _, ev := range events {
 			list.Append(ev)
 		}
-		d := starlark.NewDict(2)
+		paths := starlark.NewList(nil)
+		paths.Append(starlark.String("memfs:///ssh_harvest_test/out.log"))
+		d := starlark.NewDict(3)
 		d.SetKey(starlark.String("events"), list)
+		d.SetKey(starlark.String("out_paths"), paths)
 		d.SetKey(starlark.String("error"), starlark.String(""))
 		return d, nil
 	})
@@ -186,14 +196,34 @@ func TestSSHHarvestModule(t *testing.T) {
 	}
 	withFakeSSHHarvest(t, events)
 
+	// Starting a capture must return immediately with the memfs path instead of
+	// blocking until a timeout.
 	out, err := Run(src, []string{"RSI", "", "5", "/usr/sbin/sshd"}, map[string]any{
 		"module_files": []string{memPath},
 	}, 0)
 	if err != nil {
-		t.Fatalf("ssh_harvest run: %v\n%s", err, out)
+		t.Fatalf("ssh_harvest start: %v\n%s", err, out)
+	}
+	for _, want := range []string{"capture", "test-session", "out.log", "OK"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("start output missing %q:\n%s", want, out)
+		}
+	}
+	for _, unwanted := range []string{"supersecret", "wrongpass"} {
+		if strings.Contains(out, unwanted) {
+			t.Errorf("start output leaked a credential %q:\n%s", unwanted, out)
+		}
 	}
 
-	for _, want := range []string{"supersecret", "wrongpass", "valid=yes", "valid=no", "0x1234", "2 credential(s) captured", "OK"} {
+	// --disable stops the capture and reports what it collected.
+	out, err = Run(src, []string{"RSI", "", "5", "/usr/sbin/sshd", "-1", "true"}, map[string]any{
+		"module_files": []string{memPath},
+	}, 0)
+	if err != nil {
+		t.Fatalf("ssh_harvest disable: %v\n%s", err, out)
+	}
+
+	for _, want := range []string{"supersecret", "wrongpass", "valid=yes", "valid=no", "2 credential(s) captured", "OK"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output missing %q:\n%s", want, out)
 		}

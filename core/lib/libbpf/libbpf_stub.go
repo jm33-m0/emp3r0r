@@ -85,6 +85,26 @@ func (m *Map) NextKey([]byte) ([]byte, error) { return nil, unsupported() }
 // FD is unsupported off Linux.
 func (l *Link) FD() (int, error) { return -1, unsupported() }
 
+// UprobeCapture describes one uprobe capture (unsupported off Linux).
+type UprobeCapture struct {
+	Image         []byte
+	ProgName      string
+	EventsMapName string
+	CfgMapName    string
+	Path          string
+	PID           int
+	Offset        uint64
+	ArgIndex      uint32
+	Timeout       time.Duration
+	UntilStopped  bool
+	Stop          <-chan struct{}
+	OnAttached    func()
+	OnEvent       func(UprobeEvent)
+}
+
+// RunUprobeCapture is unsupported off Linux.
+func RunUprobeCapture(UprobeCapture) error { return unsupported() }
+
 // CaptureUprobe is unsupported off Linux.
 func CaptureUprobe([]byte, string, string, string, string, int, uint64, uint32, time.Duration) ([]UprobeEvent, error) {
 	return nil, unsupported()

@@ -23,7 +23,7 @@ There are two kinds of modules:
   (`loader_windows`, `stager_linux`, `crystal_pack`). They have no
   `agent_config`.
 
-The built-in commands (`listener`, `file_downloader`, `ssh_harvester`,
+The built-in commands (`listener`, `file_downloader`,
 `steal_token`, `list_tokens`, `list_sessions`) are Go code registered
 internally. They are not defined by a manifest and are not covered here.
 
@@ -526,6 +526,9 @@ needs `CAP_BPF`/`CAP_SYS_ADMIN`; without it the lists come back empty.
 | `ebpf_map_wipe(id)`                                                    | Delete every element of the BPF map with the given id; returns `{id, deleted, error}` (Furtex wipe_maps).                                                                                                                                                                                                                                                                                                             |
 | `ebpf_code_offset(path, pattern)`                                      | Find a hex `pattern` in the executable segments of an ELF and return `{offset, vaddr, error}`; `offset` is the file offset a uprobe attaches to.                                                                                                                                                                                                                                                                      |
 | `ebpf_uprobe_capture(image, path, offset, prog, reg, pid, timeout_ms)` | Load an in-memory BPF object, attach `prog` as a uprobe at `path:offset` (a negative `pid` covers all processes mapping the binary), and return `{events, error}`. Each event is `{pid, uid, retval, comm, arg}` where `arg` is the NUL-terminated string read from register `reg` (x86_64 order: `RAX, RDI, RSI, RDX, RCX, R8, R9, RBP, RSP, RBX, R12, R13, R14, R15`). The libbpf mapping and probe exist only for the duration of the call. |
+| `ebpf_uprobe_start(image, path, offset, prog, reg, pid, timeout_ms, out_path)` | Start a long-lived uprobe capture that outlives the script run. Returns `{id, out_path, error}` immediately. Every event is appended to `out_path` (an encrypted memfs path; generated when omitted) and streamed to the operator through the run's `notify` sender. `timeout_ms=0` keeps it running until stopped. Exactly one capture per module may run at a time. |
+| `ebpf_uprobe_stop(id, owner)` | Cancel the matching capture (by `id`, or by `owner`, defaulting to the calling module), wait for teardown, and return `{events, out_paths, error}`. |
+| `ebpf_uprobe_sessions()` | List live/finished captures as `{sessions, error}`, each `{id, owner, out_path, path, pid, running}`. |
 
 ### Signed kernel drivers (Windows)
 
@@ -539,6 +542,16 @@ needs `CAP_BPF`/`CAP_SYS_ADMIN`; without it the lists come back empty.
 
 Only signed drivers are supported; no DSE bypass is attempted. On non-Windows
 platforms these return a "not supported" error.
+
+### Streaming to the operator
+
+| Function        | Description                                                                                                                                                                                                 |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `notify(message)` | Send `message` to the operator immediately instead of buffering it until the script returns. The module handler wires the sender; standalone tools and tests drop it. Useful for long-running work. |
+
+The agent injects the `notify` sender when it dispatches a module; a script can
+call it directly. Long-lived builtins such as `ebpf_uprobe_start` capture the
+same sender and keep streaming after the script returns.
 
 ### The `agent` module
 
@@ -663,7 +676,7 @@ Pair with the `scshell` BOF to execute an uploaded file on the target.
 | `injection/`                    | Remote thread injection under an operator-selected token.                                                                  |
 | `coffloader/`                   | The Windows in-memory COFF loader DLL (`dll` module).                                                                      |
 | `libbpf/`                       | Builds a self-contained `libbpf.so` (zig) used by the Go `core/lib/libbpf` loader and the `ebpf_*` builtins.               |
-| `ssh_harvest/`                  | eBPF uprobe credential capture: zig-compiled BPF object + `ebpf_code_offset`/`ebpf_uprobe_capture` from a Starlark module. |
+| `ssh_harvest/`                  | eBPF uprobe credential capture: zig-compiled BPF object + `ebpf_code_offset`/`ebpf_uprobe_start`/`ebpf_uprobe_stop` from a Starlark module.                                        |
 | `loader_windows/`               | A local C2 module that builds a self-unpacking loader.                                                                     |
 | `CS-Situational-Awareness-BOF/` | A large third-party BOF suite imported as-is; every command is a top-level console command with one flag per BOF argument. |
 | `C2-Tool-Collection/`           | BOF suite with `choices`/`required` flags and a `make_all.sh` that builds a nested `BOF/` tree.                            |

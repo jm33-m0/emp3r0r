@@ -24,8 +24,8 @@
     },
     {
       "name": "timeout",
-      "description": "Seconds to keep the uprobe attached and collect credentials",
-      "default": "10",
+      "description": "Seconds before the capture stops itself; empty or 0 keeps it running until `--disable`",
+      "default": "",
       "type": "int",
       "required": false
     },
@@ -41,6 +41,13 @@
       "description": "Attach only to this PID (-1 probes every process mapping the binary)",
       "default": "-1",
       "type": "int",
+      "required": false
+    },
+    {
+      "name": "disable",
+      "description": "Stop the running capture, report the credentials it collected, and remove it",
+      "default": "false",
+      "type": "bool",
       "required": false
     }
   ],

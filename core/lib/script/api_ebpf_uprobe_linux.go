@@ -113,15 +113,22 @@ func starlarkEBPFUprobeCapture(_ *starlark.Thread, fn *starlark.Builtin, args st
 
 	list := starlark.NewList(nil)
 	for _, ev := range events {
-		d := starlark.NewDict(5)
-		d.SetKey(starlark.String("pid"), starlark.MakeUint64(uint64(ev.PID)))
-		d.SetKey(starlark.String("uid"), starlark.MakeUint64(uint64(ev.UID)))
-		d.SetKey(starlark.String("retval"), starlark.MakeInt64(ev.Retval))
-		d.SetKey(starlark.String("comm"), starlark.String(ev.Comm))
-		d.SetKey(starlark.String("arg"), starlark.String(ev.Arg))
-		list.Append(d)
+		list.Append(uprobeEventDict(ev))
 	}
 	return ebpfResult("events", list, nil), nil
+}
+
+// uprobeEventDict renders one captured event in the shape every uprobe builtin
+// returns. The dict is always fully populated so scripts never hit a missing
+// key.
+func uprobeEventDict(ev libbpf.UprobeEvent) *starlark.Dict {
+	d := starlark.NewDict(5)
+	d.SetKey(starlark.String("pid"), starlark.MakeUint64(uint64(ev.PID)))
+	d.SetKey(starlark.String("uid"), starlark.MakeUint64(uint64(ev.UID)))
+	d.SetKey(starlark.String("retval"), starlark.MakeInt64(ev.Retval))
+	d.SetKey(starlark.String("comm"), starlark.String(ev.Comm))
+	d.SetKey(starlark.String("arg"), starlark.String(ev.Arg))
+	return d
 }
 
 // ebpfUprobeError keeps the result-dict shape consistent on failure: callers

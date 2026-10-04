@@ -81,6 +81,15 @@ func addModuleCommands(rootCmd *cobra.Command) {
 					help = strings.TrimSpace(help + " [required]")
 				}
 				cmd.Flags().String(opt.Name, opt.Val, help)
+				// Boolean options are documented and used as bare switches
+				// (e.g. `--disable`). A string flag otherwise demands a value,
+				// so give it a NoOptDefVal; `--flag=false` still works for an
+				// explicit value.
+				if strings.EqualFold(opt.Type, "bool") {
+					if flag := cmd.Flags().Lookup(opt.Name); flag != nil {
+						flag.NoOptDefVal = "true"
+					}
+				}
 				if len(opt.Vals) > 0 {
 					vals := append([]string(nil), opt.Vals...)
 					flagActions[opt.Name] = carapace.ActionValues(vals...)

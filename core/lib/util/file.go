@@ -1182,7 +1182,11 @@ func OpenFileAgent(filename string, flag int, perm os.FileMode) (*os.File, error
 func AppendToFileAgent(filename string, data []byte) error {
 	logging.Debugf("Agent: Appending %d bytes to %s", len(data), filename)
 
-	if len(fileCryptoKey) > 0 {
+	// A memfs target always goes through ReadFileAgent/WriteFileAgent, even
+	// without an encryption key: appendPlainAgent would otherwise treat the
+	// "memfs:///" key as an on-disk path, so the appended file could never be
+	// read back from memfs.
+	if isMemPath(filename) || len(fileCryptoKey) > 0 {
 		// Read, decrypt, append, encrypt, write
 		existing, err := ReadFileAgent(filename)
 		if err != nil && !os.IsNotExist(err) {

@@ -12,12 +12,24 @@ modified, or traced.
 1. `ebpf_code_offset(path, pattern)` searches the executable segments of the
    `sshd` ELF for the code pattern and returns the file offset a uprobe
    attaches to.
-2. `ebpf_uprobe_capture(...)` loads `probe.bpf.o`, points its `cfg` map at the
-   register that holds the password, attaches the `probe` program, and drains
-   the `events` map for the configured timeout.
-3. The script filters events to `sshd` comms with printable values,
-   de-duplicates them, and reports each one with the PAM result read from
-   `RAX` (`valid=yes`/`valid=no`).
+2. `ebpf_uprobe_start(...)` loads `probe.bpf.o`, points its `cfg` map at the
+   register that holds the password, and attaches the `probe` program as a
+   long-lived background capture. It returns immediately with a session id and
+   the memfs path its events accumulate in.
+3. Each captured event is appended to that memfs file in real time and streamed
+   to the operator (`notify`), so credentials show up as they are typed instead
+   of at the end of a timeout.
+4. `ebpf_uprobe_stop()` (run by `--disable`) cancels the capture, returns
+   everything it collected, and the script reports and removes the output file.
+
+A capture with `--timeout 0` (the default; omit the flag) stays attached until
+`ssh_harvest --disable` stops it. A non-zero `--timeout` lets it stop itself
+after that many seconds; the credentials already collected remain in the memfs
+file, and a later `--disable` still reports and removes them.
+
+The script filters events to `sshd` comms with printable values,
+de-duplicates them, and reports each one with the PAM result read from
+`RAX` (`valid=yes`/`valid=no`).
 
 The BPF object is a companion file (`probe.bpf.o`) built by `make` with the
 bundled zig toolchain; the module loader caches it in encrypted memfs and
@@ -62,10 +74,16 @@ default `/usr/sbin/sshd` does not contain the pattern, e.g.
 ## Usage
 
 ```text
-ssh_harvest --reg-name RSI --timeout 30
+ssh_harvest --reg-name RSI                      # run until --disable
+ssh_harvest --timeout 30                        # stop itself after 30s
 ssh_harvest --path /usr/sbin/sshd --pid 1234 --reg-name RDX
 ssh_harvest --code-pattern 4883c4080fb6c021
+ssh_harvest --disable                           # stop, report, clean up
 ```
+
+The default invocation returns at once with the memfs path where credentials
+accumulate (and streams each one live). Use `--disable` when you are done to
+stop the capture, print the full credential list, and delete the output file.
 
 Defaults mirror the old module: register `RSI`, the classic code pattern
 `4883c4080fb6c021`, and `/usr/sbin/sshd`.

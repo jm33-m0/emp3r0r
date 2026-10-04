@@ -175,6 +175,32 @@ func TestAppendToFileAgent_Memfs(t *testing.T) {
 	}
 }
 
+// TestAppendToFileAgent_MemfsNoKey is a regression test: a memfs append must
+// stay in memfs even when no at-rest encryption key is set. Previously the
+// plaintext path treated the "memfs:///" key as an on-disk path, so the bytes
+// were written to a bogus disk file and never appeared in memfs.
+func TestAppendToFileAgent_MemfsNoKey(t *testing.T) {
+	defer SetFileCryptoKey(nil)
+	SetFileCryptoKey(nil)
+	resetMemfsState()
+	defer resetMemfsState()
+
+	key := "memfs:///append_mem_plain.bin"
+	if err := AppendToFileAgent(key, []byte("one")); err != nil {
+		t.Fatalf("mem append1: %v", err)
+	}
+	if err := AppendTextToFileAgent(key, "two"); err != nil {
+		t.Fatalf("mem append2: %v", err)
+	}
+	got, err := ReadFileAgent(key)
+	if err != nil {
+		t.Fatalf("mem read: %v", err)
+	}
+	if string(got) != "onetwo" {
+		t.Fatalf("mem append mismatch: %q", got)
+	}
+}
+
 func TestGetWritablePathsBounds(t *testing.T) {
 	// Negative depth must error, not recurse.
 	if _, err := GetWritablePaths(t.TempDir(), -1, 10); err == nil {

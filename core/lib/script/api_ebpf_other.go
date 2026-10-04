@@ -19,13 +19,18 @@ func init() {
 	RegisterAPI("ebpf_map_wipe", starlarkEBPFUnsupported)
 	RegisterAPI("ebpf_code_offset", starlarkEBPFUnsupported)
 	RegisterAPI("ebpf_uprobe_capture", starlarkEBPFUnsupported)
+	RegisterAPI("ebpf_uprobe_start", starlarkEBPFUnsupported)
+	RegisterAPI("ebpf_uprobe_stop", starlarkEBPFUnsupported)
+	RegisterAPI("ebpf_uprobe_sessions", starlarkEBPFUnsupported)
 }
 
 var ebpfResultKeys = map[string]string{
-	"ebpf_progs":          "progs",
-	"ebpf_links":          "links",
-	"ebpf_maps":           "maps",
-	"ebpf_uprobe_capture": "events",
+	"ebpf_progs":           "progs",
+	"ebpf_links":           "links",
+	"ebpf_maps":            "maps",
+	"ebpf_uprobe_capture":  "events",
+	"ebpf_uprobe_stop":     "events",
+	"ebpf_uprobe_sessions": "sessions",
 }
 
 func starlarkEBPFUnsupported(_ *starlark.Thread, fn *starlark.Builtin, args starlark.Tuple, kwargs []starlark.Tuple) (starlark.Value, error) {
@@ -41,6 +46,13 @@ func starlarkEBPFUnsupported(_ *starlark.Thread, fn *starlark.Builtin, args star
 	if fn.Name() == "ebpf_code_offset" {
 		d.SetKey(starlark.String("offset"), starlark.MakeInt(0))
 		d.SetKey(starlark.String("vaddr"), starlark.MakeInt(0))
+	}
+	if fn.Name() == "ebpf_uprobe_start" {
+		d.SetKey(starlark.String("id"), starlark.String(""))
+		d.SetKey(starlark.String("out_path"), starlark.String(""))
+	}
+	if fn.Name() == "ebpf_uprobe_stop" {
+		d.SetKey(starlark.String("out_paths"), starlark.NewList(nil))
 	}
 	d.SetKey(starlark.String("error"), starlark.String(fmt.Sprintf("%s is only supported on Linux shared-object agents", fn.Name())))
 	return d, nil

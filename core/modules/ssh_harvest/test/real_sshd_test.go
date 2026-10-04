@@ -100,25 +100,24 @@ func TestRealSSHDAuthCapture(t *testing.T) {
 	memdeps.SetResolver(func(string) ([]byte, error) { return libData, nil })
 	defer memdeps.SetResolver(nil)
 
-	type runResult struct {
-		out string
-		err error
+	// First invocation starts the background capture. ebpf_uprobe_start waits
+	// for the probe to attach before returning, so it is already live when the
+	// authentication attempt reaches auth_password.
+	startOut, err := script.Run(
+		starSrc,
+		// reg, code-pattern, timeout_s, sshd-session path, pid (-1 = all), disable
+		[]string{"RSI", pattern, "0", sshdSession, "-1", "false"},
+		map[string]any{"module_files": []string{probe}},
+		0,
+		script.WithModuleOwner("ssh_harvest"),
+	)
+	if err != nil {
+		t.Fatalf("ssh_harvest.star start failed: %v\n%s", err, startOut)
 	}
-	resultCh := make(chan runResult, 1)
-	go func() {
-		out, err := script.Run(
-			starSrc,
-			// reg, code-pattern, timeout_s, sshd-session path, pid (-1 = all)
-			[]string{"RSI", pattern, "10", sshdSession, "-1"},
-			map[string]any{"module_files": []string{probe}},
-			0,
-		)
-		resultCh <- runResult{out, err}
-	}()
-
-	// Give CaptureUprobe time to load the object and attach before the
-	// authentication attempt reaches auth_password in sshd-session.
-	time.Sleep(3 * time.Second)
+	t.Logf("module start output:\n%s", startOut)
+	if !strings.Contains(startOut, "capture") {
+		t.Fatalf("start did not report a running capture:\n%s", startOut)
+	}
 
 	client, err := ssh.Dial("tcp", addr, &ssh.ClientConfig{
 		User:            "root",
@@ -131,13 +130,24 @@ func TestRealSSHDAuthCapture(t *testing.T) {
 		t.Fatalf("authentication with a wrong password unexpectedly succeeded")
 	}
 
-	res := <-resultCh
-	if res.err != nil {
-		t.Fatalf("ssh_harvest.star failed: %v\n%s", res.err, res.out)
+	// The capture drains its map on a short poll; give the event time to land
+	// before stopping the session and collecting it.
+	time.Sleep(1 * time.Second)
+
+	// --disable stops the capture and reports everything it collected.
+	resOut, err := script.Run(
+		starSrc,
+		[]string{"RSI", pattern, "0", sshdSession, "-1", "true"},
+		map[string]any{"module_files": []string{probe}},
+		0,
+		script.WithModuleOwner("ssh_harvest"),
+	)
+	if err != nil {
+		t.Fatalf("ssh_harvest.star disable failed: %v\n%s", err, resOut)
 	}
-	t.Logf("module output:\n%s", res.out)
-	if !strings.Contains(res.out, testPassword) {
-		t.Fatalf("password %q was not captured:\n%s", testPassword, res.out)
+	t.Logf("module output:\n%s", resOut)
+	if !strings.Contains(resOut, testPassword) {
+		t.Fatalf("password %q was not captured:\n%s", testPassword, resOut)
 	}
 }
 

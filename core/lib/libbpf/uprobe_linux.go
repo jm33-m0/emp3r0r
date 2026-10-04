@@ -39,27 +39,46 @@ func decodeUprobeEvent(raw []byte) (UprobeEvent, error) {
 	}, nil
 }
 
-// CaptureUprobe loads image, attaches progName as a uprobe to path/offset, sets
-// the argument register selector in cfgMapName, and drains eventsMapName until
-// timeout elapses. Every event is deleted from the map as it is read, so the
-// returned slice has no duplicates and a long-lived probe does not accumulate
-// unbounded state.
-//
-// pid selects the tracee: a negative value attaches to every process mapping
-// the binary (covering future sessions too), while a non-negative value
-// restricts the probe to that process. offset is a file offset; derive it with
-// elfutil.FindCodePattern. argIndex selects which register is captured, using
-// the order in ArgRegisters.
+// UprobeCapture describes one uprobe capture. The zero value is not valid:
+// Image, Path and the map/program names must be set by the caller.
+type UprobeCapture struct {
+	Image         []byte
+	ProgName      string
+	EventsMapName string
+	CfgMapName    string
+	Path          string
+	PID           int
+	Offset        uint64
+	ArgIndex      uint32
+
+	// Timeout bounds a finite capture. It is ignored when UntilStopped is set.
+	// A non-positive Timeout with UntilStopped unset performs a single drain.
+	Timeout time.Duration
+	// UntilStopped runs the capture until Stop is closed. It is what backs the
+	// long-lived session API; the returned error is always nil when Stop fires.
+	UntilStopped bool
+	// Stop, when non-nil, ends the capture as soon as it is closed.
+	Stop <-chan struct{}
+	// OnAttached, when non-nil, is called exactly once after the uprobe is
+	// attached. It lets a session launcher confirm the probe is live before
+	// reporting success.
+	OnAttached func()
+	// OnEvent, when non-nil, is invoked for every event as it is drained. The
+	// callback runs on the capture goroutine, so it must not block.
+	OnEvent func(UprobeEvent)
+}
+
+// RunUprobeCapture loads image, attaches progName as a uprobe to path/offset,
+// sets the argument register selector in cfgMapName, and drains eventsMapName
+// according to opts. Every event is deleted from the map as it is read, so the
+// capture never accumulates unbounded state.
 //
 // The libbpf mapping and every libbpf object live only for the duration of this
 // call; only the kernel objects created during it persist, and they are torn
-// down before CaptureUprobe returns.
-func CaptureUprobe(image []byte, progName, eventsMapName, cfgMapName, path string,
-	pid int, offset uint64, argIndex uint32, timeout time.Duration,
-) ([]UprobeEvent, error) {
-	var events []UprobeEvent
-	err := WithLibrary(func(lib *Library) error {
-		obj, err := lib.OpenMem(image)
+// down before RunUprobeCapture returns.
+func RunUprobeCapture(opts UprobeCapture) error {
+	return WithLibrary(func(lib *Library) error {
+		obj, err := lib.OpenMem(opts.Image)
 		if err != nil {
 			return err
 		}
@@ -69,39 +88,89 @@ func CaptureUprobe(image []byte, progName, eventsMapName, cfgMapName, path strin
 			return err
 		}
 
-		cfg, err := obj.FindMap(cfgMapName)
+		cfg, err := obj.FindMap(opts.CfgMapName)
 		if err != nil {
 			return fmt.Errorf("uprobe config map: %w", err)
 		}
 		cfgKey := make([]byte, 4) // index 0
 		cfgVal := make([]byte, 4)
-		binary.LittleEndian.PutUint32(cfgVal, argIndex)
+		binary.LittleEndian.PutUint32(cfgVal, opts.ArgIndex)
 		if err := cfg.Update(cfgKey, cfgVal); err != nil {
 			return fmt.Errorf("uprobe config: %w", err)
 		}
 
-		eventsMap, err := obj.FindMap(eventsMapName)
+		eventsMap, err := obj.FindMap(opts.EventsMapName)
 		if err != nil {
 			return fmt.Errorf("uprobe events map: %w", err)
 		}
-		prog, err := obj.FindProgram(progName)
+		prog, err := obj.FindProgram(opts.ProgName)
 		if err != nil {
 			return err
 		}
-		link, err := lib.AttachUprobe(prog, pid, path, offset, false)
+		link, err := lib.AttachUprobe(prog, opts.PID, opts.Path, opts.Offset, false)
 		if err != nil {
 			return err
 		}
 		defer link.Destroy()
 
-		deadline := time.Now().Add(timeout)
+		if opts.OnAttached != nil {
+			opts.OnAttached()
+		}
+
+		deadline := time.Now().Add(opts.Timeout)
 		for {
-			drainUprobeEvents(eventsMap, &events)
-			if timeout <= 0 || !time.Now().Before(deadline) {
+			drainUprobeEvents(eventsMap, opts.OnEvent)
+			if uprobeCaptureDone(opts, deadline) {
 				return nil
 			}
 			time.Sleep(uprobePollInterval)
 		}
+	})
+}
+
+// uprobeCaptureDone reports whether the capture loop should stop after a drain.
+func uprobeCaptureDone(opts UprobeCapture, deadline time.Time) bool {
+	if opts.Stop != nil {
+		select {
+		case <-opts.Stop:
+			return true
+		default:
+		}
+	}
+	if opts.UntilStopped {
+		return false
+	}
+	return opts.Timeout <= 0 || !time.Now().Before(deadline)
+}
+
+// CaptureUprobe is the finite, collect-everything form of RunUprobeCapture: it
+// attaches progName as a uprobe to path/offset, sets the argument register
+// selector in cfgMapName, drains eventsMapName for timeout, and returns the
+// captured events. This is the synchronous API used by the ebpf_uprobe_capture
+// builtin; long-lived captures use RunUprobeCapture directly.
+//
+// pid selects the tracee: a negative value attaches to every process mapping
+// the binary (covering future sessions too), while a non-negative value
+// restricts the probe to that process. offset is a file offset; derive it with
+// elfutil.FindCodePattern. argIndex selects which register is captured, using
+// the order in ArgRegisters.
+func CaptureUprobe(image []byte, progName, eventsMapName, cfgMapName, path string,
+	pid int, offset uint64, argIndex uint32, timeout time.Duration,
+) ([]UprobeEvent, error) {
+	var events []UprobeEvent
+	err := RunUprobeCapture(UprobeCapture{
+		Image:         image,
+		ProgName:      progName,
+		EventsMapName: eventsMapName,
+		CfgMapName:    cfgMapName,
+		Path:          path,
+		PID:           pid,
+		Offset:        offset,
+		ArgIndex:      argIndex,
+		Timeout:       timeout,
+		OnEvent: func(ev UprobeEvent) {
+			events = append(events, ev)
+		},
 	})
 	if err != nil {
 		return nil, err
@@ -109,11 +178,12 @@ func CaptureUprobe(image []byte, progName, eventsMapName, cfgMapName, path strin
 	return events, nil
 }
 
-// drainUprobeEvents reads and removes every current entry of the events map.
-// Keys are collected before any deletion so a hash map's iteration order is
-// never disturbed mid-walk. Individual lookup/decode failures are skipped: one
-// malformed entry must not stall the capture.
-func drainUprobeEvents(m *Map, out *[]UprobeEvent) {
+// drainUprobeEvents reads and removes every current entry of the events map,
+// invoking emit for each decoded event. Keys are collected before any deletion
+// so a hash map's iteration order is never disturbed mid-walk. Individual
+// lookup/decode failures are skipped: one malformed entry must not stall the
+// capture.
+func drainUprobeEvents(m *Map, emit func(UprobeEvent)) {
 	keys := make([][]byte, 0, 16)
 	var prev []byte
 	for i := 0; i < maxIDIter; i++ {
@@ -133,7 +203,9 @@ func drainUprobeEvents(m *Map, out *[]UprobeEvent) {
 		if err != nil {
 			continue
 		}
-		*out = append(*out, ev)
+		if emit != nil {
+			emit(ev)
+		}
 		_ = m.Delete(key)
 	}
 }

