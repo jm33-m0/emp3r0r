@@ -7,9 +7,8 @@ import (
 
 // built-in module names
 const (
-	ModListener     = "listener"
-	ModSSHHarvester = "ssh_harvester"
-	ModDownloader   = "file_downloader"
+	ModListener   = "listener"
+	ModDownloader = "file_downloader"
 
 	// ModStealToken steals an access token from a running process on Windows.
 	// The stolen token is cached in the agent's priv.TokenMap under its SID
@@ -279,39 +278,6 @@ func populateModules() {
 					Desc: "Listener type: http, tcp, or udp",
 					Val:  "http",
 					Vals: []string{"http", "tcp", "udp"},
-				},
-			},
-			AgentConfig: AgentModuleConfig{
-				Exec:  "built-in",
-				Files: []string{},
-				Type:  "go",
-			},
-		},
-		ModSSHHarvester: {
-			Name:     ModSSHHarvester,
-			Build:    "",
-			Date:     "2020-01-25",
-			Comment:  "Harvest clear-text password automatically from OpenSSH server process",
-			IsLocal:  false,
-			Platform: "Linux",
-			Path:     "",
-			Options: ModOptions{
-				"code_pattern": &ModOption{
-					Name: "code_pattern",
-					Desc: "Code pattern to set breakpoint, big-endian. agent will stop there and dump password, and check RAX to make sure password is valid",
-					Val:  "4883c4080fb6c021",
-				},
-				"reg_name": &ModOption{
-					Name: "reg_name",
-					Desc: "Register name that stores password, eg. RDI",
-					Val:  "RSI",
-					Vals: []string{"RDI", "RSI", "RDX", "RCX", "R8", "R9", "RAX", "RBX", "RBP", "RSP", "RIP"},
-				},
-				"stop": &ModOption{
-					Name: "stop",
-					Desc: "Stop the harvester: no, yes",
-					Val:  "no",
-					Vals: []string{"no", "yes"},
 				},
 			},
 			AgentConfig: AgentModuleConfig{
