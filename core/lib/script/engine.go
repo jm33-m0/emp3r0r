@@ -8,14 +8,46 @@ import (
 	"go.starlark.net/syntax"
 )
 
+// RunOption configures a single script run. Options are additive so existing
+// callers keep working unchanged.
+type RunOption func(*runConfig)
+
+// runConfig holds per-run settings that are not Starlark globals.
+type runConfig struct {
+	// moduleOwner identifies the module that owns this run. Builtins that
+	// create state outliving the run (background eBPF uprobe captures) tag it
+	// with this owner so a later "stop" invocation can find it.
+	moduleOwner string
+	// notify streams output to the operator as it is produced instead of
+	// buffering it until the run returns.
+	notify func(string)
+}
+
+// WithModuleOwner tags a run with the name of the module that started it.
+func WithModuleOwner(owner string) RunOption {
+	return func(c *runConfig) { c.moduleOwner = owner }
+}
+
+// WithNotifier wires the streaming sender used by the `notify` builtin and by
+// long-lived builtins that report events after the run returns. A nil sender
+// disables streaming.
+func WithNotifier(fn func(string)) RunOption {
+	return func(c *runConfig) { c.notify = fn }
+}
+
 // Run executes a Starlark script with the provided source code, arguments, and optional custom global variables.
 // It redirects all Starlark print() calls to a string buffer and returns the captured output along with any execution error.
 //
 // The token parameter (Windows-only, 0 on other platforms) is a handle to an
 // impersonation token. When non-zero, token-aware starlark builtins
 // (read_file, win_call, ...) impersonate the token around each call.
-func Run(src []byte, argv []string, customGlobals map[string]any, token uintptr) (out string, err error) {
+func Run(src []byte, argv []string, customGlobals map[string]any, token uintptr, opts ...RunOption) (out string, err error) {
 	var buf bytes.Buffer
+
+	var cfg runConfig
+	for _, opt := range opts {
+		opt(&cfg)
+	}
 
 	// Top-level panic recovery to prevent script execution runtime crashes
 	defer func() {
@@ -43,6 +75,18 @@ func Run(src []byte, argv []string, customGlobals map[string]any, token uintptr)
 	// impersonate around each token-aware builtin call.
 	if token != 0 {
 		thread.SetLocal("token", token)
+	}
+
+	// Owner tags any state a builtin creates that outlives this run (e.g. a
+	// background eBPF uprobe capture) so a later stop invocation finds it.
+	if cfg.moduleOwner != "" {
+		thread.SetLocal("module_owner", cfg.moduleOwner)
+	}
+
+	// The notify builtin streams to the operator immediately; background
+	// captures capture this sender and keep streaming after Run returns.
+	if cfg.notify != nil {
+		thread.SetLocal("notify", cfg.notify)
 	}
 
 	// Fetch built-in APIs
