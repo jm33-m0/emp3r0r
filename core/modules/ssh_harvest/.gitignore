@@ -1,0 +1,2 @@
+# zig build cache (probe.bpf.o itself is covered by the repository-wide *.o)
+.build/
