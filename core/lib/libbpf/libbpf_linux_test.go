@@ -29,7 +29,11 @@ __attribute__((visibility("default"))) int libbpf_num_possible_cpus(void) {
 	return 4;
 }
 
+// libbpf_get_error(NULL) returns the stale -errno in libbpf. bpf_object__load
+// returns an int, not a pointer, so Object.Load must not route it through
+// libbpf_get_error; the mock returns -95 for NULL to catch that regression.
 __attribute__((visibility("default"))) int64_t libbpf_get_error(uintptr_t ptr) {
+	if (ptr == (uintptr_t)0) return -95;
 	return ptr == (uintptr_t)0xDEAD ? -22 : 0;
 }
 

@@ -157,11 +157,12 @@ func (o *Object) Load() error {
 	if err != nil {
 		return fmt.Errorf("libbpf: bpf_object__load: %w", err)
 	}
-	if e := o.lib.getError(rc); e != 0 {
-		return fmt.Errorf("libbpf: bpf_object__load: %w", unix.Errno(-e))
-	}
-	if int32(uint32(rc)) != 0 {
-		return fmt.Errorf("libbpf: bpf_object__load: error %d", int32(uint32(rc)))
+	// bpf_object__load returns an int; only the low 32 bits of the register
+	// are defined. Do not run it through libbpf_get_error, which interprets
+	// an error pointer and would read the (undefined) upper bits as a bogus
+	// errno.
+	if status := int32(uint32(rc)); status != 0 {
+		return fmt.Errorf("libbpf: bpf_object__load: %w", unix.Errno(-status))
 	}
 	return nil
 }
