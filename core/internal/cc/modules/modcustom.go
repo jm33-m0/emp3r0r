@@ -42,19 +42,18 @@ func moduleCustom(ctx *c2context.C2Context) {
 		return
 	}
 
-	// build module on C2
-	if config.Build != "" {
-		logging.Infof("Building %s...", config.Name)
-		out, err := build_module(config, ctx.Flags)
-		if err != nil {
-			logging.Errorf("Build module %s: %v", config.Name, err)
-			return
-		}
-		logging.Infof("Module output:\n%s", out)
-	}
-
-	// if module is a plugin, no need to upload and execute files on target
+	// Local C2 modules build and run on the C2; they have no agent dispatch
+	// and no dependencies.
 	if config.IsLocal {
+		if config.Build != "" {
+			logging.Infof("Building %s...", config.Name)
+			out, err := build_module(config, ctx.Flags)
+			if err != nil {
+				logging.Errorf("Build module %s: %v", config.Name, err)
+				return
+			}
+			logging.Infof("Module output:\n%s", out)
+		}
 		logging.Infof("%s will run as a plugin on C2, no files will be executed on target", config.Name)
 		return
 	}
@@ -70,13 +69,12 @@ func moduleCustom(ctx *c2context.C2Context) {
 		return
 	}
 
-	// Pre-flight every dependency this module declares (module config
-	// "dependencies", e.g. the auto-added "coffloader" for Windows BOFs):
-	// make sure each dependency's payload is hosted and downloadable for the
-	// target agent's arch before we dispatch, so a missing dependency fails
-	// fast with a clear error instead of a download error on the agent.
-	// Dependency modules are ordinary modules — today they are DLL loader
-	// modules, but nothing in this path assumes that.
+	// Pre-flight every dependency this module declares before building or
+	// dispatching it: each dependency is built (when it has a build step) and
+	// hosted for the target agent's arch first, so a dependency failure is
+	// reported for what it is instead of surfacing later as a missing payload
+	// on the agent. Dependency modules are ordinary modules — today they are
+	// DLL loaders and shared-library backends, but nothing here assumes that.
 	if ctx.Target != nil && len(config.Dependencies) > 0 {
 		for _, dep := range config.Dependencies {
 			if err := ensureModuleDependencyHosted(ctx, dep); err != nil {
@@ -84,6 +82,17 @@ func moduleCustom(ctx *c2context.C2Context) {
 				return
 			}
 		}
+	}
+
+	// build module on C2
+	if config.Build != "" {
+		logging.Infof("Building %s...", config.Name)
+		out, err := build_module(config, ctx.Flags)
+		if err != nil {
+			logging.Errorf("Build module %s: %v", config.Name, err)
+			return
+		}
+		logging.Infof("Module output:\n%s", out)
 	}
 
 	// Every agent module runs in memory; there is no on-disk/fork-and-run
@@ -98,9 +107,11 @@ func build_module(config *def.ModuleConfig, flags map[string]string) (out []byte
 		return out, err
 	}
 	defer func() {
-		err = os.Chdir(live.EmpWorkSpace)
-		if err != nil {
-			logging.Warningf("Failed changing directory to %s: %v", live.EmpWorkSpace, err)
+		// Use a local error: assigning to the named return here would clobber
+		// the build's own error on the return path (a failed build would look
+		// like success and the caller would report a missing payload instead).
+		if chdirErr := os.Chdir(live.EmpWorkSpace); chdirErr != nil {
+			logging.Warningf("Failed changing directory to %s: %v", live.EmpWorkSpace, chdirErr)
 		}
 	}()
 

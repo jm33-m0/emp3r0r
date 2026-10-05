@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 )
@@ -121,5 +122,83 @@ func TestBuildModuleShellQuotesFlags(t *testing.T) {
 		if !strings.Contains(got, pair) {
 			t.Errorf("argv pair %q missing from build output:\n%s", pair, got)
 		}
+	}
+}
+
+// TestBuildModuleReturnsFailure is a regression test: a failing build must
+// surface its error. The named return plus a deferred os.Chdir used to
+// overwrite the build error with the (successful) chdir result, so a failed
+// dependency build looked like success and the caller then failed with a
+// confusing "no such file" while reading the missing payload.
+func TestBuildModuleReturnsFailure(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("module build runs via sh, not available on windows")
+	}
+
+	modDir := t.TempDir()
+	origWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	origWorkspace := live.EmpWorkSpace
+	// build_module chdirs back to live.EmpWorkSpace; point it at the real cwd
+	// so the process working directory is not left inside a deleted temp dir.
+	live.EmpWorkSpace = origWD
+	defer func() {
+		_ = os.Chdir(origWD)
+		live.EmpWorkSpace = origWorkspace
+	}()
+
+	config := &def.ModuleConfig{Path: modDir, Build: "echo boom >&2; exit 7"}
+	_, err = build_module(config, nil)
+	if err == nil {
+		t.Fatal("build_module returned nil error for a failing build")
+	}
+	if !strings.Contains(err.Error(), "boom") {
+		t.Fatalf("build_module error %q does not include the build output", err)
+	}
+}
+
+// TestEnsureModuleDependencyHostedSurfacesBuildFailure pins that a dependency
+// whose build fails is reported as a build failure, not as a missing payload.
+func TestEnsureModuleDependencyHostedSurfacesBuildFailure(t *testing.T) {
+	origWWWRoot := live.WWWRoot
+	origWorkspace := live.EmpWorkSpace
+	origWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	live.WWWRoot = t.TempDir()
+	// build_module chdirs back to live.EmpWorkSpace; point it at the real cwd
+	// so the process working directory is not left inside a deleted temp dir.
+	live.EmpWorkSpace = origWD
+	defer func() {
+		_ = os.Chdir(origWD)
+		live.WWWRoot = origWWWRoot
+		live.EmpWorkSpace = origWorkspace
+	}()
+
+	dir := t.TempDir()
+	def.Modules.Store("broken_dep", &def.ModuleConfig{
+		Name:  "broken_dep",
+		Path:  dir,
+		Build: "echo dependency-build-failed >&2; exit 3",
+		AgentConfig: def.AgentModuleConfig{
+			Type:  "so",
+			Files: []string{"broken_dep.so"},
+		},
+	})
+	defer def.Modules.Delete("broken_dep")
+
+	ctx := &context.C2Context{Target: &def.Emp3r0rAgent{GOOS: "linux", GOArch: "amd64"}}
+	err = ensureModuleDependencyHosted(ctx, "broken_dep")
+	if err == nil {
+		t.Fatal("expected an error when the dependency build fails")
+	}
+	if !strings.Contains(err.Error(), "building dependency") {
+		t.Fatalf("error %q does not identify the dependency build", err)
+	}
+	if !strings.Contains(err.Error(), "dependency-build-failed") {
+		t.Fatalf("error %q does not include the build output", err)
 	}
 }
