@@ -150,12 +150,5 @@ jobs:
         working-directory: ./core
         run: |
           go tool cover -func=coverage.txt
-
-      - name: Upload coverage to Codecov
-        if: matrix.os == 'ubuntu-latest'
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./core/coverage.txt
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: false
+          PERCENT=$(go tool cover -func=coverage.txt | grep total: | awk '{print $3}')
+          echo "### Test Coverage: $PERCENT" >> $GITHUB_STEP_SUMMARY
