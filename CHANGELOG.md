@@ -1,5 +1,25 @@
 # Changelog
 
+## [4.22.0](https://github.com/jm33-m0/emp3r0r/compare/v4.21.1...v4.22.0) (2026-10-05)
+
+
+### Features
+
+* **ebpf:** `uprobe` support ([fa32b5b](https://github.com/jm33-m0/emp3r0r/commit/fa32b5b3387da49778cc50cc3c45148209ec128d))
+* **elf:** ELF parsing and code searching ([35990ae](https://github.com/jm33-m0/emp3r0r/commit/35990ae9e68f7c786c4a5b8a920a2f7fd86a01af))
+* **module:** `ssh_harvest` using eBPF uprobe ([f619b94](https://github.com/jm33-m0/emp3r0r/commit/f619b94df0c954db79765067f6143aece570bbcf))
+* **ssh-harvester:** remove `ssh_harvester` module ([865fcfe](https://github.com/jm33-m0/emp3r0r/commit/865fcfebbba6531204f8ee1ff8090eeea2ae1a42))
+* **starlark:** expose `NotifyC2` to Starlark modules ([61d1585](https://github.com/jm33-m0/emp3r0r/commit/61d1585be9ac7b25980173252235ae0e15e41015))
+
+
+### Bug Fixes
+
+* **libbpf:** `bpf_object__load` errno parsing error ([c2b529f](https://github.com/jm33-m0/emp3r0r/commit/c2b529fc87481ad61885dc2b28789abd5176c8cf))
+* **libbpf:** support more registers ([f94c24c](https://github.com/jm33-m0/emp3r0r/commit/f94c24c29b9a813171ea468eb7b738c94ccef810))
+* **memmod:** support 5 args ([1d6469f](https://github.com/jm33-m0/emp3r0r/commit/1d6469fa515873e03bcdd5fa489d5bbcc50f6adb))
+* **module:** dependencies not built before module execution ([d1ae3aa](https://github.com/jm33-m0/emp3r0r/commit/d1ae3aa662bb9a5a7463ea98ffb700f0e09e19aa))
+* **ssh_harvest:** stream creds capture to operator instead of waiting until timeout ([507a70a](https://github.com/jm33-m0/emp3r0r/commit/507a70a7195ac1317e876ca9b2de44da3b8f1854))
+
 ## [4.21.1](https://github.com/jm33-m0/emp3r0r/compare/v4.21.0...v4.21.1) (2026-10-03)
 
 
