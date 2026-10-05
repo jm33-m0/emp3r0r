@@ -108,6 +108,30 @@ Run compiled C modules in-process on either platform:
 
 ---
 
+### 🧬 In-Memory Library Loader (memmod)
+
+Native libraries are mapped into the agent's own address space and called there — no `LoadLibrary`, no `dlopen`, no file ever hits disk.
+
+- `memmod` loads PE DLLs on Windows and ELF `.so` on Linux, handling relocations, imports, and export calls in-process.
+- It builds on proven upstream work: WireGuard's `memmod` PE loader and the [Sliver C2](https://github.com/BishopFox/sliver) / [sliverarmory/reflektor](https://github.com/sliverarmory/reflektor) ELF loader and call machinery.
+- `memdeps` sits above it: a declared dependency is resolved from encrypted memfs/C2, mapped only for the operation that needs it, and unmapped on return.
+
+**Why this matters:** extending the agent with native code doesn't require a new binary, a loader service, or a file on disk.
+
+---
+
+### 🐧 Linux Modules & eBPF
+
+Linux modules are Starlark scripts that can reach all the way into the kernel. The agent maps `libbpf` on demand and exposes its API to scripts as Go-backed builtins, so a module can enumerate, attach to, and tear down eBPF objects with no compiler and no child process.
+
+- The builtins mirror libbpf: `ebpf_progs`, `ebpf_maps`, `ebpf_links`, `ebpf_detach`, `ebpf_map_wipe`, `ebpf_code_offset`, and the long-lived `ebpf_uprobe_start`/`ebpf_uprobe_stop`.
+- [`ssh_harvest`](./core/modules/ssh_harvest/) is the worked example: it locates a pattern in `sshd`, attaches a long-lived uprobe, streams captured credentials live, and holds it until `--disable` — no ptrace, no breakpoints, no disk.
+- libbpf is not the only option: the same on-demand loader handles any `.so` a module declares or supplies, and scripts can map bytes directly with `mem_load_library`.
+
+**Why this matters:** kernel-level tradecraft is a script plus a library the agent maps only while it needs it, then drops.
+
+---
+
 ### 🔑 Windows Tokens, Netonly Sessions & Kerberos Tickets (PTT)
 
 Once you're on a Windows host, emp3r0r lets you _become_ the users on it — without ever dropping a tool.
