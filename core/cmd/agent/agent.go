@@ -20,8 +20,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/syscall"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
-	"github.com/ncruces/go-dns"
 )
 
 const (
@@ -134,11 +132,7 @@ func agent_main() {
 	// DNS
 	if common.RuntimeConfig.DoHServer != "" {
 		// use DoH resolver
-		net.DefaultResolver, err = dns.NewDoHResolver(
-			common.RuntimeConfig.DoHServer,
-			dns.DoHCache(),
-		)
-		if err != nil {
+		if err := applyDoHResolver(common.RuntimeConfig.DoHServer); err != nil {
 			logging.Fatalf("cannot start DoH resolver: %v", err)
 		}
 	}
@@ -156,7 +150,7 @@ func agent_main() {
 			for !transport.IsProxyOK(cdnproxyAddr, def.CCAddress) {
 				// typically you need to configure AgentProxy manually if agent doesn't have internet
 				// and AgentProxy will be used for websocket connection, then replaced with 10888
-				err := cdn2proxy.StartProxy(strings.Split(cdnproxyAddr, "socks5://")[1], common.RuntimeConfig.CDNProxy, upperProxy, dohURL)
+				err := runCDNProxy(strings.Split(cdnproxyAddr, "socks5://")[1], common.RuntimeConfig.CDNProxy, upperProxy, dohURL)
 				if err != nil {
 					logging.Infof("CDN proxy at %s stopped (%v), restarting", cdnproxyAddr, err)
 				}
