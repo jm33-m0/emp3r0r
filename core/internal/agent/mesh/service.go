@@ -1,3 +1,5 @@
+//go:build !no_mesh
+
 // Package mesh implements the emp3r0r P2P mesh stack.
 //
 // Discovery: hashicorp/memberlist gossip (AES-encrypted, def.AESPassword).

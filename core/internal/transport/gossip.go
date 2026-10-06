@@ -1,3 +1,5 @@
+//go:build !no_mesh
+
 package transport
 
 // gossip.go — hashicorp/memberlist gossip engine for the emp3r0r mesh.

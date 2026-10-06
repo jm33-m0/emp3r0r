@@ -1,3 +1,5 @@
+//go:build !no_mesh
+
 package mesh
 
 // transport.go — pluggable transport interface for mesh peer connections.

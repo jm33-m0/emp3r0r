@@ -1,3 +1,5 @@
+//go:build !no_mesh
+
 package transport
 
 import (
