@@ -27,7 +27,8 @@ func TestPayloadGOOS(t *testing.T) {
 }
 
 func TestTransportSupportedOn(t *testing.T) {
-	// SMB is Windows-only; kcp/mtls run everywhere.
+	// SMB is Windows-only; kcp/mtls run everywhere. KCP is optional, so its
+	// cases are asserted only when the build compiled it in.
 	cases := []struct {
 		transport string
 		goos      string
@@ -35,8 +36,6 @@ func TestTransportSupportedOn(t *testing.T) {
 	}{
 		{"smb", "windows", true},
 		{"smb", "linux", false},
-		{"kcp", "windows", true},
-		{"kcp", "linux", true},
 		{"mtls", "windows", true},
 		{"mtls", "linux", true},
 		{"unknown-transport", "linux", false},
@@ -44,6 +43,13 @@ func TestTransportSupportedOn(t *testing.T) {
 	for _, tc := range cases {
 		if got := transport.TransportSupportedOn(tc.transport, tc.goos); got != tc.want {
 			t.Errorf("TransportSupportedOn(%q, %q) = %v, want %v", tc.transport, tc.goos, got, tc.want)
+		}
+	}
+	if _, err := transport.GetTransportImplementationStrict("kcp"); err == nil {
+		for _, goos := range []string{"windows", "linux"} {
+			if !transport.TransportSupportedOn("kcp", goos) {
+				t.Errorf("TransportSupportedOn(\"kcp\", %q) = false, want true", goos)
+			}
 		}
 	}
 }

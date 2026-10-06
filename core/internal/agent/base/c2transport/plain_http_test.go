@@ -118,8 +118,10 @@ func runCheckinACK(t *testing.T, mode string) {
 
 	go server.StartC2AgentTLSServer()
 	server.MarkOperatorOnline("test-operator")
-	if err := waitForPort(fmt.Sprintf("127.0.0.1:%d", tlsPort), time.Now().Add(10*time.Second)); err != nil {
-		t.Fatalf("TLS C2 server did not become ready: %v", err)
+	if mode != "http_poll" {
+		if err := waitForPort(fmt.Sprintf("127.0.0.1:%d", tlsPort), time.Now().Add(10*time.Second)); err != nil {
+			t.Fatalf("TLS C2 server did not become ready: %v", err)
+		}
 	}
 
 	if mode == "http_poll" {
@@ -211,7 +213,20 @@ func TestPlainHTTPCheckinACK(t *testing.T) {
 	for _, mode := range []string{def.C2ChannelModeH2Conn, "http_poll"} {
 		mode := mode
 		t.Run(mode, func(t *testing.T) {
+			requireH2Conn(t, mode)
 			runCheckinACK(t, mode)
 		})
+	}
+}
+
+// requireH2Conn skips a subtest when it targets the h2conn channel but the
+// build excluded that channel (tag "no_h2conn").
+func requireH2Conn(t *testing.T, mode string) {
+	t.Helper()
+	if mode != def.C2ChannelModeH2Conn {
+		return
+	}
+	if _, err := transport.GetC2ChannelWrapper(def.C2ChannelModeH2Conn); err != nil {
+		t.Skipf("h2conn channel not compiled into this build: %v", err)
 	}
 }

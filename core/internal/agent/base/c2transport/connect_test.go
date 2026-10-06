@@ -86,6 +86,8 @@ func startTestC2Server(t *testing.T) {
 }
 
 func TestEstablishC2Connection(t *testing.T) {
+	requireH2Conn(t, def.C2ChannelModeH2Conn)
+
 	// Setup temp dir for certs
 	tmpDir, err := os.MkdirTemp("", "agent_test")
 	if err != nil {
@@ -316,6 +318,8 @@ func TestURLConstruction(t *testing.T) {
 }
 
 func TestDuplicatedCheckin(t *testing.T) {
+	requireH2Conn(t, def.C2ChannelModeH2Conn)
+
 	// Setup temp dir for certs
 	tmpDir, err := os.MkdirTemp("", "agent_test_dupe")
 	if err != nil {
@@ -491,6 +495,8 @@ func TestDuplicatedCheckin(t *testing.T) {
 }
 
 func TestBackslashTag(t *testing.T) {
+	requireH2Conn(t, def.C2ChannelModeH2Conn)
+
 	// Setup temp dir for certs
 	tmpDir, err := os.MkdirTemp("", "agent_test_backslash")
 	if err != nil {
@@ -617,6 +623,8 @@ func TestBackslashTag(t *testing.T) {
 }
 
 func TestEmptyUUID(t *testing.T) {
+	requireH2Conn(t, def.C2ChannelModeH2Conn)
+
 	// Setup temp dir for certs
 	tmpDir, err := os.MkdirTemp("", "agent_test_empty")
 	if err != nil {
@@ -743,6 +751,8 @@ func TestEmptyUUID(t *testing.T) {
 }
 
 func TestNewAgentCheckin(t *testing.T) {
+	requireH2Conn(t, def.C2ChannelModeH2Conn)
+
 	// Setup temp dir for certs
 	tmpDir, err := os.MkdirTemp("", "agent_test_new")
 	if err != nil {

@@ -61,6 +61,7 @@ func TestSocks5PivotEndToEnd(t *testing.T) {
 	for _, mode := range []string{def.C2ChannelModeH2Conn, def.C2ChannelModePlainHTTP} {
 		mode := mode
 		t.Run(mode, func(t *testing.T) {
+			requireH2Conn(t, mode)
 			runSocks5PivotE2E(t, mode, false)
 		})
 	}
@@ -71,6 +72,7 @@ func TestSocks5PivotCONNECTRefused(t *testing.T) {
 	for _, mode := range []string{def.C2ChannelModeH2Conn, def.C2ChannelModePlainHTTP} {
 		mode := mode
 		t.Run(mode, func(t *testing.T) {
+			requireH2Conn(t, mode)
 			runSocks5PivotE2E(t, mode, true)
 		})
 	}
@@ -184,8 +186,10 @@ func runSocks5PivotE2E(t *testing.T, mode string, expectRefused bool) {
 	// Wait until the C2 listener(s) are actually accepting (not a blind
 	// sleep): agent enrollment below must not race a half-bound server, and a
 	// plain-HTTP subtest must not start polling a TLS endpoint that is not up.
-	if err := waitForPort(fmt.Sprintf("127.0.0.1:%d", tlsPort), time.Now().Add(10*time.Second)); err != nil {
-		t.Fatalf("C2 TLS server did not become ready: %v", err)
+	if mode != def.C2ChannelModePlainHTTP {
+		if err := waitForPort(fmt.Sprintf("127.0.0.1:%d", tlsPort), time.Now().Add(10*time.Second)); err != nil {
+			t.Fatalf("C2 TLS server did not become ready: %v", err)
+		}
 	}
 	if mode == def.C2ChannelModePlainHTTP {
 		if err := waitForPort(fmt.Sprintf("127.0.0.1:%d", httpPort), time.Now().Add(10*time.Second)); err != nil {

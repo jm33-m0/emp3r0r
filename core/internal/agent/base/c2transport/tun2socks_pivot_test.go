@@ -46,6 +46,7 @@ import (
 func startPivotStack(t *testing.T) (pivotAddr string) {
 	t.Helper()
 	mode := def.C2ChannelModeH2Conn
+	requireH2Conn(t, mode)
 
 	// A previous full-stack test may still have server goroutines (both the
 	// TLS/h2 and the plain-HTTP C2 endpoints) draining. If any of them outlives

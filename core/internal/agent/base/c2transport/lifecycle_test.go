@@ -1,3 +1,5 @@
+//go:build !no_h2conn
+
 package c2transport_test
 
 import (

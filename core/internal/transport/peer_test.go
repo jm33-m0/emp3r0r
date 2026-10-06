@@ -32,6 +32,11 @@ func TestPeerEndpointNetworkAddr(t *testing.T) {
 }
 
 func TestResolvePeerTransport(t *testing.T) {
+	// Register a probe transport so the test does not depend on which optional
+	// transports (kcp, smb, ...) this particular build compiled in.
+	Transports.Store("__probe__", &TransportDescriptor{Name: "__probe__", Transport: &mockTransport{}})
+	t.Cleanup(func() { Transports.Delete("__probe__") })
+
 	cases := []struct {
 		name          string
 		peerTransport string
@@ -39,9 +44,9 @@ func TestResolvePeerTransport(t *testing.T) {
 		wantName      string
 		wantErr       bool
 	}{
-		{"peer advertised transport wins", "kcp", "mtls", "kcp", false},
+		{"peer advertised transport wins", "__probe__", "mtls", "__probe__", false},
 		{"peer matches fallback", "mtls", "mtls", "mtls", false},
-		{"empty peer uses fallback", "", "kcp", "kcp", false},
+		{"empty peer uses fallback", "", "__probe__", "__probe__", false},
 		{"nothing configured defaults to mtls", "", "", "mtls", false},
 		{"unknown peer transport is an error", "quic", "mtls", "", true},
 	}
@@ -139,9 +144,16 @@ func TestTransportCapabilities(t *testing.T) {
 		}
 		_ = tr.Supported() // must not panic
 	}
-	for _, want := range []string{"kcp", "mtls", "smb"} {
+	for _, want := range []string{"mtls", "smb"} {
 		if _, err := GetTransportImplementationStrict(want); err != nil {
 			t.Errorf("expected transport %q to be registered: %v", want, err)
+		}
+	}
+	// KCP is optional: a build that excludes the mesh/KCP stack must not have
+	// it registered, and every other build must.
+	if meshKCPTransportCompiled {
+		if _, err := GetTransportImplementationStrict("kcp"); err != nil {
+			t.Errorf("expected transport \"kcp\" to be registered: %v", err)
 		}
 	}
 	// mTLS is the documented fallback and must always be usable.
@@ -158,7 +170,7 @@ func TestTransportCapabilities(t *testing.T) {
 // transports that open a dialable port and SMB, whose relay "port" only derives
 // the pipe name.
 func TestTransportUsesNetworkPort(t *testing.T) {
-	for _, name := range []string{"kcp", "mtls"} {
+	for _, name := range []string{"mtls"} {
 		if !TransportUsesNetworkPort(name) {
 			t.Errorf("%s should report using a network port", name)
 		}
