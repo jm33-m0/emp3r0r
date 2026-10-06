@@ -170,26 +170,13 @@ Pivot without burning another implant: the C2 runs a SOCKS5 proxy that relays th
 
 ### 🪶 Modular Agents — Compile Out What You Don't Need
 
-Every optional subsystem is another third-party library and another set of strings a defender can fingerprint. emp3r0r agents are assembled from independently gated features, so a payload carries only what the mission needs. The P2P mesh is a core feature and stays in; everything else is opt-in.
+Every unused subsystem is another dependency and another string for a defender to find. Agents are built from independently gated features, so a payload carries only what the mission needs.
 
-- `install.py --agent-slim` drops the optional transports and helpers (KCP, h2conn, uTLS, DoH, the CDN proxy, and netlink). The delivered shared-object payloads stay compact — around **11 MB for a Windows DLL** and **13 MB for a Linux `.so`** — and the built-in **donut/malasada** shellcode conversion compresses them to roughly **4–6 MB**.
-- `--agent-tags '<tags>'` selects any subset with free-form Go build tags, e.g. `--agent-tags 'no_kcp no_utls no_doh'`, and `--list-agent-tags` prints the full reference.
-- The **P2P mesh is enabled by default** and survives `--agent-slim`; add `no_mesh` only when you truly want a standalone agent.
-- C2 binaries always keep the full feature set, so trimming an agent never reduces what the server can speak.
+- `install.py --agent-slim` drops the optional transports and helpers (KCP, h2conn, uTLS, DoH, CDN proxy, netlink): a Windows DLL or Linux `.so` lands at **~11–13 MB**, and **~4–6 MB** once donut/malasada convert it to shellcode.
+- The P2P mesh is a core feature — it stays enabled by default, and `no_mesh` opts out for a standalone agent.
+- `--agent-tags '<tags>'` compiles out any subset (`--list-agent-tags` prints the reference); C2 binaries always keep the full feature set.
 
-| Tag | Feature removed |
-| --- | --- |
-| `no_mesh` | P2P mesh and memberlist gossip (standalone agent) |
-| `no_kcp` | KCP C2 transport (xtaci `kcp-go`/`kcptun`/`smux`/`qpp`) |
-| `no_h2conn` | HTTP/2 duplex (`h2conn`) C2 channel |
-| `no_utls` | uTLS JA3 randomization (falls back to `crypto/tls`) |
-| `no_doh` | DNS-over-HTTPS resolver (the OS resolver is used) |
-| `no_cdnproxy` | CDN fronting proxy |
-| `no_netlink` | netlink route/neighbour enumeration (procfs fallback) |
-
-`--agent-slim` is shorthand for every tag except `no_mesh`.
-
-**Why this matters:** less code means a smaller implant, a shorter string table, and fewer third-party dependencies for EDR and AV to key on. A trimmed agent blends into the host as an ordinary program while still speaking the full C2 protocol.
+**Why this matters:** a smaller implant has a shorter string table and fewer third-party dependencies for EDR and AV to key on, while still speaking the full C2 protocol.
 
 ---
 
