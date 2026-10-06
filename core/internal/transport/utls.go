@@ -1,3 +1,5 @@
+//go:build !no_utls
+
 // Support code for TLS camouflage using uTLS.
 //
 // The goal is: provide an http.RoundTripper abstraction that retains the
@@ -50,9 +52,8 @@ import (
 )
 
 // We use this RoundTripper to make all our requests when neither --helper nor
-// utls is in effect. We use the defaults, except we take control of the Proxy
-// setting (notably, disabling the default ProxyFromEnvironment).
-var httpRoundTripper *http.Transport = http.DefaultTransport.(*http.Transport).Clone()
+// utls is in effect. It lives in tls_common.go so the no_utls build can reuse
+// it without compiling any uTLS code.
 
 // Extract a host:port address from a URL, suitable for passing to net.Dial.
 func addrForDial(url *url.URL) (string, error) {

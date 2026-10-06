@@ -1,3 +1,5 @@
+//go:build !no_utls
+
 package transport
 
 import (
