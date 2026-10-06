@@ -1,3 +1,5 @@
+//go:build !no_kcp
+
 package c2transport
 
 import (

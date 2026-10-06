@@ -1,3 +1,5 @@
+//go:build !no_kcp
+
 package transport
 
 // Modified from xtaci/kcptun/client
