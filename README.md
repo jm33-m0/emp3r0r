@@ -62,7 +62,7 @@ Every C2 and peer link uses ephemeral ECDH keys with session-derived encryption 
 
 Agents discover each other and relay traffic through a gossip mesh, so the operation doesn't collapse when one link or one server disappears.
 
-- Peers connect over camouflage mTLS 1.3 or reliable UDP (KCP), with every hop encrypted.
+- Peers connect over camouflage mTLS 1.3, Windows SMB named pipes, or reliable UDP (KCP), with every hop encrypted.
 - Traffic routes around dead relays automatically — no manual proxy surgery mid-operation.
 - Segments with no direct C2 access still stay reachable through their neighbors.
 
@@ -168,6 +168,31 @@ Pivot without burning another implant: the C2 runs a SOCKS5 proxy that relays th
 
 ---
 
+### 🪶 Modular Agents — Compile Out What You Don't Need
+
+Every optional subsystem is another third-party library and another set of strings a defender can fingerprint. emp3r0r agents are assembled from independently gated features, so a payload carries only what the mission needs. The P2P mesh is a core feature and stays in; everything else is opt-in.
+
+- `install.py --agent-slim` drops the optional transports and helpers (KCP, h2conn, uTLS, DoH, the CDN proxy, and netlink). The delivered shared-object payloads stay compact — around **11 MB for a Windows DLL** and **13 MB for a Linux `.so`** — and the built-in **donut/malasada** shellcode conversion compresses them to roughly **4–6 MB**.
+- `--agent-tags '<tags>'` selects any subset with free-form Go build tags, e.g. `--agent-tags 'no_kcp no_utls no_doh'`, and `--list-agent-tags` prints the full reference.
+- The **P2P mesh is enabled by default** and survives `--agent-slim`; add `no_mesh` only when you truly want a standalone agent.
+- C2 binaries always keep the full feature set, so trimming an agent never reduces what the server can speak.
+
+| Tag | Feature removed |
+| --- | --- |
+| `no_mesh` | P2P mesh and memberlist gossip (standalone agent) |
+| `no_kcp` | KCP C2 transport (xtaci `kcp-go`/`kcptun`/`smux`/`qpp`) |
+| `no_h2conn` | HTTP/2 duplex (`h2conn`) C2 channel |
+| `no_utls` | uTLS JA3 randomization (falls back to `crypto/tls`) |
+| `no_doh` | DNS-over-HTTPS resolver (the OS resolver is used) |
+| `no_cdnproxy` | CDN fronting proxy |
+| `no_netlink` | netlink route/neighbour enumeration (procfs fallback) |
+
+`--agent-slim` is shorthand for every tag except `no_mesh`.
+
+**Why this matters:** less code means a smaller implant, a shorter string table, and fewer third-party dependencies for EDR and AV to key on. A trimmed agent blends into the host as an ordinary program while still speaking the full C2 protocol.
+
+---
+
 ### 💾 Encrypted Memory-First Storage
 
 - Agent file operations run against an in-memory, AES-GCM-encrypted virtual filesystem; large data spills to disk only as encrypted blobs with no identifiable headers.
@@ -188,7 +213,7 @@ git clone --depth=1 https://github.com/jm33-m0/emp3r0r.git && cd emp3r0r
 ./install.py
 ```
 
-The installer builds everything in a throwaway container and prepares the operator kit. Useful flags: `--lightweight` (Linux/Windows amd64 only, fastest), `--targets OS/ARCH,...`, `--debug`, `--skip-build`.
+The installer builds everything in a throwaway container and prepares the operator kit. Useful flags: `--lightweight` (Linux/Windows amd64 only, fastest), `--targets OS/ARCH,...`, `--agent-slim` / `--agent-tags` (trim agent features to shrink the implant and reduce fingerprinting), `--debug`, `--skip-build`.
 
 Launch the server:
 
