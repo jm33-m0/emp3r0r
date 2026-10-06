@@ -46,9 +46,9 @@ func IPr() (routes []string) {
 		case dst == "0.0.0.0" && gw != "":
 			routes = append(routes, fmt.Sprintf("default via %s (%s)", gw, iface))
 		case gw != "":
-			routes = append(routes, fmt.Sprintf("%s/%s via %s (%s)", dst, procMaskLen(mask), gw, iface))
+			routes = append(routes, fmt.Sprintf("%s/%d via %s (%s)", dst, procMaskLen(mask), gw, iface))
 		default:
-			routes = append(routes, fmt.Sprintf("%s/%s (%s)", dst, procMaskLen(mask), iface))
+			routes = append(routes, fmt.Sprintf("%s/%d (%s)", dst, procMaskLen(mask), iface))
 		}
 	}
 	if len(routes) == 0 {
