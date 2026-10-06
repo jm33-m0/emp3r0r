@@ -47,11 +47,20 @@ Target selection options (combinable with any build command):
                       (.so/.dll) variants for the matched targets.
                       C2 server binaries (cc, cat, listener) are always built.
 
+Agent feature selection options (combinable with any build command):
+  --agent-slim        Compile agent payloads without the optional subsystems
+                      (P2P mesh/memberlist, KCP, h2conn, uTLS, DoH, CDN proxy,
+                      netlink) to cut binary size and third-party dependencies.
+                      The default keeps every feature. C2 server binaries are
+                      always built with the full feature set.
+
 Environment variables:
   EMP3R0R_DISABLE_GARBLE=1   Disable garble obfuscation for non-debug builds
   PREFIX=/usr/local          Custom install prefix
   EMP3R0R_TARGETS            Comma-separated targets (same format as --targets)
   EMP3R0R_LIGHTWEIGHT=1      Equivalent to --lightweight
+  EMP3R0R_SLIM_AGENT=1       Equivalent to --agent-slim
+  EMP3R0R_AGENT_TAGS         Extra Go build tags for agent payloads
 """
 
 import argparse
@@ -101,6 +110,18 @@ ZIG_SHA256 = {
     ),
 }
 REQUIRED_FREE_KB = 10 * 1024 * 1024  # 10 GB
+
+# Optional agent features that can be compiled out. The full build keeps them
+# all (no tags); --agent-slim drops them to shed the corresponding dependencies
+# (memberlist gossip, xtaci KCP, h2conn/websocket, go-dns, go-cdn2proxy,
+# vishvananda/netlink and uTLS). The tag names must stay in sync with the
+# //go:build constraints across core/.
+SLIM_AGENT_TAGS = "no_mesh no_kcp no_h2conn no_utls no_doh no_cdnproxy no_netlink"
+
+# Extra Go build tags applied to every agent payload in the current run. Set
+# once by build()/build_single_payload() from the CLI and environment so the
+# per-artefact helpers stay focused on their own toolchain concerns.
+AGENT_EXTRA_TAGS = ""
 
 USE_COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
 IS_DRY_RUN = os.environ.get("EMP3R0R_DRY_RUN", "0").lower() in ("1", "true", "yes")
@@ -630,6 +651,36 @@ def install_crystalpalace(
         log_warn(f"Failed to extract Crystal Palace archive {archive}")
 
 
+def agent_build_tags(mode: str) -> str:
+    """Build tags for agent executables (cgo and pure Go).
+
+    The full feature set is the default so an untagged build keeps every
+    transport; ``--agent-slim`` appends the exclusion tags that drop the
+    optional subsystems.
+    """
+    base = "netgo agent" if mode == "--debug" else "netgo release agent"
+    return f"{base} {AGENT_EXTRA_TAGS}" if AGENT_EXTRA_TAGS else base
+
+
+def agent_shared_tags(mode: str) -> str:
+    """Build tags for the agent c-shared object (Linux .so / Windows DLL)."""
+    base = "emp3r0r_so" if mode == "--debug" else "release emp3r0r_so"
+    return f"{base} {AGENT_EXTRA_TAGS}" if AGENT_EXTRA_TAGS else base
+
+
+def resolve_agent_tags(args: "argparse.Namespace") -> str:
+    """Resolve the extra agent build tags from CLI flags and environment.
+
+    ``--agent-slim`` (or ``EMP3R0R_SLIM_AGENT=1``) selects the full exclusion
+    preset; ``EMP3R0R_AGENT_TAGS`` allows an explicit, fine-grained set.
+    """
+    if getattr(args, "agent_slim", False) or os.environ.get(
+        "EMP3R0R_SLIM_AGENT", "0"
+    ).lower() in ("1", "true", "yes"):
+        return SLIM_AGENT_TAGS
+    return os.environ.get("EMP3R0R_AGENT_TAGS", "").strip()
+
+
 def build_agent_pure(
     arch: str,
     os_name: str,
@@ -645,7 +696,7 @@ def build_agent_pure(
 ) -> None:
     log_info(f"Building pure agent stub for {os_name} {arch}")
 
-    tags = "netgo agent" if arg1 == "--debug" else "netgo release agent"
+    tags = agent_build_tags(arg1)
     win_gui_flag = (
         "-H=windowsgui " if (arg1 != "--debug" and os_name == "windows") else ""
     )
@@ -687,7 +738,7 @@ def build_agent_cgo(
 ) -> None:
     log_info(f"Building CGO agent stub for {os_name} {arch}")
 
-    tags = "netgo agent" if arg1 == "--debug" else "netgo release agent"
+    tags = agent_build_tags(arg1)
 
     cc_targets = {
         "amd64": "x86_64-linux-musl",
@@ -740,7 +791,7 @@ def build_shared_object(
 ) -> None:
     log_info(f"Building shared object for {os_name} {arch}")
 
-    tags = "emp3r0r_so" if arg1 == "--debug" else "release emp3r0r_so"
+    tags = agent_shared_tags(arg1)
     # mingw-w64's DLL pseudo-relocation startup (_pei386_runtime_relocator)
     # calls alloca() with a runtime-computed size, which the compiler lowers to
     # a ___chkstk_ms stack-probe call. zig 0.16 honours -nostdlib by dropping
@@ -1788,6 +1839,24 @@ def parse_args() -> argparse.Namespace:
             "toolchain, tags, and ldflags as the full build"
         ),
     )
+
+    # ── Agent feature selection ───────────────────────────────────────────────
+    feat_group = parser.add_argument_group(
+        "agent feature selection",
+        "Control which optional agent subsystems are compiled in. The default "
+        "keeps every transport and feature.",
+    )
+    feat_group.add_argument(
+        "--agent-slim",
+        action="store_true",
+        default=False,
+        help=(
+            "Compile agents without optional subsystems (P2P mesh/memberlist, "
+            "KCP, h2conn, uTLS, DoH, CDN proxy, netlink) to cut binary size "
+            "and third-party dependencies. Equivalent to passing "
+            "EMP3R0R_AGENT_TAGS with the exclusion preset."
+        ),
+    )
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -1874,6 +1943,11 @@ def main() -> None:
     if args.dry_run:
         IS_DRY_RUN = True
         os.environ["EMP3R0R_DRY_RUN"] = "1"
+
+    global AGENT_EXTRA_TAGS
+    AGENT_EXTRA_TAGS = resolve_agent_tags(args)
+    if AGENT_EXTRA_TAGS:
+        log_info(f"Agent build tags: {AGENT_EXTRA_TAGS}")
 
     core_dir = pathlib.Path(__file__).resolve().parent
     prefix = os.environ.get("PREFIX", "/usr/local")
