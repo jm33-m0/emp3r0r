@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.23.0](https://github.com/jm33-m0/emp3r0r/compare/v4.22.0...v4.23.0) (2026-10-06)
+
+
+### Features
+
+* make it possible to slim down agent size to the minimum ([e9eabc7](https://github.com/jm33-m0/emp3r0r/commit/e9eabc7326aa7106a6471259b2ee929bb78f1110))
+
 ## [4.22.0](https://github.com/jm33-m0/emp3r0r/compare/v4.21.1...v4.22.0) (2026-10-05)
 
 
