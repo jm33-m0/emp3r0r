@@ -17,6 +17,7 @@ require (
 	github.com/hashicorp/memberlist v0.6.0
 	github.com/jm33-m0/go-cdn2proxy v1.1.2
 	github.com/lithammer/fuzzysearch v1.1.8
+	github.com/miekg/dns v1.1.72
 	github.com/ncruces/go-dns v1.3.3
 	github.com/pkg/errors v0.9.1
 	github.com/posener/h2conn v0.0.0-20231204025407-3997deeca0f0
@@ -25,7 +26,6 @@ require (
 	github.com/sagernet/sing v0.8.12-0.20260717023913-84ab32b56cb8
 	github.com/sagernet/sing-tun v0.9.0-beta.4
 	github.com/schollz/progressbar/v3 v3.19.1
-	github.com/shadowsocks/go-shadowsocks2 v0.1.5
 	github.com/sliverarmory/malasada v0.0.3
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
@@ -86,13 +86,11 @@ require (
 	github.com/mdlayher/genetlink v1.4.0 // indirect
 	github.com/mdlayher/netlink v1.11.2 // indirect
 	github.com/mdlayher/socket v0.6.1 // indirect
-	github.com/miekg/dns v1.1.72 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/moloch--/go-keystone v0.0.2 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/reeflective/readline v1.3.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/riobard/go-bloom v0.0.0-20200614022211-cdc8013cb5b3 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/sagernet/fswatch v0.1.2 // indirect
 	github.com/sagernet/gvisor v0.0.0-20260727.0-sing-box-mod.1 // indirect
