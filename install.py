@@ -28,6 +28,33 @@ DONUT_ARCHIVE_NAME = "donut_v1.1.tar.gz"
 USE_COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
 IS_DRY_RUN = os.environ.get("EMP3R0R_DRY_RUN", "0").lower() in ("1", "true", "yes")
 
+# What each agent exclusion tag disables. Keep in sync with core/build.py and
+# the //go:build constraints across core/.
+AGENT_TAG_DOCS: dict[str, str] = {
+    "no_mesh": "P2P mesh and memberlist gossip (peer discovery/routing)",
+    "no_kcp": "KCP C2 transport and the xtaci kcp-go/kcptun/smux stack",
+    "no_h2conn": "HTTP/2 duplex (h2conn) C2 channel",
+    "no_utls": "uTLS TLS fingerprinting (falls back to crypto/tls)",
+    "no_doh": "DNS-over-HTTPS resolver (uses the OS resolver)",
+    "no_cdnproxy": "CDN fronting proxy (go-cdn2proxy)",
+    "no_netlink": "netlink route/neighbour enumeration (procfs fallback)",
+}
+
+# Recommended --agent-slim exclusions. P2P mesh stays enabled; use the
+# additional "no_mesh" tag to opt out. Keep in sync with core/build.py.
+SLIM_AGENT_TAGS = "no_kcp no_h2conn no_utls no_doh no_cdnproxy no_netlink"
+
+
+def agent_tag_reference() -> str:
+    """Render the agent exclusion-tag reference for --help/--list-agent-tags."""
+    width = max(len(tag) for tag in AGENT_TAG_DOCS)
+    lines = ["Agent exclusion tags (combine freely with --agent-tags):"]
+    for tag, desc in AGENT_TAG_DOCS.items():
+        lines.append(f"  {tag:<{width}}  {desc}")
+    lines.append("")
+    lines.append(f"--agent-slim is shorthand for: {SLIM_AGENT_TAGS}")
+    return "\n".join(lines)
+
 
 def _fmt(text: str, color_code: str) -> str:
     if USE_COLOR:
@@ -400,7 +427,8 @@ def docker_build(
         build_env.extend(["-e", "EMP3R0R_DRY_RUN=1"])
         build_arg += " --dry-run"
 
-    # Append any extra target-selection flags (--lightweight / --targets ...)
+    # Append any extra target/feature flags (--lightweight / --targets /
+    # --agent-slim / --agent-tags ...).
     full_build_arg = build_arg
     if extra_build_flags:
         full_build_arg = f"{build_arg} {extra_build_flags}"
@@ -481,6 +509,7 @@ def install_from_operator_kit(cached_kit: pathlib.Path, prefix: str) -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="emp3r0r Installation and Operator Kit Installer Script",
+        epilog=agent_tag_reference(),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
@@ -541,11 +570,72 @@ def parse_args() -> argparse.Namespace:
         ),
     )
 
+    # ── Agent feature selection (forwarded verbatim to core/build.py) ────────
+    feat_group = parser.add_argument_group(
+        "agent feature selection",
+        "Control which optional agent subsystems are compiled into the agent "
+        "payloads. C2 binaries (cc, cat, listener) always keep every feature. "
+        "These flags are forwarded verbatim to core/build.py.",
+    )
+    feat_group.add_argument(
+        "--agent-slim",
+        action="store_true",
+        default=False,
+        help=(
+            "Compile agents without the optional transports/features (KCP, "
+            "h2conn, uTLS, DoH, CDN proxy, netlink) while keeping the core "
+            "P2P mesh (mTLS/SMB) enabled. Add the 'no_mesh' tag to opt out "
+            "of P2P entirely."
+        ),
+    )
+    feat_group.add_argument(
+        "--agent-tags",
+        metavar="TAGS",
+        default="",
+        help=(
+            "Space-separated Go build tags to add to every agent payload, e.g. "
+            "'no_mesh no_kcp' or a custom tag. Combined with --agent-slim when "
+            "both are given. See the tag reference below or --list-agent-tags."
+        ),
+    )
+    parser.add_argument(
+        "--list-agent-tags",
+        action="store_true",
+        help="Print the available agent exclusion tags and exit",
+    )
+
     return parser.parse_args()
+
+
+def collect_extra_build_flags(args: argparse.Namespace) -> str:
+    """Translate install.py options into core/build.py arguments.
+
+    The result is embedded in ``EMP3R0R_BUILD_ARG`` and expanded by the builder
+    container's shell, so values containing spaces are quoted here to keep them
+    as a single argument.
+    """
+    flags = []
+    if getattr(args, "lightweight", False):
+        flags.append("--lightweight")
+    elif getattr(args, "targets", ""):
+        # Shell-quote so the comma-separated value survives the env var.
+        flags.append(f"--targets {args.targets}")
+    if getattr(args, "agent_slim", False):
+        flags.append("--agent-slim")
+    agent_tags = getattr(args, "agent_tags", "").strip()
+    if agent_tags:
+        # Quote the tag set so word-splitting yields one flag with many tags
+        # when the build container expands EMP3R0R_BUILD_ARG.
+        flags.append(f'--agent-tags "{agent_tags}"')
+    return " ".join(flags)
 
 
 def main() -> None:
     args = parse_args()
+
+    if getattr(args, "list_agent_tags", False):
+        print(agent_tag_reference())
+        return
 
     global IS_DRY_RUN
     if args.dry_run:
@@ -572,13 +662,8 @@ def main() -> None:
     if disable_garble:
         os.environ["EMP3R0R_DISABLE_GARBLE"] = "1"
 
-    # Build any extra target-selection flags to pass into core/build.py.
-    extra_build_flags = ""
-    if getattr(args, "lightweight", False):
-        extra_build_flags = "--lightweight"
-    elif getattr(args, "targets", ""):
-        # Shell-quote the targets string so spaces/commas survive the env var.
-        extra_build_flags = f"--targets {args.targets}"
+    # Build any extra target/feature flags to pass into core/build.py.
+    extra_build_flags = collect_extra_build_flags(args)
 
     if args.skip_build:
         log_info("--skip-build: skipping Docker build, using cached operator kit")
