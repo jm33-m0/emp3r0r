@@ -36,6 +36,7 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/wireguard"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -162,7 +163,7 @@ type socks5Listener struct {
 	bindAddr string
 	port     int
 	owner    string // operator session that started this listener
-	ln       net.Listener
+	lns      []net.Listener
 	ctx      context.Context
 	cancel   context.CancelFunc
 	conns    sync.Map // active operator-side connections
@@ -205,9 +206,29 @@ func StartSocks5Proxy(agentTag string, port int, bindAddr string) error {
 	if bindAddr == "" {
 		bindAddr = "0.0.0.0"
 	}
-	ln, err := net.Listen("tcp", net.JoinHostPort(bindAddr, strconv.Itoa(port)))
-	if err != nil {
-		return fmt.Errorf("socks5: listen %s:%d: %w", bindAddr, port, err)
+
+	// Bind on the host (for local traffic) and, when the C2 runs a userspace
+	// WireGuard stack, on the tunnel as well so remote operators can reach it.
+	var lns []net.Listener
+	hostLn, hostErr := net.Listen("tcp", net.JoinHostPort(bindAddr, strconv.Itoa(port)))
+	if hostErr == nil {
+		lns = append(lns, hostLn)
+	} else {
+		logging.Warningf("socks5: listen %s:%d on host: %v", bindAddr, port, hostErr)
+	}
+	var wgErr error
+	if wireguard.WgServer != nil {
+		wgAddr := net.JoinHostPort(wireguard.WgServerIP, strconv.Itoa(port))
+		var wgLn net.Listener
+		wgLn, wgErr = wireguard.WgServer.Listen("tcp", wgAddr)
+		if wgErr == nil {
+			lns = append(lns, wgLn)
+		} else {
+			logging.Warningf("socks5: listen %s on WireGuard: %v", wgAddr, wgErr)
+		}
+	}
+	if len(lns) == 0 {
+		return fmt.Errorf("socks5: could not bind port %d on any interface (host: %v, wireguard: %v)", port, hostErr, wgErr)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -216,7 +237,7 @@ func StartSocks5Proxy(agentTag string, port int, bindAddr string) error {
 		agentID:  agent.UUID,
 		bindAddr: bindAddr,
 		port:     port,
-		ln:       ln,
+		lns:      lns,
 		ctx:      ctx,
 		cancel:   cancel,
 	}
@@ -225,15 +246,19 @@ func StartSocks5Proxy(agentTag string, port int, bindAddr string) error {
 	if _, exists := socks5Proxies.listeners[port]; exists {
 		socks5Proxies.mu.Unlock()
 		cancel()
-		_ = ln.Close()
+		for _, ln := range lns {
+			_ = ln.Close()
+		}
 		return fmt.Errorf("socks5: port %d is already used by another SOCKS5 listener", port)
 	}
 	socks5Proxies.listeners[port] = ls
 	socks5Proxies.mu.Unlock()
 
 	logging.Infof("SOCKS5 pivot started on %s:%d (relaying through agent %s)", bindAddr, port, agentTag)
-	ls.wg.Add(1)
-	go ls.acceptLoop()
+	for _, ln := range lns {
+		ls.wg.Add(1)
+		go ls.acceptLoop(ln)
+	}
 	return nil
 }
 
@@ -251,7 +276,9 @@ func StopSocks5Proxy(port int) error {
 
 	logging.Infof("SOCKS5 pivot on port %d stopped", port)
 	ls.cancel()
-	_ = ls.ln.Close()
+	for _, ln := range ls.lns {
+		_ = ln.Close()
+	}
 	ls.conns.Range(func(key, _ any) bool {
 		if c, ok := key.(net.Conn); ok {
 			_ = c.Close()
@@ -310,10 +337,10 @@ func StopSocks5ProxiesForOperator(session string) {
 	}
 }
 
-func (ls *socks5Listener) acceptLoop() {
+func (ls *socks5Listener) acceptLoop(ln net.Listener) {
 	defer ls.wg.Done()
 	for {
-		conn, err := ls.ln.Accept()
+		conn, err := ln.Accept()
 		if err != nil {
 			if ls.ctx.Err() != nil || errors.Is(err, net.ErrClosed) {
 				return

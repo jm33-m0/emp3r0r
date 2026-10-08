@@ -1,9 +1,11 @@
 package controllers
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"time"
@@ -17,6 +19,9 @@ type MTLSClientConfig struct {
 	ClientKeyFile  string
 	CACertFile     string
 	Timeout        time.Duration
+	// DialContext, when set, is used to open the TCP connection before the
+	// TLS handshake (e.g. to route through a userspace WireGuard stack).
+	DialContext func(ctx context.Context, network, address string) (net.Conn, error)
 }
 
 // CreateMTLSClient creates an HTTP/2 client with mTLS authentication
@@ -50,6 +55,24 @@ func CreateMTLSClient(cfg MTLSClientConfig) (*http.Client, error) {
 		TLSClientConfig: tlsConfig,
 		ReadIdleTimeout: 10 * time.Second,
 		PingTimeout:     5 * time.Second,
+	}
+
+	// Route the TCP connection through a custom dialer (userspace WireGuard)
+	// when one is provided, then perform the TLS handshake on top of it.
+	if cfg.DialContext != nil {
+		dialCtx := cfg.DialContext
+		transport.DialTLSContext = func(ctx context.Context, network, addr string, tlsCfg *tls.Config) (net.Conn, error) {
+			raw, err := dialCtx(ctx, network, addr)
+			if err != nil {
+				return nil, err
+			}
+			tlsConn := tls.Client(raw, tlsCfg)
+			if err := tlsConn.HandshakeContext(ctx); err != nil {
+				_ = raw.Close()
+				return nil, err
+			}
+			return tlsConn, nil
+		}
 	}
 
 	// Set timeout policy:

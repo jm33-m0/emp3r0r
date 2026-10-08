@@ -13,6 +13,7 @@ package operator
 //     tun2socks stop
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/netip"
@@ -139,8 +140,12 @@ func tun2socksStartCmdRun(cmd *cobra.Command, _ []string) {
 		}
 	}
 
-	// Preflight: the pivot must be reachable before we reroute traffic.
-	conn, err := net.DialTimeout("tcp", socksAddr, 3*time.Second)
+	// Preflight: the pivot must be reachable before we reroute traffic. Dial
+	// through the userspace WireGuard stack (the pivot is reached on the C2's
+	// tunnel address, not on the host network).
+	dialCtx, cancelDial := context.WithTimeout(context.Background(), 3*time.Second)
+	conn, err := wireguard.DialContext(dialCtx, "tcp", socksAddr)
+	cancelDial()
 	if err != nil {
 		logging.Errorf("SOCKS5 pivot at %s is not reachable (run `socks_start` first): %v", socksAddr, err)
 		return
@@ -170,6 +175,7 @@ func tun2socksStartCmdRun(cmd *cobra.Command, _ []string) {
 		Socks5Addr:    socksAddr,
 		Route:         routePrefixes,
 		RouteExcludes: prefixes,
+		DialContext:   wireguard.DialContext,
 		LogTag:        tunName,
 	})
 	if err != nil {

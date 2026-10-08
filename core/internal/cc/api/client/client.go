@@ -18,6 +18,7 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/fxamacker/cbor/v2"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/wireguard"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -221,6 +222,9 @@ func websocketHTTPClient() (*http.Client, error) {
 		TLSClientConfig:   tlsConfig,
 		ForceAttemptHTTP2: false,
 		Proxy:             http.ProxyFromEnvironment,
+		// Dial through the userspace WireGuard stack when the destination is
+		// on the tunnel (no-op fallback to the host network otherwise).
+		DialContext: wireguard.DialContext,
 	}
 
 	client := &http.Client{Transport: httpTransport}

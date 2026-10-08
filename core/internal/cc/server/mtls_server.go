@@ -40,13 +40,18 @@ func StartOperatorMTLSServer(port int) {
 	}
 
 	network.MTLSServer = &http.Server{
-		Addr:      fmt.Sprintf("%s:%d", wireguard.WgServerIP, port),
 		Handler:   r,
 		TLSConfig: tlsConfig,
 	}
 	network.MTLSServerCtx, network.MTLSServerCancel = context.WithCancel(context.Background())
 	logging.Successf("🚀 Starting C2 operator service with mTLS at port %d", port)
-	err = network.MTLSServer.ListenAndServeTLS(transport.OperatorServerCrtFile, transport.OperatorServerKeyFile)
+
+	listenAddr := fmt.Sprintf("%s:%d", wireguard.WgServerIP, port)
+	ln, err := wireguard.Listen("tcp", listenAddr)
+	if err != nil {
+		logging.Fatalf("Failed to listen on %s: %v", listenAddr, err)
+	}
+	err = network.MTLSServer.ServeTLS(ln, transport.OperatorServerCrtFile, transport.OperatorServerKeyFile)
 	if err != nil {
 		if err == http.ErrServerClosed {
 			logging.Warningf("C2 operator service is shutdown")

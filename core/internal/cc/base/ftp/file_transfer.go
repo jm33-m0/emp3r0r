@@ -213,10 +213,12 @@ func GetFile(file_path string, agent *def.Emp3r0rAgent) (ftpSh *network.StreamHa
 	return ftpSh, nil
 }
 
-// DownloadFile download file from URL
-func DownloadFile(url, filepath string) error {
+// DownloadFile downloads a file from URL using the provided HTTP client. A
+// custom client lets callers route the transfer through the userspace
+// WireGuard stack.
+func DownloadFile(client *http.Client, url, filepath string) error {
 	// Create the HTTP request
-	resp, err := http.Get(url)
+	resp, err := client.Get(url)
 	if err != nil {
 		return err
 	}

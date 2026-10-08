@@ -22,9 +22,29 @@ type pivotHandler struct {
 	tag   string
 }
 
-func newPivotHandler(socksAddr, tag string) *pivotHandler {
+// singDialer adapts a plain func(ctx, network, address) dialer to sing's
+// dialer interface so the SOCKS5 client can reach the C2 pivot through the
+// userspace WireGuard stack. A nil dialer falls back to the host network.
+type singDialer struct {
+	dial func(ctx context.Context, network, address string) (net.Conn, error)
+}
+
+func (d singDialer) DialContext(ctx context.Context, network string, destination M.Socksaddr) (net.Conn, error) {
+	if d.dial != nil {
+		return d.dial(ctx, network, destination.String())
+	}
+	var nd net.Dialer
+	return nd.DialContext(ctx, network, destination.String())
+}
+
+func (d singDialer) ListenPacket(ctx context.Context, _ M.Socksaddr) (net.PacketConn, error) {
+	var lc net.ListenConfig
+	return lc.ListenPacket(ctx, "udp", "")
+}
+
+func newPivotHandler(socksAddr string, dial func(ctx context.Context, network, address string) (net.Conn, error), tag string) *pivotHandler {
 	return &pivotHandler{
-		socks: socks.NewClient(N.SystemDialer, M.ParseSocksaddr(socksAddr), socks.Version5, "", ""),
+		socks: socks.NewClient(singDialer{dial: dial}, M.ParseSocksaddr(socksAddr), socks.Version5, "", ""),
 		tag:   tag,
 	}
 }

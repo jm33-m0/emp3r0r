@@ -45,8 +45,10 @@ func ServerMain(wg_port int, hosts string, numOperators int) {
 	// start all services
 	network.EmpKCPCtx, network.EmpKCPCancel = context.WithCancel(context.Background())
 	go KCPC2ListenAndServe(network.EmpKCPCtx, network.EmpKCPCancel)
-	go tarConfig(hosts)
+	// Bring the userspace WireGuard stack up first so the operator-facing
+	// listeners can be bound on it.
 	wg(wg_port, numOperators)
+	go tarConfig(hosts)
 	time.Sleep(3 * time.Second)
 	go StartC2AgentTLSServer()
 	go StartC2HTTPServer()
@@ -180,12 +182,12 @@ func wg(wg_port, numOperators int) {
 		PrivateKey:    server_privkey,
 		Peers:         peers,
 	}
-	go func() {
-		wireguard.WgServer, err = wireguard.WireGuardMain(wgConfig)
-		if err != nil {
-			logging.Fatalf("Failed to start WireGuard server: %v", err)
-		}
-	}()
+	wgServer, err := wireguard.CreateWireGuardDevice(wgConfig)
+	if err != nil {
+		logging.Fatalf("Failed to start WireGuard server: %v", err)
+	}
+	wireguard.WgServer = wgServer
+	go wgServer.Wait()
 
 	// Create server config table
 	headers := []string{"Parameter", "Value"}

@@ -4,9 +4,9 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"strconv"
-	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/ftp"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
@@ -200,7 +200,10 @@ func runClientMode(opts *Options) {
 
 	// download and extract config files
 	url := fmt.Sprintf("http://%s:%d/%s", wireguard.WgServerIP, wireguard.WgFileServerPort, "emp3r0r_operator_config.tar.gz")
-	err = live.DownloadExtractConfig(url, ftp.DownloadFile)
+	downloadClient := &http.Client{Transport: &http.Transport{DialContext: wireguard.DialContext}}
+	err = live.DownloadExtractConfig(url, func(u, p string) error {
+		return ftp.DownloadFile(downloadClient, u, p)
+	})
 	if err != nil {
 		logging.Fatalf("Failed to extract config: %v", err)
 	}
@@ -290,14 +293,13 @@ func connectWg(opts *Options) {
 		},
 	}
 	logging.Infof("Connecting to C2 WireGuard server at %s:%d...", opts.c2_server_ip, opts.c2_operator_server_port)
-	go func() {
-		_, err = wireguard.WireGuardMain(wgConfig)
-		if err != nil {
-			logging.Fatalf("WireGuard connection error: %v", err)
-		}
-		logging.Infof("WireGuard interface closed")
-	}()
-	time.Sleep(2 * time.Second)
+	wgDev, err := wireguard.CreateWireGuardDevice(wgConfig)
+	if err != nil {
+		logging.Fatalf("WireGuard connection error: %v", err)
+	}
+	wireguard.WgOperator = wgDev
+	go wgDev.Wait()
+	logging.Infof("WireGuard userspace tunnel established")
 }
 
 // helper function to start the cdn2proxy server

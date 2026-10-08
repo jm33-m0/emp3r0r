@@ -104,7 +104,7 @@ func (s *minimalSOCKS5Server) addr() string { return s.ln.Addr().String() }
 func TestPivotHandlerRelay(t *testing.T) {
 	srv := startMinimalSOCKS5Server(t)
 
-	h := newPivotHandler(srv.addr(), "test")
+	h := newPivotHandler(srv.addr(), nil, "test")
 	clientSide, gvisorSide := net.Pipe()
 	defer clientSide.Close()
 	defer gvisorSide.Close()

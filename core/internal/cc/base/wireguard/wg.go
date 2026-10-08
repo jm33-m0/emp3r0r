@@ -1,25 +1,19 @@
-//go:build linux
-
 package wireguard
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/base64"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"net"
-	"os"
-	"os/signal"
+	"net/netip"
 	"strings"
 	"time"
 
-	"github.com/vishvananda/netlink"
-	"golang.org/x/sys/unix"
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
-	"golang.zx2c4.com/wireguard/ipc"
 	"golang.zx2c4.com/wireguard/tun"
-	"golang.zx2c4.com/wireguard/wgctrl"
+	"golang.zx2c4.com/wireguard/tun/netstack"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
@@ -34,44 +28,50 @@ const (
 
 	// WgFileServerPort port for file server
 	WgFileServerPort = 7000
+
+	// persistentKeepalive keeps NAT mappings alive between the two peers.
+	persistentKeepalive = 25 * time.Second
 )
 
 var (
-	WgSubnet     = "172.16.254.0/24" // WireGuard subnet
-	WgServerIP   = "172.16.254.1"    // server's static WireGuard IP
-	WgOperatorIP = "172.16.254.2"    // operator's static WireGuard IP
+	WgServerIP   = "172.16.254.1" // server's static WireGuard IP
+	WgOperatorIP = "172.16.254.2" // operator's static WireGuard IP
 
-	// WgRelayedHTTPPort port for relayed HTTP server
-	WgRelayedHTTPPort = 1025
-	WgServer          *WireGuardDevice // server's WireGuard device
-	WgOperator        *WireGuardDevice // operator's WireGuard device
+	WgServer   *WireGuardDevice // server's WireGuard device
+	WgOperator *WireGuardDevice // operator's WireGuard device
 )
 
-// WireGuardDevice represents a WireGuard virtual network interface
+// WireGuardDevice is a fully userspace WireGuard interface. Its TCP/IP stack
+// is provided by gVisor (via wireguard-go's tun/netstack), so it needs neither
+// a kernel TUN device nor netlink and therefore no elevated privileges. Only
+// the owning process can reach the tunnel addresses; use DialContext/Listen to
+// route traffic through it.
 type WireGuardDevice struct {
-	// Interface name (e.g. "wg0")
+	// Name is a human readable label (the userspace stack has no OS interface)
 	Name string
-	// IP address with CIDR (e.g. "192.168.2.1/24")
+	// IPAddress is the tunnel address with CIDR (e.g. "192.168.2.1/24")
 	IPAddress string
-	// WireGuard private key
+	// PrivateKey is the WireGuard private key (base64)
 	PrivateKey string
-	// Generated public key (derived from private key)
+	// PublicKey is derived from PrivateKey
 	PublicKey string
-	// UDP listen port for WireGuard
+	// ListenPort is the UDP port the WireGuard transport listens on
 	ListenPort int
-	// Log verbosity level
+	// LogLevel is the verbosity of the WireGuard logger
 	LogLevel LogLevel
-	// Context of the WireGuard device
+	// Context is cancelled when the device is closed
 	Context context.Context
-	// Cancel function for the context
+	// Cancel cancels Context
 	Cancel context.CancelFunc
 
-	// Underlying device objects
-	device   *device.Device
-	tun      tun.Device
-	uapi     net.Listener
-	uapiFile *os.File
-	logger   *device.Logger
+	device *device.Device
+	tun    tun.Device
+	tnet   *netstack.Net
+	logger *device.Logger
+
+	// subnet is the tunnel network derived from IPAddress; it decides whether
+	// an outbound dial belongs on the userspace stack.
+	subnet *net.IPNet
 }
 
 // PeerConfig represents WireGuard peer configuration
@@ -102,84 +102,125 @@ type WireGuardConfig struct {
 
 // GeneratePrivateKey creates a new random WireGuard private key
 func GeneratePrivateKey() (string, error) {
-	key := make([]byte, wgtypes.KeyLen)
-	_, err := rand.Read(key)
+	key, err := wgtypes.GeneratePrivateKey()
 	if err != nil {
-		return "", fmt.Errorf("failed to generate random key: %w", err)
+		return "", fmt.Errorf("failed to generate private key: %w", err)
 	}
-	return base64.StdEncoding.EncodeToString(key), nil
+	return key.String(), nil
 }
 
 // PublicKeyFromPrivate derives the public key from a private key
 func PublicKeyFromPrivate(privateKey string) (string, error) {
-	privKeyBytes, err := base64.StdEncoding.DecodeString(privateKey)
+	key, err := wgtypes.ParseKey(privateKey)
 	if err != nil {
-		return "", fmt.Errorf("invalid base64 in private key: %w", err)
+		return "", fmt.Errorf("invalid private key: %w", err)
 	}
-
-	var privKey wgtypes.Key
-	copy(privKey[:], privKeyBytes)
-	pubKey := privKey.PublicKey()
-
-	return pubKey.String(), nil
+	return key.PublicKey().String(), nil
 }
 
-// Close shuts down the WireGuard device and releases resources
+// Close shuts down the WireGuard device and releases its resources. It is safe
+// to call more than once.
 func (w *WireGuardDevice) Close() {
-	if w.uapi != nil {
-		w.uapi.Close()
-		w.uapi = nil
-	}
-
-	if w.device != nil {
-		w.device.Close()
-		w.device = nil
-	}
-
-	if w.uapiFile != nil {
-		w.uapiFile.Close()
-		w.uapiFile = nil
-	}
 	if w.Cancel != nil {
 		w.Cancel()
 	}
+	if w.device != nil {
+		// device.Close also closes the underlying tun, so it must not be
+		// closed separately (netstack channels would be double closed). It is
+		// idempotent, so the field is intentionally left intact to keep Wait
+		// race-free.
+		w.device.Close()
+	}
 }
 
-// WaitShutdown blocks until the device is shut down or a termination signal is received
-func (w *WireGuardDevice) WaitShutdown() {
+// Wait blocks until the device is closed.
+func (w *WireGuardDevice) Wait() {
 	if w.device == nil {
 		return
 	}
-
-	errs := make(chan error)
-	term := make(chan os.Signal, 1)
-
-	signal.Notify(term, unix.SIGTERM)
-	signal.Notify(term, os.Interrupt)
-
-	// Wait for termination
 	select {
-	case <-term:
-		w.logger.Verbosef("Received termination signal")
-	case <-errs:
-		w.logger.Errorf("Error occurred")
 	case <-w.device.Wait():
-		w.logger.Verbosef("Device closed")
 	case <-w.Context.Done():
-		w.logger.Verbosef("Context done")
 	}
-
-	// Clean up
-	w.Close()
 }
 
-// ConfigureWireGuardDevice configures the WireGuard device with the specified private key, listen port and peers
+// ConfigureWireGuardDevice applies the given peers (and the device's key and
+// listen port) to a running device.
 func (w *WireGuardDevice) ConfigureWireGuardDevice(peers []PeerConfig) error {
-	// Configure the interface
-	return configureInterface(w.Name, w.PrivateKey, w.ListenPort, peers)
+	if w.device == nil {
+		return errors.New("wireguard: device is not initialized")
+	}
+	uapi, err := buildUAPIConfig(w.PrivateKey, w.ListenPort, peers)
+	if err != nil {
+		return err
+	}
+	if err := w.device.IpcSet(uapi); err != nil {
+		return fmt.Errorf("apply WireGuard configuration: %w", err)
+	}
+	return nil
 }
 
-// CreateWireGuardDevice creates and configures a new WireGuard interface
+// DialContext opens a connection through the userspace stack.
+func (w *WireGuardDevice) DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	if w.tnet == nil {
+		return nil, errors.New("wireguard: device is not initialized")
+	}
+	return w.tnet.DialContext(ctx, network, address)
+}
+
+// Dial opens a connection through the userspace stack.
+func (w *WireGuardDevice) Dial(network, address string) (net.Conn, error) {
+	return w.DialContext(context.Background(), network, address)
+}
+
+// Listen creates a TCP listener on the userspace stack.
+func (w *WireGuardDevice) Listen(network, address string) (net.Listener, error) {
+	if w.tnet == nil {
+		return nil, errors.New("wireguard: device is not initialized")
+	}
+	switch network {
+	case "tcp", "tcp4", "tcp6":
+		addr, err := net.ResolveTCPAddr(network, address)
+		if err != nil {
+			return nil, err
+		}
+		return w.tnet.ListenTCP(addr)
+	default:
+		return nil, fmt.Errorf("wireguard: unsupported listen network %q", network)
+	}
+}
+
+// ListenPacket creates a UDP packet listener on the userspace stack.
+func (w *WireGuardDevice) ListenPacket(network, address string) (net.PacketConn, error) {
+	if w.tnet == nil {
+		return nil, errors.New("wireguard: device is not initialized")
+	}
+	switch network {
+	case "udp", "udp4", "udp6":
+		addr, err := net.ResolveUDPAddr(network, address)
+		if err != nil {
+			return nil, err
+		}
+		return w.tnet.ListenUDP(addr)
+	default:
+		return nil, fmt.Errorf("wireguard: unsupported packet network %q", network)
+	}
+}
+
+// Contains reports whether address belongs to this device's tunnel subnet.
+func (w *WireGuardDevice) Contains(address string) bool {
+	if w.subnet == nil {
+		return false
+	}
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		host = address
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && w.subnet.Contains(ip)
+}
+
+// CreateWireGuardDevice creates and configures a userspace WireGuard device.
 func CreateWireGuardDevice(config WireGuardConfig) (*WireGuardDevice, error) {
 	var err error
 	wg := &WireGuardDevice{
@@ -190,23 +231,25 @@ func CreateWireGuardDevice(config WireGuardConfig) (*WireGuardDevice, error) {
 		LogLevel:   config.LogLevel,
 	}
 
-	// Create context
 	wg.Context, wg.Cancel = context.WithCancel(context.Background())
 
-	// Validate IP address format
-	_, _, err = net.ParseCIDR(config.IPAddress)
+	// Validate the tunnel address and remember the subnet for DialContext.
+	// A single CIDR parse provides both the interface address and its network.
+	localIP, ipnet, err := net.ParseCIDR(config.IPAddress)
 	if err != nil {
 		return nil, fmt.Errorf("invalid IP address format: %w", err)
 	}
+	wg.subnet = ipnet
+	localAddr, ok := netip.AddrFromSlice(localIP)
+	if !ok {
+		return nil, fmt.Errorf("invalid IP address format: %q", config.IPAddress)
+	}
+	// net.ParseCIDR may return a 16-byte IPv4-mapped address; unmap so the
+	// netstack enables the IPv4 protocol (Is4 must be true).
+	localAddr = localAddr.Unmap()
 
-	// Create logger
-	wg.logger = device.NewLogger(
-		int(config.LogLevel),
+	wg.logger = device.NewLogger(int(config.LogLevel), fmt.Sprintf("(%s) ", config.InterfaceName))
 
-		fmt.Sprintf("(%s) ", config.InterfaceName),
-	)
-
-	// Generate private key if not provided
 	if wg.PrivateKey == "" {
 		wg.PrivateKey, err = GeneratePrivateKey()
 		if err != nil {
@@ -215,171 +258,107 @@ func CreateWireGuardDevice(config WireGuardConfig) (*WireGuardDevice, error) {
 		wg.logger.Verbosef("Generated private key")
 	}
 
-	// Get public key
 	wg.PublicKey, err = PublicKeyFromPrivate(wg.PrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to derive public key: %w", err)
 	}
 
-	// Create TUN device
-	wg.logger.Verbosef("Creating interface %s...", wg.Name)
-	wg.tun, err = tun.CreateTUN(wg.Name, device.DefaultMTU)
+	// Build the userspace gVisor stack. There is no kernel interface and the
+	// stack routes every outbound packet into the WireGuard device, which then
+	// drops anything outside the configured allowed IPs.
+	wg.logger.Verbosef("Creating userspace interface %s...", wg.Name)
+	wg.tun, wg.tnet, err = netstack.CreateNetTUN([]netip.Addr{localAddr}, nil, device.DefaultMTU)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create TUN device: %w", err)
+		wg.Close()
+		return nil, fmt.Errorf("failed to create userspace netstack: %w", err)
 	}
 
-	// Get actual interface name (might be different from requested)
-	realInterfaceName, err := wg.tun.Name()
-	if err == nil {
-		wg.Name = realInterfaceName
-	}
-
-	// Create WireGuard device
 	wg.device = device.NewDevice(wg.tun, conn.NewDefaultBind(), wg.logger)
-	wg.logger.Verbosef("WireGuard device started")
 
-	// Open UAPI file for configuration
-	wg.logger.Verbosef("Starting UAPI listener...")
-	wg.uapiFile, err = ipc.UAPIOpen(wg.Name)
+	uapi, err := buildUAPIConfig(wg.PrivateKey, wg.ListenPort, config.Peers)
 	if err != nil {
 		wg.Close()
-		return nil, fmt.Errorf("UAPI listen error: %w", err)
+		return nil, err
 	}
-
-	// Set up UAPI listener
-	wg.uapi, err = ipc.UAPIListen(wg.Name, wg.uapiFile)
-	if err != nil {
+	if err = wg.device.IpcSet(uapi); err != nil {
 		wg.Close()
-		return nil, fmt.Errorf("failed to listen on UAPI socket: %w", err)
+		return nil, fmt.Errorf("failed to configure WireGuard device: %w", err)
 	}
-
-	// Start handling UAPI connections
-	go func() {
-		for {
-			conn, err := wg.uapi.Accept()
-			if err != nil {
-				wg.logger.Errorf("Error accepting UAPI connection: %v", err)
-				return
-			}
-			go wg.device.IpcHandle(conn)
-		}
-	}()
-
-	// Configure the interface using netlink
-	wg.logger.Verbosef("Configuring IP address %s...", wg.IPAddress)
-	link, err := netlink.LinkByName(wg.Name)
-	if err != nil {
+	if err = wg.device.Up(); err != nil {
 		wg.Close()
-		return nil, fmt.Errorf("failed to get netlink interface: %w", err)
+		return nil, fmt.Errorf("failed to bring WireGuard device up: %w", err)
 	}
-
-	// Parse IP address
-	addr, err := netlink.ParseAddr(wg.IPAddress)
-	if err != nil {
-		wg.Close()
-		return nil, fmt.Errorf("failed to parse IP address: %w", err)
-	}
-
-	// Set link up
-	if err := netlink.LinkSetUp(link); err != nil {
-		wg.Close()
-		return nil, fmt.Errorf("failed to set link up: %w", err)
-	}
-
-	// Add IP address to interface
-	if err := netlink.AddrAdd(link, addr); err != nil {
-		wg.Close()
-		return nil, fmt.Errorf("failed to add IP address: %w", err)
-	}
-
-	// Configure WireGuard with keys and peer if specified
-	if len(config.Peers) > 0 {
-		if err := wg.ConfigureWireGuardDevice(config.Peers); err != nil {
-			wg.logger.Errorf("Failed to configure WireGuard: %v", err)
-		} else {
-			wg.logger.Verbosef("WireGuard configuration applied")
-		}
-	}
+	wg.logger.Verbosef("WireGuard userspace device started")
 
 	return wg, nil
 }
 
-// configureInterface configures WireGuard device using the UAPI (internal function)
-func configureInterface(name, privateKey string, listenPort int, peers []PeerConfig) error {
-	client, err := wgctrl.New()
-	if err != nil {
-		return fmt.Errorf("failed to create wgctrl client: %w", err)
+// Listen creates a listener for server-side services. When a userspace
+// server device is active the listener lives on its gVisor stack; otherwise
+// (e.g. in tests or local mode) it falls back to the host network.
+func Listen(network, address string) (net.Listener, error) {
+	if WgServer != nil {
+		return WgServer.Listen(network, address)
 	}
-	defer client.Close()
+	return net.Listen(network, address)
+}
 
-	// Parse private key
+// DialContext dials through the operator userspace stack when the destination
+// belongs to the WireGuard tunnel, and through the host network otherwise.
+func DialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	if WgOperator != nil && WgOperator.Contains(address) {
+		return WgOperator.DialContext(ctx, network, address)
+	}
+	var dialer net.Dialer
+	return dialer.DialContext(ctx, network, address)
+}
+
+// buildUAPIConfig renders the WireGuard UAPI "set" payload used to configure a
+// userspace device. Keys are hex-encoded as the UAPI requires.
+func buildUAPIConfig(privateKey string, listenPort int, peers []PeerConfig) (string, error) {
 	privKey, err := wgtypes.ParseKey(privateKey)
 	if err != nil {
-		return fmt.Errorf("invalid private key: %w", err)
+		return "", fmt.Errorf("invalid private key: %w", err)
 	}
 
-	// Create device config
-	config := wgtypes.Config{
-		PrivateKey: &privKey,
-	}
-
-	// Add listen port if specified
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "private_key=%s\n", hex.EncodeToString(privKey[:]))
 	if listenPort > 0 {
-		config.ListenPort = &listenPort
+		fmt.Fprintf(&sb, "listen_port=%d\n", listenPort)
 	}
+	sb.WriteString("replace_peers=true\n")
 
-	// Add peers if provided
-	if len(peers) > 0 {
-		peerConfigs := make([]wgtypes.PeerConfig, 0, len(peers))
+	for _, peer := range peers {
+		pubKey, err := wgtypes.ParseKey(peer.PublicKey)
+		if err != nil {
+			return "", fmt.Errorf("invalid peer public key: %w", err)
+		}
+		fmt.Fprintf(&sb, "public_key=%s\n", hex.EncodeToString(pubKey[:]))
+		sb.WriteString("replace_allowed_ips=true\n")
 
-		for _, peer := range peers {
-			pubKey, err := wgtypes.ParseKey(peer.PublicKey)
-			if err != nil {
-				return fmt.Errorf("invalid peer public key: %w", err)
+		for _, cidr := range strings.Split(peer.AllowedIPs, ",") {
+			cidr = strings.TrimSpace(cidr)
+			if cidr == "" {
+				continue
 			}
-
-			keepalive := 25 * time.Second
-			peerConfig := wgtypes.PeerConfig{
-				PublicKey:                   pubKey,
-				ReplaceAllowedIPs:           true,
-				PersistentKeepaliveInterval: &keepalive,
+			if _, _, err := net.ParseCIDR(cidr); err != nil {
+				return "", fmt.Errorf("invalid allowed IP address %q: %w", cidr, err)
 			}
-
-			// Parse endpoint
-
-			if peer.Endpoint != "" {
-				endpoint, err := net.ResolveUDPAddr("udp", peer.Endpoint)
-				if err != nil {
-					return fmt.Errorf("invalid endpoint address: %w", err)
-				}
-
-				peerConfig.Endpoint = endpoint
-			}
-
-			// Parse allowed IPs
-			if peer.AllowedIPs != "" {
-				ips := strings.Split(peer.AllowedIPs, ",")
-				allowedIPs := make([]net.IPNet, 0, len(ips))
-
-				for _, ip := range ips {
-					_, ipNet, err := net.ParseCIDR(strings.TrimSpace(ip))
-					if err != nil {
-						return fmt.Errorf("invalid allowed IP address: %w", err)
-					}
-					allowedIPs = append(allowedIPs, *ipNet)
-				}
-
-				peerConfig.AllowedIPs = allowedIPs
-			}
-
-			peerConfigs = append(peerConfigs, peerConfig)
+			fmt.Fprintf(&sb, "allowed_ip=%s\n", cidr)
 		}
 
-		config.Peers = peerConfigs
+		if peer.Endpoint != "" {
+			endpoint, err := net.ResolveUDPAddr("udp", peer.Endpoint)
+			if err != nil {
+				return "", fmt.Errorf("invalid endpoint address %q: %w", peer.Endpoint, err)
+			}
+			fmt.Fprintf(&sb, "endpoint=%s\n", endpoint.String())
+		}
+
+		fmt.Fprintf(&sb, "persistent_keepalive_interval=%d\n", int(persistentKeepalive.Seconds()))
 	}
 
-	// Configure the interface
-	return client.ConfigureDevice(name, config)
+	return sb.String(), nil
 }
 
 // WireGuardDeviceInfo returns a printable summary of the WireGuard device configuration
@@ -393,24 +372,4 @@ func (w *WireGuardDevice) WireGuardDeviceInfo() string {
 	sb.WriteString(fmt.Sprintf("Private Key:  %s\n", w.PrivateKey))
 	sb.WriteString(fmt.Sprintf("Public Key:   %s\n", w.PublicKey))
 	return sb.String()
-}
-
-// WireGuardMain provides the main entry point for using this library programmatically
-// It sets up a WireGuard interface based on the provided configuration and blocks until termination.
-func WireGuardMain(config WireGuardConfig) (wg *WireGuardDevice, err error) {
-	// Validate required parameters
-	if config.IPAddress == "" {
-		return nil, fmt.Errorf("IP address is required in configuration")
-	}
-
-	// Create and configure the WireGuard device
-	wg, err = CreateWireGuardDevice(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create WireGuard device: %w", err)
-	}
-	defer wg.Close()
-
-	// Wait for termination
-	wg.WaitShutdown()
-	return wg, nil
 }

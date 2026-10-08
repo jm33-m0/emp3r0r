@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/netip"
 	"runtime/debug"
 	"time"
@@ -50,6 +51,9 @@ type Config struct {
 	// would make the engine proxy its own dials). Loopback is excluded by
 	// the kernel automatically.
 	RouteExcludes []netip.Prefix
+	// DialContext, when set, is used to reach the SOCKS5 pivot (e.g. through
+	// a userspace WireGuard stack). Nil means the host network.
+	DialContext func(ctx context.Context, network, address string) (net.Conn, error)
 	// LogTag prefixes log lines (default "tun2socks").
 	LogTag string
 }
@@ -197,7 +201,7 @@ func Start(cfg Config) (eng *Engine, err error) {
 		return fail(fmt.Errorf("start tun: %w", err))
 	}
 
-	handler := newPivotHandler(cfg.Socks5Addr, cfg.LogTag)
+	handler := newPivotHandler(cfg.Socks5Addr, cfg.DialContext, cfg.LogTag)
 	stack, err := tun.NewStack("gvisor", tun.StackOptions{
 		Context:         ctx,
 		Tun:             device,
