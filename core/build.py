@@ -1525,6 +1525,26 @@ def package_operator_bundle(prefix: str, core_dir: pathlib.Path) -> None:
         )
 
 
+def remove_obsolete_wireguard_config() -> None:
+    """Remove the tmpfiles entry older installs used to create /var/run/wireguard.
+
+    WireGuard now runs entirely in userspace (wireguard-go plus a gVisor
+    netstack), so emp3r0r-cc needs no CAP_NET_ADMIN, no kernel TUN device and
+    no WireGuard socket directory. Deleting this emp3r0r-specific entry stops
+    the host from recreating that directory on emp3r0r's behalf.
+    /var/run/wireguard itself is left alone: it may belong to a real WireGuard
+    installation.
+    """
+    stale = pathlib.Path("/etc/tmpfiles.d/emp3r0r-wireguard.conf")
+    if IS_DRY_RUN:
+        log_info(f"Would remove obsolete {stale}")
+        return
+    try:
+        stale.unlink(missing_ok=True)
+    except OSError as e:
+        log_warn(f"Could not remove obsolete {stale}: {e}")
+
+
 def do_install(prefix: str, temp_dir: pathlib.Path, core_dir: pathlib.Path) -> None:
     if (
         not IS_DRY_RUN
@@ -1607,35 +1627,10 @@ def do_install(prefix: str, temp_dir: pathlib.Path, core_dir: pathlib.Path) -> N
     )
 
     if not is_container:
-        log_info("Setting capabilities for emp3r0r-cc...")
-        run_cmd(["setcap", "cap_net_admin=eip", str(data_dir / "emp3r0r-cc")])
-
-        if not IS_DRY_RUN:
-            wg_dir = pathlib.Path("/var/run/wireguard")
-            try:
-                wg_dir.mkdir(parents=True, exist_ok=True)
-                wg_dir.chmod(0o755)
-                current_user = (
-                    os.environ.get("SUDO_USER") or os.environ.get("USER") or "root"
-                )
-                shutil.chown(wg_dir, user=current_user, group=current_user)
-            except Exception:
-                pass
-
-            tmpfiles = pathlib.Path("/etc/tmpfiles.d")
-            if tmpfiles.is_dir():
-                current_user = (
-                    os.environ.get("SUDO_USER") or os.environ.get("USER") or "root"
-                )
-                try:
-                    write_text_atomic(
-                        tmpfiles / "emp3r0r-wireguard.conf",
-                        f"d /var/run/wireguard 0755 {current_user} {current_user}\n",
-                    )
-                except OSError as e:
-                    log_warn(
-                        f"Could not write {tmpfiles / 'emp3r0r-wireguard.conf'} (overwrite failed: {e}); continuing"
-                    )
+        # WireGuard runs entirely in userspace now, so there is no capability to
+        # grant and no /var/run/wireguard socket directory to create. Clean up
+        # the artifacts older kernel-WireGuard installs left behind.
+        remove_obsolete_wireguard_config()
 
         cc_bin = data_dir / "emp3r0r-cc"
         bash_comp_dir = pathlib.Path("/etc/bash_completion.d")
@@ -1654,9 +1649,7 @@ def do_install(prefix: str, temp_dir: pathlib.Path, core_dir: pathlib.Path) -> N
                         f"Could not install Bash completion (overwrite failed: {e}); continuing"
                     )
     else:
-        log_info(
-            "Running inside container, skipping setcap, wireguard runtime dir, and autocomplete setup"
-        )
+        log_info("Running inside container, skipping autocomplete setup")
 
     log_success("Installed emp3r0r, please check")
 
@@ -1690,6 +1683,8 @@ def do_uninstall(prefix: str) -> None:
         if zsh_comp.exists():
             zsh_comp.unlink(missing_ok=True)
             log_info(f"Removed Zsh completion from {zsh_dir}")
+
+    remove_obsolete_wireguard_config()
 
     log_success("emp3r0r has been removed")
 

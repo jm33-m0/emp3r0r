@@ -10,8 +10,8 @@ Can be executed in two modes:
    from the LOCAL source tree, then installs the resulting binaries.
 
 2. Operator Kit Mode (installing on operator machine):
-   Installs pre-compiled binaries into PREFIX (/usr/local), sets WireGuard
-   capabilities, configures tmux, and installs Bash/Zsh shell completions.
+   Installs pre-compiled binaries into PREFIX (/usr/local), configures tmux,
+   and installs Bash/Zsh shell completions.
 """
 
 import argparse
@@ -160,6 +160,26 @@ def link_usr_local_bin(target: pathlib.Path) -> None:
         log_warn(f"Could not symlink /usr/local/bin/{target.name}: {e}")
 
 
+def remove_obsolete_wireguard_config() -> None:
+    """Remove the tmpfiles entry older installs used to create /var/run/wireguard.
+
+    WireGuard now runs entirely in userspace (wireguard-go plus a gVisor
+    netstack), so emp3r0r-cc needs no CAP_NET_ADMIN, no kernel TUN device and
+    no WireGuard socket directory. Deleting this emp3r0r-specific entry stops
+    the host from recreating that directory on emp3r0r's behalf.
+    /var/run/wireguard itself is left alone: it may belong to a real WireGuard
+    installation.
+    """
+    stale = pathlib.Path("/etc/tmpfiles.d/emp3r0r-wireguard.conf")
+    if IS_DRY_RUN:
+        log_info(f"Would remove obsolete {stale}")
+        return
+    try:
+        stale.unlink(missing_ok=True)
+    except OSError as e:
+        log_warn(f"Could not remove obsolete {stale}: {e}")
+
+
 def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> None:
     if (
         not IS_DRY_RUN
@@ -187,16 +207,14 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
         if not req.exists() and not IS_DRY_RUN:
             log_error(f"Kit is missing required file: {req.relative_to(kit_dir)}")
 
-    for dep in ["setcap", "tmux"]:
+    for dep in ["tmux"]:
         if not shutil.which(dep):
             log_warn(f"Required tool '{dep}' not found. Attempting to install...")
             if shutil.which("apt-get"):
-                pkg = "libcap2-bin" if dep == "setcap" else dep
                 run_cmd(["apt-get", "update", "-qq"], check=False)
-                run_cmd(["apt-get", "install", "-y", pkg], check=False)
+                run_cmd(["apt-get", "install", "-y", dep], check=False)
             elif shutil.which("yum"):
-                pkg = "libcap" if dep == "setcap" else dep
-                run_cmd(["yum", "install", "-y", pkg], check=False)
+                run_cmd(["yum", "install", "-y", dep], check=False)
             else:
                 log_warn(f"{dep} is required but could not be installed automatically.")
 
@@ -254,21 +272,9 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
     else:
         log_warn("Donut not found in kit; skipping donut installation")
 
-    if shutil.which("setcap") or IS_DRY_RUN:
-        log_info("Setting cap_net_admin on emp3r0r-cc...")
-        run_cmd(
-            ["setcap", "cap_net_admin=eip", str(data_dir / "emp3r0r-cc")], check=False
-        )
-
-    log_info("Creating /var/run/wireguard...")
-    wg_dir = pathlib.Path("/var/run/wireguard")
-    if not IS_DRY_RUN:
-        try:
-            wg_dir.mkdir(parents=True, exist_ok=True)
-            wg_dir.chmod(0o755)
-            shutil.chown(wg_dir, user=install_user, group=install_user)
-        except (OSError, LookupError) as e:
-            log_warn(f"Could not prepare {wg_dir}: {e}")
+    # WireGuard is userspace-only now; make sure no stale kernel-WireGuard
+    # capability or socket directory is needed or left behind.
+    remove_obsolete_wireguard_config()
 
     cc_bin = data_dir / "emp3r0r-cc"
     # Refresh shell completions from the freshly installed binary. Writing the
