@@ -203,7 +203,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Run:     CmdMkdir,
 		}
 		rootCmd.AddCommand(mkdirCmd)
-		carapace.Gen(mkdirCmd).PositionalCompletion(carapace.ActionMultiParts("", listRemoteDir))
+		carapace.Gen(mkdirCmd).PositionalCompletion(carapace.ActionMultiParts("/", listRemoteDir))
 
 		pwdCmd := &cobra.Command{
 			Use:     "pwd",

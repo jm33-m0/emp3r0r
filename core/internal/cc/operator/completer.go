@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/carapace-sh/carapace"
@@ -48,17 +47,6 @@ func listAgentExes(ctx carapace.Context) carapace.Action {
 	return carapace.ActionValues(exes...)
 }
 
-// Cache for remote directory listing
-// cwd: listing
-type RemoteDirListingCache struct {
-	CWD     string
-	Listing []string
-	Ctx     context.Context
-	Cancel  context.CancelFunc
-}
-
-var RemoteDirListing sync.Map
-
 // autocomplete items in current remote directory
 func listRemoteDir(ctx carapace.Context) carapace.Action {
 	activeAgent := agents.MustGetActiveAgent()
@@ -67,91 +55,129 @@ func listRemoteDir(ctx carapace.Context) carapace.Action {
 		return carapace.ActionValues()
 	}
 
-	// what dir to list
-	dir_to_list := strings.Join(ctx.Parts, "/")
-	if dir_to_list == "" {
-		// what if the user wants to complete / ?
-		dir_to_list = "/"
-	}
-
-	// Handle memfs paths: if user typed memfs://, preserve the scheme and
-	// complete within the flat memfs namespace. ctx.Parts might be ["memfs:",
-	// ""] for "memfs:/" or ["memfs:", "", ""] for "memfs://".
-	// We reconstruct the proper memfs:// prefix and hand the rest to the agent's
-	// prefix-based ls.
-	if len(ctx.Parts) > 0 && strings.HasPrefix(ctx.Parts[0], "memfs") {
-		restParts := ctx.Parts[1:]
-		if len(restParts) == 0 || (len(restParts) == 1 && restParts[0] == "") {
-			dir_to_list = "memfs://"
-		} else {
-			// Remove empty parts and rejoin
-			var nonEmpty []string
-			for _, part := range restParts {
-				if part != "" {
-					nonEmpty = append(nonEmpty, part)
-				}
-			}
-			if len(nonEmpty) == 0 {
-				dir_to_list = "memfs://"
-			} else {
-				dir_to_list = "memfs:///" + strings.Join(nonEmpty, "/")
-			}
-		}
-	}
-
-	cwd, listing := listRemoteDirWorker(dir_to_list, activeAgent.Tag)
-	cache := &RemoteDirListingCache{
-		CWD:     cwd,
-		Listing: listing,
-	}
-	cache.Ctx, cache.Cancel = context.WithTimeout(context.Background(), 2*time.Minute)
-	RemoteDirListing.Store(cache.CWD, cache)
-
+	prefix, dirToLis := remoteDirRequest(ctx.Parts)
+	listing := listRemoteDirWorker(prefix, dirToLis, activeAgent.Tag)
 	return carapace.ActionValues(listing...)
 }
 
-func listRemoteDirWorker(path_to_list, agent_tag string) (cwd string, names []string) {
+// remoteDirRequest derives, from the parts carapace reports for a multi-part
+// completion, the exact prefix carapace will prepend to candidates and the
+// directory to list on the agent. Splitting a memfs path on "/" yields a first
+// component of "memfs:", so memfs paths are rebuilt into canonical
+// memfs:/// form (and the typed prefix is kept verbatim, e.g. the two-slash
+// "memfs://" is not the three-slash root).
+func remoteDirRequest(parts []string) (prefix, dirToLis string) {
+	dirToLis = strings.Join(parts, "/")
+	if len(parts) > 0 {
+		prefix = strings.Join(parts, "/") + "/"
+		if parts[0] == "memfs:" {
+			rest := strings.TrimLeft(strings.TrimPrefix(prefix, "memfs:"), "/")
+			dirToLis = "memfs:///" + strings.TrimSuffix(rest, "/")
+		}
+	}
+	if dirToLis == "" {
+		// what if the user wants to complete / ?
+		dirToLis = "/"
+	}
+	return prefix, dirToLis
+}
+
+// completionSegment returns the completion candidate for full relative to the
+// exact prefix carapace will prepend. Separators immediately following prefix
+// are preserved (needed because a typed "memfs://" prefix is not the canonical
+// "memfs:///" root) and a trailing separator is kept on intermediate components
+// so completion can descend.
+func completionSegment(prefix, full string) string {
+	rest := strings.TrimPrefix(full, prefix)
+	if rest == "" || rest == full {
+		return ""
+	}
+	lead := ""
+	for strings.HasPrefix(rest, "/") {
+		lead += "/"
+		rest = rest[1:]
+	}
+	if rest == "" {
+		return ""
+	}
+	if i := strings.Index(rest, "/"); i != -1 {
+		return lead + rest[:i+1]
+	}
+	return lead + rest
+}
+
+// remoteDirListing decodes a !ls_dir CBOR response ([]util.Dentry) and returns
+// completion candidates relative to prefix. Extracted from the worker so the
+// decode/segment logic is unit testable without a live agent.
+func remoteDirListing(prefix, raw string) []string {
+	var dents []util.Dentry
+	if err := cbor.Unmarshal([]byte(raw), &dents); err != nil {
+		logging.Debugf("listRemoteDirWorker: unmarshal: %v", err)
+		return nil
+	}
+
+	names := make([]string, 0, len(dents))
+	seen := make(map[string]struct{}, len(dents))
+	for _, dent := range dents {
+		name := dent.Name
+		if util.IsMemPath(name) {
+			// memfs keys are full paths; reduce to the next segment below the
+			// typed prefix so carapace does not concatenate them twice.
+			name = completionSegment(prefix, name)
+		} else if dent.Ftype == "dir" {
+			// Trailing slash lets completion descend into the directory.
+			name += "/"
+		}
+		if name == "" {
+			continue
+		}
+		// Filenames are agent-controlled: strip terminal escapes/control bytes
+		// before they are rendered as completion candidates.
+		name = util.SanitizeText(name)
+		if name == "" {
+			continue
+		}
+		if _, dup := seen[name]; dup {
+			continue
+		}
+		seen[name] = struct{}{}
+		name = strings.ReplaceAll(name, "\t", "\\t")
+		name = strings.ReplaceAll(name, " ", "\\ ")
+		names = append(names, name)
+	}
+	return names
+}
+
+func listRemoteDirWorker(prefix, pathToList string, agentTag string) (names []string) {
 	names = make([]string, 0) // listing to return
-	cmd := fmt.Sprintf("%s --path %s", def.C2CmdListDir, strconv.Quote(path_to_list))
+	cmd := fmt.Sprintf("%s --path %s", def.C2CmdListDir, strconv.Quote(pathToList))
 	job_id := uuid.NewString()
 	// Register a ready channel before sending the command so we don't miss the signal.
 	resultReady := make(chan struct{}, 1)
 	live.CmdResultsReady.Store(job_id, resultReady)
 
-	err := controllers.ExecuteCommand(cmd, job_id, agent_tag)
+	err := controllers.ExecuteCommand(cmd, job_id, agentTag)
 	if err != nil {
 		live.CmdResultsReady.Delete(job_id) // clean up if we never send
 		logging.Debugf("Cannot list remote directory: %v", err)
-		return cwd, names
+		return names
 	}
-	remote_entries := []string{}
 	listingCtx, listingCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer listingCancel()
 	select {
 	case <-resultReady:
 		if res, ok := live.CmdResultString(job_id); ok {
-			safeListing := util.SanitizeText(res)
-			remote_entries = strings.Split(safeListing, "\n")
+			names = remoteDirListing(prefix, res)
 			live.CmdResults.Delete(job_id)
 		}
 	case <-listingCtx.Done():
 		live.CmdResultsReady.Delete(job_id) // timed out, clean up orphaned channel
 		logging.Debugf("listRemoteDirWorker: timeout waiting for result")
 	}
-	if len(remote_entries) == 0 {
+	if len(names) == 0 {
 		logging.Debugf("Nothing in remote directory")
-		return cwd, names
 	}
-	cwd = remote_entries[0]
-	for n, name := range remote_entries {
-		if n == 0 {
-			continue // this is the cwd
-		}
-		name = strings.ReplaceAll(name, "\t", "\\t")
-		name = strings.ReplaceAll(name, " ", "\\ ")
-		names = append(names, name)
-	}
-	return cwd, names
+	return names
 }
 
 // autocomplete cached impersonation tokens from target agent
