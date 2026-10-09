@@ -28,7 +28,7 @@
 # Install the kit in a throwaway stage so the Python installer and its
 # interpreter never reach the runtime image. tmux and setcap are what
 # install.py checks for; libcap2-bin provides setcap.
-FROM debian:bookworm-slim AS install
+FROM debian:trixie-slim AS install
 RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 tmux libcap2-bin \
   && rm -rf /var/lib/apt/lists/*
@@ -49,7 +49,7 @@ RUN /opt/emp3r0r-operator-kit/install.py \
 # the proxy-ns hints the console prints work verbatim (the container is already
 # root, so it is a no-op, just less surprising than "command not found"). The
 # bundled binaries are static Go/zig builds, so no other libraries are needed.
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 # The image tag and version label come from the kit's VERSION file. Pass it at
 # build time so the image is self-describing:
