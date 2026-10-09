@@ -3,8 +3,8 @@
 This guide covers the full emp3r0r deployment: building and launching the C2
 server, installing and running the operator console (natively on Linux or from
 a container -- the recommended path on Windows), and generating agent payloads.
-The console is driven through a tmux session, so its keybindings are documented
-below as well.
+The console is driven through a tmux session; its keybindings are documented in
+[TMUX.md](TMUX.md).
 
 The C2 server is a standalone deployment: it publishes random public ports, so
 it is intentionally not containerized.
@@ -167,40 +167,25 @@ docker run -it --rm --privileged -v emp3r0r-operator:/root/.emp3r0r emp3r0r-oper
 
 ## tmux console
 
-The bundled config is at `/usr/local/lib/emp3r0r/tmux/.tmux.conf`; the launcher
-starts tmux with `-f` pointing at it.
-
-The prefix is **<kbd>Ctrl</kbd>+<kbd>x</kbd>** (the default <kbd>Ctrl</kbd>+<kbd>b</kbd> is unbound).
+The console, every shell it opens, and every pane run under one tmux session.
+The prefix is **<kbd>Ctrl</kbd>+<kbd>x</kbd>** (the default
+<kbd>Ctrl</kbd>+<kbd>b</kbd> is unbound). A few keys worth memorising right
+away:
 
 | Keys | Action |
 | --- | --- |
-| <kbd>Ctrl</kbd>+<kbd>x</kbd> | prefix |
-| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>Ctrl</kbd>+<kbd>x</kbd> | send a literal <kbd>Ctrl</kbd>+<kbd>x</kbd> to the program |
-| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>Ctrl</kbd>+<kbd>c</kbd> | new session |
-| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>Ctrl</kbd>+<kbd>f</kbd> | find / switch session |
-| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>_</kbd> | split pane top/bottom |
-| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>-</kbd> | split pane left/right |
-| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>h</kbd>/<kbd>j</kbd>/<kbd>k</kbd>/<kbd>l</kbd> | move left/down/up/right (repeatable) |
-| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>H</kbd>/<kbd>J</kbd>/<kbd>K</kbd>/<kbd>L</kbd> | resize pane (repeatable) |
-| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>&gt;</kbd> / <kbd>&lt;</kbd> | swap pane with next / previous |
-| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>Tab</kbd> | previous window |
-| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>Enter</kbd> | copy mode (vi) |
-| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>b</kbd> / <kbd>p</kbd> / <kbd>P</kbd> | list / paste / choose paste buffer |
-| <kbd>Ctrl</kbd>+<kbd>l</kbd> | clear screen and scrollback (no prefix) |
-| mouse | enabled (select panes, drag borders) |
+| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>c</kbd> | new window |
+| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>z</kbd> | zoom / maximize the current pane |
+| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>_</kbd> / <kbd>-</kbd> | split top/bottom / left/right |
+| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>h</kbd>/<kbd>j</kbd>/<kbd>k</kbd>/<kbd>l</kbd> | move between panes |
+| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>x</kbd> / <kbd>&amp;</kbd> | kill pane / window |
+| <kbd>Shift</kbd>+drag | select with the terminal, i.e. copy to the OS clipboard |
+| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>?</kbd> | list every key binding |
 
-In copy mode (vi keys): <kbd>v</kbd> begins a selection,
-<kbd>Ctrl</kbd>+<kbd>v</kbd> toggles rectangle selection, <kbd>y</kbd> copies and
-exits, <kbd>H</kbd>/<kbd>L</kbd> jump to line start/end, <kbd>Esc</kbd> cancels.
-
-Reload the config with:
-
-```bash
-tmux source-file /usr/local/lib/emp3r0r/tmux/.tmux.conf
-```
-
-(The <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>r</kbd> binding sources `~/.tmux.conf`, which
-the container does not create.)
+The full reference -- mouse and clipboard, all window/pane/session keys, copy
+mode, and everything this config changes versus stock tmux -- is in
+[TMUX.md](TMUX.md). Reload an edited config with
+`tmux source-file /usr/local/lib/emp3r0r/tmux/.tmux.conf`.
 
 ## Workspace
 
