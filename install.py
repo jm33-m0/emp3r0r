@@ -563,43 +563,37 @@ def export_operator_image(
     version = (
         version_file.read_text(encoding="utf-8").strip()
         if version_file.is_file()
-        else "latest"
+        else ""
     )
-    image = f"emp3r0r-operator:{version}"
+    # A real release tag is worth pinning; an unknown/empty version is not, so
+    # fall back to the plain `latest` tag instead of `unknown-<timestamp>`.
+    if not version or version.startswith("unknown"):
+        version = "latest"
+    tags = [f"emp3r0r-operator:{version}"]
+    if version != "latest":
+        tags.append("emp3r0r-operator:latest")
 
-    log_info(f"Building operator container image {image}...")
-    res = run_cmd(
-        [
-            container_engine,
-            "build",
-            "--build-arg",
-            f"EMP3R0R_VERSION={version}",
-            "-t",
-            image,
-            "-t",
-            "emp3r0r-operator:latest",
-            str(kit_dir),
-        ],
-        check=False,
-    )
+    log_info(f"Building operator container image {tags[0]}...")
+    build_cmd = [
+        container_engine,
+        "build",
+        "--build-arg",
+        f"EMP3R0R_VERSION={version}",
+    ]
+    for tag in tags:
+        build_cmd += ["-t", tag]
+    build_cmd.append(str(kit_dir))
+    res = run_cmd(build_cmd, check=False)
     if res.returncode != 0:
         log_warn("Operator image build failed; see OPERATOR.md to build it manually")
         return
 
     out = core_dir / f"emp3r0r-operator-image-{version}.tar.zst"
     tar_path = core_dir / f"emp3r0r-operator-image-{version}.tar"
-    log_info(f"Exporting {image} to {out} (this can take a few minutes)...")
-    res = run_cmd(
-        [
-            container_engine,
-            "save",
-            "-o",
-            str(tar_path),
-            image,
-            "emp3r0r-operator:latest",
-        ],
-        check=False,
-    )
+    log_info(f"Exporting {tags[0]} to {out} (this can take a few minutes)...")
+    save_cmd = [container_engine, "save", "-o", str(tar_path)]
+    save_cmd += tags
+    res = run_cmd(save_cmd, check=False)
     if res.returncode != 0 or IS_DRY_RUN:
         if not IS_DRY_RUN:
             log_warn("Operator image export failed")

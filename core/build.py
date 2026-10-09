@@ -1486,8 +1486,12 @@ def package_operator_bundle(prefix: str, core_dir: pathlib.Path) -> None:
             )
 
         # Record the build version so operators can tag and label the image
-        # with the same version as the binaries in the kit.
+        # with the same version as the binaries in the kit. Without a real
+        # version there is nothing useful to pin, so use `latest` rather than
+        # an `unknown-<timestamp>` tag.
         operator_version = get_version(core_dir)
+        if not operator_version or operator_version.startswith("unknown"):
+            operator_version = "latest"
         write_text_atomic(kit_dir / "VERSION", operator_version + "\n")
         log_info(f"Operator kit version: {operator_version}")
 
