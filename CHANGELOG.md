@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.24.1](https://github.com/jm33-m0/emp3r0r/compare/v4.24.0...v4.24.1) (2026-10-09)
+
+
+### Bug Fixes
+
+* **container:** install necessary tools so the operator container can work ([997bfaf](https://github.com/jm33-m0/emp3r0r/commit/997bfafb016a5e31140e2ec61b6778a45df6e588))
+
 ## [4.24.0](https://github.com/jm33-m0/emp3r0r/compare/v4.23.0...v4.24.0) (2026-10-09)
 
 
