@@ -70,48 +70,22 @@ import argparse
 import hashlib
 import os
 import pathlib
-import platform
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
 import time
-import urllib.request
 
-DONUT_URL = "https://github.com/TheWover/donut/releases/download/v1.1/donut_v1.1.tar.gz"
-DONUT_ARCHIVE_NAME = "donut_v1.1.tar.gz"
-# Crystal Palace (the Crystal-Kit module's crystal_pack linker). The
-# distribution directory is gitignored, so the build installs it. The URL is a
-# moving "latest" alias, so the pinned digest must be refreshed when upstream
-# cuts a new release; the build fails closed rather than extracting an
-# unverified archive.
-CRYSTALPALACE_URL = "https://tradecraftgarden.org/download/cpdist-latest.tgz"
-CRYSTALPALACE_ARCHIVE_NAME = "cpdist-latest.tgz"
-CRYSTALPALACE_SHA256 = (
-    "bfeb0d8fa01bf7f81845758a12300d19a4915540e7008e320ccb43b332ea6917"
-)
+# Remote payload tooling is downloaded once when the builder image is built
+# (see Dockerfile) and cached there. The build/install scripts copy it from
+# these locations instead of hitting the network on every run.
+DONUT_IMAGE_BIN = pathlib.Path("/opt/donut/donut")
+CRYSTALPALACE_IMAGE_DIR = pathlib.Path("/opt/crystalpalace")
 REQUIRED_GO_VERSION = "1.26.2"
 REQUIRED_ZIG_VERSION = "0.16.0"
 # zig is the explicit cross compiler for the Windows loader (and backs the
-# mingw shims in the builder image), so the build host needs it too. The
-# release is pinned per host platform and SHA-256 verified before extraction;
-# builds never consume an unverified toolchain.
-ZIG_URL_TEMPLATE = "https://ziglang.org/download/{v}/zig-{zig_platform}-{v}.tar.xz"
-ZIG_SHA256 = {
-    "x86_64-linux": (
-        "70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00"
-    ),
-    "aarch64-linux": (
-        "ea4b09bfb22ec6f6c6ceac57ab63efb6b46e17ab08d21f69f3a48b38e1534f17"
-    ),
-    "x86_64-macos": (
-        "0387557ed1877bc6a2e1802c8391953baddba76081876301c522f52977b52ba7"
-    ),
-    "aarch64-macos": (
-        "b23d70deaa879b5c2d486ed3316f7eaa53e84acf6fc9cc747de152450d401489"
-    ),
-}
+# mingw shims in the builder image), so the builder image ships it as well.
 REQUIRED_FREE_KB = 10 * 1024 * 1024  # 10 GB
 
 # Optional agent features that can be compiled out. The full build keeps them
@@ -205,51 +179,6 @@ def run_cmd(
             raise e
         log_error(f"Command failed (exit code {e.returncode}): {cmd_str}")
         raise e
-
-
-def verify_sha256(path: pathlib.Path, expected: str) -> bool:
-    """Return True when path's SHA-256 matches expected (case-insensitive)."""
-    digest = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            digest.update(chunk)
-    actual = digest.hexdigest()
-    if actual.lower() != expected.lower():
-        log_warn(f"Checksum mismatch for {path}: got {actual}, want {expected}")
-        return False
-    return True
-
-
-# The origin (Cloudflare) rejects the stdlib default Python-urllib/x.y UA with
-# 403, so present a browser UA.
-DOWNLOAD_USER_AGENT = (
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-)
-
-
-def download_file(url: str, dest: pathlib.Path, sha256: str | None = None) -> bool:
-    """Download url to dest using urllib only.
-
-    When sha256 is set the archive is verified and a mismatch deletes it and
-    fails closed, so callers never consume an unverified download.
-    """
-    request = urllib.request.Request(
-        url, headers={"User-Agent": DOWNLOAD_USER_AGENT}
-    )
-    try:
-        log_info(f"Downloading {url} to {dest}...")
-        with urllib.request.urlopen(request, timeout=60) as response:
-            with open(dest, "wb") as f:
-                shutil.copyfileobj(response, f)
-    except Exception as e:
-        log_warn(f"Failed to download {url}: {e}")
-        dest.unlink(missing_ok=True)
-        return False
-    if sha256 is not None and not verify_sha256(dest, sha256):
-        dest.unlink(missing_ok=True)
-        return False
-    return True
 
 
 def write_text_atomic(path: pathlib.Path, content: str) -> None:
@@ -377,27 +306,12 @@ def check_disk_space(core_dir: pathlib.Path) -> None:
     log_info("Disk space check passed: at least 10GB free for build and temp files")
 
 
-def zig_platform() -> str | None:
-    """Return zig's release platform tag for this host (e.g. x86_64-linux)."""
-    os_name = {"linux": "linux", "darwin": "macos"}.get(platform.system().lower())
-    arch = {
-        "x86_64": "x86_64",
-        "amd64": "x86_64",
-        "aarch64": "aarch64",
-        "arm64": "aarch64",
-    }.get(platform.machine().lower())
-    if os_name and arch:
-        return f"{arch}-{os_name}"
-    return None
-
-
 def locate_zig_install() -> pathlib.Path | None:
-    """Return the installation root of an already-installed zig, if any.
+    """Return the installation root of the builder image's zig, if any.
 
-    The builder image ships zig (the Dockerfile extracts it to /opt/zig and
-    links it onto PATH), so that installation can be copied instead of
-    downloading the same archive again. Only installations that look complete
-    (the binary plus its sibling ``lib/``) are accepted.
+    The Dockerfile extracts zig to /opt/zig and links it onto PATH. Only
+    installations that look complete (the binary plus its sibling ``lib/``)
+    are accepted.
     """
     existing = shutil.which("zig")
     if not existing:
@@ -408,31 +322,28 @@ def locate_zig_install() -> pathlib.Path | None:
     return None
 
 
-def link_zig(zig_bin: pathlib.Path) -> None:
-    """Point /usr/local/bin/zig at ``zig_bin`` (best effort)."""
+def link_system_command(target: pathlib.Path, name: str) -> None:
+    """Point /usr/local/bin/<name> at ``target`` (best effort)."""
     usr_local_bin = pathlib.Path("/usr/local/bin")
     usr_local_bin.mkdir(parents=True, exist_ok=True)
-    symlink = usr_local_bin / "zig"
+    symlink = usr_local_bin / name
     try:
         if symlink.is_symlink() or symlink.exists():
             symlink.unlink(missing_ok=True)
-        symlink.symlink_to(zig_bin)
-        log_info(f"Linked zig executable to {symlink}")
+        symlink.symlink_to(target)
+        log_info(f"Linked {name} executable to {symlink}")
     except OSError as e:
         log_warn(f"Could not symlink {symlink}: {e}")
 
 
 def install_zig(target_dir: pathlib.Path | None = None) -> pathlib.Path | None:
-    """Ensure the pinned zig toolchain is available, optionally installing it.
+    """Install the builder image's zig toolchain under ``target_dir/zig``.
 
     ``zig cc`` is the explicit cross compiler for C modules, so zig is
-    installed next to emp3r0r (and copied into the operator kit). With no
-    explicit ``target_dir`` an existing zig on PATH is accepted; otherwise the
-    toolchain lands in ``<prefix>/lib/emp3r0r``. An existing installation (as
-    provided by the builder image) is copied rather than downloaded, so the
-    pinned archive is fetched at most once. Downloaded archives are SHA-256
-    verified before extraction and ``/usr/local/bin/zig`` points at the
-    installed binary. Returns the executable path, or None on failure.
+    installed next to emp3r0r (and copied into the operator kit). The builder
+    image downloads and caches the pinned zig once (see Dockerfile); this
+    copies it and ``/usr/local/bin/zig`` points at the installed binary.
+    Returns the executable path, or None when the image has no usable zig.
     """
     existing_root = locate_zig_install()
 
@@ -440,70 +351,45 @@ def install_zig(target_dir: pathlib.Path | None = None) -> pathlib.Path | None:
         if existing_root is not None:
             log_info(f"zig is already installed: {existing_root / 'zig'}")
             return existing_root / "zig"
-        target_dir = (
-            pathlib.Path(os.environ.get("PREFIX", "/usr/local")) / "lib" / "emp3r0r"
+        log_warn(
+            f"zig {REQUIRED_ZIG_VERSION} is not available; run the build inside "
+            "the builder image"
         )
+        return None
+
     zig_dir = target_dir / "zig"
     zig_bin = zig_dir / "zig"
     if zig_bin.is_file():
         log_info(f"zig is already installed: {zig_bin}")
         return zig_bin
 
-    # Reuse the toolchain already present (e.g. the builder image's) instead of
-    # downloading the same pinned archive a second time.
-    if existing_root is not None and existing_root.resolve() != zig_dir.resolve():
-        log_info(f"Copying zig from {existing_root} to {zig_dir}...")
-        if IS_DRY_RUN:
-            log_warn("[DRY-RUN] would copy zig from the builder image")
-            return None
-        try:
-            zig_dir.mkdir(parents=True, exist_ok=True)
-            shutil.copytree(
-                existing_root,
-                zig_dir,
-                dirs_exist_ok=True,
-                symlinks=True,
-                copy_function=copy2_atomic,
-            )
-        except OSError as e:
-            log_warn(f"Could not copy zig from {existing_root}: {e}")
-        else:
-            if zig_bin.is_file():
-                link_zig(zig_bin)
-                return zig_bin
-            log_warn(f"Copied zig from {existing_root} but {zig_bin} is missing")
-
-    host_platform = zig_platform()
-    if host_platform is None:
+    if existing_root is None or existing_root.resolve() == zig_dir.resolve():
         log_warn(
-            f"no pinned zig {REQUIRED_ZIG_VERSION} for "
-            f"{platform.system()}/{platform.machine()}; install zig manually"
+            f"zig {REQUIRED_ZIG_VERSION} is not available in the builder image; "
+            "rebuild it from the current Dockerfile"
         )
         return None
 
-    log_info(f"Installing zig {REQUIRED_ZIG_VERSION} ({host_platform})...")
+    log_info(f"Copying zig from {existing_root} to {zig_dir}...")
     if IS_DRY_RUN:
-        log_warn("[DRY-RUN] would download and install zig")
+        log_warn("[DRY-RUN] would copy zig from the builder image")
         return None
-    url = ZIG_URL_TEMPLATE.format(v=REQUIRED_ZIG_VERSION, zig_platform=host_platform)
-    archive = (
-        pathlib.Path(tempfile.gettempdir())
-        / f"zig-{host_platform}-{REQUIRED_ZIG_VERSION}.tar.xz"
-    )
-    if not download_file(url, archive, ZIG_SHA256[host_platform]):
-        log_warn("zig archive could not be obtained")
+    try:
+        zig_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(
+            existing_root,
+            zig_dir,
+            dirs_exist_ok=True,
+            symlinks=True,
+            copy_function=copy2_atomic,
+        )
+    except OSError as e:
+        log_warn(f"Could not copy zig from {existing_root}: {e}")
         return None
-    zig_dir.mkdir(parents=True, exist_ok=True)
-    res = run_cmd(
-        ["tar", "-xJf", str(archive), "-C", str(zig_dir), "--strip-components=1"],
-        check=False,
-    )
-    archive.unlink(missing_ok=True)
-    if res.returncode != 0 or not zig_bin.is_file():
-        log_warn(f"Failed to extract the zig archive for {host_platform}")
+    if not zig_bin.is_file():
+        log_warn(f"Copied zig from {existing_root} but {zig_bin} is missing")
         return None
-
-    link_zig(zig_bin)
+    link_system_command(zig_bin, "zig")
     return zig_bin
 
 
@@ -511,9 +397,9 @@ def check_zig() -> None:
     if install_zig() is not None:
         return
     msg = (
-        f"zig {REQUIRED_ZIG_VERSION} is required but could not be installed "
-        "automatically. Install it manually, or run the build inside the "
-        "builder container."
+        f"zig {REQUIRED_ZIG_VERSION} is required but was not found. "
+        "Run the build inside the builder image (see Dockerfile), or install "
+        "zig manually on PATH."
     )
     if IS_DRY_RUN:
         log_warn(f"[DRY-RUN] {msg}")
@@ -634,96 +520,84 @@ def record_malasada_stage0_size(core_dir: pathlib.Path) -> None:
     log_info(f"Recorded malasada stage0 size ({size} bytes) for stager_linux")
 
 
-def install_donut(
-    target_dir: pathlib.Path, search_dir: pathlib.Path | None = None
-) -> None:
-    donut_archive = None
-    if search_dir and (search_dir / DONUT_ARCHIVE_NAME).is_file():
-        donut_archive = search_dir / DONUT_ARCHIVE_NAME
-
-    if not donut_archive or not donut_archive.is_file():
-        tmp_archive = pathlib.Path(tempfile.gettempdir()) / DONUT_ARCHIVE_NAME
-        if download_file(DONUT_URL, tmp_archive):
-            donut_archive = tmp_archive
-
-    if donut_archive and donut_archive.is_file():
-        log_info("Extracting and installing donut...")
-        with tempfile.TemporaryDirectory(prefix="donut-extract-") as tmp_dir:
-            tmp_path = pathlib.Path(tmp_dir)
-            res = run_cmd(
-                ["tar", "-xzf", str(donut_archive), "-C", str(tmp_path)], check=False
-            )
-            if res.returncode == 0:
-                donut_bin = None
-                for p in tmp_path.rglob("donut"):
-                    if p.is_file():
-                        donut_bin = p
-                        break
-                if donut_bin:
-                    bin_target = target_dir / "bin"
-                    bin_target.mkdir(parents=True, exist_ok=True)
-                    copy2_atomic(donut_bin, bin_target / "donut")
-                    (bin_target / "donut").chmod(0o755)
-
-                    usr_local_bin = pathlib.Path("/usr/local/bin")
-                    usr_local_bin.mkdir(parents=True, exist_ok=True)
-                    symlink = usr_local_bin / "donut"
-                    if symlink.is_symlink() or symlink.exists():
-                        symlink.unlink(missing_ok=True)
-                    try:
-                        symlink.symlink_to(bin_target / "donut")
-                        log_info("Linked donut executable to /usr/local/bin/donut")
-                    except Exception as e:
-                        log_warn(f"Could not symlink /usr/local/bin/donut: {e}")
-                else:
-                    log_warn(f"Executable 'donut' not found inside {donut_archive}")
-            else:
-                log_warn(f"Failed to extract {donut_archive}")
-    else:
-        log_warn("Donut archive could not be obtained; skipping donut installation")
+def locate_donut_bin() -> pathlib.Path | None:
+    """Return the donut executable cached by the builder image, if any."""
+    existing = shutil.which("donut")
+    if existing:
+        return pathlib.Path(existing).resolve()
+    if DONUT_IMAGE_BIN.is_file():
+        return DONUT_IMAGE_BIN.resolve()
+    return None
 
 
-def install_crystalpalace(
-    target_dir: pathlib.Path, search_dir: pathlib.Path | None = None
-) -> None:
-    """Install the Crystal Palace distribution into the Crystal-Kit module.
+def install_donut(target_dir: pathlib.Path, link_bin: bool = True) -> None:
+    """Copy the builder image's donut executable into ``target_dir/bin/donut``.
 
-    The distribution is gitignored, so the build fetches it where crystal_pack
-    expects it. The archive is SHA-256 verified before extraction; it ships a
-    top-level crystalpalace/ directory, so extracting into target_dir yields
-    target_dir/crystalpalace/crystalpalace.jar.
+    The image downloads and caches donut once (see Dockerfile). ``link_bin``
+    additionally points /usr/local/bin/donut at the installed copy, which the
+    C2 needs to find the tool on PATH.
+    """
+    bin_target = target_dir / "bin"
+    installed = bin_target / "donut"
+    if installed.is_file():
+        log_info(f"donut already installed at {installed}")
+        return
+
+    donut_bin = locate_donut_bin()
+    if donut_bin is None:
+        log_warn(
+            "donut was not found in the builder image; rebuild it from the "
+            "current Dockerfile"
+        )
+        return
+
+    bin_target.mkdir(parents=True, exist_ok=True)
+    copy2_atomic(donut_bin, installed)
+    installed.chmod(0o755)
+    if link_bin:
+        link_system_command(installed, "donut")
+
+
+def install_crystalpalace(target_dir: pathlib.Path) -> None:
+    """Copy the builder image's Crystal Palace distribution into the module.
+
+    crystal_pack expects ``target_dir/crystalpalace/crystalpalace.jar``. The
+    image downloads, verifies and extracts the distribution once (see
+    Dockerfile), so the build never hits the network.
     """
     installed = target_dir / "crystalpalace" / "crystalpalace.jar"
     if installed.is_file():
         log_info(f"Crystal Palace already installed at {installed}")
         return
 
-    archive = None
-    if search_dir and (search_dir / CRYSTALPALACE_ARCHIVE_NAME).is_file():
-        archive = search_dir / CRYSTALPALACE_ARCHIVE_NAME
-    if archive is None:
-        tmp_archive = (
-            pathlib.Path(tempfile.gettempdir()) / CRYSTALPALACE_ARCHIVE_NAME
-        )
-        if download_file(CRYSTALPALACE_URL, tmp_archive, CRYSTALPALACE_SHA256):
-            archive = tmp_archive
-    if archive is None:
+    if not CRYSTALPALACE_IMAGE_DIR.is_dir():
         log_warn(
-            "Crystal Palace archive could not be obtained; crystal_pack will "
-            "not work until it is installed"
+            f"Crystal Palace not found in {CRYSTALPALACE_IMAGE_DIR}; rebuild the "
+            "builder image from the current Dockerfile or crystal_pack will not work"
         )
         return
-    if not verify_sha256(archive, CRYSTALPALACE_SHA256):
-        archive.unlink(missing_ok=True)
-        log_error("Crystal Palace checksum verification failed; refusing to extract")
 
-    log_info("Extracting and installing Crystal Palace...")
+    dest = target_dir / "crystalpalace"
+    log_info(f"Copying Crystal Palace from {CRYSTALPALACE_IMAGE_DIR} to {dest}...")
+    if IS_DRY_RUN:
+        log_warn("[DRY-RUN] would copy Crystal Palace from the builder image")
+        return
     target_dir.mkdir(parents=True, exist_ok=True)
-    res = run_cmd(["tar", "-xzf", str(archive), "-C", str(target_dir)], check=False)
-    if res.returncode == 0 and installed.is_file():
-        log_success(f"Installed Crystal Palace to {installed.parent}")
+    try:
+        shutil.copytree(
+            CRYSTALPALACE_IMAGE_DIR,
+            dest,
+            dirs_exist_ok=True,
+            symlinks=True,
+            copy_function=copy2_atomic,
+        )
+    except OSError as e:
+        log_warn(f"Could not copy Crystal Palace from {CRYSTALPALACE_IMAGE_DIR}: {e}")
+        return
+    if installed.is_file():
+        log_success(f"Installed Crystal Palace to {dest}")
     else:
-        log_warn(f"Failed to extract Crystal Palace archive {archive}")
+        log_warn(f"Copied Crystal Palace but {installed} is missing")
 
 
 def agent_build_tags(mode: str) -> str:
@@ -1533,9 +1407,7 @@ def package_operator_bundle(prefix: str, core_dir: pathlib.Path) -> None:
             else:
                 log_warn(f"{src_dir} not found; operator package may be incomplete")
 
-        log_info(f"Downloading donut package from {DONUT_URL}...")
-        download_file(DONUT_URL, kit_dir / DONUT_ARCHIVE_NAME)
-        install_donut(kit_dir / "lib" / "emp3r0r", search_dir=kit_dir)
+        install_donut(kit_dir / "lib" / "emp3r0r", link_bin=False)
 
         # Copy Python installer directly from repo root
         root_install_py = core_dir.parent / "install.py"
@@ -1666,7 +1538,7 @@ def do_install(prefix: str, temp_dir: pathlib.Path, core_dir: pathlib.Path) -> N
             copy2_atomic(temp_dir / "cat.exe", data_dir / "emp3r0r-cat")
             (data_dir / "emp3r0r-cat").chmod(0o755)
 
-    install_donut(data_dir, search_dir=temp_dir)
+    install_donut(data_dir)
     # zig ships with emp3r0r so the C2 can build the C modules on the host.
     install_zig(data_dir)
 

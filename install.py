@@ -22,9 +22,6 @@ import subprocess
 import sys
 import tempfile
 
-DONUT_URL = "https://github.com/TheWover/donut/releases/download/v1.1/donut_v1.1.tar.gz"
-DONUT_ARCHIVE_NAME = "donut_v1.1.tar.gz"
-
 USE_COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
 IS_DRY_RUN = os.environ.get("EMP3R0R_DRY_RUN", "0").lower() in ("1", "true", "yes")
 

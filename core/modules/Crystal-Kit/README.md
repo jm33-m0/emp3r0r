@@ -71,10 +71,11 @@ bash make_all.sh
   objects.
 - `nasm` for the SilentMoonwalk stack-spoofing stub.
 - Java for the `crystal_pack` link step.
-- Crystal Palace: `core/build.py` downloads
+- Crystal Palace: the `emp3r0r-builder` image downloads
   `https://tradecraftgarden.org/download/cpdist-latest.tgz`, verifies its
-  pinned SHA-256, and unpacks it into the gitignored `crystalpalace/`
-  directory before the module build runs.
+  pinned SHA-256 and caches it at `/opt/crystalpalace`; `core/build.py` copies
+  it into the gitignored `crystalpalace/` directory before the module build
+  runs.
 
 ## Notes
 
