@@ -161,8 +161,9 @@ def remove_obsolete_wireguard_config() -> None:
     """Remove the tmpfiles entry older installs used to create /var/run/wireguard.
 
     WireGuard now runs entirely in userspace (wireguard-go plus a gVisor
-    netstack), so emp3r0r-cc needs no CAP_NET_ADMIN, no kernel TUN device and
-    no WireGuard socket directory. Deleting this emp3r0r-specific entry stops
+    netstack), so it needs neither a kernel TUN device nor the WireGuard socket
+    directory; CAP_NET_ADMIN is only required by tun2socks, which creates a
+    kernel TUN and installs routes. Deleting this emp3r0r-specific entry stops
     the host from recreating that directory on emp3r0r's behalf.
     /var/run/wireguard itself is left alone: it may belong to a real WireGuard
     installation.
@@ -204,14 +205,16 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
         if not req.exists() and not IS_DRY_RUN:
             log_error(f"Kit is missing required file: {req.relative_to(kit_dir)}")
 
-    for dep in ["tmux"]:
+    for dep in ["setcap", "tmux"]:
         if not shutil.which(dep):
             log_warn(f"Required tool '{dep}' not found. Attempting to install...")
             if shutil.which("apt-get"):
+                pkg = "libcap2-bin" if dep == "setcap" else dep
                 run_cmd(["apt-get", "update", "-qq"], check=False)
-                run_cmd(["apt-get", "install", "-y", dep], check=False)
+                run_cmd(["apt-get", "install", "-y", pkg], check=False)
             elif shutil.which("yum"):
-                run_cmd(["yum", "install", "-y", dep], check=False)
+                pkg = "libcap" if dep == "setcap" else dep
+                run_cmd(["yum", "install", "-y", pkg], check=False)
             else:
                 log_warn(f"{dep} is required but could not be installed automatically.")
 
@@ -269,8 +272,19 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
     else:
         log_warn("Donut not found in kit; skipping donut installation")
 
-    # WireGuard is userspace-only now; make sure no stale kernel-WireGuard
-    # capability or socket directory is needed or left behind.
+    # tun2socks creates a kernel TUN device and installs routes, so emp3r0r-cc
+    # needs CAP_NET_ADMIN to use it without root. WireGuard itself runs in
+    # userspace and needs no privileges; the kernel-WireGuard socket directory
+    # is obsolete and is cleaned up below.
+    if shutil.which("setcap") or IS_DRY_RUN:
+        log_info("Setting cap_net_admin on emp3r0r-cc (for tun2socks)...")
+        run_cmd(
+            ["setcap", "cap_net_admin=eip", str(data_dir / "emp3r0r-cc")], check=False
+        )
+    else:
+        log_warn(
+            "setcap not found; tun2socks will require running emp3r0r as root"
+        )
     remove_obsolete_wireguard_config()
 
     cc_bin = data_dir / "emp3r0r-cc"
