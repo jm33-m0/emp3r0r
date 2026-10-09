@@ -89,16 +89,10 @@ func TestInitConfigFile(t *testing.T) {
 
 	checkPort("CCPort", live.RuntimeConfig.CCH2Port)
 	checkPort("AgentSocksServerPort", live.RuntimeConfig.AgentSocksServerPort)
-	checkPort("SSHDShellPort", live.RuntimeConfig.SSHDShellPort)
 
 	// Check if UUID is set
 	if live.RuntimeConfig.AgentUUID == "" {
 		t.Error("AgentUUID is empty")
-	}
-
-	// Check if SSHHostKey is generated
-	if len(live.RuntimeConfig.SSHHostKey) == 0 {
-		t.Error("SSHHostKey is empty")
 	}
 
 	// Check if AgentUUIDSig is set

@@ -17,30 +17,27 @@ func TestInitConfig_Comprehensive(t *testing.T) {
 
 	// 1. Prepare a config with ALL fields populated
 	originalCfg := &def.Config{
-		CCAddress:                 "192.168.1.100",
-		CCHost:                    "192.168.1.100",
-		CCH2Port:                  "8443",
-		C2ChannelMode:             def.C2ChannelModeH2Conn,
-		AgentSocksServerPort:      "50001",
-		AgentSocksTimeout:         60,
-		StagerHTTPListenerPort:    "8080",
-		Password:                  "secret_password",
-		ShadowsocksLocalSocksPort: "1080",
-		ShadowsocksServerPort:     "8388",
-		P2PRelayPort:              "4000",
-		KCPClientPort:             "4001",
-		UseKCP:                    false,
-		EnableNCSI:                true,
-		SSHHostKey:                []byte("ssh-rsa AAAAB3Nza..."),
-		SSHDShellPort:             "2222",
-		MeshGossipPort:            "9000",
-		CCTimeout:                 5000,
-		PreflightEnabled:          true,
-		PreflightURL:              "http://example.com",
-		PreflightMethod:           "GET",
-		PreflightHeaders:          map[string]string{"X-Test": "True"},
-		PreflightIntervalMin:      30,
-		PreflightIntervalMax:      120,
+		CCAddress:              "192.168.1.100",
+		CCHost:                 "192.168.1.100",
+		CCH2Port:               "8443",
+		C2ChannelMode:          def.C2ChannelModeH2Conn,
+		AgentSocksServerPort:   "50001",
+		AgentSocksTimeout:      60,
+		StagerHTTPListenerPort: "8080",
+		Password:               "secret_password",
+		Socks5LocalPort:        "1080",
+		P2PRelayPort:           "4000",
+		KCPClientPort:          "4001",
+		UseKCP:                 false,
+		EnableNCSI:             true,
+		MeshGossipPort:         "9000",
+		CCTimeout:              5000,
+		PreflightEnabled:       true,
+		PreflightURL:           "http://example.com",
+		PreflightMethod:        "GET",
+		PreflightHeaders:       map[string]string{"X-Test": "True"},
+		PreflightIntervalMin:   30,
+		PreflightIntervalMax:   120,
 	}
 
 	// 2. Marshal to CBOR
@@ -89,11 +86,8 @@ func TestInitConfig_Comprehensive(t *testing.T) {
 	if RuntimeConfig.Password != originalCfg.Password {
 		t.Errorf("Password mismatch: got %s, want %s", RuntimeConfig.Password, originalCfg.Password)
 	}
-	if RuntimeConfig.ShadowsocksLocalSocksPort != originalCfg.ShadowsocksLocalSocksPort {
-		t.Errorf("ShadowsocksLocalSocksPort mismatch: got %s, want %s", RuntimeConfig.ShadowsocksLocalSocksPort, originalCfg.ShadowsocksLocalSocksPort)
-	}
-	if RuntimeConfig.ShadowsocksServerPort != originalCfg.ShadowsocksServerPort {
-		t.Errorf("ShadowsocksServerPort mismatch: got %s, want %s", RuntimeConfig.ShadowsocksServerPort, originalCfg.ShadowsocksServerPort)
+	if RuntimeConfig.Socks5LocalPort != originalCfg.Socks5LocalPort {
+		t.Errorf("Socks5LocalPort mismatch: got %s, want %s", RuntimeConfig.Socks5LocalPort, originalCfg.Socks5LocalPort)
 	}
 	if RuntimeConfig.P2PRelayPort != originalCfg.P2PRelayPort {
 		t.Errorf("KCPServerPort mismatch: got %s, want %s", RuntimeConfig.P2PRelayPort, originalCfg.P2PRelayPort)
@@ -106,12 +100,6 @@ func TestInitConfig_Comprehensive(t *testing.T) {
 	}
 	if RuntimeConfig.EnableNCSI != originalCfg.EnableNCSI {
 		t.Errorf("EnableNCSI mismatch: got %v, want %v", RuntimeConfig.EnableNCSI, originalCfg.EnableNCSI)
-	}
-	if string(RuntimeConfig.SSHHostKey) != string(originalCfg.SSHHostKey) {
-		t.Errorf("SSHHostKey mismatch")
-	}
-	if RuntimeConfig.SSHDShellPort != originalCfg.SSHDShellPort {
-		t.Errorf("SSHDShellPort mismatch: got %s, want %s", RuntimeConfig.SSHDShellPort, originalCfg.SSHDShellPort)
 	}
 	if RuntimeConfig.MeshGossipPort != originalCfg.MeshGossipPort {
 		t.Errorf("MeshGossipPort mismatch: got %s, want %s", RuntimeConfig.MeshGossipPort, originalCfg.MeshGossipPort)

@@ -30,57 +30,54 @@ type jsonC2Routing struct {
 }
 
 type jsonConfig struct {
-	CCAddress                 string                  `json:"cc_address"`
-	CCHost                    string                  `json:"cc_host"`
-	CCPort                    string                  `json:"cc_port"`
-	AgentSocksServerPort      string                  `json:"agent_socks_server_port"`
-	AgentSocksTimeout         int                     `json:"agent_socks_timeout"`
-	StagerHTTPListenerPort    string                  `json:"stager_http_listener_port"`
-	Password                  string                  `json:"password"`
-	ShadowsocksLocalSocksPort string                  `json:"shadowsocks_local_socks_port"`
-	ShadowsocksServerPort     string                  `json:"shadowsocks_server_port"`
-	KCPServerPort             string                  `json:"kcp_server_port"`
-	KCPClientPort             string                  `json:"kcp_client_port"`
-	UseKCP                    bool                    `json:"use_kcp"`
-	EnableNCSI                bool                    `json:"enable_ncsi"`
-	SSHHostKey                string                  `json:"ssh_host_key"`
-	SSHDShellPort             string                  `json:"sshd_shell_port"`
-	MeshGossipPort            string                  `json:"mesh_gossip_port"`
-	PreflightEnabled          bool                    `json:"preflight_enabled"`
-	PreflightURL              string                  `json:"preflight_url"`
-	PreflightMethod           string                  `json:"preflight_method"`
-	PreflightHeaders          map[string]string       `json:"preflight_headers"`
-	PreflightIntervalMin      int                     `json:"preflight_interval_min"`
-	PreflightIntervalMax      int                     `json:"preflight_interval_max"`
-	CAPEM                     string                  `json:"ca_pem"`
-	CAFingerprint             string                  `json:"ca_fingerprint"`
-	C2TransportProxy          string                  `json:"c2_transport_proxy"`
-	CDNProxy                  string                  `json:"cdn_proxy"`
-	DoHServer                 string                  `json:"doh_server"`
-	AgentUUID                 string                  `json:"agent_uuid"`
-	AgentUUIDSig              string                  `json:"agent_uuid_sig"`
-	AgentTag                  string                  `json:"agent_tag"`
-	CCTimeout                 int                     `json:"cc_timeout"`
-	PaddingMin                int                     `json:"padding_min"`
-	PaddingMax                int                     `json:"padding_max"`
-	Jitter                    int                     `json:"jitter"`
-	PollInterval              int                     `json:"poll_interval"`
-	ModulePath                string                  `json:"module_path"`
-	IsRunByStager             bool                    `json:"is_run_by_stager"`
-	MachineID                 string                  `json:"machine_id"`
-	InitialPeers              []string                `json:"initial_peers"`
-	IsP2PEnabled              bool                    `json:"is_p2p_enabled"`
-	IsDirectC2Enabled         bool                    `json:"is_direct_c2_enabled"`
-	PersistentRouter          bool                    `json:"persistent_router"`
-	OperatorIdleTimeout       int                     `json:"operator_idle_timeout"`
-	P2PTransport              string                  `json:"p2p_transport"`
-	CamouflageCertOrg         string                  `json:"camouflage_cert_org"`
-	CamouflageCertCN          string                  `json:"camouflage_cert_cn"`
-	C2Routes                  jsonC2Routing           `json:"c2_routes"`
-	C2ChannelMode             string                  `json:"c2_channel_mode"`
-	CCHTTPPort                string                  `json:"cc_http_port"`
-	MalleableC2               jsonMalleableHTTPConfig `json:"malleable_c2"`
-	SNI                       string                  `json:"sni"`
+	CCAddress              string                  `json:"cc_address"`
+	CCHost                 string                  `json:"cc_host"`
+	CCPort                 string                  `json:"cc_port"`
+	AgentSocksServerPort   string                  `json:"agent_socks_server_port"`
+	AgentSocksTimeout      int                     `json:"agent_socks_timeout"`
+	StagerHTTPListenerPort string                  `json:"stager_http_listener_port"`
+	Password               string                  `json:"password"`
+	Socks5LocalPort        string                  `json:"socks5_local_port"`
+	KCPServerPort          string                  `json:"kcp_server_port"`
+	KCPClientPort          string                  `json:"kcp_client_port"`
+	UseKCP                 bool                    `json:"use_kcp"`
+	EnableNCSI             bool                    `json:"enable_ncsi"`
+	MeshGossipPort         string                  `json:"mesh_gossip_port"`
+	PreflightEnabled       bool                    `json:"preflight_enabled"`
+	PreflightURL           string                  `json:"preflight_url"`
+	PreflightMethod        string                  `json:"preflight_method"`
+	PreflightHeaders       map[string]string       `json:"preflight_headers"`
+	PreflightIntervalMin   int                     `json:"preflight_interval_min"`
+	PreflightIntervalMax   int                     `json:"preflight_interval_max"`
+	CAPEM                  string                  `json:"ca_pem"`
+	CAFingerprint          string                  `json:"ca_fingerprint"`
+	C2TransportProxy       string                  `json:"c2_transport_proxy"`
+	CDNProxy               string                  `json:"cdn_proxy"`
+	DoHServer              string                  `json:"doh_server"`
+	AgentUUID              string                  `json:"agent_uuid"`
+	AgentUUIDSig           string                  `json:"agent_uuid_sig"`
+	AgentTag               string                  `json:"agent_tag"`
+	CCTimeout              int                     `json:"cc_timeout"`
+	PaddingMin             int                     `json:"padding_min"`
+	PaddingMax             int                     `json:"padding_max"`
+	Jitter                 int                     `json:"jitter"`
+	PollInterval           int                     `json:"poll_interval"`
+	ModulePath             string                  `json:"module_path"`
+	IsRunByStager          bool                    `json:"is_run_by_stager"`
+	MachineID              string                  `json:"machine_id"`
+	InitialPeers           []string                `json:"initial_peers"`
+	IsP2PEnabled           bool                    `json:"is_p2p_enabled"`
+	IsDirectC2Enabled      bool                    `json:"is_direct_c2_enabled"`
+	PersistentRouter       bool                    `json:"persistent_router"`
+	OperatorIdleTimeout    int                     `json:"operator_idle_timeout"`
+	P2PTransport           string                  `json:"p2p_transport"`
+	CamouflageCertOrg      string                  `json:"camouflage_cert_org"`
+	CamouflageCertCN       string                  `json:"camouflage_cert_cn"`
+	C2Routes               jsonC2Routing           `json:"c2_routes"`
+	C2ChannelMode          string                  `json:"c2_channel_mode"`
+	CCHTTPPort             string                  `json:"cc_http_port"`
+	MalleableC2            jsonMalleableHTTPConfig `json:"malleable_c2"`
+	SNI                    string                  `json:"sni"`
 }
 
 // applyIfSet copies src into *dst when src is non-zero, preserving a default the
@@ -121,16 +118,11 @@ func readJSONConfig(jsonData []byte, cfg *def.Config) error {
 	applyIfSet(&cfg.AgentSocksTimeout, jCfg.AgentSocksTimeout)
 	applyIfSet(&cfg.StagerHTTPListenerPort, jCfg.StagerHTTPListenerPort)
 	applyIfSet(&cfg.Password, jCfg.Password)
-	applyIfSet(&cfg.ShadowsocksLocalSocksPort, jCfg.ShadowsocksLocalSocksPort)
-	applyIfSet(&cfg.ShadowsocksServerPort, jCfg.ShadowsocksServerPort)
+	applyIfSet(&cfg.Socks5LocalPort, jCfg.Socks5LocalPort)
 	applyIfSet(&cfg.P2PRelayPort, jCfg.KCPServerPort)
 	applyIfSet(&cfg.KCPClientPort, jCfg.KCPClientPort)
 	applyIfSet(&cfg.UseKCP, jCfg.UseKCP)
 	applyIfSet(&cfg.EnableNCSI, jCfg.EnableNCSI)
-	if jCfg.SSHHostKey != "" {
-		cfg.SSHHostKey = []byte(jCfg.SSHHostKey)
-	}
-	applyIfSet(&cfg.SSHDShellPort, jCfg.SSHDShellPort)
 	applyIfSet(&cfg.MeshGossipPort, jCfg.MeshGossipPort)
 	applyIfSet(&cfg.PreflightEnabled, jCfg.PreflightEnabled)
 	applyIfSet(&cfg.PreflightURL, jCfg.PreflightURL)

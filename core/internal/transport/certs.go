@@ -19,8 +19,6 @@ import (
 	"os"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
-
-	"golang.org/x/crypto/ssh"
 )
 
 func publicKey(priv any) any {
@@ -213,52 +211,6 @@ func ParseCertPemFile(cert_file string) (cert *x509.Certificate, err error) {
 		return cert, err
 	}
 	return ParsePem(cert_data)
-}
-
-// Generate a new key pair for use with openssh
-func GenerateSSHKeyPair() (privateKey, publicKey []byte, err error) {
-	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		err = fmt.Errorf("GenerateKey: %v", err)
-		return privateKey, publicKey, err
-
-	}
-	// pem encode
-	keyBlock, err := pemBlockForKey(priv)
-	if err != nil {
-		return privateKey, publicKey, err
-	}
-	priv_buf := new(bytes.Buffer)
-	if err := pem.Encode(priv_buf, keyBlock); err != nil {
-		return privateKey, publicKey, fmt.Errorf("encode private key: %v", err)
-	}
-	privateKey = priv_buf.Bytes()
-
-	// public
-	pub_buf := new(bytes.Buffer)
-	pub := &priv.PublicKey
-	pubBytes, err := x509.MarshalPKIXPublicKey(pub)
-	if err != nil {
-		err = fmt.Errorf("MarshalPKIXPublicKey: %v", err)
-		return privateKey, publicKey, err
-
-	}
-	pem.Encode(pub_buf, &pem.Block{Type: "EC PUBLIC KEY", Bytes: pubBytes})
-	publicKey = pub_buf.Bytes()
-
-	return privateKey, publicKey, err
-}
-
-// SSHPublicKey return ssh.PublicKey from PEM encoded private key
-func SSHPublicKey(privkey []byte) (pubkey ssh.PublicKey, err error) {
-	priv, err := ssh.ParsePrivateKey(privkey)
-	if err != nil {
-		err = fmt.Errorf("ParsePrivateKey: %v", err)
-		return pubkey, err
-	}
-	pubkey = priv.PublicKey()
-
-	return pubkey, err
 }
 
 // SignECDSA sign a message with ECDSA private key

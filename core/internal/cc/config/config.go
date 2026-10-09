@@ -21,54 +21,51 @@ import (
 func SaveConfigJSON() (err error) {
 	// Use shadow struct for JSON serialization to keep strings out of shared def package
 	jCfg := jsonConfig{
-		CCAddress:                 live.RuntimeConfig.CCAddress,
-		CCHost:                    live.RuntimeConfig.CCHost,
-		CCPort:                    live.RuntimeConfig.CCH2Port,
-		AgentSocksServerPort:      live.RuntimeConfig.AgentSocksServerPort,
-		AgentSocksTimeout:         live.RuntimeConfig.AgentSocksTimeout,
-		StagerHTTPListenerPort:    live.RuntimeConfig.StagerHTTPListenerPort,
-		Password:                  live.RuntimeConfig.Password,
-		ShadowsocksLocalSocksPort: live.RuntimeConfig.ShadowsocksLocalSocksPort,
-		ShadowsocksServerPort:     live.RuntimeConfig.ShadowsocksServerPort,
-		KCPServerPort:             live.RuntimeConfig.P2PRelayPort,
-		KCPClientPort:             live.RuntimeConfig.KCPClientPort,
-		UseKCP:                    live.RuntimeConfig.UseKCP,
-		EnableNCSI:                live.RuntimeConfig.EnableNCSI,
-		SSHHostKey:                string(live.RuntimeConfig.SSHHostKey),
-		SSHDShellPort:             live.RuntimeConfig.SSHDShellPort,
-		MeshGossipPort:            live.RuntimeConfig.MeshGossipPort,
-		PreflightEnabled:          live.RuntimeConfig.PreflightEnabled,
-		PreflightURL:              live.RuntimeConfig.PreflightURL,
-		PreflightMethod:           live.RuntimeConfig.PreflightMethod,
-		PreflightHeaders:          live.RuntimeConfig.PreflightHeaders,
-		PreflightIntervalMin:      live.RuntimeConfig.PreflightIntervalMin,
-		PreflightIntervalMax:      live.RuntimeConfig.PreflightIntervalMax,
-		CAPEM:                     live.RuntimeConfig.CAPEM,
-		CAFingerprint:             live.RuntimeConfig.CAFingerprint,
-		C2TransportProxy:          live.RuntimeConfig.C2TransportProxy,
-		CDNProxy:                  live.RuntimeConfig.CDNProxy,
-		DoHServer:                 live.RuntimeConfig.DoHServer,
-		AgentUUID:                 live.RuntimeConfig.AgentUUID,
-		AgentUUIDSig:              live.RuntimeConfig.AgentUUIDSig,
-		AgentTag:                  live.RuntimeConfig.AgentTag,
-		CCTimeout:                 live.RuntimeConfig.CCTimeout,
-		PaddingMin:                live.RuntimeConfig.PaddingMin,
-		PaddingMax:                live.RuntimeConfig.PaddingMax,
-		Jitter:                    live.RuntimeConfig.Jitter,
-		PollInterval:              live.RuntimeConfig.PollInterval,
-		ModulePath:                live.RuntimeConfig.ModulePath,
-		IsRunByStager:             live.RuntimeConfig.IsRunByStager,
-		MachineID:                 live.RuntimeConfig.MachineID,
-		InitialPeers:              live.RuntimeConfig.InitialPeers,
-		IsP2PEnabled:              live.RuntimeConfig.IsP2PEnabled,
-		IsDirectC2Enabled:         live.RuntimeConfig.IsDirectC2Enabled,
-		PersistentRouter:          live.RuntimeConfig.PersistentRouter,
-		OperatorIdleTimeout:       live.RuntimeConfig.OperatorIdleTimeout,
-		P2PTransport:              live.RuntimeConfig.P2PTransport,
-		CamouflageCertOrg:         live.RuntimeConfig.CamouflageCertOrg,
-		CamouflageCertCN:          live.RuntimeConfig.CamouflageCertCN,
-		C2ChannelMode:             live.RuntimeConfig.C2ChannelMode,
-		CCHTTPPort:                live.RuntimeConfig.CCHTTPPort,
+		CCAddress:              live.RuntimeConfig.CCAddress,
+		CCHost:                 live.RuntimeConfig.CCHost,
+		CCPort:                 live.RuntimeConfig.CCH2Port,
+		AgentSocksServerPort:   live.RuntimeConfig.AgentSocksServerPort,
+		AgentSocksTimeout:      live.RuntimeConfig.AgentSocksTimeout,
+		StagerHTTPListenerPort: live.RuntimeConfig.StagerHTTPListenerPort,
+		Password:               live.RuntimeConfig.Password,
+		Socks5LocalPort:        live.RuntimeConfig.Socks5LocalPort,
+		KCPServerPort:          live.RuntimeConfig.P2PRelayPort,
+		KCPClientPort:          live.RuntimeConfig.KCPClientPort,
+		UseKCP:                 live.RuntimeConfig.UseKCP,
+		EnableNCSI:             live.RuntimeConfig.EnableNCSI,
+		MeshGossipPort:         live.RuntimeConfig.MeshGossipPort,
+		PreflightEnabled:       live.RuntimeConfig.PreflightEnabled,
+		PreflightURL:           live.RuntimeConfig.PreflightURL,
+		PreflightMethod:        live.RuntimeConfig.PreflightMethod,
+		PreflightHeaders:       live.RuntimeConfig.PreflightHeaders,
+		PreflightIntervalMin:   live.RuntimeConfig.PreflightIntervalMin,
+		PreflightIntervalMax:   live.RuntimeConfig.PreflightIntervalMax,
+		CAPEM:                  live.RuntimeConfig.CAPEM,
+		CAFingerprint:          live.RuntimeConfig.CAFingerprint,
+		C2TransportProxy:       live.RuntimeConfig.C2TransportProxy,
+		CDNProxy:               live.RuntimeConfig.CDNProxy,
+		DoHServer:              live.RuntimeConfig.DoHServer,
+		AgentUUID:              live.RuntimeConfig.AgentUUID,
+		AgentUUIDSig:           live.RuntimeConfig.AgentUUIDSig,
+		AgentTag:               live.RuntimeConfig.AgentTag,
+		CCTimeout:              live.RuntimeConfig.CCTimeout,
+		PaddingMin:             live.RuntimeConfig.PaddingMin,
+		PaddingMax:             live.RuntimeConfig.PaddingMax,
+		Jitter:                 live.RuntimeConfig.Jitter,
+		PollInterval:           live.RuntimeConfig.PollInterval,
+		ModulePath:             live.RuntimeConfig.ModulePath,
+		IsRunByStager:          live.RuntimeConfig.IsRunByStager,
+		MachineID:              live.RuntimeConfig.MachineID,
+		InitialPeers:           live.RuntimeConfig.InitialPeers,
+		IsP2PEnabled:           live.RuntimeConfig.IsP2PEnabled,
+		IsDirectC2Enabled:      live.RuntimeConfig.IsDirectC2Enabled,
+		PersistentRouter:       live.RuntimeConfig.PersistentRouter,
+		OperatorIdleTimeout:    live.RuntimeConfig.OperatorIdleTimeout,
+		P2PTransport:           live.RuntimeConfig.P2PTransport,
+		CamouflageCertOrg:      live.RuntimeConfig.CamouflageCertOrg,
+		CamouflageCertCN:       live.RuntimeConfig.CamouflageCertCN,
+		C2ChannelMode:          live.RuntimeConfig.C2ChannelMode,
+		CCHTTPPort:             live.RuntimeConfig.CCHTTPPort,
 		C2Routes: jsonC2Routing{
 			Checkin: live.RuntimeConfig.C2Routes.Checkin,
 			Msg:     live.RuntimeConfig.C2Routes.Msg,
@@ -112,9 +109,7 @@ func InitConfigFile(cc_host string) (err error) {
 	live.RuntimeConfig.CCHost = cc_host
 	live.RuntimeConfig.AgentSocksServerPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	live.RuntimeConfig.MeshGossipPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
-	live.RuntimeConfig.SSHDShellPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
-	live.RuntimeConfig.ShadowsocksLocalSocksPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
-	live.RuntimeConfig.ShadowsocksServerPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
+	live.RuntimeConfig.Socks5LocalPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	live.RuntimeConfig.P2PRelayPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	live.RuntimeConfig.KCPClientPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	live.RuntimeConfig.StagerHTTPListenerPort = fmt.Sprintf("%v", util.RandInt(1026, 65534))
@@ -126,12 +121,6 @@ func InitConfigFile(cc_host string) (err error) {
 	live.RuntimeConfig.C2Routes.FTP = "c2-" + strings.ToLower(util.RandStr(12))
 	live.RuntimeConfig.C2Routes.WWW = "c2-" + strings.ToLower(util.RandStr(12))
 	live.RuntimeConfig.C2Routes.Proxy = "c2-" + strings.ToLower(util.RandStr(12))
-
-	// SSH host key
-	live.RuntimeConfig.SSHHostKey, _, err = transport.GenerateSSHKeyPair()
-	if err != nil {
-		return fmt.Errorf("failed to generate SSH host key: %v", err)
-	}
 
 	live.RuntimeConfig.AgentUUID = uuid.NewString()
 	live.RuntimeConfig.Password = util.RandStr(20)

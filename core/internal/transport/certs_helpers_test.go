@@ -13,8 +13,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"golang.org/x/crypto/ssh"
 )
 
 // TestGenCertsCAAndServer verifies GenCerts produces a usable CA cert/key pair
@@ -133,40 +131,6 @@ func TestGetFingerprintAndPublicKeyToPEM(t *testing.T) {
 
 	if _, err := PublicKeyToPEM(nil); err == nil {
 		t.Fatal("PublicKeyToPEM(nil) should error")
-	}
-}
-
-// TestSSHKeyHelpers verifies GenerateSSHKeyPair produces a parseable ECDSA
-// key pair whose SSH public key is derived correctly.
-func TestSSHKeyHelpers(t *testing.T) {
-	privPEM, pubPEM, err := GenerateSSHKeyPair()
-	if err != nil {
-		t.Fatalf("GenerateSSHKeyPair: %v", err)
-	}
-	if len(privPEM) == 0 || len(pubPEM) == 0 {
-		t.Fatal("GenerateSSHKeyPair returned empty keys")
-	}
-
-	pub, err := SSHPublicKey(privPEM)
-	if err != nil {
-		t.Fatalf("SSHPublicKey: %v", err)
-	}
-	if pub.Type() != "ecdsa-sha2-nistp256" {
-		t.Fatalf("SSHPublicKey type = %q, want ecdsa-sha2-nistp256", pub.Type())
-	}
-
-	// The OpenSSH public key re-parses from its own wire encoding.
-	wire := ssh.MarshalAuthorizedKey(pub)
-	parsed, _, _, _, err := ssh.ParseAuthorizedKey(wire)
-	if err != nil {
-		t.Fatalf("re-parse ssh pubkey: %v", err)
-	}
-	if parsed.Type() != pub.Type() {
-		t.Fatalf("round-tripped ssh key type = %q, want %q", parsed.Type(), pub.Type())
-	}
-
-	if _, err := SSHPublicKey([]byte("not-a-key")); err == nil {
-		t.Fatal("SSHPublicKey on garbage should error")
 	}
 }
 
