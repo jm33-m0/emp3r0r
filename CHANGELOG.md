@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.24.0](https://github.com/jm33-m0/emp3r0r/compare/v4.23.0...v4.24.0) (2026-10-09)
+
+
+### Features
+
+* **proxy:** `proxy-ns` is shipped by default ([46b018c](https://github.com/jm33-m0/emp3r0r/commit/46b018cd84c528fe4e8e3c63888b2a33fc6cf2aa))
+* **wg:** user mode wireguard ([f04f50a](https://github.com/jm33-m0/emp3r0r/commit/f04f50a5aab9d7d95115f910411e4a63f41f3f27))
+
+
+### Bug Fixes
+
+* **completer:** remote path completion ([e78797d](https://github.com/jm33-m0/emp3r0r/commit/e78797d138a0b84ae2eb53d8c97e972dfa3aaac1))
+* **wg:** no need to set privileges for wg ([68f1790](https://github.com/jm33-m0/emp3r0r/commit/68f179038e0eb85ac19bc5bedc98462111958980))
+
 ## [4.23.0](https://github.com/jm33-m0/emp3r0r/compare/v4.22.0...v4.23.0) (2026-10-06)
 
 
