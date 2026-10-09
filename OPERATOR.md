@@ -52,7 +52,7 @@ emp3r0r client --c2-port 13377 \
   --c2-host 1.2.3.4
 ```
 
-#### Windows (container, recommended)
+#### Windows (container)
 
 `install.py` is Linux-only, but you do not build the image by hand: running
 `./install.py` on the build host builds the operator image and exports it to
