@@ -438,12 +438,30 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Short:   "Start a SOCKS5 pivot on the C2, relaying through the selected agent",
 			Long: `Start a SOCKS5 pivot on the C2, relaying through the selected agent.
 
-CONNECT and UDP-ASSOCIATE (DNS) are supported. UDP-ASSOCIATE datagrams whose
-payload is a DNS query are resolved by the bound agent (which answers as if it
-were a DNS server for the target network) and the reply is sent back, so
-proxychains proxy_dns and apps that resolve through the proxy work. Non-DNS
-UDP is dropped: the pivot is a stream relay and has no UDP path to the agent.`,
-			Example: "socks_start 1080\n\tproxychains (proxy_dns): socks5 <C2 WireGuard IP> 1080",
+CONNECT and UDP-ASSOCIATE (DNS) are supported. DNS datagrams are resolved by
+the bound agent: the agent forwards the raw query to the DNS server the client
+addressed, so internal names (for example records held by a domain controller)
+resolve as they would from inside the target network. Non-DNS UDP is dropped:
+the pivot is a stream relay and has no UDP path to the agent.
+
+Use the bundled proxy-ns instead of proxychains. proxychains LD_PRELOADs libc
+to rewrite connect()/resolver calls, so it silently bypasses statically linked
+binaries and anything that does not go through libc, and it needs per-tool
+configuration. proxy-ns runs the program in its own network namespace with a
+TUN that pipes all of its traffic into the pivot, so TCP, UDP and static
+binaries are proxied transparently with no per-tool setup. It needs root for
+the namespace and TUN, so run it with sudo.
+
+Spawn a shell so everything started from it goes through the pivot:
+  sudo proxy-ns --socks5-address=<pivot> $SHELL
+
+DNS: FakeDNS (proxy-ns default) answers locally with fake IPs and sends the
+domain to the pivot. That is fast, but tools like dig receive fake answers. To
+resolve real internal names, disable it and point proxy-ns at the target's DNS
+server, which the pivot forwards to the agent:
+  sudo proxy-ns --socks5-address=<pivot> --fake-dns=false \
+      --dns-server=<target DNS> $SHELL`,
+			Example: "socks_start 1080\n\tsudo proxy-ns --socks5-address=<C2 host>:1080 $SHELL\n\tsudo proxy-ns --socks5-address=<C2 host>:1080 --fake-dns=false --dns-server=<target DNS> $SHELL",
 			Args:    cobra.MaximumNArgs(1),
 			Run:     socks5StartCmdRun,
 		}
@@ -501,7 +519,27 @@ func socks5StartCmdRun(cmd *cobra.Command, args []string) {
 		proxyAddr = bind
 	}
 	logging.Successf("SOCKS5 pivot on %s:%d via agent %s", proxyAddr, port, agent.Tag)
-	logging.Warningf("proxychains config: socks5 %s %d", proxyAddr, port)
+	hostAddr := socks5HostAddress()
+	if bind != "" && bind != "0.0.0.0" {
+		hostAddr = bind
+	}
+	logging.Warningf("Prefer proxy-ns over proxychains: proxychains only hooks libc, so static binaries and non-libc apps escape it.")
+	logging.Infof("Spawn a shell with everything proxied through this pivot:")
+	logging.Infof("  sudo proxy-ns --socks5-address=%s:%d $SHELL", hostAddr, port)
+	logging.Infof("Internal DNS: add --fake-dns=false --dns-server=<target DNS> (the agent forwards queries to it).")
+	logging.Warningf("proxychains (legacy): socks5 %s %d", proxyAddr, port)
+}
+
+// socks5HostAddress returns the pivot address reachable from the operator
+// host's normal network stack. Tools like proxy-ns run outside the operator
+// process, so they cannot see its in-process userspace WireGuard netstack:
+// local mode uses loopback, remote operators use the C2 address they connected
+// to (the pivot also binds all host interfaces).
+func socks5HostAddress() string {
+	if ServerIP == "" || ServerIP == "127.0.0.1" || ServerIP == "localhost" {
+		return "127.0.0.1"
+	}
+	return ServerIP
 }
 
 // socks5ProxyHost returns the address the operator should reach the C2-side

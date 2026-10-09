@@ -15,6 +15,8 @@ ARG GARBLE_VERSION=v0.17.0
 ARG DONUT_VERSION=1.1
 ARG DONUT_SHA256=033132caee328c6d53cf6074719bfa326d88044484cc8bcbce0eaeeb73dd6494
 ARG CRYSTALPALACE_SHA256=bfeb0d8fa01bf7f81845758a12300d19a4915540e7008e320ccb43b332ea6917
+ARG PROXY_NS_VERSION=v2.4.5
+ARG PROXY_NS_SHA256=511b6a5bb97cf3ae06a3b30d69c3b00ac09c5a3e287c4efdd1a4a4f3042f14cd
 
 # Build-time/runtime dependencies, installed in a single layer with the yum
 # metadata/cache removed in the same layer. `tsflags=nodocs` keeps unnecessary
@@ -106,6 +108,25 @@ RUN curl -fsSL --retry 3 -o /tmp/donut.tar.gz \
   && mkdir -p /opt/crystalpalace \
   && tar -xzf /tmp/cpdist.tgz -C /opt/crystalpalace --strip-components=1 --no-same-owner \
   && rm -f /tmp/cpdist.tgz
+
+# proxy-ns: a lightweight, per-command SOCKS5 transparent proxy that runs the
+# target program in its own network namespace (user namespaces + an in-namespace
+# TUN + fake DNS). Built from a pinned source tarball because upstream ships no
+# release binaries; vendored deps keep the build offline. The operator kit
+# carries the resulting static binary and its default config (proxy-ns refuses
+# to start without one; operators override socks5_address per invocation).
+RUN curl -fsSL --retry 3 -o /tmp/proxy-ns.tar.gz \
+      "https://github.com/OkamiW/proxy-ns/archive/refs/tags/${PROXY_NS_VERSION}.tar.gz" \
+  && echo "${PROXY_NS_SHA256}  /tmp/proxy-ns.tar.gz" | sha256sum -c - \
+  && mkdir -p /opt/proxy-ns-src /opt/proxy-ns \
+  && tar -xzf /tmp/proxy-ns.tar.gz -C /opt/proxy-ns-src --strip-components=1 --no-same-owner \
+  && cp /opt/proxy-ns-src/config.json /opt/proxy-ns/config.json \
+  && cd /opt/proxy-ns-src \
+  && GOTOOLCHAIN=local CGO_ENABLED=0 go build -mod=vendor -buildvcs=false -trimpath \
+       -ldflags="-buildid= -buildmode=pie" \
+       -o /opt/proxy-ns/proxy-ns . \
+  && cd / \
+  && rm -rf /opt/proxy-ns-src /tmp/proxy-ns.tar.gz /root/.cache/go-build
 
 # Set default working directory inside the container.
 WORKDIR /src

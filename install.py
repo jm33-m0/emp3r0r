@@ -25,6 +25,10 @@ import tempfile
 USE_COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
 IS_DRY_RUN = os.environ.get("EMP3R0R_DRY_RUN", "0").lower() in ("1", "true", "yes")
 
+# proxy-ns refuses to start without a config file at its compiled-in path; the
+# kit ships the upstream default and the installer drops it here.
+PROXY_NS_SYSTEM_CONFIG = pathlib.Path("/etc/proxy-ns/config.json")
+
 # What each agent exclusion tag disables. Keep in sync with core/build.py and
 # the //go:build constraints across core/.
 AGENT_TAG_DOCS: dict[str, str] = {
@@ -272,10 +276,31 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
     else:
         log_warn("Donut not found in kit; skipping donut installation")
 
+    proxy_ns_src = kit_dir / "lib" / "emp3r0r" / "bin" / "proxy-ns"
+    proxy_ns_cfg_src = (
+        kit_dir / "lib" / "emp3r0r" / "etc" / "proxy-ns" / "config.json"
+    )
+    if proxy_ns_src.is_file():
+        log_info("Installing proxy-ns...")
+        proxy_ns_dst = data_dir / "bin" / "proxy-ns"
+        if not IS_DRY_RUN:
+            proxy_ns_dst.parent.mkdir(parents=True, exist_ok=True)
+            copy2_atomic(proxy_ns_src, proxy_ns_dst)
+            proxy_ns_dst.chmod(0o755)
+            link_usr_local_bin(proxy_ns_dst)
+            # Install the default config only if the operator has none yet.
+            if proxy_ns_cfg_src.is_file() and not PROXY_NS_SYSTEM_CONFIG.exists():
+                PROXY_NS_SYSTEM_CONFIG.parent.mkdir(parents=True, exist_ok=True)
+                copy2_atomic(proxy_ns_cfg_src, PROXY_NS_SYSTEM_CONFIG)
+    else:
+        log_warn("proxy-ns not found in kit; skipping proxy-ns installation")
+
     # tun2socks creates a kernel TUN device and installs routes, so emp3r0r-cc
     # needs CAP_NET_ADMIN to use it without root. WireGuard itself runs in
     # userspace and needs no privileges; the kernel-WireGuard socket directory
-    # is obsolete and is cleaned up below.
+    # is obsolete and is cleaned up below. proxy-ns is deliberately left
+    # uncapable: it needs several powerful capabilities, so operators run it
+    # with sudo instead of granting them to a user-runnable binary.
     if shutil.which("setcap") or IS_DRY_RUN:
         log_info("Setting cap_net_admin on emp3r0r-cc (for tun2socks)...")
         run_cmd(

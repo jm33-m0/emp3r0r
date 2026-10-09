@@ -82,6 +82,15 @@ import time
 # these locations instead of hitting the network on every run.
 DONUT_IMAGE_BIN = pathlib.Path("/opt/donut/donut")
 CRYSTALPALACE_IMAGE_DIR = pathlib.Path("/opt/crystalpalace")
+# proxy-ns is an operator-side tool built in the image and shipped in the kit.
+# It is intentionally not given capabilities: it needs several powerful ones
+# (cap_sys_admin, cap_net_admin, ...), so operators run it with sudo (see the
+# socks_start hint).
+PROXY_NS_IMAGE_BIN = pathlib.Path("/opt/proxy-ns/proxy-ns")
+# proxy-ns refuses to start without a config; the image caches the upstream
+# default so the kit/install can drop it at the compiled-in /etc path.
+PROXY_NS_IMAGE_CONFIG = pathlib.Path("/opt/proxy-ns/config.json")
+PROXY_NS_SYSTEM_CONFIG = pathlib.Path("/etc/proxy-ns/config.json")
 REQUIRED_GO_VERSION = "1.26.2"
 REQUIRED_ZIG_VERSION = "0.16.0"
 # zig is the explicit cross compiler for the Windows loader (and backs the
@@ -556,6 +565,47 @@ def install_donut(target_dir: pathlib.Path, link_bin: bool = True) -> None:
     installed.chmod(0o755)
     if link_bin:
         link_system_command(installed, "donut")
+
+
+def install_proxy_ns(target_dir: pathlib.Path, link_bin: bool = False) -> None:
+    """Copy the builder image's proxy-ns into ``target_dir``.
+
+    The binary goes to ``target_dir/bin/proxy-ns`` and the default config to
+    ``target_dir/etc/proxy-ns/config.json`` (the kit layout). proxy-ns runs a
+    program in its own network namespace and forces all its traffic through a
+    SOCKS5 proxy, so an operator can opt into transparent proxying per command
+    without tun2socks' CAP_NET_ADMIN on the host. It needs privileged
+    namespace/TUN operations, so it is run with sudo rather than given
+    capabilities. With ``link_bin`` (direct host install) the binary is also
+    linked into /usr/local/bin and the config installed at the compiled-in
+    /etc path unless one already exists.
+    """
+    bin_target = target_dir / "bin"
+    installed = bin_target / "proxy-ns"
+    if installed.is_file():
+        log_info(f"proxy-ns already installed at {installed}")
+    else:
+        if not PROXY_NS_IMAGE_BIN.is_file():
+            log_warn(
+                "proxy-ns was not found in the builder image; rebuild it from "
+                "the current Dockerfile"
+            )
+            return
+        bin_target.mkdir(parents=True, exist_ok=True)
+        copy2_atomic(PROXY_NS_IMAGE_BIN, installed)
+        installed.chmod(0o755)
+
+    if PROXY_NS_IMAGE_CONFIG.is_file():
+        config_target = target_dir / "etc" / "proxy-ns" / "config.json"
+        if not config_target.exists():
+            config_target.parent.mkdir(parents=True, exist_ok=True)
+            copy2_atomic(PROXY_NS_IMAGE_CONFIG, config_target)
+
+    if link_bin:
+        link_system_command(installed, "proxy-ns")
+        if PROXY_NS_IMAGE_CONFIG.is_file() and not PROXY_NS_SYSTEM_CONFIG.exists():
+            PROXY_NS_SYSTEM_CONFIG.parent.mkdir(parents=True, exist_ok=True)
+            copy2_atomic(PROXY_NS_IMAGE_CONFIG, PROXY_NS_SYSTEM_CONFIG)
 
 
 def install_crystalpalace(target_dir: pathlib.Path) -> None:
@@ -1408,6 +1458,7 @@ def package_operator_bundle(prefix: str, core_dir: pathlib.Path) -> None:
                 log_warn(f"{src_dir} not found; operator package may be incomplete")
 
         install_donut(kit_dir / "lib" / "emp3r0r", link_bin=False)
+        install_proxy_ns(kit_dir / "lib" / "emp3r0r")
 
         # Copy Python installer directly from repo root
         root_install_py = core_dir.parent / "install.py"
@@ -1540,6 +1591,7 @@ def do_install(prefix: str, temp_dir: pathlib.Path, core_dir: pathlib.Path) -> N
             (data_dir / "emp3r0r-cat").chmod(0o755)
 
     install_donut(data_dir)
+    install_proxy_ns(data_dir, link_bin=True)
     # zig ships with emp3r0r so the C2 can build the C modules on the host.
     install_zig(data_dir)
 
