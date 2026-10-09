@@ -25,6 +25,13 @@ import tempfile
 USE_COLOR = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
 IS_DRY_RUN = os.environ.get("EMP3R0R_DRY_RUN", "0").lower() in ("1", "true", "yes")
 
+# Capabilities proxy-ns needs. They are NOT applied automatically (that would
+# grant cap_sys_admin to a user-runnable binary); the installer only prints the
+# opt-in setcap command.
+PROXY_NS_CAPS = (
+    "cap_sys_admin,cap_net_admin,cap_net_bind_service,cap_sys_chroot,cap_chown=ep"
+)
+
 # proxy-ns refuses to start without a config file at its compiled-in path; the
 # kit ships the upstream default and the installer drops it here.
 PROXY_NS_SYSTEM_CONFIG = pathlib.Path("/etc/proxy-ns/config.json")
@@ -292,6 +299,11 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
             if proxy_ns_cfg_src.is_file() and not PROXY_NS_SYSTEM_CONFIG.exists():
                 PROXY_NS_SYSTEM_CONFIG.parent.mkdir(parents=True, exist_ok=True)
                 copy2_atomic(proxy_ns_cfg_src, PROXY_NS_SYSTEM_CONFIG)
+        log_info(
+            "proxy-ns installed; run it with sudo, or grant the capabilities "
+            "once to drop sudo:"
+        )
+        log_info(f"  sudo setcap {PROXY_NS_CAPS} {proxy_ns_dst}")
     else:
         log_warn("proxy-ns not found in kit; skipping proxy-ns installation")
 

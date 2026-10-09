@@ -450,7 +450,10 @@ binaries and anything that does not go through libc, and it needs per-tool
 configuration. proxy-ns runs the program in its own network namespace with a
 TUN that pipes all of its traffic into the pivot, so TCP, UDP and static
 binaries are proxied transparently with no per-tool setup. It needs root for
-the namespace and TUN, so run it with sudo.
+the namespace and TUN device. Either prefix commands with sudo, or grant it
+the capabilities once so you do not have to:
+  sudo setcap cap_sys_admin,cap_net_admin,cap_net_bind_service,cap_sys_chroot,cap_chown=ep \
+      "$(readlink -f "$(command -v proxy-ns)")"
 
 Spawn a shell so everything started from it goes through the pivot:
   sudo proxy-ns --socks5-address=<pivot> $SHELL
@@ -526,6 +529,7 @@ func socks5StartCmdRun(cmd *cobra.Command, args []string) {
 	logging.Warningf("Prefer proxy-ns over proxychains: proxychains only hooks libc, so static binaries and non-libc apps escape it.")
 	logging.Infof("Spawn a shell with everything proxied through this pivot:")
 	logging.Infof("  sudo proxy-ns --socks5-address=%s:%d $SHELL", hostAddr, port)
+	logging.Infof("Run proxy-ns without sudo (once): sudo setcap cap_sys_admin,cap_net_admin,cap_net_bind_service,cap_sys_chroot,cap_chown=ep \"$(readlink -f \"$(command -v proxy-ns)\")\"")
 	logging.Infof("Internal DNS: add --fake-dns=false --dns-server=<target DNS> (the agent forwards queries to it).")
 	logging.Warningf("proxychains (legacy): socks5 %s %d", proxyAddr, port)
 }
