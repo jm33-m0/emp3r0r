@@ -1472,6 +1472,25 @@ def package_operator_bundle(prefix: str, core_dir: pathlib.Path) -> None:
         else:
             log_error(f"Root install.py not found at {root_install_py}")
 
+        # Ship the container recipe as a plain `Dockerfile` so operators on
+        # Windows -- where install.py cannot run -- can `docker build .` the
+        # extracted kit without passing -f.
+        operator_dockerfile = core_dir / "Dockerfile.operator"
+        if operator_dockerfile.is_file():
+            copy2_atomic(operator_dockerfile, kit_dir / "Dockerfile")
+            log_info("Included operator Dockerfile in operator kit")
+        else:
+            log_warn(
+                f"Operator Dockerfile not found at {operator_dockerfile}; "
+                "the kit cannot be built as a container image"
+            )
+
+        # Record the build version so operators can tag and label the image
+        # with the same version as the binaries in the kit.
+        operator_version = get_version(core_dir)
+        write_text_atomic(kit_dir / "VERSION", operator_version + "\n")
+        log_info(f"Operator kit version: {operator_version}")
+
         operator_bundle_name = "emp3r0r-operator-kit.tar.zst"
         bundle_tar = core_dir / operator_bundle_name
         res = run_cmd(
@@ -1495,6 +1514,12 @@ def package_operator_bundle(prefix: str, core_dir: pathlib.Path) -> None:
         log_success(
             f"  tar -I zstd -xpf {operator_bundle_name} && ./emp3r0r-operator-kit/install.py"
         )
+        log_success("Or run the operator from a container (recommended on Windows):")
+        log_success(
+            "  install.py builds and exports emp3r0r-operator-image-<VERSION>.tar.zst"
+        )
+        log_success("  transfer it, then on the operator machine: docker load -i <file>")
+        log_success("  Full operator guide: OPERATOR.md")
 
 
 def remove_obsolete_wireguard_config() -> None:

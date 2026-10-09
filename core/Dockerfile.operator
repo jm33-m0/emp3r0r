@@ -1,0 +1,76 @@
+# Operator console image.
+#
+# Containerizes the operator kit that `core/build.py` already produces, so
+# operators on Windows -- where install.py cannot run -- can use the client
+# from a container instead of a native install. Build it from the extracted
+# kit (the Dockerfile ships inside the kit), using the kit's VERSION file as
+# the image tag:
+#
+#   tar --zstd -xpf emp3r0r-operator-kit.tar.zst
+#   cd emp3r0r-operator-kit
+#   VERSION=$(cat VERSION)
+#   docker build --build-arg EMP3R0R_VERSION="$VERSION" \
+#     -t "emp3r0r-operator:$VERSION" -t emp3r0r-operator:latest .
+#
+# Run it with a TTY. The client always drives a tmux session and `-it` lets
+# that session attach to the terminal (Windows Terminal works):
+#
+#   docker run -it --rm -v emp3r0r-operator:/root/.emp3r0r emp3r0r-operator:latest \
+#     client --c2-port 13377 --c2-host 1.2.3.4 ...
+#
+# Add `--cap-add NET_ADMIN --device /dev/net/tun` for tun2socks, or `--privileged`
+# for proxy-ns. See OPERATOR.md for the full operator guide.
+#
+# The C2 server is deliberately NOT containerized: it publishes random public
+# ports, which container networking makes awkward, so it stays a standalone
+# binary on the server host.
+
+# Install the kit in a throwaway stage so the Python installer and its
+# interpreter never reach the runtime image. tmux and setcap are what
+# install.py checks for; libcap2-bin provides setcap.
+FROM debian:bookworm-slim AS install
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends python3 tmux libcap2-bin \
+  && rm -rf /var/lib/apt/lists/*
+COPY . /opt/emp3r0r-operator-kit
+# Ensure the proxy-ns config path exists so the runtime COPY below works even
+# for a kit that predates (or was built without) proxy-ns. install.py applies
+# cap_net_admin to the client for host-side tun2socks; inside the container the
+# process already runs as root (NET_ADMIN comes from `--cap-add NET_ADMIN`),
+# and a stale file capability makes execve fail with EPERM when the container's
+# bounding set lacks it (rootless podman). Stripping is best-effort: `setcap -r`
+# exits non-zero when the file already has no capabilities, which is the state
+# we want.
+RUN /opt/emp3r0r-operator-kit/install.py \
+  && mkdir -p /etc/proxy-ns \
+  && (setcap -r /usr/local/lib/emp3r0r/emp3r0r-cc || true)
+
+# Runtime image: tmux (the console UI) plus the installed kit. sudo is kept so
+# the proxy-ns hints the console prints work verbatim (the container is already
+# root, so it is a no-op, just less surprising than "command not found"). The
+# bundled binaries are static Go/zig builds, so no other libraries are needed.
+FROM debian:bookworm-slim
+
+# The image tag and version label come from the kit's VERSION file. Pass it at
+# build time so the image is self-describing:
+#   docker build --build-arg EMP3R0R_VERSION=$(cat VERSION) \
+#     -t emp3r0r-operator:$(cat VERSION) -t emp3r0r-operator:latest .
+ARG EMP3R0R_VERSION=unknown
+LABEL org.opencontainers.image.title="emp3r0r operator" \
+      org.opencontainers.image.version="${EMP3R0R_VERSION}" \
+      org.opencontainers.image.source="https://github.com/jm33-m0/emp3r0r"
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends tmux ca-certificates sudo \
+  && rm -rf /var/lib/apt/lists/*
+COPY --from=install /usr/local /usr/local
+# proxy-ns refuses to start without its config at the compiled-in path.
+COPY --from=install /etc/proxy-ns /etc/proxy-ns
+
+# The launcher keeps its workspace in ~/.emp3r0r. Mount a volume there so the
+# operator's wireguard keys, generated payloads and logs survive `--rm` runs.
+VOLUME ["/root/.emp3r0r"]
+WORKDIR /root/.emp3r0r
+
+ENTRYPOINT ["emp3r0r"]
+CMD ["client"]

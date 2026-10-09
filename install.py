@@ -7,7 +7,9 @@ emp3r0r Installation & Operator Kit Script (Python)
 Can be executed in two modes:
 1. Repository Root Mode (building from source):
    Uses Docker (or Podman) as a throwaway build container to compile emp3r0r
-   from the LOCAL source tree, then installs the resulting binaries.
+   from the LOCAL source tree, installs the resulting binaries, and builds the
+   operator kit plus a loadable operator container image
+   (core/emp3r0r-operator-image-<VERSION>.tar.gz).
 
 2. Operator Kit Mode (installing on operator machine):
    Installs pre-compiled binaries into PREFIX (/usr/local), configures tmux,
@@ -197,8 +199,15 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
         and os.geteuid() != 0
     ):
         log_info("Re-running with sudo...")
+        sudo = ["sudo"]
+        if sys.stdin is None or not sys.stdin.isatty():
+            # Non-interactive: fail fast instead of blocking on a password prompt.
+            sudo.append("-n")
         os.execvp(
-            "sudo", ["sudo", sys.executable, str(kit_dir / "install.py")] + sys.argv[1:]
+            "sudo",
+            sudo
+            + [sys.executable, str(kit_dir / "install.py")]
+            + sys.argv[1:],
         )
 
     bin_dir = prefix_path / "bin"
@@ -327,8 +336,8 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
     cc_bin = data_dir / "emp3r0r-cc"
     # Refresh shell completions from the freshly installed binary. Writing the
     # output (not discarding it) keeps /etc/bash_completion.d/emp3r0r in sync
-    # with the binary — otherwise operators keep a stale script (missing newly
-    # added flags like --gui) after upgrading.
+    # with the binary — otherwise operators keep a stale script that is missing
+    # flags added in newer builds after upgrading.
     bash_comp_dir = pathlib.Path("/etc/bash_completion.d")
     if bash_comp_dir.is_dir():
         res = run_cmd(
@@ -357,33 +366,42 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
 # ===========================================================================
 # Mode 2: Repository Container Build & Installation
 # ===========================================================================
-def detect_container_engine() -> str:
+def find_container_engine() -> str | None:
+    """Return the container engine on PATH without installing one."""
     if shutil.which("docker"):
-        engine = "docker"
-    elif shutil.which("podman"):
-        engine = "podman"
+        return "docker"
+    if shutil.which("podman"):
+        return "podman"
+    return None
+
+
+def detect_container_engine() -> str:
+    engine = find_container_engine()
+    if engine:
+        log_info(f"Using container engine: {engine}")
+        return engine
+
+    log_warn(
+        "Neither 'docker' nor 'podman' was found. Attempting to install 'podman'..."
+    )
+    if shutil.which("apt-get"):
+        try:
+            run_cmd(["sudo", "apt-get", "update", "-qq"])
+            run_cmd(["sudo", "apt-get", "install", "-y", "podman"])
+            engine = "podman"
+        except (OSError, subprocess.CalledProcessError):
+            log_error("Failed to install podman via apt-get")
+    elif shutil.which("yum"):
+        try:
+            run_cmd(["sudo", "yum", "install", "-y", "podman"])
+            engine = "podman"
+        except (OSError, subprocess.CalledProcessError):
+            log_error("Failed to install podman via yum")
     else:
-        log_warn(
-            "Neither 'docker' nor 'podman' was found. Attempting to install 'podman'..."
+        log_error(
+            "Neither 'docker' nor 'podman' was found, and apt-get/yum is not available to install podman. "
+            "Please install docker or podman manually."
         )
-        if shutil.which("apt-get"):
-            try:
-                run_cmd(["sudo", "apt-get", "update", "-qq"])
-                run_cmd(["sudo", "apt-get", "install", "-y", "podman"])
-                engine = "podman"
-            except (OSError, subprocess.CalledProcessError):
-                log_error("Failed to install podman via apt-get")
-        elif shutil.which("yum"):
-            try:
-                run_cmd(["sudo", "yum", "install", "-y", "podman"])
-                engine = "podman"
-            except (OSError, subprocess.CalledProcessError):
-                log_error("Failed to install podman via yum")
-        else:
-            log_error(
-                "Neither 'docker' nor 'podman' was found, and apt-get/yum is not available to install podman. "
-                "Please install docker or podman manually."
-            )
     log_info(f"Using container engine: {engine}")
     return engine
 
@@ -531,7 +549,84 @@ def docker_build(
     log_success("Docker build completed")
 
 
-def install_from_operator_kit(cached_kit: pathlib.Path, prefix: str) -> None:
+def export_operator_image(
+    container_engine: str, kit_dir: pathlib.Path, core_dir: pathlib.Path
+) -> None:
+    """Build the operator container image and export it for transfer.
+
+    The kit is C2-specific -- its agent stubs and modules carry this server's
+    MagicString -- so a published image cannot be reused across servers. The
+    build host therefore builds the image from its own kit and saves a tarball
+    the operator machine can `docker load`.
+    """
+    version_file = kit_dir / "VERSION"
+    version = (
+        version_file.read_text(encoding="utf-8").strip()
+        if version_file.is_file()
+        else "latest"
+    )
+    image = f"emp3r0r-operator:{version}"
+
+    log_info(f"Building operator container image {image}...")
+    res = run_cmd(
+        [
+            container_engine,
+            "build",
+            "--build-arg",
+            f"EMP3R0R_VERSION={version}",
+            "-t",
+            image,
+            "-t",
+            "emp3r0r-operator:latest",
+            str(kit_dir),
+        ],
+        check=False,
+    )
+    if res.returncode != 0:
+        log_warn("Operator image build failed; see OPERATOR.md to build it manually")
+        return
+
+    out = core_dir / f"emp3r0r-operator-image-{version}.tar.zst"
+    tar_path = core_dir / f"emp3r0r-operator-image-{version}.tar"
+    log_info(f"Exporting {image} to {out} (this can take a few minutes)...")
+    res = run_cmd(
+        [
+            container_engine,
+            "save",
+            "-o",
+            str(tar_path),
+            image,
+            "emp3r0r-operator:latest",
+        ],
+        check=False,
+    )
+    if res.returncode != 0 or IS_DRY_RUN:
+        if not IS_DRY_RUN:
+            log_warn("Operator image export failed")
+        tar_path.unlink(missing_ok=True)
+        return
+
+    # zstd -T0 keeps the export fast for the multi-GB image; modern Docker can
+    # `load` a zstd-compressed tarball directly.
+    res = run_cmd(
+        ["zstd", "-T0", "-3", "-f", str(tar_path), "-o", str(out)], check=False
+    )
+    tar_path.unlink(missing_ok=True)
+    if res.returncode != 0:
+        log_warn("Operator image compression failed")
+        return
+
+    log_success(f"Operator container image saved to {out}")
+    log_info(f"Copy it to the operator machine, then: docker load -i {out.name}")
+
+
+def install_from_operator_kit(
+    cached_kit: pathlib.Path,
+    prefix: str,
+    core_dir: pathlib.Path,
+    container_engine: str | None = None,
+    build_image: bool = False,
+) -> None:
     if not cached_kit.exists() and not IS_DRY_RUN:
         log_error(f"Operator kit not found: {cached_kit}")
 
@@ -544,6 +639,12 @@ def install_from_operator_kit(cached_kit: pathlib.Path, prefix: str) -> None:
         )
 
         kit_dir = tmp_path / "emp3r0r-operator-kit"
+
+        # Build/export the image before the local install: it needs no root, so
+        # a non-root build host still gets the container without a sudo prompt.
+        if build_image and container_engine:
+            export_operator_image(container_engine, kit_dir, core_dir)
+
         installer_py = kit_dir / "install.py"
         log_info("Running operator kit installer...")
         env = os.environ.copy()
@@ -585,6 +686,11 @@ def parse_args() -> argparse.Namespace:
         "--skip-build",
         action="store_true",
         help="Skip Docker build; reinstall from the last cached build",
+    )
+    parser.add_argument(
+        "--no-operator-image",
+        action="store_true",
+        help="Do not build/export the operator container image",
     )
     parser.add_argument(
         "--operator-kit",
@@ -719,10 +825,21 @@ def main() -> None:
     # Build any extra target/feature flags to pass into core/build.py.
     extra_build_flags = collect_extra_build_flags(args)
 
+    build_image = not args.no_operator_image
+
     if args.skip_build:
         log_info("--skip-build: skipping Docker build, using cached operator kit")
         check_host_deps(script_dir)
-        install_from_operator_kit(cached_kit, args.prefix)
+        engine = find_container_engine() if build_image else None
+        if build_image and engine is None:
+            log_warn("Docker/Podman not found; skipping the operator image build")
+        install_from_operator_kit(
+            cached_kit,
+            args.prefix,
+            script_dir / "core",
+            engine,
+            build_image and engine is not None,
+        )
     else:
         container_engine = detect_container_engine()
         check_host_deps(script_dir)
@@ -730,7 +847,9 @@ def main() -> None:
         docker_build(
             container_engine, script_dir, build_arg, disable_garble, extra_build_flags
         )
-        install_from_operator_kit(cached_kit, args.prefix)
+        install_from_operator_kit(
+            cached_kit, args.prefix, script_dir / "core", container_engine, build_image
+        )
 
     log_success(f"emp3r0r installed successfully to {args.prefix}")
 
