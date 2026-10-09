@@ -89,7 +89,7 @@ DONUT_ARCHIVE_NAME = "donut_v1.1.tar.gz"
 CRYSTALPALACE_URL = "https://tradecraftgarden.org/download/cpdist-latest.tgz"
 CRYSTALPALACE_ARCHIVE_NAME = "cpdist-latest.tgz"
 CRYSTALPALACE_SHA256 = (
-    "39af4ad53d612b0a2c9c3948ef97d9de3a2fc4730012a54e2bab7f081d5d4e32"
+    "bfeb0d8fa01bf7f81845758a12300d19a4915540e7008e320ccb43b332ea6917"
 )
 REQUIRED_GO_VERSION = "1.26.2"
 REQUIRED_ZIG_VERSION = "0.16.0"
@@ -391,21 +391,55 @@ def zig_platform() -> str | None:
     return None
 
 
-def install_zig(target_dir: pathlib.Path | None = None) -> pathlib.Path | None:
-    """Install the pinned zig toolchain under ``target_dir/zig``.
+def locate_zig_install() -> pathlib.Path | None:
+    """Return the installation root of an already-installed zig, if any.
 
-    ``zig cc`` is the explicit cross compiler for the Windows loader, so zig is
+    The builder image ships zig (the Dockerfile extracts it to /opt/zig and
+    links it onto PATH), so that installation can be copied instead of
+    downloading the same archive again. Only installations that look complete
+    (the binary plus its sibling ``lib/``) are accepted.
+    """
+    existing = shutil.which("zig")
+    if not existing:
+        return None
+    root = pathlib.Path(existing).resolve().parent
+    if (root / "lib").is_dir():
+        return root
+    return None
+
+
+def link_zig(zig_bin: pathlib.Path) -> None:
+    """Point /usr/local/bin/zig at ``zig_bin`` (best effort)."""
+    usr_local_bin = pathlib.Path("/usr/local/bin")
+    usr_local_bin.mkdir(parents=True, exist_ok=True)
+    symlink = usr_local_bin / "zig"
+    try:
+        if symlink.is_symlink() or symlink.exists():
+            symlink.unlink(missing_ok=True)
+        symlink.symlink_to(zig_bin)
+        log_info(f"Linked zig executable to {symlink}")
+    except OSError as e:
+        log_warn(f"Could not symlink {symlink}: {e}")
+
+
+def install_zig(target_dir: pathlib.Path | None = None) -> pathlib.Path | None:
+    """Ensure the pinned zig toolchain is available, optionally installing it.
+
+    ``zig cc`` is the explicit cross compiler for C modules, so zig is
     installed next to emp3r0r (and copied into the operator kit). With no
     explicit ``target_dir`` an existing zig on PATH is accepted; otherwise the
-    toolchain lands in ``<prefix>/lib/emp3r0r``. The archive is SHA-256
+    toolchain lands in ``<prefix>/lib/emp3r0r``. An existing installation (as
+    provided by the builder image) is copied rather than downloaded, so the
+    pinned archive is fetched at most once. Downloaded archives are SHA-256
     verified before extraction and ``/usr/local/bin/zig`` points at the
     installed binary. Returns the executable path, or None on failure.
     """
+    existing_root = locate_zig_install()
+
     if target_dir is None:
-        existing = shutil.which("zig")
-        if existing:
-            log_info(f"zig is already installed: {existing}")
-            return pathlib.Path(existing)
+        if existing_root is not None:
+            log_info(f"zig is already installed: {existing_root / 'zig'}")
+            return existing_root / "zig"
         target_dir = (
             pathlib.Path(os.environ.get("PREFIX", "/usr/local")) / "lib" / "emp3r0r"
         )
@@ -414,6 +448,30 @@ def install_zig(target_dir: pathlib.Path | None = None) -> pathlib.Path | None:
     if zig_bin.is_file():
         log_info(f"zig is already installed: {zig_bin}")
         return zig_bin
+
+    # Reuse the toolchain already present (e.g. the builder image's) instead of
+    # downloading the same pinned archive a second time.
+    if existing_root is not None and existing_root.resolve() != zig_dir.resolve():
+        log_info(f"Copying zig from {existing_root} to {zig_dir}...")
+        if IS_DRY_RUN:
+            log_warn("[DRY-RUN] would copy zig from the builder image")
+            return None
+        try:
+            zig_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(
+                existing_root,
+                zig_dir,
+                dirs_exist_ok=True,
+                symlinks=True,
+                copy_function=copy2_atomic,
+            )
+        except OSError as e:
+            log_warn(f"Could not copy zig from {existing_root}: {e}")
+        else:
+            if zig_bin.is_file():
+                link_zig(zig_bin)
+                return zig_bin
+            log_warn(f"Copied zig from {existing_root} but {zig_bin} is missing")
 
     host_platform = zig_platform()
     if host_platform is None:
@@ -445,16 +503,7 @@ def install_zig(target_dir: pathlib.Path | None = None) -> pathlib.Path | None:
         log_warn(f"Failed to extract the zig archive for {host_platform}")
         return None
 
-    usr_local_bin = pathlib.Path("/usr/local/bin")
-    usr_local_bin.mkdir(parents=True, exist_ok=True)
-    symlink = usr_local_bin / "zig"
-    try:
-        if symlink.is_symlink() or symlink.exists():
-            symlink.unlink(missing_ok=True)
-        symlink.symlink_to(zig_bin)
-        log_info(f"Linked zig executable to {symlink}")
-    except OSError as e:
-        log_warn(f"Could not symlink {symlink}: {e}")
+    link_zig(zig_bin)
     return zig_bin
 
 
