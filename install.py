@@ -9,7 +9,7 @@ Can be executed in two modes:
    Uses Docker (or Podman) as a throwaway build container to compile emp3r0r
    from the LOCAL source tree, installs the resulting binaries, and builds the
    operator kit plus a loadable operator container image
-   (core/emp3r0r-operator-image-<VERSION>.tar.gz).
+   (core/emp3r0r-operator-image.tar.zst).
 
 2. Operator Kit Mode (installing on operator machine):
    Installs pre-compiled binaries into PREFIX (/usr/local), configures tmux,
@@ -558,42 +558,24 @@ def export_operator_image(
     MagicString -- so a published image cannot be reused across servers. The
     build host therefore builds the image from its own kit and saves a tarball
     the operator machine can `docker load`.
-    """
-    version_file = kit_dir / "VERSION"
-    version = (
-        version_file.read_text(encoding="utf-8").strip()
-        if version_file.is_file()
-        else ""
-    )
-    # A real release tag is worth pinning; an unknown/empty version is not, so
-    # fall back to the plain `latest` tag instead of `unknown-<timestamp>`.
-    if not version or version.startswith("unknown"):
-        version = "latest"
-    tags = [f"emp3r0r-operator:{version}"]
-    if version != "latest":
-        tags.append("emp3r0r-operator:latest")
 
-    log_info(f"Building operator container image {tags[0]}...")
-    build_cmd = [
-        container_engine,
-        "build",
-        "--build-arg",
-        f"EMP3R0R_VERSION={version}",
-    ]
-    for tag in tags:
-        build_cmd += ["-t", tag]
-    build_cmd.append(str(kit_dir))
-    res = run_cmd(build_cmd, check=False)
+    The image is only ever tagged `latest`; there is no release version to pin,
+    and operators can tag the imported image however they like.
+    """
+    image = "emp3r0r-operator:latest"
+
+    log_info(f"Building operator container image {image}...")
+    res = run_cmd([container_engine, "build", "-t", image, str(kit_dir)], check=False)
     if res.returncode != 0:
         log_warn("Operator image build failed; see OPERATOR.md to build it manually")
         return
 
-    out = core_dir / f"emp3r0r-operator-image-{version}.tar.zst"
-    tar_path = core_dir / f"emp3r0r-operator-image-{version}.tar"
-    log_info(f"Exporting {tags[0]} to {out} (this can take a few minutes)...")
-    save_cmd = [container_engine, "save", "-o", str(tar_path)]
-    save_cmd += tags
-    res = run_cmd(save_cmd, check=False)
+    out = core_dir / "emp3r0r-operator-image.tar.zst"
+    tar_path = core_dir / "emp3r0r-operator-image.tar"
+    log_info(f"Exporting {image} to {out} (this can take a few minutes)...")
+    res = run_cmd(
+        [container_engine, "save", "-o", str(tar_path), image], check=False
+    )
     if res.returncode != 0 or IS_DRY_RUN:
         if not IS_DRY_RUN:
             log_warn("Operator image export failed")

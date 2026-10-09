@@ -55,30 +55,31 @@ emp3r0r client --c2-port 13377 \
 #### Windows (container, recommended)
 
 `install.py` is Linux-only, but you do not build the image by hand: running
-`./install.py` on the build host builds the operator image from the kit and
-exports it to `core/emp3r0r-operator-image-<VERSION>.tar.zst`. Pass
-`--no-operator-image` to skip that.
+`./install.py` on the build host builds the operator image and exports it to
+`core/emp3r0r-operator-image.tar.zst`. Pass `--no-operator-image` to skip that.
 
 **1. Move the image to the operator machine.** On the build host, after
 `./install.py`:
 
 ```bash
-ls core/emp3r0r-operator-image-*.tar.zst
+ls core/emp3r0r-operator-image.tar.zst
 ```
 
 Copy that `.tar.zst` over however you like (scp, USB, ...), then load it on the
 operator machine:
 
 ```powershell
-docker load -i "emp3r0r-operator-image-<VERSION>.tar.zst"
+docker load -i "emp3r0r-operator-image.tar.zst"
 ```
 
 **2. Run the console.** Everything (the console, its panes and any shell you
-open) lives inside the container's tmux session:
+open) lives inside the container's tmux session. Pass the full `emp3r0r`
+command -- the image has no entrypoint, so `docker run IMAGE emp3r0r ...` works
+exactly like running it on the host:
 
 ```powershell
 docker run -it --rm -v emp3r0r-operator:/root/.emp3r0r emp3r0r-operator:latest `
-  client --c2-port 13377 --server-wg-key '<SERVER_WG_KEY>' `
+  emp3r0r client --c2-port 13377 --server-wg-key '<SERVER_WG_KEY>' `
   --server-wg-ip '<SERVER_WG_IP>' --operator-wg-ip '<OPERATOR_WG_IP>' `
   --operator-wg-key '<OPERATOR_WG_KEY>' --c2-host 1.2.3.4
 ```
@@ -88,6 +89,7 @@ docker run -it --rm -v emp3r0r-operator:/root/.emp3r0r emp3r0r-operator:latest `
 - The named volume keeps the operator workspace (`~/.emp3r0r`: WireGuard keys,
   generated payloads, logs) across `--rm` runs.
 - The container runs as root, so drop `sudo` from any hint the console prints.
+- The image is only tagged `latest`; tag the imported image however you like.
 
 If the image was not exported (for example you passed `--no-operator-image`),
 you can build it on any Docker host from the kit instead:
@@ -95,13 +97,10 @@ you can build it on any Docker host from the kit instead:
 ```bash
 tar --zstd -xpf emp3r0r-operator-kit.tar.zst
 cd emp3r0r-operator-kit
-VERSION=$(cat VERSION)
-docker build --build-arg EMP3R0R_VERSION="$VERSION" \
-  -t "emp3r0r-operator:$VERSION" -t emp3r0r-operator:latest .
-docker save -o "emp3r0r-operator-image-$VERSION.tar" \
-  "emp3r0r-operator:$VERSION" emp3r0r-operator:latest
-zstd -T0 -3 -f "emp3r0r-operator-image-$VERSION.tar" -o "emp3r0r-operator-image-$VERSION.tar.zst"
-rm -f "emp3r0r-operator-image-$VERSION.tar"
+docker build -t emp3r0r-operator:latest .
+docker save -o emp3r0r-operator-image.tar emp3r0r-operator:latest
+zstd -T0 -3 -f emp3r0r-operator-image.tar -o emp3r0r-operator-image.tar.zst
+rm -f emp3r0r-operator-image.tar
 ```
 
 ### 3. Generate Agent Payloads
@@ -146,7 +145,7 @@ needs `CAP_NET_ADMIN` and access to `/dev/net/tun`:
 
 ```powershell
 docker run -it --rm --cap-add NET_ADMIN --device /dev/net/tun `
-  -v emp3r0r-operator:/root/.emp3r0r emp3r0r-operator:latest client ...
+  -v emp3r0r-operator:/root/.emp3r0r emp3r0r-operator:latest emp3r0r client ...
 ```
 
 If Docker Desktop's Linux VM does not expose `/dev/net/tun`, run the operator
@@ -160,7 +159,7 @@ fake DNS, so it needs several powerful capabilities (`cap_sys_admin`,
 privileged:
 
 ```powershell
-docker run -it --rm --privileged -v emp3r0r-operator:/root/.emp3r0r emp3r0r-operator:latest client ...
+docker run -it --rm --privileged -v emp3r0r-operator:/root/.emp3r0r emp3r0r-operator:latest emp3r0r client ...
 ```
 
 `--privileged` is a large grant. Prefer the native Linux install for

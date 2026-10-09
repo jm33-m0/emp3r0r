@@ -3,20 +3,17 @@
 # Containerizes the operator kit that `core/build.py` already produces, so
 # operators on Windows -- where install.py cannot run -- can use the client
 # from a container instead of a native install. Build it from the extracted
-# kit (the Dockerfile ships inside the kit), using the kit's VERSION file as
-# the image tag:
+# kit (the Dockerfile ships inside the kit):
 #
 #   tar --zstd -xpf emp3r0r-operator-kit.tar.zst
 #   cd emp3r0r-operator-kit
-#   VERSION=$(cat VERSION)
-#   docker build --build-arg EMP3R0R_VERSION="$VERSION" \
-#     -t "emp3r0r-operator:$VERSION" -t emp3r0r-operator:latest .
+#   docker build -t emp3r0r-operator:latest .
 #
 # Run it with a TTY. The client always drives a tmux session and `-it` lets
 # that session attach to the terminal (Windows Terminal works):
 #
 #   docker run -it --rm -v emp3r0r-operator:/root/.emp3r0r emp3r0r-operator:latest \
-#     client --c2-port 13377 --c2-host 1.2.3.4 ...
+#     emp3r0r client --c2-port 13377 --c2-host 1.2.3.4 ...
 #
 # Add `--cap-add NET_ADMIN --device /dev/net/tun` for tun2socks, or `--privileged`
 # for proxy-ns. See OPERATOR.md for the full operator guide.
@@ -51,15 +48,6 @@ RUN /opt/emp3r0r-operator-kit/install.py \
 # bundled binaries are static Go/zig builds, so no other libraries are needed.
 FROM debian:trixie-slim
 
-# The image tag and version label come from the kit's VERSION file. Pass it at
-# build time so the image is self-describing:
-#   docker build --build-arg EMP3R0R_VERSION=$(cat VERSION) \
-#     -t emp3r0r-operator:$(cat VERSION) -t emp3r0r-operator:latest .
-ARG EMP3R0R_VERSION=unknown
-LABEL org.opencontainers.image.title="emp3r0r operator" \
-      org.opencontainers.image.version="${EMP3R0R_VERSION}" \
-      org.opencontainers.image.source="https://github.com/jm33-m0/emp3r0r"
-
 RUN apt-get update \
   && apt-get install -y --no-install-recommends tmux ca-certificates sudo \
   && rm -rf /var/lib/apt/lists/*
@@ -71,6 +59,3 @@ COPY --from=install /etc/proxy-ns /etc/proxy-ns
 # operator's wireguard keys, generated payloads and logs survive `--rm` runs.
 VOLUME ["/root/.emp3r0r"]
 WORKDIR /root/.emp3r0r
-
-ENTRYPOINT ["emp3r0r"]
-CMD ["client"]

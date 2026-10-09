@@ -1485,16 +1485,6 @@ def package_operator_bundle(prefix: str, core_dir: pathlib.Path) -> None:
                 "the kit cannot be built as a container image"
             )
 
-        # Record the build version so operators can tag and label the image
-        # with the same version as the binaries in the kit. Without a real
-        # version there is nothing useful to pin, so use `latest` rather than
-        # an `unknown-<timestamp>` tag.
-        operator_version = get_version(core_dir)
-        if not operator_version or operator_version.startswith("unknown"):
-            operator_version = "latest"
-        write_text_atomic(kit_dir / "VERSION", operator_version + "\n")
-        log_info(f"Operator kit version: {operator_version}")
-
         operator_bundle_name = "emp3r0r-operator-kit.tar.zst"
         bundle_tar = core_dir / operator_bundle_name
         res = run_cmd(
@@ -1519,9 +1509,7 @@ def package_operator_bundle(prefix: str, core_dir: pathlib.Path) -> None:
             f"  tar -I zstd -xpf {operator_bundle_name} && ./emp3r0r-operator-kit/install.py"
         )
         log_success("Or run the operator from a container (recommended on Windows):")
-        log_success(
-            "  install.py builds and exports emp3r0r-operator-image-<VERSION>.tar.zst"
-        )
+        log_success("  install.py builds and exports emp3r0r-operator-image.tar.zst")
         log_success("  transfer it, then on the operator machine: docker load -i <file>")
         log_success("  Full operator guide: OPERATOR.md")
 
