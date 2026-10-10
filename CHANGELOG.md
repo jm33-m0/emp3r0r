@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.24.3](https://github.com/jm33-m0/emp3r0r/compare/v4.24.2...v4.24.3) (2026-10-10)
+
+
+### Bug Fixes
+
+* **ftp:** unregister ftp streams when closing them ([f08417f](https://github.com/jm33-m0/emp3r0r/commit/f08417ff75205757394b79ba2c727e2b837ff05a))
+
 ## [4.24.2](https://github.com/jm33-m0/emp3r0r/compare/v4.24.1...v4.24.2) (2026-10-10)
 
 
