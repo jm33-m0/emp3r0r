@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
@@ -20,6 +21,58 @@ import (
 
 // rotationRateLimiter tracks key rotation timestamps per AgentUUID to prevent log flooding
 var rotationRateLimiter sync.Map
+
+// checkinRateLimitWindow is the maximum number of rate-limited events allowed per
+// agent UUID in a one-minute window.
+const checkinRateLimitWindow = 10
+
+// rotationLimiterLastPurge throttles the stale-entry sweep so the map can never
+// grow without bound and the sweep stays O(n) at most once a minute.
+var rotationLimiterLastPurge atomic.Int64
+
+// purgeStaleRotationEntries drops per-UUID timestamps that have fallen outside
+// the one-minute window. Without it a hostile agent could enrol endless random
+// UUIDs and leak one rate-limiter entry each, forever.
+func purgeStaleRotationEntries(now time.Time) {
+	last := rotationLimiterLastPurge.Load()
+	if now.Unix()-last < 60 {
+		return
+	}
+	if !rotationLimiterLastPurge.CompareAndSwap(last, now.Unix()) {
+		return
+	}
+	rotationRateLimiter.Range(func(k, v any) bool {
+		times, ok := v.([]time.Time)
+		if !ok || len(times) == 0 || now.Sub(times[len(times)-1]) > time.Minute {
+			rotationRateLimiter.Delete(k)
+		}
+		return true
+	})
+}
+
+// recordCheckinAttempt records one check-in attempt for uuid and reports whether
+// it is within the per-UUID rate limit. The stored slice is capped at just past
+// the window so a flood against one UUID cannot grow server memory without
+// bound.
+func recordCheckinAttempt(uuid string, now time.Time) bool {
+	validTimestamps := make([]time.Time, 0, checkinRateLimitWindow+1)
+	if val, exists := rotationRateLimiter.Load(uuid); exists {
+		if stored, ok := val.([]time.Time); ok {
+			for _, ts := range stored {
+				if now.Sub(ts) < time.Minute {
+					validTimestamps = append(validTimestamps, ts)
+				}
+			}
+		}
+	}
+	validTimestamps = append(validTimestamps, now)
+	if len(validTimestamps) > checkinRateLimitWindow+1 {
+		validTimestamps = validTimestamps[len(validTimestamps)-(checkinRateLimitWindow+1):]
+	}
+	rotationRateLimiter.Store(uuid, validTimestamps)
+	purgeStaleRotationEntries(now)
+	return len(validTimestamps) <= checkinRateLimitWindow
+}
 
 // handleAgentCheckInStream is the protocol-native checkin handler.
 // It is transport-agnostic and only depends on an encrypted byte stream.
@@ -57,22 +110,9 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 	// subsequent rejection path (missing key, key mismatch, ghost session, etc.)
 	// is capped. An attacker with a valid CA cert cannot flood logs or the
 	// operator console beyond 10 requests/minute per agent UUID.
-	{
-		now := time.Now()
-		validTimestamps := []time.Time{}
-		if val, exists := rotationRateLimiter.Load(target.UUID); exists {
-			for _, t := range val.([]time.Time) {
-				if now.Sub(t) < time.Minute {
-					validTimestamps = append(validTimestamps, t)
-				}
-			}
-		}
-		validTimestamps = append(validTimestamps, now)
-		rotationRateLimiter.Store(target.UUID, validTimestamps)
-		if len(validTimestamps) > 10 {
-			// Silent drop — no log, no broadcast.
-			return fmt.Errorf("forbidden: rate limit")
-		}
+	if !recordCheckinAttempt(target.UUID, time.Now()) {
+		// Silent drop — no log, no broadcast.
+		return fmt.Errorf("forbidden: rate limit")
 	}
 
 	// SECURITY: Agent MUST provide its public key in every checkin.
