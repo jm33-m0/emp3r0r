@@ -58,6 +58,9 @@ const (
 	// maxOperatorTunnelMessage bounds one operator message-tunnel frame. Relay
 	// chunks are ~64 KiB, so this is generous while still bounding memory.
 	maxOperatorTunnelMessage = 4 << 20 // 4 MiB
+	// maxFTPStreamsPerOperator bounds concurrent FTP streams per operator so one
+	// operator cannot grow the server's stream registry without limit.
+	maxFTPStreamsPerOperator = 64
 )
 
 // DecodeCBORBody decodes CBOR HTTP request body
@@ -485,7 +488,16 @@ func handleRegisterFTPStream(wrt http.ResponseWriter, req *http.Request) {
 			return
 		}
 	}
-	// Register token in server's map
+	if countOperatorFTPStreams(operatorSession) >= maxFTPStreamsPerOperator {
+		logging.Warningf("CRITICAL: operator %s exceeded the FTP stream limit (%d)", operatorSession, maxFTPStreamsPerOperator)
+		auditOperatorAction(operatorSession, "ftp_register_denied", "", "too many streams")
+		http.Error(wrt, "too many concurrent FTP streams", http.StatusTooManyRequests)
+		return
+	}
+	// Register the token. Only the unique token key is stored: the file-path key
+	// an operator supplies is not needed server-side, and using it as a global key
+	// would let two operators clobber each other's entries or delete an unrelated
+	// stream by guessing a path.
 	sh := &network.StreamHandler{
 		Token:           ftpReq.Token,
 		StreamID:        ftpReq.Token,
@@ -494,7 +506,6 @@ func handleRegisterFTPStream(wrt http.ResponseWriter, req *http.Request) {
 		ExpectedSize:    ftpReq.ExpectedSize,
 		Checksum:        ftpReq.Checksum,
 	}
-	network.FTPStreams.Store(ftpReq.FilePath, sh)
 	network.FTPStreams.Store("token:"+ftpReq.Token, sh)
 	auditOperatorAction(operatorSession, "ftp_register", "", ftpReq.FilePath)
 
@@ -521,16 +532,23 @@ func handleUnregisterFTPStream(wrt http.ResponseWriter, req *http.Request) {
 		return
 	}
 	val, ok := network.FTPStreams.Load("token:" + ftpReq.Token)
-	if ok {
-		if sh, castOK := val.(*network.StreamHandler); castOK && sh != nil && sh.OperatorSession != "" && sh.OperatorSession != operatorSession {
-			logging.Errorf("CRITICAL: operator %s attempted to unregister ftp stream owned by %s", operatorSession, sh.OperatorSession)
-			http.Error(wrt, "Forbidden", http.StatusForbidden)
-			return
-		}
+	if !ok {
+		http.Error(wrt, "Unknown FTP stream", http.StatusNotFound)
+		return
+	}
+	sh, castOK := val.(*network.StreamHandler)
+	if !castOK || sh == nil {
+		http.Error(wrt, "Invalid FTP stream", http.StatusBadRequest)
+		return
+	}
+	if sh.OperatorSession != "" && sh.OperatorSession != operatorSession {
+		logging.Errorf("CRITICAL: operator %s attempted to unregister ftp stream owned by %s", operatorSession, sh.OperatorSession)
+		auditOperatorAction(operatorSession, "ftp_unregister_denied", "", ftpReq.FilePath)
+		http.Error(wrt, "Forbidden", http.StatusForbidden)
+		return
 	}
 
-	// Unregister token in server's map
-	network.FTPStreams.Delete(ftpReq.FilePath)
+	// Remove only the token entry the caller actually owns.
 	network.FTPStreams.Delete("token:" + ftpReq.Token)
 	auditOperatorAction(operatorSession, "ftp_unregister", "", ftpReq.FilePath)
 
@@ -652,6 +670,24 @@ func cleanupOperatorFTPStreams(session string) {
 		}
 		return true
 	})
+}
+
+// countOperatorFTPStreams counts the tokens currently registered by one
+// operator. Only token keys are counted so the alias bookkeeping cannot inflate
+// the total.
+func countOperatorFTPStreams(operatorSession string) int {
+	count := 0
+	network.FTPStreams.Range(func(k, v any) bool {
+		key, ok := k.(string)
+		if !ok || !strings.HasPrefix(key, "token:") {
+			return true
+		}
+		if sh, ok := v.(*network.StreamHandler); ok && sh != nil && sh.OperatorSession == operatorSession {
+			count++
+		}
+		return true
+	})
+	return count
 }
 
 // registerOperatorSession publishes a live message tunnel for operatorID,

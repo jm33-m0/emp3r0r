@@ -207,7 +207,7 @@ func handleWWWRelayStream(conn io.ReadWriteCloser, agentUUID, streamID, remoteAd
 		return
 	}
 
-	ownerSession, err := getOnlyOperatorSession()
+	ownerSession, err := wwwRelayOperatorFor(agentUUID)
 	if err != nil {
 		logging.Errorf("CRITICAL: www relay: %v", err)
 		conn.Close()
@@ -226,6 +226,21 @@ func handleWWWRelayStream(conn io.ReadWriteCloser, agentUUID, streamID, remoteAd
 
 	// Keep this stream alive until operator finishes or errors; otherwise agent receives EOF with empty body.
 	<-rs.done
+}
+
+// wwwRelayOperatorFor resolves which operator should serve a WWW relay stream
+// opened by agentUUID. A WWW stream fetches a file hosted in an operator's WWW
+// root, so it must be served by the operator that currently owns the agent.
+// When no operator holds the agent (an agent-initiated fetch such as a module
+// download during check-in), it falls back to the sole online operator so
+// single-operator deployments keep working; when several operators are online
+// the request is ambiguous and is refused rather than letting an agent pick an
+// arbitrary operator to serve from its filesystem.
+func wwwRelayOperatorFor(agentUUID string) (string, error) {
+	if owner := agentLockOwnerSession(agentUUID); owner != "" {
+		return owner, nil
+	}
+	return getOnlyOperatorSession()
 }
 
 func getOnlyOperatorSession() (string, error) {
