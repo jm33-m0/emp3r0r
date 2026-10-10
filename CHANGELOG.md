@@ -1,5 +1,13 @@
 # Changelog
 
+## [5.1.0](https://github.com/jm33-m0/emp3r0r/compare/v5.0.0...v5.1.0) (2026-10-10)
+
+
+### Features
+
+* **ech:** ECH support in C2 channels; both utls/tls are supported ([b4b224e](https://github.com/jm33-m0/emp3r0r/commit/b4b224e204ca87e8ecb30caeb3c5f3e5a37c6303))
+* **operator:** remove mTLS ([80f9d59](https://github.com/jm33-m0/emp3r0r/commit/80f9d59ffc2a513dc0c1260215cc79af3be8c147))
+
 ## [5.0.0](https://github.com/jm33-m0/emp3r0r/compare/v4.24.2...v5.0.0) (2026-10-10)
 
 
