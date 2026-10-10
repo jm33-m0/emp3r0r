@@ -84,8 +84,7 @@ DONUT_IMAGE_BIN = pathlib.Path("/opt/donut/donut")
 CRYSTALPALACE_IMAGE_DIR = pathlib.Path("/opt/crystalpalace")
 # proxy-ns is an operator-side tool built in the image and shipped in the kit.
 # It is intentionally not given capabilities: it needs several powerful ones
-# (cap_sys_admin, cap_net_admin, ...), so operators run it with sudo (see the
-# socks_start hint).
+# (cap_sys_admin, cap_net_admin, ...), so operators run it with sudo.
 PROXY_NS_IMAGE_BIN = pathlib.Path("/opt/proxy-ns/proxy-ns")
 # proxy-ns refuses to start without a config; the image caches the upstream
 # default so the kit/install can drop it at the compiled-in /etc path.

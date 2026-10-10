@@ -150,7 +150,7 @@ Once you're on a Windows host, emp3r0r lets you _become_ the users on it — wit
 
 Pivot without burning another implant: the C2 runs a SOCKS5 proxy that relays through the agent you select, and the operator side can go one step further with a transparent TUN device.
 
-- `socks_start 1080` gives you a SOCKS5 endpoint on the C2 that tunnels through the chosen agent — point proxychains or any tool at it and you're inside the target network.
+- `socks_start 1080` runs a SOCKS5 endpoint on the C2's **WireGuard address** that tunnels through the chosen agent; reach it from inside the tunnel, or let `tun2socks` dial it for you.
 - `tun2socks start --route 10.10.0.0/24` creates a TUN device that routes only the subnets you name through that proxy — everything else keeps using your normal connection.
 - The result looks like it originates from the agent, with no per-tool proxy configuration.
 
