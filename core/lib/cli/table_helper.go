@@ -38,13 +38,3 @@ func AdaptiveTable(tableString string) {
 	// Nothing to do - simple text formatting doesn't need pane resizing
 	logging.Debugf("Using simple text formatting - no pane resizing needed")
 }
-
-// CliPrettyPrint prints two-column help info using simple formatting
-func CliPrettyPrint(header1, header2 string, map2write *map[string]string) {
-	for c1, c2 := range *map2write {
-		logging.Infof("%s: %s\n",
-			color.HiCyanString("%-40s", c1),
-			color.WhiteString(c2))
-	}
-	logging.Infof("\n")
-}

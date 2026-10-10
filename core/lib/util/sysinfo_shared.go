@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"net"
 	"os"
 	"os/user"
 	"runtime"
@@ -70,50 +69,6 @@ func GetUsername() string {
 	return u.Username
 }
 
-// Golang code to get MAC address for purposes of generating a unique id. Returns a uint64.
-// Skips virtual MAC addresses (Locally Administered Addresses).
-func macUint64() uint64 {
-	interfaces, err := net.Interfaces()
-	if err != nil {
-		logging.Debugf("macUint64: %v", err)
-		return uint64(0)
-	}
-
-	for _, i := range interfaces {
-		// Skip loopback and down interfaces
-		if i.Flags&net.FlagLoopback != 0 || i.Flags&net.FlagUp == 0 {
-			continue
-		}
-
-		// Skip if no hardware address
-		if len(i.HardwareAddr) == 0 {
-			continue
-		}
-
-		// Skip virtual/locally administered MAC addresses (bit 1 of first byte is set)
-		if i.HardwareAddr[0]&0x02 != 0 {
-			continue
-		}
-
-		var mac uint64
-		for j, b := range i.HardwareAddr {
-			if j >= 8 {
-				break
-			}
-			mac <<= 8
-			mac += uint64(b)
-		}
-
-		return mac
-	}
-
-	return uint64(0)
-}
-
-func genShortID() string {
-	return fmt.Sprintf("%x", macUint64())
-}
-
 // agentIDHexLen is the number of hex characters in a derived agent identifier.
 // It is short enough to type and recognise, and wide enough (32 bits) that
 // collisions are negligible for the number of agents a C2 tracks at once.
@@ -166,35 +121,6 @@ func AgentRef(id string) string {
 	}
 	canonical := parsed.String()
 	return GenAgentTag(canonical) + " (" + canonical + ")"
-}
-
-// ScanPATH scan $PATH and return a list of executables, for autocomplete
-func ScanPATH() (exes []string) {
-	path_str := os.Getenv("PATH")
-	sep := ":"
-	if runtime.GOOS == "windows" {
-		sep = ";"
-	}
-
-	paths := strings.Split(path_str, sep)
-	if len(paths) < 1 {
-		exes = []string{""}
-		logging.Debugf("Empty PATH: %s", path_str)
-		return exes
-	}
-
-	// scan paths
-	for _, path := range paths {
-		files, err := os.ReadDir(path)
-		if err != nil {
-			continue
-		}
-		for _, f := range files {
-			exes = append(exes, f.Name())
-		}
-	}
-	logging.Debugf("Found %d executables from PATH (%s)", len(exes), path_str)
-	return exes
 }
 
 // FormatUptime converts seconds to human readable string (d h m s)

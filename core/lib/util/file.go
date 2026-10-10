@@ -233,17 +233,6 @@ func IsDirExist(path string) bool {
 	return false
 }
 
-// RemoveItemFromArray remove string/int from slice
-func RemoveItemFromArray[T string | int](to_remove T, sliceList []T) []T {
-	list := []T{}
-	for _, item := range sliceList {
-		if item != to_remove {
-			list = append(list, item)
-		}
-	}
-	return list
-}
-
 // RemoveDupsFromArray remove duplicated string/int from slice
 func RemoveDupsFromArray[T string | int](sliceList []T) []T {
 	allKeys := make(map[T]bool)
@@ -255,56 +244,6 @@ func RemoveDupsFromArray[T string | int](sliceList []T) []T {
 		}
 	}
 	return list
-}
-
-// IntArrayToStringArray convert int array to string array
-func IntArrayToStringArray(arr []int) []string {
-	var res []string
-	for _, v := range arr {
-		res = append(res, fmt.Sprintf("%d", v))
-	}
-	return res
-}
-
-// AppendToFile append bytes to a file
-func AppendToFile(filename string, data []byte) (err error) {
-	f, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	if _, err = f.Write(data); err != nil {
-		return err
-	}
-	return err
-}
-
-// AppendTextToFile append text to a file
-func AppendTextToFile(filename, text string) (err error) {
-	f, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	if _, err = f.WriteString(text); err != nil {
-		return err
-	}
-	return err
-}
-
-// IsStrInFile works like grep, check if a string is in a text file
-func IsStrInFile(text, filepath string) bool {
-	content, err := ReadFileAgent(filepath)
-	if err != nil {
-		// try direct read if ReadFileAgent fails (which handles memory)
-		// but ReadFileAgent is mostly superset.
-		// fallback to old way if needed but cleaner to use ReadFileAgent
-		logging.Debugf("IsStrInFile: %v", err)
-		return false
-	}
-	return strings.Contains(string(content), text)
 }
 
 // Copy copy file or directory from src to dst
@@ -459,35 +398,6 @@ func FileSize(path string) (size int64) {
 	}
 	size = fi.Size()
 	return size
-}
-
-// FindHolesInBinary find holes in a binary file that are big enough for a payload
-func FindHolesInBinary(fdata []byte, size int64) (indexes []int64, err error) {
-	// find_hole finds a hole from start
-	find_hole := func(start int64) (end int64) {
-		for i := start; i < int64(len(fdata)); i++ {
-			if fdata[i] == 0 {
-				end = i
-			} else {
-				break
-			}
-		}
-		return end
-	}
-
-	// find holes
-	for i := int64(0); i < int64(len(fdata)); i++ {
-		if fdata[i] == 0 {
-			end := find_hole(i)
-			// if hole is big enough
-			if end-i >= size {
-				indexes = append(indexes, i)
-			}
-			i = end
-		}
-	}
-
-	return indexes, err
 }
 
 // IsDirWritable check if a directory is writable
@@ -1149,32 +1059,6 @@ func CreateFileAgent(filename string) (*os.File, error) {
 	}
 
 	return os.Create(filename)
-}
-
-// OpenFileAgent is a centralized file opening function for agent operations.
-// This function wraps file opening operations to allow for future modifications.
-// Note: OpenFileAgent returns a raw os.File, so it DOES NOT support transparent encryption.
-// Use ReadFileAgent for encryption.
-func OpenFileAgent(filename string, flag int, perm os.FileMode) (*os.File, error) {
-	// Apply pattern
-	filename = ApplyFilePattern(filename)
-
-	logging.Debugf("Agent: Opening file %s with flags %d and permissions %o", filename, flag, perm)
-
-	// Future enhancements can be added here:
-	// - Special file opening flags
-	// - Anti-forensics techniques
-	// - File locking mechanisms
-
-	// ensure the directory exists
-	// only if we are creating or writing to the file
-	if flag&os.O_CREATE != 0 || flag&os.O_WRONLY != 0 || flag&os.O_RDWR != 0 {
-		if err := os.MkdirAll(filepath.Dir(filename), 0o700); err != nil {
-			return nil, fmt.Errorf("OpenFileAgent mkdir %s: %v", filepath.Dir(filename), err)
-		}
-	}
-
-	return os.OpenFile(filename, flag, perm)
 }
 
 // AppendToFileAgent is a centralized file appending function for agent operations.

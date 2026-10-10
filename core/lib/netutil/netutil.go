@@ -75,20 +75,6 @@ func ValidateDomain(domain string) bool {
 	return re.MatchString(domain)
 }
 
-// ValidateIPPort check if the host string looks like IP:Port
-func ValidateIPPort(to string) bool {
-	fields := strings.Split(to, ":")
-	if len(fields) != 2 {
-		return false
-	}
-	host := fields[0]
-	if !ValidateIP(host) {
-		return false
-	}
-	_, err := strconv.Atoi(fields[1])
-	return err == nil
-}
-
 // IsTor is the C2 on Tor?
 func IsTor(addr string) bool {
 	if !strings.HasPrefix(addr, "http://") &&
@@ -172,50 +158,6 @@ func IPIfaces() (ifaces []net.Interface) {
 		return nil
 	}
 	return ifaces
-}
-
-// IPbroadcastAddr calculate broadcast address of an IP
-func IPbroadcastAddr(ipMask IPWithMask) string {
-	ip := ipMask.IP
-	mask := ipMask.Mask
-
-	// check if IP is a valid IPv4 address
-	if ip.To4() == nil {
-		logging.Infof("%s is not a valid IPv4 address", ip.String())
-		return ""
-	}
-
-	broadcast := net.IP(make([]byte, 4))
-	for i, p := range ip.To4() {
-		broadcast[i] = p | ^mask[i]
-	}
-	return broadcast.String()
-}
-
-// FindIPToUse find an IP that resides in target IP range
-// target: 192.168.1.1/24
-func FindIPToUse(target string) string {
-	_, subnet, _ := net.ParseCIDR(target)
-	for _, ipnetstr := range IPa() {
-		ipstr := strings.Split(ipnetstr, "/")[0]
-		ip := net.ParseIP(ipstr)
-		if ip == nil {
-			continue
-		}
-		if subnet.Contains(ip) {
-			return ip.String()
-		}
-	}
-	return ""
-}
-
-// GenerateRandomSubnet24 generates a random /24 subnet
-func GenerateRandomSubnet24() string {
-	first := rand.IntN(256)
-	second := rand.IntN(256)
-	third := rand.IntN(256)
-
-	return fmt.Sprintf("%d.%d.%d.0/24", first, second, third)
 }
 
 // GenerateRandomPrivateSubnet24 generates a random private /24 subnet from RFC 1918 address space

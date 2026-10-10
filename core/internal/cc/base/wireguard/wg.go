@@ -168,11 +168,6 @@ func (w *WireGuardDevice) DialContext(ctx context.Context, network, address stri
 	return w.tnet.DialContext(ctx, network, address)
 }
 
-// Dial opens a connection through the userspace stack.
-func (w *WireGuardDevice) Dial(network, address string) (net.Conn, error) {
-	return w.DialContext(context.Background(), network, address)
-}
-
 // Listen creates a TCP listener on the userspace stack.
 func (w *WireGuardDevice) Listen(network, address string) (net.Listener, error) {
 	if w.tnet == nil {
@@ -187,23 +182,6 @@ func (w *WireGuardDevice) Listen(network, address string) (net.Listener, error) 
 		return w.tnet.ListenTCP(addr)
 	default:
 		return nil, fmt.Errorf("wireguard: unsupported listen network %q", network)
-	}
-}
-
-// ListenPacket creates a UDP packet listener on the userspace stack.
-func (w *WireGuardDevice) ListenPacket(network, address string) (net.PacketConn, error) {
-	if w.tnet == nil {
-		return nil, errors.New("wireguard: device is not initialized")
-	}
-	switch network {
-	case "udp", "udp4", "udp6":
-		addr, err := net.ResolveUDPAddr(network, address)
-		if err != nil {
-			return nil, err
-		}
-		return w.tnet.ListenUDP(addr)
-	default:
-		return nil, fmt.Errorf("wireguard: unsupported packet network %q", network)
 	}
 }
 
@@ -359,17 +337,4 @@ func buildUAPIConfig(privateKey string, listenPort int, peers []PeerConfig) (str
 	}
 
 	return sb.String(), nil
-}
-
-// WireGuardDeviceInfo returns a printable summary of the WireGuard device configuration
-func (w *WireGuardDevice) WireGuardDeviceInfo() string {
-	var sb strings.Builder
-	sb.WriteString("\n=== WireGuard Interface Info ===\n")
-	sb.WriteString(fmt.Sprintf("Interface:    %s\n", w.Name))
-
-	sb.WriteString(fmt.Sprintf("IP Address:   %s\n", w.IPAddress))
-	sb.WriteString(fmt.Sprintf("Listen Port:  %d\n", w.ListenPort))
-	sb.WriteString(fmt.Sprintf("Private Key:  %s\n", w.PrivateKey))
-	sb.WriteString(fmt.Sprintf("Public Key:   %s\n", w.PublicKey))
-	return sb.String()
 }

@@ -194,11 +194,6 @@ func (logger *Logger) Msg(format string, a ...any) {
 	logger.helper(format, a, nil, INFO, false)
 }
 
-// Alert prints an alert message with custom color in bold font to console and log file, regardless of log level
-func (l *Logger) Alert(textColor color.Attribute, format string, a ...any) {
-	l.helper(format, a, color.New(textColor, color.Bold), WARN, false)
-}
-
 // Printf writes formatted output directly to the multi-writer without log prefixes.
 func (l *Logger) Printf(textColor *color.Color, format string, a ...any) {
 	logMsg := fmt.Sprintf(format, a...)

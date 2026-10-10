@@ -20,10 +20,6 @@ func Println(a ...any) {
 	logger.Msg("%v", fmt.Sprint(a...))
 }
 
-func Printf(format string, a ...any) {
-	logger.Msg(format, a...)
-}
-
 func RawPrintf(textColor *color.Color, format string, a ...any) {
 	logger.Printf(textColor, format, a...)
 }

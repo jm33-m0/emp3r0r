@@ -1853,15 +1853,6 @@ func matchSymbolOffset(symbols []elf.Symbol, want string) (uintptr, bool) {
 	return 0, false
 }
 
-func validateELFForCurrentArch(data []byte) error {
-	f, err := elf.NewFile(bytes.NewReader(data))
-	if err != nil {
-		return fmt.Errorf("invalid ELF image: %w", err)
-	}
-	defer f.Close()
-	return validateELFHeaders(f, data)
-}
-
 func validateELFHeaders(f *elf.File, raw []byte) error {
 	machine, err := currentELFMachine()
 	if err != nil {
