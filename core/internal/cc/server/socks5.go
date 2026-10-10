@@ -205,7 +205,12 @@ func StartSocks5Proxy(agentTag string, port int, bindAddr string) error {
 	}
 
 	if bindAddr == "" {
-		bindAddr = "0.0.0.0"
+		// Never default to all interfaces: the operator reaches the pivot over
+		// the WireGuard tunnel, not the public host interface.
+		bindAddr = wireguard.WgServerIP
+		if bindAddr == "" {
+			bindAddr = "127.0.0.1"
+		}
 	}
 
 	// Bind on the host (for local traffic) and, when the C2 runs a userspace
@@ -264,9 +269,15 @@ func StartSocks5Proxy(agentTag string, port int, bindAddr string) error {
 }
 
 // StopSocks5Proxy stops a running SOCKS5 pivot listener and its live relays.
-func StopSocks5Proxy(port int) error {
+// When operatorID is non-empty it must match the listener's owner, so one
+// operator cannot tear down another's pivot.
+func StopSocks5Proxy(port int, operatorID string) error {
 	socks5Proxies.mu.Lock()
 	ls, ok := socks5Proxies.listeners[port]
+	if ok && operatorID != "" && ls.owner != "" && ls.owner != operatorID {
+		socks5Proxies.mu.Unlock()
+		return fmt.Errorf("socks5: port %d is owned by another operator", port)
+	}
 	if ok {
 		delete(socks5Proxies.listeners, port)
 	}
@@ -299,7 +310,7 @@ func StopAllSocks5Proxies() {
 	}
 	socks5Proxies.mu.Unlock()
 	for _, p := range ports {
-		_ = StopSocks5Proxy(p)
+		_ = StopSocks5Proxy(p, "")
 	}
 }
 
@@ -334,7 +345,7 @@ func StopSocks5ProxiesForOperator(session string) {
 	socks5Proxies.mu.Unlock()
 	for _, p := range ports {
 		logging.Infof("SOCKS5 pivot on port %d owned by operator %s is being stopped", p, session)
-		_ = StopSocks5Proxy(p)
+		_ = StopSocks5Proxy(p, session)
 	}
 }
 
@@ -622,40 +633,76 @@ func handleSocks5Start(wrt http.ResponseWriter, req *http.Request) {
 		http.Error(wrt, "Invalid port", http.StatusBadRequest)
 		return
 	}
-	if err := StartSocks5Proxy(payload.AgentTag, payload.Port, payload.BindAddr); err != nil {
+	operatorID, idErr := operatorSessionFromReq(req)
+	if idErr != nil {
+		http.Error(wrt, "missing operator identity", http.StatusUnauthorized)
+		return
+	}
+	bindAddr, bindErr := validateSocks5BindAddr(payload.BindAddr)
+	if bindErr != nil {
+		http.Error(wrt, bindErr.Error(), http.StatusBadRequest)
+		return
+	}
+	// An operator can only pivot through an agent it owns (or a free one).
+	agent := agents.GetAgentByTag(payload.AgentTag)
+	if agent == nil {
+		http.Error(wrt, "Agent not found", http.StatusNotFound)
+		return
+	}
+	if owner := agentLockOwner(agent.UUID); owner != "" && owner != operatorDisplayName(operatorID) {
+		http.Error(wrt, fmt.Sprintf("Agent %s is operated by %s", agent.Tag, owner), http.StatusConflict)
+		return
+	}
+	if err := StartSocks5Proxy(payload.AgentTag, payload.Port, bindAddr); err != nil {
 		logging.Errorf("handleSocks5Start: %v", err)
 		http.Error(wrt, err.Error(), http.StatusBadRequest)
 		return
 	}
 	// Track ownership so the listener dies with its operator session.
-	if owner, err := operatorSessionFromReq(req); err == nil {
-		socks5Proxies.mu.Lock()
-		if ls, ok := socks5Proxies.listeners[payload.Port]; ok {
-			ls.owner = owner
-		}
-		socks5Proxies.mu.Unlock()
+	socks5Proxies.mu.Lock()
+	if ls, ok := socks5Proxies.listeners[payload.Port]; ok {
+		ls.owner = operatorID
 	}
+	socks5Proxies.mu.Unlock()
 	// Prefer the UUID the listener resolved at start; fall back to the request
 	// value (which may already be a tag) if the listener has gone.
 	agentRef := util.AgentRef(payload.AgentTag)
 	if ls, ok := socks5Proxies.listeners[payload.Port]; ok {
 		agentRef = util.AgentRef(ls.agentID)
 	}
-	if operatorID, opErr := operatorSessionFromReq(req); opErr == nil {
-		auditOperatorAction(operatorID, "socks5_start", agentRef, fmt.Sprintf("port=%d", payload.Port))
-	}
+	auditOperatorAction(operatorID, "socks5_start", agentRef, fmt.Sprintf("port=%d", payload.Port))
 	logging.Successf("SOCKS5 pivot started on port %d via agent %s", payload.Port, agentRef)
 	wrt.WriteHeader(http.StatusOK)
 }
 
+// validateSocks5BindAddr restricts the pivot listener to loopback or the C2's
+// WireGuard address, so an operator cannot expose it on a public interface.
+func validateSocks5BindAddr(bindAddr string) (string, error) {
+	addr := strings.TrimSpace(bindAddr)
+	if addr == "" {
+		return "", nil // StartSocks5Proxy applies the WireGuard default
+	}
+	if addr == "localhost" {
+		return "127.0.0.1", nil
+	}
+	ip := net.ParseIP(addr)
+	if ip == nil || (!ip.IsLoopback() && addr != wireguard.WgServerIP) {
+		return "", fmt.Errorf("socks5: bind address %q is not allowed; use loopback or the WireGuard address", addr)
+	}
+	return addr, nil
+}
+
 // handleSocks5List returns the running SOCKS5 pivots to the operator console.
-func handleSocks5List(wrt http.ResponseWriter, _ *http.Request) {
+func handleSocks5List(wrt http.ResponseWriter, req *http.Request) {
 	defer func() {
 		if r := recover(); r != nil {
 			logging.Errorf("handleSocks5List panicked: %v", r)
 			http.Error(wrt, "Internal server error", http.StatusInternalServerError)
 		}
 	}()
+	if _, ok := requireOperatorIdentity(wrt, req); !ok {
+		return
+	}
 	wrt.Header().Set("Content-Type", "application/cbor")
 	if err := cbor.NewEncoder(wrt).Encode(ListSocks5Proxies()); err != nil {
 		http.Error(wrt, err.Error(), http.StatusInternalServerError)
@@ -674,12 +721,15 @@ func handleSocks5Stop(wrt http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		return
 	}
-	if err := StopSocks5Proxy(payload.Port); err != nil {
+	operatorID, idErr := operatorSessionFromReq(req)
+	if idErr != nil {
+		http.Error(wrt, "missing operator identity", http.StatusUnauthorized)
+		return
+	}
+	if err := StopSocks5Proxy(payload.Port, operatorID); err != nil {
 		http.Error(wrt, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if operatorID, opErr := operatorSessionFromReq(req); opErr == nil {
-		auditOperatorAction(operatorID, "socks5_stop", "", fmt.Sprintf("port=%d", payload.Port))
-	}
+	auditOperatorAction(operatorID, "socks5_stop", "", fmt.Sprintf("port=%d", payload.Port))
 	wrt.WriteHeader(http.StatusOK)
 }
