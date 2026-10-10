@@ -15,7 +15,16 @@ const (
 	// ReplayWindowSeconds defines the allowed clock skew / replay window.
 	ReplayWindowSeconds = 60
 	// OperatorClaimMaxTTLSeconds bounds accepted operator stream claim validity.
+	// It is compared against the claim's own (operator-side) TTL, i.e. the
+	// difference ExpiresAt-IssuedAt, so it is independent of clock skew between
+	// the operator and the server.
 	OperatorClaimMaxTTLSeconds = 300
+	// OperatorClaimMaxAgeSeconds bounds how stale or future-dated a claim's
+	// absolute timestamps may be. It exists only to tolerate clock skew between
+	// the operator host and the server and to stop replay of very old claims;
+	// actual replay protection is the server-side nonce cache, which must retain
+	// nonces for at least this long.
+	OperatorClaimMaxAgeSeconds = 600
 )
 
 // CanonicalAuthString builds the payload-auth canonical string.
@@ -127,11 +136,18 @@ func VerifyOperatorStreamClaim(
 	if claim.IssuedAt <= 0 || claim.ExpiresAt <= 0 || claim.ExpiresAt <= claim.IssuedAt {
 		return fmt.Errorf("invalid claim timestamps")
 	}
-	if claim.ExpiresAt-now > OperatorClaimMaxTTLSeconds {
-		return fmt.Errorf("claim ttl exceeds limit")
+	// The claim's own TTL is a difference between operator-side timestamps, so
+	// it cannot be affected by operator/server clock skew. Comparing an absolute
+	// expiry against the server clock (as this used to) rejected every claim
+	// whenever the two hosts' clocks disagreed.
+	if claim.ExpiresAt-claim.IssuedAt > OperatorClaimMaxTTLSeconds {
+		return fmt.Errorf("claim TTL %ds exceeds the %ds limit", claim.ExpiresAt-claim.IssuedAt, OperatorClaimMaxTTLSeconds)
 	}
-	if claim.IssuedAt-now > ReplayWindowSeconds || now-claim.ExpiresAt > ReplayWindowSeconds {
-		return fmt.Errorf("claim outside replay window")
+	// Only guard against absurd timestamps; the nonce cache is the replay
+	// boundary. Allow generous skew in both directions, and say so: this is the
+	// error an operator hits when the two hosts' clocks disagree.
+	if claim.IssuedAt-now > OperatorClaimMaxAgeSeconds || now-claim.ExpiresAt > OperatorClaimMaxAgeSeconds {
+		return fmt.Errorf("claim timestamps are %ds ahead of and %ds behind the C2 clock; check that the operator and C2 clocks are in sync (NTP)", claim.IssuedAt-now, now-claim.ExpiresAt)
 	}
 
 	canonical := CanonicalOperatorStreamClaimString(claim)

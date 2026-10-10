@@ -118,18 +118,20 @@ func operatorPubKeyPEMFromReq(req *http.Request) ([]byte, string, error) {
 	return pubPEM, hex.EncodeToString(fp[:]), nil
 }
 
-func rememberOperatorClaimNonce(fingerprint, session, nonce string, ts int64) error {
+func rememberOperatorClaimNonce(fingerprint, session, nonce string) error {
 	if fingerprint == "" || session == "" || nonce == "" {
 		return fmt.Errorf("invalid nonce cache key")
 	}
 	now := time.Now().Unix()
 	key := fingerprint + ":" + session + ":" + nonce
 	if prev, exists := operatorClaimNonceCache.Load(key); exists {
-		if prevTS, ok := prev.(int64); ok && now-prevTS <= transport.OperatorClaimMaxTTLSeconds {
+		// Replay protection uses the server's own clock only, so operator/server
+		// clock skew cannot let a nonce be reused.
+		if prevTS, ok := prev.(int64); ok && now-prevTS <= operatorClaimNonceTTLSeconds {
 			return fmt.Errorf("replayed claim nonce")
 		}
 	}
-	operatorClaimNonceCache.Store(key, ts)
+	operatorClaimNonceCache.Store(key, now)
 	operatorClaimNonceCache.Range(func(k, v any) bool {
 		nonceTS, ok := v.(int64)
 		if !ok || now-nonceTS > operatorClaimNonceTTLSeconds {
@@ -152,7 +154,7 @@ func verifyOperatorStreamClaim(req *http.Request, claim *def.OperatorStreamClaim
 	if err = transport.VerifyOperatorStreamClaim(claim, session, streamID, capability, pubPEM); err != nil {
 		return "", err
 	}
-	if err = rememberOperatorClaimNonce(fp, session, claim.Nonce, claim.IssuedAt); err != nil {
+	if err = rememberOperatorClaimNonce(fp, session, claim.Nonce); err != nil {
 		return "", err
 	}
 	if _, ok := OPERATORS.Load(session); !ok {
@@ -475,7 +477,9 @@ func handleRegisterFTPStream(wrt http.ResponseWriter, req *http.Request) {
 	operatorSession, err := verifyOperatorStreamClaim(req, ftpReq.Claim, ftpReq.Token, def.OperatorCapabilityRegisterFTP)
 	if err != nil {
 		logging.Errorf("CRITICAL: Reject ftp stream registration from %s: %v", req.RemoteAddr, err)
-		http.Error(wrt, "Unauthorized", http.StatusUnauthorized)
+		// Return the reason so the operator sees it (e.g. clock skew) instead of
+		// a bare "Unauthorized".
+		http.Error(wrt, err.Error(), http.StatusUnauthorized)
 		return
 	}
 	// An operator may not hijack a token that another operator already owns.
