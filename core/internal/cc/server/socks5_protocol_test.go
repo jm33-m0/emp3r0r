@@ -155,7 +155,7 @@ func TestSocks5ManagerPortValidation(t *testing.T) {
 	if err := StartSocks5Proxy("", 70000, ""); err == nil {
 		t.Fatal("expected error for out-of-range port")
 	}
-	if err := StopSocks5Proxy(1); err == nil {
+	if err := StopSocks5Proxy(1, ""); err == nil {
 		t.Fatal("expected error stopping a listener that does not exist")
 	}
 	StopAllSocks5Proxies() // must be a no-op and not panic

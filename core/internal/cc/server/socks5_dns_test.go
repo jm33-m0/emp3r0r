@@ -107,7 +107,7 @@ func startRealDNSRelayServer(t *testing.T) (int, func()) {
 		t.Fatalf("StartSocks5Proxy: %v", err)
 	}
 	return port, func() {
-		_ = StopSocks5Proxy(port)
+		_ = StopSocks5Proxy(port, "")
 		agents.SendCmd = nil
 		live.ForgetAgent(agent.UUID)
 		_ = agentPipe.Close()

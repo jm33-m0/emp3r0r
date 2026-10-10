@@ -55,7 +55,7 @@ func startUDPAssociateTest(t *testing.T) (int, func()) {
 	return port, func() {
 		// Stop first: StopSocks5Proxy drains in-flight handlers, so none can
 		// still be calling agents.SendCmd when we nil it.
-		_ = StopSocks5Proxy(port)
+		_ = StopSocks5Proxy(port, "")
 		agents.SendCmd = nil
 		live.ForgetAgent(agent.UUID)
 		_ = srv.Close()
@@ -215,7 +215,7 @@ func TestSocks5UDPAssociateAgentErrorSynthesizesServfail(t *testing.T) {
 		t.Fatalf("StartSocks5Proxy: %v", err)
 	}
 	defer func() {
-		_ = StopSocks5Proxy(port)
+		_ = StopSocks5Proxy(port, "")
 		agents.SendCmd = nil
 		live.ForgetAgent(agent.UUID)
 		_ = srv.Close()

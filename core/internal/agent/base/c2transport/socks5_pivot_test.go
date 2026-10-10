@@ -327,7 +327,7 @@ func runSocks5PivotE2E(t *testing.T, mode string, expectRefused bool) {
 	if err := server.StartSocks5Proxy(agentTag, socksPort, "127.0.0.1"); err != nil {
 		t.Fatalf("StartSocks5Proxy: %v", err)
 	}
-	defer server.StopSocks5Proxy(socksPort)
+	defer server.StopSocks5Proxy(socksPort, "")
 
 	// -----------------------------------------------------------------------
 	// Proxychains-style client.

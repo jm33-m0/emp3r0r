@@ -234,7 +234,7 @@ func startPivotStack(t *testing.T) (pivotAddr string) {
 	if err := server.StartSocks5Proxy(agentTag, socksPort, "127.0.0.1"); err != nil {
 		t.Fatalf("StartSocks5Proxy: %v", err)
 	}
-	t.Cleanup(func() { _ = server.StopSocks5Proxy(socksPort) })
+	t.Cleanup(func() { _ = server.StopSocks5Proxy(socksPort, "") })
 	t.Logf("real SOCKS5 pivot on 127.0.0.1:%d via agent %s", socksPort, agentTag)
 	return fmt.Sprintf("127.0.0.1:%d", socksPort)
 }
