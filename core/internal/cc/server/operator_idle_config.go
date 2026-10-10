@@ -136,6 +136,15 @@ func handleUpdateOperatorIdleConfig(wrt http.ResponseWriter, req *http.Request) 
 		http.Error(wrt, "OperatorIdleTimeout must be >= 0", http.StatusBadRequest)
 		return
 	}
+	// In multi-operator mode the idle policy is server-wide: letting any operator
+	// disable idle rejection (0) or extend it would weaken admission control for
+	// every other operator, so only the server may set it there.
+	if isMultiOperator() {
+		logging.Warningf("CRITICAL: operator %s tried to change the global operator idle timeout in multi-operator mode", operatorID)
+		auditOperatorAction(operatorID, "set_idle_timeout_denied", "", fmt.Sprintf("%d", cfg.OperatorIdleTimeout))
+		http.Error(wrt, "operator idle timeout is server-managed in multi-operator mode", http.StatusForbidden)
+		return
+	}
 
 	live.RuntimeConfig.OperatorIdleTimeout = cfg.OperatorIdleTimeout
 	setOperatorIdleTimeout(cfg.OperatorIdleTimeout)
