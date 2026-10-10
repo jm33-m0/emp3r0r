@@ -418,31 +418,19 @@ addressed, so internal names (for example records held by a domain controller)
 resolve as they would from inside the target network. Non-DNS UDP is dropped:
 the pivot is a stream relay and has no UDP path to the agent.
 
-Use the bundled proxy-ns instead of proxychains. proxychains LD_PRELOADs libc
-to rewrite connect()/resolver calls, so it silently bypasses statically linked
-binaries and anything that does not go through libc, and it needs per-tool
-configuration. proxy-ns runs the program in its own network namespace with a
-TUN that pipes all of its traffic into the pivot, so TCP, UDP and static
-binaries are proxied transparently with no per-tool setup. It needs root for
-the namespace and TUN device. Either prefix commands with sudo, or grant it
-the capabilities once so you do not have to:
-  sudo setcap cap_sys_admin,cap_net_admin,cap_net_bind_service,cap_sys_chroot,cap_chown=ep \
-      "$(readlink -f "$(command -v proxy-ns)")"
+The pivot listens on the C2's WireGuard address and on the C2 host's loopback.
+Use the bundled tun2socks to route target networks through it transparently;
+tun2socks dials the pivot inside the WireGuard tunnel, so this works from a
+remote operator:
+  tun2socks start --route <target-network>/24
 
-Spawn a shell so everything started from it goes through the pivot:
-  sudo proxy-ns --socks5-address=<pivot> $SHELL
-
-DNS: FakeDNS (proxy-ns default) answers locally with fake IPs and sends the
-domain to the pivot. That is fast, but tools like dig receive fake answers. To
-resolve real internal names, disable it and point proxy-ns at the target's DNS
-server, which the pivot forwards to the agent:
-  sudo proxy-ns --socks5-address=<pivot> --fake-dns=false \
-      --dns-server=<target DNS> $SHELL`,
-			Example: "socks_start 1080\n\tsudo proxy-ns --socks5-address=<C2 host>:1080 $SHELL\n\tsudo proxy-ns --socks5-address=<C2 host>:1080 --fake-dns=false --dns-server=<target DNS> $SHELL",
+A plain SOCKS5 client can also use the pivot at the WireGuard address, but only
+from inside the tunnel.`,
+			Example: "socks_start 1080\n\ttun2socks start --route 10.10.0.0/24",
 			Args:    cobra.MaximumNArgs(1),
 			Run:     socks5StartCmdRun,
 		}
-		socksStartCmd.Flags().StringP("bind", "b", "", "C2 bind address (default: all interfaces, e.g. reachable via the WireGuard IP)")
+		socksStartCmd.Flags().StringP("bind", "b", "", "C2 bind address (default: the WireGuard address plus loopback)")
 		rootCmd.AddCommand(socksStartCmd)
 
 		socksStopCmd := &cobra.Command{
@@ -496,28 +484,9 @@ func socks5StartCmdRun(cmd *cobra.Command, args []string) {
 		proxyAddr = bind
 	}
 	logging.Successf("SOCKS5 pivot on %s:%d via agent %s", proxyAddr, port, agent.Tag)
-	hostAddr := socks5HostAddress()
-	if bind != "" && bind != "0.0.0.0" {
-		hostAddr = bind
-	}
-	logging.Warningf("Prefer proxy-ns over proxychains: proxychains only hooks libc, so static binaries and non-libc apps escape it.")
-	logging.Infof("Spawn a shell with everything proxied through this pivot:")
-	logging.Infof("  sudo proxy-ns --socks5-address=%s:%d $SHELL", hostAddr, port)
-	logging.Infof("Run proxy-ns without sudo (once): sudo setcap cap_sys_admin,cap_net_admin,cap_net_bind_service,cap_sys_chroot,cap_chown=ep \"$(readlink -f \"$(command -v proxy-ns)\")\"")
-	logging.Infof("Internal DNS: add --fake-dns=false --dns-server=<target DNS> (the agent forwards queries to it).")
-	logging.Warningf("proxychains (legacy): socks5 %s %d", proxyAddr, port)
-}
-
-// socks5HostAddress returns the pivot address reachable from the operator
-// host's normal network stack. Tools like proxy-ns run outside the operator
-// process, so they cannot see its in-process userspace WireGuard netstack:
-// local mode uses loopback, remote operators use the C2 address they connected
-// to (the pivot also binds all host interfaces).
-func socks5HostAddress() string {
-	if ServerIP == "" || ServerIP == "127.0.0.1" || ServerIP == "localhost" {
-		return "127.0.0.1"
-	}
-	return ServerIP
+	logging.Infof("Route target networks through it with tun2socks (dials the pivot inside WireGuard):")
+	logging.Infof("  tun2socks start --route <target-network>/24")
+	logging.Infof("Plain SOCKS5 clients can use %s:%d, reachable only over the WireGuard tunnel.", proxyAddr, port)
 }
 
 // socks5ProxyHost returns the address the operator should reach the C2-side
@@ -562,7 +531,7 @@ func socks5StatusCmdRun(cmd *cobra.Command, _ []string) {
 		}
 		logging.Infof("SOCKS5 pivot on %s:%d via agent %s", bind, p.Port, p.AgentTag)
 	}
-	logging.Infof("Reach it at socks5 %s <port> (tun2socks picks it up automatically)", socks5ProxyHost())
+	logging.Infof("Reach it at the WireGuard address %s (tun2socks picks it up automatically)", socks5ProxyHost())
 }
 
 func execCmd(cmd *cobra.Command, args []string) {

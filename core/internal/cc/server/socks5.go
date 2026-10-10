@@ -218,14 +218,26 @@ func StartSocks5Proxy(agentTag string, port int, bindAddr string) error {
 		}
 	}
 
-	// Bind on the host (for local traffic) and, when the C2 runs a userspace
-	// WireGuard stack, on the tunnel as well so remote operators can reach it.
+	// Bind loopback on the host unconditionally, so tools running on the C2 host
+	// (and local-mode operators) can reach the pivot without a tunnel. The
+	// requested address is bound too when it is a real host address; the
+	// WireGuard address never is (it lives on the userspace stack below), so
+	// attempting it on the host only produced a misleading "cannot assign
+	// requested address" warning.
+	hostAddrs := []string{"127.0.0.1"}
+	if bindAddr != "" && bindAddr != "127.0.0.1" && bindAddr != wireguard.WgServerIP {
+		hostAddrs = append(hostAddrs, bindAddr)
+	}
 	var lns []net.Listener
-	hostLn, hostErr := net.Listen("tcp", net.JoinHostPort(bindAddr, strconv.Itoa(port)))
-	if hostErr == nil {
-		lns = append(lns, hostLn)
-	} else {
-		logging.Warningf("socks5: listen %s:%d on host: %v", bindAddr, port, hostErr)
+	var hostErr error
+	for _, addr := range hostAddrs {
+		ln, err := net.Listen("tcp", net.JoinHostPort(addr, strconv.Itoa(port)))
+		if err == nil {
+			lns = append(lns, ln)
+			continue
+		}
+		hostErr = errors.Join(hostErr, fmt.Errorf("%s: %w", addr, err))
+		logging.Warningf("socks5: listen %s:%d on host: %v", addr, port, err)
 	}
 	var wgErr error
 	if wireguard.WgServer != nil {
