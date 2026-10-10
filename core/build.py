@@ -49,9 +49,10 @@ Target selection options (combinable with any build command):
 
 Agent feature selection options (combinable with any build command):
   --agent-slim        Compile agent payloads without the optional transports
-                      and features (KCP, h2conn, uTLS, DoH, CDN proxy, netlink)
-                      while keeping the core P2P mesh (mTLS/SMB) enabled. Add
-                      the ``no_mesh`` tag to opt out of P2P entirely.
+                      and features (KCP, h2conn, DoH, CDN proxy, netlink) while
+                      keeping uTLS TLS fingerprinting and the core P2P mesh
+                      (mTLS/SMB) enabled. Add the ``no_mesh`` tag to opt out of
+                      P2P entirely, or ``no_utls`` to fall back to crypto/tls.
   --agent-tags TAGS   Extra Go build tags for every agent payload, e.g.
                       "no_mesh no_kcp" or a custom tag. Combined with
                       --agent-slim when both are given. C2 server binaries are
@@ -98,10 +99,13 @@ REQUIRED_FREE_KB = 10 * 1024 * 1024  # 10 GB
 
 # Optional agent features that can be compiled out. The full build keeps them
 # all (no tags); --agent-slim drops the optional transports and features while
-# keeping the core P2P mesh (memberlist gossip + mTLS/SMB relay) enabled. Use
-# the additional ``no_mesh`` tag to opt out of P2P entirely. The tag names must
-# stay in sync with the //go:build constraints across core/.
-SLIM_AGENT_TAGS = "no_kcp no_h2conn no_utls no_doh no_cdnproxy no_netlink"
+# keeping the core P2P mesh (memberlist gossip + mTLS/SMB relay) and uTLS TLS
+# fingerprinting enabled. uTLS costs only ~0.8 MiB compressed on the packaged
+# implant, so it is kept in slim builds too; add the ``no_utls`` tag to fall
+# back to crypto/tls. Use the additional ``no_mesh`` tag to opt out of P2P
+# entirely. The tag names must stay in sync with the //go:build constraints
+# across core/.
+SLIM_AGENT_TAGS = "no_kcp no_h2conn no_doh no_cdnproxy no_netlink"
 
 # What each exclusion tag disables, shown in --help and --list-agent-tags.
 # Keep in sync with core/ build constraints and with install.py.
@@ -2024,9 +2028,10 @@ def parse_args() -> argparse.Namespace:
         default=False,
         help=(
             "Compile agents without the optional transports/features (KCP, "
-            "h2conn, uTLS, DoH, CDN proxy, netlink) while keeping the core "
-            "P2P mesh (mTLS/SMB) enabled. Add the 'no_mesh' tag to opt out "
-            "of P2P entirely."
+            "h2conn, DoH, CDN proxy, netlink) while keeping uTLS TLS "
+            "fingerprinting and the core P2P mesh (mTLS/SMB) enabled. Add the "
+            "'no_mesh' tag to opt out of P2P entirely, or 'no_utls' to use "
+            "crypto/tls."
         ),
     )
     feat_group.add_argument(

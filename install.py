@@ -51,9 +51,10 @@ AGENT_TAG_DOCS: dict[str, str] = {
     "no_netlink": "netlink route/neighbour enumeration (procfs fallback)",
 }
 
-# Recommended --agent-slim exclusions. P2P mesh stays enabled; use the
-# additional "no_mesh" tag to opt out. Keep in sync with core/build.py.
-SLIM_AGENT_TAGS = "no_kcp no_h2conn no_utls no_doh no_cdnproxy no_netlink"
+# Recommended --agent-slim exclusions. P2P mesh and uTLS TLS fingerprinting
+# stay enabled (uTLS is only ~0.8 MiB compressed); use the additional
+# "no_mesh"/"no_utls" tags to drop them. Keep in sync with core/build.py.
+SLIM_AGENT_TAGS = "no_kcp no_h2conn no_doh no_cdnproxy no_netlink"
 
 
 def agent_tag_reference() -> str:
@@ -794,9 +795,10 @@ def parse_args() -> argparse.Namespace:
         default=False,
         help=(
             "Compile agents without the optional transports/features (KCP, "
-            "h2conn, uTLS, DoH, CDN proxy, netlink) while keeping the core "
-            "P2P mesh (mTLS/SMB) enabled. Add the 'no_mesh' tag to opt out "
-            "of P2P entirely."
+            "h2conn, DoH, CDN proxy, netlink) while keeping uTLS TLS "
+            "fingerprinting and the core P2P mesh (mTLS/SMB) enabled. Add the "
+            "'no_mesh' tag to opt out of P2P entirely, or 'no_utls' to use "
+            "crypto/tls."
         ),
     )
     feat_group.add_argument(
