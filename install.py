@@ -17,6 +17,7 @@ Can be executed in two modes:
 """
 
 import argparse
+import hashlib
 import os
 import pathlib
 import shutil
@@ -451,6 +452,29 @@ def check_host_deps(repo_root: pathlib.Path) -> None:
         )
 
 
+def builder_image_ref(repo_root: pathlib.Path) -> str:
+    """Return the builder image reference pinned to the current Dockerfile.
+
+    The tag carries a hash of the Dockerfile so changing the recipe (a new
+    pinned toolchain, a new mingw shim, donut/proxy-ns, ...) rebuilds the image
+    instead of silently reusing a stale ``emp3r0r-builder``. Without this, an
+    old image keeps producing kits that are missing every tool added since it
+    was built -- which is exactly how donut and proxy-ns went missing while the
+    image still existed.
+    """
+    dockerfile = repo_root / "Dockerfile"
+    if not dockerfile.is_file():
+        return "emp3r0r-builder"
+    try:
+        digest = hashlib.sha256(dockerfile.read_bytes()).hexdigest()[:12]
+    except OSError as e:
+        log_warn(
+            f"Could not hash {dockerfile}: {e}; using the unversioned builder tag"
+        )
+        return "emp3r0r-builder"
+    return f"emp3r0r-builder:{digest}"
+
+
 def docker_build(
     container_engine: str,
     repo_root: pathlib.Path,
@@ -460,7 +484,7 @@ def docker_build(
 ) -> None:
     log_info(f"Using local source: {repo_root}")
 
-    builder_image = "emp3r0r-builder"
+    builder_image = builder_image_ref(repo_root)
 
     inspect_res = run_cmd(
         [container_engine, "image", "inspect", builder_image],
