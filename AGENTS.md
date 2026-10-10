@@ -75,6 +75,21 @@
 - Initial check-in phase is the only phase where static keys can be used. Sessions need to be re-keyed immediately after this phase.
 - Reject early in new check-ins if anything doesn't work; avoid executing more work such as CBOR decoding.
 
+## Operator isolation (multi-operator mode)
+
+In multi-operator mode the server is the trust root and operators are untrusted relative to the server and to each other. Enforce every boundary on the server; never rely on the operator client to police itself. See `SECURITY.md` for the threat model.
+
+- Operator identity is the provisioned WireGuard IP, derived from the authenticated peer address (`operatorIDFromRemote`). Trust the `operator_session` header only from loopback (local mode, embedders, tests), never from a network peer.
+- Every operator-facing endpoint must call `requireOperatorIdentity` (or `verifyOperatorStreamClaim` for stream registration) and reject unidentified callers with 401.
+- Agent ownership is a per-agent single-owner lock (`acquireAgentLock`): a second claim is 409, a command is refused 409 unless the caller owns the agent, and `forget_agent` is refused while another operator owns the agent. Release an operator's locks on target switch, disconnect and idle timeout.
+- A job's owner is immutable (`setJobOwner` uses `LoadOrStore`), so one operator can never redirect another operator's command output.
+- SOCKS5 pivots, FTP streams and WWW relays are owner-checked. Route agent-initiated work (e.g. the WWW download relay) to the operator that owns the agent with `agentLockOwnerSession`; only fall back to "the sole online operator" for single-operator setups, never when several operators are online. A pivot or FTP listing shows only the caller's own entries.
+- The operator idle timeout is a server-wide policy: in multi-operator mode only the server may change it, and an operator update must be refused.
+- `sign_agent` signs only a validated UUID, never arbitrary content (the CA is not a signing oracle).
+- SOCKS5 pivots bind only loopback or the C2's WireGuard address, never a public interface.
+- Bound every operator-controlled input and map: request bodies (1 MiB), message-tunnel frames (4 MiB) and per-operator counts (FTP streams, SOCKS5 pivots). Cap and sweep per-agent rate-limiter/replay caches so a hostile peer cannot grow server memory without bound.
+- Record every operator action, including denials, in `~/.emp3r0r/operator_audit.log` (0600) via `auditOperatorAction`.
+
 ## Agent Identity and tmux UI
 
 - The agent's `Tag` is the operator-facing identifier: short lowercase hex derived only from the cryptographically verified UUID by `util.GenAgentTag`. The C2 derives it from the verified UUID at the trust boundary and overwrites any agent-reported tag.
