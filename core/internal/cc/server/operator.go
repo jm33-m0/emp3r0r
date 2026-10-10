@@ -208,10 +208,12 @@ func handleSetActiveAgent(wrt http.ResponseWriter, req *http.Request) {
 	if acquired, heldBy := acquireAgentLock(agent.UUID, operatorID, operatorDisplayName(operatorID)); !acquired {
 		msg := fmt.Sprintf("Agent %s is operated by %s", agent.Tag, heldBy)
 		logging.Warningf("%s (operator %s)", msg, operatorID)
+		auditOperatorAction(operatorID, "claim_denied", util.AgentRef(agent.UUID), "held by "+heldBy)
 		http.Error(wrt, msg, http.StatusConflict)
 		return
 	}
 	releaseAgentLocksForOperatorExcept(operatorID, agent.UUID)
+	auditOperatorAction(operatorID, "claim", util.AgentRef(agent.UUID), agent.Name)
 
 	// Return a snapshot so the operator always gets a consistent view of the
 	// agent metadata (especially LastSeen/RTT) instead of the shared pointer
@@ -260,6 +262,7 @@ func handleSendCommand(wrt http.ResponseWriter, req *http.Request) {
 	if acquired, heldBy := acquireAgentLock(agent.UUID, operatorID, operatorDisplayName(operatorID)); !acquired {
 		msg := fmt.Sprintf("Agent %s is operated by %s", agent.Tag, heldBy)
 		logging.Warningf("%s (operator %s)", msg, operatorID)
+		auditOperatorAction(operatorID, "command_denied", util.AgentRef(agent.UUID), "held by "+heldBy)
 		http.Error(wrt, msg, http.StatusConflict)
 		return
 	}
@@ -267,6 +270,7 @@ func handleSendCommand(wrt http.ResponseWriter, req *http.Request) {
 	// stale lock never blocks another operator.
 	releaseAgentLocksForOperatorExcept(operatorID, agent.UUID)
 	setJobOwner(*operation.JobID, operatorID)
+	auditOperatorAction(operatorID, "command", util.AgentRef(agent.UUID), *operation.Command)
 
 	// Track the job ID so the message tunnel accepts the response
 	live.CmdTime.Store(*operation.JobID, time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST"))
@@ -334,6 +338,7 @@ func handleForgetAgent(wrt http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		return
 	}
+	operatorID, _ := operatorSessionFromReq(req)
 
 	uuid := operation.AgentTag
 	uuid = strings.TrimSpace(uuid)
@@ -407,6 +412,7 @@ func handleForgetAgent(wrt http.ResponseWriter, req *http.Request) {
 	}
 	// A forgotten agent must not stay locked against a future re-check-in.
 	deleteAgentLock(uuid)
+	auditOperatorAction(operatorID, "forget_agent", util.AgentRef(uuid), "")
 	wrt.WriteHeader(http.StatusOK)
 	fmt.Fprintf(wrt, "%s\n\nHas been forgotten.", agentDetails)
 }
@@ -440,6 +446,7 @@ func handleRegisterFTPStream(wrt http.ResponseWriter, req *http.Request) {
 	}
 	network.FTPStreams.Store(ftpReq.FilePath, sh)
 	network.FTPStreams.Store("token:"+ftpReq.Token, sh)
+	auditOperatorAction(operatorSession, "ftp_register", "", ftpReq.FilePath)
 
 	logging.Infof("Registered FTP stream token %s for %s from operator", ftpReq.Token, ftpReq.FilePath)
 	wrt.WriteHeader(http.StatusOK)
@@ -475,6 +482,7 @@ func handleUnregisterFTPStream(wrt http.ResponseWriter, req *http.Request) {
 	// Unregister token in server's map
 	network.FTPStreams.Delete(ftpReq.FilePath)
 	network.FTPStreams.Delete("token:" + ftpReq.Token)
+	auditOperatorAction(operatorSession, "ftp_unregister", "", ftpReq.FilePath)
 
 	logging.Infof("Unregistered FTP stream token %s for %s from operator", ftpReq.Token, ftpReq.FilePath)
 	wrt.WriteHeader(http.StatusOK)
@@ -624,6 +632,7 @@ func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 	operatorName := operatorDisplayName(operatorID)
 	logging.Infof("Operator %s connected to message tunnel from %s", operatorName, req.RemoteAddr)
 	operator := registerOperatorSession(operatorID, operatorName, conn)
+	auditOperatorAction(operatorID, "connect", "", req.RemoteAddr)
 
 	ctx, cancel := context.WithCancel(req.Context())
 	readDone := make(chan struct{})
@@ -636,6 +645,7 @@ func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 		// Guarded teardown: a newer connection may have replaced this operator,
 		// in which case we must leave the replacement alone.
 		if unregisterOperatorConn(operatorID, operator) {
+			auditOperatorAction(operatorID, "disconnect", "", "")
 			// If this was the last operator, disconnect all agents.
 			lastOperator := true
 			OPERATORS.Range(func(_, _ any) bool {

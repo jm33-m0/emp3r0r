@@ -14,6 +14,7 @@ import (
 
 // handleSignAgent handles operator requests to sign an agent UUID with the CA key.
 func handleSignAgent(wrt http.ResponseWriter, req *http.Request) {
+	operatorID, _ := operatorSessionFromReq(req)
 	var signReq def.SignRequest
 	decoder := cbor.NewDecoder(req.Body)
 	if err := decoder.Decode(&signReq); err != nil {
@@ -35,6 +36,7 @@ func handleSignAgent(wrt http.ResponseWriter, req *http.Request) {
 	}
 
 	sigStr := base64.URLEncoding.EncodeToString(sig)
+	auditOperatorAction(operatorID, "sign_agent", "", string(signReq.Content))
 	data, err := cbor.Marshal(sigStr)
 	if err != nil {
 		logging.Errorf("handleSignAgent: failed to marshal response: %v", err)

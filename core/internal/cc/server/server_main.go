@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
@@ -22,7 +23,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-func ServerMain(wg_port int, hosts string, numOperators int, operatorsSet bool, addOperators int) {
+func ServerMain(wg_port int, hosts string, operatorNames, addOperators []string, operatorsSet bool) {
 	// Publish the configured idle timeout to the atomic mirror that agent
 	// tunnels and agent-lock expiry read, so config updates and readers never
 	// race on the shared RuntimeConfig field.
@@ -53,7 +54,7 @@ func ServerMain(wg_port int, hosts string, numOperators int, operatorsSet bool, 
 	go KCPC2ListenAndServe(network.EmpKCPCtx, network.EmpKCPCancel)
 	// Bring the userspace WireGuard stack up first so the operator-facing
 	// listeners can be bound on it.
-	wg(wg_port, numOperators, addOperators, operatorsSet)
+	wg(wg_port, operatorNames, addOperators, operatorsSet)
 	go tarConfig(hosts)
 	time.Sleep(3 * time.Second)
 	go StartC2AgentTLSServer()
@@ -78,11 +79,10 @@ type SavedWgConfig struct {
 	Operators        []OperatorConfig `json:"operators"`
 }
 
-// generateOperators creates count new operators on subnet, numbering their
-// display names from startIndex so appended operators keep a stable name.
-func generateOperators(subnet string, startIndex, count int) ([]OperatorConfig, error) {
-	operators := make([]OperatorConfig, count)
-	for i := range count {
+// generateOperators creates one operator per name on subnet.
+func generateOperators(subnet string, names []string) ([]OperatorConfig, error) {
+	operators := make([]OperatorConfig, len(names))
+	for i, name := range names {
 		priv, err := wireguard.GeneratePrivateKey()
 		if err != nil {
 			return nil, fmt.Errorf("generate operator private key: %w", err)
@@ -96,13 +96,71 @@ func generateOperators(subnet string, startIndex, count int) ([]OperatorConfig, 
 			return nil, fmt.Errorf("allocate operator IP: %w", err)
 		}
 		operators[i] = OperatorConfig{
-			Name:       fmt.Sprintf("operator-%d", startIndex+i+1),
+			Name:       name,
 			PrivateKey: priv,
 			PublicKey:  pub,
 			IP:         ip,
 		}
 	}
 	return operators, nil
+}
+
+// resolveOperatorNames turns a --operators/--add-operator spec into concrete
+// operator names. A single integer N expands to N default names
+// (operator-<startIndex+1>..), keeping the count form working; every other
+// value is a name. Names are sanitized and checked for duplicates.
+func resolveOperatorNames(spec []string, startIndex int) ([]string, error) {
+	names := spec
+	if len(spec) == 1 {
+		if n, err := strconv.Atoi(strings.TrimSpace(spec[0])); err == nil {
+			if n < 1 {
+				return nil, fmt.Errorf("operator count must be >= 1, got %d", n)
+			}
+			names = make([]string, n)
+			for i := range n {
+				names[i] = fmt.Sprintf("operator-%d", startIndex+i+1)
+			}
+		}
+	}
+	return validateOperatorNames(names)
+}
+
+// validateOperatorNames rejects empty or control-character names and duplicates,
+// so the audit log and UI cannot be spoofed by a second operator with the same
+// name.
+func validateOperatorNames(names []string) ([]string, error) {
+	out := make([]string, 0, len(names))
+	seen := map[string]bool{}
+	for _, raw := range names {
+		name := strings.TrimSpace(raw)
+		if name == "" {
+			return nil, fmt.Errorf("operator name must not be empty")
+		}
+		if name != util.SanitizeOneLine(name) {
+			return nil, fmt.Errorf("operator name %q contains control characters", name)
+		}
+		if seen[name] {
+			return nil, fmt.Errorf("duplicate operator name %q", name)
+		}
+		seen[name] = true
+		out = append(out, name)
+	}
+	return out, nil
+}
+
+// ensureNewNamesUnused verifies none of names is already taken by an existing
+// operator.
+func ensureNewNamesUnused(existing []OperatorConfig, names []string) error {
+	used := make(map[string]bool, len(existing))
+	for _, op := range existing {
+		used[op.Name] = true
+	}
+	for _, name := range names {
+		if used[name] {
+			return fmt.Errorf("operator %q already exists", name)
+		}
+	}
+	return nil
 }
 
 // writeWgConfig persists the WireGuard config with owner-only permissions.
@@ -121,11 +179,18 @@ func writeWgConfig(path string, config SavedWgConfig) error {
 // and preserving existing operator identities on every later run. Existing
 // identities are never regenerated: --operators is refused once the file exists
 // (remove it manually to start over), and --add-operator appends new operators.
-func loadOrProvisionWg(configFile string, numOperators, addOperators int, operatorsSet bool) (SavedWgConfig, error) {
+func loadOrProvisionWg(configFile string, operatorNames, addOperators []string, operatorsSet bool) (SavedWgConfig, error) {
 	if !util.IsFileExist(configFile) {
-		count := max(numOperators, 1)
-		if addOperators > 0 {
-			count = addOperators
+		spec := operatorNames
+		if len(spec) == 0 {
+			spec = addOperators
+		}
+		if len(spec) == 0 {
+			spec = []string{"1"}
+		}
+		names, err := resolveOperatorNames(spec, 0)
+		if err != nil {
+			return SavedWgConfig{}, err
 		}
 		serverPriv, err := wireguard.GeneratePrivateKey()
 		if err != nil {
@@ -136,7 +201,7 @@ func loadOrProvisionWg(configFile string, numOperators, addOperators int, operat
 		if err != nil {
 			return SavedWgConfig{}, fmt.Errorf("allocate server IP: %w", err)
 		}
-		operators, err := generateOperators(subnet, 0, count)
+		operators, err := generateOperators(subnet, names)
 		if err != nil {
 			return SavedWgConfig{}, err
 		}
@@ -149,7 +214,7 @@ func loadOrProvisionWg(configFile string, numOperators, addOperators int, operat
 		if err := writeWgConfig(configFile, config); err != nil {
 			return SavedWgConfig{}, err
 		}
-		logging.Successf("Created WireGuard config with %d operator(s): %s", count, configFile)
+		logging.Successf("Created WireGuard config with %d operator(s): %s", len(operators), configFile)
 		return config, nil
 	}
 
@@ -167,8 +232,15 @@ func loadOrProvisionWg(configFile string, numOperators, addOperators int, operat
 	}
 
 	switch {
-	case addOperators > 0:
-		added, err := generateOperators(config.Subnet, len(config.Operators), addOperators)
+	case len(addOperators) > 0:
+		names, err := resolveOperatorNames(addOperators, len(config.Operators))
+		if err != nil {
+			return SavedWgConfig{}, err
+		}
+		if err := ensureNewNamesUnused(config.Operators, names); err != nil {
+			return SavedWgConfig{}, err
+		}
+		added, err := generateOperators(config.Subnet, names)
 		if err != nil {
 			return SavedWgConfig{}, fmt.Errorf("add operators: %w", err)
 		}
@@ -176,7 +248,7 @@ func loadOrProvisionWg(configFile string, numOperators, addOperators int, operat
 		if err := writeWgConfig(configFile, config); err != nil {
 			return SavedWgConfig{}, err
 		}
-		logging.Successf("Added %d operator(s); %d total", addOperators, len(config.Operators))
+		logging.Successf("Added %d operator(s); %d total", len(added), len(config.Operators))
 	case operatorsSet:
 		return SavedWgConfig{}, fmt.Errorf(
 			"wireguard config %s already holds %d operator(s); refusing --operators. "+
@@ -189,9 +261,9 @@ func loadOrProvisionWg(configFile string, numOperators, addOperators int, operat
 	return config, nil
 }
 
-func wg(wg_port, numOperators, addOperators int, operatorsSet bool) {
+func wg(wg_port int, operatorNames, addOperators []string, operatorsSet bool) {
 	configFile := filepath.Join(live.EmpWorkSpace, "wg_config.json")
-	config, err := loadOrProvisionWg(configFile, numOperators, addOperators, operatorsSet)
+	config, err := loadOrProvisionWg(configFile, operatorNames, addOperators, operatorsSet)
 	if err != nil {
 		logging.Fatalf("%v", err)
 	}
@@ -276,66 +348,74 @@ func wg(wg_port, numOperators, addOperators int, operatorsSet bool) {
 		wg_port, wg_port+1)
 }
 
-func tarConfig(hosts string) {
-	err := config.GenC2Certs(hosts)
-	if err != nil {
-		logging.Fatalf("Failed to generate C2 certs: %v", err)
-	}
-	// create temp dir
-	tempDir, err := os.MkdirTemp("", "emp3r0r_config_")
-	if err != nil {
-		logging.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	// create .emp3r0r in temp dir
-	tempEmpDir := filepath.Join(tempDir, filepath.Base(live.EmpWorkSpace))
-	err = os.MkdirAll(tempEmpDir, 0o700)
-	if err != nil {
-		logging.Fatalf("Failed to create temp .emp3r0r dir: %v", err)
-	}
-
-	// copy necessary files to temp dir
-	//
-	// Only what an operator needs: the operator CA (to verify the C2's server
-	// certificate), the shared operator client cert/key, and the runtime
-	// config. The agent CA/server keys and the full wg_config.json (which holds
-	// every operator's WireGuard private key) must never leave the C2.
-	filesToCopy := []string{
+// operatorConfigFileNames lists the files copied into the operator config
+// bundle. It is the complete set an operator needs to start and to mint agents:
+// the runtime config, the public C2/agent/operator CA certificates (which the
+// operator verifies and reads for C2 names) and its own client identity. The
+// agent-CA/server private keys and wg_config.json (every operator's WireGuard
+// private key) must never leave the C2.
+func operatorConfigFileNames() []string {
+	return []string{
 		"emp3r0r.json",
+		filepath.Base(transport.CaCrtFile),
+		filepath.Base(transport.ServerCrtFile),
 		filepath.Base(transport.OperatorCaCrtFile),
 		filepath.Base(transport.OperatorClientCrtFile),
 		filepath.Base(transport.OperatorClientKeyFile),
 	}
+}
 
-	for _, file := range filesToCopy {
+// BuildOperatorConfigArchive stages the operator config bundle and writes it to
+// live.EmpConfigTar, returning the tarball path. It is exported so tests can
+// assert exactly what an operator receives.
+func BuildOperatorConfigArchive() (string, error) {
+	tempDir, err := os.MkdirTemp("", "emp3r0r_config_")
+	if err != nil {
+		return "", fmt.Errorf("create config staging dir: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	tempEmpDir := filepath.Join(tempDir, filepath.Base(live.EmpWorkSpace))
+	if err := os.MkdirAll(tempEmpDir, 0o700); err != nil {
+		return "", fmt.Errorf("create staging workspace: %w", err)
+	}
+
+	for _, file := range operatorConfigFileNames() {
 		src := filepath.Join(live.EmpWorkSpace, file)
 		if !util.IsFileExist(src) {
+			logging.Warningf("Operator config bundle is missing %s", src)
 			continue
 		}
-		copyErr := util.Copy(src, tempEmpDir) // util.Copy handles dir dst
-		if copyErr != nil {
-			logging.Warningf("Failed to copy %s to temp dir: %v", src, copyErr)
+		if err := util.Copy(src, tempEmpDir); err != nil {
+			logging.Warningf("Failed to copy %s to config bundle: %v", src, err)
 		}
 	}
 
-	// tar the temp dir
 	cwd, err := os.Getwd()
 	if err != nil {
-		logging.Warningf("Failed to get current directory: %v", err)
+		return "", fmt.Errorf("get working directory: %w", err)
 	}
-	err = os.Chdir(tempDir)
-	if err != nil {
-		logging.Fatalf("Failed to change directory to temp dir: %v", err)
+	if err := os.Chdir(tempDir); err != nil {
+		return "", fmt.Errorf("cd to staging dir: %w", err)
 	}
 	defer os.Chdir(cwd)
 
-	err = util.TarArchive(filepath.Base(live.EmpWorkSpace), live.EmpConfigTar)
-	if err != nil {
-		logging.Errorf("Failed to tar config files: %v", err)
+	if err := util.TarArchive(filepath.Base(live.EmpWorkSpace), live.EmpConfigTar); err != nil {
+		return "", fmt.Errorf("archive config bundle: %w", err)
 	}
-	err = relay.WgFileServer(live.EmpConfigTar)
+	return live.EmpConfigTar, nil
+}
+
+func tarConfig(hosts string) {
+	if err := config.GenC2Certs(hosts); err != nil {
+		logging.Fatalf("Failed to generate C2 certs: %v", err)
+	}
+	tarball, err := BuildOperatorConfigArchive()
 	if err != nil {
+		logging.Errorf("Failed to build operator config bundle: %v", err)
+		return
+	}
+	if err := relay.WgFileServer(tarball); err != nil {
 		logging.Errorf("Failed to start file server to serve config tarball: %v", err)
 	}
 }

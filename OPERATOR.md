@@ -28,22 +28,31 @@ shrink the implant and reduce fingerprinting), `--debug`, `--skip-build`.
 Launch the server:
 
 ```bash
-emp3r0r server --c2-hosts 1.2.3.4 --http-port 12345 --operator-port 13377 --operators 3
+emp3r0r server --c2-hosts 1.2.3.4 --http-port 12345 --operator-port 13377 \
+  --operators alice bob carl
 ```
 
-`--operators N` provisions N operator WireGuard configs on the **first** start
-(they are persisted in `wg_config.json` and printed as a table). Each operator
-gets its own WireGuard key/IP and is identified by that IP at the mTLS layer.
-On every later start the existing identities are kept as-is: `--operators` is
-refused once `wg_config.json` exists, so a restart can never regenerate (and
-invalidate) an operator's keys. To add more operators without touching the
-existing ones, use `--add-operator N`. To start over, delete `wg_config.json`
-and restart.
+`--operators` names the operators to provision on the **first** start (they are
+persisted in `wg_config.json` and printed as a table). Names can be
+comma-separated (`--operators alice,bob`), repeated
+(`--operators alice --operators bob`) or given as positional arguments after
+`server`. A single integer still works as a count (`--operators 3` creates
+`operator-1..operator-3`), and with no names one default operator is created.
+
+Each operator gets its own WireGuard key/IP and is identified by that IP at the
+mTLS layer. On every later start the existing identities are kept as-is:
+`--operators` is refused once `wg_config.json` exists, so a restart can never
+regenerate (and invalidate) an operator's keys. To add more operators without
+touching the existing ones, use `--add-operator` with the same name syntax. To
+start over, delete `wg_config.json` and restart.
 
 ```bash
-# add two operators to an existing deployment
-emp3r0r server --c2-hosts 1.2.3.4 --add-operator 2
+# add two named operators to an existing deployment
+emp3r0r server --c2-hosts 1.2.3.4 --add-operator dave erin
 ```
+
+Names must be unique and free of control characters; they are used in the
+console and the audit log.
 
 > **Firewall warning.** WireGuard gives every provisioned operator IP-level
 > access to the C2's tunnel subnet. Firewall the WireGuard UDP port and the
@@ -62,9 +71,24 @@ operator keeps its own jobs, pivots, file streams and agent claims.
   operator switches target, disconnects, or stops talking to the C2 for the
   operator idle timeout.
 - **Agent list.** The `Operator` column shows who is on what agent.
-- **Adding operators.** Run the server with `--add-operator N`; existing keys and
-  IPs are preserved and only N new rows are appended to `wg_config.json` and the
-  printed table. `--operators N` is for the first run only.
+- **Adding operators.** Run the server with `--add-operator <names>`; existing
+  keys and IPs are preserved and only the new named rows are appended to
+  `wg_config.json` and the printed table. `--operators` is for the first run
+  only.
+
+#### Operator audit log
+
+The server appends every operator action to `~/.emp3r0r/operator_audit.log`
+(mode `0600`), one timestamped line per event, naming the operator, its
+WireGuard IP and public key, the action and the target:
+
+```text
+2026-10-11T04:02:15Z operator="alice" wg_ip="10.123.180.207" wg_pubkey="..." action="command" target="1a2b3c4d (uuid)" detail="ls -la"
+```
+
+Recorded actions include `connect`, `disconnect`, `claim`/`claim_denied`,
+`command`/`command_denied`, `forget_agent`, `sign_agent`, `set_idle_timeout`
+and `resume`. The log is append-only; rotate or archive it as needed.
 
 #### Upgrading without breaking existing agents
 

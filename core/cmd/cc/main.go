@@ -24,21 +24,21 @@ import (
 
 // Options struct to hold flag values
 type Options struct {
-	c2_server_ip            string // C2 server IP
-	c2_http_port            int    // C2 HTTP service port
-	c2_h2_port              int    // C2 HTTP/2 stream service port
-	c2_operator_server_port int    // C2 operator server port
-	wg_server_key           string // C2 server's WireGuard public key
-	wg_server_ip            string // C2 server's WireGuard IP
-	wg_operator_ip          string // Operator's WireGuard IP
-	wg_operator_key         string // Operator's WireGuard private key
-	c2_hosts                string // C2 hosts to generate cert for
-	cdnProxy                string // Start cdn2proxy server on this port
-	debug                   bool   // Do not kill tmux session when crashing
-	server_debug            bool   // Enable verbose server logging (level 4)
-	num_operators           int    // Number of operator configurations to create on the first run
-	operators_set           bool   // whether --operators was given explicitly
-	add_operators           int    // Number of operators to append to an existing WireGuard config
+	c2_server_ip            string   // C2 server IP
+	c2_http_port            int      // C2 HTTP service port
+	c2_h2_port              int      // C2 HTTP/2 stream service port
+	c2_operator_server_port int      // C2 operator server port
+	wg_server_key           string   // C2 server's WireGuard public key
+	wg_server_ip            string   // C2 server's WireGuard IP
+	wg_operator_ip          string   // Operator's WireGuard IP
+	wg_operator_key         string   // Operator's WireGuard private key
+	c2_hosts                string   // C2 hosts to generate cert for
+	cdnProxy                string   // Start cdn2proxy server on this port
+	debug                   bool     // Do not kill tmux session when crashing
+	server_debug            bool     // Enable verbose server logging (level 4)
+	operator_names          []string // Operator names to create on the first run
+	operators_named         bool     // whether operator names were given explicitly
+	append_operator_names   []string // Operator names to append to an existing WireGuard config
 }
 
 const (
@@ -103,10 +103,17 @@ func main() {
 
 	// Server subcommand
 	serverCmd := &cobra.Command{
-		Use:   "server",
+		Use:   "server [operator names...]",
 		Short: "Run as C2 operator server",
 		Run: func(cmd *cobra.Command, args []string) {
-			opts.operators_set = cmd.Flags().Changed("operators")
+			// Positional args are more operator names, so both
+			// `--operators alice bob` and `--operators alice --operators bob` work.
+			if cmd.Flags().Changed("add-operator") {
+				opts.append_operator_names = append(opts.append_operator_names, args...)
+			} else {
+				opts.operator_names = append(opts.operator_names, args...)
+			}
+			opts.operators_named = cmd.Flags().Changed("operators") || len(opts.operator_names) > 0
 			runServerMode(opts)
 		},
 	}
@@ -116,8 +123,8 @@ func main() {
 	serverCmd.Flags().IntVar(&opts.c2_http_port, "http-port", 0, "C2 HTTP server port to listen on")
 	serverCmd.Flags().IntVar(&opts.c2_h2_port, "h2-port", 0, "C2 HTTP/2 stream (h2conn) server port to listen on")
 	serverCmd.Flags().StringVar(&opts.c2_hosts, "c2-hosts", "", "C2 hosts to generate cert for, separated by whitespace")
-	serverCmd.Flags().IntVar(&opts.num_operators, "operators", 1, "Create a fresh WireGuard config with N operators (first run only; refused once wg_config.json exists)")
-	serverCmd.Flags().IntVar(&opts.add_operators, "add-operator", 0, "Append N operators to the existing WireGuard config and keep the current ones")
+	serverCmd.Flags().StringSliceVar(&opts.operator_names, "operators", nil, "Operator names to create on the first run (comma-separated, repeatable, or positional); a single integer N creates operator-1..N")
+	serverCmd.Flags().StringSliceVar(&opts.append_operator_names, "add-operator", nil, "Operator names to append to the existing WireGuard config and keep the current ones")
 	serverCmd.MarkFlagsMutuallyExclusive("operators", "add-operator")
 	serverCmd.Flags().BoolVar(&opts.server_debug, "debug", false, "Enable verbose server logging (level 4, includes agent hellos)")
 
@@ -249,7 +256,7 @@ func runServerMode(opts *Options) {
 	if err != nil {
 		logging.Fatalf("Failed to load config: %v", err)
 	}
-	server.ServerMain(opts.c2_operator_server_port, opts.c2_hosts, opts.num_operators, opts.operators_set, opts.add_operators)
+	server.ServerMain(opts.c2_operator_server_port, opts.c2_hosts, opts.operator_names, opts.append_operator_names, opts.operators_named)
 }
 
 func connectWg(opts *Options) {

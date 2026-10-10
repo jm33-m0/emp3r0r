@@ -641,6 +641,9 @@ func handleSocks5Start(wrt http.ResponseWriter, req *http.Request) {
 	if ls, ok := socks5Proxies.listeners[payload.Port]; ok {
 		agentRef = util.AgentRef(ls.agentID)
 	}
+	if operatorID, opErr := operatorSessionFromReq(req); opErr == nil {
+		auditOperatorAction(operatorID, "socks5_start", agentRef, fmt.Sprintf("port=%d", payload.Port))
+	}
 	logging.Successf("SOCKS5 pivot started on port %d via agent %s", payload.Port, agentRef)
 	wrt.WriteHeader(http.StatusOK)
 }
@@ -674,6 +677,9 @@ func handleSocks5Stop(wrt http.ResponseWriter, req *http.Request) {
 	if err := StopSocks5Proxy(payload.Port); err != nil {
 		http.Error(wrt, err.Error(), http.StatusBadRequest)
 		return
+	}
+	if operatorID, opErr := operatorSessionFromReq(req); opErr == nil {
+		auditOperatorAction(operatorID, "socks5_stop", "", fmt.Sprintf("port=%d", payload.Port))
 	}
 	wrt.WriteHeader(http.StatusOK)
 }

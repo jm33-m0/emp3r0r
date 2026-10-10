@@ -128,6 +128,7 @@ func handleUpdateOperatorIdleConfig(wrt http.ResponseWriter, req *http.Request) 
 	if err != nil {
 		return
 	}
+	operatorID, _ := operatorSessionFromReq(req)
 	if cfg.OperatorIdleTimeout < 0 {
 		http.Error(wrt, "OperatorIdleTimeout must be >= 0", http.StatusBadRequest)
 		return
@@ -140,6 +141,7 @@ func handleUpdateOperatorIdleConfig(wrt http.ResponseWriter, req *http.Request) 
 		return
 	}
 	logging.Infof("Operator idle timeout updated to %d seconds", cfg.OperatorIdleTimeout)
+	auditOperatorAction(operatorID, "set_idle_timeout", "", fmt.Sprintf("%d", cfg.OperatorIdleTimeout))
 	wrt.WriteHeader(http.StatusOK)
 }
 
@@ -147,13 +149,16 @@ func handleUpdateOperatorIdleConfig(wrt http.ResponseWriter, req *http.Request) 
 // again after an idle timeout. The dispatcher already touched the operator
 // command timer, but this endpoint makes the intent explicit for the `resume`
 // command and returns a clean HTTP 200 response.
-func handleResumeOperator(wrt http.ResponseWriter, _ *http.Request) {
+func handleResumeOperator(wrt http.ResponseWriter, req *http.Request) {
 	defer func() {
 		if r := recover(); r != nil {
 			logging.Errorf("handleResumeOperator panicked: %v", r)
 			http.Error(wrt, "Internal server error", http.StatusInternalServerError)
 		}
 	}()
+	if operatorID, err := operatorSessionFromReq(req); err == nil {
+		auditOperatorAction(operatorID, "resume", "", "")
+	}
 	touchOperatorCommand()
 	wrt.WriteHeader(http.StatusOK)
 }
