@@ -50,19 +50,26 @@ func ModuleRun(ctx *context.C2Context) {
 	// Snapshot the selected target once: it can be replaced concurrently by
 	// the agent-list refresher.
 	active := live.GetActiveAgent()
-	if active != nil {
-		target_os := active.GOOS
-		mod_os := strings.ToLower(live.ActiveModule.Platform)
-		if mod_os != "generic" && target_os != mod_os {
-			logging.Errorf("ModuleRun: module %s does not support %s", strconv.Quote(live.ActiveModule.Name), target_os)
+
+	// A local C2 module runs entirely on the operator host and never reaches an
+	// agent, so neither the selected target's OS nor the presence of a target
+	// is relevant. Its Platform field (when set) only describes the OS its
+	// generated payload targets, not where the module runs.
+	if !live.ActiveModule.IsLocal {
+		if active != nil {
+			target_os := active.GOOS
+			mod_os := strings.ToLower(live.ActiveModule.Platform)
+			if mod_os != "generic" && target_os != mod_os {
+				logging.Errorf("ModuleRun: module %s does not support %s", strconv.Quote(live.ActiveModule.Name), target_os)
+				return
+			}
+		}
+
+		// an agent module needs a target to run on
+		if active == nil {
+			logging.Errorf("Target not specified")
 			return
 		}
-	}
-
-	// is a target needed?
-	if active == nil && !live.ActiveModule.IsLocal {
-		logging.Errorf("Target not specified")
-		return
 	}
 
 	// run module

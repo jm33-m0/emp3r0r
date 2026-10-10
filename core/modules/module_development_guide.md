@@ -21,7 +21,10 @@ There are two kinds of modules:
 - **C2 modules** (`"is_local": true`) run on the operator host. They execute
   their `build` command on the C2 and are used to produce payloads
   (`loader_windows`, `stager_linux`, `crystal_pack`). They have no
-  `agent_config`.
+  `agent_config`. Because they never reach an agent, they run without a
+  selected target and their `platform` field (when set) is informational
+  only — it describes the OS the produced payload targets, not where the
+  module runs.
 
 The built-in commands (`listener`, `file_downloader`,
 `steal_token`, `list_tokens`, `list_sessions`) are Go code registered
@@ -293,7 +296,8 @@ native C compiler.
 On the C2 (`moduleCustom`):
 
 1. If `build` is set, run it in the module directory with the current flags.
-2. If `is_local` is true, stop — the module ran on the C2.
+2. If `is_local` is true, stop — the module ran on the C2 with no target
+   required and no platform check (see §1).
 3. Resolve and validate the invocation from the console flags.
 4. Pre-host every `dependencies` payload for the target architecture so a
    missing dependency fails fast.
@@ -689,7 +693,7 @@ Pair with the `scshell` BOF to execute an uploaded file on the target.
 | Symptom                                                | Likely cause                                                                                                                               |
 | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `missing COFF invocation data`                         | `invocation.coff_export` is not set on a `coff` module.                                                                                    |
-| Module registered but never runs; "does not support …" | `platform` does not match the agent OS and is not `Generic`.                                                                               |
+| Module registered but never runs; "does not support …" | `platform` does not match the agent OS and is not `Generic`. Only applies to agent modules — local (`is_local`) modules are exempt.        |
 | Manifest fails to load                                 | A parameter has no `description`, or a non-local module's `agent_config.type` is missing or not `coff`/`starlark`/`dll`/`so`.              |
 | `option X is required`                                 | The flag was empty and the parameter is `required`.                                                                                        |
 | Starlark receives the wrong values                     | Starlark parameters are positional strings in declaration order; remember that `argv`/`main` include any `invocation.argv` literals first. |

