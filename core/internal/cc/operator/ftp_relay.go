@@ -67,14 +67,32 @@ func (c *relayFTPConn) Push(data []byte) error {
 var ftpRelayConns sync.Map // map[token]*relayFTPConn
 
 // dropFTPRelayConn removes token from the relay registry and closes its
-// connection, tolerating a missing or mismatched entry.
+// connection, then drops the local stream registration and tells the server to
+// do the same so a finished or failed transfer cannot leak stream handlers.
 func dropFTPRelayConn(token string) {
 	val, ok := ftpRelayConns.LoadAndDelete(token)
-	if !ok {
-		return
+	if ok {
+		if rc, ok := val.(*relayFTPConn); ok && rc != nil {
+			_ = rc.Close()
+		}
 	}
-	if rc, ok := val.(*relayFTPConn); ok && rc != nil {
-		_ = rc.Close()
+
+	filePath := ""
+	network.FTPStreams.Range(func(k, v any) bool {
+		sh, isSh := v.(*network.StreamHandler)
+		if !isSh || sh == nil || sh.Token != token {
+			return true
+		}
+		if key, isStr := k.(string); isStr && !strings.HasPrefix(key, "token:") {
+			filePath = key
+		}
+		network.FTPStreams.Delete(k)
+		return true
+	})
+	if filePath != "" {
+		if err := client.UnregisterFTPStream(token, filePath); err != nil {
+			logging.Warningf("ftp relay: unregister token %q: %v", token, err)
+		}
 	}
 }
 
