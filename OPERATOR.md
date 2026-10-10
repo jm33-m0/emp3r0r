@@ -71,6 +71,9 @@ operator keeps its own jobs, pivots, file streams and agent claims.
   operator switches target, disconnects, or stops talking to the C2 for the
   operator idle timeout.
 - **Agent list.** The `Operator` column shows who is on what agent.
+- **Pivots, streams and downloads are owner-scoped.** SOCKS5 pivots, FTP uploads and WWW download relays are bound to the operator that started them; another operator cannot stop your pivot, hijack or unregister your stream, or list your pivots. An agent that fetches a file over the WWW route is served by the operator that currently owns it.
+- **Operator idle timeout is server-managed.** In multi-operator mode the server owns the idle policy; an operator request to change it is refused and audited. Set it in the server's config, not from the console.
+- **Keep the clocks in sync.** Stream claims carry timestamps, and the server rejects a claim whose timestamps are more than about ten minutes off its own clock. Run NTP on both the C2 and every operator host; the rejection message tells you to check the clocks when this happens.
 - **Adding operators.** Run the server with `--add-operator <names>`; existing
   keys and IPs are preserved and only the new named rows are appended to
   `wg_config.json` and the printed table. `--operators` is for the first run
@@ -87,8 +90,11 @@ WireGuard IP and public key, the action and the target:
 ```
 
 Recorded actions include `connect`, `disconnect`, `claim`/`claim_denied`,
-`command`/`command_denied`, `forget_agent`, `sign_agent`, `set_idle_timeout`
-and `resume`. The log is append-only; rotate or archive it as needed.
+`command`/`command_denied`, `forget_agent`/`forget_agent_denied`,
+`sign_agent`, `set_idle_timeout`/`set_idle_timeout_denied`,
+`ftp_register`/`ftp_register_denied`,
+`socks5_start`/`socks5_start_denied` and `resume`. The log is append-only;
+rotate or archive it as needed.
 
 #### Upgrading without breaking existing agents
 

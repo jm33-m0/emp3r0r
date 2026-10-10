@@ -20,7 +20,7 @@ go test -race ./...                            # race detector
 ```
 
 Plain `go test ./...` should stay green. CI runs on every push and pull
-request touching `core/` against the `v4` branch.
+request touching `core/` against the `v5` branch.
 
 ### The `EMP3R0R_RACE_ON` switch
 
