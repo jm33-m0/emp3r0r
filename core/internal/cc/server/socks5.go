@@ -659,7 +659,7 @@ func socks5Reply(conn net.Conn, rep byte, bindHost string, bindPort uint16) erro
 // ---------------------------------------------------------------------------
 
 // handleSocks5Start starts a SOCKS5 pivot listener on the C2 host bound to the
-// requested agent. Invoked by the operator console via the mTLS operator API.
+// requested agent. Invoked by the operator console via the operator API.
 func handleSocks5Start(wrt http.ResponseWriter, req *http.Request) {
 	defer func() {
 		if r := recover(); r != nil {

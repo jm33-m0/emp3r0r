@@ -16,8 +16,8 @@ import (
 // agent (how long since the agent last received a command from the operator).
 var OnCommandSent func(agentTag string)
 
-// ExecuteCommand sends a command to an agent through the mTLS C2 operator server
-// This replaces operator.operatorSendCommand2Agent
+// ExecuteCommand sends a command to an agent through the operator HTTP service
+// over WireGuard. This replaces operator.operatorSendCommand2Agent
 func ExecuteCommand(cmd, jobID, agentTag string) error {
 	if jobID == "" {
 		// create a job to track this command

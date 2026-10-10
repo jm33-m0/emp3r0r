@@ -50,20 +50,3 @@ const (
 	TagWWWRelayDonePrefix    = "www_relay_done:"
 	TagWWWRelayErrorPrefix   = "www_relay_error:"
 )
-
-// Operator stream capabilities for claim-scoped authorization.
-const (
-	OperatorCapabilityRegisterFTP = "register_ftp"
-)
-
-// OperatorStreamClaim is a signed, short-lived claim used by operators to
-// authorize stream registration actions.
-type OperatorStreamClaim struct {
-	OperatorSession string `cbor:"1,keyasint"` // operator session id
-	StreamID        string `cbor:"2,keyasint"` // stream/session id bound to this claim
-	Capability      string `cbor:"3,keyasint"` // one of OperatorCapability*
-	IssuedAt        int64  `cbor:"4,keyasint"` // unix timestamp
-	ExpiresAt       int64  `cbor:"5,keyasint"` // unix timestamp
-	Nonce           string `cbor:"6,keyasint"` // replay protection nonce
-	Signature       []byte `cbor:"7,keyasint"` // ECDSA signature over canonical claim string
-}

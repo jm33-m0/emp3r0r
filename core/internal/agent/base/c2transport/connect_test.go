@@ -123,7 +123,6 @@ func TestEstablishC2Connection(t *testing.T) {
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile
 	transport.CaKeyFile = caKeyFile
-	transport.OperatorCaCrtFile = caCertFile // Set OperatorCaCrtFile for apiDispatcher
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
 	transport.EmpWorkSpace = tmpDir
@@ -356,7 +355,6 @@ func TestDuplicatedCheckin(t *testing.T) {
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile
 	transport.CaKeyFile = caKeyFile
-	transport.OperatorCaCrtFile = caCertFile
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
 	transport.EmpWorkSpace = tmpDir
@@ -533,7 +531,6 @@ func TestBackslashTag(t *testing.T) {
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile
 	transport.CaKeyFile = caKeyFile
-	transport.OperatorCaCrtFile = caCertFile
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
 	transport.EmpWorkSpace = tmpDir
@@ -661,7 +658,6 @@ func TestEmptyUUID(t *testing.T) {
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile
 	transport.CaKeyFile = caKeyFile
-	transport.OperatorCaCrtFile = caCertFile
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
 	transport.EmpWorkSpace = tmpDir
@@ -788,7 +784,6 @@ func TestNewAgentCheckin(t *testing.T) {
 
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile
-	transport.OperatorCaCrtFile = caCertFile
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
 	transport.EmpWorkSpace = tmpDir

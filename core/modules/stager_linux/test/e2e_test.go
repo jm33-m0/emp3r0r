@@ -458,12 +458,6 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	transport.CaKeyFile = filepath.Join(tmpDir, "ca-key.pem")
 	transport.ServerCrtFile = filepath.Join(tmpDir, "server-cert.pem")
 	transport.ServerKeyFile = filepath.Join(tmpDir, "server-key.pem")
-	transport.OperatorCaCrtFile = filepath.Join(tmpDir, "operator-ca-cert.pem")
-	transport.OperatorCaKeyFile = filepath.Join(tmpDir, "operator-ca-key.pem")
-	transport.OperatorServerCrtFile = filepath.Join(tmpDir, "operator-server-cert.pem")
-	transport.OperatorServerKeyFile = filepath.Join(tmpDir, "operator-server-key.pem")
-	transport.OperatorClientCrtFile = filepath.Join(tmpDir, "operator-client-cert.pem")
-	transport.OperatorClientKeyFile = filepath.Join(tmpDir, "operator-client-key.pem")
 	live.EmpConfigFile = filepath.Join(tmpDir, "emp3r0r.json")
 
 	if err = config.InitCertsAndConfig(); err != nil {

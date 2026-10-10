@@ -81,7 +81,6 @@ func startPivotStack(t *testing.T) (pivotAddr string) {
 	transport.CACrtPEM = caCertData
 	transport.CaCrtFile = caCertFile
 	transport.CaKeyFile = caKeyFile
-	transport.OperatorCaCrtFile = caCertFile
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
 	transport.EmpWorkSpace = tmpDir

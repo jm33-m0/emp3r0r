@@ -2,8 +2,6 @@ package operator
 
 import (
 	"bytes"
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"net"
 	"net/http"
@@ -15,60 +13,34 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	clientpkg "github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/wireguard"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/server"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 )
 
+// TestOperatorConnection drives the operator console's HTTP client against the
+// real operator service over the WireGuard dialer (host-network fallback in
+// tests): it verifies the identity requirement, command dispatch and the
+// websocket message tunnel.
 func TestOperatorConnection(t *testing.T) {
-	// Setup temporary workspace
 	tempDir, err := os.MkdirTemp("", "emp3r0r_operator_test")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tempDir)
 
-	// Update live.EmpWorkSpace
 	live.EmpWorkSpace = tempDir
 	live.EmpConfigFile = filepath.Join(tempDir, "emp3r0r.json")
-
-	// Update transport paths
 	transport.EmpWorkSpace = tempDir
-	transport.CaCrtFile = filepath.Join(tempDir, "ca-cert.pem")
-	transport.CaKeyFile = filepath.Join(tempDir, "ca-key.pem")
-	transport.ServerCrtFile = filepath.Join(tempDir, "server-cert.pem")
-	transport.ServerKeyFile = filepath.Join(tempDir, "server-key.pem")
-	transport.OperatorCaCrtFile = filepath.Join(tempDir, "operator-ca-cert.pem")
-	transport.OperatorCaKeyFile = filepath.Join(tempDir, "operator-ca-key.pem")
-	transport.OperatorServerCrtFile = filepath.Join(tempDir, "operator-server-cert.pem")
-	transport.OperatorServerKeyFile = filepath.Join(tempDir, "operator-server-key.pem")
-	transport.OperatorClientCrtFile = filepath.Join(tempDir, "operator-client-cert.pem")
-	transport.OperatorClientKeyFile = filepath.Join(tempDir, "operator-client-key.pem")
 
-	// Set WireGuard IP to localhost for testing
+	// No userspace WireGuard device is started here, so the dialer and the
+	// listener fall back to the host network, both on loopback.
 	wireguard.WgServerIP = "127.0.0.1"
 	wireguard.WgOperatorIP = "127.0.0.1"
 
-	// Set IsServer to true so InitCertsAndConfig generates certs
-	live.IsServer = true
-
-	// Initialize certs and config
-	// This generates OperatorClientCrtFile and OperatorCaCrtFile
-	err = config.InitCertsAndConfig()
-	if err != nil {
-		t.Fatalf("InitCertsAndConfig failed: %v", err)
-	}
-
-	// Generate C2 certs (including OperatorServerCrtFile)
-	err = config.GenC2Certs("127.0.0.1")
-	if err != nil {
-		t.Fatalf("GenC2Certs failed: %v", err)
-	}
-
-	// Pick a random port
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("Failed to listen: %v", err)
@@ -77,39 +49,20 @@ func TestOperatorConnection(t *testing.T) {
 	ln.Close()
 	OperatorPort = port
 
-	// Start Operator mTLS Server
-	go func() {
-		server.StartOperatorMTLSServer(port)
-	}()
+	go server.StartOperatorServer(port)
+	t.Cleanup(func() {
+		if network.OperatorServer != nil && network.OperatorServerCtx != nil {
+			_ = network.OperatorServer.Shutdown(network.OperatorServerCtx)
+		}
+	})
 
 	// Give the server some time to start
 	time.Sleep(2 * time.Second)
 
-	// Create mTLS HTTP client
-	client, err := createMTLSHttpClient()
-	if err != nil {
-		t.Fatalf("createMTLSHttpClient failed: %v", err)
-	}
+	client := createOperatorHTTPClient()
 	if client.Timeout != 0 {
-		t.Fatalf("createMTLSHttpClient must not set a global timeout for streaming tunnel, got %v", client.Timeout)
+		t.Fatalf("operator client must not set a global timeout for streaming tunnel, got %v", client.Timeout)
 	}
-
-	// Test connection
-	// The server exposes /emp3r0r/api
-	// We can try to hit a non-existent endpoint to check connectivity,
-	// or a valid one if we know it.
-	// operationDispatcher handles /{api}
-
-	url := fmt.Sprintf("https://127.0.0.1:%d/%s/checkin", port, transport.OperatorRoot)
-	resp, err := client.Get(url)
-	if err != nil {
-		t.Fatalf("Failed to connect to operator server: %v", err)
-	}
-	defer resp.Body.Close()
-
-	// We expect 404 or 200, but not a connection error
-	// Since "checkin" might not be a valid API handler or might require POST
-	t.Logf("Response status: %s", resp.Status)
 
 	// Mock active agent
 	agentTag := "test-agent"
@@ -132,61 +85,56 @@ func TestOperatorConnection(t *testing.T) {
 		Command:  &cmd,
 		JobID:    &cmdID,
 	}
-
 	opData, err := cbor.Marshal(op)
 	if err != nil {
 		t.Fatalf("Failed to marshal operation: %v", err)
 	}
 
-	url = fmt.Sprintf("https://127.0.0.1:%d/%s/%s", port, transport.OperatorRoot, "send_command")
-	opReq, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(opData))
+	sendCommandURL := fmt.Sprintf("http://127.0.0.1:%d/%s/%s", port, transport.OperatorRoot, "send_command")
+
+	// Security assertion: the operator API requires an operator identity. A
+	// request without one is rejected.
+	anonReq, err := http.NewRequest(http.MethodPost, sendCommandURL, bytes.NewBuffer(opData))
+	if err != nil {
+		t.Fatalf("Failed to build anonymous request: %v", err)
+	}
+	anonReq.Header.Set("Content-Type", "application/cbor")
+	anonResp, err := client.Do(anonReq)
+	if err != nil {
+		t.Fatalf("Anonymous request failed: %v", err)
+	}
+	anonResp.Body.Close()
+	if anonResp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("anonymous request = %d, want 401", anonResp.StatusCode)
+	}
+
+	// An identified operator can send a command.
+	opReq, err := http.NewRequest(http.MethodPost, sendCommandURL, bytes.NewBuffer(opData))
 	if err != nil {
 		t.Fatalf("Failed to build command request: %v", err)
 	}
 	opReq.Header.Set("Content-Type", "application/cbor")
-	// The C2 requires an operator identity; use the same session the message
-	// tunnel registers with below.
 	opReq.Header.Set("operator_session", "test-operator-session")
-	resp, err = client.Do(opReq)
+	resp, err := client.Do(opReq)
 	if err != nil {
 		t.Fatalf("Failed to send command: %v", err)
 	}
-	defer resp.Body.Close()
-
-	t.Logf("Send command response status: %s", resp.Status)
-
-	// We expect 200 OK because we mocked the agent and SendCmd
-	if resp.StatusCode != 200 {
-		t.Errorf("Expected 200 OK, got %s", resp.Status)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("Expected 200 OK, got %s", resp.Status)
 	}
 
-	// Security assertion: operator endpoint must require mTLS client certs.
-	operatorCAPEM, err := os.ReadFile(transport.OperatorCaCrtFile)
-	if err != nil {
-		t.Fatalf("Failed to read operator CA cert: %v", err)
-	}
-	rootCAs := x509.NewCertPool()
-	if !rootCAs.AppendCertsFromPEM(operatorCAPEM) {
-		t.Fatal("Failed to append operator CA cert to pool")
-	}
-	unauthorizedClient := &http.Client{
-		Timeout: 3 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{RootCAs: rootCAs},
-		},
-	}
-	_, err = unauthorizedClient.Get(fmt.Sprintf("https://127.0.0.1:%d/%s/checkin", port, transport.OperatorRoot))
-	if err == nil {
-		t.Fatal("SECURITY VIOLATION: operator endpoint accepted a client without mTLS certificate")
-	}
-
-	// Verify the websocket operator message tunnel also connects over the same mTLS trust root.
+	// Point the shared operator client at the service and exercise the poll and
+	// message-tunnel paths.
 	clientpkg.HTTPClient = client
-	clientpkg.RootURL = fmt.Sprintf("https://127.0.0.1:%d", port)
+	clientpkg.RootURL = fmt.Sprintf("http://127.0.0.1:%d", port)
 	clientpkg.SessionID = "test-operator-session"
+	t.Cleanup(func() {
+		clientpkg.HTTPClient = nil
+		clientpkg.RootURL = ""
+		clientpkg.SessionID = ""
+	})
 
-	// Verify the agent-list poll path (list_connected_agents) round-trips
-	// LastSeen correctly.
 	live.PublishAgent(&live.AgentRecord{Agent: &def.Emp3r0rAgent{UUID: "u-poll", Tag: "t-poll", LastSeen: time.Now()}, Control: &live.AgentControl{Index: 0}})
 	pollAgents, pollErr := clientpkg.GetAgentList()
 	if pollErr != nil {

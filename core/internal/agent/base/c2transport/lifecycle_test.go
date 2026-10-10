@@ -117,7 +117,6 @@ func TestFullAgentLifecycle(t *testing.T) {
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile
 	transport.CaKeyFile = caKeyFile
-	transport.OperatorCaCrtFile = caCertFile
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
 	transport.EmpWorkSpace = tmpDir
@@ -465,7 +464,6 @@ func TestCheckinWithRandomPaths(t *testing.T) {
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile
 	transport.CaKeyFile = caKeyFile
-	transport.OperatorCaCrtFile = caCertFile
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
 	transport.EmpWorkSpace = tmpDir
@@ -617,7 +615,6 @@ func TestDynamicPrefix(t *testing.T) {
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile
 	transport.CaKeyFile = caKeyFile
-	transport.OperatorCaCrtFile = caCertFile
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
 	transport.EmpWorkSpace = tmpDir
@@ -757,7 +754,6 @@ func TestCheckinWithRandomPaths_Strict(t *testing.T) {
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile
 	transport.CaKeyFile = caKeyFile
-	transport.OperatorCaCrtFile = caCertFile
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
 	transport.EmpWorkSpace = tmpDir

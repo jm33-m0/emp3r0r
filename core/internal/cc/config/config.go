@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/wireguard"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
@@ -225,22 +224,9 @@ func InitCertsAndConfig() error {
 		}
 	}
 
-	// generate mTLS cert for operator
-	if _, err := os.Stat(transport.OperatorCaCrtFile); os.IsNotExist(err) {
-		logging.Warningf("mTLS cert not found, generating a new one")
-		// CA cert
-		_, err := transport.GenCerts(nil, transport.OperatorCaCrtFile, transport.OperatorCaKeyFile, "", "", true)
-		if err != nil {
-			return fmt.Errorf("generating operator CA: %v", err)
-		}
-
-		// client cert signed by CA
-		_, err = transport.GenCerts(nil, transport.OperatorClientCrtFile, transport.OperatorClientKeyFile, transport.OperatorCaKeyFile, transport.OperatorCaCrtFile, false)
-		if err != nil {
-			return fmt.Errorf("generating operator cert: %v", err)
-		}
-	}
-
+	// The operator channel is plain HTTP over the userspace WireGuard stack,
+	// authenticated by the per-operator WireGuard key. No operator-facing
+	// certificates or CA are generated.
 	return nil
 }
 
@@ -250,8 +236,7 @@ func GenC2Certs(hosts_str string) error {
 	hosts = strings.Fields(hosts_str)
 
 	// Check if certs exist
-	if util.IsFileExist(transport.ServerCrtFile) && util.IsFileExist(transport.ServerKeyFile) &&
-		util.IsFileExist(transport.OperatorServerCrtFile) && util.IsFileExist(transport.OperatorServerKeyFile) {
+	if util.IsFileExist(transport.ServerCrtFile) && util.IsFileExist(transport.ServerKeyFile) {
 		logging.Infof("C2 certs already exist, skipping generation")
 		return nil
 	}
@@ -272,13 +257,6 @@ func GenC2Certs(hosts_str string) error {
 	_, certErr := transport.GenCerts(hosts, transport.ServerCrtFile, transport.ServerKeyFile, transport.CaKeyFile, transport.CaCrtFile, false)
 	if certErr != nil {
 		return fmt.Errorf("generating C2 TLS cert: %v", certErr)
-	}
-	// generate operator mTLS cert
-	hosts = append(hosts, wireguard.WgServerIP)   // add wireguard IP for operator
-	hosts = append(hosts, wireguard.WgOperatorIP) // add wireguard IP for operator
-	_, certErr = transport.GenCerts(hosts, transport.OperatorServerCrtFile, transport.OperatorServerKeyFile, transport.OperatorCaKeyFile, transport.OperatorCaCrtFile, false)
-	if certErr != nil {
-		return fmt.Errorf("generating operator cert: %v", certErr)
 	}
 
 	return nil

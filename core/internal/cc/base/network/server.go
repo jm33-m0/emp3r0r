@@ -86,7 +86,6 @@ type StreamHandler struct {
 	Secure          io.ReadWriter // The SecureConn (PSK or Session Key)
 	Token           string        // token string for identification
 	StreamID        string        // stream identifier bound at registration
-	Capability      string        // operator capability bound at registration
 	OperatorSession string        // stream owner operator session id
 	ExpectedSize    int64         // expected final file size for file transfers
 	Checksum        string        // expected checksum for file transfers

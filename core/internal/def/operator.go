@@ -32,11 +32,10 @@ type OperatorIdleConfig struct {
 
 // FTPStreamRequest is the request to register an FTP stream
 type FTPStreamRequest struct {
-	Token        string               `cbor:"1,keyasint"`
-	FilePath     string               `cbor:"2,keyasint"`
-	ExpectedSize int64                `cbor:"3,keyasint"`
-	Checksum     string               `cbor:"4,keyasint"`
-	Claim        *OperatorStreamClaim `cbor:"5,keyasint"`
+	Token        string `cbor:"1,keyasint"`
+	FilePath     string `cbor:"2,keyasint"`
+	ExpectedSize int64  `cbor:"3,keyasint"`
+	Checksum     string `cbor:"4,keyasint"`
 }
 
 // Socks5ProxyRequest is the payload used to start/stop a C2-resident SOCKS5

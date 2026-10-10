@@ -45,13 +45,9 @@ var (
 )
 
 func backgroundJobs() {
-	var err error
-	client.HTTPClient, err = createMTLSHttpClient()
-	if err != nil {
-		logging.Fatalf("Failed to create HTTP client: %v", err)
-	}
+	client.HTTPClient = createOperatorHTTPClient()
 	// The operator's stable identity is its provisioned WireGuard IP: the C2
-	// sees that IP as the mTLS peer address, so both sides agree on identity
+	// sees that IP as the tunnel peer address, so both sides agree on identity
 	// WITHOUT an extra handshake. Local/no-WireGuard mode falls back to a
 	// random session id.
 	if wireguard.WgOperator != nil && wireguard.WgOperatorIP != "" {
@@ -64,7 +60,7 @@ func backgroundJobs() {
 	logging.Infof("Operator's address: %s", OperatorAddr)
 
 	// Update operator's IP to Wireguard IP
-	client.RootURL = fmt.Sprintf("https://%s", OperatorAddr)
+	client.RootURL = fmt.Sprintf("http://%s", OperatorAddr)
 	logging.Infof("Operator's WireGuard address: %s", client.RootURL)
 
 	// set up command senders

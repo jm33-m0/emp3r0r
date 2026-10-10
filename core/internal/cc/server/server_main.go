@@ -65,11 +65,11 @@ func ServerMain(wg_port int, hosts string, operatorNames, addOperators []string,
 	logging.Successf("   📡 C2 Agent Port (TLS):  %s", live.RuntimeConfig.CCH2Port)
 	logging.Successf("   📡 C2 Agent Port (HTTP): %s", live.RuntimeConfig.CCHTTPPort)
 	logging.Successf("   🔄 KCP C2 Port (UDP):    %s", live.RuntimeConfig.P2PRelayPort)
-	logging.Successf("   🌐 Operator Port (mTLS): %d", wg_port+1)
+	logging.Successf("   🌐 Operator Port (WG):   %d", wg_port+1)
 	logging.Successf("   🔧 WireGuard Port:       %d", wg_port)
 	logging.Successf("══════════════════════════════════════════════════════════════════\n")
 
-	StartOperatorMTLSServer(wg_port + 1)
+	StartOperatorServer(wg_port + 1)
 }
 
 type SavedWgConfig struct {
@@ -290,8 +290,8 @@ func wg(wg_port int, operatorNames, addOperators []string, operatorsSet bool) {
 		}
 	}
 
-	// Publish the provisioned identities so the operator mTLS and HTTP handlers
-	// can map a peer's WireGuard IP to its stable operator identity.
+	// Publish the provisioned identities so the operator HTTP handlers can map a
+	// peer's WireGuard IP to its stable operator identity.
 	registerOperators(operators)
 
 	wgConfig := wireguard.WireGuardConfig{
@@ -343,25 +343,23 @@ func wg(wg_port int, operatorNames, addOperators []string, operatorsSet bool) {
 	generateConnectionCommands(wg_port, server_pubkey, operators)
 
 	logging.Warningf("WireGuard gives every operator IP-level access to the C2's tunnel subnet.")
-	logging.Warningf("Firewall the WireGuard UDP port (%d) and the operator mTLS port (%d) so only"+
-		" intended operators can reach them, and never expose the WG subnet to an untrusted network.",
-		wg_port, wg_port+1)
+	logging.Warningf("Firewall the WireGuard UDP port (%d) so only intended operators can"+
+		" reach the operator service, and never expose the WG subnet to an untrusted network.",
+		wg_port)
 }
 
 // operatorConfigFileNames lists the files copied into the operator config
 // bundle. It is the complete set an operator needs to start and to mint agents:
-// the runtime config, the public C2/agent/operator CA certificates (which the
-// operator verifies and reads for C2 names) and its own client identity. The
-// agent-CA/server private keys and wg_config.json (every operator's WireGuard
-// private key) must never leave the C2.
+// the runtime config plus the public agent CA and server certificates (which
+// the operator verifies and reads for C2 names). The agent-CA/server private
+// keys and wg_config.json (every operator's WireGuard private key) must never
+// leave the C2. There is no per-operator identity file: the operator channel is
+// authenticated by the operator's WireGuard key.
 func operatorConfigFileNames() []string {
 	return []string{
 		"emp3r0r.json",
 		filepath.Base(transport.CaCrtFile),
 		filepath.Base(transport.ServerCrtFile),
-		filepath.Base(transport.OperatorCaCrtFile),
-		filepath.Base(transport.OperatorClientCrtFile),
-		filepath.Base(transport.OperatorClientKeyFile),
 	}
 }
 

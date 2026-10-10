@@ -2,10 +2,6 @@ package server
 
 import (
 	"context"
-	"crypto/sha256"
-	"crypto/x509"
-	"encoding/hex"
-	"encoding/pem"
 	"fmt"
 	"net"
 	"net/http"
@@ -40,15 +36,10 @@ var (
 	OPERATORS sync.Map
 	// operatorJobOwners maps job IDs to the owning operator session.
 	operatorJobOwners sync.Map
-	// operatorClaimNonceCache stores recently seen nonces to reject replayed
-	// operator stream-activation claims.
-	operatorClaimNonceCache sync.Map
 
 	// SERVER_WG_CONFIG is the wireguard config for the server
 	SERVER_WG_CONFIG *wireguard.WireGuardConfig
 )
-
-const operatorClaimNonceTTLSeconds int64 = 600
 
 // Operator-facing request bounds. Operator messages are small control frames,
 // never bulk data, so they must not be able to exhaust server memory.
@@ -102,65 +93,6 @@ func operatorSessionOnline(operatorID string) bool {
 	}
 	_, ok := OPERATORS.Load(operatorID)
 	return ok
-}
-
-func operatorPubKeyPEMFromReq(req *http.Request) ([]byte, string, error) {
-	if req == nil || req.TLS == nil || len(req.TLS.PeerCertificates) == 0 {
-		return nil, "", fmt.Errorf("missing operator mTLS peer certificate")
-	}
-	cert := req.TLS.PeerCertificates[0]
-	pubBytes, err := x509.MarshalPKIXPublicKey(cert.PublicKey)
-	if err != nil {
-		return nil, "", fmt.Errorf("marshal operator public key: %w", err)
-	}
-	pubPEM := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubBytes})
-	fp := sha256.Sum256(cert.Raw)
-	return pubPEM, hex.EncodeToString(fp[:]), nil
-}
-
-func rememberOperatorClaimNonce(fingerprint, session, nonce string) error {
-	if fingerprint == "" || session == "" || nonce == "" {
-		return fmt.Errorf("invalid nonce cache key")
-	}
-	now := time.Now().Unix()
-	key := fingerprint + ":" + session + ":" + nonce
-	if prev, exists := operatorClaimNonceCache.Load(key); exists {
-		// Replay protection uses the server's own clock only, so operator/server
-		// clock skew cannot let a nonce be reused.
-		if prevTS, ok := prev.(int64); ok && now-prevTS <= operatorClaimNonceTTLSeconds {
-			return fmt.Errorf("replayed claim nonce")
-		}
-	}
-	operatorClaimNonceCache.Store(key, now)
-	operatorClaimNonceCache.Range(func(k, v any) bool {
-		nonceTS, ok := v.(int64)
-		if !ok || now-nonceTS > operatorClaimNonceTTLSeconds {
-			operatorClaimNonceCache.Delete(k)
-		}
-		return true
-	})
-	return nil
-}
-
-func verifyOperatorStreamClaim(req *http.Request, claim *def.OperatorStreamClaim, streamID, capability string) (string, error) {
-	session, err := operatorSessionFromReq(req)
-	if err != nil {
-		return "", err
-	}
-	pubPEM, fp, err := operatorPubKeyPEMFromReq(req)
-	if err != nil {
-		return "", err
-	}
-	if err = transport.VerifyOperatorStreamClaim(claim, session, streamID, capability, pubPEM); err != nil {
-		return "", err
-	}
-	if err = rememberOperatorClaimNonce(fp, session, claim.Nonce); err != nil {
-		return "", err
-	}
-	if _, ok := OPERATORS.Load(session); !ok {
-		return "", fmt.Errorf("operator session not connected")
-	}
-	return session, nil
 }
 
 func setJobOwner(jobID, operatorSession string) {
@@ -474,12 +406,16 @@ func handleRegisterFTPStream(wrt http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		return
 	}
-	operatorSession, err := verifyOperatorStreamClaim(req, ftpReq.Claim, ftpReq.Token, def.OperatorCapabilityRegisterFTP)
-	if err != nil {
-		logging.Errorf("CRITICAL: Reject ftp stream registration from %s: %v", req.RemoteAddr, err)
-		// Return the reason so the operator sees it (e.g. clock skew) instead of
-		// a bare "Unauthorized".
-		http.Error(wrt, err.Error(), http.StatusUnauthorized)
+	// Registering an FTP stream requires a live, identified operator. Ownership
+	// is the operator's WireGuard-derived session (cryptokey-routed, so it
+	// cannot be spoofed by another operator).
+	operatorSession, ok := requireOperatorIdentity(wrt, req)
+	if !ok {
+		return
+	}
+	if _, online := OPERATORS.Load(operatorSession); !online {
+		logging.Warningf("Reject ftp stream registration from %s: operator session is not connected", req.RemoteAddr)
+		http.Error(wrt, "operator session not connected", http.StatusUnauthorized)
 		return
 	}
 	// An operator may not hijack a token that another operator already owns.
@@ -505,7 +441,6 @@ func handleRegisterFTPStream(wrt http.ResponseWriter, req *http.Request) {
 	sh := &network.StreamHandler{
 		Token:           ftpReq.Token,
 		StreamID:        ftpReq.Token,
-		Capability:      def.OperatorCapabilityRegisterFTP,
 		OperatorSession: operatorSession,
 		ExpectedSize:    ftpReq.ExpectedSize,
 		Checksum:        ftpReq.Checksum,

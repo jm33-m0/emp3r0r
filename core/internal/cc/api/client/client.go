@@ -4,31 +4,29 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/coder/websocket"
 	"github.com/fxamacker/cbor/v2"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/wireguard"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
 var (
-	// HTTPClient is an HTTP/2 client for the mTLS C2 operator server
+	// HTTPClient is the plain HTTP client for the operator service on the
+	// WireGuard stack.
 	HTTPClient *http.Client
 
-	// RootURL is the root URL of the mTLS C2 operator server
+	// RootURL is the root URL of the operator service
 	RootURL string
 
 	// SessionID marks the operator session
@@ -187,56 +185,7 @@ func websocketHTTPClient() (*http.Client, error) {
 	if HTTPClient == nil {
 		return nil, fmt.Errorf("HTTPClient is nil")
 	}
-
-	if transport.OperatorCaCrtFile == "" {
-		return nil, fmt.Errorf("operator CA file path is empty")
-	}
-
-	operatorCAPEM, err := os.ReadFile(transport.OperatorCaCrtFile)
-	if err != nil {
-		return nil, fmt.Errorf("read operator CA cert: %w", err)
-	}
-
-	rootCAs, err := transport.ExtractCABundle(operatorCAPEM)
-	if err != nil {
-		return nil, fmt.Errorf("extract operator CA bundle: %w", err)
-	}
-
-	serverURL, err := url.Parse(RootURL)
-	if err != nil {
-		return nil, fmt.Errorf("parse RootURL: %w", err)
-	}
-
-	tlsConfig := &tls.Config{
-		ServerName:         serverURL.Hostname(),
-		RootCAs:            rootCAs,
-		InsecureSkipVerify: false,
-		NextProtos:         []string{"http/1.1"},
-	}
-
-	if transport.OperatorClientCrtFile != "" && transport.OperatorClientKeyFile != "" {
-		clientCert, err := tls.LoadX509KeyPair(transport.OperatorClientCrtFile, transport.OperatorClientKeyFile)
-		if err != nil {
-			return nil, fmt.Errorf("load operator client certificate: %w", err)
-		}
-		tlsConfig.Certificates = []tls.Certificate{clientCert}
-	}
-
-	httpTransport := &http.Transport{
-		TLSClientConfig:   tlsConfig,
-		ForceAttemptHTTP2: false,
-		Proxy:             http.ProxyFromEnvironment,
-		// Dial through the userspace WireGuard stack when the destination is
-		// on the tunnel (no-op fallback to the host network otherwise).
-		DialContext: wireguard.DialContext,
-	}
-
-	client := &http.Client{Transport: httpTransport}
-	if HTTPClient.Timeout > 0 {
-		client.Timeout = HTTPClient.Timeout
-	}
-
-	return client, nil
+	return HTTPClient, nil
 }
 
 // ConnectMsgTun connects to the operator message tunnel

@@ -39,12 +39,14 @@ comma-separated (`--operators alice,bob`), repeated
 `server`. A single integer still works as a count (`--operators 3` creates
 `operator-1..operator-3`), and with no names one default operator is created.
 
-Each operator gets its own WireGuard key/IP and is identified by that IP at the
-mTLS layer. On every later start the existing identities are kept as-is:
-`--operators` is refused once `wg_config.json` exists, so a restart can never
-regenerate (and invalidate) an operator's keys. To add more operators without
-touching the existing ones, use `--add-operator` with the same name syntax. To
-start over, delete `wg_config.json` and restart.
+Each operator gets its own WireGuard key/IP and is identified by that IP:
+the operator service listens on the userspace WireGuard stack, so the peer
+address is cryptokey-routed and cannot be spoofed. There is no separate
+operator certificate or mTLS layer. On every later start the existing
+identities are kept as-is: `--operators` is refused once `wg_config.json`
+exists, so a restart can never regenerate (and invalidate) an operator's keys.
+To add more operators without touching the existing ones, use `--add-operator`
+with the same name syntax. To start over, delete `wg_config.json` and restart.
 
 ```bash
 # add two named operators to an existing deployment
@@ -55,9 +57,9 @@ Names must be unique and free of control characters; they are used in the
 console and the audit log.
 
 > **Firewall warning.** WireGuard gives every provisioned operator IP-level
-> access to the C2's tunnel subnet. Firewall the WireGuard UDP port and the
-> operator mTLS port so only your operators can reach them, and never expose the
-> WG subnet to an untrusted network. The server prints this warning on startup.
+> access to the C2's tunnel subnet. Firewall the WireGuard UDP port so only your
+> operators can reach it, and never expose the WG subnet to an untrusted
+> network. The server prints this warning on startup.
 
 #### Multiple operators
 
@@ -73,7 +75,6 @@ operator keeps its own jobs, pivots, file streams and agent claims.
 - **Agent list.** The `Operator` column shows who is on what agent.
 - **Pivots, streams and downloads are owner-scoped.** SOCKS5 pivots, FTP uploads and WWW download relays are bound to the operator that started them; another operator cannot stop your pivot, hijack or unregister your stream, or list your pivots. An agent that fetches a file over the WWW route is served by the operator that currently owns it.
 - **Operator idle timeout is server-managed.** In multi-operator mode the server owns the idle policy; an operator request to change it is refused and audited. Set it in the server's config, not from the console.
-- **Keep the clocks in sync.** Stream claims carry timestamps, and the server rejects a claim whose timestamps are more than about ten minutes off its own clock. Run NTP on both the C2 and every operator host; the rejection message tells you to check the clocks when this happens.
 - **Adding operators.** Run the server with `--add-operator <names>`; existing
   keys and IPs are preserved and only the new named rows are appended to
   `wg_config.json` and the printed table. `--operators` is for the first run

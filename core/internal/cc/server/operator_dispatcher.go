@@ -10,7 +10,7 @@ import (
 )
 
 // operationDispatcher routes operator API requests to the correct handler.
-// This is the OPERATOR-facing dispatcher (mTLS channel, untouched by C2 refactor).
+// This is the OPERATOR-facing dispatcher on the WireGuard-bound HTTP service.
 func operationDispatcher(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		if r := recover(); r != nil {

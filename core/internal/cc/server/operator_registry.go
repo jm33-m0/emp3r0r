@@ -18,7 +18,7 @@ type OperatorConfig struct {
 }
 
 // operatorIndex maps a provisioned operator's WireGuard IP to its config. The
-// WG IP is the operator's stable identity: the server sees it as the mTLS peer
+// WG IP is the operator's stable identity: the server sees it as the tunnel peer
 // address and the operator knows it from --operator-wg-ip, so both sides agree
 // without extra handshake state. It is written once at startup and read-only
 // afterwards.
@@ -83,8 +83,8 @@ func isMultiOperator() bool {
 }
 
 // operatorIDFromRemote derives the operator identity from a request's remote
-// address. The operator mTLS listener is bound to the userspace WireGuard
-// stack, so the peer IP is the operator's provisioned WG IP.
+// address. The operator listener is bound to the userspace WireGuard stack, so
+// the peer IP is the operator's provisioned WG IP.
 func operatorIDFromRemote(remoteAddr string) string {
 	ip := remoteHost(remoteAddr)
 	if cfg := operatorByIP(ip); cfg != nil {

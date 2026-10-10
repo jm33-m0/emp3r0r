@@ -23,7 +23,7 @@ Always use the latest version
 Ranked by impact, from highest to lowest:
 
 1. **Agent → server/operator (primary threat, highest impact).** Agents are hostile. A compromised or malicious agent must not be able to take over the C2, another agent, or an operator. TOFU assumes only the first run of an agent is trustworthy. This gets the strongest controls (pinned identity, PFS session re-keying, per-session admission, signed peer lists, …).
-2. **Operator → server/other operators (secondary, lower impact).** An operator already holds the shared operator credential and was granted access, so this is misuse of privilege rather than a remote takeover. The damage is confined to the control plane — identity spoofing, cross-operator interference, or log tampering — and cannot exceed what the operators are collectively trusted to do. It is still in scope.
+2. **Operator → server/other operators (secondary, lower impact).** An operator already holds a valid WireGuard credential (its private key is provisioned by the server and authenticates it to the tunnel) and was granted access, so this is misuse of privilege rather than a remote takeover. The damage is confined to the control plane — identity spoofing, cross-operator interference, or log tampering — and cannot exceed what the operators are collectively trusted to do. It is still in scope.
 
 ### Out of scope
 

@@ -55,7 +55,6 @@ func TestUnauthenticatedRequestRejection(t *testing.T) {
 
 	// Setup Transport Paths
 	transport.CaCrtFile = caCertFile
-	transport.OperatorCaCrtFile = caCertFile
 	transport.ServerCrtFile = serverCertFile
 	transport.ServerKeyFile = serverKeyFile
 	transport.EmpWorkSpace = tmpDir

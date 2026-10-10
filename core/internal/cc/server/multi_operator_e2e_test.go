@@ -4,8 +4,6 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"io"
 	"net"
@@ -29,7 +27,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-// operatorTransportPaths mirrors the per-install certificate layout that
+// setOperatorTransportPaths mirrors the per-install certificate layout that
 // transport/config_c2.go initialises at process start, rooted at dir.
 func setOperatorTransportPaths(dir string) {
 	transport.EmpWorkSpace = dir
@@ -37,17 +35,11 @@ func setOperatorTransportPaths(dir string) {
 	transport.CaKeyFile = filepath.Join(dir, "ca-key.pem")
 	transport.ServerCrtFile = filepath.Join(dir, "server-cert.pem")
 	transport.ServerKeyFile = filepath.Join(dir, "server-key.pem")
-	transport.OperatorCaCrtFile = filepath.Join(dir, "operator-ca-cert.pem")
-	transport.OperatorCaKeyFile = filepath.Join(dir, "operator-ca-key.pem")
-	transport.OperatorServerCrtFile = filepath.Join(dir, "operator-server-cert.pem")
-	transport.OperatorServerKeyFile = filepath.Join(dir, "operator-server-key.pem")
-	transport.OperatorClientCrtFile = filepath.Join(dir, "operator-client-cert.pem")
-	transport.OperatorClientKeyFile = filepath.Join(dir, "operator-client-key.pem")
 }
 
-// setupServerWorkspace builds a complete C2 workspace (agent CA, operator CA
-// and client identity, C2 certificates and emp3r0r.json) in dir. It restores
-// every process-global it touches when the test ends.
+// setupServerWorkspace builds a complete C2 workspace (agent CA, C2
+// certificates and emp3r0r.json) in dir. It restores every process-global it
+// touches when the test ends.
 func setupServerWorkspace(t *testing.T, dir string) {
 	t.Helper()
 	origWorkSpace := live.EmpWorkSpace
@@ -56,12 +48,9 @@ func setupServerWorkspace(t *testing.T, dir string) {
 	origIsServer := live.IsServer
 	origRuntime := live.RuntimeConfig
 	origTransportWorkSpace := transport.EmpWorkSpace
-	origCerts := [10]string{
+	origCerts := [4]string{
 		transport.CaCrtFile, transport.CaKeyFile,
 		transport.ServerCrtFile, transport.ServerKeyFile,
-		transport.OperatorCaCrtFile, transport.OperatorCaKeyFile,
-		transport.OperatorServerCrtFile, transport.OperatorServerKeyFile,
-		transport.OperatorClientCrtFile, transport.OperatorClientKeyFile,
 	}
 	origWGServerIP, origWGOperatorIP := wireguard.WgServerIP, wireguard.WgOperatorIP
 	t.Cleanup(func() {
@@ -73,9 +62,6 @@ func setupServerWorkspace(t *testing.T, dir string) {
 		transport.EmpWorkSpace = origTransportWorkSpace
 		transport.CaCrtFile, transport.CaKeyFile = origCerts[0], origCerts[1]
 		transport.ServerCrtFile, transport.ServerKeyFile = origCerts[2], origCerts[3]
-		transport.OperatorCaCrtFile, transport.OperatorCaKeyFile = origCerts[4], origCerts[5]
-		transport.OperatorServerCrtFile, transport.OperatorServerKeyFile = origCerts[6], origCerts[7]
-		transport.OperatorClientCrtFile, transport.OperatorClientKeyFile = origCerts[8], origCerts[9]
 		wireguard.WgServerIP, wireguard.WgOperatorIP = origWGServerIP, origWGOperatorIP
 	})
 
@@ -160,8 +146,6 @@ func TestOperatorConfigBundleIsComplete(t *testing.T) {
 	for _, secret := range []string{
 		"ca-key.pem",
 		"server-key.pem",
-		"operator-ca-key.pem",
-		"operator-server-key.pem",
 		"wg_config.json",
 	} {
 		if entries[secret] {
@@ -183,35 +167,15 @@ func TestOperatorConfigBundleIsComplete(t *testing.T) {
 	}
 }
 
-// operatorHTTPClient returns an mTLS client using the operator identity from
-// dir, exactly like the operator console does.
-func operatorHTTPClient(t *testing.T, dir string) *http.Client {
+// operatorHTTPClient returns the plain HTTP client the operator console uses.
+// It dials through the userspace WireGuard stack exactly like the real
+// operator (falling back to the host network in tests, where no WireGuard
+// device is running).
+func operatorHTTPClient(t *testing.T) *http.Client {
 	t.Helper()
-	caPEM, err := os.ReadFile(filepath.Join(dir, "operator-ca-cert.pem"))
-	if err != nil {
-		t.Fatalf("read operator CA: %v", err)
-	}
-	pool := x509.NewCertPool()
-	if !pool.AppendCertsFromPEM(caPEM) {
-		t.Fatal("operator CA bundle is empty")
-	}
-	cert, err := tls.LoadX509KeyPair(
-		filepath.Join(dir, "operator-client-cert.pem"),
-		filepath.Join(dir, "operator-client-key.pem"),
-	)
-	if err != nil {
-		t.Fatalf("load operator client cert: %v", err)
-	}
 	return &http.Client{
-		Timeout: 10 * time.Second,
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				RootCAs:      pool,
-				Certificates: []tls.Certificate{cert},
-				NextProtos:   []string{"http/1.1"},
-			},
-			ForceAttemptHTTP2: false,
-		},
+		Timeout:   10 * time.Second,
+		Transport: &http.Transport{DialContext: wireguard.DialContext},
 	}
 }
 
@@ -236,7 +200,7 @@ func operatorPost(t *testing.T, client *http.Client, port int, session, api stri
 	if err != nil {
 		t.Fatalf("marshal %s: %v", api, err)
 	}
-	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("https://127.0.0.1:%d/%s", port, api), bytes.NewReader(raw))
+	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://127.0.0.1:%d/%s", port, api), bytes.NewReader(raw))
 	if err != nil {
 		t.Fatalf("build %s request: %v", api, err)
 	}
@@ -251,8 +215,9 @@ func operatorPost(t *testing.T, client *http.Client, port int, session, api stri
 	return resp.StatusCode
 }
 
-// TestMultiOperatorParallelCommands runs two operators against a real mTLS
-// server at the same time and verifies agent ownership plus command routing.
+// TestMultiOperatorParallelCommands runs two operators against a real operator
+// HTTP server at the same time and verifies agent ownership plus command
+// routing.
 func TestMultiOperatorParallelCommands(t *testing.T) {
 	serverDir := t.TempDir()
 	setupServerWorkspace(t, serverDir)
@@ -282,15 +247,15 @@ func TestMultiOperatorParallelCommands(t *testing.T) {
 	}
 
 	port := freeTCPPort(t)
-	go StartOperatorMTLSServer(port)
+	go StartOperatorServer(port)
 	waitForTCP(t, port)
 	t.Cleanup(func() {
-		if network.MTLSServer != nil && network.MTLSServerCtx != nil {
-			_ = network.MTLSServer.Shutdown(network.MTLSServerCtx)
+		if network.OperatorServer != nil && network.OperatorServerCtx != nil {
+			_ = network.OperatorServer.Shutdown(network.OperatorServerCtx)
 		}
 	})
 
-	client := operatorHTTPClient(t, serverDir)
+	client := operatorHTTPClient(t)
 
 	setActive := func(session, tag string) int {
 		return operatorPost(t, client, port, session, transport.OperatorSetActiveAgent, def.Operation{AgentTag: tag})
