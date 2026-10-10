@@ -1,5 +1,14 @@
 # Changelog
 
+## [4.24.2](https://github.com/jm33-m0/emp3r0r/compare/v4.24.1...v4.24.2) (2026-10-10)
+
+
+### Bug Fixes
+
+* **docker:** rebuild builder image if needed ([aaa576d](https://github.com/jm33-m0/emp3r0r/commit/aaa576dc9211bf21c7525d4e4401cbe921a0d1a2))
+* **module:** local modules should NOT check target platform ([b66c8b9](https://github.com/jm33-m0/emp3r0r/commit/b66c8b935d502c716028e501e4e168faa7492841))
+* **nasm:** ship nasm with operator kit ([1805b04](https://github.com/jm33-m0/emp3r0r/commit/1805b04d26dcb858e789ad3bfd8a1e5d5505ba24))
+
 ## [4.24.1](https://github.com/jm33-m0/emp3r0r/compare/v4.24.0...v4.24.1) (2026-10-09)
 
 
