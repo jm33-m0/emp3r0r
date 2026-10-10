@@ -143,18 +143,6 @@ func runModuleByName(cmd *cobra.Command, modName string) {
 		Target:    agents.MustGetActiveAgent(),
 		Flags:     runtimeFlags,
 		OpSession: client.SessionID,
-		OnUIReady: func(data any) error {
-			connStr, ok := data.(string)
-			if !ok {
-				return fmt.Errorf("expected string, got %T", data)
-			}
-			logging.Successf("Shell ready! Opening tmux...")
-			windowName := "shell"
-			if ctxTarget := agents.MustGetActiveAgent(); ctxTarget != nil {
-				windowName = fmt.Sprintf("shell-%s", ctxTarget.ShortID)
-			}
-			return cli.TmuxNewWindow(windowName, connStr)
-		},
 	}
 	modules.ModuleRun(ctx)
 	if mod.IsLocal {

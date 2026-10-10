@@ -17,13 +17,3 @@ type SSHCredential struct {
 	Password string
 	Key      string
 }
-
-// ModuleInfo represents module metadata
-type ModuleInfo struct {
-	Name     string
-	Exec     string
-	Platform string
-	Author   string
-	Date     string
-	Comment  string
-}

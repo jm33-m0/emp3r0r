@@ -19,7 +19,7 @@ const (
 // Job represents a task execution on an agent
 type Job struct {
 	ID          string    `cbor:"1,keyasint"`  // UUID
-	Name        string    `cbor:"2,keyasint"`  // "nmap scan", "interactive shell", "get root"
+	Name        string    `cbor:"2,keyasint"`  // human-readable task name, e.g. "nmap scan"
 	AgentTag    string    `cbor:"3,keyasint"`  // Target agent tag
 	Module      string    `cbor:"4,keyasint"`  // module/command name, e.g. "sa_whoami", "hello_linux"
 	Args        []string  `cbor:"5,keyasint"`  // Arguments passed to the module

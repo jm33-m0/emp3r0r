@@ -49,9 +49,6 @@ var (
 	// Displays agent list
 	AgentListPane *TmuxPane
 
-	// Displays bash shell for selected agent
-	AgentShellPane *TmuxPane
-
 	// Put all windows in this map
 	TmuxPanes = make(map[string]*TmuxPane)
 
@@ -511,21 +508,6 @@ func TmuxSetStatusRight(msg string) error {
 	if err != nil {
 		return fmt.Errorf("%s\n%v", out, err)
 	}
-	return nil
-}
-
-// TmuxNewWindow run command in a new window
-func TmuxNewWindow(name, cmd string) error {
-	if os.Getenv("TMUX") == "" ||
-		!util.IsCommandExist("tmux") {
-		return errors.New("you need to run emp3r0r under `tmux`")
-	}
-
-	out, err := exec.Command("tmux", "new-window", "-n", name, cmd).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("%v: %s", err, out)
-	}
-
 	return nil
 }
 

@@ -14,9 +14,4 @@ type C2Context struct {
 	Flags map[string]string
 	// Job is the job associated with this context
 	Job *def.Job
-
-	// OnUIReady is a callback injected by UI layer
-	// For UI actions (shell, file manager): pass connection string
-	// For data rendering (tables, lists): pass data structure
-	OnUIReady func(data any) error
 }

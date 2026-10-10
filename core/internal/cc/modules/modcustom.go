@@ -443,19 +443,6 @@ func selectArchPayload(files []string, arch string) string {
 	return files[0]
 }
 
-// Print module meta data
-func ModuleDetails(modName string, ctx *c2context.C2Context) {
-	info := GetModuleDetails(modName)
-	if info == nil {
-		return
-	}
-
-	// Call UI callback if provided
-	if ctx != nil && ctx.OnUIReady != nil {
-		ctx.OnUIReady(info)
-	}
-}
-
 // scan custom modules in ModuleDir,
 // and update ModuleHelpers, ModuleDocs
 func InitModules() {
