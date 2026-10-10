@@ -37,16 +37,13 @@ type AgentControl struct {
 // AgentRecord is an immutable snapshot of one agent known to this process.
 //
 // Agent is always set. Control is non-nil only in the C2 server process, which
-// owns the agent's live tunnel; in the operator process it is nil. Label is
-// presentation metadata that either role may maintain so a labeled agent keeps
-// its name regardless of which side set it.
+// owns the agent's live tunnel; in the operator process it is nil.
 //
 // A published AgentRecord is never mutated in place: readers snapshot fields
 // and writers copy the record, change the copy, and publish it.
 type AgentRecord struct {
 	Agent   *def.Emp3r0rAgent
 	Control *AgentControl
-	Label   string
 }
 
 // AgentRegistry is the single process-local registry of agents, keyed by agent
