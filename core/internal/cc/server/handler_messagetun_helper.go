@@ -73,6 +73,44 @@ func processKeyExchange(agentUUID string, msg *def.MsgTunData, pfsEstablished bo
 	return replyData, sessionKey, nil
 }
 
+// operatorWriteTimeout bounds a single write to an operator message tunnel so a
+// stuck operator can never block the agent message tunnel or a relay path.
+// It is a var so tests can shorten it.
+var operatorWriteTimeout = 5 * time.Second
+
+// hasActiveTunnel reports whether the operator still has a live tunnel. It is
+// used by broadcasts to skip connections that are still being registered or
+// have already been torn down.
+func (op *operator_t) hasActiveTunnel() bool {
+	op.mu.Lock()
+	defer op.mu.Unlock()
+	return op.conn != nil
+}
+
+// writeOperatorMsg serializes one CBOR frame to a single operator tunnel under
+// a bounded write deadline.
+//
+// The write deadline is cleared after every write on purpose. coder/websocket's
+// NetConn treats a deadline as terminal: when a deadline fires while no write is
+// active it permanently marks the connection write-expired, and only a later
+// SetWriteDeadline resets that flag. Operator tunnels are long-lived and shared
+// by both targeted relays and broadcasts, so a deadline left behind by one
+// relay would silently poison every later broadcast (the "only the first agent
+// reports knock knock" bug). Setting and immediately clearing a per-write
+// deadline keeps each write bounded without corrupting the shared tunnel.
+func writeOperatorMsg(op *operator_t, msg def.MsgTunData) error {
+	op.mu.Lock()
+	defer op.mu.Unlock()
+	if op.conn == nil {
+		return fmt.Errorf("operator %q has no active tunnel", op.sessionID)
+	}
+	_ = op.conn.SetWriteDeadline(time.Now().Add(operatorWriteTimeout))
+	encErr := cbor.NewEncoder(op.conn).Encode(msg)
+	// Clear the deadline so its expiry cannot linger on the shared connection.
+	_ = op.conn.SetWriteDeadline(time.Time{})
+	return encErr
+}
+
 // operatorBroadcastPrintf broadcasts a message to all connected operators.
 func operatorBroadcastPrintf(msg_type, format string, a ...any) (err error) {
 	msg := sanitize.SanitizeText(fmt.Sprintf(format, a...))
@@ -89,15 +127,12 @@ func operatorBroadcastPrintf(msg_type, format string, a ...any) (err error) {
 func fwdMsg2Operators(msg def.MsgTunData) (err error) {
 	OPERATORS.Range(func(id, value any) bool {
 		op, ok := value.(*operator_t)
-		if !ok || op == nil || op.conn == nil {
+		if !ok || op == nil || !op.hasActiveTunnel() {
 			return true // continue iteration
 		}
-		op.mu.Lock()
-		defer op.mu.Unlock()
-		encoder := cbor.NewEncoder(op.conn)
-		err = encoder.Encode(msg)
-		if err != nil {
-			logging.Errorf("Failed to forward message to operator: %v", err)
+		if writeErr := writeOperatorMsg(op, msg); writeErr != nil {
+			logging.Errorf("Failed to forward message to operator: %v", writeErr)
+			err = writeErr
 			return false // stop iteration on error
 		}
 		return true // continue iteration
@@ -115,16 +150,10 @@ func fwdMsgToOperator(operatorSession string, msg def.MsgTunData) error {
 		return fmt.Errorf("operator session %q not connected", operatorSession)
 	}
 	op, ok := val.(*operator_t)
-	if !ok || op == nil || op.conn == nil {
+	if !ok || op == nil {
 		return fmt.Errorf("operator session %q has no active tunnel", operatorSession)
 	}
-	op.mu.Lock()
-	defer op.mu.Unlock()
-	// Never let a stuck operator block the caller indefinitely. The caller
-	// (message tunnel) forwards in a goroutine; a timeout bounds the goroutine.
-	_ = op.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-	encoder := cbor.NewEncoder(op.conn)
-	if err := encoder.Encode(msg); err != nil {
+	if err := writeOperatorMsg(op, msg); err != nil {
 		return fmt.Errorf("forward to operator %q: %w", operatorSession, err)
 	}
 	return nil

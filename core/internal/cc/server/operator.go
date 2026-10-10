@@ -567,7 +567,11 @@ func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 		logging.Errorf("Operator %s: unexpected value in operator registry", operator_session)
 		return
 	}
+	// Publish the new tunnel under the same lock writers use, so forwarding
+	// goroutines never observe a half-updated connection.
+	operator.mu.Lock()
 	operator.conn = conn
+	operator.mu.Unlock()
 	OPERATORS.Store(operator_session, operator)
 
 	// A fresh operator connection resets the idle timer.
