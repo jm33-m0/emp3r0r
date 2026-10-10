@@ -8,12 +8,16 @@ package server
 // handler over a real TLS connection instead.
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -141,5 +145,44 @@ func TestFTPRegistrationRejectsOversizedTTL(t *testing.T) {
 	})
 	if code != http.StatusUnauthorized {
 		t.Fatalf("oversized-ttl register = %d, want 401", code)
+	}
+}
+
+// TestFTPRegistrationClockSkewErrorMentionsClocks verifies the operator is told
+// what to do when a claim is rejected for clock reasons, instead of a bare
+// "Unauthorized".
+func TestFTPRegistrationClockSkewErrorMentionsClocks(t *testing.T) {
+	serverDir := t.TempDir()
+	setupServerWorkspace(t, serverDir)
+	MarkOperatorOnline("op-a")
+	t.Cleanup(func() { MarkOperatorOffline("op-a") })
+
+	port, httpClient := startOperatorAPIServer(t, serverDir)
+
+	now := time.Now().Unix()
+	const token = "ftp-clock-hint"
+	claim := signOperatorClaim(t, serverDir, "op-a", token, def.OperatorCapabilityRegisterFTP,
+		now+transport.OperatorClaimMaxAgeSeconds+3600, now+transport.OperatorClaimMaxAgeSeconds+3720)
+	raw, err := cbor.Marshal(def.FTPStreamRequest{Token: token, FilePath: "/tmp/" + token, Claim: claim})
+	if err != nil {
+		t.Fatalf("marshal request: %v", err)
+	}
+	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("https://127.0.0.1:%d/%s", port, transport.OperatorRegisterFTPStream), bytes.NewReader(raw))
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/cbor")
+	req.Header.Set("operator_session", "op-a")
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		t.Fatalf("request: %v", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("skewed register = %d, want 401", resp.StatusCode)
+	}
+	if !strings.Contains(strings.ToLower(string(body)), "clock") {
+		t.Fatalf("error should tell the operator to check clocks, got %q", string(body))
 	}
 }
