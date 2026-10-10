@@ -2,6 +2,8 @@ package util
 
 import (
 	"bufio"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net"
 	"os"
@@ -10,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/sysinfo"
 )
@@ -111,19 +114,58 @@ func genShortID() string {
 	return fmt.Sprintf("%x", macUint64())
 }
 
-// GenAgentTag unique identifier of the host
-func GenAgentTag(agentUUID string) (id string) {
-	name, err := os.Hostname()
+// agentIDHexLen is the number of hex characters in a derived agent identifier.
+// It is short enough to type and recognise, and wide enough (32 bits) that
+// collisions are negligible for the number of agents a C2 tracks at once.
+const agentIDHexLen = 8
+
+// GenAgentTag derives the operator-facing agent identifier (the unified "tag"
+// and "id") from the agent's UUID alone. Callers on the C2 side must pass the
+// cryptographically verified UUID, never agent-reported metadata: the result is
+// then a fixed-length lowercase hex string, safe to render on hostile-sensitive
+// surfaces such as tmux window names and status lines.
+func GenAgentTag(agentUUID string) string {
+	if agentUUID == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(agentUUID))
+	return hex.EncodeToString(sum[:])[:agentIDHexLen]
+}
+
+// IsAgentID reports whether s is a well-formed derived agent identifier. The
+// identifier is always lowercase hex, so any other byte (tmux format syntax,
+// control characters, shell metacharacters) is rejected. Use this as
+// defense-in-depth before handing an identifier to a shell-adjacent renderer.
+func IsAgentID(s string) bool {
+	if len(s) != agentIDHexLen {
+		return false
+	}
+	for i := range s {
+		c := s[i]
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
+// AgentRef formats an agent identity for logs as "<tag> (<uuid>)" so every
+// message that names an agent also names the short identifier an operator can
+// type (e.g. `target <tag>` or `forget_agent <tag>`). Because the tag is
+// derived from the UUID, callers only need the UUID. Anything that does not
+// parse as a UUID (for example an already-resolved tag) is returned verbatim
+// instead of being hashed into a misleading tag.
+func AgentRef(id string) string {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return "<unknown>"
+	}
+	parsed, err := uuid.Parse(id)
 	if err != nil {
-		logging.Debugf("GetHostID: %v", err)
 		return id
 	}
-	name = fmt.Sprintf("%s\\%s", name, GetUsername()) // hostname\\username
-
-	// Use MachineID-based shortID and AgentUUID for deterministic AgentTag
-	id = fmt.Sprintf("%s-agent-%s", name, agentUUID)
-
-	return id
+	canonical := parsed.String()
+	return GenAgentTag(canonical) + " (" + canonical + ")"
 }
 
 // ScanPATH scan $PATH and return a list of executables, for autocomplete

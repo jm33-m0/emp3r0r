@@ -6,6 +6,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
 )
 
@@ -64,7 +65,7 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 	}
 
 	result := res.BuildResult
-	logging.Infof("Generated agent UUID: %s", result.AgentUUID)
+	logging.Infof("Generated agent UUID: %s", util.AgentRef(result.AgentUUID))
 	logging.Debugf("Config payload: %d bytes", result.ConfigSize)
 	logging.Successf("Generated %s from %s and %s", result.OutputFile, result.StubFile, live.EmpConfigFile)
 

@@ -40,7 +40,6 @@ func TestRegistrySingleLookupSurface(t *testing.T) {
 	live.PublishAgent(&live.AgentRecord{
 		Agent:   agent,
 		Control: &live.AgentControl{Index: 4, Conn: conn},
-		Label:   "prod",
 	})
 
 	if got := GetConnectedAgents(); len(got) != 1 || got[0].UUID != agent.UUID {
@@ -64,11 +63,6 @@ func TestRegistrySingleLookupSurface(t *testing.T) {
 	if a, ctrl, found := RuntimeControlByConn(conn); !found || a.UUID != agent.UUID || ctrl == nil {
 		t.Fatalf("RuntimeControlByConn = %v/%v/%v, want the published record", a, ctrl, found)
 	}
-
-	// Labels are part of the single record, so a refresh must preserve them.
-	if rec, ok := live.LookupAgent(agent.UUID); !ok || rec.Label != "prod" {
-		t.Fatalf("published label lost: %+v", rec)
-	}
 }
 
 // TestRegistryUpsertDoesNotDuplicate pins the anti-drift fix: publishing a
@@ -81,14 +75,13 @@ func TestRegistryUpsertDoesNotDuplicate(t *testing.T) {
 	live.PublishAgent(&live.AgentRecord{
 		Agent:   first,
 		Control: &live.AgentControl{Index: 7},
-		Label:   "keep-me",
 	})
 
 	// Re-check-in publishes a new agent object (as the server does) with the
 	// same UUID but refreshed metadata.
 	second := newAgent("uuid-upsert", "new-tag")
 	rec, _ := live.LookupAgent(second.UUID)
-	live.PublishAgent(&live.AgentRecord{Agent: second, Control: rec.Control, Label: rec.Label})
+	live.PublishAgent(&live.AgentRecord{Agent: second, Control: rec.Control})
 
 	list := GetConnectedAgents()
 	if len(list) != 1 {
@@ -102,9 +95,6 @@ func TestRegistryUpsertDoesNotDuplicate(t *testing.T) {
 	}
 	if got := GetAgentByIndex(7); got == nil || got.Tag != "new-tag" {
 		t.Fatalf("control index lost across upsert: %+v", got)
-	}
-	if rec, ok := live.LookupAgent(second.UUID); !ok || rec.Label != "keep-me" {
-		t.Fatalf("label lost across upsert: %+v", rec)
 	}
 }
 

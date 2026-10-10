@@ -149,7 +149,7 @@ func InitConfigFile(cc_host string) (err error) {
 		return fmt.Errorf("failed to sign agent UUID: %v", err)
 	}
 	live.RuntimeConfig.AgentUUIDSig = base64.URLEncoding.EncodeToString(sig)
-	live.RuntimeConfig.AgentTag = live.RuntimeConfig.AgentUUID
+	live.RuntimeConfig.AgentTag = util.GenAgentTag(live.RuntimeConfig.AgentUUID)
 
 	if live.RuntimeConfig.PaddingMin == 0 {
 		live.RuntimeConfig.PaddingMin = 1024

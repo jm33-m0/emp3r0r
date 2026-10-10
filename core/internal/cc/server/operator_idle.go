@@ -6,6 +6,7 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // agentCommandQueue is a per-agent FIFO of MsgTunData commands awaiting a live
@@ -39,7 +40,7 @@ func enqueueAgentCommand(agentUUID string, msg def.MsgTunData) {
 	q.cmds = append(q.cmds, msg)
 	depth := len(q.cmds)
 	q.mu.Unlock()
-	logging.Infof("Queued command %s for agent %s (queue depth %d)", msg.JobID, agentUUID, depth)
+	logging.Infof("Queued command %s for agent %s (queue depth %d)", msg.JobID, util.AgentRef(agentUUID), depth)
 }
 
 // hasQueuedCommands reports whether an agent has at least one pending command.
@@ -107,10 +108,10 @@ func drainQueuedCommands(agentUUID string, encoder *cbor.Encoder) {
 	cmds := dequeueAgentCommands(agentUUID, 0)
 	for i, cmd := range cmds {
 		if err := encoder.Encode(cmd); err != nil {
-			logging.Warningf("drainQueuedCommands: send %s to %s failed: %v", cmd.JobID, agentUUID, err)
+			logging.Warningf("drainQueuedCommands: send %s to %s failed: %v", cmd.JobID, util.AgentRef(agentUUID), err)
 			requeueAgentCommands(agentUUID, cmds[i:])
 			return
 		}
-		logging.Infof("Delivered queued command %s to agent %s", cmd.JobID, agentUUID)
+		logging.Infof("Delivered queued command %s to agent %s", cmd.JobID, util.AgentRef(agentUUID))
 	}
 }

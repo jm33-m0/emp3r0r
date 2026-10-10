@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func setupTestDB(t *testing.T) string {
@@ -426,5 +427,48 @@ func TestStartSessionResumesLegacySession(t *testing.T) {
 	}
 	if remoteAddr != "10.0.0.2" {
 		t.Fatalf("expected remote_addr to be updated, got %s", remoteAddr)
+	}
+}
+
+func TestResolveAgentUUIDByTag(t *testing.T) {
+	setupTestDB(t)
+	defer CloseAgentDB()
+
+	const uuid = "8f14e45f-ceea-467f-a8d7-3d1b4f5e2c6a"
+	tag := util.GenAgentTag(uuid)
+	agent := &def.Emp3r0rAgent{UUID: uuid, Tag: tag, PublicKey: "pk"}
+	if err := RecordAgentCheckin(agent); err != nil {
+		t.Fatalf("RecordAgentCheckin: %v", err)
+	}
+
+	got, found, err := ResolveAgentUUIDByTag(tag)
+	if err != nil || !found || got != uuid {
+		t.Fatalf("ResolveAgentUUIDByTag(%q) = %q, %v, %v; want %q, true, nil", tag, got, found, err, uuid)
+	}
+
+	if _, found, err := ResolveAgentUUIDByTag("deadbeef"); err != nil || found {
+		t.Fatalf("ResolveAgentUUIDByTag(unknown) = found=%v err=%v; want false, nil", found, err)
+	}
+}
+
+func TestResolveAgentUUIDByTagFallbackForStaleRecord(t *testing.T) {
+	setupTestDB(t)
+	defer CloseAgentDB()
+
+	const uuid = "11111111-2222-3333-4444-555555555555"
+	// Simulate a record written before the tag was unified: the stored tag is
+	// the old long form, but the derived tag must still resolve it.
+	agent := &def.Emp3r0rAgent{
+		UUID:      uuid,
+		Tag:       `old-host\user-agent-` + uuid,
+		PublicKey: "pk",
+	}
+	if err := RecordAgentCheckin(agent); err != nil {
+		t.Fatalf("RecordAgentCheckin: %v", err)
+	}
+
+	got, found, err := ResolveAgentUUIDByTag(util.GenAgentTag(uuid))
+	if err != nil || !found || got != uuid {
+		t.Fatalf("fallback resolve = %q, %v, %v; want %q, true, nil", got, found, err, uuid)
 	}
 }

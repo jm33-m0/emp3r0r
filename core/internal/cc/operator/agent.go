@@ -11,6 +11,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
 )
 
@@ -51,8 +52,14 @@ func CmdSetActiveAgent(cmd *cobra.Command, args []string) {
 		logging.Errorf("Failed to set active agent: %v", err)
 		return
 	}
+	if agent == nil {
+		logging.Errorf("Target does not exist, no target has been selected")
+		return
+	}
 	live.SetActiveAgent(agent)
-	logging.Successf("Now targeting %s", agent.Tag)
+	logging.Successf("Now targeting %s (%s)", agent.Tag, agent.Name)
+	logging.Infof("  OS: %s\n  User: %s\n  IPs: %s",
+		agent.OS, agent.User, strings.Join(agent.IPs, ", "))
 
 	// Reset operator-idle tracking for the newly selected agent so the status
 	// bar shows "Operator idle: 0s" instead of "--".
@@ -62,11 +69,22 @@ func CmdSetActiveAgent(cmd *cobra.Command, args []string) {
 	// reflect the latest server state instead of waiting for the next 10s tick.
 	safeRefreshAgentList()
 
-	// Update tmux window title to show active agent
-	setTitleErr := cli.TmuxSetWindowTitle(agent.ShortID, cli.CommandPane.WindowID)
+	// Update tmux window title to show the active agent's short identifier.
+	setTitleErr := cli.TmuxSetWindowTitle(tmuxSafeAgentID(agent.Tag), cli.CommandPane.WindowID)
 	if setTitleErr != nil {
 		logging.Warningf("Failed to set tmux window title: %v", setTitleErr)
 	}
+}
+
+// tmuxSafeAgentID returns the agent identifier only when it is a well-formed
+// derived ID, otherwise a fixed placeholder. tmux interprets its own format
+// syntax (#{...}, #(...)) in some rendering contexts, so agent-derived strings
+// must never reach a tmux command unvalidated.
+func tmuxSafeAgentID(id string) string {
+	if util.IsAgentID(id) {
+		return id
+	}
+	return "unknown"
 }
 
 // cmdListAgents triggers a refresh of the agent list and switches to the agent list pane
@@ -109,12 +127,13 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 			"IPs":     ips,
 		}
 		row := []string{
-			target.ShortID,
 			target.Tag,
+			target.Name,
 			infoMap["OS"], infoMap["Process"], infoMap["User"], infoMap["IPs"], infoMap["From"], infoMap["C2"], infoMap["Mesh"],
+			target.UUID,
 			agentLastSeen(target),
 		}
-		if activeAgent != nil && activeAgent.Tag == target.Tag {
+		if activeAgent != nil && activeAgent.UUID == target.UUID {
 			tail = row
 			continue
 		}
@@ -202,7 +221,7 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 	}
 	_ = cli.TmuxSetStatusRight(status_right)
 
-	header := []string{"ID", "Tag", "OS", "Process", "User", "IPs", "From", "C2", "Mesh", "Last seen"}
+	header := []string{"ID", "Name", "OS", "Process", "User", "IPs", "From", "C2", "Mesh", "UUID", "Last seen"}
 	tabStr := cli.BuildTable(header, tdata)
 	if cli.AgentListPane != nil {
 		cli.AgentListPane.Printf(true, "%s", tabStr)
@@ -289,21 +308,13 @@ func refreshAgentList() error {
 			logging.Debugf("refreshAgentList: %s LastSeen=%v (%.0fs ago)", a.Tag, a.LastSeen, time.Since(a.LastSeen).Seconds())
 		}
 	}
-	// Rebuild the registry from the server snapshot. Labels are process-local
-	// presentation metadata, so carry them across the refresh. live.AgentRegistry
-	// is a sync.Map because this refresher runs on its own goroutine while REPL
+	// Rebuild the registry from the server snapshot. live.AgentRegistry is a
+	// sync.Map because this refresher runs on its own goroutine while REPL
 	// handlers and autocompletion read the list.
-	labels := make(map[string]string)
-	live.RangeAgents(func(rec *live.AgentRecord) bool {
-		if rec.Label != "" {
-			labels[rec.Agent.UUID] = rec.Label
-		}
-		return true
-	})
 	live.ClearAgents()
 	for _, a := range agents {
 		if a != nil && a.UUID != "" {
-			live.PublishAgent(&live.AgentRecord{Agent: a, Label: labels[a.UUID]})
+			live.PublishAgent(&live.AgentRecord{Agent: a})
 		}
 	}
 	// Update the selected target to the refreshed object to avoid staleness.
@@ -312,7 +323,7 @@ func refreshAgentList() error {
 			if a.UUID == active.UUID {
 				live.SetActiveAgent(a)
 				// Update tmux window title
-				_ = cli.TmuxSetWindowTitle(a.ShortID, cli.CommandPane.WindowID)
+				_ = cli.TmuxSetWindowTitle(tmuxSafeAgentID(a.Tag), cli.CommandPane.WindowID)
 				break
 			}
 		}

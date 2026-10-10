@@ -39,6 +39,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 const (
@@ -103,7 +104,7 @@ func (ls *socks5Listener) handleUDPAssociate(sock net.Conn) error {
 	if err := socks5Reply(sock, socks5RepSuccess, reachHost, uint16(localPort)); err != nil {
 		return fmt.Errorf("socks5: udp associate reply: %w", err)
 	}
-	logging.Infof("SOCKS5 UDP-ASSOCIATE from %s -> udp %s:%d via agent %s", sock.RemoteAddr(), reachHost, localPort, ls.agentTag)
+	logging.Infof("SOCKS5 UDP-ASSOCIATE from %s -> udp %s:%d via agent %s", sock.RemoteAddr(), reachHost, localPort, util.AgentRef(ls.agentID))
 
 	// Watch the TCP control connection: when the client closes it (or the
 	// listener is cancelled) the association is over and pc is closed, which

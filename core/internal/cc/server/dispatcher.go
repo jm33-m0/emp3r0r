@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -130,7 +129,7 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 		logging.Errorf("CRITICAL: cborProtocolDispatch: first frame unmarshal failed from %s: %v", remoteAddr, err)
 		return
 	}
-	logging.Debugf("cborProtocolDispatch: decoded MsgAuth from %s: type=%s agent=%s", remoteAddr, msgAuth.Type, msgAuth.AgentUUID)
+	logging.Debugf("cborProtocolDispatch: decoded MsgAuth from %s: type=%s agent=%s", remoteAddr, msgAuth.Type, util.AgentRef(msgAuth.AgentUUID))
 
 	if err := transport.VerifyMsgAuth(&msgAuth); err != nil {
 		logging.Errorf("CRITICAL: cborProtocolDispatch: MsgAuth CA verification failed from %s: %v", remoteAddr, err)
@@ -141,10 +140,10 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 	// ── Dispatch by Capabilities ──────────────────────────────────────────────
 	routeCtx, routeErr := normalizeRouteFromMsgAuth(&msgAuth)
 	if routeErr != nil {
-		logging.Errorf("CRITICAL: cborProtocolDispatch: invalid route capabilities for agent %s from %s: %v", strconv.Quote(msgAuth.AgentUUID), remoteAddr, routeErr)
+		logging.Errorf("CRITICAL: cborProtocolDispatch: invalid route capabilities for agent %s from %s: %v", util.AgentRef(msgAuth.AgentUUID), remoteAddr, routeErr)
 		return
 	}
-	logging.Debugf("cborProtocolDispatch: normalized route: service=%s agent=%s", routeCtx.Service, strconv.Quote(msgAuth.AgentUUID))
+	logging.Debugf("cborProtocolDispatch: normalized route: service=%s agent=%s", routeCtx.Service, util.AgentRef(msgAuth.AgentUUID))
 
 	// ── Step ①.⑤: Pinned Key (TOFU) Verification ────────────────────────────
 	// Security decisions are DB-authoritative. Memory maps are runtime projections only.
@@ -154,7 +153,7 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 	}
 	pinnedKey, _, isKnown, err := agents.GetPinnedIdentity(msgAuth.AgentUUID)
 	if err != nil {
-		logging.Errorf("CRITICAL: cborProtocolDispatch: AgentDB lookup failed for %s from %s: %v", strconv.Quote(msgAuth.AgentUUID), remoteAddr, err)
+		logging.Errorf("CRITICAL: cborProtocolDispatch: AgentDB lookup failed for %s from %s: %v", util.AgentRef(msgAuth.AgentUUID), remoteAddr, err)
 		return
 	}
 
@@ -165,17 +164,17 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 	if !isKnown && !isCheckinRoute {
 		if val, exists := checkinReadyChannels.Load(msgAuth.AgentUUID); exists {
 			if ch, ok := val.(chan struct{}); ok {
-				logging.Debugf("cborProtocolDispatch: waiting for in-progress enrollment of %s", strconv.Quote(msgAuth.AgentUUID))
+				logging.Debugf("cborProtocolDispatch: waiting for in-progress enrollment of %s", util.AgentRef(msgAuth.AgentUUID))
 				select {
 				case <-ch:
 					// Re-check DB after signal
 					pinnedKey, _, isKnown, err = agents.GetPinnedIdentity(msgAuth.AgentUUID)
 					if err != nil {
-						logging.Errorf("CRITICAL: cborProtocolDispatch: secondary AgentDB lookup failed for %s: %v", strconv.Quote(msgAuth.AgentUUID), err)
+						logging.Errorf("CRITICAL: cborProtocolDispatch: secondary AgentDB lookup failed for %s: %v", util.AgentRef(msgAuth.AgentUUID), err)
 						return
 					}
 				case <-time.After(15 * time.Second):
-					logging.Warningf("cborProtocolDispatch: timed out waiting for enrollment of %s", strconv.Quote(msgAuth.AgentUUID))
+					logging.Warningf("cborProtocolDispatch: timed out waiting for enrollment of %s", util.AgentRef(msgAuth.AgentUUID))
 				}
 			}
 		}
@@ -183,33 +182,33 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 
 	if isKnown {
 		if pinnedKey == "" {
-			logging.Errorf("CRITICAL: cborProtocolDispatch: agent %s has empty pinned key in DB", strconv.Quote(msgAuth.AgentUUID))
+			logging.Errorf("CRITICAL: cborProtocolDispatch: agent %s has empty pinned key in DB", util.AgentRef(msgAuth.AgentUUID))
 			return
 		}
 		if msgAuth.AgentProof == "" {
-			logging.Errorf("CRITICAL: cborProtocolDispatch: agent %s is known but provided no AgentProof from %s", strconv.Quote(msgAuth.AgentUUID), remoteAddr)
+			logging.Errorf("CRITICAL: cborProtocolDispatch: agent %s is known but provided no AgentProof from %s", util.AgentRef(msgAuth.AgentUUID), remoteAddr)
 			return
 		}
 		proof, err := base64.URLEncoding.DecodeString(msgAuth.AgentProof)
 		if err != nil {
-			logging.Errorf("CRITICAL: cborProtocolDispatch: decode agent proof failed for %s from %s: %v", strconv.Quote(msgAuth.AgentUUID), remoteAddr, err)
+			logging.Errorf("CRITICAL: cborProtocolDispatch: decode agent proof failed for %s from %s: %v", util.AgentRef(msgAuth.AgentUUID), remoteAddr, err)
 			return
 		}
 		canonical := transport.CanonicalAuthString(msgAuth.AgentUUID, msgAuth.Timestamp, msgAuth.Nonce, msgAuth.Capabilities)
 		ok, err := transport.VerifySignatureWithPEM([]byte(pinnedKey), []byte(canonical), proof)
 		if err != nil || !ok {
-			msg := fmt.Sprintf("CRITICAL: cborProtocolDispatch: pinned key verification failed for agent %s from %s (sig_ok=%v, err=%v)", strconv.Quote(msgAuth.AgentUUID), remoteAddr, ok, err)
+			msg := fmt.Sprintf("CRITICAL: cborProtocolDispatch: pinned key verification failed for agent %s from %s (sig_ok=%v, err=%v)", util.AgentRef(msgAuth.AgentUUID), remoteAddr, ok, err)
 			logging.Errorf("%s", msg)
 			return
 		}
-		logging.Debugf("cborProtocolDispatch: pinned key verified for agent %s", strconv.Quote(msgAuth.AgentUUID))
+		logging.Debugf("cborProtocolDispatch: pinned key verified for agent %s", util.AgentRef(msgAuth.AgentUUID))
 	} else {
 		// Check-in is the only route allowed for unknown agents; all others require prior TOFU enrollment.
 		if !isCheckinRoute {
-			logging.Errorf("CRITICAL: cborProtocolDispatch: rejecting %s route for unknown agent %s from %s", routeCtx.Service, strconv.Quote(msgAuth.AgentUUID), remoteAddr)
+			logging.Errorf("CRITICAL: cborProtocolDispatch: rejecting %s route for unknown agent %s from %s", routeCtx.Service, util.AgentRef(msgAuth.AgentUUID), remoteAddr)
 			return
 		}
-		logging.Debugf("cborProtocolDispatch: agent %s has no pinned identity in DB (first enrollment path)", strconv.Quote(msgAuth.AgentUUID))
+		logging.Debugf("cborProtocolDispatch: agent %s has no pinned identity in DB (first enrollment path)", util.AgentRef(msgAuth.AgentUUID))
 	}
 
 	// ── Step ②: Replay protection ────────────────────────────────────────────
@@ -217,7 +216,7 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 	nonceKey := msgAuth.AgentUUID + ":" + msgAuth.Nonce
 	if prev, loaded := replayNonceCache.Load(nonceKey); loaded {
 		if prevTS, ok := prev.(int64); ok && abs64(now-prevTS) <= transport.ReplayWindowSeconds {
-			logging.Errorf("CRITICAL: cborProtocolDispatch: replay detected for agent %s from %s", strconv.Quote(msgAuth.AgentUUID), remoteAddr)
+			logging.Errorf("CRITICAL: cborProtocolDispatch: replay detected for agent %s from %s", util.AgentRef(msgAuth.AgentUUID), remoteAddr)
 			return
 		}
 	}
@@ -239,7 +238,7 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 	if m, ok := t.(transport.Authenticatable); ok {
 		m.MarkAuthenticated()
 	}
-	logging.Debugf("cborProtocolDispatch: handshake complete, timer stopped for %s", strconv.Quote(msgAuth.AgentUUID))
+	logging.Debugf("cborProtocolDispatch: handshake complete, timer stopped for %s", util.AgentRef(msgAuth.AgentUUID))
 
 	// ── Ephemeral PFS re-key for auxiliary routes ──────────────────────────
 	// The MsgAuth envelope was encrypted with the static per-build PSK. Auxiliary
@@ -253,12 +252,12 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 	// configured timeout, the C2 behaves as if it is offline: it refuses all
 	// agent connections, including check-in.
 	if !operatorOnline() {
-		logging.Warningf("cborProtocolDispatch: no operator online, rejecting agent %s from %s", strconv.Quote(msgAuth.AgentUUID), remoteAddr)
+		logging.Warningf("cborProtocolDispatch: no operator online, rejecting agent %s from %s", util.AgentRef(msgAuth.AgentUUID), remoteAddr)
 		return
 	}
 	if !operatorIsActive() {
 		maybeNotifyOperatorIdle()
-		logging.Warningf("cborProtocolDispatch: operator idle, rejecting agent %s from %s", strconv.Quote(msgAuth.AgentUUID), remoteAddr)
+		logging.Warningf("cborProtocolDispatch: operator idle, rejecting agent %s from %s", util.AgentRef(msgAuth.AgentUUID), remoteAddr)
 		return
 	}
 
@@ -273,7 +272,7 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 		dec := cbor.NewDecoder(secureConn)
 		enc := cbor.NewEncoder(secureConn)
 		if err := handleAgentCheckInStream(dec, enc, &msgAuth, agentUUID, remoteAddr); err != nil {
-			logging.Errorf("CRITICAL: cborProtocolDispatch: checkin error for %s: %v", strconv.Quote(agentUUID), err)
+			logging.Errorf("CRITICAL: cborProtocolDispatch: checkin error for %s: %v", util.AgentRef(agentUUID), err)
 		}
 
 	case live.RuntimeConfig.C2Routes.Msg:
@@ -293,7 +292,7 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 		handleWWWRelayStream(secureConn, msgAuth.AgentUUID, routeCtx.StreamID, remoteAddr)
 
 	default:
-		logging.Errorf("CRITICAL: cborProtocolDispatch: service %q is disabled or unknown for agent %s from %s", routeCtx.Service, strconv.Quote(msgAuth.AgentUUID), remoteAddr)
+		logging.Errorf("CRITICAL: cborProtocolDispatch: service %q is disabled or unknown for agent %s from %s", routeCtx.Service, util.AgentRef(msgAuth.AgentUUID), remoteAddr)
 	}
 }
 

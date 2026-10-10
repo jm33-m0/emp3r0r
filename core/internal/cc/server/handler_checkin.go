@@ -42,9 +42,15 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 		return fmt.Errorf("forbidden: empty uuid")
 	}
 	if agentUUID != "" && target.UUID != agentUUID {
-		logging.Errorf("CRITICAL: handleAgentCheckIn: route/body UUID mismatch: body=%s route=%s", strconv.Quote(target.UUID), strconv.Quote(agentUUID))
+		logging.Errorf("CRITICAL: handleAgentCheckIn: route/body UUID mismatch: body=%s route=%s", util.AgentRef(target.UUID), util.AgentRef(agentUUID))
 		return fmt.Errorf("forbidden: uuid mismatch")
 	}
+
+	// The operator-facing identifier is derived exclusively from the verified
+	// UUID. Overwrite whatever the agent reported so a hostile agent can never
+	// inject content (tmux format syntax, control bytes, ...) into any surface
+	// that renders the identifier.
+	target.Tag = util.GenAgentTag(target.UUID)
 
 	// ── Rate limiting: cap ALL log/alert output per UUID ─────────────────────
 	// Must run immediately after we have a validated UUID so that every
@@ -71,11 +77,11 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 
 	// SECURITY: Agent MUST provide its public key in every checkin.
 	if target.PublicKey == "" {
-		logging.Errorf("CRITICAL: handleAgentCheckIn: Agent %s provided no public key, rejecting", strconv.Quote(target.UUID))
+		logging.Errorf("CRITICAL: handleAgentCheckIn: Agent %s provided no public key, rejecting", util.AgentRef(target.UUID))
 		return fmt.Errorf("unauthorized: missing public key")
 	}
 	if target.UUIDSig == "" {
-		logging.Errorf("CRITICAL: handleAgentCheckIn: Agent %s provided no UUID signature, rejecting", strconv.Quote(target.UUID))
+		logging.Errorf("CRITICAL: handleAgentCheckIn: Agent %s provided no UUID signature, rejecting", util.AgentRef(target.UUID))
 		return fmt.Errorf("unauthorized: missing uuid signature")
 	}
 	if agents.AgentDB == nil {
@@ -91,13 +97,13 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 	)
 	pinnedKey, pinnedUUIDSig, isKnown, err = agents.GetPinnedIdentity(target.UUID)
 	if err != nil {
-		logging.Errorf("CRITICAL: handleAgentCheckIn: AgentDB lookup failed for %s: %v", strconv.Quote(target.UUID), err)
+		logging.Errorf("CRITICAL: handleAgentCheckIn: AgentDB lookup failed for %s: %v", util.AgentRef(target.UUID), err)
 		return fmt.Errorf("forbidden: trust lookup failed")
 	}
 
 	// ── Phase 2: TOFU Verification (DB-Authoritative) ─────────────────────
 	if isKnown && pinnedKey == "" {
-		logging.Errorf("CRITICAL: handleAgentCheckIn: %s has empty pinned key in DB", strconv.Quote(target.UUID))
+		logging.Errorf("CRITICAL: handleAgentCheckIn: %s has empty pinned key in DB", util.AgentRef(target.UUID))
 		return fmt.Errorf("forbidden: invalid pinned identity")
 	}
 
@@ -106,13 +112,13 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 		msg := fmt.Sprintf("SECURITY: agent %s presented a different key — rejecting (key rotation is disabled).\n"+
 			"  Rejected Payload Info:\n    User: %s\n    Host: %s\n    IPs:  %s\n    OS:   %s\n"+
 			"  If this is a legitimate reinstall, run `forget_agent %s` to reset its identity.",
-			target.UUID, target.User, target.Hostname, ips, target.OS, strconv.Quote(target.UUID))
+			util.AgentRef(target.UUID), target.User, target.Hostname, ips, target.OS, util.GenAgentTag(target.UUID))
 		logging.Errorf("%s", msg)
 		logging.Notify(logging.ERROR, "%s", msg)
 		return fmt.Errorf("forbidden: key rotation")
 	}
 	if isKnown && pinnedUUIDSig != "" && target.UUIDSig != pinnedUUIDSig {
-		msg := fmt.Sprintf("SECURITY: agent %s presented mismatching UUID signature — rejecting clone/impersonation risk", target.UUID)
+		msg := fmt.Sprintf("SECURITY: agent %s presented mismatching UUID signature — rejecting clone/impersonation risk", util.AgentRef(target.UUID))
 		logging.Errorf("%s", msg)
 		logging.Notify(logging.ERROR, "%s", msg)
 		return fmt.Errorf("forbidden: identity token mismatch")
@@ -155,7 +161,7 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 	// find the agent in the database.
 	if agents.AgentDB != nil {
 		if err := agents.RecordAgentCheckin(target); err != nil {
-			logging.Errorf("CRITICAL: Failed to record agent enrollment for %s: %v", strconv.Quote(target.UUID), err)
+			logging.Errorf("CRITICAL: Failed to record agent enrollment for %s: %v", util.AgentRef(target.UUID), err)
 			return fmt.Errorf("forbidden: failed to persist identity")
 		}
 	}
@@ -164,44 +170,38 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 	sessionID := fmt.Sprintf("%d", time.Now().UnixNano())
 	if sessionErr := agents.StartSession(target.UUID, sessionID, remoteAddr); sessionErr != nil {
 		if errors.Is(sessionErr, agents.ErrSessionAlreadyActive) {
-			logging.Notify(logging.ERROR, "CRITICAL: handleAgentCheckIn: duplicate live session blocked for %s from %s", strconv.Quote(target.UUID), remoteAddr)
+			logging.Notify(logging.ERROR, "CRITICAL: handleAgentCheckIn: duplicate live session blocked for %s from %s", util.AgentRef(target.UUID), remoteAddr)
 			return fmt.Errorf("forbidden: duplicate session")
 		}
-		logging.Errorf("CRITICAL: handleAgentCheckIn: session admission failed for %s: %v", strconv.Quote(target.UUID), sessionErr)
+		logging.Errorf("CRITICAL: handleAgentCheckIn: session admission failed for %s: %v", util.AgentRef(target.UUID), sessionErr)
 		return fmt.Errorf("forbidden: session admission failed")
 	}
 
 	// ── Phase 4: Runtime Projection Update (Non-Security State) ────────────
 	// Upsert the registry entry by UUID. A re-check-in keeps the existing live
-	// tunnel and label instead of resetting them.
+	// tunnel instead of resetting it.
 	existing, alreadyKnown := live.LookupAgent(target.UUID)
 	rec := &live.AgentRecord{Agent: target}
 	if alreadyKnown {
 		rec.Control = existing.Control
-		rec.Label = existing.Label
 	}
 	if rec.Control == nil {
 		rec.Control = &live.AgentControl{Index: agents.AssignAgentIndex()}
 	}
 	live.PublishAgent(rec)
 
-	logging.Infof("Updated agent %q with full data from CBOR", target.UUID)
+	logging.Infof("Updated agent %s with full data from CBOR", util.AgentRef(target.UUID))
 
 	// Signal that public key is now available (for any waiting requests)
 	// ONLY after DB persistence and Session admission are complete.
 	closeCheckinReadyChannel(target.UUID)
-	logging.Debugf("Signaled checkin completion for %s", strconv.Quote(target.UUID))
+	logging.Debugf("Signaled checkin completion for %s", util.AgentRef(target.UUID))
 
 	// Now that agent is persistent and in memory, safe to proceed with other operations
-	shortname := strings.Split(target.Tag, "-agent")[0]
-	if util.IsExist(agents.AgentsJSON) {
-		if l := agents.RefreshAgentLabel(target); l != "" {
-			shortname = l
-		}
-	}
+	shortname := target.Tag
 
 	if !alreadyKnown {
-		logging.Notify(logging.INFO, "Checked in: %s from %s, running %s", strconv.Quote(shortname), fmt.Sprintf("'%s - %s'", target.From, target.Transport), strconv.Quote(target.OS))
+		logging.Notify(logging.INFO, "Checked in: %s from %s, running %s", util.AgentRef(target.UUID), fmt.Sprintf("'%s - %s'", target.From, target.Transport), strconv.Quote(target.OS))
 	} else {
 		if logging.Level >= 4 {
 			logging.Debugf("Agent reconnected: %s from %s, running %s", shortname, fmt.Sprintf("%s - %s", target.From, target.Transport), strconv.Quote(target.OS))
@@ -212,7 +212,7 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 	// This helps agents synchronize their connection teardown, especially in polling modes
 	ack := &def.MsgTunData{Tag: "checkin-ok"}
 	if err := out.Encode(ack); err != nil {
-		logging.Errorf("Failed to send checkin-ok ACK to %s: %v", target.UUID, err)
+		logging.Errorf("Failed to send checkin-ok ACK to %s: %v", util.AgentRef(target.UUID), err)
 	}
 
 	return nil

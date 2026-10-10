@@ -36,6 +36,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
 	"github.com/sagernet/sing/protocol/socks"
@@ -143,7 +144,9 @@ func startPivotStack(t *testing.T) (pivotAddr string) {
 
 	// Agent identity + enrollment + message tunnel.
 	agentUUID := uuid.New().String()
-	agentTag := "tun2socks-agent-" + uuid.New().String()[:8]
+	// The operator-facing tag is derived from the verified UUID, never chosen by
+	// the agent; use the same derivation the C2 applies.
+	agentTag := util.GenAgentTag(agentUUID)
 	agentPriv, agentPub, err := genAgentKey()
 	if err != nil {
 		t.Fatalf("genAgentKey: %v", err)

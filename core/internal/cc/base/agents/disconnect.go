@@ -3,6 +3,7 @@ package agents
 import (
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // DisconnectAgentByUUID closes one agent's live runtime session, if present.
@@ -15,7 +16,7 @@ func DisconnectAgentByUUID(uuid string) bool {
 	agent, ctrl, found := RuntimeControlByUUID(uuid)
 	if !found {
 		if err := EndSession(uuid); err != nil {
-			logging.Debugf("Failed to end session for %s: %v", uuid, err)
+			logging.Debugf("Failed to end session for %s: %v", util.AgentRef(uuid), err)
 		}
 		return false
 	}
@@ -34,7 +35,7 @@ func DisconnectAgentByUUID(uuid string) bool {
 	live.ForgetAgent(uuid)
 
 	if err := EndSession(uuid); err != nil {
-		logging.Debugf("Failed to end session for %s: %v", uuid, err)
+		logging.Debugf("Failed to end session for %s: %v", util.AgentRef(uuid), err)
 	}
 
 	logging.Warningf("Disconnected live session for agent %s (%s)", agent.Tag, uuid)
@@ -75,7 +76,7 @@ func DisconnectAllAgents() {
 
 		// End DB session tracking
 		if err := EndSession(rec.Agent.UUID); err != nil {
-			logging.Debugf("Failed to end session for %s: %v", rec.Agent.UUID, err)
+			logging.Debugf("Failed to end session for %s: %v", util.AgentRef(rec.Agent.UUID), err)
 		}
 
 		return true

@@ -22,7 +22,6 @@ func (p *AgentProxyImpl) GatherSystemDetails() (map[string]any, error) {
 	m := map[string]any{
 		"tag":              agent.Tag,
 		"name":             agent.Name,
-		"short_id":         agent.ShortID,
 		"version":          agent.Version,
 		"transport":        agent.Transport,
 		"hostname":         agent.Hostname,

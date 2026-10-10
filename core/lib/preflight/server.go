@@ -8,6 +8,7 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // ProcessRequest handles raw body from preflight request.
@@ -47,7 +48,7 @@ func ProcessRequest(data []byte, allowConn bool) ([]byte, error) {
 		return nil, fmt.Errorf("invalid timestamp: request %s (diff=%d seconds)", direction, diff)
 	}
 
-	logging.Debugf("Preflight request from %s (ts: %d)", req.AgentUUID, req.Timestamp)
+	logging.Debugf("Preflight request from %s (ts: %d)", util.AgentRef(req.AgentUUID), req.Timestamp)
 
 	// Determine status
 	status := "RJ" // Reject by default

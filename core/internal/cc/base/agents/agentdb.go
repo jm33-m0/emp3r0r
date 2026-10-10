@@ -353,6 +353,50 @@ func GetStoredAgent(uuid string) (*StoredAgent, error) {
 	return &agent, nil
 }
 
+// ResolveAgentUUIDByTag returns the UUID of the stored agent whose
+// operator-facing tag matches tag. The tag column is canonical for any agent
+// that has checked in since the identifier was unified; as a fallback (for a
+// record written by an older build) the derived tag is recomputed from each
+// UUID. found is false when no record matches.
+func ResolveAgentUUIDByTag(tag string) (uuid string, found bool, err error) {
+	if AgentDB == nil {
+		return "", false, fmt.Errorf("database not initialized")
+	}
+	tag = strings.TrimSpace(tag)
+	if tag == "" {
+		return "", false, nil
+	}
+
+	scanErr := AgentDB.QueryRow("SELECT uuid FROM agents WHERE tag = ?", tag).Scan(&uuid)
+	if scanErr == nil {
+		return uuid, true, nil
+	}
+	if !errors.Is(scanErr, sql.ErrNoRows) {
+		return "", false, fmt.Errorf("query agent by tag: %w", scanErr)
+	}
+
+	// Fallback: recompute the derived tag for every stored UUID so records that
+	// predate the unified identifier still resolve.
+	rows, qErr := AgentDB.Query("SELECT uuid FROM agents")
+	if qErr != nil {
+		return "", false, fmt.Errorf("query agents: %w", qErr)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var candidate string
+		if scanErr := rows.Scan(&candidate); scanErr != nil {
+			return "", false, fmt.Errorf("scan agent uuid: %w", scanErr)
+		}
+		if util.GenAgentTag(candidate) == tag {
+			return candidate, true, nil
+		}
+	}
+	if rowsErr := rows.Err(); rowsErr != nil {
+		return "", false, fmt.Errorf("iterate agents: %w", rowsErr)
+	}
+	return "", false, nil
+}
+
 // RecordAgentCheckin records or updates an agent check-in in the database
 func RecordAgentCheckin(agent *def.Emp3r0rAgent) error {
 	if AgentDB == nil {
@@ -398,7 +442,7 @@ func RecordAgentCheckin(agent *def.Emp3r0rAgent) error {
 			logging.Warningf("Failed to record history: %v", err)
 		}
 
-		logging.Infof("New agent recorded in database: %s", agent.UUID)
+		logging.Infof("New agent recorded in database: %s", util.AgentRef(agent.UUID))
 	} else {
 		if existing.PublicKey != "" && agent.PublicKey != "" && existing.PublicKey != agent.PublicKey {
 			return fmt.Errorf("immutable identity violation: public key mismatch for %s", agent.UUID)
@@ -582,7 +626,7 @@ func RemoveAgent(uuid string) error {
 		return fmt.Errorf("agent not found: %s", uuid)
 	}
 
-	logging.Successf("Agent %s removed from database", uuid)
+	logging.Successf("Agent %s removed from database", util.AgentRef(uuid))
 
 	// Also drop the in-memory registry entry so PINNED KEYS are forgotten.
 	live.ForgetAgent(uuid)

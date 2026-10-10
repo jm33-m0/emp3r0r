@@ -40,6 +40,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // SOCKS5 protocol reply codes (RFC 1928).
@@ -254,7 +255,7 @@ func StartSocks5Proxy(agentTag string, port int, bindAddr string) error {
 	socks5Proxies.listeners[port] = ls
 	socks5Proxies.mu.Unlock()
 
-	logging.Infof("SOCKS5 pivot started on %s:%d (relaying through agent %s)", bindAddr, port, agentTag)
+	logging.Infof("SOCKS5 pivot started on %s:%d (relaying through agent %s)", bindAddr, port, util.AgentRef(agent.UUID))
 	for _, ln := range lns {
 		ls.wg.Add(1)
 		go ls.acceptLoop(ln)
@@ -413,7 +414,7 @@ func (ls *socks5Listener) proxyToAgent(sock net.Conn, target string) error {
 	token := socksProxyTokenPrefix + uuid.NewString()
 	// Every CONNECT the listener accepts is logged here — if tun2socks traffic
 	// never produces this line, the request is not reaching this listener at all.
-	logging.Infof("SOCKS5 CONNECT %s from %s via agent %s (token %s)", target, sock.RemoteAddr(), ls.agentTag, token)
+	logging.Infof("SOCKS5 CONNECT %s from %s via agent %s (token %s)", target, sock.RemoteAddr(), util.AgentRef(ls.agentID), token)
 	entry := &socks5ProxyEntry{
 		token:     token,
 		agentUUID: agent.UUID,
@@ -634,7 +635,13 @@ func handleSocks5Start(wrt http.ResponseWriter, req *http.Request) {
 		}
 		socks5Proxies.mu.Unlock()
 	}
-	logging.Successf("SOCKS5 pivot started on port %d via agent %s", payload.Port, payload.AgentTag)
+	// Prefer the UUID the listener resolved at start; fall back to the request
+	// value (which may already be a tag) if the listener has gone.
+	agentRef := util.AgentRef(payload.AgentTag)
+	if ls, ok := socks5Proxies.listeners[payload.Port]; ok {
+		agentRef = util.AgentRef(ls.agentID)
+	}
+	logging.Successf("SOCKS5 pivot started on port %d via agent %s", payload.Port, agentRef)
 	wrt.WriteHeader(http.StatusOK)
 }
 

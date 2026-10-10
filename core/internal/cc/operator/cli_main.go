@@ -174,8 +174,9 @@ func SetDynamicPrompt() string {
 	cwd := color.New(color.FgHiBlue).Sprint("cwd:local")
 
 	if active := live.GetActiveAgent(); active != nil {
-		// The stored snapshot is already sanitized at write time.
-		shortName = strings.Split(active.Tag, "-agent")[0]
+		// The prompt shows the unified short identifier; the human-readable
+		// name is available in the agent list and completions.
+		shortName = active.Tag
 		if active.HasRoot {
 			prompt_arrow = color.New(color.Bold, color.FgHiGreen).Sprint("\n# ")
 			prompt_name = color.New(color.Bold, color.FgBlack, color.BgHiGreen).Sprint(AppName)

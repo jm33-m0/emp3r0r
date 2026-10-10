@@ -39,6 +39,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // skipFlakyPivotE2E disables the full-stack SOCKS5-pivot E2E tests under the
@@ -201,7 +202,9 @@ func runSocks5PivotE2E(t *testing.T, mode string, expectRefused bool) {
 	// Agent identity + enrollment + message tunnel (PFS handshake inside).
 	// -----------------------------------------------------------------------
 	agentUUID := uuid.New().String()
-	agentTag := "socks5-agent-" + uuid.New().String()[:8]
+	// The operator-facing tag is derived from the verified UUID; use the same
+	// derivation the C2 applies so the test can find the agent by tag.
+	agentTag := util.GenAgentTag(agentUUID)
 	agentPriv, agentPub, err := genAgentKey()
 	if err != nil {
 		t.Fatalf("genAgentKey: %v", err)

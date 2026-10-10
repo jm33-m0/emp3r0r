@@ -44,15 +44,13 @@ func MustGetActiveAgent() *def.Emp3r0rAgent {
 		return nil
 	}
 
-	// find target in the registry
-	var fresh *def.Emp3r0rAgent
-	live.RangeAgents(func(rec *live.AgentRecord) bool {
-		if rec.Agent.Tag == active.Tag {
-			fresh = SnapshotAgent(rec.Agent)
-			return false // stop iteration
+	// find target in the registry by its stable UUID; the short ID is a
+	// display/targeting convenience and may (rarely) collide.
+	if active.UUID != "" {
+		if rec, ok := live.LookupAgent(active.UUID); ok {
+			return SnapshotAgent(rec.Agent)
 		}
-		return true
-	})
-
-	return fresh
+		return nil
+	}
+	return GetAgentByTag(active.Tag)
 }

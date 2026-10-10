@@ -61,7 +61,10 @@ func GatherSystemDetails() *def.Emp3r0rAgent {
 	info.UUIDSig = common.RuntimeConfig.AgentUUIDSig
 
 	info.Hostname = hostname
-	info.Name = strings.Split(info.Tag, "-agent")[0]
+	// Name is the human-readable label shown alongside the short identifier.
+	// use "/" as the separator and normalize any Windows domain backslash so
+	// the name never has to be escaped.
+	info.Name = strings.ReplaceAll(fmt.Sprintf("%s/%s", hostname, util.GetUsername()), `\`, "/")
 	info.Version = def.Version
 	info.Kernel = osinfo.Kernel
 	info.Arch = osinfo.Architecture

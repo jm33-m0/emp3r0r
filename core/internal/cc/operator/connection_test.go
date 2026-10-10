@@ -114,7 +114,7 @@ func TestOperatorConnection(t *testing.T) {
 	// Mock active agent
 	agentTag := "test-agent"
 	agent := &def.Emp3r0rAgent{UUID: "test-agent-uuid", Tag: agentTag}
-	live.PublishAgent(&live.AgentRecord{Agent: agent, Control: &live.AgentControl{Index: 0}, Label: "test-label"})
+	live.PublishAgent(&live.AgentRecord{Agent: agent, Control: &live.AgentControl{Index: 0}})
 
 	// Mock SendCmd
 	originalSendCmd := agents.SendCmd

@@ -3,13 +3,13 @@ package server
 import (
 	"context"
 	"io"
-	"strconv"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // handleFileUploadStream processes an FTP upload directly over the pure CBOR encrypted stream.
@@ -31,20 +31,20 @@ func handleFileUploadStream(conn *transport.SecureConn, agentUUID, streamID, rem
 	// SECURITY: Verify that agent is enrolled and has an active session.
 	// Auxiliary routes (FTP, Proxy, WWW) are sub-operations of the main agent session.
 	if agents.AgentDB == nil {
-		logging.Errorf("handleFileUploadStream: AgentDB unavailable for %s from %s", strconv.Quote(agentUUID), remoteAddr)
+		logging.Errorf("handleFileUploadStream: AgentDB unavailable for %s from %s", util.AgentRef(agentUUID), remoteAddr)
 		cancel()
 		conn.Close()
 		return
 	}
 	pinnedKey, _, found, lookupErr := agents.GetPinnedIdentity(agentUUID)
 	if lookupErr != nil {
-		logging.Errorf("CRITICAL: handleFileUploadStream: AgentDB lookup failed for %s from %s: %v", strconv.Quote(agentUUID), remoteAddr, lookupErr)
+		logging.Errorf("CRITICAL: handleFileUploadStream: AgentDB lookup failed for %s from %s: %v", util.AgentRef(agentUUID), remoteAddr, lookupErr)
 		cancel()
 		conn.Close()
 		return
 	}
 	if !found || pinnedKey == "" {
-		logging.Errorf("CRITICAL: handleFileUploadStream: agent %s not enrolled or has empty pinned key from %s", strconv.Quote(agentUUID), remoteAddr)
+		logging.Errorf("CRITICAL: handleFileUploadStream: agent %s not enrolled or has empty pinned key from %s", util.AgentRef(agentUUID), remoteAddr)
 		cancel()
 		conn.Close()
 		return

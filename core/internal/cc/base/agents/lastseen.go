@@ -1,8 +1,6 @@
 package agents
 
 import (
-	"crypto/sha1"
-	"fmt"
 	"sync"
 	"time"
 
@@ -85,13 +83,6 @@ func SnapshotAgent(a *def.Emp3r0rAgent) *def.Emp3r0rAgent {
 		return nil
 	}
 	cp := *a
-	if cp.ShortID == "" && cp.UUID != "" {
-		shortID := fmt.Sprintf("%x", sha1.Sum([]byte(cp.UUID+cp.UUIDSig)))
-		if len(shortID) > 8 {
-			shortID = shortID[:8]
-		}
-		cp.ShortID = shortID
-	}
 	if seenAt, ok := AgentLastSeen(a.UUID); ok {
 		cp.LastSeen = seenAt
 	}

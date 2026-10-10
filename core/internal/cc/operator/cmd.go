@@ -106,10 +106,10 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		addModuleCommands(rootCmd)
 
 		targetCmd := &cobra.Command{
-			Use:     "target (agent_id | agent_tag)",
+			Use:     "target <agent_id>",
 			GroupID: "agent",
 			Short:   "Set active target",
-			Example: "target 0",
+			Example: "target 1a2b3c4d",
 			Args:    cobra.ExactArgs(1),
 			Run:     CmdSetActiveAgent,
 		}
@@ -380,32 +380,6 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		}
 		rootCmd.AddCommand(searchCmd)
 
-		labelAgentCmd := &cobra.Command{
-			Use:     "label --id agent_id --label custom_name",
-			GroupID: "agent",
-			Short:   "Label an agent with custom name",
-			Example: "label --id <agent_id> --label <custom_name>",
-			Run: func(cmd *cobra.Command, args []string) {
-				agentID, _ := cmd.Flags().GetString("id")
-				label, _ := cmd.Flags().GetString("label")
-
-				err := agents.SetAgentLabel(agentID, label)
-				if err != nil {
-					logging.Errorf("Set agent label: %v", err)
-					return
-				}
-			},
-		}
-		labelAgentCmd.Flags().StringP("id", "", "0", "Agent ID")
-		labelAgentCmd.Flags().StringP("label", "", "no-label", "Custom name")
-		labelAgentCmd.MarkFlagRequired("id")
-		labelAgentCmd.MarkFlagRequired("label")
-		rootCmd.AddCommand(labelAgentCmd)
-		carapace.Gen(labelAgentCmd).FlagCompletion(carapace.ActionMap{
-			"id":    carapace.ActionCallback(listAgents),
-			"label": carapace.ActionValues("no-label", "linux", "windows", "workstation", "server", "dev", "prod", "test", "honeypot"),
-		})
-
 		execCmd := &cobra.Command{
 			Use:     "exec --cmd 'command'",
 			GroupID: "util",
@@ -422,10 +396,10 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		})
 
 		forgetAgentCmd := &cobra.Command{
-			Use:     "forget_agent <uuid>",
+			Use:     "forget_agent <agent_id>",
 			GroupID: "c2",
 			Short:   "Remove an agent from the database (tracking history)",
-			Example: "forget_agent <agent-uuid>",
+			Example: "forget_agent 1a2b3c4d",
 			Args:    cobra.ExactArgs(1),
 			Run:     CmdForgetAgent,
 		}

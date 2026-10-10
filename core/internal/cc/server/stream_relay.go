@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -15,6 +14,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 type relayStream struct {
@@ -70,16 +70,16 @@ func verifyAuxRouteAgent(agentUUID, remoteAddr, route string) bool {
 		return false
 	}
 	if agents.AgentDB == nil {
-		logging.Errorf("%s relay: AgentDB unavailable for %s from %s", route, strconv.Quote(agentUUID), remoteAddr)
+		logging.Errorf("%s relay: AgentDB unavailable for %s from %s", route, util.AgentRef(agentUUID), remoteAddr)
 		return false
 	}
 	pinnedKey, _, found, lookupErr := agents.GetPinnedIdentity(agentUUID)
 	if lookupErr != nil {
-		logging.Errorf("CRITICAL: %s relay: AgentDB lookup failed for %s from %s: %v", route, strconv.Quote(agentUUID), remoteAddr, lookupErr)
+		logging.Errorf("CRITICAL: %s relay: AgentDB lookup failed for %s from %s: %v", route, util.AgentRef(agentUUID), remoteAddr, lookupErr)
 		return false
 	}
 	if !found || pinnedKey == "" {
-		logging.Errorf("CRITICAL: %s relay: agent %s not enrolled or has empty pinned key from %s", route, strconv.Quote(agentUUID), remoteAddr)
+		logging.Errorf("CRITICAL: %s relay: agent %s not enrolled or has empty pinned key from %s", route, util.AgentRef(agentUUID), remoteAddr)
 		return false
 	}
 	_ = agents.UpdateSessionHeartbeat(agentUUID)
@@ -110,7 +110,7 @@ func handleProxyRelayStream(conn io.ReadWriteCloser, agentUUID, streamID, remote
 		return
 	}
 	if entry.agentUUID != agentUUID {
-		logging.Errorf("CRITICAL: proxy relay: agent %s hijacked token %q owned by %s", strconv.Quote(agentUUID), streamID, strconv.Quote(entry.agentUUID))
+		logging.Errorf("CRITICAL: proxy relay: agent %s hijacked token %q owned by %s", util.AgentRef(agentUUID), streamID, util.AgentRef(entry.agentUUID))
 		return
 	}
 
@@ -125,7 +125,7 @@ func handleProxyRelayStream(conn io.ReadWriteCloser, agentUUID, streamID, remote
 		entry.teardown()
 		return
 	}
-	logging.Infof("SOCKS5 relay for %q established (agent %s)", streamID, strconv.Quote(agentUUID))
+	logging.Infof("SOCKS5 relay for %q established (agent %s)", streamID, util.AgentRef(agentUUID))
 
 	relaySOCKS5Stream(entry.sock, conn, streamID)
 	logging.Debugf("proxy relay for %q finished", streamID)

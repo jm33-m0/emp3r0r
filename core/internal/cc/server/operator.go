@@ -285,14 +285,22 @@ func handleForgetAgent(wrt http.ResponseWriter, req *http.Request) {
 	}
 
 	requestedID := uuid
-	if byTag := agents.GetAgentByTag(requestedID); byTag != nil && byTag.UUID != "" {
-		uuid = byTag.UUID
+	// A short agent ID is resolved to its UUID so the DB row (keyed by UUID) can
+	// be removed even when the agent is offline and not in the live registry.
+	if util.IsAgentID(requestedID) {
+		if byTag := agents.GetAgentByTag(requestedID); byTag != nil && byTag.UUID != "" {
+			uuid = byTag.UUID
+		} else if resolved, found, resolveErr := agents.ResolveAgentUUIDByTag(requestedID); resolveErr != nil {
+			logging.Warningf("forget_agent: resolve tag %s: %v", requestedID, resolveErr)
+		} else if found {
+			uuid = resolved
+		}
 	}
 
 	// Prepare response message with agent details
-	var agentDetails string = fmt.Sprintf("Agent %s", uuid)
+	var agentDetails string = fmt.Sprintf("Agent %s", util.AgentRef(uuid))
 	if requestedID != uuid {
-		agentDetails = fmt.Sprintf("Agent %s (resolved from tag %s)", uuid, requestedID)
+		agentDetails = fmt.Sprintf("Agent %s (resolved from tag %s)", util.AgentRef(uuid), requestedID)
 	}
 
 	// Try to get agent details from memory first (if connected/recently connected)
@@ -322,7 +330,7 @@ func handleForgetAgent(wrt http.ResponseWriter, req *http.Request) {
 			}
 		}
 		if err != nil {
-			logging.Errorf("Failed to remove agent %s from DB: %v", uuid, err)
+			logging.Errorf("Failed to remove agent %s from DB: %v", util.AgentRef(uuid), err)
 			http.Error(wrt, fmt.Sprintf("DB removal failed: %v", err), http.StatusInternalServerError)
 			return
 		}
@@ -334,7 +342,7 @@ func handleForgetAgent(wrt http.ResponseWriter, req *http.Request) {
 	// Remove from memory
 	if targetAgent != nil {
 		live.ForgetAgent(uuid)
-		logging.Successf("Operator removed agent %s from memory", uuid)
+		logging.Successf("Operator removed agent %s from memory", util.AgentRef(uuid))
 	}
 	wrt.WriteHeader(http.StatusOK)
 	fmt.Fprintf(wrt, "%s\n\nHas been forgotten.", agentDetails)

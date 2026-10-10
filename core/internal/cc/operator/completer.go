@@ -18,14 +18,26 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-// autocomplete agent tags
+// autocomplete agent identifiers, with a human-readable description so the
+// short hex ID can be told apart at a glance.
 func listAgents(ctx carapace.Context) carapace.Action {
-	names := make([]string, 0)
+	values := make([]string, 0)
 	live.RangeAgents(func(rec *live.AgentRecord) bool {
-		names = append(names, strconv.Quote(rec.Agent.Tag)) // escape special characters
+		// Only offer canonical, derived identifiers. A record whose tag is not a
+		// well-formed ID must not be selectable (defense-in-depth).
+		if !util.IsAgentID(rec.Agent.Tag) {
+			return true
+		}
+		desc := rec.Agent.Name
+		if rec.Agent.OS != "" {
+			desc = fmt.Sprintf("%s (%s)", strings.TrimSpace(desc), rec.Agent.OS)
+		}
+		// The description is agent-controlled metadata, so sanitize it before
+		// rendering.
+		values = append(values, rec.Agent.Tag, util.SanitizeOneLine(desc))
 		return true
 	})
-	return carapace.ActionValues(names...)
+	return carapace.ActionValuesDescribed(values...)
 }
 
 // remote autocomplete items in $PATH

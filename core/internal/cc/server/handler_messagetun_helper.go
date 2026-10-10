@@ -19,13 +19,14 @@ import (
 // The ephemeral session key is established EXACTLY ONCE per tunnel session, during
 // the initial handshake. A fresh ECDH offer after PFS has been established would be
 // a mid-session key change and is not allowed.
-func processKeyExchange(msg *def.MsgTunData, pfsEstablished bool) (replyData, sessionKey []byte, err error) {
+func processKeyExchange(agentUUID string, msg *def.MsgTunData, pfsEstablished bool) (replyData, sessionKey []byte, err error) {
+	agentRef := util.AgentRef(agentUUID)
 	if len(msg.EphemPublicKey) > 0 {
 		if pfsEstablished {
 			// SECURITY: the session key was already negotiated for this tunnel.
 			// Accepting another ECDH offer would let an authenticated-but-hostile
 			// peer (or a compromised stream) swap the session key mid-session.
-			return nil, nil, fmt.Errorf("agent %s attempted a mid-session PFS re-key (not allowed)", msg.Tag)
+			return nil, nil, fmt.Errorf("agent %s attempted a mid-session PFS re-key (not allowed)", agentRef)
 		}
 
 		// 1. Generate Server Ephemeral Key Pair
@@ -58,15 +59,15 @@ func processKeyExchange(msg *def.MsgTunData, pfsEstablished bool) (replyData, se
 
 		// 5. Prepare Response (Server Public Key)
 		replyData = transport.SerializePublicKey(&serverPrivKey.PublicKey)
-		logging.Infof("Key Exchange: Deriving session key for %s (PFS)", msg.Tag)
+		logging.Infof("Key Exchange: Deriving session key for %s (PFS)", agentRef)
 	} else {
 		// No public key provided
 		if pfsEstablished {
 			// Already established PFS, just a keep-alive
 			replyData = util.RandBytes(util.RandInt(10, 100))
-			logging.Debugf("Keep-alive from %s (PFS active)", msg.Tag)
+			logging.Debugf("Keep-alive from %s (PFS active)", agentRef)
 		} else {
-			return nil, nil, fmt.Errorf("agent %s did not provide ephemeral key for initial handshake", msg.Tag)
+			return nil, nil, fmt.Errorf("agent %s did not provide ephemeral key for initial handshake", agentRef)
 		}
 	}
 	return replyData, sessionKey, nil

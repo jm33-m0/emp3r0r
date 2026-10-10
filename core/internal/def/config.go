@@ -117,7 +117,7 @@ type Config struct {
 	// AgentUUIDSig are derived from it at runtime for C2 identification.
 	AgentUUID    string `cbor:"32,keyasint"` // UUID of agent, used to verify agent
 	AgentUUIDSig string `cbor:"33,keyasint"` // UUID of agent signed by CA
-	AgentTag     string `cbor:"34,keyasint"` // generated from UUID, will be used to identidy agents
+	AgentTag     string `cbor:"34,keyasint"` // short operator-facing identifier derived from the UUID
 	CCTimeout    int    `cbor:"35,keyasint"` // wait until this amount of milliseconds to re-connect to C2
 
 	// Payload-length malleability (padding only — no HTTP path tuning needed)

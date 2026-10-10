@@ -23,8 +23,8 @@
   - Windows shared objects (DLLs): `*-windows-gnu`.
   - Pure-Go stubs (`build_agent_pure`, `CGO_ENABLED=0`) and the C2 binaries do
     not need a C compiler.
-  The builder image replaces mingw-w64 with `zig cc` shims, so anything that
-  expects `*-w64-mingw32-gcc` transparently uses zig as well.
+    The builder image replaces mingw-w64 with `zig cc` shims, so anything that
+    expects `*-w64-mingw32-gcc` transparently uses zig as well.
 - **C modules use zig too**: the Linux stager, `libbpf`, `hello_linux`, and the
   Windows loader default to `zig cc -target ...`.
 - **Freestanding, position-independent stages** (raw shellcode, embedded
@@ -38,8 +38,8 @@
     glibc-internal `__libc_dlopen_mode`).
   - `<arch>-linux-gnu.2.34` when relying on `dlopen`/`dlsym`/`dlclose`, which
     moved from `libdl.so.2` into `libc.so.6` in glibc 2.34.
-  Use the per-arch targets from `core/build.py` (`x86_64-linux-gnu.2.17`,
-  `aarch64-linux-gnu.2.17`, ...).
+    Use the per-arch targets from `core/build.py` (`x86_64-linux-gnu.2.17`,
+    `aarch64-linux-gnu.2.17`, ...).
 
 ## Code style
 
@@ -66,6 +66,13 @@
 - All communication data needs to CBOR-encoded and encrypted properly with PFS key.
 - Initial check-in phase is the only phase where static keys can be used. Sessions need to be re-keyed immediately after this phase.
 - Reject early in new check-ins if anything doesn't work; avoid executing more work such as CBOR decoding.
+
+## Agent Identity and tmux UI
+
+- The agent's `Tag` is the operator-facing identifier: short lowercase hex derived only from the cryptographically verified UUID by `util.GenAgentTag`. The C2 derives it from the verified UUID at the trust boundary and overwrites any agent-reported tag.
+- Operators target and reference agents by tag (`target <tag>`, `forget_agent <tag>`, completion); the UUID is shown in the agent list for reference only. `forget_agent <tag>` must also resolve offline agents.
+- Logs that name an agent print both identifiers via `util.AgentRef(uuid)` (`<tag> (<uuid>)`); rejection notices name the tag to `forget_agent`.
+- Only pass `util.IsAgentID`-validated identifiers to tmux. The output pane is a plain reader; agent fields rendered there are sanitized and tmux format syntax (`#{...}`, `#(...)`) must never reach a tmux command.
 
 ## Logging and I/O
 

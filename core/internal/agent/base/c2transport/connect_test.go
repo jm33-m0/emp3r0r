@@ -32,6 +32,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func genAgentKey() (*ecdsa.PrivateKey, string, error) {
@@ -257,8 +258,9 @@ func TestEstablishC2Connection(t *testing.T) {
 	// Wait for agent to be registered on server
 	time.Sleep(2 * time.Second)
 
-	// Verify agent is registered
-	agent := agents.GetAgentByTag(agentUUID)
+	// Verify agent is registered. The server derives the tag from the verified
+	// UUID and must ignore the agent-reported AgentTag above.
+	agent := agents.GetAgentByTag(util.GenAgentTag(agentUUID))
 	if agent == nil {
 		t.Fatalf("Agent not found on server")
 	}
