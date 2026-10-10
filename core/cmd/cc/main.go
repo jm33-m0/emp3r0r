@@ -36,7 +36,9 @@ type Options struct {
 	cdnProxy                string // Start cdn2proxy server on this port
 	debug                   bool   // Do not kill tmux session when crashing
 	server_debug            bool   // Enable verbose server logging (level 4)
-	num_operators           int    // Number of operator configurations to generate
+	num_operators           int    // Number of operator configurations to create on the first run
+	operators_set           bool   // whether --operators was given explicitly
+	add_operators           int    // Number of operators to append to an existing WireGuard config
 }
 
 const (
@@ -104,6 +106,7 @@ func main() {
 		Use:   "server",
 		Short: "Run as C2 operator server",
 		Run: func(cmd *cobra.Command, args []string) {
+			opts.operators_set = cmd.Flags().Changed("operators")
 			runServerMode(opts)
 		},
 	}
@@ -113,7 +116,9 @@ func main() {
 	serverCmd.Flags().IntVar(&opts.c2_http_port, "http-port", 0, "C2 HTTP server port to listen on")
 	serverCmd.Flags().IntVar(&opts.c2_h2_port, "h2-port", 0, "C2 HTTP/2 stream (h2conn) server port to listen on")
 	serverCmd.Flags().StringVar(&opts.c2_hosts, "c2-hosts", "", "C2 hosts to generate cert for, separated by whitespace")
-	serverCmd.Flags().IntVar(&opts.num_operators, "operators", 1, "Number of operator configurations to generate")
+	serverCmd.Flags().IntVar(&opts.num_operators, "operators", 1, "Create a fresh WireGuard config with N operators (first run only; refused once wg_config.json exists)")
+	serverCmd.Flags().IntVar(&opts.add_operators, "add-operator", 0, "Append N operators to the existing WireGuard config and keep the current ones")
+	serverCmd.MarkFlagsMutuallyExclusive("operators", "add-operator")
 	serverCmd.Flags().BoolVar(&opts.server_debug, "debug", false, "Enable verbose server logging (level 4, includes agent hellos)")
 
 	// Completion command
@@ -244,7 +249,7 @@ func runServerMode(opts *Options) {
 	if err != nil {
 		logging.Fatalf("Failed to load config: %v", err)
 	}
-	server.ServerMain(opts.c2_operator_server_port, opts.c2_hosts, opts.num_operators)
+	server.ServerMain(opts.c2_operator_server_port, opts.c2_hosts, opts.num_operators, opts.operators_set, opts.add_operators)
 }
 
 func connectWg(opts *Options) {

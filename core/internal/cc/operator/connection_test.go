@@ -139,7 +139,15 @@ func TestOperatorConnection(t *testing.T) {
 	}
 
 	url = fmt.Sprintf("https://127.0.0.1:%d/%s/%s", port, transport.OperatorRoot, "send_command")
-	resp, err = client.Post(url, "application/cbor", bytes.NewBuffer(opData))
+	opReq, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(opData))
+	if err != nil {
+		t.Fatalf("Failed to build command request: %v", err)
+	}
+	opReq.Header.Set("Content-Type", "application/cbor")
+	// The C2 requires an operator identity; use the same session the message
+	// tunnel registers with below.
+	opReq.Header.Set("operator_session", "test-operator-session")
+	resp, err = client.Do(opReq)
 	if err != nil {
 		t.Fatalf("Failed to send command: %v", err)
 	}

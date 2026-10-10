@@ -129,6 +129,7 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 		row := []string{
 			target.Tag,
 			target.Name,
+			target.Owner,
 			infoMap["OS"], infoMap["Process"], infoMap["User"], infoMap["IPs"], infoMap["From"], infoMap["C2"], infoMap["Mesh"],
 			target.UUID,
 			agentLastSeen(target),
@@ -221,7 +222,7 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 	}
 	_ = cli.TmuxSetStatusRight(status_right)
 
-	header := []string{"ID", "Name", "OS", "Process", "User", "IPs", "From", "C2", "Mesh", "UUID", "Last seen"}
+	header := []string{"ID", "Name", "Operator", "OS", "Process", "User", "IPs", "From", "C2", "Mesh", "UUID", "Last seen"}
 	tabStr := cli.BuildTable(header, tdata)
 	if cli.AgentListPane != nil {
 		cli.AgentListPane.Printf(true, "%s", tabStr)

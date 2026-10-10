@@ -28,8 +28,43 @@ shrink the implant and reduce fingerprinting), `--debug`, `--skip-build`.
 Launch the server:
 
 ```bash
-emp3r0r server --c2-hosts 1.2.3.4 --http-port 12345 --operator-port 13377
+emp3r0r server --c2-hosts 1.2.3.4 --http-port 12345 --operator-port 13377 --operators 3
 ```
+
+`--operators N` provisions N operator WireGuard configs on the **first** start
+(they are persisted in `wg_config.json` and printed as a table). Each operator
+gets its own WireGuard key/IP and is identified by that IP at the mTLS layer.
+On every later start the existing identities are kept as-is: `--operators` is
+refused once `wg_config.json` exists, so a restart can never regenerate (and
+invalidate) an operator's keys. To add more operators without touching the
+existing ones, use `--add-operator N`. To start over, delete `wg_config.json`
+and restart.
+
+```bash
+# add two operators to an existing deployment
+emp3r0r server --c2-hosts 1.2.3.4 --add-operator 2
+```
+
+> **Firewall warning.** WireGuard gives every provisioned operator IP-level
+> access to the C2's tunnel subnet. Firewall the WireGuard UDP port and the
+> operator mTLS port so only your operators can reach them, and never expose the
+> WG subnet to an untrusted network. The server prints this warning on startup.
+
+#### Multiple operators
+
+Multiple operators can connect at the same time. Operator identity comes from
+the provisioned WireGuard IP, not from a client-supplied header, so each
+operator keeps its own jobs, pivots, file streams and agent claims.
+
+- **One agent, one operator.** `target <agent>` claims the agent. While claimed,
+  other operators see the owner in the agent list (`Operator` column) and are
+  refused with "Agent ... is operated by ...". The claim is released when the
+  operator switches target, disconnects, or stops talking to the C2 for the
+  operator idle timeout.
+- **Agent list.** The `Operator` column shows who is on what agent.
+- **Adding operators.** Run the server with `--add-operator N`; existing keys and
+  IPs are preserved and only N new rows are appended to `wg_config.json` and the
+  printed table. `--operators N` is for the first run only.
 
 ### 2. Operator Machine Setup
 

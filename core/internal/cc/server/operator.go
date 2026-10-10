@@ -29,7 +29,8 @@ import (
 
 // represents an operator_t
 type operator_t struct {
-	sessionID string     // marks the operator session
+	sessionID string     // stable operator identity: the provisioned WireGuard IP (or session header in local mode)
+	name      string     // operator-facing display name
 	conn      net.Conn   // message tunnel, used to relay messages
 	mu        sync.Mutex // serialize writes to operator tunnel
 }
@@ -60,11 +61,22 @@ func DecodeCBORBody[T any](wrt http.ResponseWriter, req *http.Request) (*T, erro
 }
 
 func operatorSessionFromReq(req *http.Request) (string, error) {
-	session := strings.TrimSpace(req.Header.Get("operator_session"))
+	session := operatorRequestIdentity(req.RemoteAddr, req.Header.Get("operator_session"))
 	if session == "" {
-		return "", fmt.Errorf("missing operator_session")
+		return "", fmt.Errorf("missing operator identity")
 	}
 	return session, nil
+}
+
+// operatorSessionOnline reports whether the operator identity currently has a
+// live message tunnel. It gates agent-lock expiry so a disconnected operator's
+// agents become available again.
+func operatorSessionOnline(operatorID string) bool {
+	if operatorID == "" {
+		return false
+	}
+	_, ok := OPERATORS.Load(operatorID)
+	return ok
 }
 
 func operatorPubKeyPEMFromReq(req *http.Request) ([]byte, string, error) {
@@ -172,14 +184,42 @@ func handleSetActiveAgent(wrt http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	// Set active agent
-	agents.SetActiveAgent(operation.AgentTag)
+	// Resolve the target agent by operator-facing tag, then by control index.
+	agent := agents.GetAgentByTag(operation.AgentTag)
+	if agent == nil {
+		if index, convErr := strconv.Atoi(operation.AgentTag); convErr == nil {
+			agent = agents.GetAgentByIndex(index)
+		}
+	}
+	if agent == nil {
+		http.Error(wrt, "Agent not found", http.StatusNotFound)
+		return
+	}
+
+	// Claim the agent for this operator. Targeting a different agent is a
+	// switch: a successful claim releases the operator's other claims below. A
+	// live claim by another operator is rejected with a conflict so the UI can
+	// show who owns the agent.
+	operatorID, idErr := operatorSessionFromReq(req)
+	if idErr != nil {
+		http.Error(wrt, "missing operator identity", http.StatusUnauthorized)
+		return
+	}
+	if acquired, heldBy := acquireAgentLock(agent.UUID, operatorID, operatorDisplayName(operatorID)); !acquired {
+		msg := fmt.Sprintf("Agent %s is operated by %s", agent.Tag, heldBy)
+		logging.Warningf("%s (operator %s)", msg, operatorID)
+		http.Error(wrt, msg, http.StatusConflict)
+		return
+	}
+	releaseAgentLocksForOperatorExcept(operatorID, agent.UUID)
 
 	// Return a snapshot so the operator always gets a consistent view of the
 	// agent metadata (especially LastSeen/RTT) instead of the shared pointer
 	// that the message-tunnel goroutine is mutating.
+	snapshot := agents.SnapshotAgent(agent)
+	snapshot.Owner = agentLockOwner(agent.UUID)
 	wrt.Header().Set("Content-Type", "application/cbor")
-	if err := cbor.NewEncoder(wrt).Encode(agents.SnapshotAgent(live.GetActiveAgent())); err != nil {
+	if err := cbor.NewEncoder(wrt).Encode(snapshot); err != nil {
 		http.Error(wrt, err.Error(), http.StatusInternalServerError)
 	}
 }
@@ -209,10 +249,24 @@ func handleSendCommand(wrt http.ResponseWriter, req *http.Request) {
 		http.Error(wrt, "Command or JobID is empty", http.StatusBadRequest)
 		return
 	}
-	operatorSession, sessErr := operatorSessionFromReq(req)
-	if sessErr == nil {
-		setJobOwner(*operation.JobID, operatorSession)
+	// Operating an agent requires the caller to own it. This is also where a
+	// command auto-claims an unlocked agent when the operator never explicitly
+	// targeted it.
+	operatorID, sessErr := operatorSessionFromReq(req)
+	if sessErr != nil {
+		http.Error(wrt, "missing operator identity", http.StatusUnauthorized)
+		return
 	}
+	if acquired, heldBy := acquireAgentLock(agent.UUID, operatorID, operatorDisplayName(operatorID)); !acquired {
+		msg := fmt.Sprintf("Agent %s is operated by %s", agent.Tag, heldBy)
+		logging.Warningf("%s (operator %s)", msg, operatorID)
+		http.Error(wrt, msg, http.StatusConflict)
+		return
+	}
+	// The operator's target is its active agent; drop any other claim so a
+	// stale lock never blocks another operator.
+	releaseAgentLocksForOperatorExcept(operatorID, agent.UUID)
+	setJobOwner(*operation.JobID, operatorID)
 
 	// Track the job ID so the message tunnel accepts the response
 	live.CmdTime.Store(*operation.JobID, time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST"))
@@ -248,6 +302,13 @@ func handleListAgents(wrt http.ResponseWriter, _ *http.Request) {
 	}()
 	// Get all agents
 	agentsList := agents.GetConnectedAgents()
+	// Annotate each agent with the operator that currently holds it so the
+	// console can show who is on what target.
+	for _, a := range agentsList {
+		if a != nil {
+			a.Owner = agentLockOwner(a.UUID)
+		}
+	}
 	if logging.Level >= 4 {
 		for _, a := range agentsList {
 			logging.Debugf("handleListAgents: %s LastSeen=%v (%.0fs ago)", a.Tag, a.LastSeen, time.Since(a.LastSeen).Seconds())
@@ -344,6 +405,8 @@ func handleForgetAgent(wrt http.ResponseWriter, req *http.Request) {
 		live.ForgetAgent(uuid)
 		logging.Successf("Operator removed agent %s from memory", util.AgentRef(uuid))
 	}
+	// A forgotten agent must not stay locked against a future re-check-in.
+	deleteAgentLock(uuid)
 	wrt.WriteHeader(http.StatusOK)
 	fmt.Fprintf(wrt, "%s\n\nHas been forgotten.", agentDetails)
 }
@@ -484,14 +547,12 @@ func RegisterOperatorConn(session string, conn net.Conn) {
 	if session == "" {
 		session = "test-operator"
 	}
-	op := &operator_t{sessionID: session, conn: conn}
-	OPERATORS.Store(session, op)
-	touchOperatorCommand()
+	op := registerOperatorSession(session, operatorDisplayName(session), conn)
 	go func() {
 		defer func() {
 			// Only tear down our own registration. While we were blocked in
-			// readOperatorTunnel a newer connection for the same session name
-			// may have replaced us; deleting it would drop a live operator.
+			// readOperatorTunnel a newer connection for the same operator may
+			// have replaced us; deleting it would drop a live operator.
 			unregisterOperatorConn(session, op)
 			_ = conn.Close()
 		}()
@@ -511,7 +572,34 @@ func unregisterOperatorConn(session string, op *operator_t) bool {
 	cleanupOperatorOwnedJobs(session)
 	// SOCKS5 pivots are owned by the operator that started them.
 	StopSocks5ProxiesForOperator(session)
+	// Free every agent this operator was holding.
+	releaseAgentLocksForOperator(session)
 	return true
+}
+
+// registerOperatorSession publishes a live message tunnel for operatorID,
+// replacing and closing any previous tunnel for the same operator. Concurrent
+// operators each have their own identity, so a reconnect only affects that
+// operator's own tunnel.
+func registerOperatorSession(operatorID, name string, conn net.Conn) *operator_t {
+	if name == "" {
+		name = operatorDisplayName(operatorID)
+	}
+	operator := &operator_t{sessionID: operatorID, name: name, conn: conn}
+	if existing, loaded := OPERATORS.Swap(operatorID, operator); loaded {
+		if old, ok := existing.(*operator_t); ok && old != nil {
+			old.mu.Lock()
+			oldConn := old.conn
+			old.conn = nil
+			old.mu.Unlock()
+			if oldConn != nil {
+				_ = oldConn.Close()
+			}
+			logging.Infof("Operator %s reconnected; replaced the previous tunnel", name)
+		}
+	}
+	touchOperatorCommand()
+	return operator
 }
 
 // handleOperatorConn handles operator connections, this connection will be used to relay the message tunnel
@@ -527,74 +615,33 @@ func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 		return
 	}
 	conn := websocket.NetConn(req.Context(), wsConn, websocket.MessageBinary)
-	operator_session := req.Header.Get("operator_session")
-
-	// Check if other operators are already connected
-	activeSessionCount := 0
-	OPERATORS.Range(func(key, value any) bool {
-		activeSessionCount++
-		return true
-	})
-	if activeSessionCount > 0 {
-		logging.Warningf("⚠️  New operator %s connecting while %d session(s) active!", operator_session, activeSessionCount)
-
-		// Construct a warning message
-		warningMsg := def.MsgTunData{
-			Tag: "ERROR", // "ERROR" tag triggers red text in your UI
-			Response: []byte(fmt.Sprintf(
-				"\n\n⛔  ERROR: %d other operator session(s) are currently active!\n"+
-					"   Concurrent usage is PROHIBITED to prevent state corruption.\n"+
-					"   Closing connection... Please retry when the other session is closed.\n", activeSessionCount,
-			)),
-		}
-
-		// Send the warning immediately upon connection
-		encoder := cbor.NewEncoder(conn)
-		if err := encoder.Encode(warningMsg); err != nil {
-			logging.Errorf("Failed to send concurrency warning: %v", err)
-		}
-		time.Sleep(100 * time.Millisecond) // Ensure the message is sent
-		conn.Close()
+	operatorID := operatorRequestIdentity(req.RemoteAddr, req.Header.Get("operator_session"))
+	if operatorID == "" {
+		logging.Errorf("handleOperatorConn: refusing unidentified operator from %s", req.RemoteAddr)
+		_ = conn.Close()
 		return
 	}
-	logging.Infof("Operator %s connected to message tunnel from %s", operator_session, req.RemoteAddr)
-	op, _ := OPERATORS.LoadOrStore(operator_session, &operator_t{
-		sessionID: operator_session,
-		conn:      conn,
-	})
-	operator, ok := op.(*operator_t)
-	if !ok || operator == nil {
-		logging.Errorf("Operator %s: unexpected value in operator registry", operator_session)
-		return
-	}
-	// Publish the new tunnel under the same lock writers use, so forwarding
-	// goroutines never observe a half-updated connection.
-	operator.mu.Lock()
-	operator.conn = conn
-	operator.mu.Unlock()
-	OPERATORS.Store(operator_session, operator)
-
-	// A fresh operator connection resets the idle timer.
-	touchOperatorCommand()
+	operatorName := operatorDisplayName(operatorID)
+	logging.Infof("Operator %s connected to message tunnel from %s", operatorName, req.RemoteAddr)
+	operator := registerOperatorSession(operatorID, operatorName, conn)
 
 	ctx, cancel := context.WithCancel(req.Context())
 	readDone := make(chan struct{})
 	go func() {
 		defer close(readDone)
-		readOperatorTunnel(ctx, conn, operator_session)
+		readOperatorTunnel(ctx, conn, operatorID)
 	}()
 	defer func() {
 		logging.Debugf("handleOperatorConn exiting")
-		// Guarded teardown: a newer connection may have replaced this operator
-		// for the same session name, in which case we must leave it alone.
-		if unregisterOperatorConn(operator_session, operator) {
-			// If this was the last operator, disconnect all agents
+		// Guarded teardown: a newer connection may have replaced this operator,
+		// in which case we must leave the replacement alone.
+		if unregisterOperatorConn(operatorID, operator) {
+			// If this was the last operator, disconnect all agents.
 			lastOperator := true
-			OPERATORS.Range(func(key, value any) bool {
+			OPERATORS.Range(func(_, _ any) bool {
 				lastOperator = false
 				return false // stop iteration
 			})
-
 			if lastOperator {
 				logging.Infof("Last operator disconnected, closing all agent connections")
 				agents.DisconnectAllAgents()
@@ -614,7 +661,7 @@ func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 	for {
 		select {
 		case <-readDone:
-			logging.Infof("Operator %s disconnected (TCP connection closed)", operator_session)
+			logging.Infof("Operator %s disconnected (TCP connection closed)", operatorName)
 			return
 		case <-pingTicker.C:
 			// Send WebSocket ping to detect silent disconnections
@@ -622,7 +669,7 @@ func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 			err := wsConn.Ping(pingCtx)
 			pingCancel()
 			if err != nil {
-				logging.Warningf("Operator %s ping timeout/error, closing connection: %v", operator_session, err)
+				logging.Warningf("Operator %s ping timeout/error, closing connection: %v", operatorName, err)
 				conn.Close()
 				cancel()
 				return

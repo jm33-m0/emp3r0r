@@ -22,6 +22,11 @@ func operationDispatcher(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	touchOperatorCommand()
+	// Any authenticated request proves the operator is still alive, so keep its
+	// agent claims from expiring while it is merely reading output.
+	if id, idErr := operatorSessionFromReq(r); idErr == nil {
+		renewAgentLocksForOperator(id)
+	}
 	vars := mux.Vars(r)
 	api := vars["api"]
 	logging.Debugf("Operator request: API: %s", api)

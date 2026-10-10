@@ -11,7 +11,6 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
-	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
@@ -47,8 +46,8 @@ func TestAgentCommandQueue(t *testing.T) {
 }
 
 func TestOperatorIsActive(t *testing.T) {
-	oldTimeout := live.RuntimeConfig.OperatorIdleTimeout
-	defer func() { live.RuntimeConfig.OperatorIdleTimeout = oldTimeout }()
+	oldTimeout := currentOperatorIdleTimeout()
+	defer setOperatorIdleTimeout(oldTimeout)
 
 	if operatorOnline() {
 		t.Fatal("expected no operator to be online before test setup")
@@ -57,7 +56,7 @@ func TestOperatorIsActive(t *testing.T) {
 	OPERATORS.Store("test-operator", &operator_t{sessionID: "test-operator"})
 	defer OPERATORS.Delete("test-operator")
 
-	live.RuntimeConfig.OperatorIdleTimeout = 1
+	setOperatorIdleTimeout(1)
 	atomic.StoreInt64(&lastOperatorCommand, 0)
 	if operatorIsActive() {
 		t.Fatal("expected operator to be inactive before first command")
@@ -68,7 +67,7 @@ func TestOperatorIsActive(t *testing.T) {
 		t.Fatal("expected operator to be active after touchOperatorCommand")
 	}
 
-	live.RuntimeConfig.OperatorIdleTimeout = 0
+	setOperatorIdleTimeout(0)
 	if !operatorIsActive() {
 		t.Fatal("expected operator to be active when idle timeout is disabled")
 	}
@@ -80,8 +79,8 @@ func TestOperatorIsActive(t *testing.T) {
 }
 
 func TestOperatorIdleNotificationAndResume(t *testing.T) {
-	oldTimeout := live.RuntimeConfig.OperatorIdleTimeout
-	defer func() { live.RuntimeConfig.OperatorIdleTimeout = oldTimeout }()
+	oldTimeout := currentOperatorIdleTimeout()
+	defer setOperatorIdleTimeout(oldTimeout)
 
 	operatorIdleNotified.Store(false)
 	OPERATORS.Delete("test-operator")
@@ -104,7 +103,7 @@ func TestOperatorIdleNotificationAndResume(t *testing.T) {
 		}
 	}()
 
-	live.RuntimeConfig.OperatorIdleTimeout = 60
+	setOperatorIdleTimeout(60)
 
 	maybeNotifyOperatorIdle()
 	maybeNotifyOperatorIdle() // duplicate must be suppressed

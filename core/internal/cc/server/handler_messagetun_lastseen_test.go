@@ -87,7 +87,7 @@ func setupMessageTunnelTestWithOptions(t *testing.T, uuid string, opts messageTu
 	}
 
 	OPERATORS.Store("test-operator", &operator_t{sessionID: "test-operator"})
-	live.RuntimeConfig.OperatorIdleTimeout = 0
+	setOperatorIdleTimeout(0)
 
 	origTimeout := handshakeTimeout
 	origInterval := handshakeCheckInterval
@@ -101,7 +101,7 @@ func setupMessageTunnelTestWithOptions(t *testing.T, uuid string, opts messageTu
 	cleanup := func() {
 		handshakeTimeout = origTimeout
 		handshakeCheckInterval = origInterval
-		live.RuntimeConfig.OperatorIdleTimeout = 1800
+		setOperatorIdleTimeout(1800)
 		OPERATORS.Delete("test-operator")
 		live.ForgetAgent(agent.UUID)
 		_ = agents.EndSession(uuid)
@@ -533,7 +533,7 @@ func TestMessageTunnelOperatorIdleRemovesAgent(t *testing.T) {
 	serverSecure, clientSecure, cleanup := setupMessageTunnelTest(t, uuid)
 	defer cleanup()
 
-	live.RuntimeConfig.OperatorIdleTimeout = 1
+	setOperatorIdleTimeout(1)
 	touchOperatorCommand() // operator was active when the tunnel started
 
 	dec := cbor.NewDecoder(serverSecure)
@@ -569,7 +569,7 @@ func TestMessageTunnelOperatorIdleRemovesSilentAgent(t *testing.T) {
 	serverSecure, clientSecure, cleanup := setupMessageTunnelTest(t, uuid)
 	defer cleanup()
 
-	live.RuntimeConfig.OperatorIdleTimeout = 1
+	setOperatorIdleTimeout(1)
 	touchOperatorCommand() // operator was active when the tunnel started
 
 	dec := cbor.NewDecoder(serverSecure)
@@ -602,8 +602,8 @@ func TestMessageTunnelSelectedAgentWithActiveOperatorSurvivesWithoutCommands(t *
 	defer cleanup()
 
 	// Enable operator idle timeout (e.g. 2 seconds) and mark operator online.
-	live.RuntimeConfig.OperatorIdleTimeout = 2
-	defer func() { live.RuntimeConfig.OperatorIdleTimeout = 1800 }()
+	setOperatorIdleTimeout(2)
+	defer func() { setOperatorIdleTimeout(1800) }()
 
 	MarkOperatorOnline("test-operator")
 	defer MarkOperatorOffline("test-operator")

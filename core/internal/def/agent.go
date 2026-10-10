@@ -47,6 +47,7 @@ type Emp3r0rAgent struct {
 	Files          []string      `cbor:"40,keyasint"` // list of available files/modules in agent storage/MemFS
 	GOArch         string        `cbor:"41,keyasint"` // runtime.GOARCH of the agent binary (not the OS kernel arch)
 	P2PTransport   string        `cbor:"42,keyasint"` // transport the agent's P2P relay listens on (kcp/mtls/smb)
+	Owner          string        `cbor:"43,keyasint"` // operator currently holding this agent, empty when free
 }
 
 // EnrichedPeer holds detailed peer information signed by C2

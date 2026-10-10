@@ -17,6 +17,25 @@ import (
 // the message-tunnel admission/teardown logic.
 var lastOperatorCommand int64
 
+// operatorIdleTimeoutSeconds is the race-free mirror of the configured operator
+// idle timeout. The config field stays the serialized source of truth, but
+// concurrent readers (agent tunnels, agent-lock expiry) read this atomic so they
+// never race with handleUpdateOperatorIdleConfig.
+var operatorIdleTimeoutSeconds atomic.Int64
+
+// setOperatorIdleTimeout publishes the server-side idle timeout.
+func setOperatorIdleTimeout(seconds int) {
+	if seconds < 0 {
+		seconds = 0
+	}
+	operatorIdleTimeoutSeconds.Store(int64(seconds))
+}
+
+// currentOperatorIdleTimeout returns the configured idle timeout in seconds.
+func currentOperatorIdleTimeout() int {
+	return int(operatorIdleTimeoutSeconds.Load())
+}
+
 // operatorIdleNotified is set once the C2 has warned the operator that the
 // idle timeout was exceeded. It is cleared when the operator becomes active
 // again, so the resume notification is only broadcast on an actual
@@ -42,7 +61,7 @@ func maybeNotifyOperatorIdle() {
 	if !operatorIdleNotified.CompareAndSwap(false, true) {
 		return
 	}
-	timeout := live.RuntimeConfig.OperatorIdleTimeout
+	timeout := currentOperatorIdleTimeout()
 	msg := fmt.Sprintf("Operator idle timeout (%ds) exceeded. Agents are being disconnected/rejected. Use `resume` to reactivate, or quit and relaunch emp3r0r.", timeout)
 	logging.Warningf("%s", msg)
 	_ = operatorBroadcastPrintf(logging.WARN, "%s", msg)
@@ -85,7 +104,7 @@ func operatorIsActive() bool {
 	if !operatorOnline() {
 		return false
 	}
-	timeout := live.RuntimeConfig.OperatorIdleTimeout
+	timeout := currentOperatorIdleTimeout()
 	if timeout <= 0 {
 		return true
 	}
@@ -115,6 +134,7 @@ func handleUpdateOperatorIdleConfig(wrt http.ResponseWriter, req *http.Request) 
 	}
 
 	live.RuntimeConfig.OperatorIdleTimeout = cfg.OperatorIdleTimeout
+	setOperatorIdleTimeout(cfg.OperatorIdleTimeout)
 	if err := config.SaveConfigJSON(); err != nil {
 		http.Error(wrt, err.Error(), http.StatusInternalServerError)
 		return

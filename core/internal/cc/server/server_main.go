@@ -15,13 +15,19 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/wireguard"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
+	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-func ServerMain(wg_port int, hosts string, numOperators int) {
+func ServerMain(wg_port int, hosts string, numOperators int, operatorsSet bool, addOperators int) {
+	// Publish the configured idle timeout to the atomic mirror that agent
+	// tunnels and agent-lock expiry read, so config updates and readers never
+	// race on the shared RuntimeConfig field.
+	setOperatorIdleTimeout(live.RuntimeConfig.OperatorIdleTimeout)
+
 	// Initialize agent database for persistent tracking
 	dbPath := filepath.Join(live.EmpWorkSpace, "agents.db")
 	if err := agents.InitAgentDB(dbPath); err != nil {
@@ -47,7 +53,7 @@ func ServerMain(wg_port int, hosts string, numOperators int) {
 	go KCPC2ListenAndServe(network.EmpKCPCtx, network.EmpKCPCancel)
 	// Bring the userspace WireGuard stack up first so the operator-facing
 	// listeners can be bound on it.
-	wg(wg_port, numOperators)
+	wg(wg_port, numOperators, addOperators, operatorsSet)
 	go tarConfig(hosts)
 	time.Sleep(3 * time.Second)
 	go StartC2AgentTLSServer()
@@ -65,12 +71,6 @@ func ServerMain(wg_port int, hosts string, numOperators int) {
 	StartOperatorMTLSServer(wg_port + 1)
 }
 
-type OperatorConfig struct {
-	PrivateKey string
-	PublicKey  string
-	IP         string
-}
-
 type SavedWgConfig struct {
 	ServerIP         string           `json:"server_ip"`
 	ServerPrivateKey string           `json:"server_private_key"`
@@ -78,87 +78,130 @@ type SavedWgConfig struct {
 	Operators        []OperatorConfig `json:"operators"`
 }
 
-func wg(wg_port, numOperators int) {
-	var (
-		server_privkey string
-		server_pubkey  string
-		subnet         string
-		operators      []OperatorConfig
-		err            error
-	)
-
-	configFile := filepath.Join(live.EmpWorkSpace, "wg_config.json")
-	if util.IsFileExist(configFile) {
-		logging.Infof("Loading WireGuard config from %s", configFile)
-		data, err := os.ReadFile(configFile)
+// generateOperators creates count new operators on subnet, numbering their
+// display names from startIndex so appended operators keep a stable name.
+func generateOperators(subnet string, startIndex, count int) ([]OperatorConfig, error) {
+	operators := make([]OperatorConfig, count)
+	for i := range count {
+		priv, err := wireguard.GeneratePrivateKey()
 		if err != nil {
-			logging.Fatalf("Failed to read WireGuard config: %v", err)
+			return nil, fmt.Errorf("generate operator private key: %w", err)
 		}
-		var config SavedWgConfig
-		err = json.Unmarshal(data, &config)
+		pub, err := wireguard.PublicKeyFromPrivate(priv)
 		if err != nil {
-			logging.Fatalf("Failed to parse WireGuard config: %v", err)
+			return nil, fmt.Errorf("derive operator public key: %w", err)
 		}
-		wireguard.WgServerIP = config.ServerIP
-		server_privkey = config.ServerPrivateKey
-		subnet = config.Subnet
-		operators = config.Operators
-
-		server_pubkey, err = wireguard.PublicKeyFromPrivate(server_privkey)
+		ip, err := netutil.GenerateRandomIPInSubnet24(subnet)
 		if err != nil {
-			logging.Fatalf("Failed to generate server public key: %v", err)
+			return nil, fmt.Errorf("allocate operator IP: %w", err)
 		}
-	} else {
-		server_privkey, err = wireguard.GeneratePrivateKey()
+		operators[i] = OperatorConfig{
+			Name:       fmt.Sprintf("operator-%d", startIndex+i+1),
+			PrivateKey: priv,
+			PublicKey:  pub,
+			IP:         ip,
+		}
+	}
+	return operators, nil
+}
+
+// writeWgConfig persists the WireGuard config with owner-only permissions.
+func writeWgConfig(path string, config SavedWgConfig) error {
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal wireguard config: %w", err)
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		return fmt.Errorf("save wireguard config: %w", err)
+	}
+	return nil
+}
+
+// loadOrProvisionWg returns the WireGuard config, creating it on the first run
+// and preserving existing operator identities on every later run. Existing
+// identities are never regenerated: --operators is refused once the file exists
+// (remove it manually to start over), and --add-operator appends new operators.
+func loadOrProvisionWg(configFile string, numOperators, addOperators int, operatorsSet bool) (SavedWgConfig, error) {
+	if !util.IsFileExist(configFile) {
+		count := max(numOperators, 1)
+		if addOperators > 0 {
+			count = addOperators
+		}
+		serverPriv, err := wireguard.GeneratePrivateKey()
 		if err != nil {
-			logging.Fatalf("Failed to generate server private key: %v", err)
+			return SavedWgConfig{}, fmt.Errorf("generate server private key: %w", err)
 		}
-		server_pubkey, err = wireguard.PublicKeyFromPrivate(server_privkey)
+		subnet := netutil.GenerateRandomPrivateSubnet24()
+		serverIP, err := netutil.GenerateRandomIPInSubnet24(subnet)
 		if err != nil {
-			logging.Fatalf("Failed to generate server public key: %v", err)
+			return SavedWgConfig{}, fmt.Errorf("allocate server IP: %w", err)
 		}
-
-		// network address
-		subnet = netutil.GenerateRandomPrivateSubnet24()
-		wireguard.WgServerIP, _ = netutil.GenerateRandomIPInSubnet24(subnet)
-
-		// Generate operator configs
-		operators = make([]OperatorConfig, numOperators)
-
-		for i := range numOperators {
-			operator_privkey, err := wireguard.GeneratePrivateKey()
-			if err != nil {
-				logging.Fatalf("Failed to generate operator private key: %v", err)
-			}
-			operator_pubkey, err := wireguard.PublicKeyFromPrivate(operator_privkey)
-			if err != nil {
-				logging.Fatalf("Failed to generate operator public key: %v", err)
-			}
-			operatorIP, _ := netutil.GenerateRandomIPInSubnet24(subnet)
-
-			operators[i] = OperatorConfig{
-				PrivateKey: operator_privkey,
-				PublicKey:  operator_pubkey,
-				IP:         operatorIP,
-			}
+		operators, err := generateOperators(subnet, 0, count)
+		if err != nil {
+			return SavedWgConfig{}, err
 		}
-
-		// Save config
 		config := SavedWgConfig{
-			ServerIP:         wireguard.WgServerIP,
-			ServerPrivateKey: server_privkey,
+			ServerIP:         serverIP,
+			ServerPrivateKey: serverPriv,
 			Subnet:           subnet,
 			Operators:        operators,
 		}
-		data, err := json.MarshalIndent(config, "", "  ")
-		if err != nil {
-			logging.Fatalf("Failed to marshal WireGuard config: %v", err)
+		if err := writeWgConfig(configFile, config); err != nil {
+			return SavedWgConfig{}, err
 		}
-		err = os.WriteFile(configFile, data, 0o600)
-		if err != nil {
-			logging.Fatalf("Failed to save WireGuard config: %v", err)
-		}
+		logging.Successf("Created WireGuard config with %d operator(s): %s", count, configFile)
+		return config, nil
 	}
+
+	logging.Infof("Loading WireGuard config from %s", configFile)
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		return SavedWgConfig{}, fmt.Errorf("read wireguard config: %w", err)
+	}
+	var config SavedWgConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return SavedWgConfig{}, fmt.Errorf("parse wireguard config: %w", err)
+	}
+	if config.ServerIP == "" || config.ServerPrivateKey == "" || len(config.Operators) == 0 {
+		return SavedWgConfig{}, fmt.Errorf("wireguard config %s is incomplete; remove it and restart to regenerate", configFile)
+	}
+
+	switch {
+	case addOperators > 0:
+		added, err := generateOperators(config.Subnet, len(config.Operators), addOperators)
+		if err != nil {
+			return SavedWgConfig{}, fmt.Errorf("add operators: %w", err)
+		}
+		config.Operators = append(config.Operators, added...)
+		if err := writeWgConfig(configFile, config); err != nil {
+			return SavedWgConfig{}, err
+		}
+		logging.Successf("Added %d operator(s); %d total", addOperators, len(config.Operators))
+	case operatorsSet:
+		return SavedWgConfig{}, fmt.Errorf(
+			"wireguard config %s already holds %d operator(s); refusing --operators. "+
+				"Remove the file to regenerate from scratch, or use --add-operator to add more",
+			configFile, len(config.Operators),
+		)
+	default:
+		logging.Infof("Keeping %d existing operator config(s)", len(config.Operators))
+	}
+	return config, nil
+}
+
+func wg(wg_port, numOperators, addOperators int, operatorsSet bool) {
+	configFile := filepath.Join(live.EmpWorkSpace, "wg_config.json")
+	config, err := loadOrProvisionWg(configFile, numOperators, addOperators, operatorsSet)
+	if err != nil {
+		logging.Fatalf("%v", err)
+	}
+
+	server_pubkey, err := wireguard.PublicKeyFromPrivate(config.ServerPrivateKey)
+	if err != nil {
+		logging.Fatalf("Failed to derive server public key: %v", err)
+	}
+	wireguard.WgServerIP = config.ServerIP
+	operators := config.Operators
 
 	peers := make([]wireguard.PeerConfig, len(operators))
 	for i, op := range operators {
@@ -175,11 +218,15 @@ func wg(wg_port, numOperators int) {
 		}
 	}
 
+	// Publish the provisioned identities so the operator mTLS and HTTP handlers
+	// can map a peer's WireGuard IP to its stable operator identity.
+	registerOperators(operators)
+
 	wgConfig := wireguard.WireGuardConfig{
 		IPAddress:     wireguard.WgServerIP + "/24",
 		InterfaceName: "emp_server",
 		ListenPort:    wg_port,
-		PrivateKey:    server_privkey,
+		PrivateKey:    config.ServerPrivateKey,
 		Peers:         peers,
 	}
 	wgServer, err := wireguard.CreateWireGuardDevice(wgConfig)
@@ -201,12 +248,12 @@ func wg(wg_port, numOperators int) {
 	serverTableStr := cli.BuildTable(headers, rows)
 
 	// Create operator config table
-	opHeaders := []string{"Operator ID", "IP Address", "Private Key", "Public Key"}
-	opRows := make([][]string, numOperators)
+	opHeaders := []string{"Operator", "IP Address", "Private Key", "Public Key"}
+	opRows := make([][]string, len(operators))
 
 	for i, op := range operators {
 		opRows[i] = []string{
-			strconv.Itoa(i + 1),
+			op.Name,
 			op.IP,
 			op.PrivateKey,
 			op.PublicKey,
@@ -222,6 +269,11 @@ func wg(wg_port, numOperators int) {
 
 	// Generate and display client connection commands
 	generateConnectionCommands(wg_port, server_pubkey, operators)
+
+	logging.Warningf("WireGuard gives every operator IP-level access to the C2's tunnel subnet.")
+	logging.Warningf("Firewall the WireGuard UDP port (%d) and the operator mTLS port (%d) so only"+
+		" intended operators can reach them, and never expose the WG subnet to an untrusted network.",
+		wg_port, wg_port+1)
 }
 
 func tarConfig(hosts string) {
@@ -244,14 +296,16 @@ func tarConfig(hosts string) {
 	}
 
 	// copy necessary files to temp dir
+	//
+	// Only what an operator needs: the operator CA (to verify the C2's server
+	// certificate), the shared operator client cert/key, and the runtime
+	// config. The agent CA/server keys and the full wg_config.json (which holds
+	// every operator's WireGuard private key) must never leave the C2.
 	filesToCopy := []string{
 		"emp3r0r.json",
-		"wg_config.json", // in case it exists
-	}
-	// globs
-	pemFiles, _ := filepath.Glob(filepath.Join(live.EmpWorkSpace, "*.pem"))
-	for _, pem := range pemFiles {
-		filesToCopy = append(filesToCopy, filepath.Base(pem))
+		filepath.Base(transport.OperatorCaCrtFile),
+		filepath.Base(transport.OperatorClientCrtFile),
+		filepath.Base(transport.OperatorClientKeyFile),
 	}
 
 	for _, file := range filesToCopy {
@@ -288,14 +342,14 @@ func tarConfig(hosts string) {
 
 // generateConnectionCommands generates and displays client connection commands
 func generateConnectionCommands(wg_port int, server_pubkey string, operators []OperatorConfig) {
-	headers := []string{"Operator ID", "Connection Command"}
+	headers := []string{"Operator", "Connection Command"}
 	rows := make([][]string, len(operators))
 
 	for i, op := range operators {
 		// Generate command for each operator
 		cmd := generateClientCommand(wg_port, server_pubkey, op)
 		rows[i] = []string{
-			strconv.Itoa(i + 1),
+			op.Name,
 			cmd,
 		}
 	}

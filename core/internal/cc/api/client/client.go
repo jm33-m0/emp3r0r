@@ -152,6 +152,10 @@ func SendCBORRequest(urlPath string, data any) ([]byte, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		if detail := strings.TrimSpace(string(body)); detail != "" {
+			return nil, fmt.Errorf("%s", detail)
+		}
 		return nil, fmt.Errorf("request failed, status code: %d, url: %s", resp.StatusCode, url)
 	}
 

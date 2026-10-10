@@ -12,9 +12,19 @@ Always use the latest version
 
 ## Threat Model
 
-- Treat C2 server and operators as trusted. Currently only single operator mode is implemented.
+- Treat C2 server and operators as trusted. Multiple operators are supported:
+  each operator has its own WireGuard identity and mTLS session, and an agent is
+  owned by exactly one operator at a time (claimed on `target`, released when the
+  operator switches away, disconnects, or its lease times out).
 - All operators have to be authenticated via WireGuard and mTLS. Communication is therefore protected.
 - Treat agents as hostile. TOFU model assumes the first run of an agent is trusted.
+- The operator config bundle served over WireGuard contains only the shared
+  operator client cert/key and the operator CA. The agent CA key, the C2 keys
+  and `wg_config.json` (all operator WireGuard private keys) stay on the C2.
+- **Firewall the WireGuard UDP port and the operator mTLS port.** WireGuard
+  gives every provisioned operator IP-level access to the C2's tunnel subnet,
+  and the server warns about this on startup. Do not expose the WG port or the
+  WG subnet to an untrusted network.
 
 ## Reporting a Vulnerability
 
