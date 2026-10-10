@@ -63,6 +63,25 @@ func operatorDisplayName(ip string) string {
 	return ip
 }
 
+// provisionedOperatorCount returns how many operators were provisioned at
+// startup. The server treats more than one as multi-operator mode, where global
+// policy belongs to the server rather than to any single operator.
+func provisionedOperatorCount() int {
+	count := 0
+	operatorIndex.Range(func(_, _ any) bool {
+		count++
+		return true
+	})
+	return count
+}
+
+// isMultiOperator reports whether the C2 runs with more than one provisioned
+// operator. In that mode a single operator must not be able to weaken a
+// server-wide policy.
+func isMultiOperator() bool {
+	return provisionedOperatorCount() > 1
+}
+
 // operatorIDFromRemote derives the operator identity from a request's remote
 // address. The operator mTLS listener is bound to the userspace WireGuard
 // stack, so the peer IP is the operator's provisioned WG IP.
