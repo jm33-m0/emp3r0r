@@ -6,7 +6,6 @@ require (
 	github.com/Code-Hex/Neo-cowsay/v2 v2.0.4
 	github.com/alecthomas/chroma v0.10.0
 	github.com/carapace-sh/carapace v1.13.3
-	github.com/cavaliergopher/grab/v3 v3.0.1
 	github.com/coder/websocket v1.8.15
 	github.com/fatih/color v1.19.0
 	github.com/fsnotify/fsnotify v1.9.0
