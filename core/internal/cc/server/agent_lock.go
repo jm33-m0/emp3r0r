@@ -164,3 +164,19 @@ func agentLockOwner(agentUUID string) string {
 	}
 	return lock.OperatorName
 }
+
+// agentLockOwnerSession returns the operator identity (WireGuard IP) holding
+// agentUUID, or "" when the agent is free or its lock has expired. Callers that
+// must route work to the operator controlling an agent use this instead of the
+// display name.
+func agentLockOwnerSession(agentUUID string) string {
+	actual, ok := agentLocks.Load(agentUUID)
+	if !ok {
+		return ""
+	}
+	lock, ok := actual.(*agentLock)
+	if !ok || lock == nil || lockExpired(lock, time.Now()) {
+		return ""
+	}
+	return lock.OperatorID
+}
