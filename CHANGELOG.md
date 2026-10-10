@@ -1,5 +1,33 @@
 # Changelog
 
+## [5.0.0](https://github.com/jm33-m0/emp3r0r/compare/v4.24.2...v5.0.0) (2026-10-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **socks:** bind to wg interface only
+* **build:** make `MagicString` consistent on builder machine, enabling major version stability
+* **operator:** support multi-operator mode
+
+### Features
+
+* **operator:** add server side logging for operators ([5c527c6](https://github.com/jm33-m0/emp3r0r/commit/5c527c6c8fd68b6199d223c3ca70d2829a5d190d))
+* **operator:** support multi-operator mode ([8593e41](https://github.com/jm33-m0/emp3r0r/commit/8593e416c09eafd182dcfc11c36fccf0c4756ba5))
+
+
+### Bug Fixes
+
+* **build:** make `MagicString` consistent on builder machine, enabling major version stability ([14ca4b4](https://github.com/jm33-m0/emp3r0r/commit/14ca4b4e376e79cbff806ec4005f4c7a216ffaef))
+* **c2:** bound per-agent rate-limiter state ([85b6e07](https://github.com/jm33-m0/emp3r0r/commit/85b6e07412a55b257688d3177a398ef7b5a1cd9d))
+* **ftp:** stream ownership and resource limit ([61734d4](https://github.com/jm33-m0/emp3r0r/commit/61734d46431257d714f80e0d2de64d791d3ec8d2))
+* **ftp:** unregister ftp streams when closing them ([bb192b0](https://github.com/jm33-m0/emp3r0r/commit/bb192b0f9f6f1fa326233c7470a4a0f3214148aa))
+* operator security ([a674b7b](https://github.com/jm33-m0/emp3r0r/commit/a674b7b6f71159f5f44da0efcb823756ecee83e8))
+* **operator:** lock operator timeout in multi-operator mode ([08eed19](https://github.com/jm33-m0/emp3r0r/commit/08eed196787e8834d706d9153b16340665e98398))
+* **operator:** validate stream-claim TTL independently of clock skew ([1d7f021](https://github.com/jm33-m0/emp3r0r/commit/1d7f02138488dec39815c86e09be3967fe62aad5))
+* **socks5:** bind the pivot on loopback and update instructions ([eb17b52](https://github.com/jm33-m0/emp3r0r/commit/eb17b52385562ca8b711396556bb80a481e68b60))
+* **socks:** bind to wg interface only ([6ecf377](https://github.com/jm33-m0/emp3r0r/commit/6ecf37757c274f0bb5922dc1b729a86293b158ac))
+* **socks:** stream ownership and resource limit ([57571e3](https://github.com/jm33-m0/emp3r0r/commit/57571e3a2f52bcc3f09d0d458e64440b2a7173f7))
+
 ## [4.24.2](https://github.com/jm33-m0/emp3r0r/compare/v4.24.1...v4.24.2) (2026-10-10)
 
 
