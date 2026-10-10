@@ -66,6 +66,32 @@ operator keeps its own jobs, pivots, file streams and agent claims.
   IPs are preserved and only N new rows are appended to `wg_config.json` and the
   printed table. `--operators N` is for the first run only.
 
+#### Upgrading without breaking existing agents
+
+The `MagicString` is the static pre-shared key the agent uses for check-in.
+Every build embeds the value configured by the builder, so upgrading does not
+orphan already-deployed agents. The builder owns this: on the build host it
+keeps the value in `~/.emp3r0r/magic_string` (mode `0600`) and reuses it on every
+later build. `install.py` passes that value into the builder container, and
+`core/build.py` embeds it with `-ldflags`. Go code only consumes the embedded
+value; there is no runtime configuration.
+
+- **First build** generates a random value and stores it.
+- **Later builds** reuse the stored value automatically — no flag needed.
+- **`--magic-string VALUE`** (or `EMP3R0R_MAGIC_STRING`) sets the value: it is
+  persisted to the store, so later builds can omit it and still reuse the same
+  key:
+
+```bash
+./install.py --magic-string '<value from an existing deployment>'
+# or, when running the builder directly:
+python3 core/build.py --install --magic-string '<value>'
+```
+
+`~/.emp3r0r/magic_string` is a secret: treat it like `wg_config.json`, keep it
+out of version control, and back it up — losing it means the next build mints
+agents that cannot talk to the running C2.
+
 ### 2. Operator Machine Setup
 
 The build produced `core/emp3r0r-operator-kit.tar.zst`. Copy that archive to the

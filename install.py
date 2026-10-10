@@ -475,6 +475,43 @@ def builder_image_ref(repo_root: pathlib.Path) -> str:
     return f"emp3r0r-builder:{digest}"
 
 
+# The builder runs in a throwaway container, so the stable MagicString store
+# lives on the host and is passed into the build through EMP3R0R_MAGIC_STRING.
+# This keeps every build on the same static pre-shared key, so upgrading the
+# C2/operator does not orphan already-deployed agents.
+MAGIC_STRING_FILE = pathlib.Path.home() / ".emp3r0r" / "magic_string"
+
+
+def persist_magic_string(value: str) -> None:
+    """Store value on the build host with owner-only permissions."""
+    if IS_DRY_RUN:
+        return
+    try:
+        MAGIC_STRING_FILE.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        write_text_atomic(MAGIC_STRING_FILE, value + "\n")
+        MAGIC_STRING_FILE.chmod(0o600)
+    except OSError as e:
+        log_warn(f"Could not persist MagicString to {MAGIC_STRING_FILE}: {e}")
+
+
+def ensure_magic_string() -> str:
+    """Return the stable MagicString, creating and persisting it if needed.
+
+    A value from --magic-string / EMP3R0R_MAGIC_STRING is persisted to the
+    host store, so later builds can omit it and still reuse the same key.
+    """
+    if env := os.environ.get("EMP3R0R_MAGIC_STRING", "").strip():
+        persist_magic_string(env)
+        return env
+    if MAGIC_STRING_FILE.is_file():
+        if value := MAGIC_STRING_FILE.read_text(encoding="utf-8").strip():
+            return value
+    value = os.urandom(32).hex()
+    persist_magic_string(value)
+    log_info(f"Stored a new MagicString in {MAGIC_STRING_FILE}")
+    return value
+
+
 def docker_build(
     container_engine: str,
     repo_root: pathlib.Path,
@@ -519,6 +556,7 @@ def docker_build(
     )
 
     build_env = []
+    build_env.extend(["-e", f"EMP3R0R_MAGIC_STRING={ensure_magic_string()}"])
     if disable_garble or os.environ.get("EMP3R0R_DISABLE_GARBLE") == "1":
         build_env.extend(["-e", "EMP3R0R_DISABLE_GARBLE=1"])
 
@@ -705,6 +743,16 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Print build and setup commands without executing them",
     )
+    parser.add_argument(
+        "--magic-string",
+        metavar="VALUE",
+        default="",
+        help=(
+            "MagicString (static pre-shared key) to embed. Overrides the value "
+            "stored in ~/.emp3r0r/magic_string on the build host and is saved "
+            "there, so later builds reuse it without the flag."
+        ),
+    )
 
     # ── Target selection (forwarded verbatim to core/build.py) ───────────────
     tgt_group = parser.add_argument_group(
@@ -804,6 +852,11 @@ def main() -> None:
     if args.dry_run:
         IS_DRY_RUN = True
         os.environ["EMP3R0R_DRY_RUN"] = "1"
+
+    # --magic-string is equivalent to EMP3R0R_MAGIC_STRING: ensure_magic_string
+    # reads the variable first and persists it to the build-host store.
+    if args.magic_string:
+        os.environ["EMP3R0R_MAGIC_STRING"] = args.magic_string
 
     script_dir = pathlib.Path(__file__).resolve().parent
     prefix_path = pathlib.Path(os.environ.get("PREFIX", args.prefix))

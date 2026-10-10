@@ -248,6 +248,53 @@ def get_version(core_dir: pathlib.Path) -> str:
     return f"{version}-{build_time}"
 
 
+# MagicString store: the static pre-shared key must stay identical across
+# builds, otherwise a rebuild orphans the agents already deployed. The builder
+# owns the value: it reads this file, reuses it, and only generates a new one
+# when the file is absent (or when EMP3R0R_MAGIC_STRING is set). Go code is only
+# a consumer of the value embedded with -ldflags.
+MAGIC_STRING_FILE = pathlib.Path.home() / ".emp3r0r" / "magic_string"
+
+
+def persist_magic_string(value: str) -> None:
+    """Store the MagicString with owner-only permissions (best effort)."""
+    if IS_DRY_RUN:
+        return
+    try:
+        MAGIC_STRING_FILE.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        write_text_atomic(MAGIC_STRING_FILE, value + "\n")
+        MAGIC_STRING_FILE.chmod(0o600)
+    except OSError as e:
+        log_warn(f"Could not persist MagicString to {MAGIC_STRING_FILE}: {e}")
+
+
+def resolve_magic_string() -> str:
+    """Return the MagicString to embed, keeping it stable across builds.
+
+    Precedence:
+      1. EMP3R0R_MAGIC_STRING, an explicit value (useful in CI, or when the
+         store lives outside the build container); it is persisted so later
+         builds keep it;
+      2. the persisted store (~/.emp3r0r/magic_string), reused as-is;
+      3. a freshly generated value, persisted for the next build.
+    """
+    if env := os.environ.get("EMP3R0R_MAGIC_STRING", "").strip():
+        log_info("Using MagicString from EMP3R0R_MAGIC_STRING")
+        persist_magic_string(env)
+        return env
+
+    if MAGIC_STRING_FILE.is_file():
+        if value := MAGIC_STRING_FILE.read_text(encoding="utf-8").strip():
+            log_info(f"Reusing MagicString from {MAGIC_STRING_FILE}")
+            return value
+        log_warn(f"{MAGIC_STRING_FILE} is empty; generating a new MagicString")
+
+    value = hashlib.sha256(os.urandom(32)).hexdigest()
+    persist_magic_string(value)
+    log_success(f"Generated a new MagicString and stored it in {MAGIC_STRING_FILE}")
+    return value
+
+
 def check_required_go() -> str:
     go_bin = shutil.which("go")
     if not go_bin:
@@ -1131,7 +1178,7 @@ def build(
     if crystal_kit_dir.is_dir():
         install_crystalpalace(crystal_kit_dir)
 
-    magic_str = hashlib.sha256(os.urandom(32)).hexdigest()
+    magic_str = resolve_magic_string()
     version = get_version(core_dir)
 
     ldflags = (
@@ -1852,9 +1899,7 @@ def build_single_payload(args: argparse.Namespace) -> None:
         # These link against libc through zig; pure Go does not need a C compiler.
         check_zig()
 
-    magic_str = args.payload_magic_string or hashlib.sha256(
-        os.urandom(32)
-    ).hexdigest()
+    magic_str = args.payload_magic_string or resolve_magic_string()
     version = get_version(core_dir)
     ldflags = (
         f"-v -X 'github.com/jm33-m0/emp3r0r/core/internal/def.MagicString={magic_str}' "
@@ -2006,6 +2051,16 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Print build and setup commands without executing them",
     )
+    parser.add_argument(
+        "--magic-string",
+        metavar="VALUE",
+        default="",
+        help=(
+            "MagicString (static pre-shared key) to embed. Overrides the value "
+            "persisted in ~/.emp3r0r/magic_string and is saved there, so later "
+            "builds reuse it without the flag."
+        ),
+    )
 
     # ── Target selection ─────────────────────────────────────────────────────
     tgt_group = parser.add_argument_group(
@@ -2096,6 +2151,11 @@ def main() -> None:
     AGENT_EXTRA_TAGS = resolve_agent_tags(args)
     if AGENT_EXTRA_TAGS:
         log_info(f"Agent build tags: {AGENT_EXTRA_TAGS}")
+
+    # A --magic-string value is equivalent to EMP3R0R_MAGIC_STRING and is
+    # persisted by resolve_magic_string, so later builds can omit it.
+    if args.magic_string:
+        os.environ["EMP3R0R_MAGIC_STRING"] = args.magic_string
 
     core_dir = pathlib.Path(__file__).resolve().parent
     prefix = os.environ.get("PREFIX", "/usr/local")
