@@ -44,6 +44,7 @@ func SaveConfigJSON() (err error) {
 		C2TransportProxy:       live.RuntimeConfig.C2TransportProxy,
 		CDNProxy:               live.RuntimeConfig.CDNProxy,
 		DoHServer:              live.RuntimeConfig.DoHServer,
+		ECHServerName:          live.RuntimeConfig.ECHServerName,
 		AgentUUID:              live.RuntimeConfig.AgentUUID,
 		AgentUUIDSig:           live.RuntimeConfig.AgentUUIDSig,
 		AgentTag:               live.RuntimeConfig.AgentTag,

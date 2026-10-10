@@ -616,8 +616,9 @@ func gen_agent_cmd() *cobra.Command {
 	genAgentCmd.Flags().StringP("proxy", "", "", "Hard coded proxy URL for agent's C2 transport. Example: socks5://127.0.0.1:9050")
 	genAgentCmd.Flags().StringP("cdn", "", "", "CDN proxy to reach C2. Example: wss://cdn.example.com/ws")
 	genAgentCmd.Flags().StringP("doh", "", "", "DNS over HTTPS server to use for DNS resolution. Example: https://1.1.1.1/dns-query")
+	genAgentCmd.Flags().StringP("ech", "", "", "Enable ECH for C2 TLS: DNS name whose HTTPS RR carries the ECHConfigList, fetched over --doh. Example: c2.example.com. Use it when C2 TLS terminates at an ECH-capable CDN edge")
 	genAgentCmd.Flags().BoolP("kcp", "", false, "Use KCP (secure UDP multiplexed tunnel)")
-	addFlagToGroup("C2 Transport Options", "cc", "c2-channel-mode", "cc-http-port", "proxy", "cdn", "doh", "kcp")
+	addFlagToGroup("C2 Transport Options", "cc", "c2-channel-mode", "cc-http-port", "proxy", "cdn", "doh", "ech", "kcp")
 
 	// Group 3: Beaconing (Polling/Beaconing Mode Only)
 	genAgentCmd.Flags().IntP("interval", "i", 60, "C2 beacon interval in seconds")
@@ -737,6 +738,7 @@ Example:
 		"cc":              carapace.ActionValues(cc_hosts...),
 		"cdn":             carapace.ActionValues("wss://", "ws://"),
 		"doh":             carapace.ActionValues("https://1.1.1.1/dns-query", "https://8.8.8.8/dns-query", "https://9.9.9.9/dns-query"),
+		"ech":             carapace.ActionValues(),
 		"proxy":           carapace.ActionValues("socks5://127.0.0.1:9050", "socks5://"),
 		"c2-channel-mode": carapace.ActionValues(transport.AllC2ChannelModes()...),
 		"p2p-transport":   carapace.ActionValues(transport.AllTransportNames()...),

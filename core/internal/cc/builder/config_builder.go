@@ -24,6 +24,7 @@ type AgentConfig struct {
 	CDNProxy            *string
 	C2TransportProxy    *string
 	DoHServer           *string
+	ECHServerName       *string
 	C2ChannelMode       *string
 	IsP2PEnabled        bool
 	IsDirectC2          bool
@@ -115,6 +116,13 @@ func MakeConfig(opts AgentConfig) error {
 	}
 	if live.RuntimeConfig.DoHServer != "" {
 		logging.Infof("Using DoH server %s", live.RuntimeConfig.DoHServer)
+	}
+
+	if opts.ECHServerName != nil {
+		live.RuntimeConfig.ECHServerName = *opts.ECHServerName
+	}
+	if live.RuntimeConfig.ECHServerName != "" {
+		logging.Infof("Using ECH for C2 TLS, fetching the config from the HTTPS RR of %s", live.RuntimeConfig.ECHServerName)
 	}
 
 	// HTTP Port

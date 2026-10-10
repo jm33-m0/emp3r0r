@@ -50,6 +50,10 @@ Some packages compile C or load real object files and need extra tooling:
 - The `lib/driver` load/unload round trip only runs when
   `EMP3R0R_TEST_DRIVER_PATH` points at a signed `.sys` file. The rest of the
   package tests run normally.
+- `internal/transport` ECH integration tests query real ECH-publishing domains
+  (`crypto.cloudflare.com`, `tls-ech.dev`) through a public DoH resolver and
+  perform a real ECH handshake with both the uTLS and crypto/tls clients. They
+  need network egress; use `go test -short` to skip them offline.
 
 ## How CI runs it
 

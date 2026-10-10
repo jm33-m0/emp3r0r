@@ -47,6 +47,7 @@ AGENT_TAG_DOCS: dict[str, str] = {
     "no_h2conn": "HTTP/2 duplex (h2conn) C2 channel",
     "no_utls": "uTLS TLS fingerprinting (falls back to crypto/tls)",
     "no_doh": "DNS-over-HTTPS resolver (uses the OS resolver)",
+    "no_ech": "ECH (Encrypted Client Hello) for C2 TLS; requires DoH",
     "no_cdnproxy": "CDN fronting proxy (go-cdn2proxy)",
     "no_netlink": "netlink route/neighbour enumeration (procfs fallback)",
 }

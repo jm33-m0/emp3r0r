@@ -172,7 +172,7 @@ Pivot without burning another implant: the C2 runs a SOCKS5 proxy that relays th
 
 Every unused subsystem is another dependency and another string for a defender to find. Agents are built from independently gated features, so a payload carries only what the mission needs.
 
-- `install.py --agent-slim` drops the optional transports and helpers (KCP, h2conn, uTLS, DoH, CDN proxy, netlink): a Windows DLL or Linux `.so` lands at **~11–13 MB**, and **~4–6 MB** once donut/malasada convert it to shellcode.
+- `install.py --agent-slim` drops the optional transports and helpers (KCP, h2conn, DoH, CDN proxy, netlink); uTLS TLS fingerprinting stays enabled because it adds only ~0.8 MB to the compressed shellcode. Add `no_utls` to fall back to `crypto/tls`.
 - The P2P mesh is a core feature — it stays enabled by default, and `no_mesh` opts out for a standalone agent.
 - `--agent-tags '<tags>'` compiles out any subset (`--list-agent-tags` prints the reference); C2 binaries always keep the full feature set.
 

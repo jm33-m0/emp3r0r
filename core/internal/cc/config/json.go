@@ -54,6 +54,7 @@ type jsonConfig struct {
 	C2TransportProxy       string                  `json:"c2_transport_proxy"`
 	CDNProxy               string                  `json:"cdn_proxy"`
 	DoHServer              string                  `json:"doh_server"`
+	ECHServerName          string                  `json:"ech_server_name"`
 	AgentUUID              string                  `json:"agent_uuid"`
 	AgentUUIDSig           string                  `json:"agent_uuid_sig"`
 	AgentTag               string                  `json:"agent_tag"`
@@ -137,6 +138,7 @@ func readJSONConfig(jsonData []byte, cfg *def.Config) error {
 	applyIfSet(&cfg.C2TransportProxy, jCfg.C2TransportProxy)
 	applyIfSet(&cfg.CDNProxy, jCfg.CDNProxy)
 	applyIfSet(&cfg.DoHServer, jCfg.DoHServer)
+	applyIfSet(&cfg.ECHServerName, jCfg.ECHServerName)
 	applyIfSet(&cfg.AgentUUID, jCfg.AgentUUID)
 	applyIfSet(&cfg.AgentUUIDSig, jCfg.AgentUUIDSig)
 	applyIfSet(&cfg.AgentTag, jCfg.AgentTag)

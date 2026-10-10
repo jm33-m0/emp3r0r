@@ -450,3 +450,23 @@ func TestReadJSONConfigLoadsSNI(t *testing.T) {
 		t.Fatalf("SNI = %q, want seeded value preserved", seeded.SNI)
 	}
 }
+
+// TestReadJSONConfigLoadsECH guards the ECH query-name field.
+func TestReadJSONConfigLoadsECH(t *testing.T) {
+	cfg := &def.Config{}
+	if err := readJSONConfig([]byte(`{"cc_address":"c2.example.com","ech_server_name":"c2.example.com"}`), cfg); err != nil {
+		t.Fatalf("readJSONConfig: %v", err)
+	}
+	if cfg.ECHServerName != "c2.example.com" {
+		t.Fatalf("ECHServerName = %q, want c2.example.com", cfg.ECHServerName)
+	}
+
+	// Absent ECH preserves whatever the caller seeded.
+	seeded := &def.Config{ECHServerName: "keep.example.com"}
+	if err := readJSONConfig([]byte(`{"cc_address":"127.0.0.1"}`), seeded); err != nil {
+		t.Fatalf("readJSONConfig: %v", err)
+	}
+	if seeded.ECHServerName != "keep.example.com" {
+		t.Fatalf("ECHServerName = %q, want seeded value preserved", seeded.ECHServerName)
+	}
+}
