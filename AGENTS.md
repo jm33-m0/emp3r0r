@@ -14,6 +14,14 @@
   `install.py`, so the C2 can build C modules on any host. Prefer `zig cc`
   (and `zig c++`/`zig ar`/`zig ranlib`) over a system toolchain, and keep the
   version in sync with `Dockerfile` and `.github/workflows/test.yml`.
+- **`nasm` ships with the C2 and the operator kit** (`core/build.py`:
+  `install_nasm`). It is installed under `<prefix>/lib/emp3r0r/nasm`, symlinked
+  to `/usr/local/bin/nasm`, copied into the operator kit and installed by
+  `install.py`. The Windows loader (`loader_windows`) and Crystal-Kit assemble
+  their SilentMoonwalk stubs with it, so it must be present on the operator
+  host exactly like zig. The pre-compiled SilentMoonwalk object
+  (`lib/syscall/smw/desyncspoofer.syso`) is assembled by `assemble_smw` and
+  shipped in the kit's `build/` directory.
 - **All agent payloads that link C are built with zig.** `core/build.py` sets
   `CC="zig cc -target ..."` per target:
   - cgo Linux stubs (amd64/386/arm64/riscv64): `*-linux-musl`, statically

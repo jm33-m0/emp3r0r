@@ -269,7 +269,7 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
         (data_dir / "emp3r0r-cc").chmod(0o755)
         (data_dir / "emp3r0r-cat").chmod(0o755)
 
-        for d in ["build", "modules", "tmux", "zig"]:
+        for d in ["build", "modules", "tmux", "zig", "nasm"]:
             src_d = kit_dir / "lib" / "emp3r0r" / d
             if src_d.is_dir():
                 shutil.copytree(
@@ -279,6 +279,9 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
 
         # zig is used as the C module cross compiler; point it at /usr/local/bin.
         link_usr_local_bin(data_dir / "zig" / "zig")
+        # nasm assembles the Windows loader's SilentMoonwalk stub; expose the
+        # kit-shipped copy as /usr/local/bin/nasm.
+        link_usr_local_bin(data_dir / "nasm" / "nasm")
 
     donut_src = kit_dir / "lib" / "emp3r0r" / "bin" / "donut"
     if donut_src.is_file():

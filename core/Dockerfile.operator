@@ -43,16 +43,17 @@ RUN /opt/emp3r0r-operator-kit/install.py \
   && (setcap -r /usr/local/lib/emp3r0r/emp3r0r-cc || true)
 
 # Runtime image: the tmux console plus the toolchain the operator invokes at
-# runtime to build modules and payloads. zig itself ships inside the kit.
+# runtime to build modules and payloads. zig and nasm ship inside the kit.
 FROM debian:trixie-slim
 
 # sudo is kept so the proxy-ns hints the console prints work verbatim (the
 # container is already root, so it is a no-op, just less surprising than
 # "command not found"). The module builds need: make + binutils (stager,
-# hello, libbpf, ssh_harvest), nasm (loader_windows, Crystal-Kit), a host
-# compiler for loader_windows' pack helper, python3 for ssh_harvest's BPF
-# sanitizer, a JRE for Crystal-Kit, and git/curl/tar/bzip2 for libbpf's
-# dependency build.
+# hello, libbpf, ssh_harvest), a host compiler for loader_windows' pack
+# helper, python3 for ssh_harvest's BPF sanitizer, a JRE for Crystal-Kit, and
+# git/curl/tar/bzip2 for libbpf's dependency build. nasm and zig come from the
+# kit (installed to /usr/local), so they are deliberately not installed here to
+# avoid a second, differently-versioned copy shadowing the shipped one.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     tmux \
@@ -60,7 +61,6 @@ RUN apt-get update \
     sudo \
     make \
     binutils \
-    nasm \
     gcc \
     python3 \
     default-jre-headless \

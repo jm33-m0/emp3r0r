@@ -286,8 +286,8 @@ The `build` manifest field is separate: it is a command the C2 runs
 immediately before each execution, with the current flags appended, and is
 used by local C2 modules (`loader_windows` uses `bash ./build.sh`). Toolchain
 requirements for those modules are documented in their own READMEs; the
-Windows loader, for example, needs zig (installed by `build.py`), `nasm`, and a
-native C compiler.
+Windows loader, for example, needs zig and nasm (both installed by `build.py`
+and shipped in the operator kit), plus a native C compiler.
 
 ---
 

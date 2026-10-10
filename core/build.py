@@ -416,6 +416,63 @@ def check_zig() -> None:
         log_error(msg)
 
 
+def locate_nasm_bin() -> pathlib.Path | None:
+    """Return the builder image's nasm executable, if any."""
+    existing = shutil.which("nasm")
+    if existing:
+        return pathlib.Path(existing).resolve()
+    return None
+
+
+def install_nasm(target_dir: pathlib.Path | None = None) -> pathlib.Path | None:
+    """Install nasm under ``target_dir/nasm`` so payloads can be assembled.
+
+    The Windows loader and Crystal-Kit assemble their SilentMoonwalk stubs with
+    nasm, so the operator host needs it just like zig. nasm is a single binary,
+    so unlike zig there is no split install root to preserve: copy the builder
+    image's copy next to emp3r0r (and into the operator kit) and link
+    ``/usr/local/bin/nasm`` at it. Returns the installed binary, or None on
+    failure.
+    """
+    if target_dir is None:
+        existing = locate_nasm_bin()
+        if existing is not None:
+            log_info(f"nasm is already installed: {existing}")
+            return existing
+        log_warn("nasm is not available; run the build inside the builder image")
+        return None
+
+    nasm_dir = target_dir / "nasm"
+    nasm_bin = nasm_dir / "nasm"
+    if nasm_bin.is_file():
+        log_info(f"nasm is already installed: {nasm_bin}")
+        return nasm_bin
+
+    existing = locate_nasm_bin()
+    if existing is None:
+        log_warn(
+            "nasm was not found in the builder image; the operator kit will "
+            "not be able to assemble the Windows loader"
+        )
+        return None
+    if existing.resolve() == nasm_bin.resolve():
+        return nasm_bin
+
+    log_info(f"Copying nasm from {existing} to {nasm_bin}...")
+    if IS_DRY_RUN:
+        log_warn("[DRY-RUN] would copy nasm from the builder image")
+        return None
+    try:
+        nasm_dir.mkdir(parents=True, exist_ok=True)
+        copy2_atomic(existing, nasm_bin)
+        nasm_bin.chmod(0o755)
+    except OSError as e:
+        log_warn(f"Could not copy nasm from {existing}: {e}")
+        return None
+    link_system_command(nasm_bin, "nasm")
+    return nasm_bin
+
+
 def check_build_toolchain() -> None:
     required = ["make", "clang", "gcc", "nasm"]
     missing = []
@@ -500,6 +557,26 @@ def assemble_smw(core_dir: pathlib.Path) -> None:
     res = run_cmd(cmd, check=False, cwd=str(core_dir), shell=True)
     if res.returncode != 0 or not syso_file.is_file():
         log_error(f"Failed to assemble SilentMoonwalk desync core: {cmd}")
+
+
+def install_smw_syso(core_dir: pathlib.Path, target_build_dir: pathlib.Path) -> None:
+    """Copy the assembled SilentMoonwalk object into a ``build/`` directory.
+
+    ``assemble_smw`` writes the ``.syso`` into the source tree as part of the
+    pre-compile step. The operator kit is assembled from the installed prefix
+    (and, for ``--package-operator``, straight from the source tree), so the
+    object has to be copied explicitly; otherwise the kit ships the C sources
+    but not the built object and can no longer assemble it without a toolchain.
+    """
+    syso = core_dir / SMW_SYSO_REL
+    if not syso.is_file():
+        log_warn(f"{syso} not found; the operator kit will be missing {syso.name}")
+        return
+    if IS_DRY_RUN:
+        return
+    target_build_dir.mkdir(parents=True, exist_ok=True)
+    copy2_atomic(syso, target_build_dir / syso.name)
+    log_info(f"Included {syso.name} in {target_build_dir}")
 
 
 def record_malasada_stage0_size(core_dir: pathlib.Path) -> None:
@@ -1416,6 +1493,11 @@ def package_operator_bundle(prefix: str, core_dir: pathlib.Path) -> None:
     installed_prefix = find_installed_prefix(prefix)
     log_info(f"Using installed files from {installed_prefix}")
 
+    # Make sure the pre-compile artefacts are present in the source tree before
+    # collecting them; ``--package-operator`` may run on its own, without a
+    # preceding full build.
+    assemble_smw(core_dir)
+
     with tempfile.TemporaryDirectory(prefix="emp3r0r-operator-bundle-") as bundle_stage:
         stage_path = pathlib.Path(bundle_stage)
         kit_dir = stage_path / "emp3r0r-operator-kit"
@@ -1445,7 +1527,7 @@ def package_operator_bundle(prefix: str, core_dir: pathlib.Path) -> None:
         else:
             log_warn(f"emp3r0r-listener not found at {listener_src}; skipping")
 
-        for d in ["build", "modules", "tmux", "zig"]:
+        for d in ["build", "modules", "tmux", "zig", "nasm"]:
             src_dir = lib_src / d
             if src_dir.is_dir():
                 shutil.copytree(
@@ -1456,6 +1538,11 @@ def package_operator_bundle(prefix: str, core_dir: pathlib.Path) -> None:
                 )
             else:
                 log_warn(f"{src_dir} not found; operator package may be incomplete")
+
+        # The installed build/ may predate the current source tree (e.g. a
+        # --package-operator run after a source-only build), so refresh the
+        # pre-compiled SilentMoonwalk object from the source tree as well.
+        install_smw_syso(core_dir, kit_dir / "lib" / "emp3r0r" / "build")
 
         install_donut(kit_dir / "lib" / "emp3r0r", link_bin=False)
         install_proxy_ns(kit_dir / "lib" / "emp3r0r")
@@ -1581,6 +1668,10 @@ def do_install(prefix: str, temp_dir: pathlib.Path, core_dir: pathlib.Path) -> N
         for stub in temp_dir.glob("stub*"):
             copy2_atomic(stub, build_dir / stub.name)
 
+        # The SilentMoonwalk .syso is assembled by the pre-compile step into the
+        # source tree; carry it into the prefix so the operator kit ships it too.
+        install_smw_syso(core_dir, build_dir)
+
         tmux_conf = data_dir / "tmux" / ".tmux.conf"
         if tmux_conf.is_file():
             tmux_sh_dir = str(data_dir / "tmux" / "sh")
@@ -1611,6 +1702,9 @@ def do_install(prefix: str, temp_dir: pathlib.Path, core_dir: pathlib.Path) -> N
     install_proxy_ns(data_dir, link_bin=True)
     # zig ships with emp3r0r so the C2 can build the C modules on the host.
     install_zig(data_dir)
+    # nasm ships with emp3r0r so the Windows loader and Crystal-Kit can
+    # assemble their SilentMoonwalk stubs on the operator host.
+    install_nasm(data_dir)
 
     is_container = (
         pathlib.Path("/.dockerenv").exists()
