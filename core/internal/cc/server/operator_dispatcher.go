@@ -22,6 +22,9 @@ func operationDispatcher(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 	touchOperatorCommand()
+	// Bound every operator request: these are small control payloads, so a
+	// hostile operator cannot exhaust server memory with an oversized body.
+	r.Body = http.MaxBytesReader(w, r.Body, maxOperatorRequestBody)
 	// Any authenticated request proves the operator is still alive, so keep its
 	// agent claims from expiring while it is merely reading output.
 	if id, idErr := operatorSessionFromReq(r); idErr == nil {

@@ -22,7 +22,7 @@ func operatorHTTPRequest(t *testing.T, session string, body any) *http.Request {
 		t.Fatalf("marshal body: %v", err)
 	}
 	req := httptest.NewRequest(http.MethodPost, "/operator/set_active_agent", bytes.NewReader(raw))
-	req.RemoteAddr = "203.0.113.9:40000"
+	req.RemoteAddr = "127.0.0.1:40000"
 	if session != "" {
 		req.Header.Set("operator_session", session)
 	}
@@ -179,8 +179,11 @@ func TestOperatorIdentityPrefersWireGuardIP(t *testing.T) {
 	if got := operatorRequestIdentity("10.44.0.3:5555", "spoofed"); got != "10.44.0.3" {
 		t.Fatalf("operatorRequestIdentity = %q, want the provisioned IP to win over the header", got)
 	}
-	if got := operatorRequestIdentity("203.0.113.1:5555", "fallback"); got != "fallback" {
-		t.Fatalf("operatorRequestIdentity fallback = %q, want fallback", got)
+	if got := operatorRequestIdentity("127.0.0.1:5555", "fallback"); got != "fallback" {
+		t.Fatalf("loopback header fallback = %q, want fallback", got)
+	}
+	if got := operatorRequestIdentity("203.0.113.1:5555", "spoof"); got != "" {
+		t.Fatalf("a non-loopback peer must not self-identify by header, got %q", got)
 	}
 	if got := operatorDisplayName("10.44.0.2"); got != "operator-1" {
 		t.Fatalf("operatorDisplayName = %q, want operator-1", got)

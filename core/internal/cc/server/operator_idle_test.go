@@ -149,6 +149,8 @@ func TestOperatorIdleNotificationAndResume(t *testing.T) {
 func TestHandleResumeOperator(t *testing.T) {
 	atomic.StoreInt64(&lastOperatorCommand, 0)
 	req := httptest.NewRequest(http.MethodPost, "/operator/resume", nil)
+	req.RemoteAddr = "127.0.0.1:1"
+	req.Header.Set("operator_session", "test-operator")
 	rec := httptest.NewRecorder()
 
 	handleResumeOperator(rec, req)

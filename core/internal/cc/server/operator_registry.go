@@ -67,10 +67,7 @@ func operatorDisplayName(ip string) string {
 // address. The operator mTLS listener is bound to the userspace WireGuard
 // stack, so the peer IP is the operator's provisioned WG IP.
 func operatorIDFromRemote(remoteAddr string) string {
-	ip := strings.TrimSpace(remoteAddr)
-	if host, _, err := net.SplitHostPort(ip); err == nil {
-		ip = host
-	}
+	ip := remoteHost(remoteAddr)
 	if cfg := operatorByIP(ip); cfg != nil {
 		return cfg.IP
 	}
@@ -78,12 +75,36 @@ func operatorIDFromRemote(remoteAddr string) string {
 }
 
 // operatorRequestIdentity resolves the stable operator identity for a request:
-// the provisioned WG IP when the peer is one, otherwise the client-supplied
-// session header. Local mode, embedders and tests have no WG mapping, so they
-// keep working through the header.
+// the provisioned WG IP when the peer is one. The client-supplied session header
+// is trusted only from the local host (single-host/local mode and embedders) so
+// a network peer can never claim another operator's identity by setting it.
 func operatorRequestIdentity(remoteAddr, sessionHeader string) string {
 	if id := operatorIDFromRemote(remoteAddr); id != "" {
 		return id
 	}
-	return strings.TrimSpace(sessionHeader)
+	if isLoopbackIP(remoteHost(remoteAddr)) {
+		return strings.TrimSpace(sessionHeader)
+	}
+	return ""
+}
+
+// remoteHost strips the port from a remote address.
+func remoteHost(remoteAddr string) string {
+	host := strings.TrimSpace(remoteAddr)
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	return host
+}
+
+// isLoopbackIP reports whether host is a local address.
+func isLoopbackIP(host string) bool {
+	if host == "" {
+		return false
+	}
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }

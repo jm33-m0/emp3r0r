@@ -128,7 +128,10 @@ func handleUpdateOperatorIdleConfig(wrt http.ResponseWriter, req *http.Request) 
 	if err != nil {
 		return
 	}
-	operatorID, _ := operatorSessionFromReq(req)
+	operatorID, ok := requireOperatorIdentity(wrt, req)
+	if !ok {
+		return
+	}
 	if cfg.OperatorIdleTimeout < 0 {
 		http.Error(wrt, "OperatorIdleTimeout must be >= 0", http.StatusBadRequest)
 		return
@@ -156,9 +159,11 @@ func handleResumeOperator(wrt http.ResponseWriter, req *http.Request) {
 			http.Error(wrt, "Internal server error", http.StatusInternalServerError)
 		}
 	}()
-	if operatorID, err := operatorSessionFromReq(req); err == nil {
-		auditOperatorAction(operatorID, "resume", "", "")
+	operatorID, ok := requireOperatorIdentity(wrt, req)
+	if !ok {
+		return
 	}
+	auditOperatorAction(operatorID, "resume", "", "")
 	touchOperatorCommand()
 	wrt.WriteHeader(http.StatusOK)
 }

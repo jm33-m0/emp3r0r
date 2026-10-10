@@ -4,9 +4,11 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -14,7 +16,10 @@ import (
 
 // handleSignAgent handles operator requests to sign an agent UUID with the CA key.
 func handleSignAgent(wrt http.ResponseWriter, req *http.Request) {
-	operatorID, _ := operatorSessionFromReq(req)
+	operatorID, ok := requireOperatorIdentity(wrt, req)
+	if !ok {
+		return
+	}
 	var signReq def.SignRequest
 	decoder := cbor.NewDecoder(req.Body)
 	if err := decoder.Decode(&signReq); err != nil {
@@ -23,12 +28,19 @@ func handleSignAgent(wrt http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if len(signReq.Content) == 0 {
+	content := strings.TrimSpace(string(signReq.Content))
+	// The CA key is the server's ultimate authority. Only ever sign the agent
+	// UUID the operator is about to embed, never arbitrary content.
+	if content == "" {
 		http.Error(wrt, "Empty content", http.StatusBadRequest)
 		return
 	}
+	if _, parseErr := uuid.Parse(content); parseErr != nil {
+		http.Error(wrt, "Content must be a UUID", http.StatusBadRequest)
+		return
+	}
 
-	sig, err := transport.SignWithCAKey(signReq.Content)
+	sig, err := transport.SignWithCAKey([]byte(content))
 	if err != nil {
 		logging.Errorf("handleSignAgent: failed to sign content: %v", err)
 		http.Error(wrt, fmt.Sprintf("Failed to sign content: %v", err), http.StatusInternalServerError)
@@ -36,7 +48,7 @@ func handleSignAgent(wrt http.ResponseWriter, req *http.Request) {
 	}
 
 	sigStr := base64.URLEncoding.EncodeToString(sig)
-	auditOperatorAction(operatorID, "sign_agent", "", string(signReq.Content))
+	auditOperatorAction(operatorID, "sign_agent", "", content)
 	data, err := cbor.Marshal(sigStr)
 	if err != nil {
 		logging.Errorf("handleSignAgent: failed to marshal response: %v", err)

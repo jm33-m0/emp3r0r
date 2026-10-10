@@ -50,6 +50,16 @@ var (
 
 const operatorClaimNonceTTLSeconds int64 = 600
 
+// Operator-facing request bounds. Operator messages are small control frames,
+// never bulk data, so they must not be able to exhaust server memory.
+const (
+	// maxOperatorRequestBody bounds one operator HTTP API request body.
+	maxOperatorRequestBody = 1 << 20 // 1 MiB
+	// maxOperatorTunnelMessage bounds one operator message-tunnel frame. Relay
+	// chunks are ~64 KiB, so this is generous while still bounding memory.
+	maxOperatorTunnelMessage = 4 << 20 // 4 MiB
+)
+
 // DecodeCBORBody decodes CBOR HTTP request body
 func DecodeCBORBody[T any](wrt http.ResponseWriter, req *http.Request) (*T, error) {
 	var dst T
@@ -66,6 +76,18 @@ func operatorSessionFromReq(req *http.Request) (string, error) {
 		return "", fmt.Errorf("missing operator identity")
 	}
 	return session, nil
+}
+
+// requireOperatorIdentity resolves the caller's operator identity, writing a
+// 401 and returning false when it cannot. Every operator-facing handler calls
+// it so an unidentified peer can never act on the server.
+func requireOperatorIdentity(wrt http.ResponseWriter, req *http.Request) (string, bool) {
+	operatorID, err := operatorSessionFromReq(req)
+	if err != nil || operatorID == "" {
+		http.Error(wrt, "missing operator identity", http.StatusUnauthorized)
+		return "", false
+	}
+	return operatorID, true
 }
 
 // operatorSessionOnline reports whether the operator identity currently has a
@@ -140,7 +162,13 @@ func setJobOwner(jobID, operatorSession string) {
 	if jobID == "" || operatorSession == "" {
 		return
 	}
-	operatorJobOwners.Store(jobID, operatorSession)
+	// Never overwrite an existing owner: otherwise one operator could redirect
+	// another operator's command output by reusing its job ID.
+	if existing, loaded := operatorJobOwners.LoadOrStore(jobID, operatorSession); loaded {
+		if owner, ok := existing.(string); ok && owner != "" && owner != operatorSession {
+			logging.Warningf("CRITICAL: operator %s tried to claim job %s owned by %s", operatorSession, jobID, owner)
+		}
+	}
 }
 
 func getJobOwner(jobID string) (string, bool) {
@@ -200,9 +228,8 @@ func handleSetActiveAgent(wrt http.ResponseWriter, req *http.Request) {
 	// switch: a successful claim releases the operator's other claims below. A
 	// live claim by another operator is rejected with a conflict so the UI can
 	// show who owns the agent.
-	operatorID, idErr := operatorSessionFromReq(req)
-	if idErr != nil {
-		http.Error(wrt, "missing operator identity", http.StatusUnauthorized)
+	operatorID, ok := requireOperatorIdentity(wrt, req)
+	if !ok {
 		return
 	}
 	if acquired, heldBy := acquireAgentLock(agent.UUID, operatorID, operatorDisplayName(operatorID)); !acquired {
@@ -254,9 +281,8 @@ func handleSendCommand(wrt http.ResponseWriter, req *http.Request) {
 	// Operating an agent requires the caller to own it. This is also where a
 	// command auto-claims an unlocked agent when the operator never explicitly
 	// targeted it.
-	operatorID, sessErr := operatorSessionFromReq(req)
-	if sessErr != nil {
-		http.Error(wrt, "missing operator identity", http.StatusUnauthorized)
+	operatorID, ok := requireOperatorIdentity(wrt, req)
+	if !ok {
 		return
 	}
 	if acquired, heldBy := acquireAgentLock(agent.UUID, operatorID, operatorDisplayName(operatorID)); !acquired {
@@ -297,13 +323,16 @@ func handleSendCommand(wrt http.ResponseWriter, req *http.Request) {
 	wrt.WriteHeader(http.StatusOK)
 }
 
-func handleListAgents(wrt http.ResponseWriter, _ *http.Request) {
+func handleListAgents(wrt http.ResponseWriter, req *http.Request) {
 	defer func() {
 		if r := recover(); r != nil {
 			logging.Errorf("handleListAgents panicked: %v", r)
 			http.Error(wrt, "Internal server error", http.StatusInternalServerError)
 		}
 	}()
+	if _, ok := requireOperatorIdentity(wrt, req); !ok {
+		return
+	}
 	// Get all agents
 	agentsList := agents.GetConnectedAgents()
 	// Annotate each agent with the operator that currently holds it so the
@@ -338,7 +367,10 @@ func handleForgetAgent(wrt http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		return
 	}
-	operatorID, _ := operatorSessionFromReq(req)
+	operatorID, ok := requireOperatorIdentity(wrt, req)
+	if !ok {
+		return
+	}
 
 	uuid := operation.AgentTag
 	uuid = strings.TrimSpace(uuid)
@@ -361,6 +393,14 @@ func handleForgetAgent(wrt http.ResponseWriter, req *http.Request) {
 		} else if found {
 			uuid = resolved
 		}
+	}
+
+	// An operator cannot forget an agent another operator is actively running.
+	if owner := agentLockOwner(uuid); owner != "" && owner != operatorDisplayName(operatorID) {
+		msg := fmt.Sprintf("Agent %s is operated by %s; release target before forgetting it", util.AgentRef(uuid), owner)
+		auditOperatorAction(operatorID, "forget_agent_denied", util.AgentRef(uuid), "held by "+owner)
+		http.Error(wrt, msg, http.StatusConflict)
+		return
 	}
 
 	// Prepare response message with agent details
@@ -435,6 +475,16 @@ func handleRegisterFTPStream(wrt http.ResponseWriter, req *http.Request) {
 		http.Error(wrt, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
+	// An operator may not hijack a token that another operator already owns.
+	if val, ok := network.FTPStreams.Load("token:" + ftpReq.Token); ok {
+		if existing, castOK := val.(*network.StreamHandler); castOK && existing != nil &&
+			existing.OperatorSession != "" && existing.OperatorSession != operatorSession {
+			logging.Errorf("CRITICAL: operator %s tried to hijack ftp token %s owned by %s", operatorSession, ftpReq.Token, existing.OperatorSession)
+			auditOperatorAction(operatorSession, "ftp_register_denied", "", ftpReq.FilePath)
+			http.Error(wrt, "Forbidden", http.StatusForbidden)
+			return
+		}
+	}
 	// Register token in server's map
 	sh := &network.StreamHandler{
 		Token:           ftpReq.Token,
@@ -488,13 +538,16 @@ func handleUnregisterFTPStream(wrt http.ResponseWriter, req *http.Request) {
 	wrt.WriteHeader(http.StatusOK)
 }
 
-func handleGetCA(wrt http.ResponseWriter, _ *http.Request) {
+func handleGetCA(wrt http.ResponseWriter, req *http.Request) {
 	defer func() {
 		if r := recover(); r != nil {
 			logging.Errorf("handleGetCA panicked: %v", r)
 			http.Error(wrt, "Internal server error", http.StatusInternalServerError)
 		}
 	}()
+	if _, ok := requireOperatorIdentity(wrt, req); !ok {
+		return
+	}
 	caData, err := os.ReadFile(transport.CaCrtFile)
 	if err != nil {
 		logging.Errorf("Failed to read CA cert: %v", err)
@@ -580,9 +633,25 @@ func unregisterOperatorConn(session string, op *operator_t) bool {
 	cleanupOperatorOwnedJobs(session)
 	// SOCKS5 pivots are owned by the operator that started them.
 	StopSocks5ProxiesForOperator(session)
+	// FTP streams owned by the operator die with its session.
+	cleanupOperatorFTPStreams(session)
 	// Free every agent this operator was holding.
 	releaseAgentLocksForOperator(session)
 	return true
+}
+
+// cleanupOperatorFTPStreams removes FTP stream registrations owned by the
+// disconnecting operator so a torn-down transfer cannot leak handlers.
+func cleanupOperatorFTPStreams(session string) {
+	if session == "" {
+		return
+	}
+	network.FTPStreams.Range(func(k, v any) bool {
+		if sh, ok := v.(*network.StreamHandler); ok && sh != nil && sh.OperatorSession == session {
+			network.FTPStreams.Delete(k)
+		}
+		return true
+	})
 }
 
 // registerOperatorSession publishes a live message tunnel for operatorID,
@@ -623,6 +692,9 @@ func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 		return
 	}
 	conn := websocket.NetConn(req.Context(), wsConn, websocket.MessageBinary)
+	// NetConn disables the library read limit (-1); restore a bound so an
+	// operator cannot exhaust server memory with an oversized frame.
+	wsConn.SetReadLimit(maxOperatorTunnelMessage)
 	operatorID := operatorRequestIdentity(req.RemoteAddr, req.Header.Get("operator_session"))
 	if operatorID == "" {
 		logging.Errorf("handleOperatorConn: refusing unidentified operator from %s", req.RemoteAddr)
