@@ -300,7 +300,7 @@ func CliBanner(console *console.Console) {
 		"Welcome! You are using emp3r0r %s\n"+
 			"C2 Names: %s\n"+
 			"%s",
-		def.Version,
+		def.BuildVersion,
 		name_list,
 		formatBannerSummary(),
 	))

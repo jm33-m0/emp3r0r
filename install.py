@@ -20,6 +20,7 @@ import argparse
 import hashlib
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -81,6 +82,25 @@ def _fmt(text: str, color_code: str) -> str:
     if USE_COLOR:
         return f"\033[{color_code}m{text}\033[0m"
     return text
+
+
+def read_def_version(repo_root: pathlib.Path) -> str:
+    """Read the release version from core/internal/def/def.go.
+
+    release-please (release-type: go) updates ``const Version = "x.y.z"`` in
+    that file and build.py reads the same constant. Returns "" when it cannot
+    be read (e.g. an older source tree), so callers can fall back gracefully.
+    """
+    def_file = repo_root / "core" / "internal" / "def" / "def.go"
+    if def_file.is_file():
+        match = re.search(
+            r'^[ \t]*const Version[ \t]*=[ \t]*"([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?)"',
+            def_file.read_text(encoding="utf-8"),
+            re.MULTILINE,
+        )
+        if match:
+            return match.group(1)
+    return ""
 
 
 def log_success(msg: str) -> None:
@@ -567,6 +587,11 @@ def docker_build(
 
     build_env = []
     build_env.extend(["-e", f"EMP3R0R_MAGIC_STRING={ensure_magic_string()}"])
+    if version := read_def_version(repo_root):
+        # Pin the version build.py embeds so the container build cannot drift
+        # from the release-please-managed constant in def.go.
+        log_info(f"Building emp3r0r {version}")
+        build_env.extend(["-e", f"EMP3R0R_VERSION={version}"])
     if disable_garble or os.environ.get("EMP3R0R_DISABLE_GARBLE") == "1":
         build_env.extend(["-e", "EMP3R0R_DISABLE_GARBLE=1"])
 

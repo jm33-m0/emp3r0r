@@ -32,11 +32,20 @@ var (
 	AESPassword []byte
 )
 
-// Build
-var (
-	// Version hardcoded version string
-	Version = "unknown"
-)
+// Version is the release version. release-please (release-type: go) updates
+// this exact declaration, so keep the `const Version = "x.y.z"` form.
+const Version = "5.2.2"
+
+// BuildVersion is the version a running binary reports: the release version
+// plus the build timestamp, injected at build time with -ldflags -X. A plain
+// `go build` leaves it at the default, so fall back to the release version.
+var BuildVersion = "unknown"
+
+func init() {
+	if BuildVersion == "unknown" || BuildVersion == "" {
+		BuildVersion = Version
+	}
+}
 
 const (
 	// Unknown

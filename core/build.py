@@ -58,6 +58,8 @@ Agent feature selection options (combinable with any build command):
 Environment variables:
   EMP3R0R_DISABLE_GARBLE=1   Disable garble obfuscation for non-debug builds
   PREFIX=/usr/local          Custom install prefix
+  EMP3R0R_VERSION            Override the release version (default: the
+                             `const Version` in core/internal/def/def.go)
   EMP3R0R_TARGETS            Comma-separated targets (same format as --targets)
   EMP3R0R_LIGHTWEIGHT=1      Equivalent to --lightweight
   EMP3R0R_SLIM_AGENT=1       Equivalent to --agent-slim
@@ -232,6 +234,27 @@ def copy2_atomic(src: pathlib.Path, dst: pathlib.Path) -> None:
     os.replace(tmp, dst)
 
 
+def read_def_version(core_dir: pathlib.Path) -> str:
+    """Return the release version from the Go source.
+
+    ``core/internal/def/def.go`` holds ``const Version = "x.y.z"``, which
+    release-please updates directly (release-type: go, version-file pointing at
+    that file). Reading it ties the build to the released version instead of
+    whatever git tag happens to be checked out.
+    """
+    def_file = core_dir / "internal" / "def" / "def.go"
+    if def_file.is_file():
+        content = def_file.read_text(encoding="utf-8")
+        match = re.search(
+            r'^[ \t]*const Version[ \t]*=[ \t]*"([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?)"',
+            content,
+            re.MULTILINE,
+        )
+        if match:
+            return match.group(1)
+    return ""
+
+
 def get_git_version() -> str:
     env_tag = os.environ.get("TAG")
     if env_tag:
@@ -246,14 +269,14 @@ def get_git_version() -> str:
 
 def get_version(core_dir: pathlib.Path) -> str:
     build_time = time.strftime("%y%m%d%H%M")
-    version = get_git_version()
-    if version == "unknown":
-        def_file = core_dir / "internal" / "def" / "def.go"
-        if def_file.exists():
-            content = def_file.read_text(encoding="utf-8")
-            match = re.search(r'Version\s*=\s*"([^"]+)"', content)
-            if match:
-                version = match.group(1)
+    # def.go is authoritative; an explicit EMP3R0R_VERSION (set by install.py for
+    # the container build) pins it even when the source is read elsewhere. Dev
+    # checkouts without the constant fall back to git.
+    version = (
+        os.environ.get("EMP3R0R_VERSION", "").strip()
+        or read_def_version(core_dir)
+        or get_git_version()
+    )
     return f"{version}-{build_time}"
 
 
@@ -1192,7 +1215,7 @@ def build(
     ldflags = (
         f"-v -X 'github.com/jm33-m0/emp3r0r/core/internal/def.MagicString={magic_str}' "
         f"-X 'github.com/jm33-m0/emp3r0r/core/internal/def.QUICKey={magic_str}' "
-        f"-X 'github.com/jm33-m0/emp3r0r/core/internal/def.Version={version}'"
+        f"-X 'github.com/jm33-m0/emp3r0r/core/internal/def.BuildVersion={version}'"
     )
 
     gobuild_cmd, build_opt, ldflags = resolve_gobuild(
@@ -1914,7 +1937,7 @@ def build_single_payload(args: argparse.Namespace) -> None:
     ldflags = (
         f"-v -X 'github.com/jm33-m0/emp3r0r/core/internal/def.MagicString={magic_str}' "
         f"-X 'github.com/jm33-m0/emp3r0r/core/internal/def.QUICKey={magic_str}' "
-        f"-X 'github.com/jm33-m0/emp3r0r/core/internal/def.Version={version}'"
+        f"-X 'github.com/jm33-m0/emp3r0r/core/internal/def.BuildVersion={version}'"
     )
     gobuild_cmd, build_opt, ldflags = resolve_gobuild(
         go_bin, mod_opt, args.payload_debug, ldflags
