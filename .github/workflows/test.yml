@@ -91,7 +91,9 @@ jobs:
         env:
           CGO_ENABLED: 1
         run: |
-          cd test && go test -v -count=1 -timeout 3m -run TestAgentEndToEndLifecycle
+          # The test binary runs the C2 and the agent is built by build.py
+          # (default full feature set), so both must use the same feature tags.
+          cd test && go test -v -tags "$BUILD_TAGS" -count=1 -timeout 3m -run TestAgentEndToEndLifecycle
 
       - name: Set up MSYS2 (Windows)
         if: runner.os == 'Windows'

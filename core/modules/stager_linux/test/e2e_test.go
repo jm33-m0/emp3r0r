@@ -333,6 +333,13 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	if os.Getenv("EMP3R0R_RACE_ON") == "1" {
 		t.Skip("Skipping test: race detector is enabled")
 	}
+	// The C2 half of this test is the test binary itself, and every subtest
+	// needs the h2conn TLS listener (http_poll still waits on it too). Without
+	// the tag the server is a stub and the listener never comes up, so fail
+	// fast with an actionable message instead of a 30s wait.
+	if _, err := transport.GetC2ChannelWrapper(def.C2ChannelModeH2Conn); err != nil {
+		t.Fatalf("h2conn channel is not compiled in; run with -tags 'with_h2conn ...': %v", err)
+	}
 	transports := []string{"http", "libcurl", "libssl"}
 	for _, mode := range []string{def.C2ChannelModeH2Conn, "http_poll"} {
 		for _, tr := range transports {
