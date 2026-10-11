@@ -103,11 +103,12 @@ func StopModuleWatch() {
 	moduleWatcher.stopped = true
 	moduleWatcher.running = false
 	close(moduleWatcher.quit)
-	watcher := moduleWatcher.watcher
 	moduleWatcher.mu.Unlock()
-	if watcher != nil {
-		_ = watcher.Close()
-	}
+	// runLoop is the sole owner of the fsnotify handle and closes it on the way
+	// out (before done.Done()). Closing it here as well would race that
+	// deferred close; fsnotify's Windows backend lets both callers past its
+	// isClosed() check, but only the single reader goroutine services one
+	// Close, so the loser blocks forever (deadlock). Just wait for runLoop.
 	moduleWatcher.done.Wait()
 }
 

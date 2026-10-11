@@ -141,6 +141,34 @@ func TestModuleWatchAddEditRemove(t *testing.T) {
 	waitFor("watch_mod_a2", true, 5*time.Second)
 }
 
+func TestModuleWatchStartStopNoDeadlock(t *testing.T) {
+	// Regression guard for a shutdown deadlock: StopModuleWatch must not close
+	// the fsnotify.Watcher itself and race the deferred Close in runLoop.
+	// fsnotify's Windows backend lets both callers past its isClosed() check,
+	// but the single reader goroutine only services one Close, so the other
+	// caller blocks forever. Cycling the lifecycle exercises the ownership
+	// handoff between StartModuleWatch and runLoop.
+	searchDir, workspace := newWatchTestRoot(t)
+	defer setTestModuleDirs(t, searchDir, workspace)()
+
+	writeModule(t, searchDir, "watch_cycle", moduleBody("watch_cycle", "v1"))
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 300; i++ {
+			StartModuleWatch()
+			StopModuleWatch()
+		}
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(60 * time.Second):
+		t.Fatal("StartModuleWatch/StopModuleWatch lifecycle deadlocked")
+	}
+}
+
 func TestModuleWatchBrokenConfig(t *testing.T) {
 	searchDir, workspace := newWatchTestRoot(t)
 	defer setTestModuleDirs(t, searchDir, workspace)()
