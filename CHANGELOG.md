@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.2.1](https://github.com/jm33-m0/emp3r0r/compare/v5.2.0...v5.2.1) (2026-10-11)
+
+
+### Bug Fixes
+
+* **operator:** never purge the C2 workspace in local mode ([5e699b4](https://github.com/jm33-m0/emp3r0r/commit/5e699b40c5f0954533ce1daf35c5392c2cd4cefd))
+
 ## [5.2.0](https://github.com/jm33-m0/emp3r0r/compare/v5.1.0...v5.2.0) (2026-10-11)
 
 
