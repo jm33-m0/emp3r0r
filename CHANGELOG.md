@@ -1,5 +1,20 @@
 # Changelog
 
+## [5.2.0](https://github.com/jm33-m0/emp3r0r/compare/v5.1.0...v5.2.0) (2026-10-11)
+
+
+### Features
+
+* **c2:** add QUIC C2 transport ([aac4486](https://github.com/jm33-m0/emp3r0r/commit/aac4486c1e5605f91785fa56875bb7578c19313e))
+
+
+### Bug Fixes
+
+* **build:** use `with_*` build tags to make it more intuitive ([6ff6cf6](https://github.com/jm33-m0/emp3r0r/commit/6ff6cf60495362b7634ffaa06fe252dafd542d7e))
+* data race ([b31b62b](https://github.com/jm33-m0/emp3r0r/commit/b31b62ba6eccc170cc3ac8bef08acee361065382))
+* **modules:** avoid shutdown deadlock ([8e87f6e](https://github.com/jm33-m0/emp3r0r/commit/8e87f6e41f5bdea675cc858e51c6a73c2d8667d7))
+* report errors instead of silently fail when features are not compiled ([a9bf340](https://github.com/jm33-m0/emp3r0r/commit/a9bf340311cddcb6a613f772191208a499dc6d2e))
+
 ## [5.1.0](https://github.com/jm33-m0/emp3r0r/compare/v5.0.0...v5.1.0) (2026-10-10)
 
 
