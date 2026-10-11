@@ -32,8 +32,8 @@ func TestLoadCACrt(t *testing.T) {
 	}
 
 	// Verify CACrtPEM content
-	if string(CACrtPEM) != string(certContent) {
-		t.Errorf("CACrtPEM content mismatch. Got %s, want %s", CACrtPEM, certContent)
+	if string(GetCACrtPEM()) != string(certContent) {
+		t.Errorf("CACrtPEM content mismatch. Got %s, want %s", GetCACrtPEM(), certContent)
 	}
 
 	// Test with non-existent file

@@ -78,7 +78,7 @@ func startPivotStack(t *testing.T) (pivotAddr string) {
 	if err != nil {
 		t.Fatalf("read CA: %v", err)
 	}
-	transport.CACrtPEM = caCertData
+	transport.SetCACrtPEM(caCertData)
 	transport.CaCrtFile = caCertFile
 	transport.CaKeyFile = caKeyFile
 	transport.ServerCrtFile = serverCertFile

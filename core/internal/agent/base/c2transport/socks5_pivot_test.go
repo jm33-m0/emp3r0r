@@ -121,7 +121,7 @@ func runSocks5PivotE2E(t *testing.T, mode string, expectRefused bool) {
 	if err != nil {
 		t.Fatalf("read CA: %v", err)
 	}
-	transport.CACrtPEM = caCertData
+	transport.SetCACrtPEM(caCertData)
 	transport.CaCrtFile = caCertFile
 	transport.CaKeyFile = caKeyFile
 	transport.ServerCrtFile = serverCertFile

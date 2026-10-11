@@ -88,9 +88,9 @@ func TestCreateEmp3r0rHTTPClient(t *testing.T) {
 	caPEM, serverCert := generateCerts(t)
 
 	// Set global CACrtPEM so CreateEmp3r0rHTTPClient picks it up
-	originalCACrtPEM := CACrtPEM
-	CACrtPEM = caPEM
-	defer func() { CACrtPEM = originalCACrtPEM }()
+	originalCACrtPEM := GetCACrtPEM()
+	SetCACrtPEM(caPEM)
+	defer func() { SetCACrtPEM(originalCACrtPEM) }()
 
 	// Start Mock HTTPS Server
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -177,9 +177,9 @@ func TestCreateEmp3r0rHTTPClient(t *testing.T) {
 func TestCreateEmp3r0rHTTPClientCustomSNI(t *testing.T) {
 	caPEM, serverCert := generateCerts(t)
 
-	originalCACrtPEM := CACrtPEM
-	CACrtPEM = caPEM
-	defer func() { CACrtPEM = originalCACrtPEM }()
+	originalCACrtPEM := GetCACrtPEM()
+	SetCACrtPEM(caPEM)
+	defer func() { SetCACrtPEM(originalCACrtPEM) }()
 
 	sniCh := make(chan string, 1)
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -236,9 +236,9 @@ func TestCreatePreflightHTTPClient(t *testing.T) {
 	caPEM, serverCert := generateCerts(t)
 
 	// Set global CACrtPEM so CreatePreflightHTTPClient picks it up
-	originalCACrtPEM := CACrtPEM
-	CACrtPEM = caPEM
-	defer func() { CACrtPEM = originalCACrtPEM }()
+	originalCACrtPEM := GetCACrtPEM()
+	SetCACrtPEM(caPEM)
+	defer func() { SetCACrtPEM(originalCACrtPEM) }()
 
 	// Start Mock HTTPS Server
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

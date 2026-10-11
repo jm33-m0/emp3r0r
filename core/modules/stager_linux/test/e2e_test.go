@@ -478,7 +478,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	if err != nil {
 		t.Fatalf("Failed to read CA cert: %v", err)
 	}
-	transport.CACrtPEM = caCertData
+	transport.SetCACrtPEM(caCertData)
 	transport.EmpWorkSpace = tmpDir
 
 	agentUUID := uuid.New().String()

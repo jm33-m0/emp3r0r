@@ -459,7 +459,7 @@ func setupE2EFileTransfer(t *testing.T) *e2eFileTransferHarness {
 	origHTTPClient := def.HTTPClient
 	origCommonRuntime := common.RuntimeConfig
 	origAgentKey := agentutils.AgentKey
-	origCACrtPEM := transport.CACrtPEM
+	origCACrtPEM := transport.GetCACrtPEM()
 	origCaCrtFile := transport.CaCrtFile
 	origCaKeyFile := transport.CaKeyFile
 	origEmpWorkSpaceT := transport.EmpWorkSpace
@@ -476,7 +476,7 @@ func setupE2EFileTransfer(t *testing.T) *e2eFileTransferHarness {
 		def.HTTPClient = origHTTPClient
 		common.RuntimeConfig = origCommonRuntime
 		agentutils.AgentKey = origAgentKey
-		transport.CACrtPEM = origCACrtPEM
+		transport.SetCACrtPEM(origCACrtPEM)
 		transport.CaCrtFile = origCaCrtFile
 		transport.CaKeyFile = origCaKeyFile
 		transport.EmpWorkSpace = origEmpWorkSpaceT
@@ -510,7 +510,7 @@ func setupE2EFileTransfer(t *testing.T) *e2eFileTransferHarness {
 	if err != nil {
 		t.Fatalf("read CA cert: %v", err)
 	}
-	transport.CACrtPEM = caCertData
+	transport.SetCACrtPEM(caCertData)
 	transport.CaCrtFile = caCertFile
 	transport.CaKeyFile = caKeyFile
 	transport.EmpWorkSpace = tmpDir

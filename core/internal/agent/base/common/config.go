@@ -90,7 +90,7 @@ func InitConfig() (err error) {
 	}
 
 	// CA
-	transport.CACrtPEM = []byte(RuntimeConfig.CAPEM)
+	transport.SetCACrtPEM([]byte(RuntimeConfig.CAPEM))
 
 	return err
 }

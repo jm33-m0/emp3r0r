@@ -51,7 +51,7 @@ func TestUnauthenticatedRequestRejection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to read CA cert: %v", err)
 	}
-	transport.CACrtPEM = caCertData
+	transport.SetCACrtPEM(caCertData)
 
 	// Setup Transport Paths
 	transport.CaCrtFile = caCertFile

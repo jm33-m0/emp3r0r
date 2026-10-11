@@ -17,8 +17,11 @@ import (
 // c2_addr: C2 address, only the hostname will be used
 // proxyServer: proxy server URL, if empty, direct connection will be used
 func CreateEmp3r0rHTTPClient(c2_addr, proxyServer string) *http.Client {
+	// Snapshot the CA under its lock: the C2 may publish it concurrently
+	// (SetCACrtPEM) while an agent builds a client.
+	caPEM := GetCACrtPEM()
 	// Extract CA bundle from built-in certs
-	rootCAs, err := ExtractCABundle(CACrtPEM)
+	rootCAs, err := ExtractCABundle(caPEM)
 	if err != nil {
 		logging.Fatalf("ExtractCABundle: %v", err)
 	}
@@ -34,7 +37,7 @@ func CreateEmp3r0rHTTPClient(c2_addr, proxyServer string) *http.Client {
 	}
 
 	// add our cert
-	if ok := rootCAs.AppendCertsFromPEM(CACrtPEM); !ok {
+	if ok := rootCAs.AppendCertsFromPEM(caPEM); !ok {
 		logging.Fatalf("No CA certs appended")
 	}
 
@@ -49,7 +52,7 @@ func CreateEmp3r0rHTTPClient(c2_addr, proxyServer string) *http.Client {
 	}
 
 	// fingerprint of CA
-	ca_crt, _ := ParsePem(CACrtPEM)
+	ca_crt, _ := ParsePem(caPEM)
 	logging.Infof("CA cert fingerprint: %s, now making proxy dialer", sha256SumRaw(ca_crt.Raw))
 
 	// set proxyURL to nil to use direct connection for C2 transport
@@ -124,7 +127,8 @@ func CreatePreflightHTTPClient(c2Addr string) *http.Client {
 	}
 
 	// Create a cert pool with only C2's CA cert
-	rootCAs, err := ExtractCABundle(CACrtPEM)
+	caPEM := GetCACrtPEM()
+	rootCAs, err := ExtractCABundle(caPEM)
 	if err != nil {
 		logging.Infof("ExtractCABundle: %v", err)
 		return nil

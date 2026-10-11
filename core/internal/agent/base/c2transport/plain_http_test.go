@@ -90,7 +90,7 @@ func runCheckinACK(t *testing.T, mode string, quicStandardKey bool) {
 	if err != nil {
 		t.Fatalf("Failed to read CA cert: %v", err)
 	}
-	transport.CACrtPEM = caCertData
+	transport.SetCACrtPEM(caCertData)
 	transport.CaCrtFile = caCertFile
 	transport.CaKeyFile = caKeyFile
 	transport.ServerCrtFile = serverCertFile
@@ -140,8 +140,18 @@ func runCheckinACK(t *testing.T, mode string, quicStandardKey bool) {
 	// goroutine from an earlier test still Load/Range-ing the old instance.
 	live.ClearAgents()
 
-	go server.StartC2AgentTLSServer()
+	serverDone := make(chan error, 1)
+	go func() { serverDone <- server.StartC2AgentTLSServer() }()
 	server.MarkOperatorOnline("test-operator")
+	defer func() {
+		network.StopEmpServers()
+		// Join the server goroutine. Without this a later test can race with
+		// its read of live.RuntimeConfig (and CACrtPEM) while shutting down.
+		select {
+		case <-serverDone:
+		case <-time.After(5 * time.Second):
+		}
+	}()
 	switch mode {
 	case def.C2ChannelModePlainHTTP:
 		go server.StartC2HTTPServer()

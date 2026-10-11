@@ -112,7 +112,7 @@ func TestFullAgentLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to read CA cert: %v", err)
 	}
-	transport.CACrtPEM = caCertData
+	transport.SetCACrtPEM(caCertData)
 
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile
@@ -459,7 +459,7 @@ func TestCheckinWithRandomPaths(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to read CA cert: %v", err)
 	}
-	transport.CACrtPEM = caCertData
+	transport.SetCACrtPEM(caCertData)
 
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile
@@ -610,7 +610,7 @@ func TestDynamicPrefix(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to read CA cert: %v", err)
 	}
-	transport.CACrtPEM = caCertData
+	transport.SetCACrtPEM(caCertData)
 
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile
@@ -749,7 +749,7 @@ func TestCheckinWithRandomPaths_Strict(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to read CA cert: %v", err)
 	}
-	transport.CACrtPEM = caCertData
+	transport.SetCACrtPEM(caCertData)
 
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile

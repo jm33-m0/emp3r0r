@@ -118,7 +118,7 @@ func TestEstablishC2Connection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to read CA cert: %v", err)
 	}
-	transport.CACrtPEM = caCertData
+	transport.SetCACrtPEM(caCertData)
 
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile
@@ -350,7 +350,7 @@ func TestDuplicatedCheckin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to read CA cert: %v", err)
 	}
-	transport.CACrtPEM = caCertData
+	transport.SetCACrtPEM(caCertData)
 
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile
@@ -526,7 +526,7 @@ func TestBackslashTag(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to read CA cert: %v", err)
 	}
-	transport.CACrtPEM = caCertData
+	transport.SetCACrtPEM(caCertData)
 
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile
@@ -653,7 +653,7 @@ func TestEmptyUUID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to read CA cert: %v", err)
 	}
-	transport.CACrtPEM = caCertData
+	transport.SetCACrtPEM(caCertData)
 
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile
@@ -780,7 +780,7 @@ func TestNewAgentCheckin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to read CA cert: %v", err)
 	}
-	transport.CACrtPEM = caCertData
+	transport.SetCACrtPEM(caCertData)
 
 	// Setup Transport Paths for C2 Server
 	transport.CaCrtFile = caCertFile

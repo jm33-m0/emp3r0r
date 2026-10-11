@@ -390,11 +390,12 @@ func quicConfig() *quic.Config {
 // host. It mirrors the HTTP transport: trust the embedded C2 CA, optionally
 // present a cover SNI while still verifying against the real C2 host.
 func QUICTLSConfig(c2Host string) (*tls.Config, error) {
-	rootCAs, err := ExtractCABundle(CACrtPEM)
+	caPEM := GetCACrtPEM()
+	rootCAs, err := ExtractCABundle(caPEM)
 	if err != nil {
 		return nil, fmt.Errorf("extract CA bundle: %w", err)
 	}
-	if ok := rootCAs.AppendCertsFromPEM(CACrtPEM); !ok {
+	if ok := rootCAs.AppendCertsFromPEM(caPEM); !ok {
 		return nil, errors.New("no CA certs appended")
 	}
 	sni, verifyName := c2ServerNames(c2Host)

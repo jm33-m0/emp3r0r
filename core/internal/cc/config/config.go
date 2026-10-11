@@ -142,7 +142,7 @@ func InitConfigFile(cc_host string) (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to load CA: %v", err)
 	}
-	live.RuntimeConfig.CAPEM = string(transport.CACrtPEM)
+	live.RuntimeConfig.CAPEM = string(transport.GetCACrtPEM())
 	live.RuntimeConfig.CAFingerprint = transport.GetFingerprint(transport.CaCrtFile)
 	// sign
 	sig, err := transport.SignWithCAKey([]byte(live.RuntimeConfig.AgentUUID))
@@ -183,7 +183,7 @@ func LoadCACrt2RuntimeConfig() error {
 	if err != nil {
 		return err
 	}
-	live.RuntimeConfig.CAPEM = string(transport.CACrtPEM)
+	live.RuntimeConfig.CAPEM = string(transport.GetCACrtPEM())
 	live.RuntimeConfig.CAFingerprint = transport.GetFingerprint(transport.CaCrtFile)
 	return nil
 }
