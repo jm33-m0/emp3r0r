@@ -175,19 +175,7 @@ Every unused subsystem is another dependency and another string for a defender t
 
 - `--agent-tags 'with_quic with_utls'` compiles in exactly those features; `--list-agent-tags` prints the full reference. The default full build enables every feature; `--agent-slim` builds the minimal agent (plain HTTP polling with `crypto/tls`, no optional subsystems).
 - C2 server binaries always keep the full feature set, so one C2 serves every agent flavour.
-- Pick tags by scenario:
-
-  | Scenario                            | `--agent-tags`                                                                                               |
-  | ----------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-  | Smallest footprint / fewest strings | `--agent-slim` (no tags)                                                                                     |
-  | Randomized TLS fingerprint (uTLS)   | `with_utls`                                                                                                  |
-  | HTTP/2 streaming transport          | `with_h2conn`                                                                                                |
-  | QUIC transport, custom static key   | `with_quic`                                                                                                  |
-  | ECH behind an ECH-capable CDN       | `with_doh with_ech with_utls`                                                                                |
-  | P2P mesh (relay + gossip)           | `with_mesh with_kcp`                                                                                         |
-  | Everything                          | `with_mesh with_kcp with_h2conn with_quic with_utls with_doh with_ech with_cdnproxy with_netlink with_uring` |
-
-> CDN fronting needs no extra build tag. Every CDN fronts plain HTTP(S), so point `--cc` at the CDN hostname and use the default `http_poll` transport (or `with_h2conn` for HTTP/2). `with_cdnproxy` only compiles the separate WebSocket `--cdn` tunnel and is unnecessary when the CDN already terminates HTTPS.
+- Pick tags by scenario.
 
 **Why this matters:** a smaller implant has a shorter string table and fewer third-party dependencies for EDR and AV to key on, while still speaking the full C2 protocol.
 
