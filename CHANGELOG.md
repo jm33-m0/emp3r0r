@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.2.2](https://github.com/jm33-m0/emp3r0r/compare/v5.2.1...v5.2.2) (2026-10-11)
+
+
+### Bug Fixes
+
+* **operator:** previous fix didn't work, removing `cleanupConfig` ([6345733](https://github.com/jm33-m0/emp3r0r/commit/6345733e18bd3db732ad85625bccc3561f5b2323))
+
 ## [5.2.1](https://github.com/jm33-m0/emp3r0r/compare/v5.2.0...v5.2.1) (2026-10-11)
 
 
