@@ -350,10 +350,10 @@ func wg(wg_port int, operatorNames, addOperators []string, operatorsSet bool) {
 	// Generate and display client connection commands
 	generateConnectionCommands(wg_port, server_pubkey, operators)
 
-	logging.Warningf("WireGuard gives every operator IP-level access to the C2's tunnel subnet.")
-	logging.Warningf("Firewall the WireGuard UDP port (%d) so only intended operators can"+
-		" reach the operator service, and never expose the WG subnet to an untrusted network.",
-		wg_port)
+	// The WireGuard subnet exposes local services to every peer; warn operators
+	// to firewall the ones they do not want reachable.
+	logging.Warningf("Your local services are reachable by all operators and the server over the WireGuard " +
+		"subnet. Firewall the ones you do not want exposed.")
 }
 
 // operatorConfigFileNames lists the files copied into the operator config

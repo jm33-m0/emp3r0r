@@ -57,10 +57,9 @@ emp3r0r server --c2-hosts 1.2.3.4 --add-operator dave erin
 Names must be unique and free of control characters; they are used in the
 console and the audit log.
 
-> **Firewall warning.** WireGuard gives every provisioned operator IP-level
-> access to the C2's tunnel subnet. Firewall the WireGuard UDP port so only your
-> operators can reach it, and never expose the WG subnet to an untrusted
-> network. The server prints this warning on startup.
+> **WireGuard subnet warning.** Your local services are reachable by all
+> operators and the server over the WireGuard subnet; firewall the ones you do
+> not want exposed. The server prints this warning on startup.
 
 #### Multiple operators
 
