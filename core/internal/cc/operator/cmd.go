@@ -19,6 +19,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/reeflective/console"
 	"github.com/reeflective/console/commands/readline"
 	"github.com/spf13/cobra"
@@ -495,7 +496,7 @@ func socks5StartCmdRun(cmd *cobra.Command, args []string) {
 // server IP the operator connected through (set from --server-wg-ip), so proxy
 // traffic stays inside the WireGuard tunnel.
 func socks5ProxyHost() string {
-	if ServerIP == "" || ServerIP == "127.0.0.1" || ServerIP == "localhost" {
+	if netutil.IsLocalHost(ServerIP) {
 		return "127.0.0.1"
 	}
 	return wireguard.WgServerIP

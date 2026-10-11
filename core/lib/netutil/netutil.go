@@ -53,6 +53,35 @@ func ValidateIP(ip string) bool {
 	return net.ParseIP(ip) != nil
 }
 
+// IsLocalHost reports whether host refers to this machine. It recognises the
+// loopback names and any IP currently assigned to a local interface, so a
+// caller can tell a same-host peer from a remote one without a round trip.
+// It is the single definition of "local" used by the operator (config fetch,
+// SOCKS5 routing) and the Windows SMB pipe transport.
+func IsLocalHost(host string) bool {
+	host = strings.TrimSpace(host)
+	if host == "" || host == "." || strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(strings.Trim(host, "[]"))
+	if ip == nil {
+		return false
+	}
+	if ip.IsLoopback() {
+		return true
+	}
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return false
+	}
+	for _, a := range addrs {
+		if ipn, ok := a.(*net.IPNet); ok && ipn.IP.Equal(ip) {
+			return true
+		}
+	}
+	return false
+}
+
 // ValidateHostName is this domain legit?
 func ValidateHostName(name string) bool {
 	// if it's an IP

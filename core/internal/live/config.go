@@ -11,6 +11,7 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -128,6 +129,20 @@ func DownloadExtractConfig(url string, downloader func(string, string) error) (e
 		}
 	}()
 	return util.Unarchive(configTarPath, EmpWorkSpace)
+}
+
+// DownloadExtractOperatorConfig fetches the C2's operator config bundle, unless
+// the C2 runs on this same host. A local operator shares the C2's EmpWorkSpace
+// (both read ~/.emp3r0r), so running cleanupConfig there would delete the C2's
+// *.pem private keys (ca-key.pem, server-key.pem) and wg_config.json, while the
+// bundle only restores the public files -- permanently breaking the C2. In local
+// mode the existing files are already the C2's current ones and are reused as-is.
+func DownloadExtractOperatorConfig(c2Host, url string, downloader func(string, string) error) error {
+	if netutil.IsLocalHost(c2Host) {
+		logging.Infof("Local C2 on %s: reusing %s without touching it", c2Host, EmpWorkSpace)
+		return nil
+	}
+	return DownloadExtractConfig(url, downloader)
 }
 
 func SetupFilePaths() (err error) {

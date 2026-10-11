@@ -16,11 +16,11 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"golang.org/x/sys/windows"
 )
 
@@ -290,25 +290,5 @@ func smbDialPipe(host string, port int, password, salt string) (net.Conn, error)
 // isSMBLocalHost reports whether addr refers to this machine, in which case the
 // local pipe namespace (\\.\pipe\) should be used instead of the SMB redirector.
 func isSMBLocalHost(host string) bool {
-	host = strings.TrimSpace(host)
-	if host == "" || host == "." || strings.EqualFold(host, "localhost") {
-		return true
-	}
-	ip := net.ParseIP(strings.Trim(host, "[]"))
-	if ip == nil {
-		return false
-	}
-	if ip.IsLoopback() {
-		return true
-	}
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		return false
-	}
-	for _, a := range addrs {
-		if ipn, ok := a.(*net.IPNet); ok && ipn.IP.Equal(ip) {
-			return true
-		}
-	}
-	return false
+	return netutil.IsLocalHost(host)
 }

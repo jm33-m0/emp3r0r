@@ -26,6 +26,32 @@ func TestValidateIP(t *testing.T) {
 	}
 }
 
+func TestIsLocalHost(t *testing.T) {
+	tests := []struct {
+		host  string
+		local bool
+	}{
+		{"", true},
+		{".", true},
+		{"localhost", true},
+		{"LOCALHOST", true},
+		{"127.0.0.1", true},
+		{"127.1.2.3", true},
+		{"::1", true},
+		{"[::1]", true},
+		{" 127.0.0.1 ", true},
+		{"192.0.2.1", false},
+		{"host.example.com", false},
+		{"not-an-ip", false},
+	}
+
+	for _, tt := range tests {
+		if got := IsLocalHost(tt.host); got != tt.local {
+			t.Errorf("IsLocalHost(%q) = %v, want %v", tt.host, got, tt.local)
+		}
+	}
+}
+
 func TestValidateHostName(t *testing.T) {
 	tests := []struct {
 		host  string

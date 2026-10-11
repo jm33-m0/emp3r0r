@@ -210,10 +210,12 @@ func runClientMode(opts *Options) {
 		logging.Infof("Local connection mode - skipping WireGuard setup")
 	}
 
-	// download and extract config files
+	// Download and extract the operator config bundle. A local C2 shares this
+	// workspace, so live.DownloadExtractOperatorConfig reuses the files in
+	// place instead of running cleanupConfig on the C2's private keys.
 	url := fmt.Sprintf("http://%s:%d/%s", wireguard.WgServerIP, wireguard.WgFileServerPort, "emp3r0r_operator_config.tar.gz")
 	downloadClient := &http.Client{Transport: &http.Transport{DialContext: wireguard.DialContext}}
-	err = live.DownloadExtractConfig(url, func(u, p string) error {
+	err = live.DownloadExtractOperatorConfig(opts.c2_server_ip, url, func(u, p string) error {
 		return ftp.DownloadFile(downloadClient, u, p)
 	})
 	if err != nil {
