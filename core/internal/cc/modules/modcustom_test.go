@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/paths"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -1197,9 +1198,9 @@ func TestReadModConfigModuleFilesMemFS(t *testing.T) {
 }
 
 func TestHostModuleFile(t *testing.T) {
-	origWWWRoot := live.WWWRoot
-	live.WWWRoot = t.TempDir()
-	defer func() { live.WWWRoot = origWWWRoot }()
+	origWWWRoot := paths.WWWRoot
+	paths.WWWRoot = t.TempDir()
+	defer func() { paths.WWWRoot = origWWWRoot }()
 
 	// Companion file content that must survive the gzip round-trip.
 	content := []byte("multi-file companion data\n")
@@ -1223,7 +1224,7 @@ func TestHostModuleFile(t *testing.T) {
 		t.Fatalf("unexpected hosted name: %q", companion.Name)
 	}
 
-	hostedPath := filepath.Join(live.WWWRoot, companion.Name)
+	hostedPath := filepath.Join(paths.WWWRoot, companion.Name)
 	compressed, err := os.ReadFile(hostedPath)
 	if err != nil {
 		t.Fatalf("hosted file missing: %v", err)
@@ -1294,9 +1295,9 @@ func TestPayloadArchHelpers(t *testing.T) {
 }
 
 func TestEnsureModuleDependencyHosted(t *testing.T) {
-	origWWWRoot := live.WWWRoot
-	live.WWWRoot = t.TempDir()
-	defer func() { live.WWWRoot = origWWWRoot }()
+	origWWWRoot := paths.WWWRoot
+	paths.WWWRoot = t.TempDir()
+	defer func() { paths.WWWRoot = origWWWRoot }()
 
 	// Fake coffloader module with per-arch payloads, as shipped in
 	// core/modules/coffloader.
@@ -1325,7 +1326,7 @@ func TestEnsureModuleDependencyHosted(t *testing.T) {
 	if err := ensureModuleDependencyHosted(ctx, "coffloader"); err != nil {
 		t.Fatalf("ensureModuleDependencyHosted 386: %v", err)
 	}
-	hostedPath := filepath.Join(live.WWWRoot, "coffloader.386.gz")
+	hostedPath := filepath.Join(paths.WWWRoot, "coffloader.386.gz")
 	compressed, err := os.ReadFile(hostedPath)
 	if err != nil {
 		t.Fatalf("coffloader.386.gz missing: %v", err)
@@ -1348,7 +1349,7 @@ func TestEnsureModuleDependencyHosted(t *testing.T) {
 	if err := ensureModuleDependencyHosted(amd64Ctx, "coffloader"); err != nil {
 		t.Fatalf("ensureModuleDependencyHosted amd64: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(live.WWWRoot, "coffloader.amd64.gz")); err != nil {
+	if _, err := os.Stat(filepath.Join(paths.WWWRoot, "coffloader.amd64.gz")); err != nil {
 		t.Fatalf("coffloader.amd64.gz missing: %v", err)
 	}
 
@@ -1370,7 +1371,7 @@ func TestEnsureModuleDependencyHosted(t *testing.T) {
 	if err := ensureModuleDependencyHosted(amd64Ctx, "generic_dep"); err != nil {
 		t.Fatalf("ensureModuleDependencyHosted non-DLL dep: %v", err)
 	}
-	genericCompressed, err := os.ReadFile(filepath.Join(live.WWWRoot, "generic_dep.amd64.gz"))
+	genericCompressed, err := os.ReadFile(filepath.Join(paths.WWWRoot, "generic_dep.amd64.gz"))
 	if err != nil {
 		t.Fatalf("generic_dep.amd64.gz missing: %v", err)
 	}

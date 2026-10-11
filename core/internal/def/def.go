@@ -37,15 +37,9 @@ var (
 const Version = "5.2.2"
 
 // BuildVersion is the version a running binary reports: the release version
-// plus the build timestamp, injected at build time with -ldflags -X. A plain
-// `go build` leaves it at the default, so fall back to the release version.
-var BuildVersion = "unknown"
-
-func init() {
-	if BuildVersion == "unknown" || BuildVersion == "" {
-		BuildVersion = Version
-	}
-}
+// plus the build timestamp, injected at build time with -ldflags -X. The zero
+// value means "not injected"; non-release builds fill it from Version.
+var BuildVersion string
 
 const (
 	// Unknown

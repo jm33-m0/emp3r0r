@@ -12,6 +12,7 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/paths"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
@@ -52,8 +53,8 @@ func prepareC2ServerPrerequisites() {
 		}
 	}
 
-	if _, err := os.Stat(live.Temp + transport.WWW); os.IsNotExist(err) {
-		if err = os.MkdirAll(live.Temp+transport.WWW, 0o700); err != nil {
+	if _, err := os.Stat(paths.WWWRoot); os.IsNotExist(err) {
+		if err = os.MkdirAll(paths.WWWRoot, 0o700); err != nil {
 			logging.Fatalf("StartC2AgentTLSServer: %v", err)
 		}
 	}

@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/paths"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
-	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -33,7 +33,7 @@ func serveWWWRelay(streamID string) {
 		return
 	}
 	name := filepath.Base(localized)
-	path := filepath.Join(live.WWWRoot, name)
+	path := filepath.Join(paths.WWWRoot, name)
 
 	f, err := os.Open(path)
 	if err != nil {

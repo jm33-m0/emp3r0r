@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/paths"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -162,19 +163,19 @@ func TestBuildModuleReturnsFailure(t *testing.T) {
 // TestEnsureModuleDependencyHostedSurfacesBuildFailure pins that a dependency
 // whose build fails is reported as a build failure, not as a missing payload.
 func TestEnsureModuleDependencyHostedSurfacesBuildFailure(t *testing.T) {
-	origWWWRoot := live.WWWRoot
+	origWWWRoot := paths.WWWRoot
 	origWorkspace := live.EmpWorkSpace
 	origWD, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("getwd: %v", err)
 	}
-	live.WWWRoot = t.TempDir()
+	paths.WWWRoot = t.TempDir()
 	// build_module chdirs back to live.EmpWorkSpace; point it at the real cwd
 	// so the process working directory is not left inside a deleted temp dir.
 	live.EmpWorkSpace = origWD
 	defer func() {
 		_ = os.Chdir(origWD)
-		live.WWWRoot = origWWWRoot
+		paths.WWWRoot = origWWWRoot
 		live.EmpWorkSpace = origWorkspace
 	}()
 

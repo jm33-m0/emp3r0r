@@ -28,12 +28,6 @@ var (
 	// snapshot: replace it, never mutate it in place.
 	activeAgent atomic.Pointer[def.Emp3r0rAgent]
 
-	// WWWRoot host static files for agent
-	WWWRoot = Temp + "www/"
-
-	// UtilsArchive host utils.tar.gz for agent
-	UtilsArchive = WWWRoot + "utils.tar.gz"
-
 	// Save the configuration of the current session
 	RuntimeConfig = &def.Config{}
 	// TmuxPersistence enable debug (-debug)
@@ -58,11 +52,6 @@ var (
 
 	// emp3r0r-cat
 	CAT = ""
-)
-
-const (
-	// Temp where we save temp files
-	Temp = "/tmp/emp3r0r/"
 )
 
 func DownloadExtractConfig(url string, downloader func(string, string) error) (err error) {

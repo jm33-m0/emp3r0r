@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/paths"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
@@ -80,10 +81,10 @@ func PutFile(lpath, rpath string, a *def.Emp3r0rAgent) error {
 	)
 
 	// move file to wwwroot, then move it back when we are done with it
-	logging.Infof("Copying %s to %s", lpath, live.WWWRoot+util.FileBaseName(lpath))
-	err := util.Copy(lpath, live.WWWRoot+util.FileBaseName(lpath))
+	logging.Infof("Copying %s to %s", lpath, paths.WWWRoot+util.FileBaseName(lpath))
+	err := util.Copy(lpath, paths.WWWRoot+util.FileBaseName(lpath))
 	if err != nil {
-		return fmt.Errorf("copy %s to %s: %v", lpath, live.WWWRoot+util.FileBaseName(lpath), err)
+		return fmt.Errorf("copy %s to %s: %v", lpath, paths.WWWRoot+util.FileBaseName(lpath), err)
 	}
 
 	// send cmd

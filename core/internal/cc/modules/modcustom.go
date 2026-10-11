@@ -12,6 +12,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/uuid"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/paths"
 	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -209,7 +210,7 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 	}
 	invB64 := base64.StdEncoding.EncodeToString(invBytes)
 
-	hosted_file := filepath.Join(live.WWWRoot, hostedName+".gz")
+	hosted_file := filepath.Join(paths.WWWRoot, hostedName+".gz")
 	logging.Infof("Compressing %s with gzip...", hostedName)
 
 	path := filepath.Join(config.Path, payloadFile)
@@ -260,7 +261,7 @@ func hostModuleFile(moduleName, fileName, path string) (def.ResolvedModuleFile, 
 	// Unique per module so the agent's memfs cache key (derived from the
 	// basename) cannot collide across modules.
 	hostedBase := fmt.Sprintf("%s.%s.gz", strings.ToLower(moduleName), base)
-	hostedPath := filepath.Join(live.WWWRoot, hostedBase)
+	hostedPath := filepath.Join(paths.WWWRoot, hostedBase)
 	if err := os.WriteFile(hostedPath, compressed, 0o600); err != nil {
 		return def.ResolvedModuleFile{}, fmt.Errorf("writing %s: %w", hostedPath, err)
 	}
@@ -302,12 +303,12 @@ func hostDLLModules() {
 // hosted path. The module is not required to be a DLL module; any module with
 // payload files can be hosted this way.
 func hostModulePayload(config *def.ModuleConfig, file, arch string) (string, error) {
-	hosted := filepath.Join(live.WWWRoot, fmt.Sprintf("%s.%s.gz", strings.ToLower(config.Name), arch))
+	hosted := filepath.Join(paths.WWWRoot, fmt.Sprintf("%s.%s.gz", strings.ToLower(config.Name), arch))
 	if util.IsFileExist(hosted) {
 		return hosted, nil
 	}
-	if err := os.MkdirAll(live.WWWRoot, 0o700); err != nil {
-		return "", fmt.Errorf("create %s: %w", live.WWWRoot, err)
+	if err := os.MkdirAll(paths.WWWRoot, 0o700); err != nil {
+		return "", fmt.Errorf("create %s: %w", paths.WWWRoot, err)
 	}
 	path := filepath.Join(config.Path, file)
 	data, err := os.ReadFile(path)
@@ -345,7 +346,7 @@ func ensureModuleDependencyHosted(ctx *c2context.C2Context, depName string) erro
 		return fmt.Errorf("cannot determine target arch (GOArch=%q Arch=%q)", ctx.Target.GOArch, ctx.Target.Arch)
 	}
 	depName = strings.ToLower(depName)
-	hosted := filepath.Join(live.WWWRoot, fmt.Sprintf("%s.%s.gz", depName, arch))
+	hosted := filepath.Join(paths.WWWRoot, fmt.Sprintf("%s.%s.gz", depName, arch))
 	if util.IsFileExist(hosted) {
 		return nil
 	}
@@ -446,8 +447,8 @@ func selectArchPayload(files []string, arch string) string {
 // scan custom modules in ModuleDir,
 // and update ModuleHelpers, ModuleDocs
 func InitModules() {
-	if !util.IsExist(live.WWWRoot) {
-		os.MkdirAll(live.WWWRoot, 0o700)
+	if !util.IsExist(paths.WWWRoot) {
+		os.MkdirAll(paths.WWWRoot, 0o700)
 	}
 
 	// build the module registries from the same scan, so every loaded config

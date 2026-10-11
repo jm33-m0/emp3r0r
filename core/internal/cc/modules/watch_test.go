@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/paths"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 )
@@ -62,14 +63,14 @@ func setTestModuleDirs(t *testing.T, searchDir, workspace string) func() {
 	t.Helper()
 	origDirs := live.ModuleDirs
 	origWS := live.EmpWorkSpace
-	origWWW := live.WWWRoot
+	origWWW := paths.WWWRoot
 	live.ModuleDirs = []string{searchDir}
 	live.EmpWorkSpace = workspace
-	live.WWWRoot = filepath.Join(workspace, "www")
+	paths.WWWRoot = filepath.Join(workspace, "www")
 	return func() {
 		live.ModuleDirs = origDirs
 		live.EmpWorkSpace = origWS
-		live.WWWRoot = origWWW
+		paths.WWWRoot = origWWW
 	}
 }
 
@@ -350,14 +351,14 @@ func TestModuleWatchIntegrationRepoModules(t *testing.T) {
 	ws := t.TempDir()
 	origDirs := live.ModuleDirs
 	origWS := live.EmpWorkSpace
-	origWWW := live.WWWRoot
+	origWWW := paths.WWWRoot
 	live.ModuleDirs = []string{modulesRoot}
 	live.EmpWorkSpace = ws
-	live.WWWRoot = filepath.Join(ws, "www")
+	paths.WWWRoot = filepath.Join(ws, "www")
 	defer func() {
 		live.ModuleDirs = origDirs
 		live.EmpWorkSpace = origWS
-		live.WWWRoot = origWWW
+		paths.WWWRoot = origWWW
 	}()
 
 	// snapshot and clear the registry so the count below only reflects our

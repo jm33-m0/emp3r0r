@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/live"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/paths"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 )
 
@@ -17,7 +17,7 @@ func TestServeWWWRelay_ChecksumParsing(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	live.WWWRoot = tmpDir + "/"
+	paths.WWWRoot = tmpDir + "/"
 
 	fileName := "test_module.xz"
 	filePath := filepath.Join(tmpDir, fileName)

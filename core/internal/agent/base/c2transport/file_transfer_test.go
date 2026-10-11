@@ -24,6 +24,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/ftp"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/paths"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/server"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -454,7 +455,7 @@ func setupE2EFileTransfer(t *testing.T) *e2eFileTransferHarness {
 	origLiveRuntime := live.RuntimeConfig
 	origEmpWorkSpace := live.EmpWorkSpace
 	origFileGetDir := live.FileGetDir
-	origWWWRoot := live.WWWRoot
+	origWWWRoot := paths.WWWRoot
 	origCCAddr := def.CCAddress
 	origHTTPClient := def.HTTPClient
 	origCommonRuntime := common.RuntimeConfig
@@ -471,7 +472,7 @@ func setupE2EFileTransfer(t *testing.T) *e2eFileTransferHarness {
 		live.RuntimeConfig = origLiveRuntime
 		live.EmpWorkSpace = origEmpWorkSpace
 		live.FileGetDir = origFileGetDir
-		live.WWWRoot = origWWWRoot
+		paths.WWWRoot = origWWWRoot
 		def.CCAddress = origCCAddr
 		def.HTTPClient = origHTTPClient
 		common.RuntimeConfig = origCommonRuntime
@@ -491,11 +492,11 @@ func setupE2EFileTransfer(t *testing.T) *e2eFileTransferHarness {
 	// WWW relay.
 	live.EmpWorkSpace = tmpDir
 	live.FileGetDir = filepath.Join(tmpDir, "file-get") + string(os.PathSeparator)
-	live.WWWRoot = filepath.Join(tmpDir, "www") + string(os.PathSeparator)
+	paths.WWWRoot = filepath.Join(tmpDir, "www") + string(os.PathSeparator)
 	if err := os.MkdirAll(live.FileGetDir, 0o700); err != nil {
 		t.Fatalf("mkdir FileGetDir: %v", err)
 	}
-	if err := os.MkdirAll(live.WWWRoot, 0o700); err != nil {
+	if err := os.MkdirAll(paths.WWWRoot, 0o700); err != nil {
 		t.Fatalf("mkdir WWWRoot: %v", err)
 	}
 
@@ -700,7 +701,7 @@ func TestFileTransfer_OperatorSendsToAgent(t *testing.T) {
 	content := bytes.Repeat([]byte("operator-sends-to-agent-e2e-"), 2048) // ~53KB
 	checksum := crypto.SHA256SumRaw(content)
 	fileName := "operator_payload.bin"
-	if err := os.WriteFile(filepath.Join(live.WWWRoot, fileName), content, 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(paths.WWWRoot, fileName), content, 0o600); err != nil {
 		t.Fatalf("write hosted file: %v", err)
 	}
 
@@ -724,7 +725,7 @@ func TestFileTransfer_OperatorSendsToAgent(t *testing.T) {
 				continue
 			}
 			streamID := strings.TrimPrefix(msg.Tag, def.TagWWWRelayRequestPrefix)
-			path := filepath.Join(live.WWWRoot, filepath.Base(streamID))
+			path := filepath.Join(paths.WWWRoot, filepath.Base(streamID))
 			data, err := os.ReadFile(path)
 			if err != nil {
 				opErr <- fmt.Errorf("read hosted file: %v", err)
