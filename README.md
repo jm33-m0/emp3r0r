@@ -150,7 +150,7 @@ Once you're on a Windows host, emp3r0r lets you _become_ the users on it — wit
 
 Pivot without burning another implant: the C2 runs a SOCKS5 proxy that relays through the agent you select, and the operator side can go one step further with a transparent TUN device.
 
-- `socks_start 1080` runs a SOCKS5 endpoint on the C2's **WireGuard address** that tunnels through the chosen agent; reach it from inside the tunnel, or let `tun2socks` dial it for you.
+- `socks_start 1080` runs a SOCKS5 endpoint on the C2's WireGuard address that tunnels through the chosen agent; reach it from inside the tunnel, or let `tun2socks` dial it for you.
 - `tun2socks start --route 10.10.0.0/24` creates a TUN device that routes only the subnets you name through that proxy — everything else keeps using your normal connection.
 - The result looks like it originates from the agent, with no per-tool proxy configuration.
 
@@ -171,7 +171,7 @@ Pivot without burning another implant: the C2 runs a SOCKS5 proxy that relays th
 
 ### 🪶 Modular Agents — Opt In To What You Need
 
-Every unused subsystem is another dependency and another string for a defender to find. Optional agent subsystems are **opt-in** with `with_*` build tags, so a payload carries only what the mission needs.
+Every unused subsystem is another dependency and another string for a defender to find. Optional agent subsystems are opt-in with `with_*` build tags, so a payload carries only what the mission needs.
 
 - `--agent-tags 'with_quic with_utls'` compiles in exactly those features; `--list-agent-tags` prints the full reference. The default full build enables every feature; `--agent-slim` builds the minimal agent (plain HTTP polling with `crypto/tls`, no optional subsystems).
 - C2 server binaries always keep the full feature set, so one C2 serves every agent flavour.
@@ -204,7 +204,7 @@ Every unused subsystem is another dependency and another string for a defender t
 
 ## Quick Start
 
-See **[OPERATOR.md](./OPERATOR.md)** for the full deployment and operator guide:
+See [OPERATOR.md](./OPERATOR.md) for the full deployment and operator guide:
 C2 server installation, operator setup (native Linux or the recommended Windows
 container), container capabilities, tmux keybindings and agent payload
 generation.
