@@ -105,7 +105,7 @@ REQUIRED_FREE_KB = 10 * 1024 * 1024  # 10 GB
 # back to crypto/tls. Use the additional ``no_mesh`` tag to opt out of P2P
 # entirely. The tag names must stay in sync with the //go:build constraints
 # across core/.
-SLIM_AGENT_TAGS = "no_kcp no_h2conn no_doh no_cdnproxy no_netlink"
+SLIM_AGENT_TAGS = "no_kcp no_h2conn no_quic no_doh no_cdnproxy no_netlink"
 
 # What each exclusion tag disables, shown in --help and --list-agent-tags.
 # Keep in sync with core/ build constraints and with install.py.
@@ -113,6 +113,7 @@ AGENT_TAG_DOCS: dict[str, str] = {
     "no_mesh": "P2P mesh and memberlist gossip (peer discovery/routing)",
     "no_kcp": "KCP C2 transport and the xtaci kcp-go/kcptun/smux stack",
     "no_h2conn": "HTTP/2 duplex (h2conn) C2 channel",
+    "no_quic": "QUIC C2 transport and the quic-go stack",
     "no_utls": "uTLS TLS fingerprinting (falls back to crypto/tls)",
     "no_doh": "DNS-over-HTTPS resolver (uses the OS resolver)",
     "no_ech": "ECH (Encrypted Client Hello) for C2 TLS; requires DoH",
@@ -1187,6 +1188,7 @@ def build(
 
     ldflags = (
         f"-v -X 'github.com/jm33-m0/emp3r0r/core/internal/def.MagicString={magic_str}' "
+        f"-X 'github.com/jm33-m0/emp3r0r/core/internal/def.QUICKey={magic_str}' "
         f"-X 'github.com/jm33-m0/emp3r0r/core/internal/def.Version={version}'"
     )
 
@@ -1907,6 +1909,7 @@ def build_single_payload(args: argparse.Namespace) -> None:
     version = get_version(core_dir)
     ldflags = (
         f"-v -X 'github.com/jm33-m0/emp3r0r/core/internal/def.MagicString={magic_str}' "
+        f"-X 'github.com/jm33-m0/emp3r0r/core/internal/def.QUICKey={magic_str}' "
         f"-X 'github.com/jm33-m0/emp3r0r/core/internal/def.Version={version}'"
     )
     gobuild_cmd, build_opt, ldflags = resolve_gobuild(

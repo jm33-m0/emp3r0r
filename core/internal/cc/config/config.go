@@ -65,6 +65,7 @@ func SaveConfigJSON() (err error) {
 		CamouflageCertOrg:      live.RuntimeConfig.CamouflageCertOrg,
 		CamouflageCertCN:       live.RuntimeConfig.CamouflageCertCN,
 		C2ChannelMode:          live.RuntimeConfig.C2ChannelMode,
+		QUICStandardKey:        live.RuntimeConfig.QUICStandardKey,
 		CCHTTPPort:             live.RuntimeConfig.CCHTTPPort,
 		C2Routes: jsonC2Routing{
 			Checkin: live.RuntimeConfig.C2Routes.Checkin,

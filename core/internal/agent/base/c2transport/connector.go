@@ -100,10 +100,6 @@ func isBootstrapRoute(caps []string) bool {
 }
 
 func establishChannelStream(ctx context.Context, url string, channelWrapper transport.C2ChannelWrapper) (io.ReadWriteCloser, error) {
-	if def.HTTPClient == nil {
-		return nil, fmt.Errorf("http client is not initialized")
-	}
-
 	type connectResult struct {
 		stream io.ReadWriteCloser
 		resp   *http.Response

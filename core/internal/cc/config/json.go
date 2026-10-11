@@ -76,6 +76,7 @@ type jsonConfig struct {
 	CamouflageCertCN       string                  `json:"camouflage_cert_cn"`
 	C2Routes               jsonC2Routing           `json:"c2_routes"`
 	C2ChannelMode          string                  `json:"c2_channel_mode"`
+	QUICStandardKey        bool                    `json:"quic_standard_key"`
 	CCHTTPPort             string                  `json:"cc_http_port"`
 	MalleableC2            jsonMalleableHTTPConfig `json:"malleable_c2"`
 	SNI                    string                  `json:"sni"`
@@ -161,6 +162,12 @@ func readJSONConfig(jsonData []byte, cfg *def.Config) error {
 	applyIfSet(&cfg.CamouflageCertCN, jCfg.CamouflageCertCN)
 	applyIfSet(&cfg.C2ChannelMode, jCfg.C2ChannelMode)
 	applyIfSet(&cfg.CCHTTPPort, jCfg.CCHTTPPort)
+
+	// Bool policy: presence, not value, because an explicit false must be able
+	// to turn obfuscation back off after it was once enabled.
+	if _, ok := present["quic_standard_key"]; ok {
+		cfg.QUICStandardKey = jCfg.QUICStandardKey
+	}
 
 	applyIfSet(&cfg.C2Routes.Checkin, jCfg.C2Routes.Checkin)
 	applyIfSet(&cfg.C2Routes.Msg, jCfg.C2Routes.Msg)

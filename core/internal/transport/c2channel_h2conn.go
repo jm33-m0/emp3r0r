@@ -4,6 +4,7 @@ package transport
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 
@@ -13,6 +14,9 @@ import (
 type h2ConnChannelWrapper struct{}
 
 func (h2ConnChannelWrapper) Dial(ctx context.Context, client *http.Client, url string) (io.ReadWriteCloser, *http.Response, error) {
+	if client == nil {
+		return nil, nil, errors.New("h2conn: http client is not initialized")
+	}
 	connector := h2conn.Client{Client: client, Method: http.MethodPost}
 	conn, resp, err := connector.Connect(ctx, url)
 	return conn, resp, err

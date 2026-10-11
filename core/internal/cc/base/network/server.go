@@ -25,6 +25,12 @@ var (
 	// subsequent StartC2HTTPServer) may concurrently Stop it.
 	EmpHTTPServer *http.Server
 
+	// The QUIC endpoint is tracked as an io.Closer so this package does not
+	// depend on the (build-tag-gated) QUIC transport type.
+	quicServerMu     sync.RWMutex
+	quicServer       io.Closer
+	quicServerCancel context.CancelFunc
+
 	EmpKCPCtx    context.Context
 	EmpKCPCancel context.CancelFunc
 
@@ -79,6 +85,31 @@ func StopEmpHTTPServer() {
 func StopEmpServers() {
 	StopEmpTLSServer()
 	StopEmpHTTPServer()
+	StopEmpQUICServer()
+}
+
+// SetEmpQUICServer publishes the QUIC listener so it can be stopped later.
+func SetEmpQUICServer(c io.Closer, cancel context.CancelFunc) {
+	quicServerMu.Lock()
+	quicServer = c
+	quicServerCancel = cancel
+	quicServerMu.Unlock()
+}
+
+// StopEmpQUICServer closes the QUIC listener and cancels its accept loop.
+func StopEmpQUICServer() {
+	quicServerMu.Lock()
+	c := quicServer
+	cancel := quicServerCancel
+	quicServer = nil
+	quicServerCancel = nil
+	quicServerMu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+	if c != nil {
+		_ = c.Close()
+	}
 }
 
 // StreamHandler allows the HTTP handler to use CBOR-encapsulated streams.

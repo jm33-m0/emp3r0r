@@ -9,7 +9,7 @@ type Emp3r0rAgent struct {
 	Tag            string        `cbor:"1,keyasint"`  // operator-facing agent identifier, derived from the verified UUID
 	Name           string        `cbor:"2,keyasint"`  // human-readable name (hostname\username)
 	Version        string        `cbor:"3,keyasint"`  // agent version
-	Transport      string        `cbor:"4,keyasint"`  // transport the agent uses (HTTP2 / CDN / TOR)
+	Transport      string        `cbor:"4,keyasint"`  // transport the agent uses (HTTP / HTTP2 / QUIC / KCP / CDN / TOR)
 	Hostname       string        `cbor:"5,keyasint"`  // Hostname and machine ID
 	Hardware       string        `cbor:"6,keyasint"`  // machine details and hypervisor
 	Container      string        `cbor:"7,keyasint"`  // container tech (if any)

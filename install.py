@@ -45,6 +45,7 @@ AGENT_TAG_DOCS: dict[str, str] = {
     "no_mesh": "P2P mesh and memberlist gossip (peer discovery/routing)",
     "no_kcp": "KCP C2 transport and the xtaci kcp-go/kcptun/smux stack",
     "no_h2conn": "HTTP/2 duplex (h2conn) C2 channel",
+    "no_quic": "QUIC C2 transport and the quic-go stack",
     "no_utls": "uTLS TLS fingerprinting (falls back to crypto/tls)",
     "no_doh": "DNS-over-HTTPS resolver (uses the OS resolver)",
     "no_ech": "ECH (Encrypted Client Hello) for C2 TLS; requires DoH",
@@ -55,7 +56,7 @@ AGENT_TAG_DOCS: dict[str, str] = {
 # Recommended --agent-slim exclusions. P2P mesh and uTLS TLS fingerprinting
 # stay enabled (uTLS is only ~0.8 MiB compressed); use the additional
 # "no_mesh"/"no_utls" tags to drop them. Keep in sync with core/build.py.
-SLIM_AGENT_TAGS = "no_kcp no_h2conn no_doh no_cdnproxy no_netlink"
+SLIM_AGENT_TAGS = "no_kcp no_h2conn no_quic no_doh no_cdnproxy no_netlink"
 
 
 def agent_tag_reference() -> str:

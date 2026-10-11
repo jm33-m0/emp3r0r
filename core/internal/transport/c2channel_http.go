@@ -111,6 +111,9 @@ func randomBlink() time.Duration {
 }
 
 func (h HTTPChannelWrapper) Dial(ctx context.Context, client *http.Client, url string) (io.ReadWriteCloser, *http.Response, error) {
+	if client == nil {
+		return nil, nil, errors.New("HTTPChannelWrapper: http client is not initialized")
+	}
 	sessionID := uuid.NewString()
 
 	stream := &HTTPClientStream{

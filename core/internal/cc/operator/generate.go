@@ -27,6 +27,7 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 	persistentRouter, _ := cmd.Flags().GetBool("persistent-router")
 	ncsi, _ := cmd.Flags().GetBool("NCSI")
 	kcp, _ := cmd.Flags().GetBool("kcp")
+	quicStandardKey, _ := cmd.Flags().GetBool("quic-standard-key")
 	isStager, _ := cmd.Flags().GetBool("stager")
 	operatorIdleTimeout, _ := cmd.Flags().GetInt("operator-idle-timeout")
 
@@ -37,6 +38,7 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 		DoHServer:           getStringOptPtr(cmd, "doh"),
 		ECHServerName:       getStringOptPtr(cmd, "ech"),
 		C2ChannelMode:       getStringOptPtr(cmd, "c2-channel-mode"),
+		QUICStandardKey:     quicStandardKey,
 		InitialPeers:        getStringSliceOptPtr(cmd, "peers"),
 		P2PTransport:        getStringOptPtr(cmd, "p2p-transport"),
 		P2PRelayPort:        getStringOptPtr(cmd, "p2p-relay-port"),

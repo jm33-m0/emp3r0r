@@ -612,13 +612,14 @@ func gen_agent_cmd() *cobra.Command {
 
 	genAgentCmd.Flags().StringP("cc", "", default_cc, "C2 server address (Required)")
 	genAgentCmd.Flags().StringP("c2-channel-mode", "", def.C2ChannelModeDefault, fmt.Sprintf("C2 channel wrapper mode. Available: %s", strings.Join(transport.AllC2ChannelModesDetailed(), ";")))
+	genAgentCmd.Flags().BoolP("quic-standard-key", "", false, "QUIC mode only: disable the custom static-key datagram obfuscation and speak stock QUIC (interoperable with HTTP/3 endpoints, but exposes the Initial/ClientHello to observers)")
 	genAgentCmd.Flags().StringP("cc-http-port", "", live.RuntimeConfig.CCHTTPPort, "Port for HTTP Polling/Beaconing C2 transport")
 	genAgentCmd.Flags().StringP("proxy", "", "", "Hard coded proxy URL for agent's C2 transport. Example: socks5://127.0.0.1:9050")
 	genAgentCmd.Flags().StringP("cdn", "", "", "CDN proxy to reach C2. Example: wss://cdn.example.com/ws")
 	genAgentCmd.Flags().StringP("doh", "", "", "DNS over HTTPS server to use for DNS resolution. Example: https://1.1.1.1/dns-query")
 	genAgentCmd.Flags().StringP("ech", "", "", "Enable ECH for C2 TLS: DNS name whose HTTPS RR carries the ECHConfigList, fetched over --doh. Example: c2.example.com. Use it when C2 TLS terminates at an ECH-capable CDN edge")
 	genAgentCmd.Flags().BoolP("kcp", "", false, "Use KCP (secure UDP multiplexed tunnel)")
-	addFlagToGroup("C2 Transport Options", "cc", "c2-channel-mode", "cc-http-port", "proxy", "cdn", "doh", "ech", "kcp")
+	addFlagToGroup("C2 Transport Options", "cc", "c2-channel-mode", "quic-standard-key", "cc-http-port", "proxy", "cdn", "doh", "ech", "kcp")
 
 	// Group 3: Beaconing (Polling/Beaconing Mode Only)
 	genAgentCmd.Flags().IntP("interval", "i", 60, "C2 beacon interval in seconds")

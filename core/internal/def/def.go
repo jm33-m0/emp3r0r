@@ -10,6 +10,12 @@ var (
 	// use: C2 message construction and encryption
 	MagicString = "64781530-1475-4cf8-950c-dcdf4c619dbc"
 
+	// QUICKey is the static key that seeds the QUIC datagram obfuscation.
+	// Like MagicString it is patched at build time via -ldflags -X, so a C2 and
+	// its agents built from the same batch always agree. When empty, the key is
+	// derived from MagicString instead.
+	QUICKey = ""
+
 	// HTTPClient handles agent's http communication
 	HTTPClient *http.Client
 

@@ -39,8 +39,32 @@ func waitForPort(addr string, deadline time.Time) error {
 	}
 }
 
-func runCheckinACK(t *testing.T, mode string) {
+// waitForUDPPort waits until addr is bound by another process. UDP is
+// connectionless, so readiness is observed by failing to bind the same address
+// ourselves rather than by dialing it.
+func waitForUDPPort(addr string, deadline time.Time) error {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	udpAddr, err := net.ResolveUDPAddr("udp", addr)
+	if err != nil {
+		return err
+	}
+	for {
+		conn, listenErr := net.ListenUDP("udp", udpAddr)
+		if listenErr != nil {
+			return nil // bound by the C2 already
+		}
+		_ = conn.Close()
+		if time.Now().After(deadline) {
+			return fmt.Errorf("timeout waiting for %s to be bound", addr)
+		}
+		<-ticker.C
+	}
+}
+
+func runCheckinACK(t *testing.T, mode string, quicStandardKey bool) {
 	t.Helper()
+	transport.SetQUICStandardKey(quicStandardKey)
 
 	tmpDir, err := os.MkdirTemp("", "agent_http_poll_test")
 	if err != nil {
@@ -89,10 +113,11 @@ func runCheckinACK(t *testing.T, mode string) {
 	httpListener.Close()
 
 	live.RuntimeConfig = &def.Config{
-		CCH2Port:      fmt.Sprintf("%d", tlsPort),
-		CCHTTPPort:    fmt.Sprintf("%d", httpPort),
-		CAPEM:         string(caCertData),
-		C2ChannelMode: mode,
+		CCH2Port:        fmt.Sprintf("%d", tlsPort),
+		CCHTTPPort:      fmt.Sprintf("%d", httpPort),
+		CAPEM:           string(caCertData),
+		C2ChannelMode:   mode,
+		QUICStandardKey: quicStandardKey,
 		C2Routes: def.C2Routing{
 			Checkin: "c2-checkin",
 			Msg:     "c2-msg",
@@ -117,16 +142,19 @@ func runCheckinACK(t *testing.T, mode string) {
 
 	go server.StartC2AgentTLSServer()
 	server.MarkOperatorOnline("test-operator")
-	if mode != "http_poll" {
-		if err := waitForPort(fmt.Sprintf("127.0.0.1:%d", tlsPort), time.Now().Add(10*time.Second)); err != nil {
-			t.Fatalf("TLS C2 server did not become ready: %v", err)
-		}
-	}
-
-	if mode == "http_poll" {
+	switch mode {
+	case def.C2ChannelModePlainHTTP:
 		go server.StartC2HTTPServer()
 		if err := waitForPort(fmt.Sprintf("127.0.0.1:%d", httpPort), time.Now().Add(10*time.Second)); err != nil {
 			t.Fatalf("Plain HTTP server did not become ready: %v", err)
+		}
+	case def.C2ChannelModeQUIC:
+		if err := waitForUDPPort(fmt.Sprintf("127.0.0.1:%d", tlsPort), time.Now().Add(10*time.Second)); err != nil {
+			t.Fatalf("QUIC C2 server did not become ready: %v", err)
+		}
+	default:
+		if err := waitForPort(fmt.Sprintf("127.0.0.1:%d", tlsPort), time.Now().Add(10*time.Second)); err != nil {
+			t.Fatalf("TLS C2 server did not become ready: %v", err)
 		}
 	}
 
@@ -147,16 +175,17 @@ func runCheckinACK(t *testing.T, mode string) {
 	}
 
 	common.RuntimeConfig = &def.Config{
-		CCAddress:     "127.0.0.1",
-		CCH2Port:      fmt.Sprintf("%d", tlsPort),
-		CCHTTPPort:    fmt.Sprintf("%d", httpPort),
-		C2ChannelMode: mode,
-		CAPEM:         string(caCertData),
-		C2Routes:      live.RuntimeConfig.C2Routes,
-		AgentUUID:     agentUUID,
-		AgentUUIDSig:  agentSig,
-		AgentTag:      agentUUID,
-		MalleableC2:   live.RuntimeConfig.MalleableC2,
+		CCAddress:       "127.0.0.1",
+		CCH2Port:        fmt.Sprintf("%d", tlsPort),
+		CCHTTPPort:      fmt.Sprintf("%d", httpPort),
+		C2ChannelMode:   mode,
+		QUICStandardKey: quicStandardKey,
+		CAPEM:           string(caCertData),
+		C2Routes:        live.RuntimeConfig.C2Routes,
+		AgentUUID:       agentUUID,
+		AgentUUIDSig:    agentSig,
+		AgentTag:        agentUUID,
+		MalleableC2:     live.RuntimeConfig.MalleableC2,
 	}
 
 	certPool := x509.NewCertPool()
@@ -213,7 +242,7 @@ func TestPlainHTTPCheckinACK(t *testing.T) {
 		mode := mode
 		t.Run(mode, func(t *testing.T) {
 			requireH2Conn(t, mode)
-			runCheckinACK(t, mode)
+			runCheckinACK(t, mode, false)
 		})
 	}
 }

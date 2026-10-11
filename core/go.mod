@@ -20,6 +20,7 @@ require (
 	github.com/ncruces/go-dns v1.3.3
 	github.com/pkg/errors v0.9.1
 	github.com/posener/h2conn v0.0.0-20231204025407-3997deeca0f0
+	github.com/quic-go/quic-go v0.63.0
 	github.com/reeflective/console v0.5.0
 	github.com/refraction-networking/utls v1.8.2
 	github.com/sagernet/sing v0.8.12-0.20260717023913-84ab32b56cb8

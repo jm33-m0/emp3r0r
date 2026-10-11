@@ -160,7 +160,7 @@ Pivot without burning another implant: the C2 runs a SOCKS5 proxy that relays th
 
 ### 🎭 Pluggable C2 Transport, uTLS JA3 Evasion & CBOR Protocol
 
-- Choose beacon-style HTTP polling or streaming HTTP/2 — both with malleable profiles.
+- Choose beacon-style HTTP polling, streaming HTTP/2, or a QUIC UDP channel with a per-build static-key datagram obfuscation — all with malleable profiles. QUIC defaults to the custom key; `--quic-standard-key` opts out for stock QUIC (interoperable with HTTP/3 endpoints).
 - TLS fingerprints are randomized with uTLS, so the channel doesn't stand out in network telemetry.
 - Behind an ECH-capable CDN edge, `--ech` (with `--doh`) encrypts the inner SNI so the real C2 hostname never appears in the ClientHello.
 - Control traffic rides a compact CBOR protocol — smaller, faster, and harder to parse than JSON.
@@ -173,7 +173,7 @@ Pivot without burning another implant: the C2 runs a SOCKS5 proxy that relays th
 
 Every unused subsystem is another dependency and another string for a defender to find. Agents are built from independently gated features, so a payload carries only what the mission needs.
 
-- `install.py --agent-slim` drops the optional transports and helpers (KCP, h2conn, DoH, ECH, CDN proxy, netlink); uTLS TLS fingerprinting stays enabled because it adds only ~0.8 MB to the compressed shellcode. Add `no_utls` to fall back to `crypto/tls`, or `no_ech` to drop ECH without dropping DoH.
+- `install.py --agent-slim` drops the optional transports and helpers (KCP, h2conn, QUIC, DoH, ECH, CDN proxy, netlink); uTLS TLS fingerprinting stays enabled because it adds only ~0.8 MB to the compressed shellcode. Add `no_utls` to fall back to `crypto/tls`, or `no_ech` to drop ECH without dropping DoH.
 - The P2P mesh is a core feature — it stays enabled by default, and `no_mesh` opts out for a standalone agent.
 - `--agent-tags '<tags>'` compiles out any subset (`--list-agent-tags` prints the reference); C2 binaries always keep the full feature set.
 
