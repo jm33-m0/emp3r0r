@@ -18,10 +18,11 @@ var (
 	KCPC2Cancel context.CancelFunc
 )
 
-// RunKCPClient Connect to C2 KCP server, then to C2 server
-func RunKCPClient() {
+// RunKCPClient Connect to C2 KCP server, then to C2 server. It returns an error
+// instead of exiting so the agent can report it and keep running.
+func RunKCPClient() error {
 	if !common.RuntimeConfig.UseKCP {
-		return
+		return nil
 	}
 	logging.Infof("C2 traffic will go through KCP tunnel at port %s, KCP server port %s, C2 port %s",
 		common.RuntimeConfig.KCPClientPort, common.RuntimeConfig.P2PRelayPort, common.RuntimeConfig.CCH2Port)
@@ -35,6 +36,7 @@ func RunKCPClient() {
 	err := transport.KCPTunClient(kcp_server_addr, common.RuntimeConfig.KCPClientPort,
 		common.RuntimeConfig.Password, def.MagicString, KCPC2Ctx, KCPC2Cancel)
 	if err != nil {
-		logging.Infof("RunKCPClient failed to start: %v", err)
+		return fmt.Errorf("RunKCPClient failed to start: %w", err)
 	}
+	return nil
 }

@@ -17,13 +17,15 @@ import (
 )
 
 // StartC2QUICServer starts the QUIC agent listener. The QUIC transport owns its
-// own UDP socket, so it does not share the TLS/TCP listener.
-func StartC2QUICServer() {
+// own UDP socket, so it does not share the TLS/TCP listener. It returns an error
+// when the listener cannot be set up, so callers never wait on a socket that
+// never binds.
+func StartC2QUICServer() error {
 	network.StopEmpQUICServer()
 
 	cert, err := tls.LoadX509KeyPair(transport.ServerCrtFile, transport.ServerKeyFile)
 	if err != nil {
-		logging.Fatalf("StartC2QUICServer: load TLS keypair: %v", err)
+		return fmt.Errorf("StartC2QUICServer: load TLS keypair: %w", err)
 	}
 	tlsCfg := &tls.Config{
 		Certificates:     []tls.Certificate{cert},
@@ -38,7 +40,7 @@ func StartC2QUICServer() {
 	listener, err := transport.ListenQUIC(fmt.Sprintf(":%s", live.RuntimeConfig.CCH2Port), tlsCfg, key)
 	if err != nil {
 		cancel()
-		logging.Fatalf("StartC2QUICServer: %v", err)
+		return fmt.Errorf("StartC2QUICServer: %w", err)
 	}
 	network.SetEmpQUICServer(listener, cancel)
 
@@ -92,6 +94,7 @@ func StartC2QUICServer() {
 			}(conn)
 		}
 	}()
+	return nil
 }
 
 const (

@@ -20,8 +20,10 @@ import (
 
 // StartC2AgentTLSServer starts the C2 server entrypoint.
 // The default h2 stream mode uses a separate HTTP/h2 stream server; the raw TLS core
-// remains available for non-HTTP stream modes.
-func StartC2AgentTLSServer() {
+// remains available for non-HTTP stream modes. It returns an error when the
+// configured mode is not compiled into this build, so callers learn the
+// transport is unavailable instead of waiting for a listener that never binds.
+func StartC2AgentTLSServer() error {
 	prepareC2ServerPrerequisites()
 
 	mode := live.RuntimeConfig.C2ChannelMode
@@ -29,14 +31,12 @@ func StartC2AgentTLSServer() {
 		mode = def.C2ChannelModeDefault
 	}
 	if mode == def.C2ChannelModeQUIC {
-		StartC2QUICServer()
-		return
+		return StartC2QUICServer()
 	}
 	if mode == def.C2ChannelModeH2Conn || mode == def.C2ChannelModeDefault || mode == def.C2ChannelModePlainHTTP {
-		StartC2H2StreamServer()
-		return
+		return StartC2H2StreamServer()
 	}
-	startRawC2TLSServer()
+	return startRawC2TLSServer()
 }
 
 func prepareC2ServerPrerequisites() {
@@ -96,7 +96,7 @@ func setupC2TLSListener() net.Listener {
 // startRawC2TLSServer starts the raw TLS-over-TCP C2 listener.
 // It accepts encrypted byte streams and delegates directly to the CBOR protocol core.
 // No HTTP semantics are used at this boundary.
-func startRawC2TLSServer() {
+func startRawC2TLSServer() error {
 	listener := setupC2TLSListener()
 
 	logging.Successf("🚀 Starting C2 agent listener service with TLS at port %s", live.RuntimeConfig.CCH2Port)
@@ -105,13 +105,13 @@ func startRawC2TLSServer() {
 		if acceptErr != nil {
 			if errors.Is(acceptErr, net.ErrClosed) {
 				logging.Warningf("C2 TLS service is shutdown")
-				return
+				return nil
 			}
 			if network.EmpTLSServerCtx != nil {
 				select {
 				case <-network.EmpTLSServerCtx.Done():
 					logging.Warningf("C2 TLS service is shutdown")
-					return
+					return nil
 				default:
 				}
 			}

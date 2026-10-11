@@ -11,9 +11,11 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
-// KCPC2ListenAndServe KCP server that forwards to C2 port
-func KCPC2ListenAndServe(ctx context.Context, cancel context.CancelFunc) {
+// KCPC2ListenAndServe KCP server that forwards to C2 port. It blocks until the
+// context is cancelled and returns the server error, so the caller can report
+// it without tearing down the C2.
+func KCPC2ListenAndServe(ctx context.Context, cancel context.CancelFunc) error {
 	logging.Successf("🚀 Starting KCP C2 server at port %s", live.RuntimeConfig.P2PRelayPort)
-	transport.KCPTunServer("127.0.0.1:"+live.RuntimeConfig.CCH2Port,
+	return transport.KCPTunServer("127.0.0.1:"+live.RuntimeConfig.CCH2Port,
 		live.RuntimeConfig.P2PRelayPort, live.RuntimeConfig.Password, def.MagicString, ctx, cancel)
 }

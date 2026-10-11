@@ -51,13 +51,21 @@ func ServerMain(wg_port int, hosts string, operatorNames, addOperators []string,
 
 	// start all services
 	network.EmpKCPCtx, network.EmpKCPCancel = context.WithCancel(context.Background())
-	go KCPC2ListenAndServe(network.EmpKCPCtx, network.EmpKCPCancel)
+	go func() {
+		if err := KCPC2ListenAndServe(network.EmpKCPCtx, network.EmpKCPCancel); err != nil {
+			logging.Errorf("KCP C2 listener unavailable: %v", err)
+		}
+	}()
 	// Bring the userspace WireGuard stack up first so the operator-facing
 	// listeners can be bound on it.
 	wg(wg_port, operatorNames, addOperators, operatorsSet)
 	go tarConfig(hosts)
 	time.Sleep(3 * time.Second)
-	go StartC2AgentTLSServer()
+	go func() {
+		if err := StartC2AgentTLSServer(); err != nil {
+			logging.Errorf("C2 agent listener unavailable: %v", err)
+		}
+	}()
 	go StartC2HTTPServer()
 
 	// Highlight the key ports for easy identification

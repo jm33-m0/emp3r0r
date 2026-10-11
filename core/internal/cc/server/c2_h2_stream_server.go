@@ -16,10 +16,10 @@ import (
 
 // StartC2H2StreamServer starts the h2 stream transport server.
 // TLS is owned by the TLS layer; this server only handles HTTP/h2 stream routing.
-func StartC2H2StreamServer() {
+func StartC2H2StreamServer() error {
 	channelWrapper, err := transport.GetC2ChannelWrapper(def.C2ChannelModeH2Conn)
 	if err != nil {
-		logging.Fatalf("StartC2H2StreamServer: resolve %q wrapper: %v", def.C2ChannelModeH2Conn, err)
+		return fmt.Errorf("StartC2H2StreamServer: resolve %q wrapper: %w", def.C2ChannelModeH2Conn, err)
 	}
 
 	mux := http.NewServeMux()
@@ -42,10 +42,11 @@ func StartC2H2StreamServer() {
 	if err = network.EmpTLSServer.Serve(listener); err != nil {
 		if err == http.ErrServerClosed {
 			logging.Warningf("C2 h2 stream server is shutdown")
-			return
+			return nil
 		}
-		logging.Fatalf("Failed to start C2 h2 stream server at *:%s: %v", live.RuntimeConfig.CCH2Port, err)
+		return fmt.Errorf("start C2 h2 stream server at *:%s: %w", live.RuntimeConfig.CCH2Port, err)
 	}
+	return nil
 }
 
 func registerC2H2StreamAcceptHandler(mux *http.ServeMux, channelWrapper transport.C2ChannelWrapper) {

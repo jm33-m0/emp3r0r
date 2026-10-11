@@ -2,10 +2,11 @@
 
 package c2transport
 
-import "github.com/jm33-m0/emp3r0r/core/lib/logging"
+import "errors"
 
-// RunKCPClient is the no-op stub used when the build excludes the KCP C2
-// transport, so cmd/agent compiles without the xtaci stack.
-func RunKCPClient() {
-	logging.Warningf("KCP transport is not compiled into this agent")
+// RunKCPClient is the stub used when the build excludes the KCP C2 transport.
+// It reports the missing feature so cmd/agent can log it and keep running,
+// rather than silently dropping the configured KCP tunnel.
+func RunKCPClient() error {
+	return errors.New("KCP transport is not compiled into this agent")
 }
