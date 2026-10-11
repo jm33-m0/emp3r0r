@@ -103,7 +103,7 @@ func setJobOwner(jobID, operatorSession string) {
 	// another operator's command output by reusing its job ID.
 	if existing, loaded := operatorJobOwners.LoadOrStore(jobID, operatorSession); loaded {
 		if owner, ok := existing.(string); ok && owner != "" && owner != operatorSession {
-			logging.Warningf("CRITICAL: operator %s tried to claim job %s owned by %s", operatorSession, jobID, owner)
+			logging.Warningf("operator %s tried to claim job %s owned by %s", operatorSession, jobID, owner)
 		}
 	}
 }
@@ -422,14 +422,14 @@ func handleRegisterFTPStream(wrt http.ResponseWriter, req *http.Request) {
 	if val, ok := network.FTPStreams.Load("token:" + ftpReq.Token); ok {
 		if existing, castOK := val.(*network.StreamHandler); castOK && existing != nil &&
 			existing.OperatorSession != "" && existing.OperatorSession != operatorSession {
-			logging.Errorf("CRITICAL: operator %s tried to hijack ftp token %s owned by %s", operatorSession, ftpReq.Token, existing.OperatorSession)
+			logging.Warningf("operator %s tried to hijack ftp token %s owned by %s", operatorSession, ftpReq.Token, existing.OperatorSession)
 			auditOperatorAction(operatorSession, "ftp_register_denied", "", ftpReq.FilePath)
 			http.Error(wrt, "Forbidden", http.StatusForbidden)
 			return
 		}
 	}
 	if countOperatorFTPStreams(operatorSession) >= maxFTPStreamsPerOperator {
-		logging.Warningf("CRITICAL: operator %s exceeded the FTP stream limit (%d)", operatorSession, maxFTPStreamsPerOperator)
+		logging.Warningf("operator %s exceeded the FTP stream limit (%d)", operatorSession, maxFTPStreamsPerOperator)
 		auditOperatorAction(operatorSession, "ftp_register_denied", "", "too many streams")
 		http.Error(wrt, "too many concurrent FTP streams", http.StatusTooManyRequests)
 		return
@@ -466,7 +466,7 @@ func handleUnregisterFTPStream(wrt http.ResponseWriter, req *http.Request) {
 	}
 	operatorSession, err := operatorSessionFromReq(req)
 	if err != nil {
-		logging.Errorf("CRITICAL: Reject unregister ftp from %s: %v", req.RemoteAddr, err)
+		logging.Warningf("Reject unregister ftp from %s: %v", req.RemoteAddr, err)
 		http.Error(wrt, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -481,7 +481,7 @@ func handleUnregisterFTPStream(wrt http.ResponseWriter, req *http.Request) {
 		return
 	}
 	if sh.OperatorSession != "" && sh.OperatorSession != operatorSession {
-		logging.Errorf("CRITICAL: operator %s attempted to unregister ftp stream owned by %s", operatorSession, sh.OperatorSession)
+		logging.Warningf("operator %s attempted to unregister ftp stream owned by %s", operatorSession, sh.OperatorSession)
 		auditOperatorAction(operatorSession, "ftp_unregister_denied", "", ftpReq.FilePath)
 		http.Error(wrt, "Forbidden", http.StatusForbidden)
 		return

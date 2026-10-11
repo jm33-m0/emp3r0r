@@ -75,11 +75,11 @@ func verifyAuxRouteAgent(agentUUID, remoteAddr, route string) bool {
 	}
 	pinnedKey, _, found, lookupErr := agents.GetPinnedIdentity(agentUUID)
 	if lookupErr != nil {
-		logging.Errorf("CRITICAL: %s relay: AgentDB lookup failed for %s from %s: %v", route, util.AgentRef(agentUUID), remoteAddr, lookupErr)
+		logging.Errorf("%s relay: AgentDB lookup failed for %s from %s: %v", route, util.AgentRef(agentUUID), remoteAddr, lookupErr)
 		return false
 	}
 	if !found || pinnedKey == "" {
-		logging.Errorf("CRITICAL: %s relay: agent %s not enrolled or has empty pinned key from %s", route, util.AgentRef(agentUUID), remoteAddr)
+		logging.Warningf("%s relay: agent %s not enrolled or has empty pinned key from %s", route, util.AgentRef(agentUUID), remoteAddr)
 		return false
 	}
 	_ = agents.UpdateSessionHeartbeat(agentUUID)
@@ -100,17 +100,17 @@ func handleProxyRelayStream(conn io.ReadWriteCloser, agentUUID, streamID, remote
 	}
 	streamID = strings.TrimSpace(streamID)
 	if streamID == "" {
-		logging.Errorf("CRITICAL: proxy relay: empty stream id from %s", remoteAddr)
+		logging.Warningf("proxy relay: empty stream id from %s", remoteAddr)
 		return
 	}
 
 	entry := lookupPendingProxyEntry(streamID)
 	if entry == nil {
-		logging.Errorf("CRITICAL: proxy relay: unknown token %q from %s (timeout or spoofed)", streamID, remoteAddr)
+		logging.Warningf("proxy relay: unknown token %q from %s (timeout or spoofed)", streamID, remoteAddr)
 		return
 	}
 	if entry.agentUUID != agentUUID {
-		logging.Errorf("CRITICAL: proxy relay: agent %s hijacked token %q owned by %s", util.AgentRef(agentUUID), streamID, util.AgentRef(entry.agentUUID))
+		logging.Warningf("proxy relay: agent %s hijacked token %q owned by %s", util.AgentRef(agentUUID), streamID, util.AgentRef(entry.agentUUID))
 		return
 	}
 
@@ -202,14 +202,14 @@ func handleWWWRelayStream(conn io.ReadWriteCloser, agentUUID, streamID, remoteAd
 	conn = transport.NewBulkWriter(conn)
 	streamID = strings.TrimSpace(streamID)
 	if streamID == "" {
-		logging.Errorf("CRITICAL: www relay: empty stream id from %s", remoteAddr)
+		logging.Warningf("www relay: empty stream id from %s", remoteAddr)
 		conn.Close()
 		return
 	}
 
 	ownerSession, err := wwwRelayOperatorFor(agentUUID)
 	if err != nil {
-		logging.Errorf("CRITICAL: www relay: %v", err)
+		logging.Warningf("www relay: %v", err)
 		conn.Close()
 		return
 	}
@@ -220,7 +220,7 @@ func handleWWWRelayStream(conn io.ReadWriteCloser, agentUUID, streamID, remoteAd
 	defer conn.Close()
 
 	if err := fwdMsgToOperator(ownerSession, def.MsgTunData{Tag: def.TagWWWRelayRequestPrefix + streamID}); err != nil {
-		logging.Errorf("CRITICAL: www relay: request forwarding failed for %q: %v", streamID, err)
+		logging.Errorf("www relay: request forwarding failed for %q: %v", streamID, err)
 		return
 	}
 
@@ -267,7 +267,7 @@ func handleOperatorRelayFrame(operatorSession string, msg *def.MsgTunData) {
 		streamID := strings.TrimPrefix(tag, def.TagProxyRelayBackPrefix)
 		if rs, ok := loadRelayStream(&proxyRelayStreams, streamID); ok {
 			if rs.ownerSession != operatorSession {
-				logging.Errorf("CRITICAL: proxy relay owner mismatch for %q", streamID)
+				logging.Warningf("proxy relay owner mismatch for %q", streamID)
 				return
 			}
 			rs.writeMu.Lock()
@@ -285,14 +285,14 @@ func handleOperatorRelayFrame(operatorSession string, msg *def.MsgTunData) {
 		streamID := strings.TrimPrefix(tag, def.TagWWWRelayDataPrefix)
 		if rs, ok := loadRelayStream(&wwwRelayStreams, streamID); ok {
 			if rs.ownerSession != operatorSession {
-				logging.Errorf("CRITICAL: www relay owner mismatch for %q", streamID)
+				logging.Warningf("www relay owner mismatch for %q", streamID)
 				return
 			}
 			rs.writeMu.Lock()
 			_, err := rs.conn.Write(msg.Response)
 			rs.writeMu.Unlock()
 			if err != nil {
-				logging.Errorf("CRITICAL: www relay write failed for %q: %v", streamID, err)
+				logging.Errorf("www relay write failed for %q: %v", streamID, err)
 				wwwRelayStreams.Delete(streamID)
 				rs.signalDone()
 				_ = rs.conn.Close()

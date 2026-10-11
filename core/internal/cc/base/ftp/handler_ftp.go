@@ -156,7 +156,7 @@ func HandleFTPStream(conn io.ReadWriteCloser, token, remoteAddr string, cancel c
 		return
 	}
 	if sh.OperatorSession == "" {
-		logging.Errorf("CRITICAL: FTP stream %q missing operator owner metadata from %s", token, remoteAddr)
+		logging.Errorf("FTP stream %q missing operator owner metadata from %s", token, remoteAddr)
 		conn.Close()
 		cancel()
 		return

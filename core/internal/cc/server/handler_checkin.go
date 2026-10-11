@@ -83,7 +83,7 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 	// We are now at the second frame, which MUST be the Emp3r0rAgent info.
 	err := dec.Decode(target)
 	if err != nil {
-		logging.Errorf("CRITICAL: handleAgentCheckIn decode agent payload error from %s: %v", remoteAddr, err)
+		logging.Warningf("handleAgentCheckIn decode agent payload error from %s: %v", remoteAddr, err)
 		return err
 	}
 
@@ -91,11 +91,11 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 	util.SanitizeAgentMetadata(target)
 
 	if target.UUID == "" {
-		logging.Errorf("CRITICAL: handleAgentCheckIn: empty UUID in payload")
+		logging.Warningf("handleAgentCheckIn: empty UUID in payload")
 		return fmt.Errorf("forbidden: empty uuid")
 	}
 	if agentUUID != "" && target.UUID != agentUUID {
-		logging.Errorf("CRITICAL: handleAgentCheckIn: route/body UUID mismatch: body=%s route=%s", util.AgentRef(target.UUID), util.AgentRef(agentUUID))
+		logging.Warningf("handleAgentCheckIn: route/body UUID mismatch: body=%s route=%s", util.AgentRef(target.UUID), util.AgentRef(agentUUID))
 		return fmt.Errorf("forbidden: uuid mismatch")
 	}
 
@@ -117,15 +117,15 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 
 	// SECURITY: Agent MUST provide its public key in every checkin.
 	if target.PublicKey == "" {
-		logging.Errorf("CRITICAL: handleAgentCheckIn: Agent %s provided no public key, rejecting", util.AgentRef(target.UUID))
+		logging.Warningf("handleAgentCheckIn: Agent %s provided no public key, rejecting", util.AgentRef(target.UUID))
 		return fmt.Errorf("unauthorized: missing public key")
 	}
 	if target.UUIDSig == "" {
-		logging.Errorf("CRITICAL: handleAgentCheckIn: Agent %s provided no UUID signature, rejecting", util.AgentRef(target.UUID))
+		logging.Warningf("handleAgentCheckIn: Agent %s provided no UUID signature, rejecting", util.AgentRef(target.UUID))
 		return fmt.Errorf("unauthorized: missing uuid signature")
 	}
 	if agents.AgentDB == nil {
-		logging.Errorf("CRITICAL: handleAgentCheckIn: AgentDB unavailable for trust decision")
+		logging.Errorf("handleAgentCheckIn: AgentDB unavailable for trust decision")
 		return fmt.Errorf("forbidden: trust store unavailable")
 	}
 
@@ -137,13 +137,13 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 	)
 	pinnedKey, pinnedUUIDSig, isKnown, err = agents.GetPinnedIdentity(target.UUID)
 	if err != nil {
-		logging.Errorf("CRITICAL: handleAgentCheckIn: AgentDB lookup failed for %s: %v", util.AgentRef(target.UUID), err)
+		logging.Errorf("handleAgentCheckIn: AgentDB lookup failed for %s: %v", util.AgentRef(target.UUID), err)
 		return fmt.Errorf("forbidden: trust lookup failed")
 	}
 
 	// ── Phase 2: TOFU Verification (DB-Authoritative) ─────────────────────
 	if isKnown && pinnedKey == "" {
-		logging.Errorf("CRITICAL: handleAgentCheckIn: %s has empty pinned key in DB", util.AgentRef(target.UUID))
+		logging.Errorf("handleAgentCheckIn: %s has empty pinned key in DB", util.AgentRef(target.UUID))
 		return fmt.Errorf("forbidden: invalid pinned identity")
 	}
 
@@ -201,7 +201,7 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 	// find the agent in the database.
 	if agents.AgentDB != nil {
 		if err := agents.RecordAgentCheckin(target); err != nil {
-			logging.Errorf("CRITICAL: Failed to record agent enrollment for %s: %v", util.AgentRef(target.UUID), err)
+			logging.Errorf("Failed to record agent enrollment for %s: %v", util.AgentRef(target.UUID), err)
 			return fmt.Errorf("forbidden: failed to persist identity")
 		}
 	}
@@ -210,10 +210,10 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 	sessionID := fmt.Sprintf("%d", time.Now().UnixNano())
 	if sessionErr := agents.StartSession(target.UUID, sessionID, remoteAddr); sessionErr != nil {
 		if errors.Is(sessionErr, agents.ErrSessionAlreadyActive) {
-			logging.Notify(logging.ERROR, "CRITICAL: handleAgentCheckIn: duplicate live session blocked for %s from %s", util.AgentRef(target.UUID), remoteAddr)
+			logging.Notify(logging.WARN, "handleAgentCheckIn: duplicate live session blocked for %s from %s", util.AgentRef(target.UUID), remoteAddr)
 			return fmt.Errorf("forbidden: duplicate session")
 		}
-		logging.Errorf("CRITICAL: handleAgentCheckIn: session admission failed for %s: %v", util.AgentRef(target.UUID), sessionErr)
+		logging.Errorf("handleAgentCheckIn: session admission failed for %s: %v", util.AgentRef(target.UUID), sessionErr)
 		return fmt.Errorf("forbidden: session admission failed")
 	}
 

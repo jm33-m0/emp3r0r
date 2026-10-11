@@ -141,11 +141,11 @@ func handleFTPRelayMessage(data *def.MsgTunData) bool {
 		token := strings.TrimPrefix(tag, def.TagFTPRelayDataPrefix)
 		conn, err := getOrCreateFTPRelay(token)
 		if err != nil {
-			logging.Errorf("CRITICAL: ftp relay setup failed for token %q: %v", token, err)
+			logging.Errorf("ftp relay setup failed for token %q: %v", token, err)
 			return true
 		}
 		if err := conn.Push(data.Response); err != nil {
-			logging.Errorf("CRITICAL: ftp relay push failed for token %q: %v", token, err)
+			logging.Errorf("ftp relay push failed for token %q: %v", token, err)
 		}
 		return true
 	case strings.HasPrefix(tag, def.TagFTPRelayDonePrefix):

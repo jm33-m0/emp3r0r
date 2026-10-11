@@ -686,7 +686,7 @@ func handleSocks5Start(wrt http.ResponseWriter, req *http.Request) {
 		return
 	}
 	if countSocks5ProxiesForOperator(operatorID) >= maxSocks5ProxiesPerOperator {
-		logging.Warningf("CRITICAL: operator %s exceeded the SOCKS5 pivot limit (%d)", operatorID, maxSocks5ProxiesPerOperator)
+		logging.Warningf("operator %s exceeded the SOCKS5 pivot limit (%d)", operatorID, maxSocks5ProxiesPerOperator)
 		auditOperatorAction(operatorID, "socks5_start_denied", "", "too many pivots")
 		http.Error(wrt, "too many concurrent SOCKS5 pivots", http.StatusTooManyRequests)
 		return

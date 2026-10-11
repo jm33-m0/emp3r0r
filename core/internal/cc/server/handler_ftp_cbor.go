@@ -38,13 +38,13 @@ func handleFileUploadStream(conn *transport.SecureConn, agentUUID, streamID, rem
 	}
 	pinnedKey, _, found, lookupErr := agents.GetPinnedIdentity(agentUUID)
 	if lookupErr != nil {
-		logging.Errorf("CRITICAL: handleFileUploadStream: AgentDB lookup failed for %s from %s: %v", util.AgentRef(agentUUID), remoteAddr, lookupErr)
+		logging.Errorf("handleFileUploadStream: AgentDB lookup failed for %s from %s: %v", util.AgentRef(agentUUID), remoteAddr, lookupErr)
 		cancel()
 		conn.Close()
 		return
 	}
 	if !found || pinnedKey == "" {
-		logging.Errorf("CRITICAL: handleFileUploadStream: agent %s not enrolled or has empty pinned key from %s", util.AgentRef(agentUUID), remoteAddr)
+		logging.Warningf("handleFileUploadStream: agent %s not enrolled or has empty pinned key from %s", util.AgentRef(agentUUID), remoteAddr)
 		cancel()
 		conn.Close()
 		return
@@ -70,20 +70,20 @@ func handleFileUploadStream(conn *transport.SecureConn, agentUUID, streamID, rem
 
 	streamAny, ok := network.FTPStreams.Load("token:" + streamID)
 	if !ok {
-		logging.Errorf("CRITICAL: handleFileUploadStream: unknown FTP token %q from %s", streamID, remoteAddr)
+		logging.Warningf("handleFileUploadStream: unknown FTP token %q from %s", streamID, remoteAddr)
 		cancel()
 		conn.Close()
 		return
 	}
 	sh, castOK := streamAny.(*network.StreamHandler)
 	if !castOK || sh == nil {
-		logging.Errorf("CRITICAL: handleFileUploadStream: invalid FTP stream handler for token %q", streamID)
+		logging.Warningf("handleFileUploadStream: invalid FTP stream handler for token %q", streamID)
 		cancel()
 		conn.Close()
 		return
 	}
 	if sh.OperatorSession == "" {
-		logging.Errorf("CRITICAL: handleFileUploadStream: missing owner operator for FTP token %q", streamID)
+		logging.Errorf("handleFileUploadStream: missing owner operator for FTP token %q", streamID)
 		cancel()
 		conn.Close()
 		return
@@ -101,7 +101,7 @@ func handleFileUploadStream(conn *transport.SecureConn, agentUUID, streamID, rem
 			copy(chunk, buf[:n])
 			msg := def.MsgTunData{Tag: relayTag, Response: chunk}
 			if sendErr := fwdMsgToOperator(sh.OperatorSession, msg); sendErr != nil {
-				logging.Errorf("CRITICAL: handleFileUploadStream: relay chunk for token %q failed: %v", streamID, sendErr)
+				logging.Errorf("handleFileUploadStream: relay chunk for token %q failed: %v", streamID, sendErr)
 				cancel()
 				conn.Close()
 				return
