@@ -215,7 +215,7 @@ func runClientMode(opts *Options) {
 	// place instead of running cleanupConfig on the C2's private keys.
 	url := fmt.Sprintf("http://%s:%d/%s", wireguard.WgServerIP, wireguard.WgFileServerPort, "emp3r0r_operator_config.tar.gz")
 	downloadClient := &http.Client{Transport: &http.Transport{DialContext: wireguard.DialContext}}
-	err = live.DownloadExtractOperatorConfig(opts.c2_server_ip, url, func(u, p string) error {
+	err = live.DownloadExtractConfig(url, func(u, p string) error {
 		return ftp.DownloadFile(downloadClient, u, p)
 	})
 	if err != nil {
