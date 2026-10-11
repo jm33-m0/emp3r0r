@@ -2,7 +2,7 @@ package transport
 
 // tls_common.go holds the TLS bits that are independent of the TLS client
 // implementation (uTLS or crypto/tls): C2 SNI configuration and the mesh
-// dialer hook. Keeping them here lets tls.go be compiled out under `no_utls`
+// dialer hook. Keeping them here lets tls.go be compiled out without `with_utls`
 // without losing SetC2ServerName/GlobalMeshDialer for the rest of the agent.
 
 import (

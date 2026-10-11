@@ -1,4 +1,4 @@
-//go:build linux && !no_netlink
+//go:build linux && with_netlink
 
 package netutil
 

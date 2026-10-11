@@ -1,4 +1,4 @@
-//go:build linux && (386 || amd64 || arm || arm64) && !no_uring
+//go:build linux && (386 || amd64 || arm || arm64) && with_uring
 
 // Package uring implements a minimal raw io_uring file I/O path.
 //
@@ -591,7 +591,8 @@ func osAppend(name string, data []byte) error {
 // call probes the kernel and caches the answer. There is deliberately no
 // target-side switch: an environment variable would be a brand-identifying
 // detection vector, and a host that blocks io_uring is already detected here.
-// A build that must never use io_uring is produced with `-tags no_uring`.
+// A build that must never use io_uring is produced without the `with_uring`
+// tag.
 func enabled() bool {
 	switch atomic.LoadInt32(&availState) {
 	case stateAvailable:

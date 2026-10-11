@@ -22,6 +22,11 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         go-version: ["1.26"]
+    env:
+      # Agent features are opt-in Go build tags. CI exercises the full set so
+      # every feature and its tests are compiled; the minimal (untagged) build
+      # is checked separately below.
+      BUILD_TAGS: "with_mesh with_kcp with_h2conn with_quic with_utls with_doh with_ech with_cdnproxy with_netlink with_uring"
 
     steps:
       - name: Checkout code
@@ -37,13 +42,17 @@ jobs:
         working-directory: ./core
         run: go mod tidy
 
+      - name: Verify minimal (no-feature) build
+        working-directory: ./core
+        run: go build ./...
+
       - name: Run tests (Linux, with race & coverage)
         if: runner.os == 'Linux'
         working-directory: ./core
         env:
           EMP3R0R_RACE_ON: "1"
         run: |
-          go test -v -race "-coverprofile=coverage.txt" -covermode=atomic ./...
+          go test -v -race -tags "$BUILD_TAGS" "-coverprofile=coverage.txt" -covermode=atomic ./...
 
       - name: Install zig (for BOF loader and shellcode stager tests)
         if: runner.os == 'Linux'
@@ -66,10 +75,10 @@ jobs:
           CGO_ENABLED: 1
           EMP3R0R_RACE_ON: "0"
         run: |
-          go test -v ./lib/coffloader -count=1
-          go test -v ./lib/memmod -count=1
-          go test -v ./lib/script -count=1
-          go test -v ./internal/cc/modules -count=1
+          go test -v -tags "$BUILD_TAGS" ./lib/coffloader -count=1
+          go test -v -tags "$BUILD_TAGS" ./lib/memmod -count=1
+          go test -v -tags "$BUILD_TAGS" ./lib/script -count=1
+          go test -v -tags "$BUILD_TAGS" ./internal/cc/modules -count=1
 
       - name: Run memmod ELF loader tests without cgo (Linux)
         if: runner.os == 'Linux'
@@ -78,8 +87,8 @@ jobs:
           CGO_ENABLED: "0"
           EMP3R0R_RACE_ON: "0"
         run: |
-          go test -v ./lib/memmod -count=1
-          go test -v ./lib/script -count=1
+          go test -v -tags "$BUILD_TAGS" ./lib/memmod -count=1
+          go test -v -tags "$BUILD_TAGS" ./lib/script -count=1
 
       - name: Run shellcode stager lifecycle test (cgo, no race)
         if: runner.os == 'Linux'
@@ -120,7 +129,7 @@ jobs:
           CGO_ENABLED: "1"
           EMP3R0R_RACE_ON: "1"
         run: |
-          go test -v -race ./...
+          go test -v -race -tags "$BUILD_TAGS" ./...
 
       - name: Build COFFLoader and BOF fixtures (Windows)
         if: runner.os == 'Windows'
@@ -140,10 +149,10 @@ jobs:
         env:
           EMP3R0R_RACE_ON: "0"
         run: |
-          go test -v -gcflags="all=-d=checkptr=0" ./lib/coffloader -count=1
-          go test -v -gcflags="all=-d=checkptr=0" ./lib/memmod -count=1
-          go test -v -gcflags="all=-d=checkptr=0" ./internal/agent/modules/...
-          go test -v -gcflags="all=-d=checkptr=0" ./internal/cc/modules/...
+          go test -v -tags "$BUILD_TAGS" -gcflags="all=-d=checkptr=0" ./lib/coffloader -count=1
+          go test -v -tags "$BUILD_TAGS" -gcflags="all=-d=checkptr=0" ./lib/memmod -count=1
+          go test -v -tags "$BUILD_TAGS" -gcflags="all=-d=checkptr=0" ./internal/agent/modules/...
+          go test -v -tags "$BUILD_TAGS" -gcflags="all=-d=checkptr=0" ./internal/cc/modules/...
 
       - name: Display coverage summary
         if: runner.os == 'Linux'

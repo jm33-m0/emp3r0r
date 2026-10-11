@@ -1,4 +1,4 @@
-//go:build !no_cdnproxy
+//go:build with_cdnproxy
 
 package main
 

@@ -1,4 +1,4 @@
-//go:build linux && no_netlink
+//go:build linux && !with_netlink
 
 // Pure-procfs fallback for builds that exclude vishvananda/netlink. The agent
 // only needs route/neighbour tables to render shellhelper's `ip` output, and

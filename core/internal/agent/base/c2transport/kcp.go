@@ -1,4 +1,4 @@
-//go:build !no_kcp
+//go:build with_kcp
 
 package c2transport
 

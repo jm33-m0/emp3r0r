@@ -1,9 +1,9 @@
-//go:build no_utls
+//go:build !with_utls
 
 package transport
 
 // tls_stdlib.go is the crypto/tls client used when the build excludes the uTLS
-// dependency (tag "no_utls"). It preserves the uTLS client's contract: trust
+// dependency (no `with_utls` tag). It preserves the uTLS client's contract: trust
 // the C2 CA, optionally send a cover SNI while still verifying the server
 // certificate against the real C2 host, and honour a configured proxy and the
 // mesh dialer hook.

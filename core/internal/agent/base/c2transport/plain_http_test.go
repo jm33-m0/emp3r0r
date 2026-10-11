@@ -248,7 +248,7 @@ func TestPlainHTTPCheckinACK(t *testing.T) {
 }
 
 // requireH2Conn skips a subtest when it targets the h2conn channel but the
-// build excluded that channel (tag "no_h2conn").
+// build excluded that channel (no `with_h2conn` tag).
 func requireH2Conn(t *testing.T, mode string) {
 	t.Helper()
 	if mode != def.C2ChannelModeH2Conn {

@@ -1,4 +1,4 @@
-//go:build !no_mesh
+//go:build with_mesh
 
 // Package mesh implements the emp3r0r P2P mesh stack.
 //

@@ -1,4 +1,4 @@
-//go:build !no_mesh && no_kcp
+//go:build with_mesh && !with_kcp
 
 package transport
 
@@ -13,7 +13,7 @@ func TestMeshTransportsWithoutKCP(t *testing.T) {
 	for _, n := range names {
 		seen[n] = true
 		if n == "kcp" {
-			t.Errorf("kcp transport registered in a no_kcp build: %v", names)
+			t.Errorf("kcp transport registered without with_kcp: %v", names)
 		}
 	}
 	for _, want := range []string{"mtls", "smb"} {

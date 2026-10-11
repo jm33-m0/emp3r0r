@@ -1,4 +1,4 @@
-//go:build no_utls && !no_doh && !no_ech
+//go:build !with_utls && with_doh && with_ech
 
 package transport
 
@@ -10,9 +10,9 @@ import (
 	"time"
 )
 
-// TestECHHandshakeRealDomainStdlib drives the crypto/tls ECH path (the no_utls
-// build) against real ECH-publishing domains and asserts the server accepted
-// ECH and negotiated h2.
+// TestECHHandshakeRealDomainStdlib drives the crypto/tls ECH path (the
+// no-with_utls build) against real ECH-publishing domains and asserts the server
+// accepted ECH and negotiated h2.
 func TestECHHandshakeRealDomainStdlib(t *testing.T) {
 	if testing.Short() {
 		t.Skip("real-network integration test")

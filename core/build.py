@@ -48,15 +48,12 @@ Target selection options (combinable with any build command):
                       C2 server binaries (cc, cat, listener) are always built.
 
 Agent feature selection options (combinable with any build command):
-  --agent-slim        Compile agent payloads without the optional transports
-                      and features (KCP, h2conn, DoH, CDN proxy, netlink) while
-                      keeping uTLS TLS fingerprinting and the core P2P mesh
-                      (mTLS/SMB) enabled. Add the ``no_mesh`` tag to opt out of
-                      P2P entirely, or ``no_utls`` to fall back to crypto/tls.
-  --agent-tags TAGS   Extra Go build tags for every agent payload, e.g.
-                      "no_mesh no_kcp" or a custom tag. Combined with
-                      --agent-slim when both are given. C2 server binaries are
-                      always built with the full feature set.
+  --agent-tags TAGS   Exact set of opt-in feature tags for every agent payload,
+                      e.g. "with_quic with_utls". The default full build enables
+                      every feature; pass --agent-tags to build a lean agent with
+                      only what it needs. See --list-agent-tags.
+  --agent-slim        Build the smallest agent: plain HTTP polling + crypto/tls,
+                      no optional subsystems.
 
 Environment variables:
   EMP3R0R_DISABLE_GARBLE=1   Disable garble obfuscation for non-debug builds
@@ -64,7 +61,7 @@ Environment variables:
   EMP3R0R_TARGETS            Comma-separated targets (same format as --targets)
   EMP3R0R_LIGHTWEIGHT=1      Equivalent to --lightweight
   EMP3R0R_SLIM_AGENT=1       Equivalent to --agent-slim
-  EMP3R0R_AGENT_TAGS         Extra Go build tags for agent payloads
+  EMP3R0R_AGENT_TAGS         Exact opt-in feature tags for agent payloads
 """
 
 import argparse
@@ -97,39 +94,46 @@ REQUIRED_ZIG_VERSION = "0.16.0"
 # mingw shims in the builder image), so the builder image ships it as well.
 REQUIRED_FREE_KB = 10 * 1024 * 1024  # 10 GB
 
-# Optional agent features that can be compiled out. The full build keeps them
-# all (no tags); --agent-slim drops the optional transports and features while
-# keeping the core P2P mesh (memberlist gossip + mTLS/SMB relay) and uTLS TLS
-# fingerprinting enabled. uTLS costs only ~0.8 MiB compressed on the packaged
-# implant, so it is kept in slim builds too; add the ``no_utls`` tag to fall
-# back to crypto/tls. Use the additional ``no_mesh`` tag to opt out of P2P
-# entirely. The tag names must stay in sync with the //go:build constraints
-# across core/.
-SLIM_AGENT_TAGS = "no_kcp no_h2conn no_quic no_doh no_cdnproxy no_netlink"
+# Optional agent features. Every feature is opt-in with a ``with_<feature>``
+# build tag. The default full build enables them all; ``--agent-tags`` selects
+# an exact subset so an agent carries only what it needs, and ``--agent-slim``
+# selects the minimal build (plain HTTP polling + crypto/tls). The tag names
+# must stay in sync with the //go:build constraints across core/.
+ALL_AGENT_TAGS = (
+    "with_mesh with_kcp with_h2conn with_quic with_utls "
+    "with_doh with_ech with_cdnproxy with_netlink with_uring"
+)
 
-# What each exclusion tag disables, shown in --help and --list-agent-tags.
+# The smallest agent: no optional subsystems are compiled in.
+SLIM_AGENT_TAGS = ""
+
+# What each opt-in tag enables, shown in --help and --list-agent-tags.
 # Keep in sync with core/ build constraints and with install.py.
 AGENT_TAG_DOCS: dict[str, str] = {
-    "no_mesh": "P2P mesh and memberlist gossip (peer discovery/routing)",
-    "no_kcp": "KCP C2 transport and the xtaci kcp-go/kcptun/smux stack",
-    "no_h2conn": "HTTP/2 duplex (h2conn) C2 channel",
-    "no_quic": "QUIC C2 transport and the quic-go stack",
-    "no_utls": "uTLS TLS fingerprinting (falls back to crypto/tls)",
-    "no_doh": "DNS-over-HTTPS resolver (uses the OS resolver)",
-    "no_ech": "ECH (Encrypted Client Hello) for C2 TLS; requires DoH",
-    "no_cdnproxy": "CDN fronting proxy (go-cdn2proxy)",
-    "no_netlink": "netlink route/neighbour enumeration (procfs fallback)",
+    "with_mesh": "P2P mesh and memberlist gossip (peer discovery/routing)",
+    "with_kcp": "KCP C2 transport and the xtaci kcp-go/kcptun/smux stack",
+    "with_h2conn": "HTTP/2 duplex (h2conn) C2 channel",
+    "with_quic": "QUIC C2 transport and the quic-go stack",
+    "with_utls": "uTLS TLS fingerprinting (otherwise crypto/tls)",
+    "with_doh": "DNS-over-HTTPS resolver (otherwise the OS resolver)",
+    "with_ech": "ECH (Encrypted Client Hello) for C2 TLS; requires with_doh",
+    "with_cdnproxy": "WebSocket CDN tunnel (go-cdn2proxy; unneeded for HTTP CDN fronting)",
+    "with_netlink": "netlink route/neighbour enumeration (procfs fallback)",
+    "with_uring": "io_uring file-transfer acceleration (sync fallback)",
 }
 
 
 def agent_tag_reference() -> str:
-    """Render the agent exclusion-tag reference for --help/--list-agent-tags."""
+    """Render the agent feature-tag reference for --help/--list-agent-tags."""
     width = max(len(tag) for tag in AGENT_TAG_DOCS)
-    lines = ["Agent exclusion tags (combine freely with --agent-tags):"]
+    lines = ["Agent feature tags (combine freely with --agent-tags):"]
     for tag, desc in AGENT_TAG_DOCS.items():
         lines.append(f"  {tag:<{width}}  {desc}")
     lines.append("")
-    lines.append(f"--agent-slim is shorthand for: {SLIM_AGENT_TAGS}")
+    lines.append(
+        f"--agent-slim builds: {SLIM_AGENT_TAGS or '(no optional features)'}"
+    )
+    lines.append(f"the default full build enables: {ALL_AGENT_TAGS}")
     return "\n".join(lines)
 
 # Extra Go build tags applied to every agent payload in the current run. Set
@@ -796,27 +800,26 @@ def agent_shared_tags(mode: str) -> str:
 
 
 def resolve_agent_tags(args: "argparse.Namespace") -> str:
-    """Resolve the extra agent build tags from CLI flags and environment.
+    """Resolve the opt-in agent feature tags from CLI flags and environment.
 
-    ``--agent-slim`` (or ``EMP3R0R_SLIM_AGENT=1``) adds the recommended
-    exclusion preset; ``--agent-tags`` (or ``EMP3R0R_AGENT_TAGS``) adds an
-    arbitrary user-supplied set. When both are present they are combined, so a
-    user can start from the slim preset and add or replace tags freely.
+    Precedence: ``--agent-tags`` / ``EMP3R0R_AGENT_TAGS`` selects an exact
+    feature set (opt in to exactly what the agent needs); ``--agent-slim`` /
+    ``EMP3R0R_SLIM_AGENT=1`` selects the minimal set; otherwise the full set is
+    used. C2 server binaries always get the full set.
     """
-    groups = []
-    if getattr(args, "agent_slim", False) or os.environ.get(
-        "EMP3R0R_SLIM_AGENT", "0"
-    ).lower() in ("1", "true", "yes"):
-        groups.append(SLIM_AGENT_TAGS)
-
     extra = getattr(args, "agent_tags", "") or os.environ.get(
         "EMP3R0R_AGENT_TAGS", ""
     )
     extra = extra.strip()
     if extra:
-        groups.append(extra)
+        return extra
 
-    return " ".join(g for g in groups if g).strip()
+    if getattr(args, "agent_slim", False) or os.environ.get(
+        "EMP3R0R_SLIM_AGENT", "0"
+    ).lower() in ("1", "true", "yes"):
+        return SLIM_AGENT_TAGS
+
+    return ALL_AGENT_TAGS
 
 
 def build_agent_pure(
@@ -1204,14 +1207,15 @@ def build(
         log_info("No target filter: building all platforms")
 
     # ── C2 server binaries (always built, no target filter) ──────────────────
-    # `with_gvisor` is required by the operator-side tun2socks engine
-    # (internal/cc/base/tun2socks): it builds the gVisor user-space TCP stack
-    # into the operator console. cat/listener do not use it.
+    # C2 binaries always carry the full feature set so a single server serves
+    # every agent flavour. `with_gvisor` is additionally required by the
+    # operator-side tun2socks engine (internal/cc/base/tun2socks): it builds the
+    # gVisor user-space TCP stack into the operator console.
 
     log_info("Building CC")
     env_cgo0 = os.environ.copy()
     env_cgo0["CGO_ENABLED"] = "0"
-    cc_cmd = f"{go_bin} build {mod_opt} -tags with_gvisor -buildvcs=false -o \"{temp_dir / 'cc.exe'}\" -ldflags=\"{ldflags}\""
+    cc_cmd = f"{go_bin} build {mod_opt} -tags '{ALL_AGENT_TAGS} with_gvisor' -buildvcs=false -o \"{temp_dir / 'cc.exe'}\" -ldflags=\"{ldflags}\""
     res = run_cmd(
         cc_cmd, check=False, cwd=core_dir / "cmd" / "cc", env=env_cgo0, shell=True
     )
@@ -1219,7 +1223,7 @@ def build(
         log_error("Failed to build CC")
 
     log_info("Building cat")
-    cat_cmd = f"{go_bin} build {mod_opt} -buildvcs=false -o \"{temp_dir / 'cat.exe'}\" -ldflags=\"{ldflags}\""
+    cat_cmd = f"{go_bin} build {mod_opt} -tags '{ALL_AGENT_TAGS}' -buildvcs=false -o \"{temp_dir / 'cat.exe'}\" -ldflags=\"{ldflags}\""
     res = run_cmd(
         cat_cmd, check=False, cwd=core_dir / "cmd" / "cat", env=env_cgo0, shell=True
     )
@@ -1227,7 +1231,7 @@ def build(
         log_error("Failed to build cat")
 
     log_info("Building listener")
-    listener_cmd = f"{go_bin} build {mod_opt} -buildvcs=false -o \"{temp_dir / 'listener.exe'}\" -ldflags=\"{ldflags}\""
+    listener_cmd = f"{go_bin} build {mod_opt} -tags '{ALL_AGENT_TAGS}' -buildvcs=false -o \"{temp_dir / 'listener.exe'}\" -ldflags=\"{ldflags}\""
     res = run_cmd(
         listener_cmd,
         check=False,
@@ -2023,19 +2027,17 @@ def parse_args() -> argparse.Namespace:
     # ── Agent feature selection ───────────────────────────────────────────────
     feat_group = parser.add_argument_group(
         "agent feature selection",
-        "Control which optional agent subsystems are compiled in. The default "
-        "keeps every transport and feature.",
+        "Each optional agent subsystem is opt-in via a with_<feature> tag. The "
+        "default full build enables them all. Use --agent-tags to select an "
+        "exact set, or --agent-slim for the minimal agent.",
     )
     feat_group.add_argument(
         "--agent-slim",
         action="store_true",
         default=False,
         help=(
-            "Compile agents without the optional transports/features (KCP, "
-            "h2conn, DoH, CDN proxy, netlink) while keeping uTLS TLS "
-            "fingerprinting and the core P2P mesh (mTLS/SMB) enabled. Add the "
-            "'no_mesh' tag to opt out of P2P entirely, or 'no_utls' to use "
-            "crypto/tls."
+            "Build the smallest agent: plain HTTP polling with crypto/tls and no "
+            "optional subsystems. Ignored when --agent-tags is also given."
         ),
     )
     feat_group.add_argument(
@@ -2043,16 +2045,16 @@ def parse_args() -> argparse.Namespace:
         metavar="TAGS",
         default="",
         help=(
-            "Space-separated Go build tags to add to every agent payload, "
-            "e.g. 'no_mesh no_kcp' or a custom tag. Combined with "
-            "--agent-slim when both are given; C2 binaries are never tagged. "
-            "See the tag reference below or --list-agent-tags."
+            "Exact space-separated feature tags for every agent payload, e.g. "
+            "'with_quic with_utls'. Selects only those features; the default "
+            "full build enables all of them. C2 binaries always keep the full "
+            "set. See the tag reference below or --list-agent-tags."
         ),
     )
     parser.add_argument(
         "--list-agent-tags",
         action="store_true",
-        help="Print the available agent exclusion tags and exit",
+        help="Print the available agent feature tags and exit",
     )
     parser.add_argument(
         "--dry-run",

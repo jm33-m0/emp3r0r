@@ -1,4 +1,4 @@
-//go:build !no_mesh
+//go:build with_mesh
 
 package transport
 

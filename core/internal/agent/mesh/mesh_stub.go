@@ -1,9 +1,9 @@
-//go:build no_mesh
+//go:build !with_mesh
 
 // Package mesh is the stub form of the P2P mesh stack used when the build
-// excludes memberlist gossip (tag "no_mesh"). cmd/agent and the command
-// handlers still reference the mesh API, so keep the surface identical and
-// make every operation a safe no-op.
+// omits the `with_mesh` tag. cmd/agent and the command handlers still reference
+// the mesh API, so keep the surface identical and make every operation a safe
+// no-op.
 package mesh
 
 import (

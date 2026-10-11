@@ -7,8 +7,8 @@ package transport
 // C2 hostname. The ECHConfigList is published in the domain's DNS HTTPS RR and
 // is fetched over DoH, so ECH also requires a DoH resolver.
 //
-// The feature can be compiled out with the "no_ech" tag (or "no_doh", on which
-// it depends); the fetch/cache implementation lives in ech.go and the disabled
+// The feature can be compiled out by omitting the "with_ech" tag (or "with_doh",
+// on which it depends); the fetch/cache implementation lives in ech.go and the disabled
 // stub in ech_stub.go.
 
 import (

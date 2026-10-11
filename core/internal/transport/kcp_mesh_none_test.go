@@ -1,4 +1,4 @@
-//go:build no_mesh || no_kcp
+//go:build !with_mesh || !with_kcp
 
 package transport
 

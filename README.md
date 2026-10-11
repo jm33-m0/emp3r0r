@@ -160,7 +160,7 @@ Pivot without burning another implant: the C2 runs a SOCKS5 proxy that relays th
 
 ### 🎭 Pluggable C2 Transport, uTLS JA3 Evasion & CBOR Protocol
 
-- Choose beacon-style HTTP polling, streaming HTTP/2, or a QUIC UDP channel with a per-build static-key datagram obfuscation — all with malleable profiles. QUIC defaults to the custom key; `--quic-standard-key` opts out for stock QUIC (interoperable with HTTP/3 endpoints).
+- Choose beacon-style HTTP polling, streaming HTTP/2, or a QUIC UDP channel — HTTP/2 and QUIC are opt-in build tags (`with_h2conn`, `with_quic`). The QUIC channel obfuscates every datagram with a per-build static key by default; the `--quic-standard-key` generate flag opts out and speaks stock QUIC (interoperable with HTTP/3 endpoints). Every channel supports malleable profiles.
 - TLS fingerprints are randomized with uTLS, so the channel doesn't stand out in network telemetry.
 - Behind an ECH-capable CDN edge, `--ech` (with `--doh`) encrypts the inner SNI so the real C2 hostname never appears in the ClientHello.
 - Control traffic rides a compact CBOR protocol — smaller, faster, and harder to parse than JSON.
@@ -169,13 +169,25 @@ Pivot without burning another implant: the C2 runs a SOCKS5 proxy that relays th
 
 ---
 
-### 🪶 Modular Agents — Compile Out What You Don't Need
+### 🪶 Modular Agents — Opt In To What You Need
 
-Every unused subsystem is another dependency and another string for a defender to find. Agents are built from independently gated features, so a payload carries only what the mission needs.
+Every unused subsystem is another dependency and another string for a defender to find. Optional agent subsystems are **opt-in** with `with_*` build tags, so a payload carries only what the mission needs.
 
-- `install.py --agent-slim` drops the optional transports and helpers (KCP, h2conn, QUIC, DoH, ECH, CDN proxy, netlink); uTLS TLS fingerprinting stays enabled because it adds only ~0.8 MB to the compressed shellcode. Add `no_utls` to fall back to `crypto/tls`, or `no_ech` to drop ECH without dropping DoH.
-- The P2P mesh is a core feature — it stays enabled by default, and `no_mesh` opts out for a standalone agent.
-- `--agent-tags '<tags>'` compiles out any subset (`--list-agent-tags` prints the reference); C2 binaries always keep the full feature set.
+- `--agent-tags 'with_quic with_utls'` compiles in exactly those features; `--list-agent-tags` prints the full reference. The default full build enables every feature; `--agent-slim` builds the minimal agent (plain HTTP polling with `crypto/tls`, no optional subsystems).
+- C2 server binaries always keep the full feature set, so one C2 serves every agent flavour.
+- Pick tags by scenario:
+
+  | Scenario                            | `--agent-tags`                                                                                               |
+  | ----------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+  | Smallest footprint / fewest strings | `--agent-slim` (no tags)                                                                                     |
+  | Randomized TLS fingerprint (uTLS)   | `with_utls`                                                                                                  |
+  | HTTP/2 streaming transport          | `with_h2conn`                                                                                                |
+  | QUIC transport, custom static key   | `with_quic`                                                                                                  |
+  | ECH behind an ECH-capable CDN       | `with_doh with_ech with_utls`                                                                                |
+  | P2P mesh (relay + gossip)           | `with_mesh with_kcp`                                                                                         |
+  | Everything                          | `with_mesh with_kcp with_h2conn with_quic with_utls with_doh with_ech with_cdnproxy with_netlink with_uring` |
+
+> CDN fronting needs no extra build tag. Every CDN fronts plain HTTP(S), so point `--cc` at the CDN hostname and use the default `http_poll` transport (or `with_h2conn` for HTTP/2). `with_cdnproxy` only compiles the separate WebSocket `--cdn` tunnel and is unnecessary when the CDN already terminates HTTPS.
 
 **Why this matters:** a smaller implant has a shorter string table and fewer third-party dependencies for EDR and AV to key on, while still speaking the full C2 protocol.
 

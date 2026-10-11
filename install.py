@@ -39,34 +39,41 @@ PROXY_NS_CAPS = (
 # kit ships the upstream default and the installer drops it here.
 PROXY_NS_SYSTEM_CONFIG = pathlib.Path("/etc/proxy-ns/config.json")
 
-# What each agent exclusion tag disables. Keep in sync with core/build.py and
-# the //go:build constraints across core/.
+# What each opt-in agent feature tag enables. Keep in sync with core/build.py
+# and the //go:build constraints across core/.
 AGENT_TAG_DOCS: dict[str, str] = {
-    "no_mesh": "P2P mesh and memberlist gossip (peer discovery/routing)",
-    "no_kcp": "KCP C2 transport and the xtaci kcp-go/kcptun/smux stack",
-    "no_h2conn": "HTTP/2 duplex (h2conn) C2 channel",
-    "no_quic": "QUIC C2 transport and the quic-go stack",
-    "no_utls": "uTLS TLS fingerprinting (falls back to crypto/tls)",
-    "no_doh": "DNS-over-HTTPS resolver (uses the OS resolver)",
-    "no_ech": "ECH (Encrypted Client Hello) for C2 TLS; requires DoH",
-    "no_cdnproxy": "CDN fronting proxy (go-cdn2proxy)",
-    "no_netlink": "netlink route/neighbour enumeration (procfs fallback)",
+    "with_mesh": "P2P mesh and memberlist gossip (peer discovery/routing)",
+    "with_kcp": "KCP C2 transport and the xtaci kcp-go/kcptun/smux stack",
+    "with_h2conn": "HTTP/2 duplex (h2conn) C2 channel",
+    "with_quic": "QUIC C2 transport and the quic-go stack",
+    "with_utls": "uTLS TLS fingerprinting (otherwise crypto/tls)",
+    "with_doh": "DNS-over-HTTPS resolver (otherwise the OS resolver)",
+    "with_ech": "ECH (Encrypted Client Hello) for C2 TLS; requires with_doh",
+    "with_cdnproxy": "WebSocket CDN tunnel (go-cdn2proxy; unneeded for HTTP CDN fronting)",
+    "with_netlink": "netlink route/neighbour enumeration (procfs fallback)",
+    "with_uring": "io_uring file-transfer acceleration (sync fallback)",
 }
 
-# Recommended --agent-slim exclusions. P2P mesh and uTLS TLS fingerprinting
-# stay enabled (uTLS is only ~0.8 MiB compressed); use the additional
-# "no_mesh"/"no_utls" tags to drop them. Keep in sync with core/build.py.
-SLIM_AGENT_TAGS = "no_kcp no_h2conn no_quic no_doh no_cdnproxy no_netlink"
+# The default full build enables every feature; --agent-slim selects the
+# minimal agent (plain HTTP polling + crypto/tls, no optional subsystems).
+ALL_AGENT_TAGS = (
+    "with_mesh with_kcp with_h2conn with_quic with_utls "
+    "with_doh with_ech with_cdnproxy with_netlink with_uring"
+)
+SLIM_AGENT_TAGS = ""
 
 
 def agent_tag_reference() -> str:
-    """Render the agent exclusion-tag reference for --help/--list-agent-tags."""
+    """Render the agent feature-tag reference for --help/--list-agent-tags."""
     width = max(len(tag) for tag in AGENT_TAG_DOCS)
-    lines = ["Agent exclusion tags (combine freely with --agent-tags):"]
+    lines = ["Agent feature tags (combine freely with --agent-tags):"]
     for tag, desc in AGENT_TAG_DOCS.items():
         lines.append(f"  {tag:<{width}}  {desc}")
     lines.append("")
-    lines.append(f"--agent-slim is shorthand for: {SLIM_AGENT_TAGS}")
+    lines.append(
+        f"--agent-slim builds: {SLIM_AGENT_TAGS or '(no optional features)'}"
+    )
+    lines.append(f"the default full build enables: {ALL_AGENT_TAGS}")
     return "\n".join(lines)
 
 
@@ -796,11 +803,8 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         default=False,
         help=(
-            "Compile agents without the optional transports/features (KCP, "
-            "h2conn, DoH, CDN proxy, netlink) while keeping uTLS TLS "
-            "fingerprinting and the core P2P mesh (mTLS/SMB) enabled. Add the "
-            "'no_mesh' tag to opt out of P2P entirely, or 'no_utls' to use "
-            "crypto/tls."
+            "Build the smallest agent: plain HTTP polling with crypto/tls and no "
+            "optional subsystems. Ignored when --agent-tags is also given."
         ),
     )
     feat_group.add_argument(
@@ -808,15 +812,16 @@ def parse_args() -> argparse.Namespace:
         metavar="TAGS",
         default="",
         help=(
-            "Space-separated Go build tags to add to every agent payload, e.g. "
-            "'no_mesh no_kcp' or a custom tag. Combined with --agent-slim when "
-            "both are given. See the tag reference below or --list-agent-tags."
+            "Exact space-separated feature tags for every agent payload, e.g. "
+            "'with_quic with_utls'. Selects only those features; the default "
+            "full build enables all of them. See the tag reference below or "
+            "--list-agent-tags."
         ),
     )
     parser.add_argument(
         "--list-agent-tags",
         action="store_true",
-        help="Print the available agent exclusion tags and exit",
+        help="Print the available agent feature tags and exit",
     )
 
     return parser.parse_args()

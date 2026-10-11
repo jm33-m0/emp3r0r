@@ -1,4 +1,4 @@
-//go:build no_quic
+//go:build !with_quic
 
 package transport
 

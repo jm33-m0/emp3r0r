@@ -1,4 +1,4 @@
-//go:build !no_h2conn
+//go:build with_h2conn
 
 package transport
 

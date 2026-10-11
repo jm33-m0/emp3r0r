@@ -1,4 +1,4 @@
-//go:build !no_utls && !no_doh && !no_ech
+//go:build with_utls && with_doh && with_ech
 
 package transport
 

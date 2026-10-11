@@ -1,4 +1,4 @@
-//go:build !no_quic
+//go:build with_quic
 
 // This file implements the QUIC C2 transport: a QUIC byte-stream channel whose
 // UDP datagrams are optionally obfuscated with a per-build static key.

@@ -1,4 +1,4 @@
-//go:build linux && (386 || amd64 || arm || arm64) && !no_uring
+//go:build linux && (386 || amd64 || arm || arm64) && with_uring
 
 package uring
 

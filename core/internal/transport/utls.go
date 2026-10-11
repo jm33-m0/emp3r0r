@@ -1,4 +1,4 @@
-//go:build !no_utls
+//go:build with_utls
 
 // Support code for TLS camouflage using uTLS.
 //
@@ -55,7 +55,7 @@ import (
 )
 
 // We use this RoundTripper to make all our requests when neither --helper nor
-// utls is in effect. It lives in tls_common.go so the no_utls build can reuse
+// utls is in effect. It lives in tls_common.go so the non-uTLS build can reuse
 // it without compiling any uTLS code.
 
 // Extract a host:port address from a URL, suitable for passing to net.Dial.

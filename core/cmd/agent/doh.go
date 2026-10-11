@@ -1,4 +1,4 @@
-//go:build !no_doh
+//go:build with_doh
 
 package main
 
