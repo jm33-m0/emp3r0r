@@ -287,10 +287,10 @@ zig*
 
 # clangd
 compile_commands.json
-vendor/
 
 # Go
 .config/
+/core/vendor/
 
 # SilentMoonwalk desync core (assembled by build.py / go generate / make)
 core/lib/syscall/smw/*.syso
