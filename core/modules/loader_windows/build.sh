@@ -17,9 +17,9 @@
 #   dll      DLL exporting Run() for in-memory or normal loading
 #
 # The packed artifacts are embedded with .incbin (stage_data.S), not RCDATA,
-# so the DLL form works when mapped in memory. Shared payload sources (rc4,
-# ntsys, smw) come from ../common/ (mirrored into the operator workspace next
-# to this module, like bof_common).
+# so the DLL form works when mapped in memory. Shared payload sources are
+# mirrored into the operator workspace next to this module: rc4 comes from
+# ../../c_agent/, ntsys and smw from ../common/.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -339,7 +339,7 @@ cp "$SCRIPT_DIR"/loader.c "$SCRIPT_DIR"/stager.c "$SCRIPT_DIR"/dllhost.c \
   "$SCRIPT_DIR"/reflect.c "$SCRIPT_DIR"/reflect.h \
   "$SCRIPT_DIR"/stage_abi.h "$SCRIPT_DIR"/stage_data.h \
   "$SCRIPT_DIR"/pack.c "$SCRIPT_DIR"/config.h \
-  "$SCRIPT_DIR"/../common/rc4.c "$SCRIPT_DIR"/../common/rc4.h \
+  "$SCRIPT_DIR"/../../c_agent/src/rc4.c "$SCRIPT_DIR"/../../c_agent/include/rc4.h \
   "$SCRIPT_DIR"/../common/ntsys.c "$SCRIPT_DIR"/../common/ntsys.h \
   "$BUILDDIR"/
 if [[ -n "$SMW_FLAG" ]]; then

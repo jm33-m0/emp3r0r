@@ -1,8 +1,10 @@
 #define _GNU_SOURCE
+#include "debug.h"
 #include "downloader_blob.h"
 #include "rc4.h"
 #include "stage_abi.h"
 #include "state.h"
+#include "strings.h"
 #include "syscalls.h"
 #include "utils.h"
 #if SUPERVISE

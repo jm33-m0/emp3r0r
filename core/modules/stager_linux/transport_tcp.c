@@ -1,5 +1,6 @@
 #include "transport.h"
 #include "net_utils.h"
+#include "strings.h"
 #include "utils.h"
 
 #define BUFFER_SIZE 65536

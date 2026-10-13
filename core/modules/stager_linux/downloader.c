@@ -1,6 +1,8 @@
 #define _GNU_SOURCE
+#include "debug.h"
 #include "packer.h"
 #include "stage_abi.h"
+#include "strings.h"
 #include "syscalls.h"
 #include "transport.h"
 #include "utils.h"

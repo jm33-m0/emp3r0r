@@ -66,8 +66,11 @@
  *     Content-Length or close the connection (the built-in listener does).
  */
 
+#include "debug.h"
 #include "dynload.h"
+#include "state.h"
 #include "net_utils.h"
+#include "strings.h"
 #include "transport.h"
 #include "utils.h"
 
@@ -227,7 +230,7 @@ static int libssl_load(ssl_api *api) {
 
   size_t nsons = sizeof(LIBSONAMES) / sizeof(LIBSONAMES[0]);
   for (size_t i = 0; i < nsons; i++) {
-    api->lib = dynload_open(LIBSONAMES[i], RTLD_NOW | RTLD_LOCAL);
+    api->lib = dynload_open(stager_dynload(), LIBSONAMES[i], RTLD_NOW | RTLD_LOCAL);
     if (api->lib) {
       debug_print("libssl: loaded %s\n", LIBSONAMES[i]);
       break;
@@ -237,29 +240,29 @@ static int libssl_load(ssl_api *api) {
     return 0;
 
   api->init_ssl =
-      (openssl_init_ssl_fn)dynload_sym(api->lib, "OPENSSL_init_ssl");
+      (openssl_init_ssl_fn)dynload_sym(stager_dynload(), api->lib, "OPENSSL_init_ssl");
   api->library_init =
-      (ssl_library_init_fn)dynload_sym(api->lib, "SSL_library_init");
+      (ssl_library_init_fn)dynload_sym(stager_dynload(), api->lib, "SSL_library_init");
   api->client_method =
-      (client_method_fn)dynload_sym(api->lib, "TLS_client_method");
+      (client_method_fn)dynload_sym(stager_dynload(), api->lib, "TLS_client_method");
   if (!api->client_method)
     api->client_method =
-        (client_method_fn)dynload_sym(api->lib, "SSLv23_client_method");
-  api->ctx_new = (ssl_ctx_new_fn)dynload_sym(api->lib, "SSL_CTX_new");
-  api->ctx_free = (ssl_ctx_free_fn)dynload_sym(api->lib, "SSL_CTX_free");
+        (client_method_fn)dynload_sym(stager_dynload(), api->lib, "SSLv23_client_method");
+  api->ctx_new = (ssl_ctx_new_fn)dynload_sym(stager_dynload(), api->lib, "SSL_CTX_new");
+  api->ctx_free = (ssl_ctx_free_fn)dynload_sym(stager_dynload(), api->lib, "SSL_CTX_free");
   api->ctx_set_verify =
-      (ssl_ctx_set_verify_fn)dynload_sym(api->lib, "SSL_CTX_set_verify");
-  api->ssl_new = (ssl_new_fn)dynload_sym(api->lib, "SSL_new");
-  api->ssl_free = (ssl_free_fn)dynload_sym(api->lib, "SSL_free");
-  api->set_fd = (ssl_set_fd_fn)dynload_sym(api->lib, "SSL_set_fd");
-  api->ctrl = (ssl_ctrl_fn)dynload_sym(api->lib, "SSL_ctrl");
-  api->connect = (ssl_connect_fn)dynload_sym(api->lib, "SSL_connect");
-  api->write = (ssl_write_fn)dynload_sym(api->lib, "SSL_write");
-  api->read = (ssl_read_fn)dynload_sym(api->lib, "SSL_read");
-  api->shutdown = (ssl_shutdown_fn)dynload_sym(api->lib, "SSL_shutdown");
+      (ssl_ctx_set_verify_fn)dynload_sym(stager_dynload(), api->lib, "SSL_CTX_set_verify");
+  api->ssl_new = (ssl_new_fn)dynload_sym(stager_dynload(), api->lib, "SSL_new");
+  api->ssl_free = (ssl_free_fn)dynload_sym(stager_dynload(), api->lib, "SSL_free");
+  api->set_fd = (ssl_set_fd_fn)dynload_sym(stager_dynload(), api->lib, "SSL_set_fd");
+  api->ctrl = (ssl_ctrl_fn)dynload_sym(stager_dynload(), api->lib, "SSL_ctrl");
+  api->connect = (ssl_connect_fn)dynload_sym(stager_dynload(), api->lib, "SSL_connect");
+  api->write = (ssl_write_fn)dynload_sym(stager_dynload(), api->lib, "SSL_write");
+  api->read = (ssl_read_fn)dynload_sym(stager_dynload(), api->lib, "SSL_read");
+  api->shutdown = (ssl_shutdown_fn)dynload_sym(stager_dynload(), api->lib, "SSL_shutdown");
 #if MALLEABLE_ENABLE_ECH
   /* Optional: only present on OpenSSL 4.0+. Its absence is not an error. */
-  api->set1_ech_config_list = (ssl_set1_ech_config_list_fn)dynload_sym(
+  api->set1_ech_config_list = (ssl_set1_ech_config_list_fn)dynload_sym(stager_dynload(), 
       api->lib, "SSL_set1_ech_config_list");
   api->ech_available = (api->set1_ech_config_list != NULL);
 #endif
@@ -267,7 +270,7 @@ static int libssl_load(ssl_api *api) {
   if (!api->client_method || !api->ctx_new || !api->ctx_free ||
       !api->ctx_set_verify || !api->ssl_new || !api->ssl_free || !api->set_fd ||
       !api->connect || !api->write || !api->read) {
-    dynload_close(api->lib);
+    dynload_close(stager_dynload(), api->lib);
     api->lib = NULL;
     return 0;
   }
@@ -276,7 +279,7 @@ static int libssl_load(ssl_api *api) {
 
 static void libssl_unload(ssl_api *api) {
   if (api->lib) {
-    dynload_close(api->lib);
+    dynload_close(stager_dynload(), api->lib);
     api->lib = NULL;
   }
 }

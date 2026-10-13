@@ -1,4 +1,12 @@
+#include "state.h"
 #include "syscalls.h"
+
+/*
+ * The stager caches the vDSO `syscall; ret` gadget in its GS state block (the
+ * image is mapped RX, so there is no writable global). This is the external
+ * gadget provider selected by -DC2_SYSCALL_GADGET_EXTERN.
+ */
+void *get_syscall_gadget(void) { return get_stager_state()->syscall_gadget; }
 
 /* ---- vDSO gadget resolution (called once from init) ---- */
 
