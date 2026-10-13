@@ -300,7 +300,7 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
         (data_dir / "emp3r0r-cc").chmod(0o755)
         (data_dir / "emp3r0r-cat").chmod(0o755)
 
-        for d in ["build", "modules", "tmux", "zig", "nasm"]:
+        for d in ["build", "modules", "c_agent", "tmux", "zig", "nasm"]:
             src_d = kit_dir / "lib" / "emp3r0r" / d
             if src_d.is_dir():
                 shutil.copytree(

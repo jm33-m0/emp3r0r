@@ -1607,7 +1607,7 @@ def package_operator_bundle(prefix: str, core_dir: pathlib.Path) -> None:
         else:
             log_warn(f"emp3r0r-listener not found at {listener_src}; skipping")
 
-        for d in ["build", "modules", "tmux", "zig", "nasm"]:
+        for d in ["build", "modules", "c_agent", "tmux", "zig", "nasm"]:
             src_dir = lib_src / d
             if src_dir.is_dir():
                 shutil.copytree(
@@ -1744,6 +1744,13 @@ def do_install(prefix: str, temp_dir: pathlib.Path, core_dir: pathlib.Path) -> N
                 dirs_exist_ok=True,
                 copy_function=copy2_atomic,
             )
+        if (temp_dir / "c_agent").is_dir():
+            shutil.copytree(
+                temp_dir / "c_agent",
+                data_dir / "c_agent",
+                dirs_exist_ok=True,
+                copy_function=copy2_atomic,
+            )
 
         for stub in temp_dir.glob("stub*"):
             copy2_atomic(stub, build_dir / stub.name)
@@ -1867,7 +1874,7 @@ def do_uninstall(prefix: str) -> None:
 
 def prepare_misc_files(core_dir: pathlib.Path, temp_dir: pathlib.Path) -> None:
     log_info("Preparing misc files")
-    for name in ["tmux", "modules", "emp3r0r"]:
+    for name in ["tmux", "modules", "c_agent", "emp3r0r"]:
         src = core_dir / name
         if src.exists():
             if src.is_dir():
