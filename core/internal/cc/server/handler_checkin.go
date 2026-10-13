@@ -250,7 +250,7 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 
 	// Send checkin-ok ACK to agent
 	// This helps agents synchronize their connection teardown, especially in polling modes
-	ack := &def.MsgTunData{Tag: "checkin-ok"}
+	ack := &def.MsgTunData{Tag: def.TagCheckinOK}
 	if err := out.Encode(ack); err != nil {
 		logging.Errorf("Failed to send checkin-ok ACK to %s: %v", util.AgentRef(target.UUID), err)
 	}

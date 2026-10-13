@@ -61,7 +61,7 @@ func ReportStatus(config *def.Config, info *def.Emp3r0rAgent) (err error) {
 	if err = dec.Decode(&ack); err != nil {
 		return fmt.Errorf("decode checkin ACK: %v", err)
 	}
-	if ack.Tag != "checkin-ok" {
+	if ack.Tag != def.TagCheckinOK {
 		return fmt.Errorf("invalid checkin ACK tag: %s", ack.Tag)
 	}
 
@@ -169,7 +169,7 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 			}
 
 			// if it's a handshake reply
-			if msg.Tag == "handshake" {
+			if msg.Tag == def.TagHandshake {
 				// Only mark a hello as answered if sendHello is actually waiting
 				// on this JobID. Otherwise a late/unsolicited reply would leak an
 				// entry into HandShakes forever.

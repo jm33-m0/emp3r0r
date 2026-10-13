@@ -38,6 +38,9 @@ func VerifyMsgAuth(auth *def.MsgAuth) error {
 	if auth.Type != def.MsgAuthType {
 		return fmt.Errorf("unexpected MsgAuth type %q", auth.Type)
 	}
+	if auth.ProtocolVersion != def.ProtocolVersion {
+		return fmt.Errorf("unsupported protocol version %d (want %d)", auth.ProtocolVersion, def.ProtocolVersion)
+	}
 	if auth.AgentUUID == "" {
 		return fmt.Errorf("empty AgentUUID")
 	}

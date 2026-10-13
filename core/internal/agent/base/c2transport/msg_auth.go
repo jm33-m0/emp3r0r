@@ -35,14 +35,15 @@ func sendMsgAuthEnvelope(w io.Writer, capabilities []string, streamID string) er
 	}
 
 	msg := def.MsgAuth{
-		Type:          def.MsgAuthType,
-		AgentUUID:     cfg.AgentUUID,
-		IdentityToken: cfg.AgentUUIDSig,
-		Nonce:         nonce,
-		Timestamp:     now,
-		AgentProof:    base64.URLEncoding.EncodeToString(sig),
-		Capabilities:  capabilities,
-		StreamID:      streamID,
+		Type:            def.MsgAuthType,
+		AgentUUID:       cfg.AgentUUID,
+		IdentityToken:   cfg.AgentUUIDSig,
+		Nonce:           nonce,
+		Timestamp:       now,
+		AgentProof:      base64.URLEncoding.EncodeToString(sig),
+		Capabilities:    capabilities,
+		StreamID:        streamID,
+		ProtocolVersion: def.ProtocolVersion,
 	}
 	return cbor.NewEncoder(w).Encode(msg)
 }

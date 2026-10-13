@@ -55,10 +55,10 @@ func stagedLoaderHostCC(t *testing.T) string {
 	return ""
 }
 
-// TestSharedModuleDirsMirrored verifies that the shared payload directories
-// (bof_common for BOF headers, common for cross-platform payload C sources)
-// are mirrored from the search dirs into the operator workspace, where
-// buildable modules reference them via relative paths.
+// TestSharedModuleDirsMirrored verifies that the shared payload directories are
+// mirrored from the search dirs into the operator workspace, where buildable
+// modules reference them via relative paths: bof_common/common as ../<dir> and
+// c_agent as ../../c_agent (it lives outside the modules tree).
 func TestSharedModuleDirsMirrored(t *testing.T) {
 	searchDir, workspace := newWatchTestRoot(t)
 	defer setTestModuleDirs(t, searchDir, workspace)()
@@ -68,7 +68,7 @@ func TestSharedModuleDirsMirrored(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	marker := filepath.Join(searchDir, "common", "rc4.h")
+	marker := filepath.Join(searchDir, "common", "shared_marker.txt")
 	if err := os.WriteFile(marker, []byte("shared-marker"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -81,6 +81,15 @@ func TestSharedModuleDirsMirrored(t *testing.T) {
 	if err := os.WriteFile(smwMarker, []byte("smw-marker"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	// c_agent is a sibling of the modules search dir and must land next to the
+	// workspace's modules/ directory.
+	agentDir := filepath.Join(filepath.Dir(searchDir), "c_agent")
+	if err := os.MkdirAll(agentDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(agentDir, "marker.txt"), []byte("agent-marker"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	loadModFromDirs()
 
@@ -91,13 +100,17 @@ func TestSharedModuleDirsMirrored(t *testing.T) {
 			t.Fatalf("shared dir %q was not mirrored into the workspace", dir)
 		}
 	}
-	mirrored, err := os.ReadFile(filepath.Join(workspace, "modules", "common", "rc4.h"))
+	mirrored, err := os.ReadFile(filepath.Join(workspace, "modules", "common", "shared_marker.txt"))
 	if err != nil || string(mirrored) != "shared-marker" {
-		t.Fatalf("mirrored common/rc4.h content mismatch: %q, %v", mirrored, err)
+		t.Fatalf("mirrored common/shared_marker.txt content mismatch: %q, %v", mirrored, err)
 	}
 	mirroredSmw, err := os.ReadFile(filepath.Join(workspace, "modules", "common", "smw", "smw.h"))
 	if err != nil || string(mirroredSmw) != "smw-marker" {
 		t.Fatalf("mirrored common/smw/smw.h content mismatch: %q, %v", mirroredSmw, err)
+	}
+	mirroredAgent, err := os.ReadFile(filepath.Join(workspace, "c_agent", "marker.txt"))
+	if err != nil || string(mirroredAgent) != "agent-marker" {
+		t.Fatalf("mirrored c_agent/marker.txt content mismatch: %q, %v", mirroredAgent, err)
 	}
 }
 
@@ -206,8 +219,8 @@ func TestStagedLoaderPackRC4RoundTrip(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		packExe += ".exe"
 	}
-	buildPack := exec.Command(cc, "-O2", "-Wall", "-I", "../common", "-o", packExe,
-		"pack.c", "../common/rc4.c")
+	buildPack := exec.Command(cc, "-O2", "-Wall", "-I", "../../c_agent/include", "-o", packExe,
+		"pack.c", "../../c_agent/src/rc4.c")
 	buildPack.Dir = dir
 	if out, err := buildPack.CombinedOutput(); err != nil {
 		t.Fatalf("compiling pack: %v\n%s", err, out)

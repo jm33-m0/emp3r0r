@@ -25,6 +25,13 @@ type MeshNodeMeta struct {
 // TagAgentToken is the MsgTunData tag for token push from C2 to agent.
 const TagAgentToken = "agent_token"
 
+// TagCheckinOK is the C2 -> agent MsgTunData tag acknowledging a check-in.
+const TagCheckinOK = "checkin-ok"
+
+// TagHandshake is the C2 -> agent MsgTunData tag carrying the ECDH reply (or a
+// keep-alive response once PFS is established).
+const TagHandshake = "handshake"
+
 // TagPeerList is the MsgTunData tag for P2P peer list push from C2 to agent.
 const TagPeerList = "peer_list"
 

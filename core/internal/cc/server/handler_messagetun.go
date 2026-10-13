@@ -345,7 +345,7 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 				// respond with Server Public Key (or random data), wrapped in MsgTunData
 				replyMsg := def.MsgTunData{
 					JobID:    msg.JobID,
-					Tag:      "handshake",
+					Tag:      def.TagHandshake,
 					Response: replyData,
 				}
 				encoder := cbor.NewEncoder(secureConn)

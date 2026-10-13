@@ -83,11 +83,12 @@ func TestVerifyMsgAuthRejectsMalformed(t *testing.T) {
 			t.Fatalf("sign: %v", err)
 		}
 		a := &def.MsgAuth{
-			Type:          def.MsgAuthType,
-			AgentUUID:     "agent-1",
-			IdentityToken: base64.URLEncoding.EncodeToString(sig),
-			Nonce:         "nonce",
-			Timestamp:     time.Now().Unix(),
+			Type:            def.MsgAuthType,
+			ProtocolVersion: def.ProtocolVersion,
+			AgentUUID:       "agent-1",
+			IdentityToken:   base64.URLEncoding.EncodeToString(sig),
+			Nonce:           "nonce",
+			Timestamp:       time.Now().Unix(),
 		}
 		mut(a)
 		return a
@@ -102,6 +103,18 @@ func TestVerifyMsgAuthRejectsMalformed(t *testing.T) {
 		a := mk(func(m *def.MsgAuth) { m.Type = "nope" })
 		if err := VerifyMsgAuth(a); err == nil {
 			t.Fatal("expected error for wrong type")
+		}
+	})
+	t.Run("wrong protocol version", func(t *testing.T) {
+		a := mk(func(m *def.MsgAuth) { m.ProtocolVersion = def.ProtocolVersion + 1 })
+		if err := VerifyMsgAuth(a); err == nil {
+			t.Fatal("expected error for wrong protocol version")
+		}
+	})
+	t.Run("missing protocol version", func(t *testing.T) {
+		a := mk(func(m *def.MsgAuth) { m.ProtocolVersion = 0 })
+		if err := VerifyMsgAuth(a); err == nil {
+			t.Fatal("expected error for missing protocol version")
 		}
 	})
 	t.Run("empty agent uuid", func(t *testing.T) {
@@ -168,11 +181,12 @@ func TestVerifyMsgAuthAcceptsValidToken(t *testing.T) {
 		t.Fatalf("sign: %v", err)
 	}
 	auth := &def.MsgAuth{
-		Type:          def.MsgAuthType,
-		AgentUUID:     "agent-1",
-		IdentityToken: base64.URLEncoding.EncodeToString(sig),
-		Nonce:         "nonce",
-		Timestamp:     time.Now().Unix(),
+		Type:            def.MsgAuthType,
+		ProtocolVersion: def.ProtocolVersion,
+		AgentUUID:       "agent-1",
+		IdentityToken:   base64.URLEncoding.EncodeToString(sig),
+		Nonce:           "nonce",
+		Timestamp:       time.Now().Unix(),
 	}
 	if err := VerifyMsgAuth(auth); err != nil {
 		t.Fatalf("valid MsgAuth rejected: %v", err)

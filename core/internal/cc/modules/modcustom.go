@@ -496,9 +496,11 @@ func scanModuleDirs(handleModuleConfig func(dir string) error) {
 }
 
 // loadModFromDirs registers every module config found in live.ModuleDirs.
-// It also mirrors shared payload directories (bof_common for BOF headers,
-// common for cross-platform payload C sources) into the operator workspace,
-// where buildable/local modules reference them via relative paths.
+// It also mirrors shared payload directories into the operator workspace, where
+// buildable/local modules reference them via relative paths: bof_common (BOF
+// headers) and common (cross-platform C sources) as ../<name>, and c_agent (the
+// reusable C agent library) as ../../c_agent because it lives outside the
+// modules tree.
 func loadModFromDirs() {
 	// Ensure the shared module directories exist in the workspace if they are
 	// present in a search dir.
@@ -511,6 +513,16 @@ func loadModFromDirs() {
 				_ = os.MkdirAll(filepath.Dir(dst), 0o700)
 				_ = util.Copy(src, dst)
 			}
+		}
+	}
+	// c_agent is referenced from a module dir as ../../c_agent, so it is
+	// mirrored next to the workspace's modules/ directory, not inside it.
+	for _, mod_search_dir := range live.ModuleDirs {
+		src := filepath.Clean(filepath.Join(mod_search_dir, "..", "c_agent"))
+		dst := filepath.Join(live.EmpWorkSpace, "c_agent")
+		if util.IsExist(src) && src != dst {
+			_ = os.MkdirAll(filepath.Dir(dst), 0o700)
+			_ = util.Copy(src, dst)
 		}
 	}
 
