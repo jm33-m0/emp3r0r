@@ -59,6 +59,19 @@ static uint64_t align_up(uint64_t val, uint64_t align) {
   return (val + align - 1) & ~(align - 1);
 }
 
+/* True when [off, off+len) lies inside a buffer of `total` bytes. */
+static int range_ok(uint64_t off, uint64_t len, size_t total) {
+  return off <= (uint64_t)total && len <= (uint64_t)total - off;
+}
+
+/* True when a NUL-terminated string at `off` terminates within the table. */
+static int cstr_ok(const char *base, size_t total, uint64_t off) {
+  if (base == NULL || off >= (uint64_t)total) {
+    return 0;
+  }
+  return memchr(base + off, 0, total - (size_t)off) != NULL;
+}
+
 // BOF Mock API State
 static char *bof_out_buf = NULL;
 static size_t bof_out_len = 0;
@@ -104,7 +117,9 @@ void BeaconPrintf(int type, const char *fmt, ...) {
 }
 
 void BeaconOutput(int type, const char *data, int len) {
-  bof_out_append(data, len);
+  if (data == NULL || len <= 0)
+    return;
+  bof_out_append(data, (size_t)len);
 }
 
 // Data parse APIs
@@ -125,7 +140,8 @@ void BeaconDataParse(datap *parser, char *buffer, int size) {
 int BeaconDataInt(datap *parser) {
   if (parser->length < 4)
     return 0;
-  int v = *(int *)parser->buffer;
+  int v;
+  memcpy(&v, parser->buffer, 4);
   parser->buffer += 4;
   parser->length -= 4;
   return v;
@@ -134,7 +150,8 @@ int BeaconDataInt(datap *parser) {
 short BeaconDataShort(datap *parser) {
   if (parser->length < 2)
     return 0;
-  short v = *(short *)parser->buffer;
+  short v;
+  memcpy(&v, parser->buffer, 2);
   parser->buffer += 2;
   parser->length -= 2;
   return v;
@@ -148,7 +165,8 @@ char *BeaconDataExtract(datap *parser, int *size) {
       *size = 0;
     return NULL;
   }
-  int len = *(int *)parser->buffer;
+  int len;
+  memcpy(&len, parser->buffer, 4);
   parser->buffer += 4;
   parser->length -= 4;
   if (len > parser->length || len < 0) {
@@ -190,9 +208,11 @@ static struct sigaction old_sa[32];
 static int handled_sigs[] = {SIGSEGV, SIGBUS, SIGILL, SIGFPE};
 #define NUM_HANDLED_SIGS (sizeof(handled_sigs) / sizeof(handled_sigs[0]))
 
-// Thread-local state for crash recovery
-static __thread sigjmp_buf bof_env;
-static __thread volatile int is_in_bof = 0;
+// Crash-recovery state. bof_run serializes every execution with bof_lock, so
+// a single (non-TLS) slot is enough; avoiding __thread keeps the image free of
+// the dynamic TLS relocations the Go agent's in-memory loader cannot apply.
+static sigjmp_buf bof_env;
+static volatile sig_atomic_t is_in_bof = 0;
 
 static void bof_signal_handler(int sig, siginfo_t *info, void *ctx) {
   if (is_in_bof) {
@@ -222,10 +242,13 @@ static void bof_signal_handler(int sig, siginfo_t *info, void *ctx) {
   }
 }
 
-// bof_run loads an x86_64 ELF ET_REL object and executes the requested symbol.
-__attribute__((visibility("default"))) int
-bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
-        const uint8_t *args_buf, int args_len, char **out_buf, char **err_buf) {
+// bof_run_impl loads an x86_64 ELF ET_REL object and executes the requested
+// symbol. It is internal; the exported bof_run() wraps it with a stable,
+// machine-callable ABI (see below).
+static int
+bof_run_impl(const uint8_t *obj_buf, size_t object_size, const char *func_name,
+             const uint8_t *args_buf, int args_len, char **out_buf,
+             char **err_buf) {
 
   // Serialize access
   pthread_mutex_lock(&bof_lock);
@@ -251,6 +274,15 @@ bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
     return set_err(err_buf, "object is not x86_64 ET_REL");
   }
 
+  /* The section header table is walked by index throughout, so validate it
+   * once instead of trusting e_shoff/e_shnum. */
+  if (ehdr->e_shentsize != sizeof(Elf64_Shdr) || ehdr->e_shnum == 0 ||
+      !range_ok(ehdr->e_shoff, (uint64_t)ehdr->e_shnum * sizeof(Elf64_Shdr),
+                object_size)) {
+    pthread_mutex_unlock(&bof_lock);
+    return set_err(err_buf, "invalid section header table");
+  }
+
   Elf64_Shdr *shdrs = (Elf64_Shdr *)(obj_buf + ehdr->e_shoff);
 
   uintptr_t *sec_offsets =
@@ -269,6 +301,11 @@ bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
     uint64_t align = 4096;
     total_size = align_up(total_size, align);
     sec_offsets[i] = total_size;
+    if (total_size > UINT64_MAX - shdrs[i].sh_size) {
+      free(sec_offsets);
+      pthread_mutex_unlock(&bof_lock);
+      return set_err(err_buf, "section size overflow");
+    }
     total_size += shdrs[i].sh_size;
   }
 
@@ -296,6 +333,12 @@ bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
       continue;
     }
     if (shdrs[i].sh_type != SHT_NOBITS) {
+      if (!range_ok(shdrs[i].sh_offset, shdrs[i].sh_size, object_size)) {
+        munmap(mem_base, total_size);
+        free(sec_offsets);
+        pthread_mutex_unlock(&bof_lock);
+        return set_err(err_buf, "section out of bounds");
+      }
       memcpy(mem_base + sec_offsets[i], obj_buf + shdrs[i].sh_offset,
              shdrs[i].sh_size);
     }
@@ -303,12 +346,30 @@ bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
 
   Elf64_Sym *symtab = NULL;
   const char *strtab = NULL;
+  size_t strtab_size = 0;
   int num_syms = 0;
   for (int i = 0; i < ehdr->e_shnum; i++) {
     if (shdrs[i].sh_type == SHT_SYMTAB) {
+      if (shdrs[i].sh_link >= ehdr->e_shnum ||
+          shdrs[i].sh_size % sizeof(Elf64_Sym) != 0 ||
+          !range_ok(shdrs[i].sh_offset, shdrs[i].sh_size, object_size)) {
+        munmap(mem_base, total_size);
+        free(sec_offsets);
+        pthread_mutex_unlock(&bof_lock);
+        return set_err(err_buf, "invalid symtab");
+      }
+      Elf64_Shdr *str_sh = &shdrs[shdrs[i].sh_link];
+      if (str_sh->sh_type != SHT_STRTAB || str_sh->sh_size == 0 ||
+          !range_ok(str_sh->sh_offset, str_sh->sh_size, object_size)) {
+        munmap(mem_base, total_size);
+        free(sec_offsets);
+        pthread_mutex_unlock(&bof_lock);
+        return set_err(err_buf, "invalid strtab");
+      }
       symtab = (Elf64_Sym *)(obj_buf + shdrs[i].sh_offset);
-      num_syms = shdrs[i].sh_size / (int)sizeof(Elf64_Sym);
-      strtab = (const char *)(obj_buf + shdrs[shdrs[i].sh_link].sh_offset);
+      num_syms = (int)(shdrs[i].sh_size / sizeof(Elf64_Sym));
+      strtab = (const char *)(obj_buf + str_sh->sh_offset);
+      strtab_size = str_sh->sh_size;
       break;
     }
   }
@@ -339,13 +400,32 @@ bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
       continue;
     }
 
-    int num_rels = shdrs[i].sh_size / (int)sizeof(Elf64_Rela);
+    if (shdrs[i].sh_size % sizeof(Elf64_Rela) != 0 ||
+        !range_ok(shdrs[i].sh_offset, shdrs[i].sh_size, object_size)) {
+      munmap(mem_base, total_size);
+      free(sec_offsets);
+      pthread_mutex_unlock(&bof_lock);
+      return set_err(err_buf, "invalid rela section");
+    }
+
+    int num_rels = (int)(shdrs[i].sh_size / sizeof(Elf64_Rela));
     Elf64_Rela *rels = (Elf64_Rela *)(obj_buf + shdrs[i].sh_offset);
 
     for (int r = 0; r < num_rels; r++) {
       Elf64_Rela rel = rels[r];
       uint32_t sym_idx = ELF64_R_SYM(rel.r_info);
       uint32_t type = ELF64_R_TYPE(rel.r_info);
+
+      /* The patch must fit inside the target section, otherwise we would
+       * scribble over the neighbouring section (or outside the mapping). */
+      uint64_t patch_size = (type == R_X86_64_64) ? 8 : 4;
+      if (rel.r_offset > shdrs[target_sec_idx].sh_size ||
+          patch_size > shdrs[target_sec_idx].sh_size - rel.r_offset) {
+        munmap(mem_base, total_size);
+        free(sec_offsets);
+        pthread_mutex_unlock(&bof_lock);
+        return set_err(err_buf, "relocation out of bounds");
+      }
 
       uintptr_t patch_addr =
           (uintptr_t)mem_base + target_base_offset + rel.r_offset;
@@ -359,6 +439,12 @@ bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
 
       Elf64_Sym sym = symtab[sym_idx];
       uintptr_t sym_addr = 0;
+      if (!cstr_ok(strtab, strtab_size, sym.st_name)) {
+        munmap(mem_base, total_size);
+        free(sec_offsets);
+        pthread_mutex_unlock(&bof_lock);
+        return set_err(err_buf, "invalid symbol name");
+      }
       const char *sym_name = strtab + sym.st_name;
 
       if (sym.st_shndx == SHN_UNDEF) {
@@ -393,6 +479,14 @@ bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
       } else if (sym.st_shndx == SHN_ABS) {
         sym_addr = sym.st_value;
       } else {
+        if (sym.st_shndx >= ehdr->e_shnum ||
+            !(shdrs[sym.st_shndx].sh_flags & SHF_ALLOC) ||
+            sym.st_value > shdrs[sym.st_shndx].sh_size) {
+          munmap(mem_base, total_size);
+          free(sec_offsets);
+          pthread_mutex_unlock(&bof_lock);
+          return set_err(err_buf, "invalid symbol section");
+        }
         sym_addr =
             (uintptr_t)mem_base + sec_offsets[sym.st_shndx] + sym.st_value;
       }
@@ -463,10 +557,24 @@ bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
 
   uintptr_t entry_addr = 0;
   for (int i = 0; i < num_syms; i++) {
+    if (!cstr_ok(strtab, strtab_size, symtab[i].st_name))
+      break;
     const char *name = strtab + symtab[i].st_name;
     if (strcmp(name, entry_name) == 0) {
       if (symtab[i].st_shndx == SHN_UNDEF) {
         continue;
+      }
+      if (symtab[i].st_shndx == SHN_ABS) {
+        entry_addr = symtab[i].st_value;
+        break;
+      }
+      if (symtab[i].st_shndx >= ehdr->e_shnum ||
+          !(shdrs[symtab[i].st_shndx].sh_flags & SHF_ALLOC) ||
+          symtab[i].st_value > shdrs[symtab[i].st_shndx].sh_size) {
+        munmap(mem_base, total_size);
+        free(sec_offsets);
+        pthread_mutex_unlock(&bof_lock);
+        return set_err(err_buf, "invalid entry symbol");
       }
       entry_addr = (uintptr_t)mem_base + sec_offsets[symtab[i].st_shndx] +
                    symtab[i].st_value;
@@ -541,5 +649,46 @@ bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
   pthread_mutex_unlock(&bof_lock);
   return status;
 }
+
+/* Public ABI. Kept to five machine-word arguments so it can be called by the
+ * Go agent's in-memory loader (memmod supports at most five) as well as by the
+ * C agent's dynload. The output is a malloc'd, NUL-terminated buffer on
+ * success and NULL on failure; bof_last_error() then describes the error.
+ * Free the returned buffer with bof_free(). */
+static char bof_err_buf[512];
+
+__attribute__((visibility("default"))) char *
+bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
+        const uint8_t *args_buf, int args_len) {
+  char *out = NULL;
+  char *err = NULL;
+
+  if (bof_run_impl(obj_buf, object_size, func_name, args_buf, args_len, &out,
+                   &err) != 0) {
+    if (err != NULL) {
+      snprintf(bof_err_buf, sizeof(bof_err_buf), "%s", err);
+      free(err);
+    } else {
+      bof_err_buf[0] = '\0';
+    }
+    free(out);
+    return NULL;
+  }
+
+  bof_err_buf[0] = '\0';
+  if (out == NULL) {
+    out = (char *)malloc(1);
+    if (out != NULL) {
+      out[0] = '\0';
+    }
+  }
+  return out;
+}
+
+__attribute__((visibility("default"))) const char *bof_last_error(void) {
+  return bof_err_buf;
+}
+
+__attribute__((visibility("default"))) void bof_free(char *p) { free(p); }
 
 #pragma GCC visibility pop

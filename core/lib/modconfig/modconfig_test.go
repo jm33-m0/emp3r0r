@@ -85,6 +85,53 @@ func TestReadConfigsDerivesCoffInvocation(t *testing.T) {
 	}
 }
 
+const linuxCOFFConfig = `[
+  {
+    "name": "mod_linux",
+    "platform": "Linux",
+    "agent_config": {"type": "coff", "files": ["_bin/a.o"]},
+    "parameters": [],
+    "invocation": {"coff_export": "go"}
+  },
+  {
+    "name": "mod_linux_explicit",
+    "platform": "Linux",
+    "dependencies": ["coffloader_linux"],
+    "agent_config": {"type": "coff", "files": ["_bin/b.o"]},
+    "parameters": [],
+    "invocation": {"coff_export": "go"}
+  }
+]`
+
+// TestReadConfigsLinuxBOFDependency pins that Linux COFF modules depend on
+// coffloader_linux — whether declared in config.json or injected automatically
+// — never on the Windows coffloader, and that an explicit declaration is not
+// duplicated by the injection.
+func TestReadConfigsLinuxBOFDependency(t *testing.T) {
+	configs, err := ReadConfigs(writeConfig(t, linuxCOFFConfig))
+	if err != nil {
+		t.Fatalf("ReadConfigs: %v", err)
+	}
+	if len(configs) != 2 {
+		t.Fatalf("expected 2 modules, got %d", len(configs))
+	}
+
+	for _, config := range configs {
+		linuxDeps := 0
+		for _, dep := range config.Dependencies {
+			switch dep {
+			case "coffloader_linux":
+				linuxDeps++
+			case "coffloader":
+				t.Errorf("%s must not depend on the Windows coffloader: %v", config.Name, config.Dependencies)
+			}
+		}
+		if linuxDeps != 1 {
+			t.Errorf("%s dependencies = %v, want exactly one coffloader_linux", config.Name, config.Dependencies)
+		}
+	}
+}
+
 func TestResolveCoffArgsTypesAndOrder(t *testing.T) {
 	configs, err := ReadConfigs(writeConfig(t, twoModuleConfig))
 	if err != nil {

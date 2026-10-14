@@ -1,0 +1,16 @@
+{
+  "name": "coffloader_linux",
+  "build": "sh build.sh",
+  "author": "jm33-ng",
+  "date": "2026-10-14",
+  "comment": "Load and execute Linux relocatable BOFs in memory. A dependency for Linux 'coff' modules; not runnable directly.",
+  "is_local": false,
+  "platform": "Linux",
+  "parameters": [],
+  "agent_config": {
+    "exec": "",
+    "files": ["coffloader_linux.so"],
+    "type": "so"
+  },
+  "invocation": {}
+}

@@ -222,17 +222,16 @@ func ReadConfigs(file string) (configs []*def.ModuleConfig, err error) {
 			config.Invocation.Coff = &coff
 		}
 
-		// Windows BOF modules automatically depend on the in-memory COFFLoader DLL.
-		if isCOFF && def.IsWindowsPlatform(raw.Platform) {
-			found := false
-			for _, dep := range config.Dependencies {
-				if strings.EqualFold(dep, "coffloader") {
-					found = true
-					break
-				}
-			}
-			if !found {
-				config.Dependencies = append(config.Dependencies, "coffloader")
+		// BOF modules map their loader as an in-memory dependency: the
+		// COFFLoader DLL on Windows, the coffloader_linux shared object on
+		// Linux. Add the right one automatically; appendDependency keeps any
+		// dependency the manifest already declares rather than duplicating it.
+		if isCOFF {
+			switch {
+			case def.IsWindowsPlatform(raw.Platform):
+				appendDependency(&config, "coffloader")
+			case def.IsLinuxPlatform(raw.Platform):
+				appendDependency(&config, "coffloader_linux")
 			}
 		}
 
@@ -240,6 +239,17 @@ func ReadConfigs(file string) (configs []*def.ModuleConfig, err error) {
 	}
 
 	return configs, nil
+}
+
+// appendDependency adds a module dependency unless it is already present
+// (case-insensitively, since module names are compared case-insensitively).
+func appendDependency(config *def.ModuleConfig, name string) {
+	for _, dep := range config.Dependencies {
+		if strings.EqualFold(dep, name) {
+			return
+		}
+	}
+	config.Dependencies = append(config.Dependencies, name)
 }
 
 // typeToWireToken maps the unified parameter type to a COFFLoader wire token.

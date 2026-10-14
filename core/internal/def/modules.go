@@ -460,6 +460,13 @@ func IsWindowsPlatform(platform string) bool {
 	return strings.EqualFold(strings.TrimSpace(platform), "windows")
 }
 
+// IsLinuxPlatform reports whether a module's Platform field targets Linux.
+// Like IsWindowsPlatform it is case-insensitive and tolerant of surrounding
+// spaces.
+func IsLinuxPlatform(platform string) bool {
+	return strings.EqualFold(strings.TrimSpace(platform), "linux")
+}
+
 // tokenContextType reports whether a module kind executes inside the agent
 // process (or its loader) under an impersonated token, i.e. whether the
 // agent's ModuleHandler actually honors the universal token context.
