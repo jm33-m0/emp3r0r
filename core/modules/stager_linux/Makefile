@@ -128,11 +128,14 @@ ifeq ($(DYNLOAD_MODE), libc_dl)
   DYNLOAD_MODE_CFLAG = -DDYNLOAD_MODE=1
   # __libc_dlopen_mode/__libc_dlsym/__libc_dlclose have been in libc since
   # glibc 2.2; 2.17 is the oldest ABI the project supports.
-  GLIBC_VERSION = 2.17
+  GLIBC_VERSION ?= 2.17
+else ifeq ($(DYNLOAD_MODE), auto)
+  DYNLOAD_MODE_CFLAG = -DDYNLOAD_MODE=2
+  GLIBC_VERSION ?= 2.17
 else
   DYNLOAD_MODE_CFLAG = -DDYNLOAD_MODE=0
   # Public dlopen/dlsym/dlclose moved from libdl.so.2 into libc.so.6 in 2.34.
-  GLIBC_VERSION = 2.34
+  GLIBC_VERSION ?= 2.34
 endif
 
 # Dynamic symbol hash table preference (see dynload.c)

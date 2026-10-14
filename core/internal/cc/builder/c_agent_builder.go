@@ -22,6 +22,13 @@ var (
 	CAgentGzipProviders      = []string{"miniz", "none"}
 	CAgentHTTPProviders      = []string{"libcurl"}
 	CAgentTransportProviders = []string{"http_poll"}
+	// DYNLOAD_MODE picks the libc symbols dynload resolves: libc_dl
+	// (__libc_dlopen_mode, glibc < 2.34), public (dlopen, glibc >= 2.34) or
+	// auto (libc_dl with a runtime fallback to the public names).
+	CAgentDynloadModes = []string{"libc_dl", "public", "auto"}
+	// GLIBC_VERSION pins the oldest glibc ABI to link against. It is
+	// independent of DYNLOAD_MODE; 2.17 is the oldest the project supports.
+	CAgentGlibcVersions = []string{"2.17", "2.34"}
 )
 
 // CAgentProviders selects the providers the built C agent links. Empty fields
@@ -31,6 +38,29 @@ type CAgentProviders struct {
 	Gzip      string // GZIP=
 	HTTP      string // HTTP=
 	Transport string // TRANSPORT=
+	Dynload   string // DYNLOAD_MODE=
+	Glibc     string // GLIBC_VERSION=
+}
+
+// cAgentProviderSpec maps one operator choice to its Makefile variable. A
+// single table drives both validation and the make argument vector, so adding
+// a provider dimension cannot leave one of them out of sync.
+type cAgentProviderSpec struct {
+	group   string // operator-facing name, used in errors
+	varname string // Makefile variable name
+	value   string
+	allowed []string
+}
+
+func cAgentProviderSpecs(p CAgentProviders) []cAgentProviderSpec {
+	return []cAgentProviderSpec{
+		{group: "crypto", varname: "CRYPTO", value: p.Crypto, allowed: CAgentCryptoProviders},
+		{group: "gzip", varname: "GZIP", value: p.Gzip, allowed: CAgentGzipProviders},
+		{group: "http", varname: "HTTP", value: p.HTTP, allowed: CAgentHTTPProviders},
+		{group: "transport", varname: "TRANSPORT", value: p.Transport, allowed: CAgentTransportProviders},
+		{group: "dynload", varname: "DYNLOAD_MODE", value: p.Dynload, allowed: CAgentDynloadModes},
+		{group: "glibc", varname: "GLIBC_VERSION", value: p.Glibc, allowed: CAgentGlibcVersions},
+	}
 }
 
 // cAgentSourceDir is the on-demand C agent source shipped with the operator kit
@@ -89,27 +119,22 @@ func copyStageSource(src, dst string) error {
 }
 
 func validateCAgentProviders(p CAgentProviders) error {
-	check := func(group, value string, allowed []string) error {
-		if value == "" {
-			return nil
+	for _, spec := range cAgentProviderSpecs(p) {
+		if spec.value == "" {
+			continue
 		}
-		for _, a := range allowed {
-			if a == value {
-				return nil
+		valid := false
+		for _, a := range spec.allowed {
+			if a == spec.value {
+				valid = true
+				break
 			}
 		}
-		return fmt.Errorf("invalid %s provider %q (available: %v)", group, value, allowed)
+		if !valid {
+			return fmt.Errorf("invalid %s provider %q (available: %v)", spec.group, spec.value, spec.allowed)
+		}
 	}
-	if err := check("crypto", p.Crypto, CAgentCryptoProviders); err != nil {
-		return err
-	}
-	if err := check("gzip", p.Gzip, CAgentGzipProviders); err != nil {
-		return err
-	}
-	if err := check("http", p.HTTP, CAgentHTTPProviders); err != nil {
-		return err
-	}
-	return check("transport", p.Transport, CAgentTransportProviders)
+	return nil
 }
 
 // cAgentBuildArgs is the deterministic `make` argument vector for the on-demand
@@ -121,17 +146,10 @@ func cAgentBuildArgs(srcDir, configSrc string, p CAgentProviders) []string {
 		"-C", srcDir, "agent",
 		"CONFIG_SRC=" + configSrc,
 	}
-	if p.Crypto != "" {
-		args = append(args, "CRYPTO="+p.Crypto)
-	}
-	if p.Gzip != "" {
-		args = append(args, "GZIP="+p.Gzip)
-	}
-	if p.HTTP != "" {
-		args = append(args, "HTTP="+p.HTTP)
-	}
-	if p.Transport != "" {
-		args = append(args, "TRANSPORT="+p.Transport)
+	for _, spec := range cAgentProviderSpecs(p) {
+		if spec.value != "" {
+			args = append(args, spec.varname+"="+spec.value)
+		}
 	}
 	return args
 }

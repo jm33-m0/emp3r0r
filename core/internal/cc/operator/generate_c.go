@@ -22,6 +22,8 @@ func CmdGenerateCAgent(cmd *cobra.Command) {
 		Gzip:      flagString(cmd, "gzip"),
 		HTTP:      flagString(cmd, "http"),
 		Transport: flagString(cmd, "transport"),
+		Dynload:   flagString(cmd, "dynload"),
+		Glibc:     flagString(cmd, "glibc-version"),
 	}
 
 	res, err := builder.GenerateCAgentWorkflow(opts, providers, client.SignAgent)

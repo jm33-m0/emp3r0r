@@ -370,7 +370,9 @@ func buildCAgent(t *testing.T, tmpDir string) string {
 	ccAddr := "127.0.0.1"
 	res, err := builder.GenerateCAgentWorkflow(
 		builder.AgentConfig{CCAddress: &ccAddr},
-		builder.CAgentProviders{},
+		// auto resolves __libc_dlopen_mode then falls back to dlopen, so the
+		// agent built on this (modern glibc) host can still load libcrypto.
+		builder.CAgentProviders{Dynload: "auto"},
 		func(u string) (string, error) { return signUUID(u, transport.CaKeyFile) },
 	)
 	if err != nil {

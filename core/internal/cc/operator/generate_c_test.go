@@ -8,7 +8,7 @@ import (
 
 func TestGenerateCmdHasCAgentFlags(t *testing.T) {
 	cmd := gen_agent_cmd()
-	for _, f := range []string{"type", "arch", "cc", "crypto", "gzip", "http", "transport"} {
+	for _, f := range []string{"type", "arch", "cc", "crypto", "gzip", "http", "transport", "dynload", "glibc-version"} {
 		if cmd.Flags().Lookup(f) == nil {
 			t.Errorf("generate: missing flag --%s", f)
 		}

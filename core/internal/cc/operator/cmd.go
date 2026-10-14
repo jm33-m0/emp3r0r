@@ -650,7 +650,9 @@ func gen_agent_cmd() *cobra.Command {
 	genAgentCmd.Flags().StringP("gzip", "", builder.CAgentGzipProviders[0], fmt.Sprintf("C agent (--type c_linux) compression provider. Available: %v", builder.CAgentGzipProviders))
 	genAgentCmd.Flags().StringP("http", "", builder.CAgentHTTPProviders[0], fmt.Sprintf("C agent (--type c_linux) HTTP(S) client provider. Available: %v", builder.CAgentHTTPProviders))
 	genAgentCmd.Flags().StringP("transport", "", builder.CAgentTransportProviders[0], fmt.Sprintf("C agent (--type c_linux) transport provider. Available: %v", builder.CAgentTransportProviders))
-	addFlagToGroup("C Agent Options (--type aquila)", "crypto", "gzip", "http", "transport")
+	genAgentCmd.Flags().StringP("dynload", "", builder.CAgentDynloadModes[0], fmt.Sprintf("C agent (--type c_linux) libc dynamic-loader symbols. Available: %v", builder.CAgentDynloadModes))
+	genAgentCmd.Flags().StringP("glibc-version", "", builder.CAgentGlibcVersions[0], fmt.Sprintf("C agent (--type c_linux) oldest glibc ABI to link against. Available: %v", builder.CAgentGlibcVersions))
+	addFlagToGroup("C Agent Options (--type aquila)", "crypto", "gzip", "http", "transport", "dynload", "glibc-version")
 
 	// Force user to specify CC address
 	genAgentCmd.MarkFlagRequired("cc")
@@ -757,6 +759,8 @@ Example:
 		"gzip":            carapace.ActionValues(builder.CAgentGzipProviders...),
 		"http":            carapace.ActionValues(builder.CAgentHTTPProviders...),
 		"transport":       carapace.ActionValues(builder.CAgentTransportProviders...),
+		"dynload":         carapace.ActionValues(builder.CAgentDynloadModes...),
+		"glibc-version":   carapace.ActionValues(builder.CAgentGlibcVersions...),
 		"p2p-transport":   carapace.ActionValues(transport.AllTransportNames()...),
 	})
 	return genAgentCmd

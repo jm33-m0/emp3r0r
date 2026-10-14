@@ -12,15 +12,42 @@
 # in and build with <GROUP>=<name> to add your own backend.
 
 # zig is the project's compiler (shipped with emp3r0r, pinned in core/build.py),
-# so it builds the library and agent by default. Make predefines CC=cc, so a
-# plain `CC ?=` would never fire; override only the built-in default and leave a
-# command-line/environment CC (and HOSTCC) alone.
-ifeq ($(origin CC),default)
-  CC = zig cc
-endif
+# so it builds the library and agent. `CC = zig cc` (not `?=`) forces it even
+# when the environment exports CC; `make CC=gcc` still overrides.
+CC = zig cc
 HOSTCC ?= gcc
 AR ?= ar
 WARN = -Wall -Wextra -Werror -std=c99
+
+# ---- hosted ABI ------------------------------------------------------------
+# The library and agent link glibc dynamically (never statically).
+#
+# GLIBC_VERSION pins the oldest ABI to link against; zig then uses its bundled
+# glibc headers/stubs for that version, so the build is host-independent and the
+# binary runs on every glibc at or above it (newer host headers otherwise leak
+# in: newer glibc makes strstr a macro and pulls <strings.h> from <string.h>).
+#
+# DYNLOAD_MODE picks which libc symbols dynload resolves at runtime:
+#   libc_dl : __libc_dlopen_mode/__libc_dlsym/__libc_dlclose (glibc < 2.34)
+#   public  : dlopen/dlsym/dlclose (moved into libc.so.6 in glibc 2.34)
+#   auto    : resolve libc_dl, then fall back to the public names
+# The two knobs are independent: a binary linked for an older ABI still runs on
+# newer glibc, and any symbol set can be paired with any target version. The
+# default pair (2.17 + libc_dl) covers the widest range of old systems; use
+# DYNLOAD_MODE=auto to build one binary that loads on both old and new glibc.
+DYNLOAD_MODE ?= libc_dl
+ifeq ($(DYNLOAD_MODE),public)
+  DYNLOAD_MODE_CFLAG = -DDYNLOAD_MODE=0
+  GLIBC_VERSION ?= 2.34
+else ifeq ($(DYNLOAD_MODE),auto)
+  DYNLOAD_MODE_CFLAG = -DDYNLOAD_MODE=2
+  GLIBC_VERSION ?= 2.17
+else
+  DYNLOAD_MODE_CFLAG = -DDYNLOAD_MODE=1
+  GLIBC_VERSION ?= 2.17
+endif
+HOSTED_TARGET ?= -target x86_64-linux-gnu.$(GLIBC_VERSION)
+HOSTED_CFLAGS = $(HOSTED_TARGET) $(DYNLOAD_MODE_CFLAG)
 
 # ---- provider selection ----------------------------------------------------
 # CRYPTO:    openssl (default, system libcrypto via dynload) | mbedtls (vendored)
@@ -61,7 +88,11 @@ ifeq ($(GZIP),miniz)
   EXTRA_SRC += $(MINIZ_SRC)
 endif
 
-INCLUDES = -Iinclude -Ivendor/tinycbor -Ivendor/miniz $(MINIZ_DEFS) \
+# Project headers are found with `-iquote` (quote includes only) so they can
+# never shadow a system header pulled in with <...>: the freestanding strings.h
+# would otherwise replace the system <strings.h> that glibc's <string.h>
+# includes. Vendor headers keep -I so both "cbor.h" and <cbor.h> work.
+INCLUDES = -iquote include -Ivendor/tinycbor -Ivendor/miniz $(MINIZ_DEFS) \
            $(EXTRA_INCLUDES)
 
 # Vendored tinycbor (MIT). See vendor/tinycbor/README.md.
@@ -83,11 +114,14 @@ PORTABLE_SRC = src/rc4.c src/packer.c src/dynload.c src/dynload_hosted.c \
                $(EXTRA_SRC)
 
 SAN ?= -fsanitize=address,undefined -fno-omit-frame-pointer
-TEST_CFLAGS = $(WARN) -O1 -g $(INCLUDES) $(SAN)
+# Extra flags for the unit tests, e.g. `make test COV=--coverage SAN=` for
+# gcov instrumentation (see the `coverage` target).
+COV ?=
+TEST_CFLAGS = $(WARN) -O1 -g $(INCLUDES) $(SAN) $(COV)
 
 BUILD = build
 
-.PHONY: all lib agent test test-mbedtls vendor-mbedtls fuzz clean
+.PHONY: all lib agent test test-mbedtls vendor-mbedtls fuzz coverage clean
 
 all: lib
 
@@ -107,7 +141,7 @@ $(BUILD)/libc2agent.a: $(PORTABLE_SRC) $(TINYCBOR_SRC) | $(BUILD)
 	@rm -rf $(BUILD)/lib && mkdir -p $(BUILD)/lib
 	@set -e; for s in $(PORTABLE_SRC) $(TINYCBOR_SRC); do \
 		o=$(BUILD)/lib/$$(basename $$s .c).o; \
-		$(CC) $(WARN) -O2 -g $(INCLUDES) -c $$s -o $$o; \
+		$(CC) $(WARN) -O2 -g $(INCLUDES) $(HOSTED_CFLAGS) -c $$s -o $$o; \
 	done
 	$(AR) rcs $@ $(BUILD)/lib/*.o
 
@@ -156,7 +190,7 @@ STRIP ?= strip
 agent: $(BUILD)/c2_agent
 
 $(BUILD)/c2_agent: $(AGENT_SRC) $(EXTRA_LIBS) | $(BUILD)
-	$(CC) $(WARN) $(AGENT_CFLAGS) $(INCLUDES) $(AGENT_LDFLAGS) \
+	$(CC) $(WARN) $(AGENT_CFLAGS) $(INCLUDES) $(HOSTED_CFLAGS) $(AGENT_LDFLAGS) \
 	  $(AGENT_SRC) $(EXTRA_LIBS) -o $@
 	@command -v $(STRIP) >/dev/null 2>&1 && \
 	  $(STRIP) --remove-section=.comment $@ || true
@@ -183,6 +217,7 @@ endif
 test: $(BUILD)/test_strings $(BUILD)/test_rc4 $(BUILD)/test_packer \
       $(BUILD)/test_net_parse $(BUILD)/test_dynload \
       $(BUILD)/test_c2_auth $(BUILD)/test_c2_messages \
+      $(BUILD)/test_c2_agent_info $(BUILD)/test_c2_config \
       $(BUILD)/test_c2_sysinfo $(BUILD)/test_c2_module \
       $(BUILD)/test_c2_secureconn $(GZIP_TEST) $(BOF_TEST) \
       $(BUILD)/test_c2_crypto_openssl
@@ -193,13 +228,13 @@ test-mbedtls: vendor-mbedtls $(BUILD)/test_c2_crypto_mbedtls
 	@echo "--- $(BUILD)/test_c2_crypto_mbedtls"; ./$(BUILD)/test_c2_crypto_mbedtls
 
 $(BUILD)/test_strings: tests/test_strings.c src/strings.c tests/test.h | $(BUILD)
-	$(HOSTCC) $(TEST_CFLAGS) $< src/strings.c -o $@
+	$(HOSTCC) $(TEST_CFLAGS) -fno-builtin $< src/strings.c -o $@
 
 $(BUILD)/test_rc4: tests/test_rc4.c src/rc4.c tests/test.h | $(BUILD)
 	$(HOSTCC) $(TEST_CFLAGS) $< src/rc4.c -o $@
 
 $(BUILD)/test_packer: tests/test_packer.c src/packer.c src/strings.c tests/test.h | $(BUILD)
-	$(HOSTCC) $(TEST_CFLAGS) $< src/packer.c src/strings.c -o $@
+	$(HOSTCC) $(TEST_CFLAGS) -fno-builtin $< src/packer.c src/strings.c -o $@
 
 $(BUILD)/test_net_parse: tests/test_net_parse.c src/net_utils.c tests/test.h | $(BUILD)
 	$(HOSTCC) $(TEST_CFLAGS) $< src/net_utils.c -o $@
@@ -233,6 +268,21 @@ $(BUILD)/test_c2_auth: tests/test_c2_auth.c $(C2_TEST_SRC) tests/test.h | $(BUIL
 
 $(BUILD)/test_c2_messages: tests/test_c2_messages.c $(C2_TEST_SRC) tests/test.h | $(BUILD)
 	$(HOSTCC) $(TEST_CFLAGS) $< $(C2_TEST_SRC) -o $@
+
+$(BUILD)/test_c2_agent_info: tests/test_c2_agent_info.c tests/test.h \
+                             src/c2_agent_info.c src/c2_common.c \
+                             $(TINYCBOR_SRC) | $(BUILD)
+	$(HOSTCC) $(TEST_CFLAGS) tests/test_c2_agent_info.c src/c2_agent_info.c \
+		src/c2_common.c $(TINYCBOR_SRC) -o $@
+
+$(BUILD)/test_c2_config: tests/test_c2_config.c tests/test.h \
+                         src/c2_config.c src/c2_crypto.c src/c2_common.c \
+                         src/crypto/c2_crypto_openssl.c \
+                         src/dynload.c src/dynload_hosted.c \
+                         $(TINYCBOR_SRC) | $(BUILD)
+	$(HOSTCC) $(TEST_CFLAGS) tests/test_c2_config.c src/c2_config.c \
+		src/c2_crypto.c src/c2_common.c src/crypto/c2_crypto_openssl.c \
+		src/dynload.c src/dynload_hosted.c $(TINYCBOR_SRC) -o $@
 
 $(BUILD)/test_c2_secureconn: tests/test_c2_secureconn.c src/c2_secureconn.c src/c2_common.c $(STUB_SRC) tests/test.h | $(BUILD)
 	$(HOSTCC) $(TEST_CFLAGS) $< src/c2_secureconn.c src/c2_common.c $(STUB_SRC) -o $@
@@ -305,9 +355,9 @@ FUZZ_CORPUS ?= fuzz/corpus
 FUZZ_OUT ?= $(BUILD)/corpus
 
 fuzz: $(BUILD)/fuzz_rc4 $(BUILD)/fuzz_packer $(BUILD)/fuzz_inet_aton \
-      $(BUILD)/fuzz_messages $(BUILD)/fuzz_agent_info $(BUILD)/fuzz_secureconn \
-      $(BUILD)/fuzz_text $(BUILD)/fuzz_encdec $(GZIP_FUZZ) $(BOF_FUZZ) \
-      $(BUILD)/fuzz_dynload $(BUILD)/fuzz_maps
+      $(BUILD)/fuzz_messages $(BUILD)/fuzz_agent_info $(BUILD)/fuzz_config \
+      $(BUILD)/fuzz_secureconn $(BUILD)/fuzz_text $(BUILD)/fuzz_encdec \
+      $(GZIP_FUZZ) $(BOF_FUZZ) $(BUILD)/fuzz_dynload $(BUILD)/fuzz_maps
 	@set -e; mkdir -p $(BUILD)/crash; \
 	for t in $^; do \
 	  name=$$(basename $$t); name=$${name#fuzz_}; \
@@ -322,7 +372,7 @@ $(BUILD)/fuzz_rc4: fuzz/fuzz_rc4.c $(FUZZ_DRIVER) src/rc4.c fuzz/fuzz_common.h |
 	$(HOSTCC) $(FUZZ_CFLAGS) $< $(FUZZ_DRIVER) src/rc4.c -o $@
 
 $(BUILD)/fuzz_packer: fuzz/fuzz_packer.c $(FUZZ_DRIVER) src/packer.c src/strings.c fuzz/fuzz_common.h | $(BUILD)
-	$(HOSTCC) $(FUZZ_CFLAGS) $< $(FUZZ_DRIVER) src/packer.c src/strings.c -o $@
+	$(HOSTCC) $(FUZZ_CFLAGS) -fno-builtin $< $(FUZZ_DRIVER) src/packer.c src/strings.c -o $@
 
 $(BUILD)/fuzz_inet_aton: fuzz/fuzz_inet_aton.c $(FUZZ_DRIVER) src/net_utils.c fuzz/fuzz_common.h | $(BUILD)
 	$(HOSTCC) $(FUZZ_CFLAGS) $< $(FUZZ_DRIVER) src/net_utils.c -o $@
@@ -331,6 +381,9 @@ $(BUILD)/fuzz_messages: fuzz/fuzz_messages.c $(FUZZ_DRIVER) $(C2_TEST_SRC) fuzz/
 	$(HOSTCC) $(FUZZ_CFLAGS) $< $(FUZZ_DRIVER) $(C2_TEST_SRC) -o $@
 
 $(BUILD)/fuzz_agent_info: fuzz/fuzz_agent_info.c $(FUZZ_DRIVER) $(C2_TEST_SRC) fuzz/fuzz_common.h | $(BUILD)
+	$(HOSTCC) $(FUZZ_CFLAGS) $< $(FUZZ_DRIVER) $(C2_TEST_SRC) -o $@
+
+$(BUILD)/fuzz_config: fuzz/fuzz_config.c $(FUZZ_DRIVER) $(C2_TEST_SRC) fuzz/fuzz_common.h | $(BUILD)
 	$(HOSTCC) $(FUZZ_CFLAGS) $< $(FUZZ_DRIVER) $(C2_TEST_SRC) -o $@
 
 $(BUILD)/fuzz_secureconn: fuzz/fuzz_secureconn.c $(FUZZ_DRIVER) $(STUB_SRC) \
@@ -365,6 +418,13 @@ $(BUILD)/fuzz_dynload: fuzz/fuzz_dynload.c $(FUZZ_DRIVER) src/dynload.c fuzz/fuz
 
 $(BUILD)/fuzz_maps: fuzz/fuzz_maps.c $(FUZZ_DRIVER) src/dynload.c fuzz/fuzz_common.h | $(BUILD)
 	$(HOSTCC) $(FUZZ_CFLAGS) $< $(FUZZ_DRIVER) src/dynload.c -o $@
+
+# ---- coverage --------------------------------------------------------------
+# `make coverage` rebuilds the unit tests with gcov (sanitizers off) and prints
+# a per-source line-coverage summary; the annotated <source>.gcov files are left
+# for inspection.
+coverage:
+	./scripts/coverage.sh
 
 clean:
 	rm -rf $(BUILD)

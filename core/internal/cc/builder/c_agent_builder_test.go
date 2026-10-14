@@ -17,6 +17,8 @@ func TestCAgentBuildArgs(t *testing.T) {
 		Gzip:      "none",
 		HTTP:      "libcurl",
 		Transport: "http_poll",
+		Dynload:   "auto",
+		Glibc:     "2.17",
 	})
 	joined := strings.Join(args, " ")
 	for _, want := range []string{
@@ -27,6 +29,8 @@ func TestCAgentBuildArgs(t *testing.T) {
 		"GZIP=none",
 		"HTTP=libcurl",
 		"TRANSPORT=http_poll",
+		"DYNLOAD_MODE=auto",
+		"GLIBC_VERSION=2.17",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("build args missing %q: %v", want, args)
@@ -37,7 +41,7 @@ func TestCAgentBuildArgs(t *testing.T) {
 func TestCAgentBuildArgsOmitsEmptyProviders(t *testing.T) {
 	args := cAgentBuildArgs("/src", "/cfg", CAgentProviders{})
 	joined := strings.Join(args, " ")
-	for _, unwanted := range []string{"CRYPTO=", "GZIP=", "HTTP=", "TRANSPORT="} {
+	for _, unwanted := range []string{"CRYPTO=", "GZIP=", "HTTP=", "TRANSPORT=", "DYNLOAD_MODE=", "GLIBC_VERSION="} {
 		if strings.Contains(joined, unwanted) {
 			t.Errorf("empty provider should be omitted, got %q", joined)
 		}
@@ -48,7 +52,7 @@ func TestValidateCAgentProviders(t *testing.T) {
 	if err := validateCAgentProviders(CAgentProviders{}); err != nil {
 		t.Fatalf("empty providers should be valid (Makefile defaults): %v", err)
 	}
-	valid := CAgentProviders{Crypto: "openssl", Gzip: "miniz", HTTP: "libcurl", Transport: "http_poll"}
+	valid := CAgentProviders{Crypto: "openssl", Gzip: "miniz", HTTP: "libcurl", Transport: "http_poll", Dynload: "auto", Glibc: "2.17"}
 	if err := validateCAgentProviders(valid); err != nil {
 		t.Fatalf("valid providers rejected: %v", err)
 	}
@@ -57,6 +61,8 @@ func TestValidateCAgentProviders(t *testing.T) {
 		{Gzip: "zlib"},
 		{HTTP: "raw"},
 		{Transport: "h2conn"},
+		{Dynload: "magic"},
+		{Glibc: "1.0"},
 	} {
 		if err := validateCAgentProviders(bad); err == nil {
 			t.Errorf("expected error for %+v", bad)
