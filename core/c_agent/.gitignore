@@ -1,4 +1,6 @@
 build/
+# gcov output from `make coverage`.
+*.gcov
 # The Go C2 renders the build-time config into build/ (see c_agent_builder.go
 # and the Makefile's CONFIG_SRC). build/ already ignores it; name the file too
 # so a manual CONFIG_SRC that lands elsewhere cannot be committed.

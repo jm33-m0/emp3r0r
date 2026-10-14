@@ -224,7 +224,9 @@ c2_status c2_memfile_read_alloc(const c2_memfile *m, c2_str key, uint8_t **out,
       return C2_OK;
     }
     free(buf);
-    if (cap >= C2_MEMFILE_DEFAULT_MAX_BYTES)
+    /* Only a too-small destination is retried; a crypto/format error would
+     * otherwise spin allocating up to the ceiling before failing. */
+    if (st != C2_ERR_NOMEM || cap >= C2_MEMFILE_DEFAULT_MAX_BYTES)
       return st;
     cap *= 2;
   }

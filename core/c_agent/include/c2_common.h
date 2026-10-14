@@ -267,6 +267,21 @@ static inline int c2_str_equal_str(c2_str a, c2_str b) {
          (a.len == 0 || c2_ct_equal(a.ptr, b.ptr, a.len));
 }
 
+/* Bytewise lexicographic order, matching Go's strings.Compare / sort.Strings.
+ * Returns -1, 0 or 1. NULL pointers are legal only for zero-length slices. */
+static inline int c2_str_cmp(c2_str a, c2_str b) {
+  size_t n = a.len < b.len ? a.len : b.len;
+  for (size_t i = 0; i < n; i++) {
+    unsigned char x = (unsigned char)a.ptr[i];
+    unsigned char y = (unsigned char)b.ptr[i];
+    if (x != y)
+      return x < y ? -1 : 1;
+  }
+  if (a.len == b.len)
+    return 0;
+  return a.len < b.len ? -1 : 1;
+}
+
 /* ------------------------------------------------------------------------- */
 /* Hex and base64url (URL-safe, padded) text codecs                           */
 /* ------------------------------------------------------------------------- */

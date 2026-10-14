@@ -19,8 +19,6 @@
 
 #include "cbor.h"
 
-#include <string.h>
-
 /* ------------------------------------------------------------------------- */
 /* Build config decryption                                                    */
 /* ------------------------------------------------------------------------- */
@@ -47,21 +45,11 @@ static c2_status decode_routes(CborValue *it, c2_routes *r) {
   uint64_t key;
   while ((st = c2_cbor_map_key(&map, &key, &done)) == C2_OK && !done) {
     switch (key) {
-    case C2_KEY_ROUTE_CHECKIN:
-      st = c2_cbor_read_text(&map, &r->checkin);
-      break;
-    case C2_KEY_ROUTE_MSG:
-      st = c2_cbor_read_text(&map, &r->msg);
-      break;
-    case C2_KEY_ROUTE_FTP:
-      st = c2_cbor_read_text(&map, &r->ftp);
-      break;
-    case C2_KEY_ROUTE_WWW:
-      st = c2_cbor_read_text(&map, &r->www);
-      break;
-    case C2_KEY_ROUTE_PROXY:
-      st = c2_cbor_read_text(&map, &r->proxy);
-      break;
+      C2_CASE_TEXT(C2_KEY_ROUTE_CHECKIN, r, checkin);
+      C2_CASE_TEXT(C2_KEY_ROUTE_MSG, r, msg);
+      C2_CASE_TEXT(C2_KEY_ROUTE_FTP, r, ftp);
+      C2_CASE_TEXT(C2_KEY_ROUTE_WWW, r, www);
+      C2_CASE_TEXT(C2_KEY_ROUTE_PROXY, r, proxy);
     default:
       st = c2_cbor_map_skip(&map);
       break;
@@ -113,27 +101,13 @@ static c2_status decode_profile(CborValue *it, c2_http_profile *p) {
   uint64_t key;
   while ((st = c2_cbor_map_key(&map, &key, &done)) == C2_OK && !done) {
     switch (key) {
-    case C2_KEY_HTTP_PATH:
-      st = c2_cbor_read_text(&map, &p->c2_path);
-      break;
-    case C2_KEY_HTTP_SESSION_HEADER:
-      st = c2_cbor_read_text(&map, &p->session_header);
-      break;
-    case C2_KEY_HTTP_SESSION_VALUE:
-      st = c2_cbor_read_text(&map, &p->session_value);
-      break;
-    case C2_KEY_HTTP_INIT_HEADER:
-      st = c2_cbor_read_text(&map, &p->init_header);
-      break;
-    case C2_KEY_HTTP_INIT_VALUE:
-      st = c2_cbor_read_text(&map, &p->init_value);
-      break;
-    case C2_KEY_HTTP_CLOSE_HEADER:
-      st = c2_cbor_read_text(&map, &p->close_header);
-      break;
-    case C2_KEY_HTTP_CLOSE_VALUE:
-      st = c2_cbor_read_text(&map, &p->close_value);
-      break;
+      C2_CASE_TEXT(C2_KEY_HTTP_PATH, p, c2_path);
+      C2_CASE_TEXT(C2_KEY_HTTP_SESSION_HEADER, p, session_header);
+      C2_CASE_TEXT(C2_KEY_HTTP_SESSION_VALUE, p, session_value);
+      C2_CASE_TEXT(C2_KEY_HTTP_INIT_HEADER, p, init_header);
+      C2_CASE_TEXT(C2_KEY_HTTP_INIT_VALUE, p, init_value);
+      C2_CASE_TEXT(C2_KEY_HTTP_CLOSE_HEADER, p, close_header);
+      C2_CASE_TEXT(C2_KEY_HTTP_CLOSE_VALUE, p, close_value);
     case C2_KEY_HTTP_CUSTOM_HEADERS:
       st = decode_custom_headers(&map, p);
       break;
@@ -165,72 +139,23 @@ c2_status c2_agent_config_decode(CborValue *r, c2_agent_config *cfg) {
   uint64_t key;
   while ((st = c2_cbor_map_key(&map, &key, &done)) == C2_OK && !done) {
     switch (key) {
-    case C2_KEY_CFG_CC_ADDRESS:
-      st = c2_cbor_read_text(&map, &cfg->cc_address);
-      break;
-    case C2_KEY_CFG_CC_HTTP_PORT:
-      st = c2_cbor_read_text(&map, &cfg->cc_http_port);
-      break;
-    case C2_KEY_CFG_CC_H2_PORT:
-      st = c2_cbor_read_text(&map, &cfg->cc_h2_port);
-      break;
-    case C2_KEY_CFG_PASSWORD:
-      st = c2_cbor_read_text(&map, &cfg->password);
-      break;
-    case C2_KEY_CFG_CAPEM:
-      st = c2_cbor_read_text(&map, &cfg->ca_pem);
-      break;
-    case C2_KEY_CFG_CA_FINGERPRINT:
-      st = c2_cbor_read_text(&map, &cfg->ca_fingerprint);
-      break;
-    case C2_KEY_CFG_C2_TRANSPORT_PROXY:
-      st = c2_cbor_read_text(&map, &cfg->c2_transport_proxy);
-      break;
-    case C2_KEY_CFG_AGENT_UUID:
-      st = c2_cbor_read_text(&map, &cfg->agent_uuid);
-      break;
-    case C2_KEY_CFG_AGENT_UUID_SIG:
-      st = c2_cbor_read_text(&map, &cfg->agent_uuid_sig);
-      break;
-    case C2_KEY_CFG_AGENT_TAG:
-      st = c2_cbor_read_text(&map, &cfg->agent_tag);
-      break;
-    case C2_KEY_CFG_CC_TIMEOUT: {
-      int64_t v;
-      if ((st = c2_cbor_read_int(&map, &v)) == C2_OK)
-        cfg->cc_timeout_ms = (int32_t)v;
-      break;
-    }
-    case C2_KEY_CFG_PADDING_MIN: {
-      int64_t v;
-      if ((st = c2_cbor_read_int(&map, &v)) == C2_OK)
-        cfg->padding_min = (int32_t)v;
-      break;
-    }
-    case C2_KEY_CFG_PADDING_MAX: {
-      int64_t v;
-      if ((st = c2_cbor_read_int(&map, &v)) == C2_OK)
-        cfg->padding_max = (int32_t)v;
-      break;
-    }
-    case C2_KEY_CFG_JITTER: {
-      int64_t v;
-      if ((st = c2_cbor_read_int(&map, &v)) == C2_OK)
-        cfg->jitter = (int32_t)v;
-      break;
-    }
-    case C2_KEY_CFG_POLL_INTERVAL: {
-      int64_t v;
-      if ((st = c2_cbor_read_int(&map, &v)) == C2_OK)
-        cfg->poll_interval = (int32_t)v;
-      break;
-    }
-    case C2_KEY_CFG_C2_CHANNEL_MODE:
-      st = c2_cbor_read_text(&map, &cfg->c2_channel_mode);
-      break;
-    case C2_KEY_CFG_SNI:
-      st = c2_cbor_read_text(&map, &cfg->sni);
-      break;
+      C2_CASE_TEXT(C2_KEY_CFG_CC_ADDRESS, cfg, cc_address);
+      C2_CASE_TEXT(C2_KEY_CFG_CC_HTTP_PORT, cfg, cc_http_port);
+      C2_CASE_TEXT(C2_KEY_CFG_CC_H2_PORT, cfg, cc_h2_port);
+      C2_CASE_TEXT(C2_KEY_CFG_PASSWORD, cfg, password);
+      C2_CASE_TEXT(C2_KEY_CFG_CAPEM, cfg, ca_pem);
+      C2_CASE_TEXT(C2_KEY_CFG_CA_FINGERPRINT, cfg, ca_fingerprint);
+      C2_CASE_TEXT(C2_KEY_CFG_C2_TRANSPORT_PROXY, cfg, c2_transport_proxy);
+      C2_CASE_TEXT(C2_KEY_CFG_AGENT_UUID, cfg, agent_uuid);
+      C2_CASE_TEXT(C2_KEY_CFG_AGENT_UUID_SIG, cfg, agent_uuid_sig);
+      C2_CASE_TEXT(C2_KEY_CFG_AGENT_TAG, cfg, agent_tag);
+      C2_CASE_INT32(C2_KEY_CFG_CC_TIMEOUT, cfg, cc_timeout_ms);
+      C2_CASE_INT32(C2_KEY_CFG_PADDING_MIN, cfg, padding_min);
+      C2_CASE_INT32(C2_KEY_CFG_PADDING_MAX, cfg, padding_max);
+      C2_CASE_INT32(C2_KEY_CFG_JITTER, cfg, jitter);
+      C2_CASE_INT32(C2_KEY_CFG_POLL_INTERVAL, cfg, poll_interval);
+      C2_CASE_TEXT(C2_KEY_CFG_C2_CHANNEL_MODE, cfg, c2_channel_mode);
+      C2_CASE_TEXT(C2_KEY_CFG_SNI, cfg, sni);
     case C2_KEY_CFG_C2_ROUTES:
       st = decode_routes(&map, &cfg->routes);
       break;

@@ -253,4 +253,48 @@ static inline c2_status c2_cbor_map_skip(CborValue *map) {
   return c2_cbor_dc(cbor_value_advance(map));
 }
 
+/*
+ * Switch-case helpers for the message codecs. Every decoder is the same shape:
+ * a `while (c2_cbor_map_key)` loop with a `switch (key)` whose cases read one
+ * field. These collapse each case into one line. They expand to a case label,
+ * so they must be used inside the switch and rely on `map` and `st` being the
+ * iterator and status variable of the enclosing loop (the same convention the
+ * encoder's PUT_ and COUNT_ macros use).
+ */
+#define C2_CASE_TEXT(k, obj, f)                                                \
+  case (k):                                                                    \
+    st = c2_cbor_read_text(&map, &(obj)->f);                                   \
+    break
+#define C2_CASE_BYTES(k, obj, f)                                               \
+  case (k):                                                                    \
+    st = c2_cbor_read_bytes(&map, &(obj)->f);                                  \
+    break
+#define C2_CASE_INT(k, obj, f)                                                 \
+  case (k):                                                                    \
+    st = c2_cbor_read_int(&map, &(obj)->f);                                    \
+    break
+#define C2_CASE_STR_LIST(k, obj, f)                                            \
+  case (k):                                                                    \
+    st = c2_cbor_read_str_list(&map, &(obj)->f);                               \
+    break
+/* `hasf` is set to whether the bool was present, mirroring the Go pointer. */
+#define C2_CASE_BOOL(k, obj, f, hasf)                                          \
+  case (k):                                                                    \
+    st = c2_cbor_read_bool(&map, &(obj)->f);                                   \
+    (obj)->hasf = (st == C2_OK);                                               \
+    break
+#define C2_CASE_INT_HAS(k, obj, f, hasf)                                       \
+  case (k):                                                                    \
+    st = c2_cbor_read_int(&map, &(obj)->f);                                    \
+    (obj)->hasf = (st == C2_OK);                                               \
+    break
+/* Decode an integer that is stored in a 32-bit field (config knobs). */
+#define C2_CASE_INT32(k, obj, f)                                               \
+  case (k): {                                                                  \
+    int64_t v_;                                                                \
+    if ((st = c2_cbor_read_int(&map, &v_)) == C2_OK)                           \
+      (obj)->f = (int32_t)v_;                                                  \
+    break;                                                                     \
+  }
+
 #endif /* C2_CBOR_UTIL_H */

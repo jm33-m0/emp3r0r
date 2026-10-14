@@ -40,14 +40,22 @@
 #define DYNLOAD_MAX_PHNUM 1024
 #define DYNLOAD_MAX_SEGS 64
 
-#if DYNLOAD_MODE == DYNLOAD_MODE_LIBC_DL
-#define DYNLOAD_SYM_DLOPEN "__libc_dlopen_mode"
-#define DYNLOAD_SYM_DLSYM "__libc_dlsym"
-#define DYNLOAD_SYM_DLCLOSE "__libc_dlclose"
-#else
+/* The primary symbol set follows DYNLOAD_MODE; the _ALT set is the other one,
+ * used only by DYNLOAD_MODE_AUTO as a fallback. */
+#if DYNLOAD_MODE == DYNLOAD_MODE_PUBLIC
 #define DYNLOAD_SYM_DLOPEN "dlopen"
 #define DYNLOAD_SYM_DLSYM "dlsym"
 #define DYNLOAD_SYM_DLCLOSE "dlclose"
+#define DYNLOAD_SYM_DLOPEN_ALT "__libc_dlopen_mode"
+#define DYNLOAD_SYM_DLSYM_ALT "__libc_dlsym"
+#define DYNLOAD_SYM_DLCLOSE_ALT "__libc_dlclose"
+#else /* libc_dl and auto try the glibc-internal names first */
+#define DYNLOAD_SYM_DLOPEN "__libc_dlopen_mode"
+#define DYNLOAD_SYM_DLSYM "__libc_dlsym"
+#define DYNLOAD_SYM_DLCLOSE "__libc_dlclose"
+#define DYNLOAD_SYM_DLOPEN_ALT "dlopen"
+#define DYNLOAD_SYM_DLSYM_ALT "dlsym"
+#define DYNLOAD_SYM_DLCLOSE_ALT "dlclose"
 #endif
 
 /* ------------------------------------------------------------------------- */
@@ -660,6 +668,17 @@ void dynload_reset(dynload *dl) {
   dl->close = 0;
 }
 
+/* Resolve one set of three dl* symbols from libc. Returns 0 only when all
+ * three were found, so the caller can try the fallback set. */
+static int resolve_dl_set(const void *libc, size_t len, const char *open_name,
+                          const char *sym_name, const char *close_name,
+                          dlopen_fn *open, dlsym_fn *sym, dlclose_fn *close) {
+  *open = (dlopen_fn)dynload_resolve_module(libc, len, open_name);
+  *sym = (dlsym_fn)dynload_resolve_module(libc, len, sym_name);
+  *close = (dlclose_fn)dynload_resolve_module(libc, len, close_name);
+  return (*open && *sym && *close) ? 0 : -1;
+}
+
 int dynload_resolve(dynload *dl) {
   if (!dl)
     return -1;
@@ -670,13 +689,18 @@ int dynload_resolve(dynload *dl) {
   unsigned long libc = dynload_find_libc(&end);
   if (libc && end > libc) {
     size_t len = (size_t)(end - libc);
-    dl->open =
-        (dlopen_fn)dynload_resolve_module((const void *)libc, len,
-                                          DYNLOAD_SYM_DLOPEN);
-    dl->sym = (dlsym_fn)dynload_resolve_module((const void *)libc, len,
-                                               DYNLOAD_SYM_DLSYM);
-    dl->close = (dlclose_fn)dynload_resolve_module((const void *)libc, len,
-                                                   DYNLOAD_SYM_DLCLOSE);
+    const void *base = (const void *)libc;
+    if (resolve_dl_set(base, len, DYNLOAD_SYM_DLOPEN, DYNLOAD_SYM_DLSYM,
+                       DYNLOAD_SYM_DLCLOSE, &dl->open, &dl->sym,
+                       &dl->close) != 0) {
+#if DYNLOAD_MODE == DYNLOAD_MODE_AUTO
+      /* __libc_dlopen_mode exists before glibc 2.34 and dlopen from 2.34 on;
+       * neither is present on every host, so AUTO tries both. */
+      (void)resolve_dl_set(base, len, DYNLOAD_SYM_DLOPEN_ALT,
+                           DYNLOAD_SYM_DLSYM_ALT, DYNLOAD_SYM_DLCLOSE_ALT,
+                           &dl->open, &dl->sym, &dl->close);
+#endif
+    }
   }
   dl->resolved = (dl->open && dl->sym && dl->close) ? 1 : 0;
   return dl->resolved ? 0 : -1;

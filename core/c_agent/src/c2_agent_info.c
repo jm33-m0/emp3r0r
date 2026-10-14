@@ -18,8 +18,6 @@
 
 #include "cbor.h"
 
-#include <string.h>
-
 /* A field is present when its pointer is set; a set string may be empty.
  * Lists are present when non-empty (an absent list and an empty list are
  * indistinguishable on the wire, and the C2 treats both as empty). */
@@ -41,20 +39,10 @@ static c2_status read_agent_process(CborValue *it, c2_agent_process *p) {
   uint64_t key;
   while ((st = c2_cbor_map_key(&map, &key, &done)) == C2_OK && !done) {
     switch (key) {
-    case C2_KEY_PROCESS_PID:
-      st = c2_cbor_read_int(&map, &p->pid);
-      p->has_pid = (st == C2_OK);
-      break;
-    case C2_KEY_PROCESS_PPID:
-      st = c2_cbor_read_int(&map, &p->ppid);
-      p->has_ppid = (st == C2_OK);
-      break;
-    case C2_KEY_PROCESS_CMDLINE:
-      st = c2_cbor_read_text(&map, &p->cmdline);
-      break;
-    case C2_KEY_PROCESS_PARENT:
-      st = c2_cbor_read_text(&map, &p->parent);
-      break;
+      C2_CASE_INT_HAS(C2_KEY_PROCESS_PID, p, pid, has_pid);
+      C2_CASE_INT_HAS(C2_KEY_PROCESS_PPID, p, ppid, has_ppid);
+      C2_CASE_TEXT(C2_KEY_PROCESS_CMDLINE, p, cmdline);
+      C2_CASE_TEXT(C2_KEY_PROCESS_PARENT, p, parent);
     default:
       st = c2_cbor_map_skip(&map);
       break;
@@ -263,126 +251,46 @@ c2_status c2_agent_info_decode(CborValue *r, c2_agent_info *a) {
   uint64_t key;
   while ((st = c2_cbor_map_key(&map, &key, &done)) == C2_OK && !done) {
     switch (key) {
-    case C2_KEY_AGENT_TAG:
-      st = c2_cbor_read_text(&map, &a->tag);
-      break;
-    case C2_KEY_AGENT_NAME:
-      st = c2_cbor_read_text(&map, &a->name);
-      break;
-    case C2_KEY_AGENT_VERSION:
-      st = c2_cbor_read_text(&map, &a->version);
-      break;
-    case C2_KEY_AGENT_TRANSPORT:
-      st = c2_cbor_read_text(&map, &a->transport);
-      break;
-    case C2_KEY_AGENT_HOSTNAME:
-      st = c2_cbor_read_text(&map, &a->hostname);
-      break;
-    case C2_KEY_AGENT_HARDWARE:
-      st = c2_cbor_read_text(&map, &a->hardware);
-      break;
-    case C2_KEY_AGENT_CONTAINER:
-      st = c2_cbor_read_text(&map, &a->container);
-      break;
-    case C2_KEY_AGENT_CPU:
-      st = c2_cbor_read_text(&map, &a->cpu);
-      break;
-    case C2_KEY_AGENT_GPU:
-      st = c2_cbor_read_text(&map, &a->gpu);
-      break;
-    case C2_KEY_AGENT_MEM:
-      st = c2_cbor_read_text(&map, &a->mem);
-      break;
-    case C2_KEY_AGENT_OS:
-      st = c2_cbor_read_text(&map, &a->os);
-      break;
-    case C2_KEY_AGENT_GOOS:
-      st = c2_cbor_read_text(&map, &a->goos);
-      break;
-    case C2_KEY_AGENT_KERNEL:
-      st = c2_cbor_read_text(&map, &a->kernel);
-      break;
-    case C2_KEY_AGENT_ARCH:
-      st = c2_cbor_read_text(&map, &a->arch);
-      break;
-    case C2_KEY_AGENT_FROM:
-      st = c2_cbor_read_text(&map, &a->from);
-      break;
-    case C2_KEY_AGENT_IPS:
-      st = c2_cbor_read_str_list(&map, &a->ips);
-      break;
-    case C2_KEY_AGENT_ARP:
-      st = c2_cbor_read_str_list(&map, &a->arp);
-      break;
-    case C2_KEY_AGENT_USER:
-      st = c2_cbor_read_text(&map, &a->user);
-      break;
-    case C2_KEY_AGENT_HAS_ROOT:
-      st = c2_cbor_read_bool(&map, &a->root);
-      a->has_root = (st == C2_OK);
-      break;
-    case C2_KEY_AGENT_HAS_TOR:
-      st = c2_cbor_read_bool(&map, &a->tor);
-      a->has_tor = (st == C2_OK);
-      break;
-    case C2_KEY_AGENT_HAS_INTERNET:
-      st = c2_cbor_read_bool(&map, &a->internet);
-      a->has_internet = (st == C2_OK);
-      break;
-    case C2_KEY_AGENT_NCSI_ENABLED:
-      st = c2_cbor_read_bool(&map, &a->ncsi);
-      a->has_ncsi = (st == C2_OK);
-      break;
+      C2_CASE_TEXT(C2_KEY_AGENT_TAG, a, tag);
+      C2_CASE_TEXT(C2_KEY_AGENT_NAME, a, name);
+      C2_CASE_TEXT(C2_KEY_AGENT_VERSION, a, version);
+      C2_CASE_TEXT(C2_KEY_AGENT_TRANSPORT, a, transport);
+      C2_CASE_TEXT(C2_KEY_AGENT_HOSTNAME, a, hostname);
+      C2_CASE_TEXT(C2_KEY_AGENT_HARDWARE, a, hardware);
+      C2_CASE_TEXT(C2_KEY_AGENT_CONTAINER, a, container);
+      C2_CASE_TEXT(C2_KEY_AGENT_CPU, a, cpu);
+      C2_CASE_TEXT(C2_KEY_AGENT_GPU, a, gpu);
+      C2_CASE_TEXT(C2_KEY_AGENT_MEM, a, mem);
+      C2_CASE_TEXT(C2_KEY_AGENT_OS, a, os);
+      C2_CASE_TEXT(C2_KEY_AGENT_GOOS, a, goos);
+      C2_CASE_TEXT(C2_KEY_AGENT_KERNEL, a, kernel);
+      C2_CASE_TEXT(C2_KEY_AGENT_ARCH, a, arch);
+      C2_CASE_TEXT(C2_KEY_AGENT_FROM, a, from);
+      C2_CASE_STR_LIST(C2_KEY_AGENT_IPS, a, ips);
+      C2_CASE_STR_LIST(C2_KEY_AGENT_ARP, a, arp);
+      C2_CASE_TEXT(C2_KEY_AGENT_USER, a, user);
+      C2_CASE_BOOL(C2_KEY_AGENT_HAS_ROOT, a, root, has_root);
+      C2_CASE_BOOL(C2_KEY_AGENT_HAS_TOR, a, tor, has_tor);
+      C2_CASE_BOOL(C2_KEY_AGENT_HAS_INTERNET, a, internet, has_internet);
+      C2_CASE_BOOL(C2_KEY_AGENT_NCSI_ENABLED, a, ncsi, has_ncsi);
+      C2_CASE_STR_LIST(C2_KEY_AGENT_EXES, a, exes);
+      C2_CASE_TEXT(C2_KEY_AGENT_CWD, a, cwd);
+      C2_CASE_TEXT(C2_KEY_AGENT_PRODUCT, a, product);
+      C2_CASE_TEXT(C2_KEY_AGENT_UUID, a, uuid);
+      C2_CASE_TEXT(C2_KEY_AGENT_UUID_SIG, a, uuid_sig);
+      C2_CASE_TEXT(C2_KEY_AGENT_PUBLIC_KEY, a, public_key);
+      C2_CASE_TEXT(C2_KEY_AGENT_C2HOST, a, c2host);
+      C2_CASE_TEXT(C2_KEY_AGENT_UPTIME, a, uptime);
+      C2_CASE_TEXT(C2_KEY_AGENT_GROUPS, a, groups);
+      C2_CASE_TEXT(C2_KEY_AGENT_MESH_ROUTE, a, mesh_route);
+      C2_CASE_TEXT(C2_KEY_AGENT_P2P_RELAY_PORT, a, p2p_relay_port);
+      C2_CASE_TEXT(C2_KEY_AGENT_MESH_GOSSIP_PORT, a, mesh_gossip_port);
+      C2_CASE_STR_LIST(C2_KEY_AGENT_FILES, a, files);
+      C2_CASE_TEXT(C2_KEY_AGENT_GOARCH, a, goarch);
+      C2_CASE_TEXT(C2_KEY_AGENT_P2P_TRANSPORT, a, p2p_transport);
+      C2_CASE_TEXT(C2_KEY_AGENT_OWNER, a, owner);
     case C2_KEY_AGENT_PROCESS:
       st = read_agent_process(&map, &a->process);
-      break;
-    case C2_KEY_AGENT_EXES:
-      st = c2_cbor_read_str_list(&map, &a->exes);
-      break;
-    case C2_KEY_AGENT_CWD:
-      st = c2_cbor_read_text(&map, &a->cwd);
-      break;
-    case C2_KEY_AGENT_PRODUCT:
-      st = c2_cbor_read_text(&map, &a->product);
-      break;
-    case C2_KEY_AGENT_UUID:
-      st = c2_cbor_read_text(&map, &a->uuid);
-      break;
-    case C2_KEY_AGENT_UUID_SIG:
-      st = c2_cbor_read_text(&map, &a->uuid_sig);
-      break;
-    case C2_KEY_AGENT_PUBLIC_KEY:
-      st = c2_cbor_read_text(&map, &a->public_key);
-      break;
-    case C2_KEY_AGENT_C2HOST:
-      st = c2_cbor_read_text(&map, &a->c2host);
-      break;
-    case C2_KEY_AGENT_UPTIME:
-      st = c2_cbor_read_text(&map, &a->uptime);
-      break;
-    case C2_KEY_AGENT_GROUPS:
-      st = c2_cbor_read_text(&map, &a->groups);
-      break;
-    case C2_KEY_AGENT_MESH_ROUTE:
-      st = c2_cbor_read_text(&map, &a->mesh_route);
-      break;
-    case C2_KEY_AGENT_P2P_RELAY_PORT:
-      st = c2_cbor_read_text(&map, &a->p2p_relay_port);
-      break;
-    case C2_KEY_AGENT_MESH_GOSSIP_PORT:
-      st = c2_cbor_read_text(&map, &a->mesh_gossip_port);
-      break;
-    case C2_KEY_AGENT_FILES:
-      st = c2_cbor_read_str_list(&map, &a->files);
-      break;
-    case C2_KEY_AGENT_GOARCH:
-      st = c2_cbor_read_text(&map, &a->goarch);
-      break;
-    case C2_KEY_AGENT_P2P_TRANSPORT:
-      st = c2_cbor_read_text(&map, &a->p2p_transport);
-      break;
-    case C2_KEY_AGENT_OWNER:
-      st = c2_cbor_read_text(&map, &a->owner);
       break;
     default:
       st = c2_cbor_map_skip(&map);
@@ -412,21 +320,11 @@ c2_status c2_agent_token_decode(CborValue *r, c2_agent_token *t) {
   uint64_t key;
   while ((st = c2_cbor_map_key(&map, &key, &done)) == C2_OK && !done) {
     switch (key) {
-    case C2_KEY_TOKEN_AGENT_ID:
-      st = c2_cbor_read_text(&map, &t->agent_id);
-      break;
-    case C2_KEY_TOKEN_IP:
-      st = c2_cbor_read_text(&map, &t->ip);
-      break;
-    case C2_KEY_TOKEN_CAPABILITY:
-      st = c2_cbor_read_text(&map, &t->capability);
-      break;
-    case C2_KEY_TOKEN_EXPIRES_AT:
-      st = c2_cbor_read_int(&map, &t->expires_at);
-      break;
-    case C2_KEY_TOKEN_SIGNATURE:
-      st = c2_cbor_read_bytes(&map, &t->signature);
-      break;
+      C2_CASE_TEXT(C2_KEY_TOKEN_AGENT_ID, t, agent_id);
+      C2_CASE_TEXT(C2_KEY_TOKEN_IP, t, ip);
+      C2_CASE_TEXT(C2_KEY_TOKEN_CAPABILITY, t, capability);
+      C2_CASE_INT(C2_KEY_TOKEN_EXPIRES_AT, t, expires_at);
+      C2_CASE_BYTES(C2_KEY_TOKEN_SIGNATURE, t, signature);
     default:
       st = c2_cbor_map_skip(&map);
       break;
@@ -454,30 +352,14 @@ static c2_status read_enriched_peer(CborValue *it, c2_enriched_peer *p) {
   uint64_t key;
   while ((st = c2_cbor_map_key(&map, &key, &done)) == C2_OK && !done) {
     switch (key) {
-    case C2_KEY_PEER_UUID:
-      st = c2_cbor_read_text(&map, &p->uuid);
-      break;
-    case C2_KEY_PEER_IPS:
-      st = c2_cbor_read_str_list(&map, &p->ips);
-      break;
-    case C2_KEY_PEER_FROM:
-      st = c2_cbor_read_text(&map, &p->from);
-      break;
-    case C2_KEY_PEER_P2P_RELAY_PORT:
-      st = c2_cbor_read_text(&map, &p->p2p_relay_port);
-      break;
-    case C2_KEY_PEER_MESH_GOSSIP_PORT:
-      st = c2_cbor_read_text(&map, &p->mesh_gossip_port);
-      break;
-    case C2_KEY_PEER_FILES:
-      st = c2_cbor_read_str_list(&map, &p->files);
-      break;
-    case C2_KEY_PEER_LAST_SEEN:
-      st = c2_cbor_read_int(&map, &p->last_seen);
-      break;
-    case C2_KEY_PEER_P2P_TRANSPORT:
-      st = c2_cbor_read_text(&map, &p->p2p_transport);
-      break;
+      C2_CASE_TEXT(C2_KEY_PEER_UUID, p, uuid);
+      C2_CASE_STR_LIST(C2_KEY_PEER_IPS, p, ips);
+      C2_CASE_TEXT(C2_KEY_PEER_FROM, p, from);
+      C2_CASE_TEXT(C2_KEY_PEER_P2P_RELAY_PORT, p, p2p_relay_port);
+      C2_CASE_TEXT(C2_KEY_PEER_MESH_GOSSIP_PORT, p, mesh_gossip_port);
+      C2_CASE_STR_LIST(C2_KEY_PEER_FILES, p, files);
+      C2_CASE_INT(C2_KEY_PEER_LAST_SEEN, p, last_seen);
+      C2_CASE_TEXT(C2_KEY_PEER_P2P_TRANSPORT, p, p2p_transport);
     default:
       st = c2_cbor_map_skip(&map);
       break;

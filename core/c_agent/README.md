@@ -77,6 +77,7 @@ stager in `core/modules/stager_linux/`, which now includes them from here.
 make -C core/c_agent lib             # hosted static library (libc2agent.a)
 make -C core/c_agent agent           # hosted reference agent executable
 make -C core/c_agent test            # unit tests (gcc + ASan/UBSan)
+make -C core/c_agent coverage        # gcov line coverage per source
 make -C core/c_agent test-mbedtls    # self-contained mbedTLS backend tests
 make -C core/c_agent vendor-mbedtls  # build the vendored mbedTLS static libs
 make -C core/c_agent fuzz            # fuzz targets (ASan/UBSan fallback runner)
@@ -86,6 +87,21 @@ make -C core/c_agent fuzz            # fuzz targets (ASan/UBSan fallback runner)
 and the agent. The unit tests and fuzzers run under ASan/UBSan, which zig cannot
 link, so they use a host compiler (`gcc`/`clang`); `make test HOSTCC="zig cc"
 SAN=` builds them with zig without sanitizers.
+
+The library and agent link glibc dynamically and pin the oldest ABI to link
+against, so the build uses zig's bundled glibc headers instead of the host's and
+the binary runs on every glibc at or above the pinned version. Two independent
+knobs (also exposed to the operator as `generate --type aquila --glibc-version
+… --dynload …`):
+
+- `GLIBC_VERSION` (default `2.17`, the oldest the project supports) pins the
+target ABI.
+- `DYNLOAD_MODE` picks the libc symbols `dynload` resolves: `libc_dl`
+  (`__libc_dlopen_mode`, glibc < 2.34), `public` (`dlopen`/`dlsym`/`dlclose`,
+  glibc ≥ 2.34), or `auto` (`libc_dl` with a runtime fallback to the public
+  names, so one binary loads on both). The default is `libc_dl`.
+
+`core/modules/stager_linux` uses the same two knobs.
 
 The reference agent loads its build config at startup. The encrypted CBOR blob
 and the build-wide magic string are rendered into a C translation unit by
@@ -165,7 +181,8 @@ The targets and the surface each covers:
 | target | surface |
 | --- | --- |
 | `fuzz_messages` | `MsgAuth`/`MsgTunData` CBOR decode with varying list capacities |
-| `fuzz_agent_info` | Emp3r0rAgent / AgentToken / EnrichedPeerList / build-config decode |
+| `fuzz_agent_info` | Emp3r0rAgent / AgentToken / EnrichedPeerList decode |
+| `fuzz_config` | build-config decode (routes, malleable HTTP, custom headers) |
 | `fuzz_gzip` | gzip header parser + miniz DEFLATE/INFLATE round-trip |
 | `fuzz_memfile` | transparent memfs container decode + round-trip |
 | `fuzz_bof` | BOF loader ELF/relocation parser (real `coffloader_linux` provider) |
@@ -265,7 +282,8 @@ Implemented and tested in `src/`:
 - `c2_agent_info.c` — `Emp3r0rAgent` (check-in body), `AgentToken` and
   `EnrichedPeerList` codecs; `c2_config.c` — `c2_config_decrypt`
   (PBKDF2 + AES-GCM) and `c2_agent_config_decode` with route/channel defaults.
-  Fuzzed (`fuzz/fuzz_agent_info.c`).
+  Fuzzed (`fuzz/fuzz_agent_info.c`, `fuzz/fuzz_config.c`) and tested
+  (`tests/test_c2_agent_info.c`, `tests/test_c2_config.c`).
 - `c2_crypto.c` — PSK (`hexMD5(magic)[0:32]`), HKDF session-key derivation and
   the P-256 public-key PEM encoder.
 - `src/crypto/c2_crypto_openssl.c` — `c2_crypto_backend` over the system

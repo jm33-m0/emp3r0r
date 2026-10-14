@@ -180,24 +180,26 @@ c2_status c2_session_init(c2_agent_session *s, const c2_crypto_backend *be,
   if (st != C2_OK)
     return st;
 
+  if (agent_priv != NULL) {
+    memcpy(s->agent_priv, agent_priv, C2_P256_PRIV_BYTES);
+    /* The public key is not derivable through the vtable, so a caller that
+     * imports a private key must also hand over the matching public key via
+     * c2_session_set_identity_pub. */
+  } else {
+    if (be->ec_p256_keygen == NULL)
+      return C2_ERR_UNSUPPORTED;
+    if (be->ec_p256_keygen(be->ctx, s->agent_priv, s->agent_pub) != 0)
+      return C2_ERR_CRYPTO;
+  }
+
+  /* Allocate the read buffer last, so a failure above leaves the session
+   * zeroed and c2_session_cleanup is always a safe no-op. */
   s->rxcap = C2_SESSION_MSG_MAX;
   s->rxbuf = (uint8_t *)malloc(s->rxcap);
   if (s->rxbuf == NULL) {
     s->rxcap = 0;
     return C2_ERR_NOMEM;
   }
-
-  if (agent_priv != NULL) {
-    memcpy(s->agent_priv, agent_priv, C2_P256_PRIV_BYTES);
-    /* The public key is not derivable through the vtable, so a caller that
-     * imports a private key must also hand over the matching public key via
-     * c2_session_set_identity_pub. */
-    return C2_OK;
-  }
-  if (be->ec_p256_keygen == NULL)
-    return C2_ERR_UNSUPPORTED;
-  if (be->ec_p256_keygen(be->ctx, s->agent_priv, s->agent_pub) != 0)
-    return C2_ERR_CRYPTO;
   return C2_OK;
 }
 

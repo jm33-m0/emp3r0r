@@ -101,13 +101,20 @@ dynload *dynload_hosted(void);
 /* ---- build-time configuration (overridable with -D) ---------------------- */
 
 /*
- * DYNLOAD_MODE selects which libc names to resolve; both resolve from libc.so.6
- * only, never libdl.so.2.
- *   DYNLOAD_MODE_PUBLIC  (0, default): dlopen/dlsym/dlclose (glibc >= 2.34).
- *   DYNLOAD_MODE_LIBC_DL (1): __libc_dlopen_mode/__libc_dlsym/__libc_dlclose.
+ * DYNLOAD_MODE selects which libc names to resolve; all of them resolve from
+ * libc.so.6 only, never libdl.so.2.
+ *   DYNLOAD_MODE_PUBLIC  (0): dlopen/dlsym/dlclose (glibc >= 2.34).
+ *   DYNLOAD_MODE_LIBC_DL (1): __libc_dlopen_mode/__libc_dlsym/__libc_dlclose
+ *                             (glibc < 2.34).
+ *   DYNLOAD_MODE_AUTO    (2): resolve libc_dl, falling back to the public
+ *                             names when the glibc-internal ones are absent.
+ * PUBLIC is the default when the macro is not set, so a plain hosted build
+ * (e.g. the unit tests) uses the host libc; the Makefile always passes an
+ * explicit -DDYNLOAD_MODE for the agent.
  */
 #define DYNLOAD_MODE_PUBLIC 0
 #define DYNLOAD_MODE_LIBC_DL 1
+#define DYNLOAD_MODE_AUTO 2
 #ifndef DYNLOAD_MODE
 #define DYNLOAD_MODE DYNLOAD_MODE_PUBLIC
 #endif

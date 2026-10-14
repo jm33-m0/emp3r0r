@@ -1,5 +1,4 @@
 #include "c2_messages.h"
-#include "c2_transport.h"
 
 #include "cbor.h"
 
@@ -7,11 +6,12 @@
 
 #include <string.h>
 
-/* Decode arbitrary bytes as the wide check-in body, AgentToken, enriched peer
- * list and build config. All of these read nested maps/arrays from hostile
- * input, so the property under test is memory safety and bounded recursion
- * (ASan/UBSan), not acceptance. List storage is deliberately small and varies
- * with the input so the out-of-capacity path is hit. */
+/* Decode arbitrary bytes as the wide check-in body, AgentToken and enriched
+ * peer list. All of these read nested maps/arrays from hostile input, so the
+ * property under test is memory safety and bounded recursion (ASan/UBSan), not
+ * acceptance. List storage is deliberately small and varies with the input so
+ * the out-of-capacity path is hit. The build config has its own fuzz target
+ * (fuzz_config). */
 
 #define PEER_MAX 4
 #define IPS_PER_PEER 8
@@ -56,15 +56,6 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       peers[i].files.cap = IPS_PER_PEER;
     }
     (void)c2_enriched_peer_list_decode(&it, &l);
-  }
-
-  if (cbor_parser_init(data, size, 0, &parser, &it) == CborNoError) {
-    c2_str hk[8], hv[8];
-    c2_agent_config cfg = {0};
-    cfg.http.header_keys = hk;
-    cfg.http.header_values = hv;
-    cfg.http.header_cap = size % 9;
-    (void)c2_agent_config_decode(&it, &cfg);
   }
 
   return 0;

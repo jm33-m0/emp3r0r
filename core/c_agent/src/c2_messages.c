@@ -70,20 +70,6 @@ static c2_status sb_put_i64(c2_sb *s, int64_t v) {
   return sb_put(s, tmp, n);
 }
 
-/* Bytewise lexicographic order, matching Go's sort.Strings and ==. */
-static int c2_str_cmp(c2_str a, c2_str b) {
-  size_t n = a.len < b.len ? a.len : b.len;
-  for (size_t i = 0; i < n; i++) {
-    unsigned char x = (unsigned char)a.ptr[i];
-    unsigned char y = (unsigned char)b.ptr[i];
-    if (x != y)
-      return x < y ? -1 : 1;
-  }
-  if (a.len == b.len)
-    return 0;
-  return a.len < b.len ? -1 : 1;
-}
-
 c2_status c2_auth_canonical(c2_str agent_uuid, int64_t timestamp, c2_str nonce,
                             const c2_str_list *caps, char *out, size_t out_cap,
                             size_t *out_len) {
@@ -209,36 +195,16 @@ c2_status c2_msgauth_decode(CborValue *r, c2_msgauth *m) {
   uint64_t key;
   while ((st = c2_cbor_map_key(&map, &key, &done)) == C2_OK && !done) {
     switch (key) {
-    case C2_KEY_AUTH_TYPE:
-      st = c2_cbor_read_text(&map, &m->type);
-      break;
-    case C2_KEY_AUTH_AGENT_UUID:
-      st = c2_cbor_read_text(&map, &m->agent_uuid);
-      break;
-    case C2_KEY_AUTH_IDENTITY_TOKEN:
-      st = c2_cbor_read_text(&map, &m->identity_token);
-      break;
-    case C2_KEY_AUTH_TIMESTAMP:
-      st = c2_cbor_read_int(&map, &m->timestamp);
-      break;
-    case C2_KEY_AUTH_NONCE:
-      st = c2_cbor_read_text(&map, &m->nonce);
-      break;
-    case C2_KEY_AUTH_CAPABILITIES:
-      st = c2_cbor_read_str_list(&map, &m->capabilities);
-      break;
-    case C2_KEY_AUTH_AGENT_PROOF:
-      st = c2_cbor_read_text(&map, &m->agent_proof);
-      break;
-    case C2_KEY_AUTH_EPHEM_PUBLIC:
-      st = c2_cbor_read_bytes(&map, &m->ephem_public_key);
-      break;
-    case C2_KEY_AUTH_STREAM_ID:
-      st = c2_cbor_read_text(&map, &m->stream_id);
-      break;
-    case C2_KEY_AUTH_PROTOCOL_VERSION:
-      st = c2_cbor_read_int(&map, &m->protocol_version);
-      break;
+      C2_CASE_TEXT(C2_KEY_AUTH_TYPE, m, type);
+      C2_CASE_TEXT(C2_KEY_AUTH_AGENT_UUID, m, agent_uuid);
+      C2_CASE_TEXT(C2_KEY_AUTH_IDENTITY_TOKEN, m, identity_token);
+      C2_CASE_INT(C2_KEY_AUTH_TIMESTAMP, m, timestamp);
+      C2_CASE_TEXT(C2_KEY_AUTH_NONCE, m, nonce);
+      C2_CASE_STR_LIST(C2_KEY_AUTH_CAPABILITIES, m, capabilities);
+      C2_CASE_TEXT(C2_KEY_AUTH_AGENT_PROOF, m, agent_proof);
+      C2_CASE_BYTES(C2_KEY_AUTH_EPHEM_PUBLIC, m, ephem_public_key);
+      C2_CASE_TEXT(C2_KEY_AUTH_STREAM_ID, m, stream_id);
+      C2_CASE_INT(C2_KEY_AUTH_PROTOCOL_VERSION, m, protocol_version);
     default:
       st = c2_cbor_map_skip(&map);
       break;
@@ -337,33 +303,15 @@ c2_status c2_msgtun_decode(CborValue *r, c2_msgtun *m) {
   uint64_t key;
   while ((st = c2_cbor_map_key(&map, &key, &done)) == C2_OK && !done) {
     switch (key) {
-    case C2_KEY_TUN_JOB_ID:
-      st = c2_cbor_read_text(&map, &m->job_id);
-      break;
-    case C2_KEY_TUN_CMD_SLICE:
-      st = c2_cbor_read_str_list(&map, &m->cmd_slice);
-      break;
-    case C2_KEY_TUN_RESPONSE:
-      st = c2_cbor_read_bytes(&map, &m->response);
-      break;
-    case C2_KEY_TUN_TAG:
-      st = c2_cbor_read_text(&map, &m->tag);
-      break;
-    case C2_KEY_TUN_TIME:
-      st = c2_cbor_read_text(&map, &m->time);
-      break;
-    case C2_KEY_TUN_AGENT_UUID:
-      st = c2_cbor_read_text(&map, &m->agent_uuid);
-      break;
-    case C2_KEY_TUN_AGENT_UUID_SIG:
-      st = c2_cbor_read_text(&map, &m->agent_uuid_sig);
-      break;
-    case C2_KEY_TUN_EPHEM_PUBLIC:
-      st = c2_cbor_read_bytes(&map, &m->ephem_public_key);
-      break;
-    case C2_KEY_TUN_PEER_LIST:
-      st = c2_cbor_read_str_list(&map, &m->peer_list);
-      break;
+      C2_CASE_TEXT(C2_KEY_TUN_JOB_ID, m, job_id);
+      C2_CASE_STR_LIST(C2_KEY_TUN_CMD_SLICE, m, cmd_slice);
+      C2_CASE_BYTES(C2_KEY_TUN_RESPONSE, m, response);
+      C2_CASE_TEXT(C2_KEY_TUN_TAG, m, tag);
+      C2_CASE_TEXT(C2_KEY_TUN_TIME, m, time);
+      C2_CASE_TEXT(C2_KEY_TUN_AGENT_UUID, m, agent_uuid);
+      C2_CASE_TEXT(C2_KEY_TUN_AGENT_UUID_SIG, m, agent_uuid_sig);
+      C2_CASE_BYTES(C2_KEY_TUN_EPHEM_PUBLIC, m, ephem_public_key);
+      C2_CASE_STR_LIST(C2_KEY_TUN_PEER_LIST, m, peer_list);
     default:
       st = c2_cbor_map_skip(&map);
       break;
