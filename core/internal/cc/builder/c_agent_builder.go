@@ -39,6 +39,55 @@ func cAgentSourceDir() string {
 	return filepath.Join(live.EmpDataDir, "c_agent")
 }
 
+// stageCAgentSource copies the parts of the installed C agent tree the Makefile
+// needs into a writable directory. Only the build inputs are copied, so no
+// stale build/ output can leak into the new build.
+func stageCAgentSource(srcDir, dstDir string) error {
+	if err := os.MkdirAll(dstDir, 0o755); err != nil {
+		return fmt.Errorf("create %s: %w", dstDir, err)
+	}
+	for _, name := range []string{"Makefile", "src", "include", "vendor"} {
+		src := filepath.Join(srcDir, name)
+		if !util.IsExist(src) {
+			return fmt.Errorf("C agent source %s is missing %s (rebuild the operator kit)", srcDir, name)
+		}
+		if err := copyStageSource(src, filepath.Join(dstDir, name)); err != nil {
+			return fmt.Errorf("stage C agent %s: %w", name, err)
+		}
+	}
+	return nil
+}
+
+// copyStageSource copies a file or directory, creating directories with writable
+// permissions regardless of the source mode (the installed tree is often
+// read-only, and a copy must be buildable).
+func copyStageSource(src, dst string) error {
+	info, err := os.Lstat(src)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		data, err := os.ReadFile(src)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(dst, data, 0o644)
+	}
+	if err := os.MkdirAll(dst, 0o755); err != nil {
+		return err
+	}
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if err := copyStageSource(filepath.Join(src, entry.Name()), filepath.Join(dst, entry.Name())); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func validateCAgentProviders(p CAgentProviders) error {
 	check := func(group, value string, allowed []string) error {
 		if value == "" {
@@ -123,27 +172,38 @@ func GenerateCAgentWorkflow(opts AgentConfig, providers CAgentProviders, signAge
 		return nil, fmt.Errorf("encrypt config: %w", err)
 	}
 
-	// The C agent's build-time data (encrypted config + magic string) is
-	// rendered as a C translation unit into the Makefile's build directory,
-	// which is gitignored, then compiled via CONFIG_SRC so building the agent
-	// needs no Python or Go toolchain on the operator host.
-	buildDir := filepath.Join(srcDir, "build")
+	// Build from a writable copy of the installed source. The install prefix is
+	// often read-only (e.g. /usr), and both the agent build and a CRYPTO=mbedtls
+	// build write into the source tree (build/, vendor/mbedtls/library/). The
+	// embedded config is rendered into the copy and compiled via CONFIG_SRC, so
+	// building needs no Python or Go toolchain on the operator host.
+	workRoot, err := os.MkdirTemp(live.EmpWorkSpace, "c_agent_build_")
+	if err != nil {
+		return nil, fmt.Errorf("create build workspace: %w", err)
+	}
+	defer os.RemoveAll(workRoot)
+
+	buildSrc := filepath.Join(workRoot, "c_agent")
+	if err := stageCAgentSource(srcDir, buildSrc); err != nil {
+		return nil, err
+	}
+	buildDir := filepath.Join(buildSrc, "build")
 	if err := os.MkdirAll(buildDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create build dir: %w", err)
 	}
 	configSrcPath := filepath.Join(buildDir, "c2_config_embedded.c")
-	if err := os.WriteFile(configSrcPath, cagent.EmbeddedConfigSource(payload, def.MagicString), 0o600); err != nil {
+	if err := os.WriteFile(configSrcPath, cagent.EmbeddedConfigSource(payload, def.MagicString, def.BuildVersion), 0o600); err != nil {
 		return nil, fmt.Errorf("write config source: %w", err)
 	}
 
 	// Build with the pinned zig toolchain the kit ships (the Makefile default).
-	build := exec.Command("make", cAgentBuildArgs(srcDir, configSrcPath, providers)...)
-	build.Dir = srcDir
+	build := exec.Command("make", cAgentBuildArgs(buildSrc, configSrcPath, providers)...)
+	build.Dir = buildSrc
 	if out, buildErr := build.CombinedOutput(); buildErr != nil {
 		return nil, fmt.Errorf("build C agent: %w\n%s", buildErr, out)
 	}
 
-	built := filepath.Join(srcDir, "build", "c2_agent")
+	built := filepath.Join(buildDir, "c2_agent")
 	if !util.IsFileExist(built) {
 		return nil, fmt.Errorf("build reported success but %s was not produced", built)
 	}

@@ -1,0 +1,79 @@
+/*
+ * test_c2_sysinfo.c — c2_gather_agent_info must report the same identity
+ * fields the Go agent's GatherSystemDetails does, so the C2 (and BOF dispatch)
+ * sees a Linux target with a full system profile.
+ */
+
+#include "c2_sysinfo.h"
+
+#include "cbor.h"
+
+#include "test.h"
+
+#include <string.h>
+
+static int str_eq(c2_str s, const char *lit) {
+  size_t n = strlen(lit);
+  return s.ptr != NULL && s.len == n && memcmp(s.ptr, lit, n) == 0;
+}
+
+static int str_has(c2_str s, const char *lit) {
+  size_t n = strlen(lit);
+  if (s.ptr == NULL || s.len < n)
+    return 0;
+  for (size_t i = 0; i + n <= s.len; i++)
+    if (memcmp(s.ptr + i, lit, n) == 0)
+      return 1;
+  return 0;
+}
+
+int main(void) {
+  c2_agent_config cfg;
+  memset(&cfg, 0, sizeof(cfg));
+  cfg.cc_address = c2_str_lit("127.0.0.1:8080");
+  cfg.agent_uuid = c2_str_lit("11111111-1111-1111-1111-111111111111");
+  cfg.agent_uuid_sig = c2_str_lit("sig");
+  cfg.agent_tag = c2_str_lit("deadbeef");
+  cfg.c2_channel_mode = c2_str_lit("http_poll");
+
+  c2_agent_info info;
+  c2_sysinfo_store store;
+  CHECK_EQ_LONG(c2_gather_agent_info(&info, &cfg, NULL, "9.9.9", &store), C2_OK);
+
+  /* The fields module selection and operator display depend on. */
+  CHECK(str_eq(info.goos, "linux"));
+  CHECK(info.goarch.ptr != NULL && info.goarch.len > 0);
+  CHECK(info.os.ptr != NULL && info.os.len > 0);
+  CHECK(info.kernel.ptr != NULL && info.kernel.len > 0);
+  CHECK(info.hostname.ptr != NULL && info.hostname.len > 0);
+  CHECK(info.name.ptr != NULL && info.name.len > 0);
+  CHECK(info.user.ptr != NULL && str_has(info.user, "uid="));
+  CHECK(info.groups.ptr != NULL);
+  CHECK(info.uptime.ptr != NULL && info.uptime.len > 0);
+  CHECK(info.cwd.ptr != NULL && info.cwd.len > 0);
+  CHECK(str_eq(info.c2host, "127.0.0.1:8080"));
+  CHECK(str_eq(info.version, "9.9.9"));
+  CHECK(str_eq(info.mesh_route, "direct"));
+  CHECK(str_has(info.transport, "HTTP (127.0.0.1:8080)"));
+  CHECK(info.hardware.ptr != NULL && str_eq(info.hardware, "N/A"));
+  CHECK(info.cpu.ptr != NULL && str_eq(info.cpu, "N/A"));
+
+  /* Identity comes straight from the build config. */
+  CHECK(str_eq(info.uuid, "11111111-1111-1111-1111-111111111111"));
+  CHECK(str_eq(info.uuid_sig, "sig"));
+
+  CHECK(info.has_root == 1);
+  CHECK(info.process.has_pid && info.process.pid > 0);
+  CHECK(info.process.cmdline.ptr != NULL && info.process.cmdline.len > 0);
+  CHECK(info.ips.count > 0);
+  CHECK(info.ips.items[0].len > 0);
+
+  /* The gathered body must encode as a well-formed Emp3r0rAgent. */
+  uint8_t buf[16384];
+  CborEncoder enc;
+  cbor_encoder_init(&enc, buf, sizeof(buf), 0);
+  CHECK_EQ_LONG(c2_agent_info_encode(&enc, &info), C2_OK);
+  CHECK(cbor_encoder_get_buffer_size(&enc, buf) > 0);
+
+  TEST_DONE();
+}

@@ -18,14 +18,24 @@
 #include <stdlib.h>
 
 /* Read exactly len bytes. *clean_eof is set only when the stream ended before
- * any byte of this read; a partial read is an error. */
+ * any byte of this read; a partial read is an error. *idle (when non-NULL) is
+ * set when a polling transport has no data yet and no byte was read. */
 static c2_status read_exact(c2_stream *s, uint8_t *buf, size_t len,
-                            int *clean_eof) {
+                            int *clean_eof, int *idle) {
   if (clean_eof)
     *clean_eof = 0;
+  if (idle)
+    *idle = 0;
   size_t off = 0;
   while (off < len) {
     long n = s->ops->read(s->ctx, buf + off, len - off);
+    if (n == C2_STREAM_IDLE) {
+      if (off == 0 && idle != NULL) {
+        *idle = 1;
+        return C2_OK;
+      }
+      continue; /* mid-frame: keep waiting for the rest */
+    }
     if (n < 0)
       return C2_ERR_IO;
     if (n == 0) {
@@ -275,29 +285,28 @@ c2_status c2_secureconn_write_bulk(c2_secureconn *sc, const uint8_t *payload,
   return write_frame(sc, payload, len, 0);
 }
 
-long c2_secureconn_read(c2_secureconn *sc, uint8_t *buf, size_t cap) {
-  if (sc == NULL || sc->stream.ops == NULL || sc->stream.ops->read == NULL ||
-      buf == NULL || cap == 0)
-    return C2_ERR_ARG;
-
-  if (sc->rxoff < sc->rxlen) {
-    size_t avail = sc->rxlen - sc->rxoff;
-    size_t n = avail < cap ? avail : cap;
-    memcpy(buf, sc->rxbuf + sc->rxoff, n);
-    sc->rxoff += n;
-    if (sc->rxoff == sc->rxlen)
-      sc->rxoff = sc->rxlen = 0;
-    return (long)n;
-  }
-
+/* Read and decrypt exactly one non-empty frame. On success *plain is a
+ * malloc'd buffer holding the whole plaintext, *payload points inside it and
+ * *plen is the payload length. On a clean EOF before any byte of a new frame,
+ * *eof is set to 1. The caller frees *plain once done. Empty control frames
+ * are skipped (never surfaced as EOF). */
+static c2_status read_one_frame(c2_secureconn *sc, uint8_t **plain_out,
+                                uint8_t **payload_out, size_t *plen_out,
+                                int *eof) {
+  *eof = 0;
   for (;;) {
     uint8_t hdr[4];
-    int eof = 0;
-    c2_status st = read_exact(&sc->stream, hdr, sizeof(hdr), &eof);
+    int eof_now = 0;
+    int idle_now = 0;
+    c2_status st = read_exact(&sc->stream, hdr, sizeof(hdr), &eof_now, &idle_now);
     if (st != C2_OK)
       return st;
-    if (eof)
-      return 0; /* clean end of stream */
+    if (idle_now)
+      return C2_ERR_TIMEOUT;
+    if (eof_now) {
+      *eof = 1;
+      return C2_OK;
+    }
 
     uint32_t enc_len = c2_be32_load(hdr);
     if (enc_len == 0 || enc_len > C2_FRAME_ENC_MAX)
@@ -306,10 +315,10 @@ long c2_secureconn_read(c2_secureconn *sc, uint8_t *buf, size_t cap) {
     uint8_t *enc = (uint8_t *)malloc(enc_len);
     if (enc == NULL)
       return C2_ERR_NOMEM;
-    st = read_exact(&sc->stream, enc, enc_len, &eof);
-    if (st != C2_OK || eof) {
+    st = read_exact(&sc->stream, enc, enc_len, &eof_now, NULL);
+    if (st != C2_OK || eof_now) {
       free(enc);
-      return eof ? C2_ERR_PROTO : st;
+      return eof_now ? C2_ERR_PROTO : st;
     }
 
     uint8_t *plain = (uint8_t *)malloc(enc_len);
@@ -327,10 +336,73 @@ long c2_secureconn_read(c2_secureconn *sc, uint8_t *buf, size_t cap) {
       return st;
     }
     if (plen == 0) {
-      /* Empty control frame: skip it, never surface it as EOF. */
+      /* Empty control frame: skip it, never surface it as a message. */
       free(plain);
       continue;
     }
+    *plain_out = plain;
+    *payload_out = payload;
+    *plen_out = plen;
+    return C2_OK;
+  }
+}
+
+c2_status c2_secureconn_read_msg(c2_secureconn *sc, uint8_t *buf, size_t cap,
+                                 size_t *len, int *eof) {
+  if (sc == NULL || buf == NULL || len == NULL || eof == NULL)
+    return C2_ERR_ARG;
+  *eof = 0;
+  *len = 0;
+  /* A buffered payload from c2_secureconn_read means the caller mixed the
+   * streaming and message APIs mid-frame, which can only be a bug. */
+  if (sc->rxoff < sc->rxlen)
+    return C2_ERR_PROTO;
+
+  uint8_t *plain = NULL;
+  uint8_t *payload = NULL;
+  size_t plen = 0;
+  c2_status st = read_one_frame(sc, &plain, &payload, &plen, eof);
+  if (st != C2_OK)
+    return st;
+  if (*eof)
+    return C2_OK;
+  if (plen > cap) {
+    free(plain);
+    return C2_ERR_NOMEM;
+  }
+  memcpy(buf, payload, plen);
+  free(plain);
+  *len = plen;
+  return C2_OK;
+}
+
+long c2_secureconn_read(c2_secureconn *sc, uint8_t *buf, size_t cap) {
+  if (sc == NULL || sc->stream.ops == NULL || sc->stream.ops->read == NULL ||
+      buf == NULL || cap == 0)
+    return C2_ERR_ARG;
+
+  for (;;) {
+    if (sc->rxoff < sc->rxlen) {
+      size_t avail = sc->rxlen - sc->rxoff;
+      size_t n = avail < cap ? avail : cap;
+      memcpy(buf, sc->rxbuf + sc->rxoff, n);
+      sc->rxoff += n;
+      if (sc->rxoff == sc->rxlen)
+        sc->rxoff = sc->rxlen = 0;
+      return (long)n;
+    }
+
+    uint8_t *plain = NULL;
+    uint8_t *payload = NULL;
+    size_t plen = 0;
+    int eof = 0;
+    c2_status st = read_one_frame(sc, &plain, &payload, &plen, &eof);
+    if (st == C2_ERR_TIMEOUT)
+      continue; /* idle long-poll: a streaming reader just keeps waiting */
+    if (st != C2_OK)
+      return st;
+    if (eof)
+      return 0; /* clean end of stream */
 
     size_t n = plen < cap ? plen : cap;
     memcpy(buf, payload, n);

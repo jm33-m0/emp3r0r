@@ -121,9 +121,11 @@ hello_linux --who friend
 - `agent_config.files` may list several architecture variants
   (`foo.x64.o`, `foo.x86.o`). The C2 picks the one matching the target agent's
   architecture and hosts it as `<name>.<arch>.gz`.
-- On Windows the agent runs the BOF through the `coffloader` dependency, which
-  is added to `dependencies` automatically. On Linux it runs through the native
-  ELF object loader. See §8 for how dependencies are mapped and unmapped.
+- A `coff` module depends on its platform loader (`coffloader` on Windows,
+  `coffloader_linux` on Linux). The dependency is injected automatically and an
+  explicit `"dependencies": ["coffloader_linux"]` in `config.json` is kept, not
+  duplicated; the C2 hosts each dependency as `<name>.<arch>.gz` before
+  dispatch. See §8 for how dependencies are mapped and unmapped.
 
 ---
 
@@ -289,6 +291,13 @@ requirements for those modules are documented in their own READMEs; the
 Windows loader, for example, needs zig and nasm (both installed by `build.py`
 and shipped in the operator kit), plus a native C compiler.
 
+A BOF is freestanding, position-independent code with no runtime, so build it
+with **no sanitizer instrumentation**: `zig cc` enables its default
+`-fsanitize` set unless told otherwise, which leaves the object referring to
+`__ubsan_handle_*` symbols the loader can never resolve. Pass
+`-fno-sanitize=all` (see `modules/hello_linux/Makefile`) and keep the object
+free of any other runtime dependency.
+
 ---
 
 ## 7. What happens when a module runs
@@ -394,6 +403,13 @@ before returning, freeing anything the script did not `mem_free`. See
 
 The point of the indirection is that no caller can hold a mapping it might
 cache; a dependency image exists only while its user is executing.
+
+The C agent has no `memdeps` layer: its BOF runner
+(`core/c_agent/src/c2_bof.c`) resolves the `coffloader_linux` dependency
+itself, pulling `coffloader_linux.<arch>.gz` into memfs on first use and
+mapping it with `dynload` for the duration of a single BOF run. The loader is
+built by `core/modules/coffloader_linux` as a position-independent `.so` with a
+single exported entry point (`bof_run`).
 
 ---
 

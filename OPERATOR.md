@@ -218,6 +218,18 @@ generate --type windows_executable --arch amd64 --cc your.domain.com \
   --p2p --p2p-transport smb
 ```
 
+#### Native C agent
+
+The native C agent is a payload type of `generate`. It is built on demand from
+`core/c_agent` with a config encrypted under the C2's `MagicString`:
+
+```bash
+generate --type aquila --cc your.domain.com
+generate --type aquila --cc your.domain.com --crypto mbedtls --gzip none
+```
+
+Output: `aquila_linux_<timestamp>`.
+
 Mesh nodes may run different transports. Each agent advertises the transport and
 port its relay listens on, and dialers always use the _peer's_ advertised
 transport, so a mixed mesh (for example Windows SMB nodes alongside Linux mTLS

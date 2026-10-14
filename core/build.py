@@ -1872,6 +1872,16 @@ def do_uninstall(prefix: str) -> None:
     log_success("emp3r0r has been removed")
 
 
+# Build artefacts that must not travel with the C agent source. The operator
+# renders its own config/MagicString and builds the agent on demand, so a
+# packaged build/ (or vendored .o/.a) would be stale, arch-specific, and could
+# carry the packaging host's embedded config. Modules keep their built payloads;
+# the C agent source is shipped as source only.
+_C_AGENT_IGNORE = shutil.ignore_patterns(
+    "build", "compile_commands.json", ".cache", "__pycache__", "*.o", "*.a"
+)
+
+
 def prepare_misc_files(core_dir: pathlib.Path, temp_dir: pathlib.Path) -> None:
     log_info("Preparing misc files")
     for name in ["tmux", "modules", "c_agent", "emp3r0r"]:
@@ -1879,7 +1889,11 @@ def prepare_misc_files(core_dir: pathlib.Path, temp_dir: pathlib.Path) -> None:
         if src.exists():
             if src.is_dir():
                 shutil.copytree(
-                    src, temp_dir / name, dirs_exist_ok=True, copy_function=copy2_atomic
+                    src,
+                    temp_dir / name,
+                    dirs_exist_ok=True,
+                    copy_function=copy2_atomic,
+                    ignore=_C_AGENT_IGNORE if name == "c_agent" else None,
                 )
             else:
                 copy2_atomic(src, temp_dir / name)

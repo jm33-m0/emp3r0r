@@ -1,20 +1,21 @@
 /*
- * c2_messages.c — CBOR codecs for the C2 message schemas.
+ * c2_messages.c — the two envelopes every agent always needs:
+ * c2_auth_canonical (the string AgentProof signs) and the MsgAuth / MsgTunData
+ * codecs. The check-in body, AgentToken and peer list live in c2_agent_info.c.
  *
- * The CBOR layer is Intel's vendored tinycbor (see vendor/tinycbor). Only the
- * two envelopes the agent always needs are implemented here: c2_auth_canonical
- * (the string AgentProof signs) and MsgAuth / MsgTunData. The check-in body,
- * AgentToken and peer list are separate translation units.
- *
- * Decoding is zero-copy: every c2_str/c2_bytes returned by the decoder points
- * into the reader's input buffer. String lists take caller-provided storage
- * (items/cap); a list that does not fit returns C2_ERR_NOMEM.
+ * Decoding is zero-copy: every c2_str/c2_bytes points into the reader's input
+ * buffer. String lists take caller-provided storage (items/cap); a list that
+ * does not fit returns C2_ERR_NOMEM. The tinycbor glue is in c2_cbor_util.h.
  */
 
 #include "c2_messages.h"
 
-#include "cbor.h"
+#include "c2_cbor_util.h"
 #include "c2_crypto.h"
+
+#include "cbor.h"
+
+#include <string.h>
 
 /* ------------------------------------------------------------------------- */
 /* Bounded string builder for the canonical auth string                      */
@@ -145,203 +146,6 @@ c2_status c2_auth_canonical(c2_str agent_uuid, int64_t timestamp, c2_str nonce,
 }
 
 /* ------------------------------------------------------------------------- */
-/* tinycbor glue                                                              */
-/* ------------------------------------------------------------------------- */
-
-static c2_status ec(CborError e) {
-  return e == CborNoError ? C2_OK : C2_ERR_NOMEM;
-}
-
-/* Decode-side error mapping: any tinycbor error is malformed input. */
-static c2_status dc(CborError e) {
-  return e == CborNoError ? C2_OK : C2_ERR_PROTO;
-}
-
-static c2_status wr_key(CborEncoder *w, uint64_t key) {
-  return ec(cbor_encode_uint(w, key));
-}
-
-static c2_status wr_text(CborEncoder *w, uint64_t key, c2_str v) {
-  c2_status st = wr_key(w, key);
-  if (st != C2_OK)
-    return st;
-  return ec(cbor_encode_text_string(w, v.ptr ? v.ptr : "", v.len));
-}
-
-static c2_status wr_bytes(CborEncoder *w, uint64_t key, c2_bytes v) {
-  c2_status st = wr_key(w, key);
-  if (st != C2_OK)
-    return st;
-  return ec(
-      cbor_encode_byte_string(w, v.ptr ? v.ptr : (const uint8_t *)"", v.len));
-}
-
-static c2_status wr_int(CborEncoder *w, uint64_t key, int64_t v) {
-  c2_status st = wr_key(w, key);
-  if (st != C2_OK)
-    return st;
-  return ec(cbor_encode_int(w, v));
-}
-
-static c2_status wr_str_list(CborEncoder *w, uint64_t key,
-                             const c2_str_list *l) {
-  c2_status st = wr_key(w, key);
-  if (st != C2_OK)
-    return st;
-  CborEncoder arr;
-  st = ec(cbor_encoder_create_array(w, &arr, l->count));
-  if (st != C2_OK)
-    return st;
-  for (size_t i = 0; i < l->count; i++) {
-    st = ec(cbor_encode_text_string(
-        &arr, l->items[i].ptr ? l->items[i].ptr : "", l->items[i].len));
-    if (st != C2_OK)
-      return st;
-  }
-  return ec(cbor_encoder_close_container(w, &arr));
-}
-
-/* Zero-copy text/bytes read. tinycbor exposes string contents only through its
- * chunk iterator, so begin the iteration, read the chunk(s), then finish. An
- * indefinite-length (multi-chunk) string is rejected: the C2 never emits one
- * and reassembling chunks would break zero-copy. */
-static c2_status rd_text(CborValue *it, c2_str *out) {
-  if (!cbor_value_is_text_string(it))
-    return C2_ERR_PROTO;
-  CborValue cur = *it;
-  if (cbor_value_begin_string_iteration(&cur) != CborNoError)
-    return C2_ERR_PROTO;
-
-  const char *ptr = NULL;
-  size_t len = 0;
-  int chunks = 0;
-  while (!cbor_value_string_iteration_at_end(&cur)) {
-    CborValue next;
-    const char *cp = NULL;
-    size_t cl = 0;
-    if (cbor_value_get_text_string_chunk(&cur, &cp, &cl, &next) !=
-        CborNoError) {
-      return C2_ERR_PROTO;
-    }
-    if (chunks == 0) {
-      ptr = cp;
-      len = cl;
-    }
-    chunks++;
-    cur = next;
-  }
-  if (cbor_value_finish_string_iteration(&cur) != CborNoError)
-    return C2_ERR_PROTO;
-  *it = cur;
-  if (chunks > 1)
-    return C2_ERR_UNSUPPORTED;
-  out->ptr = ptr ? ptr : "";
-  out->len = len;
-  return C2_OK;
-}
-
-static c2_status rd_bytes(CborValue *it, c2_bytes *out) {
-  if (!cbor_value_is_byte_string(it))
-    return C2_ERR_PROTO;
-  CborValue cur = *it;
-  if (cbor_value_begin_string_iteration(&cur) != CborNoError)
-    return C2_ERR_PROTO;
-
-  const uint8_t *ptr = NULL;
-  size_t len = 0;
-  int chunks = 0;
-  while (!cbor_value_string_iteration_at_end(&cur)) {
-    CborValue next;
-    const uint8_t *cp = NULL;
-    size_t cl = 0;
-    if (cbor_value_get_byte_string_chunk(&cur, &cp, &cl, &next) !=
-        CborNoError) {
-      return C2_ERR_PROTO;
-    }
-    if (chunks == 0) {
-      ptr = cp;
-      len = cl;
-    }
-    chunks++;
-    cur = next;
-  }
-  if (cbor_value_finish_string_iteration(&cur) != CborNoError)
-    return C2_ERR_PROTO;
-  *it = cur;
-  if (chunks > 1)
-    return C2_ERR_UNSUPPORTED;
-  out->ptr = ptr ? ptr : (const uint8_t *)"";
-  out->len = len;
-  return C2_OK;
-}
-
-static c2_status rd_int(CborValue *it, int64_t *v) {
-  if (!cbor_value_is_integer(it))
-    return C2_ERR_PROTO;
-  int64_t tmp;
-  if (cbor_value_get_int64_checked(it, &tmp) != CborNoError)
-    return C2_ERR_OVERFLOW;
-  *v = tmp;
-  return dc(cbor_value_advance(it));
-}
-
-static c2_status rd_str_list(CborValue *it, c2_str_list *out) {
-  if (!cbor_value_is_array(it))
-    return C2_ERR_PROTO;
-  CborValue arr;
-  c2_status st = dc(cbor_value_enter_container(it, &arr));
-  if (st != C2_OK)
-    return st;
-  out->count = 0;
-  while (!cbor_value_at_end(&arr)) {
-    c2_str s;
-    st = rd_text(&arr, &s);
-    if (st != C2_OK)
-      return st;
-    if (out->count >= out->cap)
-      return C2_ERR_NOMEM;
-    out->items[out->count++] = s;
-  }
-  return dc(cbor_value_leave_container(it, &arr));
-}
-
-/* Enter a map for iteration; the caller must reach cbor_value_at_end before
- * calling leave_container. */
-static c2_status map_enter(CborValue *it, CborValue *map) {
-  if (!cbor_value_is_map(it))
-    return C2_ERR_PROTO;
-  return dc(cbor_value_enter_container(it, map));
-}
-
-static c2_status map_key(CborValue *map, uint64_t *key, int *done) {
-  *done = 0;
-  if (cbor_value_at_end(map)) {
-    *done = 1;
-    return C2_OK;
-  }
-  if (!cbor_value_is_unsigned_integer(map))
-    return C2_ERR_PROTO;
-  if (cbor_value_get_uint64(map, key) != CborNoError)
-    return C2_ERR_PROTO;
-  c2_status st = dc(cbor_value_advance(map));
-  if (st != C2_OK)
-    return st;
-  /* A key must be followed by a value; an odd item ends the map here. */
-  if (cbor_value_at_end(map))
-    return C2_ERR_PROTO;
-  return C2_OK;
-}
-
-static c2_status map_skip(CborValue *map) {
-  /* cbor_value_advance moves past a tag to its tagged value, not past the
-   * whole value, so consume any tag wrappers first. The C2 never emits tags,
-   * but hostile input can. */
-  if (cbor_value_skip_tag(map) != CborNoError)
-    return C2_ERR_PROTO;
-  return dc(cbor_value_advance(map));
-}
-
-/* ------------------------------------------------------------------------- */
 /* MsgAuth                                                                    */
 /* ------------------------------------------------------------------------- */
 
@@ -356,35 +160,40 @@ c2_status c2_msgauth_encode(CborEncoder *w, const c2_msgauth *m) {
     pairs++;
 
   CborEncoder map;
-  c2_status st = ec(cbor_encoder_create_map(w, &map, pairs));
+  c2_status st = c2_cbor_ec(cbor_encoder_create_map(w, &map, pairs));
   if (st != C2_OK)
     return st;
-  if ((st = wr_text(&map, C2_KEY_AUTH_TYPE, m->type)) != C2_OK)
+  if ((st = c2_cbor_write_text(&map, C2_KEY_AUTH_TYPE, m->type)) != C2_OK)
     return st;
-  if ((st = wr_text(&map, C2_KEY_AUTH_AGENT_UUID, m->agent_uuid)) != C2_OK)
-    return st;
-  if ((st = wr_text(&map, C2_KEY_AUTH_IDENTITY_TOKEN, m->identity_token)) !=
+  if ((st = c2_cbor_write_text(&map, C2_KEY_AUTH_AGENT_UUID, m->agent_uuid)) !=
       C2_OK)
     return st;
-  if ((st = wr_int(&map, C2_KEY_AUTH_TIMESTAMP, m->timestamp)) != C2_OK)
+  if ((st = c2_cbor_write_text(&map, C2_KEY_AUTH_IDENTITY_TOKEN,
+                               m->identity_token)) != C2_OK)
     return st;
-  if ((st = wr_text(&map, C2_KEY_AUTH_NONCE, m->nonce)) != C2_OK)
-    return st;
-  if ((st = wr_str_list(&map, C2_KEY_AUTH_CAPABILITIES, &m->capabilities)) !=
+  if ((st = c2_cbor_write_int(&map, C2_KEY_AUTH_TIMESTAMP, m->timestamp)) !=
       C2_OK)
     return st;
-  if ((st = wr_text(&map, C2_KEY_AUTH_AGENT_PROOF, m->agent_proof)) != C2_OK)
+  if ((st = c2_cbor_write_text(&map, C2_KEY_AUTH_NONCE, m->nonce)) != C2_OK)
     return st;
-  if (m->ephem_public_key.len && (st = wr_bytes(&map, C2_KEY_AUTH_EPHEM_PUBLIC,
-                                                m->ephem_public_key)) != C2_OK)
+  if ((st = c2_cbor_write_str_list(&map, C2_KEY_AUTH_CAPABILITIES,
+                                   &m->capabilities)) != C2_OK)
+    return st;
+  if ((st = c2_cbor_write_text(&map, C2_KEY_AUTH_AGENT_PROOF, m->agent_proof)) !=
+      C2_OK)
+    return st;
+  if (m->ephem_public_key.len &&
+      (st = c2_cbor_write_bytes(&map, C2_KEY_AUTH_EPHEM_PUBLIC,
+                                m->ephem_public_key)) != C2_OK)
     return st;
   if (m->stream_id.len &&
-      (st = wr_text(&map, C2_KEY_AUTH_STREAM_ID, m->stream_id)) != C2_OK)
+      (st = c2_cbor_write_text(&map, C2_KEY_AUTH_STREAM_ID, m->stream_id)) !=
+          C2_OK)
     return st;
-  if ((st = wr_int(&map, C2_KEY_AUTH_PROTOCOL_VERSION, m->protocol_version)) !=
-      C2_OK)
+  if ((st = c2_cbor_write_int(&map, C2_KEY_AUTH_PROTOCOL_VERSION,
+                              m->protocol_version)) != C2_OK)
     return st;
-  return ec(cbor_encoder_close_container(w, &map));
+  return c2_cbor_ec(cbor_encoder_close_container(w, &map));
 }
 
 c2_status c2_msgauth_decode(CborValue *r, c2_msgauth *m) {
@@ -392,46 +201,46 @@ c2_status c2_msgauth_decode(CborValue *r, c2_msgauth *m) {
     return C2_ERR_ARG;
 
   CborValue map;
-  c2_status st = map_enter(r, &map);
+  c2_status st = c2_cbor_map_enter(r, &map);
   if (st != C2_OK)
     return st;
 
   int done;
   uint64_t key;
-  while ((st = map_key(&map, &key, &done)) == C2_OK && !done) {
+  while ((st = c2_cbor_map_key(&map, &key, &done)) == C2_OK && !done) {
     switch (key) {
     case C2_KEY_AUTH_TYPE:
-      st = rd_text(&map, &m->type);
+      st = c2_cbor_read_text(&map, &m->type);
       break;
     case C2_KEY_AUTH_AGENT_UUID:
-      st = rd_text(&map, &m->agent_uuid);
+      st = c2_cbor_read_text(&map, &m->agent_uuid);
       break;
     case C2_KEY_AUTH_IDENTITY_TOKEN:
-      st = rd_text(&map, &m->identity_token);
+      st = c2_cbor_read_text(&map, &m->identity_token);
       break;
     case C2_KEY_AUTH_TIMESTAMP:
-      st = rd_int(&map, &m->timestamp);
+      st = c2_cbor_read_int(&map, &m->timestamp);
       break;
     case C2_KEY_AUTH_NONCE:
-      st = rd_text(&map, &m->nonce);
+      st = c2_cbor_read_text(&map, &m->nonce);
       break;
     case C2_KEY_AUTH_CAPABILITIES:
-      st = rd_str_list(&map, &m->capabilities);
+      st = c2_cbor_read_str_list(&map, &m->capabilities);
       break;
     case C2_KEY_AUTH_AGENT_PROOF:
-      st = rd_text(&map, &m->agent_proof);
+      st = c2_cbor_read_text(&map, &m->agent_proof);
       break;
     case C2_KEY_AUTH_EPHEM_PUBLIC:
-      st = rd_bytes(&map, &m->ephem_public_key);
+      st = c2_cbor_read_bytes(&map, &m->ephem_public_key);
       break;
     case C2_KEY_AUTH_STREAM_ID:
-      st = rd_text(&map, &m->stream_id);
+      st = c2_cbor_read_text(&map, &m->stream_id);
       break;
     case C2_KEY_AUTH_PROTOCOL_VERSION:
-      st = rd_int(&map, &m->protocol_version);
+      st = c2_cbor_read_int(&map, &m->protocol_version);
       break;
     default:
-      st = map_skip(&map);
+      st = c2_cbor_map_skip(&map);
       break;
     }
     if (st != C2_OK)
@@ -439,7 +248,7 @@ c2_status c2_msgauth_decode(CborValue *r, c2_msgauth *m) {
   }
   if (st != C2_OK)
     return st;
-  return dc(cbor_value_leave_container(r, &map));
+  return c2_cbor_dc(cbor_value_leave_container(r, &map));
 }
 
 /* ------------------------------------------------------------------------- */
@@ -473,35 +282,43 @@ c2_status c2_msgtun_encode(CborEncoder *w, const c2_msgtun *m) {
     pairs++;
 
   CborEncoder map;
-  c2_status st = ec(cbor_encoder_create_map(w, &map, pairs));
+  c2_status st = c2_cbor_ec(cbor_encoder_create_map(w, &map, pairs));
   if (st != C2_OK)
     return st;
   if (m->job_id.len &&
-      (st = wr_text(&map, C2_KEY_TUN_JOB_ID, m->job_id)) != C2_OK)
+      (st = c2_cbor_write_text(&map, C2_KEY_TUN_JOB_ID, m->job_id)) != C2_OK)
     return st;
   if (m->cmd_slice.count &&
-      (st = wr_str_list(&map, C2_KEY_TUN_CMD_SLICE, &m->cmd_slice)) != C2_OK)
+      (st = c2_cbor_write_str_list(&map, C2_KEY_TUN_CMD_SLICE, &m->cmd_slice)) !=
+          C2_OK)
     return st;
   if (m->response.len &&
-      (st = wr_bytes(&map, C2_KEY_TUN_RESPONSE, m->response)) != C2_OK)
+      (st = c2_cbor_write_bytes(&map, C2_KEY_TUN_RESPONSE, m->response)) !=
+          C2_OK)
     return st;
-  if (m->tag.len && (st = wr_text(&map, C2_KEY_TUN_TAG, m->tag)) != C2_OK)
+  if (m->tag.len &&
+      (st = c2_cbor_write_text(&map, C2_KEY_TUN_TAG, m->tag)) != C2_OK)
     return st;
-  if (m->time.len && (st = wr_text(&map, C2_KEY_TUN_TIME, m->time)) != C2_OK)
+  if (m->time.len &&
+      (st = c2_cbor_write_text(&map, C2_KEY_TUN_TIME, m->time)) != C2_OK)
     return st;
   if (m->agent_uuid.len &&
-      (st = wr_text(&map, C2_KEY_TUN_AGENT_UUID, m->agent_uuid)) != C2_OK)
+      (st = c2_cbor_write_text(&map, C2_KEY_TUN_AGENT_UUID, m->agent_uuid)) !=
+          C2_OK)
     return st;
-  if (m->agent_uuid_sig.len && (st = wr_text(&map, C2_KEY_TUN_AGENT_UUID_SIG,
-                                             m->agent_uuid_sig)) != C2_OK)
+  if (m->agent_uuid_sig.len &&
+      (st = c2_cbor_write_text(&map, C2_KEY_TUN_AGENT_UUID_SIG,
+                               m->agent_uuid_sig)) != C2_OK)
     return st;
-  if (m->ephem_public_key.len && (st = wr_bytes(&map, C2_KEY_TUN_EPHEM_PUBLIC,
-                                                m->ephem_public_key)) != C2_OK)
+  if (m->ephem_public_key.len &&
+      (st = c2_cbor_write_bytes(&map, C2_KEY_TUN_EPHEM_PUBLIC,
+                                m->ephem_public_key)) != C2_OK)
     return st;
   if (m->peer_list.count &&
-      (st = wr_str_list(&map, C2_KEY_TUN_PEER_LIST, &m->peer_list)) != C2_OK)
+      (st = c2_cbor_write_str_list(&map, C2_KEY_TUN_PEER_LIST,
+                                   &m->peer_list)) != C2_OK)
     return st;
-  return ec(cbor_encoder_close_container(w, &map));
+  return c2_cbor_ec(cbor_encoder_close_container(w, &map));
 }
 
 c2_status c2_msgtun_decode(CborValue *r, c2_msgtun *m) {
@@ -512,43 +329,43 @@ c2_status c2_msgtun_decode(CborValue *r, c2_msgtun *m) {
     m->enriched_peer_list->count = 0;
 
   CborValue map;
-  c2_status st = map_enter(r, &map);
+  c2_status st = c2_cbor_map_enter(r, &map);
   if (st != C2_OK)
     return st;
 
   int done;
   uint64_t key;
-  while ((st = map_key(&map, &key, &done)) == C2_OK && !done) {
+  while ((st = c2_cbor_map_key(&map, &key, &done)) == C2_OK && !done) {
     switch (key) {
     case C2_KEY_TUN_JOB_ID:
-      st = rd_text(&map, &m->job_id);
+      st = c2_cbor_read_text(&map, &m->job_id);
       break;
     case C2_KEY_TUN_CMD_SLICE:
-      st = rd_str_list(&map, &m->cmd_slice);
+      st = c2_cbor_read_str_list(&map, &m->cmd_slice);
       break;
     case C2_KEY_TUN_RESPONSE:
-      st = rd_bytes(&map, &m->response);
+      st = c2_cbor_read_bytes(&map, &m->response);
       break;
     case C2_KEY_TUN_TAG:
-      st = rd_text(&map, &m->tag);
+      st = c2_cbor_read_text(&map, &m->tag);
       break;
     case C2_KEY_TUN_TIME:
-      st = rd_text(&map, &m->time);
+      st = c2_cbor_read_text(&map, &m->time);
       break;
     case C2_KEY_TUN_AGENT_UUID:
-      st = rd_text(&map, &m->agent_uuid);
+      st = c2_cbor_read_text(&map, &m->agent_uuid);
       break;
     case C2_KEY_TUN_AGENT_UUID_SIG:
-      st = rd_text(&map, &m->agent_uuid_sig);
+      st = c2_cbor_read_text(&map, &m->agent_uuid_sig);
       break;
     case C2_KEY_TUN_EPHEM_PUBLIC:
-      st = rd_bytes(&map, &m->ephem_public_key);
+      st = c2_cbor_read_bytes(&map, &m->ephem_public_key);
       break;
     case C2_KEY_TUN_PEER_LIST:
-      st = rd_str_list(&map, &m->peer_list);
+      st = c2_cbor_read_str_list(&map, &m->peer_list);
       break;
     default:
-      st = map_skip(&map);
+      st = c2_cbor_map_skip(&map);
       break;
     }
     if (st != C2_OK)
@@ -556,7 +373,7 @@ c2_status c2_msgtun_decode(CborValue *r, c2_msgtun *m) {
   }
   if (st != C2_OK)
     return st;
-  return dc(cbor_value_leave_container(r, &map));
+  return c2_cbor_dc(cbor_value_leave_container(r, &map));
 }
 
 /* ------------------------------------------------------------------------- */

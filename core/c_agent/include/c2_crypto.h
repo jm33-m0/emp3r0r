@@ -105,8 +105,9 @@ typedef struct c2_crypto_backend {
  * secrecy by design (see PROTOCOL.md §13); never carry sensitive data before
  * the PFS handshake completes.
  */
-int c2_psk_from_magic(const c2_crypto_backend *be, const char *magic,
-                      size_t magic_len, uint8_t psk[C2_AES_KEY_BYTES]);
+c2_status c2_psk_from_magic(const c2_crypto_backend *be, const char *magic,
+                            size_t magic_len,
+                            uint8_t psk[C2_AES_KEY_BYTES]);
 
 /*
  * Derive the 32-byte ephemeral session key from an ECDH shared secret:
@@ -116,10 +117,61 @@ int c2_psk_from_magic(const c2_crypto_backend *be, const char *magic,
  *
  * Both peers use the same info string; the server does not flip the label.
  */
-int c2_derive_session_key(const c2_crypto_backend *be,
-                          const uint8_t shared[C2_P256_COORD_BYTES],
-                          c2_str agent_uuid,
-                          uint8_t out[C2_AES_KEY_BYTES]);
+c2_status c2_derive_session_key(const c2_crypto_backend *be,
+                                const uint8_t shared[C2_P256_COORD_BYTES],
+                                c2_str agent_uuid,
+                                uint8_t out[C2_AES_KEY_BYTES]);
+
+/*
+ * Encode a P-256 public key (X||Y) as a PEM "PUBLIC KEY" SubjectPublicKeyInfo,
+ * which is what the C2's x509.ParsePKIXPublicKey expects in
+ * Emp3r0rAgent.PublicKey. Writes a NUL-terminated PEM into `out` and returns
+ * its length (excluding the terminator), or 0 when it does not fit.
+ */
+size_t c2_p256_pub_to_pem(const uint8_t pub[C2_P256_PUB_BYTES], char *out,
+                          size_t cap);
+
+/*
+ * Password-based AES-256-GCM in the same container format as Go's
+ * crypto.AES_GCM_Encrypt:
+ *
+ *   salt[16] || nonce[12] || AES-256-GCM(ciphertext || tag)
+ *   key = PBKDF2-HMAC-SHA256(password, salt, 100000, 32)
+ *
+ * Used for agent file storage (memfs) and the embedded build config. The
+ * password may be empty, in which case the primitives are still keyed (an
+ * empty password is a valid PBKDF2 input); callers that want "no encryption"
+ * simply skip calling these.
+ */
+c2_status c2_aes_gcm_encrypt_password(const c2_crypto_backend *be,
+                                      c2_str password, const uint8_t *plain,
+                                      size_t plain_len, uint8_t *out,
+                                      size_t out_cap, size_t *out_len);
+c2_status c2_aes_gcm_decrypt_password(const c2_crypto_backend *be,
+                                      c2_str password, const uint8_t *enc,
+                                      size_t enc_len, uint8_t *out,
+                                      size_t out_cap, size_t *out_len);
+
+/* ------------------------------------------------------------------------- */
+/* Provider contract                                                          */
+/* ------------------------------------------------------------------------- */
+
+/*
+ * Exactly one crypto provider is compiled in, selected with `CRYPTO=<name>`
+ * (see the Makefile): src/crypto/c2_crypto_<name>.c. A provider implements this
+ * contract and nothing in the protocol layer depends on which library it uses.
+ *
+ *   openssl (default): dlopen the system libcrypto, no build-time dependency.
+ *   mbedtls:           the vendored, self-contained mbedTLS (CRYPTO=mbedtls).
+ *
+ * Add a provider by dropping src/crypto/c2_crypto_<name>.c into the tree and
+ * building with CRYPTO=<name>.
+ *
+ * c2_crypto_open returns NULL when the primitives are unavailable on this
+ * host; the returned backend is freed with c2_crypto_close.
+ */
+c2_crypto_backend *c2_crypto_open(void);
+void c2_crypto_close(c2_crypto_backend *be);
 
 #ifdef __cplusplus
 }

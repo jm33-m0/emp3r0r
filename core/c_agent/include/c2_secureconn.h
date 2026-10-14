@@ -42,6 +42,14 @@ extern "C" {
  * bytes accepted, or a negative c2_status. close releases the stream and is
  * idempotent.
  */
+/*
+ * A polling transport returns C2_STREAM_IDLE from read() when a long-poll
+ * cycle completes with no data. It is neither data nor an error: the caller
+ * uses it to send a keepalive before polling again. A blocking/duplex
+ * transport never returns it.
+ */
+#define C2_STREAM_IDLE (-1001L)
+
 typedef struct c2_stream_ops {
   long (*read)(void *ctx, uint8_t *buf, size_t cap);
   long (*write)(void *ctx, const uint8_t *buf, size_t len);
@@ -104,6 +112,16 @@ c2_status c2_secureconn_write_bulk(c2_secureconn *sc, const uint8_t *payload,
  * a return of 0 always means EOF and not "empty control frame".
  */
 long c2_secureconn_read(c2_secureconn *sc, uint8_t *buf, size_t cap);
+
+/*
+ * Read exactly one frame's payload (one CBOR message) into buf. Empty control
+ * frames are skipped. On clean stream EOF, *eof is set to 1 and C2_OK is
+ * returned; otherwise *eof is 0 and *len holds the payload length. Returns
+ * C2_ERR_NOMEM when the message does not fit in `cap` (the session layer sizes
+ * its buffer to the message cap, so this is a protocol violation).
+ */
+c2_status c2_secureconn_read_msg(c2_secureconn *sc, uint8_t *buf, size_t cap,
+                                 size_t *len, int *eof);
 
 /* Close the underlying stream. Does not zero the key; do that yourself. */
 void c2_secureconn_close(c2_secureconn *sc);
