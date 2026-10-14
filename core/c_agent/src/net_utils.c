@@ -15,13 +15,16 @@ unsigned int htonl(unsigned int hostlong) {
 
 int inet_aton(const char *cp, struct in_addr *inp) {
   unsigned int val = 0;
-  int part = 0;
+  unsigned int part = 0;
   int parts = 0;
   char c;
 
   while ((c = *cp++) != '\0') {
     if (c >= '0' && c <= '9') {
-      part = part * 10 + (c - '0');
+      /* Bound part before the multiply so a long digit run cannot overflow. */
+      if (part > 255)
+        return 0;
+      part = part * 10u + (unsigned int)(c - '0');
     } else if (c == '.') {
       if (part > 255)
         return 0;
