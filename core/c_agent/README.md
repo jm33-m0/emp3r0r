@@ -27,10 +27,12 @@ Everything here is a transcription of a Go constant or struct:
 | ----------------- | -------------------------------------------------------------------------- |
 | `c2_common.h`     | `core/internal/def/{config,def,msg_auth}.go`, §2/§4                        |
 | `c2_crypto.h`     | `core/lib/crypto/aes.go`, `core/internal/transport/keyexchange.go`         |
-| `c2_cbor.h`       | RFC 8949, `github.com/fxamacker/cbor/v2` (`keyasint`)                      |
 | `c2_secureconn.h` | `core/internal/transport/crypto.go` (`SecureConn`)                         |
 | `c2_messages.h`   | `core/internal/def/{msg_auth,agent,token}.go`                              |
 | `c2_transport.h`  | `core/internal/def/config.go`, `core/internal/transport/c2channel_http.go` |
+
+CBOR is provided by vendored [Intel tinycbor](https://github.com/intel/tinycbor)
+(MIT, version 7.0) under `vendor/tinycbor/`; there is no hand-rolled codec.
 
 When the Go side changes, this document and the headers change in the same
 commit. All peers are built from the same batch, so there is no
@@ -43,7 +45,6 @@ include/
   c2_protocol.h    umbrella: include this for the protocol
   c2_common.h      constants, limits, status, byte-order + hex/base64url
   c2_crypto.h      crypto backend contract (AES-GCM, SHA-256, HKDF, P-256)
-  c2_cbor.h        bounded CBOR reader/writer
   c2_secureconn.h  SecureConn framing + key lifecycle
   c2_messages.h    MsgAuth, MsgTunData, Emp3r0rAgent, AgentToken, peers
   c2_transport.h   build config, channel contract, agent session flow
@@ -58,6 +59,7 @@ include/
 src/               implementations of the above (see Makefile)
 tests/             standalone unit tests (make test)
 fuzz/              LLVMFuzzerTestOneInput targets + fallback runner (make fuzz)
+vendor/tinycbor/   vendored CBOR codec (MIT, Intel tinycbor 7.0)
 ```
 
 The `c2_*` headers are the protocol contract. `dynload`, `rc4`, `packer`,
@@ -76,7 +78,30 @@ make -C core/c_agent fuzz   # fuzz targets (ASan/UBSan fallback runner)
 only into `-nostdlib` payloads; a hosted binary links libc instead. The fuzz
 targets are `LLVMFuzzerTestOneInput` functions, so `make fuzz CC=clang
 HOSTCC=clang FUZZER=libfuzzer` runs them under libFuzzer where clang is
-available; otherwise `fuzz/fuzz_runner.c` drives a bounded mutational loop.
+available; otherwise `fuzz/fuzz_runner.c` drives a bounded mutational loop. The
+fallback runner loads every file under `fuzz/corpus/<target>/` as a seed, grows
+its corpus at runtime, persists new entries under `build/corpus/`, and writes
+the crashing input to `build/crash/<target>.bin` so a failure is reproducible.
+
+The targets and the surface each covers:
+
+| target | surface |
+| --- | --- |
+| `fuzz_messages` | `MsgAuth`/`MsgTunData` CBOR decode with varying list capacities |
+| `fuzz_encdec` | decode → re-encode → decode round-trip for both envelopes |
+| `fuzz_secureconn` | frame length/padding parser, stream read, encode/decode (identity and stub AEAD) |
+| `fuzz_text` | hex/base64url codecs, canonical auth string, signature encoding |
+| `fuzz_dynload` | bounds-checked ELF dynamic-symbol resolver (SysV and GNU hash) |
+| `fuzz_maps` | `/proc/self/maps` parser (same line machine as the file-backed finders) |
+| `fuzz_rc4` | RC4 keystream |
+| `fuzz_packer` | passphrase packing / key derivation |
+| `fuzz_inet_aton` | IP literal parser |
+
+Every target is compiled with `-fsanitize=address,undefined`; the property under
+test is that no input — however malformed or hostile — can over-read, overflow,
+recurse without a bound, or abort. The vendored tinycbor keeps its `assert`s
+enabled so a decoder invariant violation fails loudly in fuzzing rather than
+silently misbehaving in a release build.
 
 The headers are C99 and freestanding-friendly: only `<stdint.h>` and
 `<stddef.h>`. They carry no implementation, no allocation, and no dependency on
@@ -145,21 +170,26 @@ key = PBKDF2-HMAC-SHA256(password = MagicString, salt, 100000, 32)
      gunzips it (`core/internal/cc/base/ftp/handler_ftp.go`). This is a wire
      requirement, not a convention: an uncompressed stream is rejected.
 
-### Implementation roadmap (next task)
+### Implementation status
 
-The generic C utilities (`dynload`, `rc4`, `packer`, `strings`, `net_utils`)
-already live here and are built/tested/fuzzed by this directory's Makefile. What
-remains is the protocol and channel implementation, mirroring the stager's split
-between syscall/raw-socket and dynamic-library paths:
+Implemented and tested in `src/`:
 
-- `c2_crypto_openssl.c` — `c2_crypto_backend` over libcrypto loaded with
-  `dynload.h` (the stager already resolves libssl/libcurl this way).
-- `c2_crypto_internal.c` — optional freestanding backend for raw shellcode.
-- `c2_cbor.c` — the bounded reader/writer declared in `c2_cbor.h`.
-- `c2_secureconn.c` — frame codec and key switch.
-- `c2_messages.c` — the per-message CBOR codecs.
-- `c2_http_poll.c` — `http_poll` over libcurl or raw sockets, driven by the
-  malleable profile.
+- `c2_common.c` — status strings.
+- `c2_messages.c` — `c2_auth_canonical` (sorts/dedups like Go) plus the
+  `MsgAuth` and `MsgTunData` codecs on top of vendored tinycbor. `MsgAuth`
+  encoding is pinned byte-for-byte to the Go encoder; the Go `MsgTunData`
+  vector is decoded field by field. Fuzzed (`fuzz/fuzz_messages.c`).
+- `c2_secureconn.c` — frame codec, padding strip, zero-length-frame skip and
+  key switch, tested over an in-memory stream with a deterministic stub AEAD.
+
+Still to come:
+
+- `c2_crypto_openssl.c` — `c2_crypto_backend` over libcrypto resolved with
+  `dynload.h` (the stager already resolves libssl/libcurl this way). It enables
+  PSK/session-key derivation, AES-256-GCM and P-256 ECDH/ECDSA.
+- Agent-info / `AgentToken` / `EnrichedPeerList` codecs.
+- `c2_config.c` — embedded build-config decrypt and decode.
+- `c2_http_poll.c` — the `http_poll` channel over libcurl/raw sockets.
 - `c2_agent.c` — the check-in / msg-tunnel / job loop.
 
 ---

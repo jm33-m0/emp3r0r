@@ -140,7 +140,7 @@ typedef struct {
  * Decode a CBOR build config (the plaintext produced by c2_config_decrypt).
  * Only the communication keys above are read; unknown keys are skipped.
  */
-c2_status c2_agent_config_decode(c2_cbor_reader *r, c2_agent_config *cfg);
+c2_status c2_agent_config_decode(CborValue *r, c2_agent_config *cfg);
 
 /*
  * Decrypt def.AgentConfig:

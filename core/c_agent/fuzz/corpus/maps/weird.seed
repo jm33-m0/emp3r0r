@@ -1,0 +1,6 @@
+not-a-maps-line
+-
+ffffffffffffffff-ffffffffffffffff r-xp 0 0 0 /lib/libc.so
+7f0000000000-7f0000001000 r-xp 00000000 08:01 2 
+7f0000001000-7f0000002000 r-xp 00000000 08:01 2 /a b c
+7f0000002000-7f0000003000 r-xp 00000000 08:01 2 /lib/libc-

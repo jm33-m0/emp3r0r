@@ -111,6 +111,11 @@ extern "C" {
 /* AgentToken.Capability value that authorises mesh routing. */
 #define C2_CAP_ROUTER "router"
 
+/* Maximum capability tokens c2_auth_canonical will sort. A route plus a handful
+ * of feature tokens is the realistic maximum; the bound keeps sorting off the
+ * heap in freestanding builds. */
+#define C2_MAX_CAPABILITIES 32
+
 /* ------------------------------------------------------------------------- */
 /* MsgTunData.Tag values                                                      */
 /* ------------------------------------------------------------------------- */

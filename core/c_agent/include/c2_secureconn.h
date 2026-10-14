@@ -66,11 +66,12 @@ typedef struct {
 
   /* Decrypted but not yet consumed payload. Freestanding callers may attach
    * their own buffer with c2_secureconn_use_buffer; otherwise the first read
-   * may allocate. */
+   * may allocate and c2_secureconn_close frees what it allocated. */
   uint8_t *rxbuf;
   size_t rxcap;
   size_t rxlen;
   size_t rxoff;
+  int rx_owned;
 } c2_secureconn;
 
 /* Initialise a SecureConn over an already-open raw stream, using `key`. */

@@ -8,9 +8,9 @@
  *
  *   c2_common.h     constants, limits, status, byte-order and text codecs
  *   c2_crypto.h     crypto backend contract (AES-GCM, SHA-256, HKDF, P-256)
- *   c2_cbor.h       bounded CBOR reader/writer
- *   c2_secureconn.h SecureConn framing and key lifecycle
  *   c2_messages.h   MsgAuth / MsgTunData / Emp3r0rAgent / AgentToken schemas
+ *                   (CBOR via the vendored tinycbor, vendor/tinycbor/)
+ *   c2_secureconn.h SecureConn framing and key lifecycle
  *   c2_transport.h  build config, channel contract, agent session flow
  *
  * Normative protocol text lives in PROTOCOL.md at the repository root. When
@@ -28,7 +28,6 @@
 
 #include "c2_common.h"
 
-#include "c2_cbor.h"
 #include "c2_crypto.h"
 #include "c2_messages.h"
 #include "c2_secureconn.h"

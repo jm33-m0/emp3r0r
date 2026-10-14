@@ -12,8 +12,9 @@
  * core/internal/def/{msg_auth,agent,token}.go. The key enums MUST match.
  */
 
-#include "c2_cbor.h"
 #include "c2_common.h"
+
+#include "cbor.h"
 #include "c2_crypto.h"
 
 #ifdef __cplusplus
@@ -71,10 +72,10 @@ c2_status c2_auth_canonical(c2_str agent_uuid, int64_t timestamp, c2_str nonce,
                             size_t *out_len);
 
 /* Encode a MsgAuth map. `m->type` is emitted as-is; the caller sets it. */
-c2_status c2_msgauth_encode(c2_cbor_writer *w, const c2_msgauth *m);
+c2_status c2_msgauth_encode(CborEncoder *w, const c2_msgauth *m);
 
 /* Decode a MsgAuth map (the C agent normally only encodes it). */
-c2_status c2_msgauth_decode(c2_cbor_reader *r, c2_msgauth *m);
+c2_status c2_msgauth_decode(CborValue *r, c2_msgauth *m);
 
 /* ------------------------------------------------------------------------- */
 /* MsgTunData (CBOR keys 1..10)                                               */
@@ -115,8 +116,8 @@ typedef struct {
   c2_enriched_peer_list *enriched_peer_list; /* NULL when absent */
 } c2_msgtun;
 
-c2_status c2_msgtun_encode(c2_cbor_writer *w, const c2_msgtun *m);
-c2_status c2_msgtun_decode(c2_cbor_reader *r, c2_msgtun *m);
+c2_status c2_msgtun_encode(CborEncoder *w, const c2_msgtun *m);
+c2_status c2_msgtun_decode(CborValue *r, c2_msgtun *m);
 
 /*
  * True when the message is a hello: Response absent/empty AND CmdSlice has at
@@ -252,8 +253,8 @@ typedef struct {
   c2_str owner;
 } c2_agent_info;
 
-c2_status c2_agent_info_encode(c2_cbor_writer *w, const c2_agent_info *a);
-c2_status c2_agent_info_decode(c2_cbor_reader *r, c2_agent_info *a);
+c2_status c2_agent_info_encode(CborEncoder *w, const c2_agent_info *a);
+c2_status c2_agent_info_decode(CborValue *r, c2_agent_info *a);
 
 /* ------------------------------------------------------------------------- */
 /* AgentToken (CBOR keys 1..5)                                                */
@@ -275,7 +276,7 @@ typedef struct {
   c2_bytes signature;
 } c2_agent_token;
 
-c2_status c2_agent_token_decode(c2_cbor_reader *r, c2_agent_token *t);
+c2_status c2_agent_token_decode(CborValue *r, c2_agent_token *t);
 
 /* ------------------------------------------------------------------------- */
 /* EnrichedPeer / EnrichedPeerList (CBOR keys 1..8)                           */
@@ -308,7 +309,7 @@ struct c2_enriched_peer {
   c2_str p2p_transport;
 };
 
-c2_status c2_enriched_peer_list_decode(c2_cbor_reader *r,
+c2_status c2_enriched_peer_list_decode(CborValue *r,
                                        c2_enriched_peer_list *l);
 
 /* ------------------------------------------------------------------------- */
