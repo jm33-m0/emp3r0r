@@ -1,5 +1,7 @@
 #include "c2_messages.h"
 
+#include "cbor.h"
+
 #include "fuzz_common.h"
 
 static c2_status dec_tun(const uint8_t *buf, size_t len, c2_msgtun *m) {

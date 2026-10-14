@@ -2,6 +2,9 @@
 
 #include "fuzz_common.h"
 
+#include <stdint.h>
+#include <string.h>
+
 /* inet_aton must be a pure, deterministic function of its input: it must never
  * read past the string and must return the same result on repeat calls. */
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {

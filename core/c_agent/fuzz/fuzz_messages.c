@@ -1,5 +1,7 @@
 #include "c2_messages.h"
 
+#include "cbor.h"
+
 #include "fuzz_common.h"
 
 /* Decode arbitrary bytes as the two envelopes. Errors are expected and

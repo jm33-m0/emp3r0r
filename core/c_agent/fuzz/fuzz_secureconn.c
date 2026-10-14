@@ -4,6 +4,8 @@
 
 #include "fuzz_common.h"
 
+#include <string.h>
+
 /* Identity "AEAD": open returns the ciphertext minus its 16-byte tag unchanged,
  * seal appends a zero tag. This lets arbitrary fuzz input control the
  * plaintext, so the frame parser (enc_len, payload_len, padding, the

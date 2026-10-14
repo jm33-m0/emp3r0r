@@ -2,6 +2,8 @@
 
 #include "fuzz_common.h"
 
+#include <string.h>
+
 /* Drives derive_key_from_string (passphrase -> fixed 16-byte key) and
  * decode_config_string (XOR-encoded string -> NUL-terminated output) with
  * arbitrary, unsanitised input. The bounds check in decode_config_string is

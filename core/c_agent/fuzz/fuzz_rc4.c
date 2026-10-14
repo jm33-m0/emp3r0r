@@ -2,6 +2,8 @@
 
 #include "fuzz_common.h"
 
+#include <string.h>
+
 /* Property: RC4 is an involution on the keystream, so encrypting twice with
  * the same key restores the input. Any state/keystream bug fails here. */
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {

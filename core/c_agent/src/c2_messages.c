@@ -12,9 +12,9 @@
  */
 
 #include "c2_messages.h"
-#include "c2_crypto.h"
 
-#include "strings.h"
+#include "cbor.h"
+#include "c2_crypto.h"
 
 /* ------------------------------------------------------------------------- */
 /* Bounded string builder for the canonical auth string                      */
@@ -97,7 +97,8 @@ c2_status c2_auth_canonical(c2_str agent_uuid, int64_t timestamp, c2_str nonce,
   if (count > C2_MAX_CAPABILITIES)
     return C2_ERR_OVERFLOW;
 
-  /* Copy and insertion-sort the capability views; caller storage is untouched. */
+  /* Copy and insertion-sort the capability views; caller storage is untouched.
+   */
   c2_str sorted[C2_MAX_CAPABILITIES];
   for (size_t i = 0; i < count; i++) {
     if (caps->items[i].len > 0 && caps->items[i].ptr == NULL)
@@ -171,8 +172,8 @@ static c2_status wr_bytes(CborEncoder *w, uint64_t key, c2_bytes v) {
   c2_status st = wr_key(w, key);
   if (st != C2_OK)
     return st;
-  return ec(cbor_encode_byte_string(
-      w, v.ptr ? v.ptr : (const uint8_t *)"", v.len));
+  return ec(
+      cbor_encode_byte_string(w, v.ptr ? v.ptr : (const uint8_t *)"", v.len));
 }
 
 static c2_status wr_int(CborEncoder *w, uint64_t key, int64_t v) {
@@ -192,9 +193,8 @@ static c2_status wr_str_list(CborEncoder *w, uint64_t key,
   if (st != C2_OK)
     return st;
   for (size_t i = 0; i < l->count; i++) {
-    st = ec(cbor_encode_text_string(&arr,
-                                    l->items[i].ptr ? l->items[i].ptr : "",
-                                    l->items[i].len));
+    st = ec(cbor_encode_text_string(
+        &arr, l->items[i].ptr ? l->items[i].ptr : "", l->items[i].len));
     if (st != C2_OK)
       return st;
   }
@@ -219,7 +219,8 @@ static c2_status rd_text(CborValue *it, c2_str *out) {
     CborValue next;
     const char *cp = NULL;
     size_t cl = 0;
-    if (cbor_value_get_text_string_chunk(&cur, &cp, &cl, &next) != CborNoError) {
+    if (cbor_value_get_text_string_chunk(&cur, &cp, &cl, &next) !=
+        CborNoError) {
       return C2_ERR_PROTO;
     }
     if (chunks == 0) {
@@ -253,7 +254,8 @@ static c2_status rd_bytes(CborValue *it, c2_bytes *out) {
     CborValue next;
     const uint8_t *cp = NULL;
     size_t cl = 0;
-    if (cbor_value_get_byte_string_chunk(&cur, &cp, &cl, &next) != CborNoError) {
+    if (cbor_value_get_byte_string_chunk(&cur, &cp, &cl, &next) !=
+        CborNoError) {
       return C2_ERR_PROTO;
     }
     if (chunks == 0) {
@@ -373,9 +375,8 @@ c2_status c2_msgauth_encode(CborEncoder *w, const c2_msgauth *m) {
     return st;
   if ((st = wr_text(&map, C2_KEY_AUTH_AGENT_PROOF, m->agent_proof)) != C2_OK)
     return st;
-  if (m->ephem_public_key.len &&
-      (st = wr_bytes(&map, C2_KEY_AUTH_EPHEM_PUBLIC, m->ephem_public_key)) !=
-          C2_OK)
+  if (m->ephem_public_key.len && (st = wr_bytes(&map, C2_KEY_AUTH_EPHEM_PUBLIC,
+                                                m->ephem_public_key)) != C2_OK)
     return st;
   if (m->stream_id.len &&
       (st = wr_text(&map, C2_KEY_AUTH_STREAM_ID, m->stream_id)) != C2_OK)
@@ -491,13 +492,11 @@ c2_status c2_msgtun_encode(CborEncoder *w, const c2_msgtun *m) {
   if (m->agent_uuid.len &&
       (st = wr_text(&map, C2_KEY_TUN_AGENT_UUID, m->agent_uuid)) != C2_OK)
     return st;
-  if (m->agent_uuid_sig.len &&
-      (st = wr_text(&map, C2_KEY_TUN_AGENT_UUID_SIG, m->agent_uuid_sig)) !=
-          C2_OK)
+  if (m->agent_uuid_sig.len && (st = wr_text(&map, C2_KEY_TUN_AGENT_UUID_SIG,
+                                             m->agent_uuid_sig)) != C2_OK)
     return st;
-  if (m->ephem_public_key.len &&
-      (st = wr_bytes(&map, C2_KEY_TUN_EPHEM_PUBLIC, m->ephem_public_key)) !=
-          C2_OK)
+  if (m->ephem_public_key.len && (st = wr_bytes(&map, C2_KEY_TUN_EPHEM_PUBLIC,
+                                                m->ephem_public_key)) != C2_OK)
     return st;
   if (m->peer_list.count &&
       (st = wr_str_list(&map, C2_KEY_TUN_PEER_LIST, &m->peer_list)) != C2_OK)

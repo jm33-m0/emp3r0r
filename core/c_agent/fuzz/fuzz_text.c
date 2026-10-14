@@ -3,6 +3,8 @@
 
 #include "fuzz_common.h"
 
+#include <string.h>
+
 static int fake_sign(void *ctx, const uint8_t priv[C2_P256_PRIV_BYTES],
                      const uint8_t *msg, size_t msg_len, uint8_t *sig,
                      size_t sig_cap, size_t *sig_len) {

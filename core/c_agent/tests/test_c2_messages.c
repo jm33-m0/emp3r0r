@@ -1,5 +1,7 @@
 #include "c2_messages.h"
 
+#include "cbor.h"
+
 #include "test.h"
 
 /* Authoritative vectors produced by the Go encoder (fxamacker/cbor) for the

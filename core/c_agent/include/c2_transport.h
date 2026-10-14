@@ -21,6 +21,8 @@
 #include "c2_messages.h"
 #include "c2_secureconn.h"
 
+#include "cbor.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
