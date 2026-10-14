@@ -3,30 +3,42 @@
 
 #include "dynload.h"
 #include "strings.h"
-#include "syscalls.h"
 #include "utils.h"
 
-/* ---- minimal ELF dynamic-linker types/constants (no elf.h) ---- */
-typedef struct {
-  long d_tag;
-  unsigned long d_val;
-} Elf64_Dyn;
+/* ---- minimal ELF layout (no elf.h) ----
+ *
+ * Tables are read field-by-field from raw bytes rather than through a struct
+ * pointer: an ELF offset is attacker-controlled and need not be aligned, and a
+ * misaligned struct access is undefined behaviour. */
+#define ELF64_EHDR_SIZE 64
+#define ELF64_PHDR_SIZE 56
+#define ELF64_DYN_SIZE 16
+#define ELF64_SYM_SIZE 24
 
-typedef struct {
-  uint32_t st_name;
-  unsigned char st_info;
-  unsigned char st_other;
-  uint16_t st_shndx;
-  unsigned long st_value;
-  unsigned long st_size;
-} Elf64_Sym;
+#define ELFMAG0 0x7f
+#define ELFMAG1 'E'
+#define ELFMAG2 'L'
+#define ELFMAG3 'F'
 
+#define PT_LOAD_TYPE 1
 #define PT_DYNAMIC_TYPE 2
 #define DT_NULL 0
 #define DT_HASH 4
 #define DT_STRTAB 5
 #define DT_SYMTAB 6
 #define DT_GNU_HASH 0x6ffffef5
+
+#define EI_CLASS 4
+#define EI_DATA 5
+#define EI_VERSION 6
+#define ELFCLASS64 2
+#define ELFDATA2LSB 1
+#define EV_CURRENT 1
+
+/* Defensive caps. Real modules are far below these; they only stop a corrupt
+ * header from driving an unbounded walk. */
+#define DYNLOAD_MAX_PHNUM 1024
+#define DYNLOAD_MAX_SEGS 64
 
 #if DYNLOAD_MODE == DYNLOAD_MODE_LIBC_DL
 #define DYNLOAD_SYM_DLOPEN "__libc_dlopen_mode"
@@ -37,6 +49,160 @@ typedef struct {
 #define DYNLOAD_SYM_DLSYM "dlsym"
 #define DYNLOAD_SYM_DLCLOSE "dlclose"
 #endif
+
+/* ------------------------------------------------------------------------- */
+/* Bounds-checked view of a mapped module                                      */
+/* ------------------------------------------------------------------------- */
+
+typedef struct {
+  const uint8_t *base;
+  size_t len; /* readable bytes starting at base */
+} Mod;
+
+static int mod_has(const Mod *m, const void *p, size_t n) {
+  const uint8_t *bp = (const uint8_t *)p;
+  if (bp < m->base)
+    return 0;
+  size_t off = (size_t)(bp - m->base);
+  return off <= m->len && n <= m->len - off;
+}
+
+static const void *mod_at(const Mod *m, unsigned long off, size_t n) {
+  if ((unsigned long)off > (unsigned long)m->len)
+    return NULL;
+  size_t o = (size_t)off;
+  if (n > m->len - o)
+    return NULL;
+  return m->base + o;
+}
+
+/*
+ * Resolve a DT_* pointer. In a loaded module the loader has already relocated
+ * it to an absolute runtime address; in a flat in-memory image it is a base-
+ * relative offset. Accept either, reject anything outside the module.
+ */
+static const void *mod_abs(const Mod *m, unsigned long v) {
+  const void *p = (const void *)(uintptr_t)v;
+  if (mod_has(m, p, 1))
+    return p;
+  return mod_at(m, v, 1);
+}
+
+/* A PT_LOAD segment, used to keep every read inside mapped memory (a module's
+ * address span can contain unmapped gaps between segments). */
+typedef struct {
+  const uint8_t *p;
+  size_t len;
+} Seg;
+
+static int seg_has(const Seg *segs, int nsegs, const void *p, size_t len) {
+  const uint8_t *bp = (const uint8_t *)p;
+  for (int i = 0; i < nsegs; i++) {
+    const uint8_t *s = segs[i].p;
+    if (bp < s)
+      continue;
+    size_t off = (size_t)(bp - s);
+    if (off <= segs[i].len && len <= segs[i].len - off)
+      return 1;
+  }
+  return 0;
+}
+
+/* Bytes available at `p` up to the end of its containing segment, or 0. */
+static size_t seg_avail(const Seg *segs, int nsegs, const void *p) {
+  const uint8_t *bp = (const uint8_t *)p;
+  for (int i = 0; i < nsegs; i++) {
+    const uint8_t *s = segs[i].p;
+    if (bp < s)
+      continue;
+    size_t off = (size_t)(bp - s);
+    if (off <= segs[i].len)
+      return segs[i].len - off;
+  }
+  return 0;
+}
+
+/* Compare a NUL-terminated name at `s` (bounded by `max`) against `name`.
+ * Never reads past s[max]; a name without a terminator within bounds fails. */
+static int name_eq(const uint8_t *s, size_t max, const char *name) {
+  for (size_t i = 0; i < max; i++) {
+    unsigned char c = s[i];
+    if (c != (unsigned char)name[i])
+      return 0;
+    if (c == 0)
+      return 1;
+  }
+  return 0;
+}
+
+static uint16_t rd16(const uint8_t *p) { return (uint16_t)(p[0] | (p[1] << 8)); }
+
+static uint32_t rd32(const uint8_t *p) {
+  return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) |
+         ((uint32_t)p[3] << 24);
+}
+
+static uint64_t rd64(const uint8_t *p) {
+  return (uint64_t)rd32(p) | ((uint64_t)rd32(p + 4) << 32);
+}
+
+/* A program header, copied out of the (possibly unaligned) table. */
+typedef struct {
+  uint32_t p_type;
+  unsigned long p_vaddr;
+  unsigned long p_filesz;
+  unsigned long p_memsz;
+} PhdrInfo;
+
+static int phdr_read(const Mod *m, size_t off, PhdrInfo *out) {
+  if (off > m->len || ELF64_PHDR_SIZE > m->len - off)
+    return 0;
+  const uint8_t *p = m->base + off;
+  out->p_type = rd32(p);
+  out->p_vaddr = rd64(p + 16);
+  out->p_filesz = rd64(p + 32);
+  out->p_memsz = rd64(p + 40);
+  return 1;
+}
+
+/* A DT_ entry, copied out of the (possibly unaligned) dynamic array. */
+typedef struct {
+  long d_tag;
+  unsigned long d_val;
+} DynInfo;
+
+static int dyn_read(const Mod *m, size_t off, DynInfo *out) {
+  if (off > m->len || ELF64_DYN_SIZE > m->len - off)
+    return 0;
+  const uint8_t *p = m->base + off;
+  out->d_tag = (long)rd64(p);
+  out->d_val = rd64(p + 8);
+  return 1;
+}
+
+/* A dynamic symbol, copied out of the (possibly unaligned) symbol table. */
+typedef struct {
+  uint32_t st_name;
+  uint16_t st_shndx;
+  unsigned long st_value;
+} SymInfo;
+
+static int sym_read(const Mod *m, size_t sym_off, size_t idx, SymInfo *out) {
+  if (sym_off > m->len)
+    return 0;
+  size_t avail = m->len - sym_off;
+  if (idx >= avail / ELF64_SYM_SIZE)
+    return 0;
+  const uint8_t *p = m->base + sym_off + idx * ELF64_SYM_SIZE;
+  out->st_name = rd32(p);
+  out->st_shndx = (uint16_t)(p[6] | (p[7] << 8));
+  out->st_value = rd64(p + 8);
+  return 1;
+}
+
+/* ------------------------------------------------------------------------- */
+/* /proc/self/maps parsing                                                     */
+/* ------------------------------------------------------------------------- */
 
 /* Parse a leading hex number (start address of a /proc/self/maps line). */
 static unsigned long parse_hex(const char *s) {
@@ -52,51 +218,225 @@ static unsigned long parse_hex(const char *s) {
       d = (unsigned long)(c - 'A' + 10);
     else
       break;
+    if (v > (~0UL >> 4))
+      break; /* saturate instead of wrapping */
     v = (v << 4) | d;
   }
   return v;
 }
 
-unsigned long dynload_find_module(const char *needle) {
-  char buf[65536];
-  size_t total = 0;
-
-  int fd = open("/proc/self/maps", O_RDONLY, 0);
-  if (fd < 0)
+/* End address (the number after '-') of a maps line. */
+static unsigned long maps_line_end(const char *line) {
+  const char *p = line;
+  while (*p && *p != '-')
+    p++;
+  if (*p != '-')
     return 0;
-
-  while (total < sizeof(buf) - 1) {
-    long n = read(fd, buf + total, sizeof(buf) - 1 - total);
-    if (n <= 0)
-      break;
-    total += (size_t)n;
-  }
-  close(fd);
-  buf[total] = '\0';
-
-  char *line = buf;
-  while (*line) {
-    char *nl = line;
-    while (*nl && *nl != '\n')
-      nl++;
-    char saved = *nl;
-    *nl = '\0';
-    if (strstr(line, needle))
-      return parse_hex(line);
-    if (saved == '\0')
-      break;
-    line = nl + 1;
-  }
-  return 0;
+  return parse_hex(p + 1);
 }
 
-unsigned long dynload_find_libc(void) {
-  /* /proc/self/maps reports the real file name: libc.so.6 on Debian/Ubuntu,
-   * libc-2.17.so on RHEL/CentOS. */
-  unsigned long base = dynload_find_module("libc.so");
+/* Pathname of a maps line: the field after "start-end perms offset dev inode". */
+static const char *maps_line_path(const char *line) {
+  int spaces = 0;
+  for (const char *p = line; *p; p++) {
+    if (*p == ' ' && ++spaces == 5)
+      return p + 1;
+  }
+  return NULL;
+}
+
+static void copy_str(char *dst, size_t cap, const char *src) {
+  size_t i = 0;
+  if (cap == 0)
+    return;
+  for (; src && src[i] && i + 1 < cap; i++)
+    dst[i] = src[i];
+  dst[i] = '\0';
+}
+
+/*
+ * Streaming line reader for /proc/self/maps. Lines are read in chunks so a
+ * large maps file (many threads/mappings) is handled without a fixed-size
+ * whole-file buffer. A line longer than `cap` is truncated; that is fine for
+ * the fixed-width fields we parse and for real library paths.
+ */
+typedef struct {
+  int fd;
+  char buf[8192];
+  size_t len;
+  size_t pos;
+} MapsReader;
+
+static int maps_open(MapsReader *r) {
+  r->fd = open("/proc/self/maps", O_RDONLY, 0);
+  r->len = 0;
+  r->pos = 0;
+  return r->fd >= 0;
+}
+
+static void maps_close(MapsReader *r) {
+  if (r->fd >= 0)
+    close(r->fd);
+  r->fd = -1;
+}
+
+static int maps_line(MapsReader *r, char *out, size_t cap) {
+  size_t n = 0;
+  for (;;) {
+    if (r->pos >= r->len) {
+      long got = read(r->fd, r->buf, sizeof(r->buf));
+      if (got <= 0) {
+        if (n > 0) {
+          out[n] = '\0';
+          return 1;
+        }
+        return 0;
+      }
+      r->len = (size_t)got;
+      r->pos = 0;
+    }
+    while (r->pos < r->len) {
+      char c = r->buf[r->pos++];
+      if (c == '\n') {
+        out[n] = '\0';
+        return 1;
+      }
+      if (n + 1 < cap)
+        out[n++] = c;
+    }
+  }
+}
+
+/* Incremental /proc/self/maps scanner shared by the file-backed finders and
+ * the pure, fuzzable dynload_maps_find(). Keeping both on one line machine
+ * means the fuzzer exercises the same logic the stager runs. */
+typedef struct {
+  const char *needle;
+  int found;
+  int done;
+  unsigned long base;
+  unsigned long end;
+  char want[512];
+} MapsScan;
+
+static void maps_scan_init(MapsScan *s, const char *needle) {
+  s->needle = needle;
+  s->found = 0;
+  s->done = 0;
+  s->base = 0;
+  s->end = 0;
+  s->want[0] = '\0';
+}
+
+static void maps_scan_line(MapsScan *s, const char *line) {
+  if (s->done)
+    return;
+  const char *path = maps_line_path(line);
+  if (!s->found) {
+    if (path && *path && strstr(path, s->needle)) {
+      s->base = parse_hex(line);
+      s->end = maps_line_end(line);
+      copy_str(s->want, sizeof(s->want), path);
+      s->found = 1;
+    }
+  } else if (path && strcmp(path, s->want) == 0) {
+    unsigned long e = maps_line_end(line);
+    if (e > s->end)
+      s->end = e;
+  } else if (path && *path) {
+    s->done = 1; /* a different module: this one's mappings have ended */
+  }
+}
+
+/* Pure parser over a length-delimited /proc/self/maps buffer (the input need
+ * not be NUL-terminated). Exposed for the unit test and fuzzer, which feed it
+ * arbitrary text; the file-backed finders use the same maps_scan_line(). */
+unsigned long dynload_maps_find(const char *text, size_t len,
+                                const char *needle, unsigned long *mod_end) {
+  if (text == NULL || needle == NULL)
+    return 0;
+  MapsScan s;
+  char line[512];
+  maps_scan_init(&s, needle);
+  size_t n = 0;
+  for (size_t i = 0; i < len && !s.done; i++) {
+    char c = text[i];
+    if (c == '\n') {
+      line[n] = '\0';
+      maps_scan_line(&s, line);
+      n = 0;
+    } else if (n + 1 < sizeof(line)) {
+      line[n++] = c;
+    }
+  }
+  if (!s.done && n > 0) {
+    line[n] = '\0';
+    maps_scan_line(&s, line);
+  }
+  if (s.found && mod_end)
+    *mod_end = s.end;
+  return s.found ? s.base : 0;
+}
+
+/* Base of the first mapping whose pathname contains `needle`, and the end of
+ * that module's contiguous mapping run when `mod_end` is non-NULL. */
+static unsigned long maps_find(const char *needle, unsigned long *mod_end) {
+  MapsReader r;
+  char line[512];
+  MapsScan s;
+  maps_scan_init(&s, needle);
+  if (!maps_open(&r))
+    return 0;
+  while (!s.done && maps_line(&r, line, sizeof(line)))
+    maps_scan_line(&s, line);
+  maps_close(&r);
+  if (s.found && mod_end)
+    *mod_end = s.end;
+  return s.found ? s.base : 0;
+}
+
+unsigned long dynload_find_module(const char *needle, unsigned long *end) {
+  return needle ? maps_find(needle, end) : 0;
+}
+
+unsigned long dynload_find_libc(unsigned long *end) {
+  unsigned long base = maps_find("libc.so", end);
   if (base == 0)
-    base = dynload_find_module("libc-");
+    base = maps_find("libc-", end);
   return base;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Symbol resolution                                                           */
+/* ------------------------------------------------------------------------- */
+
+static int sym_named(const Mod *m, const Seg *segs, int nsegs, size_t str_off,
+                     const SymInfo *sym, const char *name) {
+  if (sym->st_name == 0 || sym->st_shndx == 0)
+    return 0;
+  if (str_off > m->len)
+    return 0;
+  size_t avail = m->len - str_off;
+  if ((size_t)sym->st_name >= avail)
+    return 0;
+  const uint8_t *np = m->base + str_off + sym->st_name;
+  size_t max = avail - sym->st_name;
+  if (nsegs > 0) {
+    size_t sav = seg_avail(segs, nsegs, np);
+    if (sav < max)
+      max = sav;
+  }
+  return name_eq(np, max, name);
+}
+
+static void *sym_addr(const Mod *m, const Seg *segs, int nsegs,
+                      unsigned long st_value) {
+  const void *a = mod_at(m, st_value, 1);
+  if (a == NULL)
+    return NULL;
+  if (nsegs > 0 && !seg_has(segs, nsegs, a, 1))
+    return NULL;
+  return (void *)a;
 }
 
 #if DYNLOAD_HASH_STYLE != DYNLOAD_HASH_SYSV
@@ -108,114 +448,207 @@ static uint32_t elf_gnu_hash(const char *name) {
   return h;
 }
 
-/* Resolve `name` via a GNU hash table (DT_GNU_HASH).
- *
- * Layout (Elf64): nbuckets, symoffset, bloom_size, bloom_shift,
- * bloom[bloom_size] (uint64_t each), buckets[nbuckets], chains[].
- * chains[] is indexed relative to symoffset: the chain entry for dynamic
- * symbol i lives at chains[i - symoffset]. */
-static void *resolve_sym_gnu(void *base, Elf64_Sym *symtab, const char *strtab,
-                             const uint32_t *ghash, const char *name) {
-  uint32_t nbuckets = ghash[0];
-  uint32_t symoffset = ghash[1];
-  uint32_t bloom_size = ghash[2];
-  uint32_t bloom_shift = ghash[3];
-  if (nbuckets == 0 || bloom_size == 0)
-    return 0;
+/*
+ * DT_GNU_HASH: nbuckets, symoffset, bloom_size, bloom_shift, bloom[],
+ * buckets[], chains[]. chains[] is indexed relative to symoffset.
+ */
+static void *resolve_sym_gnu(const Mod *m, const Seg *segs, int nsegs,
+                             size_t sym_off, size_t str_off, const uint8_t *gp,
+                             const char *name) {
+  if (!mod_has(m, gp, 16))
+    return NULL;
+  uint32_t nbuckets = rd32(gp);
+  uint32_t symoffset = rd32(gp + 4);
+  uint32_t bloom_size = rd32(gp + 8);
+  uint32_t bloom_shift = rd32(gp + 12);
+  if (nbuckets == 0 || bloom_size == 0 || bloom_shift >= 64)
+    return NULL;
 
-  const uint64_t *bloom = (const uint64_t *)(ghash + 4);
-  const uint32_t *buckets = (const uint32_t *)(bloom + bloom_size);
-  const uint32_t *chains = buckets + nbuckets;
+  size_t off_bloom = 16;
+  if ((size_t)bloom_size > (SIZE_MAX - off_bloom) / sizeof(uint64_t))
+    return NULL;
+  size_t off_buckets = off_bloom + (size_t)bloom_size * sizeof(uint64_t);
+  if ((size_t)nbuckets > (SIZE_MAX - off_buckets) / sizeof(uint32_t))
+    return NULL;
+  size_t off_chains = off_buckets + (size_t)nbuckets * sizeof(uint32_t);
+  if (!mod_has(m, gp, off_chains))
+    return NULL;
+  if (nsegs > 0 && !seg_has(segs, nsegs, gp, off_chains))
+    return NULL;
 
-  uint64_t h = elf_gnu_hash(name);
+  const uint8_t *bloom = gp + off_bloom;
+  const uint8_t *buckets = gp + off_buckets;
+  const uint8_t *chains = gp + off_chains;
+  size_t chain_cap =
+      (m->len - (size_t)(chains - m->base)) / sizeof(uint32_t);
 
-  /* Cheap bloom-filter rejection. */
-  uint64_t word = bloom[(h / 64) % bloom_size];
-  uint64_t mask = (1ULL << (h % 64)) | (1ULL << ((h >> bloom_shift) % 64));
+  uint32_t h = elf_gnu_hash(name);
+  /* Widen before the bloom shift: the hash itself is 32-bit but the shift
+   * amount is a 6-bit value, so a 32-bit shift would be undefined for shift
+   * >= 32 (glibc computes it on a 64-bit value). */
+  uint64_t hw = (uint64_t)h;
+  uint64_t word =
+      rd64(bloom + (size_t)((h / 64) % bloom_size) * sizeof(uint64_t));
+  uint64_t mask = (1ULL << (hw % 64)) | (1ULL << ((hw >> bloom_shift) % 64));
   if ((word & mask) != mask)
-    return 0;
+    return NULL;
 
-  uint32_t si = buckets[h % nbuckets];
-  if (si == 0)
-    return 0;
+  uint32_t si = rd32(buckets + (size_t)(h % nbuckets) * sizeof(uint32_t));
+  if (si == 0 || si < symoffset)
+    return NULL;
+  size_t start = (size_t)si - symoffset;
+  if (start >= chain_cap)
+    return NULL;
 
-  const uint32_t *chain = chains - symoffset;
-  for (uint32_t i = si;; i++) {
-    uint32_t eh = chain[i];
+  for (size_t i = start; i < chain_cap; i++) {
+    uint32_t eh = rd32(chains + i * sizeof(uint32_t));
     if ((eh | 1) == (h | 1)) {
-      const Elf64_Sym *sym = &symtab[i];
-      if (sym->st_name != 0 && sym->st_shndx != 0 &&
-          strcmp(strtab + sym->st_name, name) == 0)
-        return (void *)((char *)base + sym->st_value);
+      SymInfo sym;
+      if (sym_read(m, sym_off, (size_t)symoffset + i, &sym) &&
+          sym_named(m, segs, nsegs, str_off, &sym, name))
+        return sym_addr(m, segs, nsegs, sym.st_value);
     }
     if (eh & 1)
-      break;
+      break; /* chain terminator */
   }
-  return 0;
+  return NULL;
 }
 #endif /* DYNLOAD_HASH_STYLE != DYNLOAD_HASH_SYSV */
 
-void *dynload_resolve_module(void *base, const char *name) {
-  Syscall_Elf64_Ehdr *ehdr = (Syscall_Elf64_Ehdr *)base;
-  if (ehdr->e_ident[0] != ELFMAG0 || ehdr->e_ident[1] != ELFMAG1 ||
-      ehdr->e_ident[2] != ELFMAG2 || ehdr->e_ident[3] != ELFMAG3)
-    return 0;
+void *dynload_resolve_module(const void *base, size_t len, const char *name) {
+  if (base == NULL || name == NULL || len < ELF64_EHDR_SIZE)
+    return NULL;
 
-  Syscall_Elf64_Phdr *phdr =
-      (Syscall_Elf64_Phdr *)((char *)base + ehdr->e_phoff);
-  Elf64_Dyn *dyn = 0;
-  for (int i = 0; i < ehdr->e_phnum; i++) {
-    if (phdr[i].p_type == PT_DYNAMIC_TYPE) {
-      dyn = (Elf64_Dyn *)((char *)base + phdr[i].p_vaddr);
-      break;
+  Mod m = {(const uint8_t *)base, len};
+  const uint8_t *e = m.base;
+  if (e[0] != ELFMAG0 || e[1] != ELFMAG1 || e[2] != ELFMAG2 || e[3] != ELFMAG3)
+    return NULL;
+  if (e[EI_CLASS] != ELFCLASS64 || e[EI_DATA] != ELFDATA2LSB ||
+      e[EI_VERSION] != EV_CURRENT)
+    return NULL;
+  unsigned long phoff = rd64(e + 32);
+  uint16_t phentsize = rd16(e + 54);
+  uint16_t phnum = rd16(e + 56);
+  if (phentsize != ELF64_PHDR_SIZE)
+    return NULL;
+  if (phnum == 0 || phnum > DYNLOAD_MAX_PHNUM)
+    return NULL;
+
+  Seg segs[DYNLOAD_MAX_SEGS];
+  int nsegs = 0;
+  size_t dyn_off = 0;
+  size_t dyn_bytes = 0;
+  int have_dyn = 0;
+  for (unsigned i = 0; i < (unsigned)phnum; i++) {
+    PhdrInfo ph;
+    if (!phdr_read(&m, (size_t)phoff + (size_t)i * ELF64_PHDR_SIZE, &ph))
+      break; /* the program-header array ended early */
+    if (ph.p_type == PT_LOAD_TYPE && nsegs < DYNLOAD_MAX_SEGS) {
+      const uint8_t *s = (const uint8_t *)mod_at(&m, ph.p_vaddr, 1);
+      if (s) {
+        size_t avail = m.len - (size_t)(s - m.base);
+        size_t seglen = ph.p_memsz;
+        if (seglen > avail)
+          seglen = avail;
+        segs[nsegs].p = s;
+        segs[nsegs].len = seglen;
+        nsegs++;
+      }
+    }
+    if (ph.p_type == PT_DYNAMIC_TYPE && !have_dyn) {
+      const uint8_t *dp = (const uint8_t *)mod_at(&m, ph.p_vaddr, 1);
+      if (dp) {
+        dyn_off = (size_t)(dp - m.base);
+        size_t avail = m.len - dyn_off;
+        dyn_bytes = (size_t)ph.p_filesz;
+        if (dyn_bytes > avail)
+          dyn_bytes = avail;
+        have_dyn = 1;
+      }
     }
   }
-  if (!dyn)
-    return 0;
+  if (!have_dyn || dyn_bytes < ELF64_DYN_SIZE)
+    return NULL;
+  if (nsegs > 0 && !seg_has(segs, nsegs, m.base + dyn_off, ELF64_DYN_SIZE))
+    return NULL;
 
-  Elf64_Sym *symtab = 0;
-  const char *strtab = 0;
-  const uint32_t *sysv_hash __attribute__((unused)) = 0;
-  const uint32_t *ghash __attribute__((unused)) = 0;
-  for (; dyn->d_tag != DT_NULL; dyn++) {
-    /* Pointer-type DT_* entries hold absolute runtime addresses (the loader
-     * relocates them); only st_value below needs the module base added. */
-    if (dyn->d_tag == DT_SYMTAB)
-      symtab = (Elf64_Sym *)dyn->d_val;
-    else if (dyn->d_tag == DT_STRTAB)
-      strtab = (const char *)dyn->d_val;
-    else if (dyn->d_tag == DT_HASH)
-      sysv_hash = (const uint32_t *)dyn->d_val;
-    else if (dyn->d_tag == DT_GNU_HASH)
-      ghash = (const uint32_t *)dyn->d_val;
+  unsigned long symtab_v = 0;
+  unsigned long strtab_v = 0;
+  unsigned long hash_v = 0;
+  unsigned long ghash_v = 0;
+  size_t dyn_count = dyn_bytes / ELF64_DYN_SIZE;
+  for (size_t i = 0; i < dyn_count; i++) {
+    DynInfo de;
+    if (!dyn_read(&m, dyn_off + i * ELF64_DYN_SIZE, &de))
+      break;
+    if (de.d_tag == DT_NULL)
+      break;
+    if (de.d_tag == DT_SYMTAB)
+      symtab_v = de.d_val;
+    else if (de.d_tag == DT_STRTAB)
+      strtab_v = de.d_val;
+    else if (de.d_tag == DT_HASH)
+      hash_v = de.d_val;
+    else if (de.d_tag == DT_GNU_HASH)
+      ghash_v = de.d_val;
   }
-  if (!symtab || !strtab)
-    return 0;
+  if (symtab_v == 0 || strtab_v == 0)
+    return NULL;
+  /* hash_v/ghash_v are each unused when the build pins the other hash style. */
+  (void)hash_v;
+  (void)ghash_v;
+
+  const uint8_t *symtab = (const uint8_t *)mod_abs(&m, symtab_v);
+  const uint8_t *strtab = (const uint8_t *)mod_abs(&m, strtab_v);
+  if (symtab == NULL || strtab == NULL)
+    return NULL;
+  if (nsegs > 0 && (!seg_has(segs, nsegs, symtab, ELF64_SYM_SIZE) ||
+                    !seg_has(segs, nsegs, strtab, 1)))
+    return NULL;
+
+  size_t sym_off = (size_t)(symtab - m.base);
+  size_t str_off = (size_t)(strtab - m.base);
 
 #if DYNLOAD_HASH_STYLE != DYNLOAD_HASH_GNU
-  /* SysV hash table (DT_HASH): layout is nbucket, nchain, buckets, chains.
-   * nchain is the exact dynamic-symbol count, so a linear scan is safe. */
-  if (sysv_hash) {
-    unsigned long nchain = sysv_hash[1];
-    for (unsigned long i = 0; i < nchain; i++) {
-      const Elf64_Sym *sym = &symtab[i];
-      if (sym->st_name != 0 && sym->st_shndx != 0 &&
-          strcmp(strtab + sym->st_name, name) == 0)
-        return (void *)((char *)base + sym->st_value);
+  /* SysV hash (DT_HASH): nbucket, nchain, buckets[], chains[]. nchain is the
+   * exact symbol count, so a linear scan is safe once bounded by the module. */
+  if (hash_v) {
+    const uint8_t *hp = (const uint8_t *)mod_abs(&m, hash_v);
+    if (hp == NULL || !mod_has(&m, hp, 2 * sizeof(uint32_t)))
+      return NULL;
+    uint32_t nbucket = rd32(hp);
+    uint32_t nchain = rd32(hp + 4);
+    size_t words = (size_t)nbucket + (size_t)nchain;
+    if (words > SIZE_MAX / sizeof(uint32_t) - 2)
+      return NULL;
+    size_t bytes = (2 + words) * sizeof(uint32_t);
+    if (!mod_has(&m, hp, bytes))
+      return NULL;
+    if (nsegs > 0 && !seg_has(segs, nsegs, hp, bytes))
+      return NULL;
+    if ((size_t)nchain > (m.len - sym_off) / ELF64_SYM_SIZE)
+      return NULL;
+    for (size_t i = 0; i < (size_t)nchain; i++) {
+      SymInfo sym;
+      if (!sym_read(&m, sym_off, i, &sym))
+        break;
+      if (sym_named(&m, segs, nsegs, str_off, &sym, name))
+        return sym_addr(&m, segs, nsegs, sym.st_value);
     }
-    return 0;
+    return NULL;
   }
 #endif
 
 #if DYNLOAD_HASH_STYLE != DYNLOAD_HASH_SYSV
-  /* Some binaries ship only a GNU hash table (DT_GNU_HASH), e.g. glibc built
-   * with --hash-style=gnu. Use it when DT_HASH is absent (or when the build
-   * forces GNU-only). */
-  if (ghash)
-    return resolve_sym_gnu(base, symtab, strtab, ghash, name);
+  if (ghash_v) {
+    const uint8_t *gp = (const uint8_t *)mod_abs(&m, ghash_v);
+    if (gp)
+      return resolve_sym_gnu(&m, segs, nsegs, sym_off, str_off, gp, name);
+    return NULL;
+  }
 #endif
 
-  return 0;
+  return NULL;
 }
 
 void dynload_reset(dynload *dl) {
@@ -233,12 +666,17 @@ int dynload_resolve(dynload *dl) {
   if (dl->open && dl->sym && dl->close)
     return 0;
 
-  unsigned long libc = dynload_find_libc();
-  if (libc) {
-    dl->open = (dlopen_fn)dynload_resolve_module((void *)libc, DYNLOAD_SYM_DLOPEN);
-    dl->sym = (dlsym_fn)dynload_resolve_module((void *)libc, DYNLOAD_SYM_DLSYM);
-    dl->close =
-        (dlclose_fn)dynload_resolve_module((void *)libc, DYNLOAD_SYM_DLCLOSE);
+  unsigned long end = 0;
+  unsigned long libc = dynload_find_libc(&end);
+  if (libc && end > libc) {
+    size_t len = (size_t)(end - libc);
+    dl->open =
+        (dlopen_fn)dynload_resolve_module((const void *)libc, len,
+                                          DYNLOAD_SYM_DLOPEN);
+    dl->sym = (dlsym_fn)dynload_resolve_module((const void *)libc, len,
+                                               DYNLOAD_SYM_DLSYM);
+    dl->close = (dlclose_fn)dynload_resolve_module((const void *)libc, len,
+                                                   DYNLOAD_SYM_DLCLOSE);
   }
   dl->resolved = (dl->open && dl->sym && dl->close) ? 1 : 0;
   return dl->resolved ? 0 : -1;

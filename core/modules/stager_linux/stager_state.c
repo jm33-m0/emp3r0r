@@ -33,12 +33,10 @@ void stager_state_init(void) {
   st = (struct stager_state *)ret;
   st->self = st;
   st->syscall_gadget = _SYSCALL_GADGET_UNRESOLVED;
-  /* The mapping is zero-filled by the kernel; keep the dynload cache empty so
-   * the next dynload_open resolves lazily. */
-  st->dl.resolved = 0;
-  st->dl.open = 0;
-  st->dl.sym = 0;
-  st->dl.close = 0;
+  /* The mapping is zero-filled by the kernel; reset the dynload cache through
+   * its own API so the struct layout stays owned by dynload.c and the next
+   * dynload_open resolves lazily. */
+  dynload_reset(&st->dl);
 
   /* Install the block as the GS base so get_stager_state() can find it without
    * reserving a general-purpose register. */

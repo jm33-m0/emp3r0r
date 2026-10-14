@@ -1,6 +1,8 @@
 #ifndef DYNLOAD_H
 #define DYNLOAD_H
 
+#include <stddef.h>
+
 /*
  * dynload.h — runtime resolution of libc's dl* entry points and stateless ELF
  * dynamic-symbol lookup.
@@ -47,17 +49,37 @@ void dynload_reset(dynload *dl);
 /* ---- stateless ELF helpers ---------------------------------------------- */
 
 /*
- * Base address of the first mapping in /proc/self/maps whose pathname contains
- * `needle` (e.g. "libc.so" or "libc-"). Returns 0 when not found.
+ * First mapping in /proc/self/maps whose pathname contains `needle` (e.g.
+ * "libc.so" or "libc-"). Returns its base and, when `end` is non-NULL, stores
+ * the end of the module's contiguous mapping run. Returns 0 when not found.
  */
-unsigned long dynload_find_module(const char *needle);
+unsigned long dynload_find_module(const char *needle, unsigned long *end);
 
-/* Base address of libc.so.6 / libc-2.17.so, or 0. */
-unsigned long dynload_find_libc(void);
+/*
+ * Pure parser over a length-delimited /proc/self/maps buffer (the input need
+ * not be NUL-terminated): first mapping whose pathname contains `needle`, with
+ * the module's mapping end in `*end`. The file-backed finders use the same
+ * parser; exposed so the unit test and fuzz/fuzz_maps.c can drive it with
+ * arbitrary text.
+ */
+unsigned long dynload_maps_find(const char *text, size_t len,
+                                const char *needle, unsigned long *end);
 
-/* Resolve a dynamic symbol `name` in the ELF module loaded at `base`.
- * Returns the relocated address, or NULL. */
-void *dynload_resolve_module(void *base, const char *name);
+/* libc.so.6 / libc-2.17.so base and mapping end; returns 0 when not found. */
+unsigned long dynload_find_libc(unsigned long *end);
+
+/*
+ * Resolve a dynamic symbol `name` in the ELF image occupying [base, base+len).
+ * Every header, table and pointer is bounds-checked against that range and the
+ * module's PT_LOAD segments, so malformed or truncated input can only fail,
+ * never read out of bounds. DT_* pointers may be relocated absolute addresses
+ * (loaded module) or base-relative offsets (flat image); either is accepted.
+ * Returns the relocated address, or NULL. Fuzzed by fuzz/fuzz_dynload.c.
+ *
+ * Use dynload_find_module/dynload_find_libc to obtain a trusted range for a
+ * loaded module.
+ */
+void *dynload_resolve_module(const void *base, size_t len, const char *name);
 
 /* ---- context API --------------------------------------------------------- */
 
