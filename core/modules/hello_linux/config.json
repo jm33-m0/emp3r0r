@@ -1,6 +1,6 @@
 {
   "name": "hello_linux",
-  "build": "make",
+  "build": "sh build.sh",
   "author": "jm33-ng",
   "date": "2026-01-26",
   "comment": "Linux BOF Hello World",
