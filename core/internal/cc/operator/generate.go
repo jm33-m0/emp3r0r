@@ -16,6 +16,12 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 	payloadType, _ := cmd.Flags().GetString("type")
 	archChoice, _ := cmd.Flags().GetString("arch")
 
+	// The native C agent (aquila) shares the config flags but has its own build path.
+	if payloadType == builder.PayloadTypeAquila || payloadType == builder.PayloadTypeCLinux {
+		CmdGenerateCAgent(cmd)
+		return
+	}
+
 	if !builder.IsArchValid(payloadType, archChoice) {
 		logging.Errorf("Invalid arch choice")
 		return

@@ -1396,3 +1396,56 @@ func TestEnsureModuleDependencyHosted(t *testing.T) {
 		t.Fatalf("expected not-loaded error, got: %v", err)
 	}
 }
+
+// TestHostDeclaredDependencies pins that startup pre-hosting is driven by the
+// `dependencies` modules declare in config.json, not by a payload type: a
+// module something depends on is hosted, an undeclared one is left alone.
+func TestHostDeclaredDependencies(t *testing.T) {
+	origWWWRoot := paths.WWWRoot
+	paths.WWWRoot = t.TempDir()
+	defer func() { paths.WWWRoot = origWWWRoot }()
+
+	srcDir := t.TempDir()
+	content := "linux-loader-bytes"
+	if err := os.WriteFile(filepath.Join(srcDir, "coffloader_linux.so"), []byte(content), 0o600); err != nil {
+		t.Fatalf("write loader: %v", err)
+	}
+	def.Modules.Store("coffloader_linux", &def.ModuleConfig{
+		Name: "coffloader_linux",
+		Path: srcDir,
+		AgentConfig: def.AgentModuleConfig{
+			Type:  "so",
+			Files: []string{"coffloader_linux.so"},
+		},
+	})
+	defer def.Modules.Delete("coffloader_linux")
+
+	// Nothing declares it yet: nothing is hosted.
+	hostDeclaredDependencies()
+	if _, err := os.Stat(filepath.Join(paths.WWWRoot, "coffloader_linux.amd64.gz")); err == nil {
+		t.Fatal("hosted a module that no module depends on")
+	}
+
+	// Any module declaring it pulls it in, regardless of its own payload type.
+	def.Modules.Store("linux_bof", &def.ModuleConfig{
+		Name:         "linux_bof",
+		Path:         srcDir,
+		Dependencies: []string{"coffloader_linux"},
+		AgentConfig:  def.AgentModuleConfig{Type: "coff", Files: []string{"linux_bof.o"}},
+	})
+	defer def.Modules.Delete("linux_bof")
+
+	hostDeclaredDependencies()
+
+	compressed, err := os.ReadFile(filepath.Join(paths.WWWRoot, "coffloader_linux.amd64.gz"))
+	if err != nil {
+		t.Fatalf("coffloader_linux.amd64.gz missing: %v", err)
+	}
+	got, err := util.Decompress(compressed)
+	if err != nil {
+		t.Fatalf("decompress hosted loader: %v", err)
+	}
+	if string(got) != content {
+		t.Fatalf("hosted loader mismatch: got %q", got)
+	}
+}

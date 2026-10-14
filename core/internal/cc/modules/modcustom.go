@@ -275,12 +275,28 @@ func hostModuleFile(moduleName, fileName, path string) (def.ResolvedModuleFile, 
 	}, nil
 }
 
-// hostDLLModules compresses and hosts every DLL module's payload so that
-// dependent BOF modules can fetch the correct arch from the C2 file endpoint
-// at runtime. DLL payloads are hosted as <name>.<arch>.gz.
-func hostDLLModules() {
+// hostDeclaredDependencies pre-hosts the payload of every module that another
+// module declares in its config.json `dependencies` (for example coffloader,
+// libbpf and coffloader_linux). Modules receive their loader dependency while
+// their manifest is parsed, so this covers automatic (BOF) and explicit
+// dependencies alike without guessing a payload type. Hosting here lets a
+// dependent fetch the right arch from the C2 file endpoint even if the
+// operator never ran the dependency directly.
+func hostDeclaredDependencies() {
+	needed := make(map[string]struct{})
 	def.ForEachModule(func(_ string, config *def.ModuleConfig) {
-		if !strings.EqualFold(config.AgentConfig.Type, "dll") {
+		for _, dep := range config.Dependencies {
+			if name := strings.ToLower(strings.TrimSpace(dep)); name != "" {
+				needed[name] = struct{}{}
+			}
+		}
+	})
+	if len(needed) == 0 {
+		return
+	}
+
+	def.ForEachModule(func(_ string, config *def.ModuleConfig) {
+		if _, ok := needed[strings.ToLower(config.Name)]; !ok {
 			return
 		}
 		if len(config.AgentConfig.Files) == 0 || config.Path == "" {
@@ -292,7 +308,7 @@ func hostDLLModules() {
 				arch = "amd64"
 			}
 			if _, err := hostModulePayload(config, file, arch); err != nil {
-				logging.Warningf("hostDLLModules: %v", err)
+				logging.Warningf("hostDeclaredDependencies: %v", err)
 			}
 		}
 	})
@@ -328,8 +344,8 @@ func hostModulePayload(config *def.ModuleConfig, file, arch string) (string, err
 
 // ensureModuleDependencyHosted makes sure the payload of dependency depName
 // is hosted and downloadable from the C2 file endpoint for the target agent's
-// arch before a module that depends on it is dispatched. hostDLLModules()
-// pre-hosts every DLL module's payload at startup, but hosting can fail
+// arch before a module that depends on it is dispatched. hostDeclaredDependencies()
+// pre-hosts every declared dependency at startup, but hosting can fail
 // silently (payload not built yet, module directory added after startup,
 // WWWRoot recreated), so we host on demand and fail fast instead of letting
 // the agent download a 404.
@@ -379,8 +395,8 @@ func ensureModuleDependencyHosted(ctx *c2context.C2Context, depName string) erro
 		return fmt.Errorf("dependency module %q ships no %s payload (found %s)", depName, arch, fileArch)
 	}
 
-	// Dependencies that build from source (e.g. libbpf) may not have their
-	// payload yet; build it now with empty flags.
+	// Dependencies that build from source (e.g. libbpf, coffloader_linux) may
+	// not have their payload yet; build it now with empty flags.
 	if !util.IsFileExist(filepath.Join(config.Path, payloadFile)) && config.Build != "" {
 		if _, err := build_module(config, nil); err != nil {
 			return fmt.Errorf("building dependency %q: %w", depName, err)
@@ -455,9 +471,10 @@ func InitModules() {
 	// has a runner and a console command
 	loadModFromDirs()
 
-	// Pre-host DLL modules so BOF module dependencies can download them on
-	// demand even if the operator never ran the DLL module directly.
-	hostDLLModules()
+	// Pre-host every declared module dependency (coffloader, libbpf,
+	// coffloader_linux, ...) so it can be downloaded on demand even if the
+	// operator never ran the dependency directly.
+	hostDeclaredDependencies()
 
 	count := def.CountModules()
 	logging.Infof("Loaded %d modules", count)

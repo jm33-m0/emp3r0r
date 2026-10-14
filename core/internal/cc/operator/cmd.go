@@ -643,6 +643,15 @@ func gen_agent_cmd() *cobra.Command {
 	genAgentCmd.Flags().IntP("operator-idle-timeout", "", 1800, "Operator idle timeout in seconds before C2 refuses agent connections (0 disables idle timeout)")
 	addFlagToGroup("Stealth & Connectivity Options", "stager", "NCSI", "operator-idle-timeout")
 
+	// Group 6: providers for the native C agent (payload type c_linux). The C
+	// agent is built on demand from core/c_agent with only the selected backend
+	// linked in; these are ignored for every other payload type.
+	genAgentCmd.Flags().StringP("crypto", "", builder.CAgentCryptoProviders[0], fmt.Sprintf("C agent (--type c_linux) crypto provider. Available: %v", builder.CAgentCryptoProviders))
+	genAgentCmd.Flags().StringP("gzip", "", builder.CAgentGzipProviders[0], fmt.Sprintf("C agent (--type c_linux) compression provider. Available: %v", builder.CAgentGzipProviders))
+	genAgentCmd.Flags().StringP("http", "", builder.CAgentHTTPProviders[0], fmt.Sprintf("C agent (--type c_linux) HTTP(S) client provider. Available: %v", builder.CAgentHTTPProviders))
+	genAgentCmd.Flags().StringP("transport", "", builder.CAgentTransportProviders[0], fmt.Sprintf("C agent (--type c_linux) transport provider. Available: %v", builder.CAgentTransportProviders))
+	addFlagToGroup("C Agent Options (--type aquila)", "crypto", "gzip", "http", "transport")
+
 	// Force user to specify CC address
 	genAgentCmd.MarkFlagRequired("cc")
 
@@ -666,6 +675,7 @@ Example:
 		"Beaconing Options (HTTP Mode)",
 		"Mesh networking (P2P) Options",
 		"Stealth & Connectivity Options",
+		"C Agent Options (--type aquila)",
 	}
 
 	// help and usage functions
@@ -743,6 +753,10 @@ Example:
 		"ech":             carapace.ActionValues(),
 		"proxy":           carapace.ActionValues("socks5://127.0.0.1:9050", "socks5://"),
 		"c2-channel-mode": carapace.ActionValues(transport.AllC2ChannelModes()...),
+		"crypto":          carapace.ActionValues(builder.CAgentCryptoProviders...),
+		"gzip":            carapace.ActionValues(builder.CAgentGzipProviders...),
+		"http":            carapace.ActionValues(builder.CAgentHTTPProviders...),
+		"transport":       carapace.ActionValues(builder.CAgentTransportProviders...),
 		"p2p-transport":   carapace.ActionValues(transport.AllTransportNames()...),
 	})
 	return genAgentCmd
