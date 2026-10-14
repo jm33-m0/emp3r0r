@@ -95,6 +95,17 @@ jobs:
           # (default full feature set), so both must use the same feature tags.
           cd test && go test -v -tags "$BUILD_TAGS" -count=1 -timeout 3m -run TestAgentEndToEndLifecycle
 
+      - name: Run C agent end-to-end test (cgo, no race)
+        if: runner.os == 'Linux'
+        working-directory: ./core/modules/stager_linux
+        env:
+          CGO_ENABLED: 1
+        run: |
+          # Builds core/c_agent's reference agent (system libcrypto and libcurl
+          # resolved with dlopen) and drives it against the real C2: check-in
+          # plus a live command round-trip.
+          cd test && go test -v -tags "$BUILD_TAGS" -count=1 -timeout 3m -run TestCAgentEndToEnd
+
       - name: Set up MSYS2 (Windows)
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
