@@ -74,6 +74,9 @@ jobs:
           go test -v -tags "$BUILD_TAGS" ./lib/memmod -count=1
           go test -v -tags "$BUILD_TAGS" ./lib/script -count=1
           go test -v -tags "$BUILD_TAGS" ./internal/cc/modules -count=1
+          # The builder's zig-dependent tests build the C agent; run them here
+          # where zig is installed (the main ./... run above would skip them).
+          go test -v -tags "$BUILD_TAGS" ./internal/cc/builder -count=1
 
       - name: Run memmod ELF loader tests without cgo (Linux)
         if: runner.os == 'Linux'

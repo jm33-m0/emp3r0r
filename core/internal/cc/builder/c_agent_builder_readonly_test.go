@@ -3,6 +3,7 @@ package builder
 import (
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -15,6 +16,9 @@ import (
 // installed source tree is read-only (e.g. under /usr): the builder must stage
 // a writable copy instead of writing into the install prefix.
 func TestGenerateCAgentReadOnlySource(t *testing.T) {
+	if _, err := exec.LookPath("zig"); err != nil {
+		t.Skip("zig is required to build the C agent")
+	}
 	coreDir, _ := filepath.Abs(filepath.Join("..", "..", ".."))
 	prefix := t.TempDir()
 	caDir := filepath.Join(prefix, "c_agent")
