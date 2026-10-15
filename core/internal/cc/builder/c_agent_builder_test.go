@@ -90,6 +90,7 @@ func TestValidateCAgentProviders(t *testing.T) {
 		{Libc: "musl", Dynload: "libc_dl"},
 		{Libc: "musl", Dynload: "auto"},
 		{Format: "elf"},
+		{Libc: "musl", Format: "shellcode"},
 	} {
 		if err := validateCAgentProviders(bad); err == nil {
 			t.Errorf("expected error for %+v", bad)

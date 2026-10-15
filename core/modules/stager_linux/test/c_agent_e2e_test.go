@@ -39,7 +39,13 @@ import (
 // and requires a full check-in, a command round-trip and transparent memfs file
 // IO. This is the C agent's real-world interoperability test.
 func TestCAgentEndToEnd(t *testing.T) {
-	for _, format := range []string{"exe", "shellcode"} {
+	formats := []string{"exe", "shellcode"}
+	if cAgentTestLibc() == "musl" {
+		// malasada's stage0 resolves glibc's ld-linux by hardcoded path, so the
+		// raw PIC format is glibc-only; musl covers the executable (and .so).
+		formats = []string{"exe"}
+	}
+	for _, format := range formats {
 		t.Run(format, func(t *testing.T) {
 			runCAgentEndToEnd(t, format)
 		})

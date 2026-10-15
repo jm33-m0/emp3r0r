@@ -141,11 +141,14 @@ static void read_os_release(char *pretty, size_t pretty_cap, char *id,
 }
 
 /* osinfo_linux.GetOSInfo detects the userspace architecture from the dynamic
- * loader, not the kernel (a 32-bit agent on a 64-bit kernel reports i386). */
+ * loader, not the kernel (a 32-bit agent on a 64-bit kernel reports i386).
+ * Both glibc (ld-linux) and musl (ld-musl) loaders are recognised. */
 static const char *detect_os_arch(void) {
-  if (access("/lib64/ld-linux-x86-64.so.2", F_OK) == 0)
+  if (access("/lib64/ld-linux-x86-64.so.2", F_OK) == 0 ||
+      access("/lib/ld-musl-x86_64.so.1", F_OK) == 0)
     return "amd64";
-  if (access("/lib/ld-linux.so.2", F_OK) == 0)
+  if (access("/lib/ld-linux.so.2", F_OK) == 0 ||
+      access("/lib/ld-musl-i386.so.1", F_OK) == 0)
     return "i386";
   return "";
 }

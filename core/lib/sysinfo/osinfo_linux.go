@@ -82,11 +82,21 @@ func genOSRelease() {
 
 func GetOSInfo() (osinfo *OSInfo) {
 	osinfo = &OSInfo{}
-	// This seems to be the best and most portable way to detect OS architecture (NOT kernel!)
-	if _, err := os.Stat("/lib64/ld-linux-x86-64.so.2"); err == nil {
-		osinfo.Architecture = "amd64"
-	} else if _, err := os.Stat("/lib/ld-linux.so.2"); err == nil {
-		osinfo.Architecture = "i386"
+	// This seems to be the best and most portable way to detect OS architecture (NOT kernel!).
+	// Both glibc (ld-linux) and musl (ld-musl) loaders are recognised.
+	for _, loader := range []struct {
+		path string
+		arch string
+	}{
+		{"/lib64/ld-linux-x86-64.so.2", "amd64"},
+		{"/lib/ld-musl-x86_64.so.1", "amd64"},
+		{"/lib/ld-linux.so.2", "i386"},
+		{"/lib/ld-musl-i386.so.1", "i386"},
+	} {
+		if _, err := os.Stat(loader.path); err == nil {
+			osinfo.Architecture = loader.arch
+			break
+		}
 	}
 
 	if _, err := os.Stat(osReleaseFile); os.IsNotExist(err) {

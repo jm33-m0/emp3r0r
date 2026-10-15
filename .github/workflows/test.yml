@@ -110,6 +110,30 @@ jobs:
           # a live command round-trip and the BOF path.
           cd test && go test -v -tags "$BUILD_TAGS" -count=1 -timeout 5m -run TestCAgentEndToEnd
 
+      # A musl agent can only be exercised on a real musl host. Keep the job on
+      # the existing ubuntu runner and run the same e2e inside Alpine: a
+      # `container: alpine` job would have to run actions/checkout's Node
+      # runtime on musl, so the Alpine work stays in one docker invocation.
+      - name: Run musl C agent end-to-end in Alpine
+        if: runner.os == 'Linux'
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/src" -w /src \
+            -e CGO_ENABLED=1 -e EMP3R0R_RACE_ON=0 -e EMP3R0R_CAGENT_LIBC=musl \
+            alpine:3.21 /bin/sh -c '
+              set -eux
+              apk add --no-cache bash build-base linux-headers tar xz curl openssl libcurl
+              curl -fsSL -o /tmp/go.tar.gz "https://go.dev/dl/go1.26.2.linux-amd64.tar.gz"
+              echo "990e6b4bbba816dc3ee129eaeaf4b42f17c2800b88a2166c265ac1a200262282  /tmp/go.tar.gz" | sha256sum -c -
+              tar -C /usr/local -xzf /tmp/go.tar.gz
+              curl -fsSL -o /tmp/zig.tar.xz "https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz"
+              echo "70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00  /tmp/zig.tar.xz" | sha256sum -c -
+              tar -C /usr/local -xf /tmp/zig.tar.xz
+              export PATH="/usr/local/go/bin:/usr/local/zig-x86_64-linux-0.16.0:$PATH"
+              cd core/modules/stager_linux/test
+              go test -v -count=1 -timeout 8m -run TestCAgentEndToEnd
+            '
+
       - name: Set up MSYS2 (Windows)
         if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
@@ -173,36 +197,3 @@ jobs:
           go tool cover -func=coverage.txt
           PERCENT=$(go tool cover -func=coverage.txt | grep total: | awk '{print $3}')
           echo "### Test Coverage: $PERCENT" >> $GITHUB_STEP_SUMMARY
-
-  # Build and run the C agent against musl libc on a real Alpine host, so the
-  # musl target, the loader/libc discovery in dynload and musl-built
-  # libcrypto/libcurl are exercised natively rather than cross-compiled.
-  alpine-cagent:
-    name: Alpine (musl) C agent e2e
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      # A `container: alpine` job would run actions/checkout's Node runtime on
-      # musl; keep checkout on the host and do the Alpine work in one docker
-      # invocation instead. EMP3R0R_CAGENT_LIBC=musl makes the e2e build the
-      # agent (and its BOF modules) for musl.
-      - name: Run musl C agent end-to-end in Alpine
-        run: |
-          docker run --rm \
-            -v "$GITHUB_WORKSPACE:/src" -w /src \
-            -e CGO_ENABLED=1 -e EMP3R0R_RACE_ON=0 -e EMP3R0R_CAGENT_LIBC=musl \
-            alpine:3.21 /bin/sh -c '
-              set -eux
-              apk add --no-cache bash build-base linux-headers tar xz curl openssl libcurl
-              curl -fsSL -o /tmp/go.tar.gz "https://go.dev/dl/go1.26.2.linux-amd64.tar.gz"
-              echo "990e6b4bbba816dc3ee129eaeaf4b42f17c2800b88a2166c265ac1a200262282  /tmp/go.tar.gz" | sha256sum -c -
-              tar -C /usr/local -xzf /tmp/go.tar.gz
-              curl -fsSL -o /tmp/zig.tar.xz "https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz"
-              echo "70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00  /tmp/zig.tar.xz" | sha256sum -c -
-              tar -C /usr/local -xf /tmp/zig.tar.xz
-              export PATH="/usr/local/go/bin:/usr/local/zig-x86_64-linux-0.16.0:$PATH"
-              cd core/modules/stager_linux/test
-              go test -v -count=1 -timeout 8m -run TestCAgentEndToEnd
-            '

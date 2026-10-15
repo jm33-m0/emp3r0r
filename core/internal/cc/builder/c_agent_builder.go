@@ -155,6 +155,11 @@ func validateCAgentProviders(p CAgentProviders) error {
 	if p.Format != "" && !slices.Contains(CAgentFormats, p.Format) {
 		return fmt.Errorf("invalid format %q (available: %v)", p.Format, CAgentFormats)
 	}
+	// malasada's stage0 resolves glibc's ld-linux by hardcoded path, so raw PIC
+	// is glibc-only. The musl .so itself is fine (dlopen it directly).
+	if p.Libc == "musl" && p.Format == "shellcode" {
+		return fmt.Errorf("raw PIC (malasada) is glibc-only; use format=exe or so with libc=musl")
+	}
 	return nil
 }
 
