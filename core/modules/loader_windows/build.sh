@@ -339,9 +339,13 @@ cp "$SCRIPT_DIR"/loader.c "$SCRIPT_DIR"/stager.c "$SCRIPT_DIR"/dllhost.c \
   "$SCRIPT_DIR"/reflect.c "$SCRIPT_DIR"/reflect.h \
   "$SCRIPT_DIR"/stage_abi.h "$SCRIPT_DIR"/stage_data.h \
   "$SCRIPT_DIR"/pack.c "$SCRIPT_DIR"/config.h \
-  "$SCRIPT_DIR"/../../c_agent/src/rc4.c "$SCRIPT_DIR"/../../c_agent/include/rc4.h \
+  "$SCRIPT_DIR"/../../c_agent/src/util/rc4.c \
   "$SCRIPT_DIR"/../common/ntsys.c "$SCRIPT_DIR"/../common/ntsys.h \
   "$BUILDDIR"/
+# rc4.c includes its header as "util/rc4.h" (the c_agent util/ layout), so
+# keep that path here too.
+mkdir -p "$BUILDDIR/util"
+cp "$SCRIPT_DIR"/../../c_agent/include/util/rc4.h "$BUILDDIR/util/"
 if [[ -n "$SMW_FLAG" ]]; then
   mkdir -p "$BUILDDIR/smw"
   cp "$SCRIPT_DIR"/../common/smw/* "$BUILDDIR/smw/"

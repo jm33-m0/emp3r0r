@@ -1,10 +1,10 @@
 #define _GNU_SOURCE
-#include "debug.h"
-#include "packer.h"
+#include "util/debug.h"
+#include "util/packer.h"
 #include "stage_abi.h"
-#include "strings.h"
+#include "util/strings.h"
 #include "transport.h"
-#include "utils.h"
+#include "util/utils.h"
 
 /* Configurable Options - from Makefile */
 #ifndef ENCODED_HOST

@@ -1,6 +1,6 @@
-#include "net_utils.h"
-#include "strings.h"
-#include "syscalls.h"
+#include "util/net_utils.h"
+#include "util/strings.h"
+#include "util/syscalls.h"
 
 // Non-network functions removed.
 

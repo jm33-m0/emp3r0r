@@ -66,13 +66,13 @@
  *     Content-Length or close the connection (the built-in listener does).
  */
 
-#include "debug.h"
-#include "dynload.h"
+#include "util/debug.h"
+#include "util/dynload.h"
 #include "state.h"
-#include "net_utils.h"
-#include "strings.h"
+#include "util/net_utils.h"
+#include "util/strings.h"
 #include "transport.h"
-#include "utils.h"
+#include "util/utils.h"
 
 /* --------------------------------------------------------------------------
  * Environment tuning

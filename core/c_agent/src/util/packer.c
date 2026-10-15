@@ -1,5 +1,5 @@
-#include "packer.h"
-#include "strings.h"
+#include "util/packer.h"
+#include "util/strings.h"
 
 void decode_config_string(char *dest, const unsigned char *encoded,
                           size_t max_len) {

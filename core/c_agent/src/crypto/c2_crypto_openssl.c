@@ -13,7 +13,7 @@
 
 #include "c2_crypto.h"
 
-#include "dynload.h"
+#include "util/dynload.h"
 
 #include <limits.h>
 #include <stdlib.h>

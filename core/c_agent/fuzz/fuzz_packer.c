@@ -1,4 +1,4 @@
-#include "packer.h"
+#include "util/packer.h"
 
 #include "fuzz_common.h"
 

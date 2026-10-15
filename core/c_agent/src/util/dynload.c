@@ -1,9 +1,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "dynload.h"
-#include "strings.h"
-#include "utils.h"
+#include "util/dynload.h"
+#include "util/strings.h"
+#include "util/utils.h"
 
 /* ---- minimal ELF layout (no elf.h) ----
  *

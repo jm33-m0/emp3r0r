@@ -1,5 +1,5 @@
-#ifndef C2_STRINGS_H
-#define C2_STRINGS_H
+#ifndef UTIL_STRINGS_H
+#define UTIL_STRINGS_H
 
 /*
  * strings.h — freestanding libc string/memory replacements.
@@ -22,4 +22,4 @@ size_t strlen(const char *s);
 int strcmp(const char *s1, const char *s2);
 char *strstr(const char *haystack, const char *needle);
 
-#endif /* C2_STRINGS_H */
+#endif /* UTIL_STRINGS_H */

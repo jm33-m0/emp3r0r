@@ -11,11 +11,11 @@ import (
 
 // derivedKeyLen is the length of the RC4 key derived from the download key
 // string. It must stay in sync with DERIVED_KEY_LEN in
-// core/c_agent/include/packer.h.
+// core/c_agent/include/util/packer.h.
 const derivedKeyLen = 16
 
 // deriveKeyFromString derives a fixed-size RC4 key from the passphrase.
-// This mirrors derive_key_from_string() in core/c_agent/src/packer.c; the
+// This mirrors derive_key_from_string() in core/c_agent/src/util/packer.c; the
 // two must stay in sync or the stager will not be able to decrypt the blob.
 func deriveKeyFromString(str string) []byte {
 	key := make([]uint32, derivedKeyLen/4)
@@ -34,7 +34,7 @@ func deriveKeyFromString(str string) []byte {
 
 // rc4Crypt encrypts/decrypts data in-place using the RC4 stream cipher.
 // RC4 is symmetric, so the same function is used by the listener (encryption)
-// and by the stager (decryption, see core/c_agent/src/rc4.c).
+// and by the stager (decryption, see core/c_agent/src/util/rc4.c).
 func rc4Crypt(data, key []byte) error {
 	if len(key) == 0 {
 		return nil

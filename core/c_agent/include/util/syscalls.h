@@ -1,5 +1,5 @@
-#ifndef SYSCALLS_H
-#define SYSCALLS_H
+#ifndef UTIL_SYSCALLS_H
+#define UTIL_SYSCALLS_H
 
 #define SYS_read 0
 #define SYS_write 1

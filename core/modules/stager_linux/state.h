@@ -15,7 +15,7 @@
  * without reserving a general-purpose register (clang has no -ffixed-r15).
  */
 
-#include "dynload.h"
+#include "util/dynload.h"
 
 struct stager_state {
   struct stager_state *self; /* %gs:0 points back here (see get_stager_state) */

@@ -1,5 +1,5 @@
-#ifndef DYNLOAD_H
-#define DYNLOAD_H
+#ifndef UTIL_DYNLOAD_H
+#define UTIL_DYNLOAD_H
 
 #include <stddef.h>
 
@@ -14,7 +14,7 @@
  *
  * The resolved pointers are caller-owned because the freestanding stager image
  * is mapped RX and cannot hold a writable global. A hosted agent can use the
- * process-wide context from src/dynload_hosted.c.
+ * process-wide context from src/util/dynload_hosted.c.
  */
 
 typedef void *(*dlopen_fn)(const char *, int);
@@ -93,7 +93,7 @@ int dynload_close(dynload *dl, void *handle);
 
 /*
  * Process-wide context for hosted binaries. Defined only by
- * src/dynload_hosted.c, which freestanding payloads must not link (it has a
+ * src/util/dynload_hosted.c, which freestanding payloads must not link (it has a
  * writable global). First use is not thread-safe.
  */
 dynload *dynload_hosted(void);
@@ -132,4 +132,4 @@ dynload *dynload_hosted(void);
 #define DYNLOAD_HASH_STYLE DYNLOAD_HASH_AUTO
 #endif
 
-#endif /* DYNLOAD_H */
+#endif /* UTIL_DYNLOAD_H */

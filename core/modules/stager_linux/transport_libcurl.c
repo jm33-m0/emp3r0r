@@ -12,10 +12,10 @@
  * self-signed certificates.
  */
 
-#include "debug.h"
-#include "dynload.h"
+#include "util/debug.h"
+#include "util/dynload.h"
 #include "state.h"
-#include "strings.h"
+#include "util/strings.h"
 #include "transport.h"
 
 /* Fixed-width rows (not a pointer array) keep this position-independent. */

@@ -1,5 +1,5 @@
-#ifndef PACKER_H
-#define PACKER_H
+#ifndef UTIL_PACKER_H
+#define UTIL_PACKER_H
 
 #include <stddef.h>
 #include <stdint.h>

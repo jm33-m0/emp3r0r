@@ -1,5 +1,5 @@
-#ifndef C2_UTILS_H
-#define C2_UTILS_H
+#ifndef UTIL_UTILS_H
+#define UTIL_UTILS_H
 
 /*
  * utils.h — freestanding platform helpers shared by the stager and the agent.
@@ -7,13 +7,13 @@
  * Two families live here:
  *   - compile-time mmap/mprotect constants and page helpers, usable anywhere;
  *   - raw-syscall-backed replacements for a handful of libc entry points
- *     (write/close/exit/open/read/mmap/...), implemented in src/system.c.
+ *     (write/close/exit/open/read/mmap/...), implemented in src/util/system.c.
  *
  * The libc replacements are for -nostdlib payloads only. A hosted agent links
- * libc and must not link src/system.c; include this header freely for the
+ * libc and must not link src/util/system.c; include this header freely for the
  * constants, but link the matching source only in freestanding builds.
  *
- * This header intentionally does not re-export strings.h or debug.h: include
+ * This header intentionally does not re-export util/strings.h or util/debug.h: include
  * them directly where their symbols are used.
  */
 
@@ -46,7 +46,7 @@
 #define O_RDONLY 0
 #endif
 
-// Libc replacements (src/system.c). Only for -nostdlib payloads.
+// Libc replacements (src/util/system.c). Only for -nostdlib payloads.
 long write(int fd, const void *buf, size_t count);
 long close(int fd);
 void exit(int error_code);
@@ -56,4 +56,4 @@ void *mmap(void *addr, size_t length, int prot, int flags, int fd, long offset);
 long munmap(void *addr, size_t length);
 long mprotect(void *addr, size_t len, int prot);
 
-#endif /* C2_UTILS_H */
+#endif /* UTIL_UTILS_H */

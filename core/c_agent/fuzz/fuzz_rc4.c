@@ -1,4 +1,4 @@
-#include "rc4.h"
+#include "util/rc4.h"
 
 #include "fuzz_common.h"
 

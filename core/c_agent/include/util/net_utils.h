@@ -1,5 +1,5 @@
-#ifndef NET_UTILS_H
-#define NET_UTILS_H
+#ifndef UTIL_NET_UTILS_H
+#define UTIL_NET_UTILS_H
 
 #include <stddef.h>
 

@@ -1,8 +1,8 @@
 #ifdef DEBUG
 #include <stdarg.h>
 
-#include "debug.h"
-#include "utils.h"
+#include "util/debug.h"
+#include "util/utils.h"
 
 static void put_char(char c) { write(1, &c, 1); }
 

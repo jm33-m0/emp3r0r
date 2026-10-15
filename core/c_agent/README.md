@@ -48,18 +48,21 @@ include/
   c2_secureconn.h  SecureConn framing + key lifecycle
   c2_messages.h    MsgAuth, MsgTunData, Emp3r0rAgent, AgentToken, peers
   c2_transport.h   build config, channel contract, agent session flow
-  dynload.h        runtime dlopen/dlsym from libc + ELF symbol lookup
-  rc4.h            RC4 stream cipher (payload obfuscation)
-  packer.h         build-time config XOR + RC4 key derivation
-  net_utils.h      raw-socket helpers (freestanding payloads)
-  syscalls.h       x86_64 syscall wrappers + ELF types
-  strings.h        freestanding mem/string replacements
-  utils.h          mmap constants + freestanding libc shims
-  debug.h          DEBUG-gated logging macros
+  util/            generic utilities shared with the freestanding stager
+    dynload.h        runtime dlopen/dlsym from libc + ELF symbol lookup
+    rc4.h            RC4 stream cipher (payload obfuscation)
+    packer.h         build-time config XOR + RC4 key derivation
+    net_utils.h      raw-socket helpers (freestanding payloads)
+    syscalls.h       x86_64 syscall wrappers + ELF types
+    strings.h        freestanding mem/string replacements
+    utils.h          mmap constants + freestanding libc shims
+    debug.h          DEBUG-gated logging macros
 src/               protocol layer shared by every provider
+  c2_cbor_util.h   private tinycbor glue shared by the message codecs
 src/crypto/        crypto providers (c2_crypto_<name>.c)
 src/gzip/          gzip providers (c2_gzip_<name>.c)
 src/transport/     transport + HTTP/TLS providers
+src/util/          implementations of include/util/ (debug, dynload, rc4, ...)
 tests/             standalone unit tests (make test)
 fuzz/              LLVMFuzzerTestOneInput targets + fallback runner (make fuzz)
 vendor/tinycbor/   vendored CBOR codec (MIT, Intel tinycbor 7.0)
@@ -67,9 +70,11 @@ vendor/miniz/      vendored DEFLATE/INFLATE gzip backend (MIT, miniz 3.1.2)
 vendor/mbedtls/    vendored self-contained crypto/TLS (Apache-2.0), opt-in
 ```
 
-The `c2_*` headers are the protocol contract. `dynload`, `rc4`, `packer`,
-`strings` and `net_utils` are generic utilities shared with the freestanding
-stager in `core/modules/stager_linux/`, which now includes them from here.
+The `c2_*` headers and sources are the protocol contract. Everything under
+`include/util/` and `src/util/` is a generic utility shared with the
+freestanding stager in `core/modules/stager_linux/`, which includes it from
+here. Utility headers are namespaced under `util/` so a bare name cannot
+shadow a system header (e.g. `util/strings.h` vs `<strings.h>`).
 
 ### Building, testing and fuzzing
 
@@ -167,7 +172,7 @@ matching directory and build with `<GROUP>=<name>`:
 
 The vendored trees are source-only; their `.o`/`.a` files are build artifacts.
 
-`src/system.c` (raw-syscall libc replacements) and `src/strings.c` are linked
+`src/util/system.c` (raw-syscall libc replacements) and `src/util/strings.c` are linked
 only into `-nostdlib` payloads; a hosted binary links libc instead. The fuzz
 targets are `LLVMFuzzerTestOneInput` functions, so `make fuzz CC=clang
 HOSTCC=clang FUZZER=libfuzzer` runs them under libFuzzer where clang is

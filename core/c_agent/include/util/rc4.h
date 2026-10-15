@@ -6,8 +6,8 @@
  * primitive.
  */
 
-#ifndef COMMON_RC4_H
-#define COMMON_RC4_H
+#ifndef UTIL_RC4_H
+#define UTIL_RC4_H
 
 #include <stddef.h>
 #include <stdint.h>
@@ -34,4 +34,4 @@ int rc4_decrypt_alloc(const uint8_t *cipher, size_t cipher_len,
                       const uint8_t *key, size_t key_len, uint8_t **plain,
                       size_t *plain_len);
 
-#endif /* COMMON_RC4_H */
+#endif /* UTIL_RC4_H */

@@ -11,7 +11,7 @@
 
 #include "c2_http_client.h"
 
-#include "dynload.h"
+#include "util/dynload.h"
 
 #include <stdlib.h>
 #include <string.h>

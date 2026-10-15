@@ -13,7 +13,7 @@
 
 #include "c2_secureconn.h"
 
-#include "strings.h"
+#include "util/strings.h"
 
 #include <stdlib.h>
 

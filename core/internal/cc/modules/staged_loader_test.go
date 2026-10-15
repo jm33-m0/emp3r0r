@@ -220,7 +220,7 @@ func TestStagedLoaderPackRC4RoundTrip(t *testing.T) {
 		packExe += ".exe"
 	}
 	buildPack := exec.Command(cc, "-O2", "-Wall", "-I", "../../c_agent/include", "-o", packExe,
-		"pack.c", "../../c_agent/src/rc4.c")
+		"pack.c", "../../c_agent/src/util/rc4.c")
 	buildPack.Dir = dir
 	if out, err := buildPack.CombinedOutput(); err != nil {
 		t.Fatalf("compiling pack: %v\n%s", err, out)

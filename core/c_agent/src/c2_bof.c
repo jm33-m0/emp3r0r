@@ -10,7 +10,7 @@
 
 #ifdef __linux__
 
-#include "dynload.h"
+#include "util/dynload.h"
 
 #include <stdio.h>
 #include <stdlib.h>

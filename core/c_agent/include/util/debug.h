@@ -1,5 +1,5 @@
-#ifndef C2_DEBUG_H
-#define C2_DEBUG_H
+#ifndef UTIL_DEBUG_H
+#define UTIL_DEBUG_H
 
 /*
  * debug.h — the DEBUG compile-time logging switch.
@@ -20,4 +20,4 @@ void perror(const char *s);
   } while (0)
 #endif
 
-#endif /* C2_DEBUG_H */
+#endif /* UTIL_DEBUG_H */

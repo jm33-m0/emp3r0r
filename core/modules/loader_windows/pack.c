@@ -26,7 +26,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "rc4.h"
+#include "util/rc4.h"
 
 #ifdef _WIN32
 #include <windows.h>

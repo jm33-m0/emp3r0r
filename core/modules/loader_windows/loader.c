@@ -65,7 +65,7 @@
 
 #include "config.h"
 #include "ntsys.h"
-#include "rc4.h"
+#include "util/rc4.h"
 #include "stage_abi.h"
 
 #if defined(NTSYS_SMW)

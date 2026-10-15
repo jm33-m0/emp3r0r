@@ -4,7 +4,7 @@
 // mapping, which is then flipped to RX, and jumps to it. See unpack.h for the
 // stub/packer contract.
 
-#include "rc4.h"
+#include "util/rc4.h"
 #include "unpack.h"
 
 /* Header is emitted into the read-only .unpack_header section; pack_rc4.py

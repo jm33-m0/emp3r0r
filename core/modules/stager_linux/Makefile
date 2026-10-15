@@ -194,13 +194,13 @@ DYNLOAD_TRANSPORTS := libcurl libssl
 # that the stub maps, runs, then zeroes and unmaps. It holds the transports
 # and the encoded listener config; the payload stays encrypted while in this
 # blob, so no decryption code is needed here.
-DL_SRCS = downloader.c syscalls_indirect.c $(C2_SRC)/strings.c $(C2_SRC)/system.c \
-          $(C2_SRC)/packer.c $(C2_SRC)/debug.c
+DL_SRCS = downloader.c syscalls_indirect.c $(C2_SRC)/util/strings.c $(C2_SRC)/util/system.c \
+          $(C2_SRC)/util/packer.c $(C2_SRC)/util/debug.c
 ifneq ($(filter $(TRANSPORT),$(SOCKET_TRANSPORTS)),)
-  DL_SRCS += $(C2_SRC)/net_utils.c
+  DL_SRCS += $(C2_SRC)/util/net_utils.c
 endif
 ifneq ($(filter $(TRANSPORT),$(DYNLOAD_TRANSPORTS)),)
-  DL_SRCS += $(C2_SRC)/dynload.c
+  DL_SRCS += $(C2_SRC)/util/dynload.c
 endif
 DL_SRCS += $(TRANSPORT_SRC)
 
@@ -214,9 +214,9 @@ DL_BLOB_H = downloader_blob.h
 # decrypts its own RX view. It resets the shared dynload context with
 # dynload_reset(), so it links dynload.c; --gc-sections drops the unresolved
 # ELF/maps parser the downloader blob carries on its own.
-STUB_SRCS = stub.c syscalls_indirect.c stager_state.c $(C2_SRC)/strings.c \
-            $(C2_SRC)/system.c $(C2_SRC)/rc4.c $(C2_SRC)/debug.c \
-            $(C2_SRC)/dynload.c
+STUB_SRCS = stub.c syscalls_indirect.c stager_state.c $(C2_SRC)/util/strings.c \
+            $(C2_SRC)/util/system.c $(C2_SRC)/util/rc4.c $(C2_SRC)/util/debug.c \
+            $(C2_SRC)/util/dynload.c
 
 STAGE0_TARGET = stager
 SHELLCODE = stager.bin
@@ -227,7 +227,7 @@ SHARED_LIB = stager.so
 # has a stub (unpack_stub_<name>.c) and a matching packer (pack_<name>.py).
 UNPACKER ?= rc4
 ifeq ($(UNPACKER),rc4)
-  UNPACK_SRCS = unpack_stub_rc4.c $(C2_SRC)/rc4.c
+  UNPACK_SRCS = unpack_stub_rc4.c $(C2_SRC)/util/rc4.c
 else
   UNPACK_SRCS = unpack_stub_$(UNPACKER).c
 endif

@@ -5,7 +5,7 @@
  * strings.h.
  */
 
-#include "strings.h"
+#include "util/strings.h"
 
 #include <stdint.h>
 

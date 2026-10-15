@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "packer.h"
+#include "util/packer.h"
 
 /*
  * ABI between the stager stub and the downloader stage.

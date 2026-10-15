@@ -1,4 +1,4 @@
-#include "net_utils.h"
+#include "util/net_utils.h"
 
 #include "fuzz_common.h"
 

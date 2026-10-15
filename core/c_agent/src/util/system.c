@@ -9,8 +9,8 @@
  * freestanding implementation reads a defined value from the varargs list.
  */
 
-#include "syscalls.h"
-#include "utils.h"
+#include "util/syscalls.h"
+#include "util/utils.h"
 
 #include <stdarg.h>
 

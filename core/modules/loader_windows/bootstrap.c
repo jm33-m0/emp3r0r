@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "rc4.h"
+#include "util/rc4.h"
 #include "reflect.h"
 #include "stage_abi.h"
 

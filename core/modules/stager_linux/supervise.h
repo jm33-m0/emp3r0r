@@ -4,8 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "syscalls.h"
-#include "utils.h"
+#include "util/syscalls.h"
+#include "util/utils.h"
 
 /*
  * Optional lifecycle supervision for the stager.

@@ -10,8 +10,8 @@
  */
 
 #include "state.h"
-#include "syscalls.h"
-#include "utils.h"
+#include "util/syscalls.h"
+#include "util/utils.h"
 
 void stager_state_init(void) {
   struct stager_state *st;

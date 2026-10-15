@@ -7,7 +7,7 @@
  * single-threaded startup (or protect it with the caller's own lock).
  */
 
-#include "dynload.h"
+#include "util/dynload.h"
 
 static dynload g_hosted;
 

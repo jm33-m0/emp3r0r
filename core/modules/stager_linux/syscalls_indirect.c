@@ -1,5 +1,5 @@
 #include "state.h"
-#include "syscalls.h"
+#include "util/syscalls.h"
 
 /*
  * The stager caches the vDSO `syscall; ret` gadget in its GS state block (the
