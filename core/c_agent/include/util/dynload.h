@@ -101,11 +101,13 @@ dynload *dynload_hosted(void);
 /* ---- build-time configuration (overridable with -D) ---------------------- */
 
 /*
- * DYNLOAD_MODE selects which libc names to resolve; all of them resolve from
- * libc.so.6 only, never libdl.so.2.
- *   DYNLOAD_MODE_PUBLIC  (0): dlopen/dlsym/dlclose (glibc >= 2.34).
+ * DYNLOAD_MODE selects which libc names to resolve; they are looked up in the
+ * libc segment (glibc's libc.so.6 or the musl loader, see dynload_find_libc),
+ * never in libdl.so.2.
+ *   DYNLOAD_MODE_PUBLIC  (0): dlopen/dlsym/dlclose (glibc >= 2.34 and musl).
  *   DYNLOAD_MODE_LIBC_DL (1): __libc_dlopen_mode/__libc_dlsym/__libc_dlclose
- *                             (glibc < 2.34).
+ *                             (glibc < 2.34; absent on musl, which has no libdl
+ *                             and only exports the public names).
  *   DYNLOAD_MODE_AUTO    (2): resolve libc_dl, falling back to the public
  *                             names when the glibc-internal ones are absent.
  * PUBLIC is the default when the macro is not set, so a plain hosted build

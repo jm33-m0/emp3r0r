@@ -29,6 +29,9 @@ var (
 	// GLIBC_VERSION pins the oldest glibc ABI to link against. It is
 	// independent of DYNLOAD_MODE; 2.17 is the oldest the project supports.
 	CAgentGlibcVersions = []string{"2.17", "2.34"}
+	// LIBC picks the C library the hosted agent links: glibc (pinned via
+	// GLIBC_VERSION) or musl (zig's bundled musl, stable ABI).
+	CAgentLibcs = []string{"glibc", "musl"}
 )
 
 // CAgentProviders selects the providers the built C agent links. Empty fields
@@ -40,6 +43,7 @@ type CAgentProviders struct {
 	Transport string // TRANSPORT=
 	Dynload   string // DYNLOAD_MODE=
 	Glibc     string // GLIBC_VERSION=
+	Libc      string // LIBC=
 }
 
 // cAgentProviderSpec maps one operator choice to its Makefile variable. A
@@ -60,6 +64,7 @@ func cAgentProviderSpecs(p CAgentProviders) []cAgentProviderSpec {
 		{group: "transport", varname: "TRANSPORT", value: p.Transport, allowed: CAgentTransportProviders},
 		{group: "dynload", varname: "DYNLOAD_MODE", value: p.Dynload, allowed: CAgentDynloadModes},
 		{group: "glibc", varname: "GLIBC_VERSION", value: p.Glibc, allowed: CAgentGlibcVersions},
+		{group: "libc", varname: "LIBC", value: p.Libc, allowed: CAgentLibcs},
 	}
 }
 
@@ -133,6 +138,12 @@ func validateCAgentProviders(p CAgentProviders) error {
 		if !valid {
 			return fmt.Errorf("invalid %s provider %q (available: %v)", spec.group, spec.value, spec.allowed)
 		}
+	}
+	// musl has no libdl and no __libc_dl* names: the public dlopen/dlsym/
+	// dlclose are exported by the loader/libc segment itself, so public is the
+	// only mode that can resolve.
+	if p.Libc == "musl" && p.Dynload != "" && p.Dynload != "public" {
+		return fmt.Errorf("libc musl only provides the public dl* symbols; use dynload=public")
 	}
 	return nil
 }

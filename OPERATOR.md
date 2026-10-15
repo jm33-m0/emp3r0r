@@ -226,6 +226,8 @@ The native C agent is a payload type of `generate`. It is built on demand from
 ```bash
 generate --type aquila --cc your.domain.com
 generate --type aquila --cc your.domain.com --crypto mbedtls --gzip none
+# musl target (Alpine and other musl hosts); dynload follows the library
+generate --type aquila --cc your.domain.com --libc musl
 ```
 
 Output: `aquila_linux_<timestamp>`.

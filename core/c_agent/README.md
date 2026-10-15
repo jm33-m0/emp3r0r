@@ -93,20 +93,32 @@ and the agent. The unit tests and fuzzers run under ASan/UBSan, which zig cannot
 link, so they use a host compiler (`gcc`/`clang`); `make test HOSTCC="zig cc"
 SAN=` builds them with zig without sanitizers.
 
-The library and agent link glibc dynamically and pin the oldest ABI to link
-against, so the build uses zig's bundled glibc headers instead of the host's and
-the binary runs on every glibc at or above the pinned version. Two independent
-knobs (also exposed to the operator as `generate --type aquila --glibc-version
-… --dynload …`):
+The hosted agent links a C library dynamically and pins it for portability.
+`LIBC` selects which, and two further knobs tune the glibc build (all exposed
+to the operator as `generate --type aquila --libc … --glibc-version …
+--dynload …`):
 
+- `LIBC` (default `glibc`) picks the C library. `glibc` uses zig's bundled glibc
+  headers instead of the host's, so the build is host-independent. `musl` links
+  dynamically against zig's bundled musl, so the agent runs on any musl host
+  that provides `/lib/ld-musl-<arch>.so.1` (e.g. Alpine).
 - `GLIBC_VERSION` (default `2.17`, the oldest the project supports) pins the
-target ABI.
+  oldest glibc ABI to link against, so the binary runs on every glibc at or
+  above it. Ignored when `LIBC=musl`, since musl keeps a stable ABI.
 - `DYNLOAD_MODE` picks the libc symbols `dynload` resolves: `libc_dl`
   (`__libc_dlopen_mode`, glibc < 2.34), `public` (`dlopen`/`dlsym`/`dlclose`,
-  glibc ≥ 2.34), or `auto` (`libc_dl` with a runtime fallback to the public
-  names, so one binary loads on both). The default is `libc_dl`.
+  glibc ≥ 2.34 and musl), or `auto` (`libc_dl` with a runtime fallback to the
+  public names, so one binary loads on both). The default is `libc_dl` for glibc
+  and `public` for musl. musl supports only `public`: it has no libdl and no
+  `__libc_*` names, and exports `dlopen`/`dlsym`/`dlclose` from its loader/libc
+  segment.
 
-`core/modules/stager_linux` uses the same two knobs.
+Neither library is linked statically: the agent loads libcrypto/libcurl at
+runtime through `dynload`, which needs a dynamic loader and a `/proc/self/maps`
+libc segment. `dynload` finds glibc (`libc.so.6`) and musl
+(`ld-musl-<arch>.so.1`, where musl keeps libc and the loader in one file).
+
+`core/modules/stager_linux` uses the same glibc knobs.
 
 The reference agent loads its build config at startup. The encrypted CBOR blob
 and the build-wide magic string are rendered into a C translation unit by
@@ -136,7 +148,7 @@ the embedded config is encrypted under the C2's own `MagicString`:
 
 ```text
 generate --type aquila --cc your.domain.com
-  --crypto openssl|mbedtls --gzip miniz|none --http libcurl --transport http_poll
+  --libc glibc|musl --crypto openssl|mbedtls --gzip miniz|none --http libcurl --transport http_poll
 ```
 
 ### Provider selection
@@ -147,6 +159,7 @@ providers, selected at build time (the same model as
 
 | Group     | Selector    | Default     | Providers                                                   |
 | --------- | ----------- | ----------- | ----------------------------------------------------------- |
+| Libc      | `LIBC`      | `glibc`     | `glibc` · `musl`                                            |
 | Crypto    | `CRYPTO`    | `openssl`   | `openssl` (system libcrypto via `dynload`) · `mbedtls` (vendored) |
 | Gzip      | `GZIP`      | `miniz`     | `miniz` (vendored) · `none`                                 |
 | HTTP/TLS  | `HTTP`      | `libcurl`   | `libcurl` (system libcurl via `dynload`)                    |

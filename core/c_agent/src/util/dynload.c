@@ -411,6 +411,13 @@ unsigned long dynload_find_libc(unsigned long *end) {
   unsigned long base = maps_find("libc.so", end);
   if (base == 0)
     base = maps_find("libc-", end);
+  /* musl keeps libc and the dynamic loader in a single file, mapped from
+   * /lib/ld-musl-<arch>.so.1 (SONAME libc.musl-<arch>.so.1). The public
+   * dlopen/dlsym/dlclose are exported from that segment. */
+  if (base == 0)
+    base = maps_find("ld-musl", end);
+  if (base == 0)
+    base = maps_find("libc.musl", end);
   return base;
 }
 

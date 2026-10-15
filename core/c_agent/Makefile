@@ -20,22 +20,34 @@ AR ?= ar
 WARN = -Wall -Wextra -Werror -std=c99
 
 # ---- hosted ABI ------------------------------------------------------------
-# The library and agent link glibc dynamically (never statically).
+# LIBC selects the C library the hosted agent and library link:
+#   glibc (default) : glibc, dynamically linked and pinned to GLIBC_VERSION.
+#   musl            : musl, dynamically linked against zig's bundled musl.
+# Neither is ever linked statically: the agent loads libcrypto/libcurl at
+# runtime through dynload, which needs a dynamic loader and a /proc/self/maps
+# libc segment. zig's musl default is a static binary (no loader, no dlopen),
+# so the musl target adds -dynamic.
 #
-# GLIBC_VERSION pins the oldest ABI to link against; zig then uses its bundled
-# glibc headers/stubs for that version, so the build is host-independent and the
-# binary runs on every glibc at or above it (newer host headers otherwise leak
-# in: newer glibc makes strstr a macro and pulls <strings.h> from <string.h>).
+# GLIBC_VERSION pins the oldest glibc ABI to link against; zig then uses its
+# bundled glibc headers/stubs for that version, so the build is host-independent
+# and the binary runs on every glibc at or above it (newer host headers
+# otherwise leak in: newer glibc makes strstr a macro and pulls <strings.h>
+# from <string.h>). It is ignored when LIBC=musl: musl keeps a stable ABI, so
+# the agent runs on any musl host that provides /lib/ld-musl-<arch>.so.1.
 #
 # DYNLOAD_MODE picks which libc symbols dynload resolves at runtime:
 #   libc_dl : __libc_dlopen_mode/__libc_dlsym/__libc_dlclose (glibc < 2.34)
 #   public  : dlopen/dlsym/dlclose (moved into libc.so.6 in glibc 2.34)
 #   auto    : resolve libc_dl, then fall back to the public names
-# The two knobs are independent: a binary linked for an older ABI still runs on
-# newer glibc, and any symbol set can be paired with any target version. The
-# default pair (2.17 + libc_dl) covers the widest range of old systems; use
-# DYNLOAD_MODE=auto to build one binary that loads on both old and new glibc.
-DYNLOAD_MODE ?= libc_dl
+# musl only exports the public names (from the loader itself, no libdl), so
+# LIBC=musl defaults DYNLOAD_MODE to public.
+LIBC ?= glibc
+ifeq ($(LIBC),musl)
+  DYNLOAD_MODE ?= public
+else
+  DYNLOAD_MODE ?= libc_dl
+endif
+
 ifeq ($(DYNLOAD_MODE),public)
   DYNLOAD_MODE_CFLAG = -DDYNLOAD_MODE=0
   GLIBC_VERSION ?= 2.34
@@ -46,7 +58,27 @@ else
   DYNLOAD_MODE_CFLAG = -DDYNLOAD_MODE=1
   GLIBC_VERSION ?= 2.17
 endif
-HOSTED_TARGET ?= -target x86_64-linux-gnu.$(GLIBC_VERSION)
+
+# The two glibc knobs are independent: a binary linked for an older ABI still
+# runs on newer glibc, and any symbol set can be paired with any target version.
+# The default glibc pair (2.17 + libc_dl) covers the widest range of old
+# systems; use DYNLOAD_MODE=auto to build one binary that loads on both old and
+# new glibc.
+
+# musl has no libdl and no __libc_dlopen_mode/__libc_dlsym/__libc_dlclose: the
+# public dlopen/dlsym/dlclose are exported by the loader/libc segment itself
+# (see dynload_find_libc), so public is the only mode that can work.
+ifeq ($(LIBC),musl)
+  ifneq ($(DYNLOAD_MODE),public)
+    $(error LIBC=musl only supports DYNLOAD_MODE=public, got '$(DYNLOAD_MODE)')
+  endif
+endif
+
+ifeq ($(LIBC),musl)
+  HOSTED_TARGET ?= -target x86_64-linux-musl -dynamic
+else
+  HOSTED_TARGET ?= -target x86_64-linux-gnu.$(GLIBC_VERSION)
+endif
 HOSTED_CFLAGS = $(HOSTED_TARGET) $(DYNLOAD_MODE_CFLAG)
 
 # ---- provider selection ----------------------------------------------------

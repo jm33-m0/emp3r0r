@@ -17,13 +17,16 @@ func CmdGenerateCAgent(cmd *cobra.Command) {
 		CCHTTPPort:    getStringOptPtr(cmd, "cc-http-port"),
 		C2ChannelMode: getStringOptPtr(cmd, "c2-channel-mode"),
 	}
+	libc := flagString(cmd, "libc")
+	dynload := cAgentDynloadForLibc(libc, flagString(cmd, "dynload"), cmd.Flags().Changed("dynload"))
 	providers := builder.CAgentProviders{
 		Crypto:    flagString(cmd, "crypto"),
 		Gzip:      flagString(cmd, "gzip"),
 		HTTP:      flagString(cmd, "http"),
 		Transport: flagString(cmd, "transport"),
-		Dynload:   flagString(cmd, "dynload"),
+		Dynload:   dynload,
 		Glibc:     flagString(cmd, "glibc-version"),
+		Libc:      libc,
 	}
 
 	res, err := builder.GenerateCAgentWorkflow(opts, providers, client.SignAgent)
@@ -40,4 +43,15 @@ func CmdGenerateCAgent(cmd *cobra.Command) {
 func flagString(cmd *cobra.Command, name string) string {
 	v, _ := cmd.Flags().GetString(name)
 	return v
+}
+
+// cAgentDynloadForLibc follows the selected libc when the operator did not pick
+// a dynload mode. The --dynload default targets glibc, but musl only exports
+// the public dl* names, so an unset mode becomes public for a musl build rather
+// than failing validation on the glibc default.
+func cAgentDynloadForLibc(libc, dynload string, dynloadSet bool) string {
+	if libc == "musl" && !dynloadSet {
+		return "public"
+	}
+	return dynload
 }
