@@ -27,6 +27,7 @@ func CmdGenerateCAgent(cmd *cobra.Command) {
 		Dynload:   dynload,
 		Glibc:     flagString(cmd, "glibc-version"),
 		Libc:      libc,
+		Format:    flagString(cmd, "format"),
 	}
 
 	res, err := builder.GenerateCAgentWorkflow(opts, providers, client.SignAgent)

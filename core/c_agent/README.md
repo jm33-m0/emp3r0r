@@ -81,6 +81,7 @@ shadow a system header (e.g. `util/strings.h` vs `<strings.h>`).
 ```sh
 make -C core/c_agent lib             # hosted static library (libc2agent.a)
 make -C core/c_agent agent           # hosted reference agent executable
+make -C core/c_agent so              # hosted shared object (c2_agent.so, PIC)
 make -C core/c_agent test            # unit tests (gcc + ASan/UBSan)
 make -C core/c_agent coverage        # gcov line coverage per source
 make -C core/c_agent test-mbedtls    # self-contained mbedTLS backend tests
@@ -119,6 +120,23 @@ libc segment. `dynload` finds glibc (`libc.so.6`) and musl
 (`ld-musl-<arch>.so.1`, where musl keeps libc and the loader in one file).
 
 `core/modules/stager_linux` uses the same glibc knobs.
+
+### Artifact formats
+
+The same agent is emitted in three formats (also exposed to the operator as
+`generate --type aquila --format exe|so|shellcode`):
+
+- `agent` — a hosted executable.
+- `so` — a PIC `ET_DYN` shared object exporting `main`, for `dlopen`/
+  injection.
+- `shellcode` — the shared object passed through malasada into a raw PIC
+  (`<name>.bin`) blob that a stager/loader maps and enters.
+
+The `.so` keeps a `PT_NOTE` (build-id) on purpose: malasada repurposes
+`PT_NOTE`/`PT_GNU_EH_FRAME` into its stage0 executable segment, and the
+release executable's `--build-id=none` + `-fno-unwind-tables` would leave it
+with neither. `so` and `shellcode` still link the C library dynamically, so
+they load `libcrypto`/`libcurl` from the host process just like the executable.
 
 The reference agent loads its build config at startup. The encrypted CBOR blob
 and the build-wide magic string are rendered into a C translation unit by

@@ -153,7 +153,7 @@ TEST_CFLAGS = $(WARN) -O1 -g $(INCLUDES) $(SAN) $(COV)
 
 BUILD = build
 
-.PHONY: all lib agent test test-mbedtls vendor-mbedtls fuzz coverage clean
+.PHONY: all lib agent so test test-mbedtls vendor-mbedtls fuzz coverage clean
 
 all: lib
 
@@ -226,6 +226,24 @@ $(BUILD)/c2_agent: $(AGENT_SRC) $(EXTRA_LIBS) | $(BUILD)
 	  $(AGENT_SRC) $(EXTRA_LIBS) -o $@
 	@command -v $(STRIP) >/dev/null 2>&1 && \
 	  $(STRIP) --remove-section=.comment $@ || true
+
+# ---- shared object ---------------------------------------------------------
+# The same agent as a PIC ET_DYN, for in-process loading (dlopen/injection) and
+# as the input to malasada (raw PIC). main stays exported in .dynsym (see
+# c2_agent.c); -Wl,-u,main keeps it even with --gc-sections, and a normal
+# -s strip keeps .dynsym while dropping the rest. Unlike the executable, the
+# shared object keeps a PT_NOTE (build-id): malasada repurposes a PT_NOTE or
+# PT_GNU_EH_FRAME into the executable segment for its stage0 stub, and the
+# release flags (-fno-unwind-tables / --build-id=none) otherwise remove both.
+AGENT_SO_CFLAGS = $(AGENT_CFLAGS) -fPIC
+AGENT_SO_LDFLAGS = -shared -Wl,--gc-sections -Wl,--build-id \
+                   -Wl,-z,noexecstack -Wl,-u,main -s
+
+so: $(BUILD)/c2_agent.so
+
+$(BUILD)/c2_agent.so: $(AGENT_SRC) $(EXTRA_LIBS) | $(BUILD)
+	$(CC) $(WARN) $(AGENT_SO_CFLAGS) $(INCLUDES) $(HOSTED_CFLAGS) \
+	  $(AGENT_SO_LDFLAGS) $(AGENT_SRC) $(EXTRA_LIBS) -o $@
 
 # ---- unit tests ------------------------------------------------------------
 # test_dynload needs the real dynamic loader and libc, so it is not linked with

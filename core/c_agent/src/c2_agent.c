@@ -803,7 +803,10 @@ static void dispatch(const c2_msgtun *m, c2_agent_session *s, c2_memfile *mem,
 /* main */
 /* ------------------------------------------------------------------------- */
 
-int main(void) {
+/* Exported so a shared-object build (and malasada's raw PIC) can resolve the
+ * entry from .dynsym; the agent is built with -fvisibility=hidden, which would
+ * otherwise drop it. Harmless for the executable. */
+__attribute__((visibility("default"))) int main(void) {
   TRACE("[agent] start\n");
   c2_crypto_backend *be = c2_crypto_open();
   if (be == NULL) {

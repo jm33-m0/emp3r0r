@@ -228,9 +228,11 @@ generate --type aquila --cc your.domain.com
 generate --type aquila --cc your.domain.com --crypto mbedtls --gzip none
 # musl target (Alpine and other musl hosts); dynload follows the library
 generate --type aquila --cc your.domain.com --libc musl
+# artifact formats: exe (default), so (dlopen/injection), shellcode (malasada PIC)
+generate --type aquila --cc your.domain.com --format so
 ```
 
-Output: `aquila_linux_<timestamp>`.
+Output: `aquila_linux_<timestamp>` (`.so` / `.bin` for `--format so` / `--format shellcode`).
 
 Mesh nodes may run different transports. Each agent advertises the transport and
 port its relay listens on, and dialers always use the _peer's_ advertised

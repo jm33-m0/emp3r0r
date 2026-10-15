@@ -648,12 +648,13 @@ func gen_agent_cmd() *cobra.Command {
 	// linked in; these are ignored for every other payload type.
 	genAgentCmd.Flags().StringP("crypto", "", builder.CAgentCryptoProviders[0], fmt.Sprintf("C agent (--type c_linux) crypto provider. Available: %v", builder.CAgentCryptoProviders))
 	genAgentCmd.Flags().StringP("libc", "", builder.CAgentLibcs[0], fmt.Sprintf("C agent (--type c_linux) C library to link. Available: %v", builder.CAgentLibcs))
+	genAgentCmd.Flags().StringP("format", "", builder.CAgentFormats[0], fmt.Sprintf("C agent (--type c_linux) output format. Available: %v", builder.CAgentFormats))
 	genAgentCmd.Flags().StringP("gzip", "", builder.CAgentGzipProviders[0], fmt.Sprintf("C agent (--type c_linux) compression provider. Available: %v", builder.CAgentGzipProviders))
 	genAgentCmd.Flags().StringP("http", "", builder.CAgentHTTPProviders[0], fmt.Sprintf("C agent (--type c_linux) HTTP(S) client provider. Available: %v", builder.CAgentHTTPProviders))
 	genAgentCmd.Flags().StringP("transport", "", builder.CAgentTransportProviders[0], fmt.Sprintf("C agent (--type c_linux) transport provider. Available: %v", builder.CAgentTransportProviders))
 	genAgentCmd.Flags().StringP("dynload", "", builder.CAgentDynloadModes[0], fmt.Sprintf("C agent (--type c_linux) libc dynamic-loader symbols. Available: %v", builder.CAgentDynloadModes))
 	genAgentCmd.Flags().StringP("glibc-version", "", builder.CAgentGlibcVersions[0], fmt.Sprintf("C agent (--type c_linux) oldest glibc ABI to link against. Available: %v", builder.CAgentGlibcVersions))
-	addFlagToGroup("C Agent Options (--type aquila)", "crypto", "libc", "gzip", "http", "transport", "dynload", "glibc-version")
+	addFlagToGroup("C Agent Options (--type aquila)", "crypto", "libc", "format", "gzip", "http", "transport", "dynload", "glibc-version")
 
 	// Force user to specify CC address
 	genAgentCmd.MarkFlagRequired("cc")
@@ -758,6 +759,7 @@ Example:
 		"c2-channel-mode": carapace.ActionValues(transport.AllC2ChannelModes()...),
 		"crypto":          carapace.ActionValues(builder.CAgentCryptoProviders...),
 		"libc":            carapace.ActionValues(builder.CAgentLibcs...),
+		"format":          carapace.ActionValues(builder.CAgentFormats...),
 		"gzip":            carapace.ActionValues(builder.CAgentGzipProviders...),
 		"http":            carapace.ActionValues(builder.CAgentHTTPProviders...),
 		"transport":       carapace.ActionValues(builder.CAgentTransportProviders...),

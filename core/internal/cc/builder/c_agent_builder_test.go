@@ -1,7 +1,9 @@
 package builder
 
 import (
+	"bytes"
 	"debug/elf"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -51,11 +53,25 @@ func TestCAgentBuildArgsOmitsEmptyProviders(t *testing.T) {
 	}
 }
 
+func TestCAgentBuildTarget(t *testing.T) {
+	for format, want := range map[string]string{
+		"":          "agent",
+		"exe":       "agent",
+		"so":        "so",
+		"shellcode": "so",
+	} {
+		args := cAgentBuildArgs("/src", "/cfg", CAgentProviders{Format: format})
+		if args[2] != want {
+			t.Errorf("format %q builds target %q, want %q", format, args[2], want)
+		}
+	}
+}
+
 func TestValidateCAgentProviders(t *testing.T) {
 	if err := validateCAgentProviders(CAgentProviders{}); err != nil {
 		t.Fatalf("empty providers should be valid (Makefile defaults): %v", err)
 	}
-	valid := CAgentProviders{Crypto: "openssl", Gzip: "miniz", HTTP: "libcurl", Transport: "http_poll", Dynload: "auto", Glibc: "2.17", Libc: "glibc"}
+	valid := CAgentProviders{Crypto: "openssl", Gzip: "miniz", HTTP: "libcurl", Transport: "http_poll", Dynload: "auto", Glibc: "2.17", Libc: "glibc", Format: "so"}
 	if err := validateCAgentProviders(valid); err != nil {
 		t.Fatalf("valid providers rejected: %v", err)
 	}
@@ -73,6 +89,7 @@ func TestValidateCAgentProviders(t *testing.T) {
 		{Libc: "uclibc"},
 		{Libc: "musl", Dynload: "libc_dl"},
 		{Libc: "musl", Dynload: "auto"},
+		{Format: "elf"},
 	} {
 		if err := validateCAgentProviders(bad); err == nil {
 			t.Errorf("expected error for %+v", bad)
@@ -170,4 +187,60 @@ func elfInterp(path string) (string, error) {
 		return strings.TrimRight(string(buf), "\x00"), nil
 	}
 	return "", nil
+}
+
+// TestGenerateCAgentFormats exercises the shared-object and raw-PIC formats for
+// real: the `.so` must be a PIC ET_DYN exporting `main`, and the shellcode must
+// be malasada-wrapped (not the bare ELF).
+func TestGenerateCAgentFormats(t *testing.T) {
+	setupCAgentBuildEnv(t)
+
+	so, err := GenerateCAgentWorkflow(AgentConfig{}, CAgentProviders{Format: "so"}, nil)
+	if err != nil {
+		t.Fatalf("GenerateCAgentWorkflow(so): %v", err)
+	}
+	if !strings.HasSuffix(so.OutputFile, ".so") {
+		t.Fatalf("so output name = %q, want .so", so.OutputFile)
+	}
+	f, err := elf.Open(so.OutputFile)
+	if err != nil {
+		t.Fatalf("open so: %v", err)
+	}
+	if f.Type != elf.ET_DYN {
+		t.Errorf("so ELF type = %v, want ET_DYN", f.Type)
+	}
+	syms, err := f.DynamicSymbols()
+	if err != nil {
+		t.Errorf("read .dynsym: %v", err)
+	} else if !hasElfSymbol(syms, "main") {
+		t.Errorf("%s does not export main in .dynsym", so.OutputFile)
+	}
+	_ = f.Close()
+
+	sc, err := GenerateCAgentWorkflow(AgentConfig{}, CAgentProviders{Format: "shellcode"}, nil)
+	if err != nil {
+		t.Fatalf("GenerateCAgentWorkflow(shellcode): %v", err)
+	}
+	if !strings.HasSuffix(sc.OutputFile, ".bin") {
+		t.Fatalf("shellcode output name = %q, want .bin", sc.OutputFile)
+	}
+	data, err := os.ReadFile(sc.OutputFile)
+	if err != nil {
+		t.Fatalf("read shellcode: %v", err)
+	}
+	if len(data) == 0 {
+		t.Fatal("shellcode is empty")
+	}
+	if bytes.HasPrefix(data, []byte{0x7f, 'E', 'L', 'F'}) {
+		t.Fatal("shellcode is a bare ELF, want malasada-wrapped raw PIC")
+	}
+}
+
+func hasElfSymbol(syms []elf.Symbol, name string) bool {
+	for _, s := range syms {
+		if s.Name == name {
+			return true
+		}
+	}
+	return false
 }
