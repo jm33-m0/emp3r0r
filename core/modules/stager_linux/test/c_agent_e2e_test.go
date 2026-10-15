@@ -33,12 +33,23 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-// TestCAgentEndToEnd drives the native C agent against the real Go C2: it
-// builds core/c_agent's reference agent with an encrypted config generated at
-// build time, runs it, and requires a full check-in, a command round-trip and
-// transparent memfs file IO. This is the C agent's real-world interoperability
-// test.
+// TestCAgentEndToEnd drives the native C agent against the real Go C2 in every
+// deliverable form: it builds core/c_agent's reference agent (executable and
+// malasada raw PIC) with an encrypted config generated at build time, runs it,
+// and requires a full check-in, a command round-trip and transparent memfs file
+// IO. This is the C agent's real-world interoperability test.
 func TestCAgentEndToEnd(t *testing.T) {
+	for _, format := range []string{"exe", "shellcode"} {
+		t.Run(format, func(t *testing.T) {
+			runCAgentEndToEnd(t, format)
+		})
+	}
+}
+
+// runCAgentEndToEnd is the shared body for one agent format. format selects the
+// artifact the builder produces (exe or shellcode) and how it is launched: an
+// executable directly, or a raw PIC blob through a small mmap launcher.
+func runCAgentEndToEnd(t *testing.T, format string) {
 	if os.Getenv("CGO_ENABLED") != "1" {
 		t.Skip("Skipping test: CGO_ENABLED is not set to 1")
 	}
@@ -112,7 +123,7 @@ func TestCAgentEndToEnd(t *testing.T) {
 
 	// Build through the real operator path (generate --type aquila): config
 	// rendering, writable-source staging and the zig build are all exercised.
-	agentBin := buildCAgent(t, tmpDir)
+	agentArgv := buildCAgent(t, tmpDir, format)
 
 	// --- Start the real C2 ---
 	server.OPERATORS.Store("dummy", nil)
@@ -132,7 +143,7 @@ func TestCAgentEndToEnd(t *testing.T) {
 
 	// --- Run the C agent ---
 	var agentOut bytes.Buffer
-	cmd := exec.Command(agentBin)
+	cmd := exec.Command(agentArgv[0], agentArgv[1:]...)
 	cmd.Env = append(os.Environ(), "HOME="+tmpDir)
 	cmd.Stdout = &agentOut
 	cmd.Stderr = &agentOut
@@ -302,8 +313,12 @@ func hostBOFModules(t *testing.T) {
 	}
 	ww := t.TempDir()
 	paths.WWWRoot = ww
-	host := func(moduleDir, src, hosted string) {
-		build := exec.Command("make", "-C", filepath.Join(coreDir, moduleDir))
+	host := func(moduleDir, src, hosted string, extraArgs ...string) {
+		// -B forces a rebuild: the module Makefiles have no libc in their
+		// dependency graph, so a switch (e.g. glibc <-> musl) must not reuse a
+		// stale object from a previous run.
+		args := append([]string{"-B", "-C", filepath.Join(coreDir, moduleDir)}, extraArgs...)
+		build := exec.Command("make", args...)
 		if out, berr := build.CombinedOutput(); berr != nil {
 			t.Skipf("build %s: %v\n%s", moduleDir, berr, out)
 		}
@@ -319,8 +334,15 @@ func hostBOFModules(t *testing.T) {
 			t.Fatalf("host %s: %v", hosted, werr)
 		}
 	}
-	host("modules/coffloader_linux", "coffloader_linux.so", "coffloader_linux.amd64.gz")
-	host("modules/hello_linux", "hello_linux.o", "hello_linux.amd64.gz")
+	// The C agent maps these modules in-process, so they must match its libc.
+	coffArgs := []string{}
+	helloArgs := []string{}
+	if cAgentTestLibc() == "musl" {
+		coffArgs = append(coffArgs, "ZIG_TARGET=x86_64-linux-musl")
+		helloArgs = append(helloArgs, "CC=zig cc -target x86_64-linux-musl")
+	}
+	host("modules/coffloader_linux", "coffloader_linux.so", "coffloader_linux.amd64.gz", coffArgs...)
+	host("modules/hello_linux", "hello_linux.o", "hello_linux.amd64.gz", helloArgs...)
 }
 
 // startCAgentOperator connects a minimal operator message tunnel to the C2 and
@@ -357,9 +379,13 @@ func startCAgentOperator(t *testing.T, opPort int) {
 	time.Sleep(4 * time.Second)
 }
 
-// (builder.GenerateCAgentWorkflow), so the test covers the writable-source
-// staging, config rendering and the embedded build the operator uses.
-func buildCAgent(t *testing.T, tmpDir string) string {
+// buildCAgent builds core/c_agent's reference agent in the requested format
+// with the encrypted CBOR config and magic string rendered as a C translation
+// unit (lib/cagent), and returns the argv that launches it. Nothing is patched
+// after linking: the Makefile compiles the exact config for this target. A
+// shellcode build is a malasada raw PIC blob, so it is launched through a tiny
+// mmap loader (buildPICLoader).
+func buildCAgent(t *testing.T, tmpDir, format string) []string {
 	t.Helper()
 	coreDir, err := filepath.Abs(filepath.Join("..", "..", ".."))
 	if err != nil {
@@ -368,15 +394,88 @@ func buildCAgent(t *testing.T, tmpDir string) string {
 	live.EmpDataDir = coreDir
 	live.EmpWorkSpace = tmpDir
 	ccAddr := "127.0.0.1"
+	libc := cAgentTestLibc()
+	// auto resolves __libc_dlopen_mode then falls back to dlopen, so a glibc
+	// agent built on a modern host can still load libcrypto. musl only exports
+	// the public names.
+	dynload := "auto"
+	if libc == "musl" {
+		dynload = "public"
+	}
 	res, err := builder.GenerateCAgentWorkflow(
 		builder.AgentConfig{CCAddress: &ccAddr},
-		// auto resolves __libc_dlopen_mode then falls back to dlopen, so the
-		// agent built on this (modern glibc) host can still load libcrypto.
-		builder.CAgentProviders{Dynload: "auto"},
+		builder.CAgentProviders{Dynload: dynload, Format: format, Libc: libc},
 		func(u string) (string, error) { return signUUID(u, transport.CaKeyFile) },
 	)
 	if err != nil {
-		t.Fatalf("GenerateCAgentWorkflow: %v", err)
+		t.Fatalf("GenerateCAgentWorkflow(%s): %v", format, err)
 	}
-	return res.OutputFile
+	if format == "shellcode" {
+		return []string{buildPICLoader(t, tmpDir), res.OutputFile}
+	}
+	return []string{res.OutputFile}
+}
+
+// cAgentTestLibc is the C library the e2e links the agent (and its BOF modules)
+// against. Empty keeps the Makefile default (glibc); CI sets
+// EMP3R0R_CAGENT_LIBC=musl to run the whole test on an Alpine host.
+func cAgentTestLibc() string { return os.Getenv("EMP3R0R_CAGENT_LIBC") }
+
+// picLoaderSource maps a malasada raw PIC blob executable and enters it. The
+// blob carries malasada's own stage0, which maps the wrapped payload and jumps
+// to it, so the loader only has to map the blob RX and call it.
+const picLoaderSource = `#define _GNU_SOURCE
+#include <fcntl.h>
+#include <stdio.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+int main(int argc, char **argv) {
+  if (argc < 2) {
+    fprintf(stderr, "usage: %s <pic.bin>\n", argv[0]);
+    return 2;
+  }
+  int fd = open(argv[1], O_RDONLY);
+  if (fd < 0) {
+    perror("open");
+    return 2;
+  }
+  struct stat st;
+  if (fstat(fd, &st) != 0) {
+    perror("fstat");
+    return 2;
+  }
+  void *p = mmap(NULL, (size_t)st.st_size, PROT_READ | PROT_WRITE,
+                 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  if (p == MAP_FAILED) {
+    perror("mmap");
+    return 2;
+  }
+  if (read(fd, p, (size_t)st.st_size) != st.st_size) {
+    perror("read");
+    return 2;
+  }
+  if (mprotect(p, (size_t)st.st_size, PROT_READ | PROT_EXEC) != 0) {
+    perror("mprotect");
+    return 2;
+  }
+  ((void (*)(void))p)();
+  return 0;
+}
+`
+
+// buildPICLoader compiles the raw-PIC launcher and returns its path.
+func buildPICLoader(t *testing.T, dir string) string {
+	t.Helper()
+	src := filepath.Join(dir, "pic_loader.c")
+	if err := os.WriteFile(src, []byte(picLoaderSource), 0o600); err != nil {
+		t.Fatalf("write pic loader: %v", err)
+	}
+	out := filepath.Join(dir, "pic_loader")
+	build := exec.Command("zig", "cc", "-O2", "-o", out, src)
+	if buildOut, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("build pic loader: %v\n%s", err, buildOut)
+	}
+	return out
 }
