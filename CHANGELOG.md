@@ -1,5 +1,34 @@
 # Changelog
 
+## [5.3.0](https://github.com/jm33-m0/emp3r0r/compare/v5.2.2...v5.3.0) (2026-10-16)
+
+
+### Features
+
+* **agent:** experimental C agent headers ([f4cffb6](https://github.com/jm33-m0/emp3r0r/commit/f4cffb62566a8733b123a5263fd3fe6aaf8cc252))
+* **agent:** use tinycbor ([7687b95](https://github.com/jm33-m0/emp3r0r/commit/7687b950ebf6839da2e3f595cd7d7f909ac79936))
+* **bof:** linux agent now doesn't ship bof loader. the old CGO loader is a module like coffloader ([4bd6a5b](https://github.com/jm33-m0/emp3r0r/commit/4bd6a5b3356ffb6c61a224c1053cd7a05cbaf252))
+* **c_agent:** `so` format and PIC (malasada) ([375518d](https://github.com/jm33-m0/emp3r0r/commit/375518d1d0f7c34f4d911e25bc43d939900b8428))
+* **c_agent:** C agent builder ([50a25f0](https://github.com/jm33-m0/emp3r0r/commit/50a25f074f31cbcd92ea333780ac4eeef71a43ac))
+* **c_agent:** implement basic c2 functions ([de49a48](https://github.com/jm33-m0/emp3r0r/commit/de49a4883884904cae1ff41ee843694ca861c72a))
+* **c_agent:** introducing C agent for emp3r0r (WIP) ([11f751c](https://github.com/jm33-m0/emp3r0r/commit/11f751c5cd8f0403d2a850ebd61bb4afff7ff645))
+* **c_agent:** musl libc ([917d49f](https://github.com/jm33-m0/emp3r0r/commit/917d49f60a115d1e9be1d758d0e5073def8d69d7))
+* **c2:** standardize c2 protocol ([bf6fe64](https://github.com/jm33-m0/emp3r0r/commit/bf6fe649a949a1e6d7a0b301e15b8165793b5aab))
+
+
+### Bug Fixes
+
+* **c_agent:** `getgroups` returns empty string ([cff0864](https://github.com/jm33-m0/emp3r0r/commit/cff08642d27325a45178358846d19d692170d1be))
+* **c_agent:** BOF relocation issue ([4feb823](https://github.com/jm33-m0/emp3r0r/commit/4feb823ceb5e739ef914ade201ea0aff90fcc22f))
+* **c_agent:** decoder bug ([afda52e](https://github.com/jm33-m0/emp3r0r/commit/afda52e1bc613d81482d1c83f42ddde683251478))
+* **c_agent:** increase test/fuzz coverage and improve robustness ([2f1d5ea](https://github.com/jm33-m0/emp3r0r/commit/2f1d5ead0d4f1f1c4876395472860c5df39c41e1))
+* **c_agent:** openssl not found in older environments ([f642007](https://github.com/jm33-m0/emp3r0r/commit/f642007ff3981e08581e7a9db8173079acacea60))
+* **c_agent:** remove `memfd` bullshit introduced by AI slop ([21d94ef](https://github.com/jm33-m0/emp3r0r/commit/21d94efd34ef31b25be0e6a78fefd5b1cac7e708))
+* **c_agent:** sysinfo ([7e754c3](https://github.com/jm33-m0/emp3r0r/commit/7e754c3b0f13ae93ee2814652fb5d1af4dba1b33))
+* **dynload:** improve robustness of dynload ([7fb72fe](https://github.com/jm33-m0/emp3r0r/commit/7fb72fe7f098d60ea1408a51f1e97d84d5b5aaf0))
+* **glibc:** configurable glibc version and libdl method ([fee650e](https://github.com/jm33-m0/emp3r0r/commit/fee650e380f123681ac579397f5a6b3ff69ea07f))
+* **module:** BOF flags passed to local build command ([1288a36](https://github.com/jm33-m0/emp3r0r/commit/1288a366a53d71ea84aa2a8cc00fcd823b18f65e))
+
 ## [5.2.2](https://github.com/jm33-m0/emp3r0r/compare/v5.2.1...v5.2.2) (2026-10-11)
 
 
