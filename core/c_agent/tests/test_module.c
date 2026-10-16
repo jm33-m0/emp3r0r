@@ -84,5 +84,58 @@ int main(void) {
                                  tokens, &tokenc, 8, tbuf, sizeof(tbuf),
                                  &tbuf_used) != C2_OK);
 
+  /* Regression: a truncated 64-bit integer inside an argument map. The decoder
+   * used to re-enter the desynchronised map after a tinycbor error and read
+   * out of bounds (minimized libFuzzer artifact a1 04 a2 02 8f bf 00 00 1b). */
+  {
+    static const uint8_t bad[] = {0xa1, 0x04, 0xa2, 0x02, 0x8f, 0xbf,
+                                  0x00, 0x00, 0x1b};
+    char bad_b64[64];
+    size_t n = c2_base64url_encode(bad, sizeof(bad), bad_b64, sizeof(bad_b64));
+    CHECK(n > 0);
+    CHECK(c2_coff_invocation_parse(bad_b64, n, export_name,
+                                   sizeof(export_name), tokens, &tokenc, 8,
+                                   tbuf, sizeof(tbuf), &tbuf_used) != C2_OK);
+  }
+
+  /* A zero-length export buffer must be accepted without writing through it
+   * (regression: `export_cap - 1` underflowed to SIZE_MAX). */
+  {
+    char one = 'X';
+    CHECK(c2_coff_invocation_parse(b64, b64_len, &one, 0, tokens, &tokenc, 8,
+                                   tbuf, sizeof(tbuf), &tbuf_used) == C2_OK);
+    CHECK(one == 'X');
+  }
+
+  /* Regression: NaN/out-of-range float or double arguments must be rejected,
+   * not cast to int64 (undefined behaviour) and not read with the wrong
+   * tinycbor getter. `fb`/`fa` encode a double/float NaN; a finite float is
+   * still accepted. */
+  {
+    static const uint8_t nan_double[] = {
+        0xa1, 0x04, 0xa2, 0x01, 0x62, 0x67, 0x6f, 0x02, 0x81, 0xa2,
+        0x01, 0x61, 0x73, 0x02, 0xfb, 0x7f, 0xf8, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00};
+    static const uint8_t nan_float[] = {
+        0xa1, 0x04, 0xa2, 0x01, 0x62, 0x67, 0x6f, 0x02, 0x81, 0xa2,
+        0x01, 0x61, 0x73, 0x02, 0xfa, 0x7f, 0xc0, 0x00, 0x00};
+    static const uint8_t inf_double[] = {
+        0xa1, 0x04, 0xa2, 0x01, 0x62, 0x67, 0x6f, 0x02, 0x81, 0xa2,
+        0x01, 0x61, 0x73, 0x02, 0xfb, 0x7f, 0xf0, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00};
+    const uint8_t *cases[] = {nan_double, nan_float, inf_double};
+    const size_t lens[] = {sizeof(nan_double), sizeof(nan_float),
+                           sizeof(inf_double)};
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+      char bad_b64[64];
+      size_t n =
+          c2_base64url_encode(cases[i], lens[i], bad_b64, sizeof(bad_b64));
+      CHECK(n > 0);
+      CHECK(c2_coff_invocation_parse(bad_b64, n, export_name,
+                                     sizeof(export_name), tokens, &tokenc, 8,
+                                     tbuf, sizeof(tbuf), &tbuf_used) != C2_OK);
+    }
+  }
+
   TEST_DONE();
 }

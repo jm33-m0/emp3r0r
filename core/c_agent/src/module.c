@@ -20,6 +20,7 @@
 
 #include "cbor.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -79,8 +80,19 @@ static c2_status coff_arg_token(CborValue *v, char wire, char *buf, size_t cap,
         return st;
     } else if (cbor_value_is_double(v) || cbor_value_is_float(v)) {
       double d = 0;
-      if (cbor_value_get_double(v, &d) != CborNoError)
-        return C2_ERR_PROTO;
+      if (cbor_value_is_double(v)) {
+        if (cbor_value_get_double(v, &d) != CborNoError)
+          return C2_ERR_PROTO;
+      } else {
+        float f = 0;
+        if (cbor_value_get_float(v, &f) != CborNoError)
+          return C2_ERR_PROTO;
+        d = f;
+      }
+      /* A hostile float argument can be NaN or out of int64 range; casting
+       * either is undefined behaviour, so reject instead of converting. */
+      if (!isfinite(d) || d < (double)INT64_MIN || d >= (double)INT64_MAX)
+        return C2_ERR_OVERFLOW;
       n = (int64_t)d;
       if ((st = c2_cbor_dc(cbor_value_advance(v))) != C2_OK)
         return st;
@@ -127,7 +139,8 @@ c2_status c2_coff_invocation_parse(const char *b64, size_t b64len,
     return C2_ERR_ARG;
   *tokenc = 0;
   *buf_used = 0;
-  export_name[0] = '\0';
+  if (export_cap > 0)
+    export_name[0] = '\0';
 
   size_t raw_cap = b64len / 4 * 3 + 4;
   uint8_t *raw = (uint8_t *)malloc(raw_cap);
@@ -178,7 +191,7 @@ c2_status c2_coff_invocation_parse(const char *b64, size_t b64len,
       if (ckey == 1) { /* Export */
         c2_str ex;
         st = c2_cbor_read_text(&coff, &ex);
-        if (st == C2_OK) {
+        if (st == C2_OK && export_cap > 0) {
           size_t en = ex.len < export_cap - 1 ? ex.len : export_cap - 1;
           memcpy(export_name, ex.ptr, en);
           export_name[en] = '\0';
@@ -224,6 +237,10 @@ c2_status c2_coff_invocation_parse(const char *b64, size_t b64len,
             } else {
               st = c2_cbor_map_skip(&amap);
             }
+            /* tinycbor calls after an error are undefined behaviour: stop now
+             * so the loop condition cannot re-enter the desynchronised map. */
+            if (st != C2_OK)
+              break;
           }
           if (st == C2_OK && wire != 0 && have_val) {
             st = coff_arg_token(&val, wire, buf, buf_cap, buf_used,
