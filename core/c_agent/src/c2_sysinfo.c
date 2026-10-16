@@ -13,6 +13,7 @@
 #include "c2_sysinfo.h"
 
 #include <arpa/inet.h>
+#include <grp.h>
 #include <ifaddrs.h>
 #include <netinet/in.h>
 #include <pwd.h>
@@ -265,6 +266,45 @@ static void str_to_c(c2_str s, char *out, size_t cap) {
   out[n] = '\0';
 }
 
+/* Group ids as a comma-joined list, primary GID first. getgroups() returns
+ * only the supplementary groups and drops the primary one, so a minimal
+ * container (root with no supplementary groups) would report an empty list;
+ * getgrouplist() matches Go's (*user.User).GroupIds and the reference agent's
+ * strings.Join(gids, ","). Falls back to supplementary groups plus the
+ * primary GID when the NSS lookup fails. */
+static c2_str groups_joined(c2_sysinfo_store *st, const char *username) {
+  enum { MAX_GROUPS = 256 };
+  gid_t gids[MAX_GROUPS];
+  int ng = MAX_GROUPS;
+  if (getgrouplist(username, getgid(), gids, &ng) < 0) {
+    int sup = getgroups(MAX_GROUPS - 1, gids + 1);
+    if (sup < 0)
+      sup = 0;
+    gids[0] = getgid();
+    int n = 1;
+    for (int i = 0; i < sup; i++) {
+      if (gids[i + 1] == gids[0])
+        continue;
+      gids[n++] = gids[i + 1];
+    }
+    ng = n;
+  }
+  if (ng > MAX_GROUPS)
+    ng = MAX_GROUPS;
+
+  char joined[4096];
+  size_t off = 0;
+  joined[0] = '\0';
+  for (int i = 0; i < ng && off < sizeof(joined) - 1; i++) {
+    int n = snprintf(joined + off, sizeof(joined) - off, "%s%u",
+                     i ? "," : "", (unsigned)gids[i]);
+    if (n <= 0)
+      break;
+    off += (size_t)n;
+  }
+  return store_cstr(st, joined);
+}
+
 /* ------------------------------------------------------------------------- */
 /* Gather                                                                     */
 /* ------------------------------------------------------------------------- */
@@ -345,22 +385,8 @@ c2_status c2_gather_agent_info(c2_agent_info *info, const c2_agent_config *cfg,
   info->user = store_fmt(st, "%s (%s), uid=%u, gid=%u", username, home,
                          (unsigned)getuid(), (unsigned)getgid());
 
-  /* Group ids, joined by commas (Go: strings.Join(u.GroupIds(), ",")). */
-  {
-    gid_t groups[64];
-    int ng = getgroups(64, groups);
-    char joined[1024];
-    joined[0] = '\0';
-    size_t off = 0;
-    for (int i = 0; i < ng && off < sizeof(joined) - 1; i++) {
-      int n = snprintf(joined + off, sizeof(joined) - off, "%s%u",
-                       i ? "," : "", (unsigned)groups[i]);
-      if (n <= 0)
-        break;
-      off += (size_t)n;
-    }
-    info->groups = store_cstr(st, joined);
-  }
+  /* Group ids, primary first (Go: strings.Join(u.GroupIds(), ",")). */
+  info->groups = groups_joined(st, username);
 
   info->has_root = 1;
   info->root = (geteuid() == 0);
