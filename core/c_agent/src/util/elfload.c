@@ -125,10 +125,14 @@ struct elfload_module {
 };
 
 /* Host libraries searched for an undefined (imported) symbol. libc covers
- * glibc >= 2.34 and musl; libdl/libpthread cover older glibc. */
+ * glibc >= 2.34 and musl; libdl/libpthread cover older glibc. Both the soname
+ * and the dashed real filename are listed because /proc/self/maps shows the
+ * latter on RHEL/CentOS (libpthread-2.17.so, not libpthread.so.0). */
 static const char *const host_libs[] = {
-    "libc.so",   "libc-",        "libc.musl", "ld-musl",
-    "libdl.so",  "libpthread.so", "librt.so",  "libgcc_s.so",
+    "libc.so",     "libc-",       "libc.musl",     "ld-musl",
+    "libdl.so",    "libdl-",      "libpthread.so", "libpthread-",
+    "librt.so",    "librt-",      "libm.so",       "libm-",
+    "libgcc_s.so", "libgcc_s-",
 };
 
 static void set_err(char *err, size_t cap, const char *msg) {
