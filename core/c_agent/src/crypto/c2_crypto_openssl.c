@@ -4,8 +4,9 @@
  * Every symbol is resolved at runtime through dynload.h, so the agent neither
  * links against libcrypto nor needs its headers at build time. Only the stable,
  * public OpenSSL ABI is used (EVP for AES-GCM/HMAC/PBKDF2, the EC/ECDSA
- * primitives for P-256). libcrypto.so.3 (OpenSSL 3.x) and libcrypto.so.1.1 are
- * tried in turn.
+ * primitives for P-256). libcrypto.so.3 (OpenSSL 3.x), libcrypto.so.1.1 and
+ * libcrypto.so.10 (OpenSSL 1.0.2, as shipped by RHEL/CentOS 7) are tried in
+ * turn; the 1.1-only BN_bn2binpad is emulated on 1.0.2 with BN_bn2bin.
  *
  * The backend is deliberately not thread-safe: the protocol layer is used from
  * one tunnel goroutine, matching the Go agent's single message-tunnel loop.
@@ -94,6 +95,8 @@ typedef struct {
   void (*BN_free)(BIGNUM *);
   BIGNUM *(*BN_bin2bn)(const unsigned char *, int, BIGNUM *);
   int (*BN_bn2binpad)(const BIGNUM *, unsigned char *, int);
+  int (*BN_bn2bin)(const BIGNUM *, unsigned char *);
+  int (*BN_num_bits)(const BIGNUM *);
   BN_CTX *(*BN_CTX_new)(void);
   void (*BN_CTX_free)(BN_CTX *);
 
@@ -118,6 +121,13 @@ static void *sym(openssl_ctx *c, const char *name) {
     void *p_ = sym(c, name);                                                   \
     if (p_ == NULL)                                                            \
       goto fail;                                                               \
+    memcpy(&(c->field), &p_, sizeof(p_));                                      \
+  } while (0)
+
+/* Optional symbol: absent on older OpenSSL, so a NULL result is not fatal. */
+#define LOAD_OPT(field, name)                                                  \
+  do {                                                                         \
+    void *p_ = sym(c, name);                                                   \
     memcpy(&(c->field), &p_, sizeof(p_));                                      \
   } while (0)
 
@@ -159,7 +169,13 @@ static int load_symbols(openssl_ctx *c) {
   LOAD(BN_new, "BN_new");
   LOAD(BN_free, "BN_free");
   LOAD(BN_bin2bn, "BN_bin2bn");
-  LOAD(BN_bn2binpad, "BN_bn2binpad");
+  /* BN_bn2binpad is OpenSSL >= 1.1.0; 1.0.2 needs the emulation below. */
+  LOAD_OPT(BN_bn2binpad, "BN_bn2binpad");
+  LOAD_OPT(BN_bn2bin, "BN_bn2bin");
+  LOAD_OPT(BN_num_bits, "BN_num_bits");
+  if (c->BN_bn2binpad == NULL &&
+      (c->BN_bn2bin == NULL || c->BN_num_bits == NULL))
+    goto fail;
   LOAD(BN_CTX_new, "BN_CTX_new");
   LOAD(BN_CTX_free, "BN_CTX_free");
   LOAD(ECDSA_do_sign, "ECDSA_do_sign");
@@ -371,6 +387,22 @@ static EC_POINT *point_from_pub(openssl_ctx *c, const EC_GROUP *group,
   return pt;
 }
 
+/* BN_bn2binpad is OpenSSL >= 1.1.0. On 1.0.2, pad BN_bn2bin's big-endian
+ * output with leading zero bytes to the requested width. Returns `tolen` on
+ * success, like BN_bn2binpad, and -1 when the value does not fit. */
+static int os_bn2binpad(openssl_ctx *c, const BIGNUM *bn, unsigned char *to,
+                        int tolen) {
+  if (c->BN_bn2binpad != NULL)
+    return c->BN_bn2binpad(bn, to, tolen);
+  int bytes = (c->BN_num_bits(bn) + 7) / 8;
+  if (bytes < 0 || bytes > tolen)
+    return -1;
+  memset(to, 0, (size_t)(tolen - bytes));
+  if (bytes > 0 && c->BN_bn2bin(bn, to + (tolen - bytes)) != bytes)
+    return -1;
+  return tolen;
+}
+
 static int os_ec_keygen(void *vctx, uint8_t priv[C2_P256_PRIV_BYTES],
                         uint8_t pub[C2_P256_PUB_BYTES]) {
   openssl_ctx *c = (openssl_ctx *)vctx;
@@ -381,7 +413,7 @@ static int os_ec_keygen(void *vctx, uint8_t priv[C2_P256_PRIV_BYTES],
   if (c->EC_KEY_generate_key(key) != 1)
     goto done;
   const BIGNUM *d = c->EC_KEY_get0_private_key(key);
-  if (d == NULL || c->BN_bn2binpad(d, priv, C2_P256_PRIV_BYTES) !=
+  if (d == NULL || os_bn2binpad(c, d, priv, C2_P256_PRIV_BYTES) !=
                        (int)C2_P256_PRIV_BYTES)
     goto done;
   const EC_GROUP *group = c->EC_KEY_get0_group(key);
@@ -425,7 +457,7 @@ static int os_ecdh(void *vctx, const uint8_t priv[C2_P256_PRIV_BYTES],
     goto done;
   if (c->EC_POINT_get_affine_coordinates_GFp(group, res, x, NULL, bn) != 1)
     goto done;
-  if (c->BN_bn2binpad(x, shared, C2_P256_COORD_BYTES) !=
+  if (os_bn2binpad(c, x, shared, C2_P256_COORD_BYTES) !=
       (int)C2_P256_COORD_BYTES)
     goto done;
   ok = 1;
@@ -534,7 +566,10 @@ fail:
 /* ------------------------------------------------------------------------- */
 
 c2_crypto_backend *c2_crypto_open(void) {
-  static const char *names[] = {"libcrypto.so.3", "libcrypto.so.1.1", NULL};
+  static const char *names[] = {
+      "libcrypto.so.3",     "libcrypto.so.1.1",   "libcrypto.so.10",
+      "libcrypto.so.1.0.0", "libcrypto.so.1.0.2", "libcrypto.so",
+      NULL};
   openssl_ctx *c = (openssl_ctx *)calloc(1, sizeof(*c));
   if (c == NULL)
     return NULL;
