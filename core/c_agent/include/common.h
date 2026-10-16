@@ -8,9 +8,9 @@
  * <stdint.h> so it compiles in a -nostdlib PIC stager as well as in a hosted
  * agent. It carries no state and pulls in no crypto, CBOR or network code.
  *
- * The normative description of the protocol is PROTOCOL.md at the repository
- * root. Every constant here is a transcription of a Go constant or default so
- * a C agent can be written without re-reading the Go source. If a value changes
+ * The normative description of the protocol is in README.md. Every constant
+ * here is a transcription of a Go constant or default so a C agent can be
+ * written without re-reading the Go source. If a value changes
  * on the Go side it MUST change here in the same commit.
  */
 
@@ -36,7 +36,7 @@ extern "C" {
 #define C2_MSGAUTH_TYPE "auth_v1"
 
 /* ------------------------------------------------------------------------- */
-/* Hard limits (mirrors PROTOCOL.md §2.4)                                     */
+/* Hard limits (mirrors README.md §2.4)                                     */
 /* ------------------------------------------------------------------------- */
 
 /* The first CBOR frame (MsgAuth) must fit in one SecureConn frame. */

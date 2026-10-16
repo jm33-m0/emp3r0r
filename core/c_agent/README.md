@@ -1,17 +1,18 @@
-# emp3r0r C2 agent protocol (v1)
+# emp3r0r C agent
 
-Home of the emp3r0r C agent: protocol headers today, the concrete agent
-implementation next. This document is the normative wire specification; the C
-headers in [`include/`](include/) are its machine-readable form.
+The C agent is the Linux counterpart of emp3r0r's Go agent: one binary, shared
+object or raw PIC payload that speaks the same C2 protocol and runs the same
+command/module surface. It lives in `core/c_agent/`, builds with the project's
+pinned `zig` toolchain, and links no crypto or HTTP library at build time —
+`libcrypto`/`libcurl` are resolved at runtime through `src/util/dynload.c` when
+`CRYPTO=openssl`/`HTTP=libcurl`.
 
-Status: **draft, describes the protocol as implemented today**, plus one clearly
-marked proposed extension in §11. Anything not marked _PROPOSED_ is normative
-and must be implemented byte-for-byte by an interoperating agent.
-
-Audience: implementers of non-Go agents (C, Rust, ...) and maintainers changing
-the wire format. If you change an implemented behaviour, update this document
-and the headers in the same commit; the protocol is only "standard" for as long
-as this document is true.
+This document is the agent's manual. The [C2 protocol
+specification](#c2-protocol-specification) is its final section and is
+normative: the C headers in [`include/`](include/) are its machine-readable
+form, and an interoperating agent must match it byte for byte. Anything not
+marked _PROPOSED_ is normative. Agent, C2 and tools are always built from one
+batch, so there is no back-compatibility shim.
 
 Related reading:
 
@@ -19,26 +20,139 @@ Related reading:
 - [`core/modules/module_development_guide.md`](../modules/module_development_guide.md) — command/module semantics layered on top.
 - [`SECURITY.md`](../../SECURITY.md) — threat model.
 
-## C agent headers
+## Contents
 
-Everything here is a transcription of a Go constant or struct:
+- [Building](#building)
+  - [Toolchain and targets](#toolchain-and-targets)
+  - [libc and runtime symbol resolution](#libc-and-runtime-symbol-resolution)
+  - [Providers](#providers)
+  - [Build config embedding](#build-config-embedding)
+  - [Operator console](#operator-console)
+- [Code layout](#code-layout)
+- [Output formats](#output-formats)
+- [Lifecycle](#lifecycle)
+  - [Three layers](#three-layers)
+  - [Bootstrap config decryption](#bootstrap-config-decryption)
+  - [Minimal C agent flow](#minimal-c-agent-flow)
+- [Hardening](#hardening)
+  - [Recovering from faulty images](#recovering-from-faulty-images)
+  - [Freestanding helpers](#freestanding-helpers)
+- [Testing and fuzzing](#testing-and-fuzzing)
+- [Implementation status](#implementation-status)
+- [C2 protocol specification](#c2-protocol-specification)
 
-| Header        | Go source                                                                  |
-| ------------- | -------------------------------------------------------------------------- |
-| `common.h`    | `core/internal/def/{config,def,msg_auth}.go`, §2/§4                        |
-| `crypto.h`    | `core/lib/crypto/aes.go`, `core/internal/transport/keyexchange.go`         |
-| `secureconn.h` | `core/internal/transport/crypto.go` (`SecureConn`)                         |
-| `messages.h`  | `core/internal/def/{msg_auth,agent,token}.go`                              |
-| `transport.h` | `core/internal/def/config.go`, `core/internal/transport/c2channel_http.go` |
+## Building
 
-CBOR is provided by vendored [Intel tinycbor](https://github.com/intel/tinycbor)
-(MIT, version 7.0) under `vendor/tinycbor/`; there is no hand-rolled codec.
+### Toolchain and targets
 
-When the Go side changes, this document and the headers change in the same
-commit. All peers are built from the same batch, so there is no
-back-compatibility shim.
+```sh
+make -C core/c_agent lib             # hosted static library (libagent.a)
+make -C core/c_agent agent           # hosted reference agent executable
+make -C core/c_agent so              # hosted shared object (agent.so, PIC)
+make -C core/c_agent test            # unit tests (gcc + ASan/UBSan)
+make -C core/c_agent coverage        # gcov line coverage per source
+make -C core/c_agent test-mbedtls    # self-contained mbedTLS backend tests
+make -C core/c_agent vendor-mbedtls  # build the vendored mbedTLS static libs
+make -C core/c_agent fuzz            # fuzz targets (ASan/UBSan fallback runner)
+make -C core/c_agent fuzz FUZZER=libfuzzer HOSTCC=clang FUZZ_TIME=60  # libFuzzer
+```
 
-### Layout
+`zig` (the project's pinned compiler, shipped with emp3r0r) builds the library
+and the agent. The unit tests and fuzzers run under ASan/UBSan, which zig cannot
+link, so they use a host compiler (`gcc`/`clang`); `make test HOSTCC="zig cc"
+SAN=` builds them with zig without sanitizers.
+
+### libc and runtime symbol resolution
+
+The hosted agent links a C library dynamically and pins it for portability.
+`LIBC` selects which, and two further knobs tune the glibc build (all exposed
+to the operator as `generate --type aquila --libc … --glibc-version …
+--dynload …`):
+
+- `LIBC` (default `glibc`) picks the C library. `glibc` uses zig's bundled glibc
+  headers instead of the host's, so the build is host-independent. `musl` links
+  dynamically against zig's bundled musl, so the agent runs on any musl host
+  that provides `/lib/ld-musl-<arch>.so.1` (e.g. Alpine).
+- `GLIBC_VERSION` (default `2.17`, the oldest the project supports) pins the
+  oldest glibc ABI to link against, so the binary runs on every glibc at or
+  above it. Ignored when `LIBC=musl`, since musl keeps a stable ABI.
+- `DYNLOAD_MODE` picks the libc symbols `dynload` resolves: `libc_dl`
+  (`__libc_dlopen_mode`, glibc < 2.34), `public` (`dlopen`/`dlsym`/`dlclose`,
+  glibc ≥ 2.34 and musl), or `auto` (`libc_dl` with a runtime fallback to the
+  public names, so one binary loads on both). The default is `libc_dl` for glibc
+  and `public` for musl. musl supports only `public`: it has no libdl and no
+  `__libc_*` names, and exports `dlopen`/`dlsym`/`dlclose` from its loader/libc
+  segment.
+
+Neither library is linked statically: the agent loads libcrypto/libcurl at
+runtime through `dynload`, which needs a dynamic loader and a `/proc/self/maps`
+libc segment. `dynload` finds glibc (`libc.so.6`) and musl
+(`ld-musl-<arch>.so.1`, where musl keeps libc and the loader in one file).
+
+`core/modules/stager_linux` uses the same glibc knobs.
+
+### Providers
+
+Every external dependency sits behind a small interface and one or more
+providers, selected at build time (the same model as
+`core/modules/stager_linux`'s `TRANSPORT=<name>`):
+
+| Group     | Selector    | Default     | Providers                                                         |
+| --------- | ----------- | ----------- | ----------------------------------------------------------------- |
+| Libc      | `LIBC`      | `glibc`     | `glibc` · `musl`                                                  |
+| Crypto    | `CRYPTO`    | `openssl`   | `openssl` (system libcrypto via `dynload`) · `mbedtls` (vendored) |
+| Gzip      | `GZIP`      | `miniz`     | `miniz` (vendored) · `none`                                       |
+| HTTP/TLS  | `HTTP`      | `libcurl`   | `libcurl` (system libcurl via `dynload`)                          |
+| Transport | `TRANSPORT` | `http_poll` | `http_poll`                                                       |
+
+The default build pulls in nothing but the protocol code at build time:
+libcrypto and libcurl are resolved at runtime and the vendored miniz is a small
+single file. A fully self-contained agent (no system SSL dependency) is built
+with `CRYPTO=mbedtls`; a build that does not need gzip uses `GZIP=none`.
+
+```sh
+make -C core/c_agent agent CRYPTO=mbedtls GZIP=none
+```
+
+To add your own backend, drop a file implementing the interface into the
+matching directory and build with `<GROUP>=<name>`:
+
+- `crypto.h` — `c2_crypto_open` / `c2_crypto_close` returning a
+  `c2_crypto_backend`.
+- `gzip.h` — `c2_gzip_bound` / `c2_gzip_compress` / `c2_gzip_decompress`.
+- `http_client.h` — `c2_http_client_perform`.
+- `transport.h` — `c2_transport_create` / `c2_transport_name`.
+
+The vendored trees are source-only; their `.o`/`.a` files are build artifacts.
+
+### Build config embedding
+
+The reference agent loads its build config at startup. The encrypted CBOR blob
+and the build-wide magic string are rendered into a C translation unit by
+`lib/cagent` (`EmbeddedConfigSource`) and compiled via the Makefile's
+`CONFIG_SRC`, so there is no ELF placeholder to patch afterwards. The Go C2 does
+this automatically; a manual build renders the same file and passes its path:
+
+```sh
+# config.bin is the encrypted CBOR blob the Go builder produces (def.AgentConfig)
+make -C core/c_agent agent CONFIG_SRC=/path/to/config_embedded.c
+```
+
+Without `CONFIG_SRC` the agent links with weak empty defaults and exits at
+startup (nothing to decrypt).
+
+### Operator console
+
+From the operator console, the same build is a payload type of `generate`
+(`--type aquila`, the C agent's name); it reuses the C2's config plumbing so
+the embedded config is encrypted under the C2's own `MagicString`:
+
+```text
+generate --type aquila --cc your.domain.com
+  --libc glibc|musl --crypto openssl|mbedtls --gzip miniz|none --http libcurl --transport http_poll
+```
+
+## Code layout
 
 ```
 include/
@@ -71,59 +185,26 @@ vendor/miniz/      vendored DEFLATE/INFLATE gzip backend (MIT, miniz 3.1.2)
 vendor/mbedtls/    vendored self-contained crypto/TLS (Apache-2.0), opt-in
 ```
 
-The headers and sources in `include/` and `src/` are the protocol contract.
-Everything under `include/util/` and `src/util/` is a generic utility shared with
-the freestanding stager in `core/modules/stager_linux/`, which includes it from
-here. Utility headers are namespaced under `util/` so a bare name cannot
-shadow a system header (e.g. `util/strings.h` vs `<strings.h>`).
+The headers and sources in `include/` and `src/` are the protocol contract; the
+[header-to-Go-source table](#c-agent-headers) lives in the [protocol
+specification](#c2-protocol-specification). Everything under `include/util/` and
+`src/util/` is a generic utility shared with the freestanding stager in
+`core/modules/stager_linux/`, which includes it from here. Utility headers are
+namespaced under `util/` so a bare name cannot shadow a system header (e.g.
+`util/strings.h` vs `<strings.h>`).
 
-### Building, testing and fuzzing
+The headers are C99 and freestanding-friendly: only `<stdint.h>` and
+`<stddef.h>`. They carry no implementation, no allocation, and no dependency on
+a particular crypto or HTTP library. Two backend contracts are abstracted out:
 
-```sh
-make -C core/c_agent lib             # hosted static library (libagent.a)
-make -C core/c_agent agent           # hosted reference agent executable
-make -C core/c_agent so              # hosted shared object (agent.so, PIC)
-make -C core/c_agent test            # unit tests (gcc + ASan/UBSan)
-make -C core/c_agent coverage        # gcov line coverage per source
-make -C core/c_agent test-mbedtls    # self-contained mbedTLS backend tests
-make -C core/c_agent vendor-mbedtls  # build the vendored mbedTLS static libs
-make -C core/c_agent fuzz            # fuzz targets (ASan/UBSan fallback runner)
-make -C core/c_agent fuzz FUZZER=libfuzzer HOSTCC=clang FUZZ_TIME=60  # libFuzzer
-```
+- **`c2_crypto_backend`** — AES-256-GCM, SHA-256, MD5, HKDF-SHA256,
+  PBKDF2-SHA256, P-256 ECDH and ECDSA/DER. Back it with libcrypto (resolved at
+  runtime with the stager's `dynload.h`) or a vendored implementation.
+- **`c2_transport`** — turns a URL + malleable profile into a `c2_stream`. The
+  default channel is `http_poll` (init/GET/POST/close over HTTP); a duplex
+  transport just returns a connected stream.
 
-`zig` (the project's pinned compiler, shipped with emp3r0r) builds the library
-and the agent. The unit tests and fuzzers run under ASan/UBSan, which zig cannot
-link, so they use a host compiler (`gcc`/`clang`); `make test HOSTCC="zig cc"
-SAN=` builds them with zig without sanitizers.
-
-The hosted agent links a C library dynamically and pins it for portability.
-`LIBC` selects which, and two further knobs tune the glibc build (all exposed
-to the operator as `generate --type aquila --libc … --glibc-version …
---dynload …`):
-
-- `LIBC` (default `glibc`) picks the C library. `glibc` uses zig's bundled glibc
-  headers instead of the host's, so the build is host-independent. `musl` links
-  dynamically against zig's bundled musl, so the agent runs on any musl host
-  that provides `/lib/ld-musl-<arch>.so.1` (e.g. Alpine).
-- `GLIBC_VERSION` (default `2.17`, the oldest the project supports) pins the
-  oldest glibc ABI to link against, so the binary runs on every glibc at or
-  above it. Ignored when `LIBC=musl`, since musl keeps a stable ABI.
-- `DYNLOAD_MODE` picks the libc symbols `dynload` resolves: `libc_dl`
-  (`__libc_dlopen_mode`, glibc < 2.34), `public` (`dlopen`/`dlsym`/`dlclose`,
-  glibc ≥ 2.34 and musl), or `auto` (`libc_dl` with a runtime fallback to the
-  public names, so one binary loads on both). The default is `libc_dl` for glibc
-  and `public` for musl. musl supports only `public`: it has no libdl and no
-  `__libc_*` names, and exports `dlopen`/`dlsym`/`dlclose` from its loader/libc
-  segment.
-
-Neither library is linked statically: the agent loads libcrypto/libcurl at
-runtime through `dynload`, which needs a dynamic loader and a `/proc/self/maps`
-libc segment. `dynload` finds glibc (`libc.so.6`) and musl
-(`ld-musl-<arch>.so.1`, where musl keeps libc and the loader in one file).
-
-`core/modules/stager_linux` uses the same glibc knobs.
-
-### Artifact formats
+## Output formats
 
 The same agent is emitted in three formats (also exposed to the operator as
 `generate --type aquila --format exe|so|shellcode`):
@@ -140,20 +221,6 @@ release executable's `--build-id=none` + `-fno-unwind-tables` would leave it
 with neither. `so` and `shellcode` still link the C library dynamically, so
 they load `libcrypto`/`libcurl` from the host process just like the executable.
 
-The reference agent loads its build config at startup. The encrypted CBOR blob
-and the build-wide magic string are rendered into a C translation unit by
-`lib/cagent` (`EmbeddedConfigSource`) and compiled via the Makefile's
-`CONFIG_SRC`, so there is no ELF placeholder to patch afterwards. The Go C2 does
-this automatically; a manual build renders the same file and passes its path:
-
-```sh
-# config.bin is the encrypted CBOR blob the Go builder produces (def.AgentConfig)
-make -C core/c_agent agent CONFIG_SRC=/path/to/config_embedded.c
-```
-
-Without `CONFIG_SRC` the agent links with weak empty defaults and exits at
-startup (nothing to decrypt).
-
 The agent executable is a minimal release build: it links only the translation
 units it reaches at runtime (rc4/packer/debug and the unused tinycbor files are
 not linked), one section per function/data with `--gc-sections`, no unwind
@@ -162,116 +229,7 @@ strings are absent), and `-s`/`--build-id=none` (stripped, no build-id). The
 linker `.comment` ident is removed with `strip` when it is available. The fuzzers
 keep asserts so an invariant violation still fails loudly there.
 
-From the operator console, the same build is a payload type of `generate`
-(`--type aquila`, the C agent's name); it reuses the C2's config plumbing so
-the embedded config is encrypted under the C2's own `MagicString`:
-
-```text
-generate --type aquila --cc your.domain.com
-  --libc glibc|musl --crypto openssl|mbedtls --gzip miniz|none --http libcurl --transport http_poll
-```
-
-### Provider selection
-
-Every external dependency sits behind a small interface and one or more
-providers, selected at build time (the same model as
-`core/modules/stager_linux`'s `TRANSPORT=<name>`):
-
-| Group     | Selector    | Default     | Providers                                                   |
-| --------- | ----------- | ----------- | ----------------------------------------------------------- |
-| Libc      | `LIBC`      | `glibc`     | `glibc` · `musl`                                            |
-| Crypto    | `CRYPTO`    | `openssl`   | `openssl` (system libcrypto via `dynload`) · `mbedtls` (vendored) |
-| Gzip      | `GZIP`      | `miniz`     | `miniz` (vendored) · `none`                                 |
-| HTTP/TLS  | `HTTP`      | `libcurl`   | `libcurl` (system libcurl via `dynload`)                    |
-| Transport | `TRANSPORT` | `http_poll` | `http_poll`                                                 |
-
-The default build pulls in nothing but the protocol code at build time:
-libcrypto and libcurl are resolved at runtime and the vendored miniz is a small
-single file. A fully self-contained agent (no system SSL dependency) is built
-with `CRYPTO=mbedtls`; a build that does not need gzip uses `GZIP=none`.
-
-```sh
-make -C core/c_agent agent CRYPTO=mbedtls GZIP=none
-```
-
-To add your own backend, drop a file implementing the interface into the
-matching directory and build with `<GROUP>=<name>`:
-
-- `crypto.h` — `c2_crypto_open` / `c2_crypto_close` returning a
-  `c2_crypto_backend`.
-- `gzip.h` — `c2_gzip_bound` / `c2_gzip_compress` / `c2_gzip_decompress`.
-- `http_client.h` — `c2_http_client_perform`.
-- `transport.h` — `c2_transport_create` / `c2_transport_name`.
-
-The vendored trees are source-only; their `.o`/`.a` files are build artifacts.
-
-`src/util/system.c` (raw-syscall libc replacements) and `src/util/strings.c` are linked
-only into `-nostdlib` payloads; a hosted binary links libc instead. The fuzz
-targets are `LLVMFuzzerTestOneInput` functions. On a host with clang,
-`make fuzz FUZZER=libfuzzer HOSTCC=clang FUZZ_TIME=<seconds>` runs
-coverage-guided libFuzzer over every target: each target gets `FUZZ_TIME`
-seconds (default 60), new corpus entries persist under `build/corpus/<target>/`
-so a later run resumes instead of starting over, and any crash is written to
-`build/crash/`. CI runs this as a weekly campaign over the restored corpus
-cache (and on manual dispatch); developer machines can run it any time. Without
-clang, `fuzz/fuzz_runner.c` drives a bounded mutational loop for `FUZZ_ITERS`
-iterations instead, writing the crashing input to `build/crash/<target>.bin` so
-a failure is reproducible.
-
-The targets and the surface each covers:
-
-| target | surface |
-| --- | --- |
-| `fuzz_messages` | `MsgAuth`/`MsgTunData` CBOR decode with varying list capacities |
-| `fuzz_agent_info` | Emp3r0rAgent / AgentToken / EnrichedPeerList decode |
-| `fuzz_config` | build-config decode (routes, malleable HTTP, custom headers) |
-| `fuzz_gzip` | gzip header parser + miniz DEFLATE/INFLATE round-trip |
-| `fuzz_memfile` | transparent memfs container decode + round-trip |
-| `fuzz_bof` | BOF loader ELF/relocation parser (real `coffloader_linux` provider) |
-| `fuzz_elfload` | in-memory ELF64 mapper + relocator (constructors/IFUNCs are recorded, not run) |
-| `fuzz_encdec` | decode → re-encode → decode round-trip for both envelopes |
-| `fuzz_secureconn` | frame length/padding parser, stream read, encode/decode (identity and stub AEAD) |
-| `fuzz_text` | hex/base64url codecs, canonical auth string, signature encoding |
-| `fuzz_module` | `c2_coff_invocation_parse`: base64 + nested CBOR COFF invocation |
-| `fuzz_strings` | freestanding mem/str primitives vs. a byte-wise reference |
-| `fuzz_dynload` | bounds-checked ELF dynamic-symbol resolver (SysV and GNU hash) |
-| `fuzz_maps` | `/proc/self/maps` parser (same line machine as the file-backed finders) |
-| `fuzz_rc4` | RC4 keystream |
-| `fuzz_packer` | passphrase packing / key derivation |
-| `fuzz_inet_aton` | IP literal parser |
-
-Every target is compiled with `-fsanitize=address,undefined`; the property under
-test is that no input — however malformed or hostile — can over-read, overflow,
-recurse without a bound, or abort. The vendored tinycbor keeps its `assert`s
-enabled so a decoder invariant violation fails loudly in fuzzing rather than
-silently misbehaving in a release build.
-
-### Recovering from faulty images
-
-Untrusted code paths are guarded so a malformed payload fails one operation
-instead of taking the agent down:
-
-- `src/util/elfload.c` catches SIGSEGV/SIGBUS/SIGILL/SIGFPE while an image's
-  IFUNC/IRELATIVE resolvers and constructors run, and while its dynamic symbol
-  table is searched. A fault becomes a rejected image (`elfload_map` returns
-  NULL, `elfload_sym` returns NULL) with the previous signal handlers restored
-  on every path; a private signal stack lets a runaway constructor be caught
-  too. The fuzz build defines `ELFLOAD_NO_EXEC`, which records rather than
-  calls image-supplied addresses so ASan/UBSan can still see the fault.
-- The `coffloader_linux` loader (`core/modules/coffloader_linux`) wraps BOF
-  execution in the same kind of guard and restores the host handlers
-  afterwards.
-
-The headers are C99 and freestanding-friendly: only `<stdint.h>` and
-`<stddef.h>`. They carry no implementation, no allocation, and no dependency on
-a particular crypto or HTTP library. Two backend contracts are abstracted out:
-
-- **`c2_crypto_backend`** — AES-256-GCM, SHA-256, MD5, HKDF-SHA256,
-  PBKDF2-SHA256, P-256 ECDH and ECDSA/DER. Back it with libcrypto (resolved at
-  runtime with the stager's `dynload.h`) or a vendored implementation.
-- **`c2_transport`** — turns a URL + malleable profile into a `c2_stream`. The
-  default channel is `http_poll` (init/GET/POST/close over HTTP); a duplex
-  transport just returns a connected stream.
+## Lifecycle
 
 ### Three layers
 
@@ -331,7 +289,77 @@ key = PBKDF2-HMAC-SHA256(password = MagicString, salt, 100000, 32)
      gunzips it (`core/internal/cc/base/ftp/handler_ftp.go`). This is a wire
      requirement, not a convention: an uncompressed stream is rejected.
 
-### Implementation status
+## Hardening
+
+### Recovering from faulty images
+
+Untrusted code paths are guarded so a malformed payload fails one operation
+instead of taking the agent down:
+
+- `src/util/elfload.c` catches SIGSEGV/SIGBUS/SIGILL/SIGFPE while an image's
+  IFUNC/IRELATIVE resolvers and constructors run, and while its dynamic symbol
+  table is searched. A fault becomes a rejected image (`elfload_map` returns
+  NULL, `elfload_sym` returns NULL) with the previous signal handlers restored
+  on every path; a private signal stack lets a runaway constructor be caught
+  too. The fuzz build defines `ELFLOAD_NO_EXEC`, which records rather than
+  calls image-supplied addresses so ASan/UBSan can still see the fault.
+- The `coffloader_linux` loader (`core/modules/coffloader_linux`) wraps BOF
+  execution in the same kind of guard and restores the host handlers
+  afterwards.
+
+Every remote input is treated as hostile: lengths and indexes are checked
+before use, decoders never panic on malformed CBOR or frames, and no code or
+image is loaded through an fd or disk. See [`AGENTS.md`](../../AGENTS.md) for
+the project-wide invariants.
+
+### Freestanding helpers
+
+`src/util/system.c` (raw-syscall libc replacements) and `src/util/strings.c` are
+linked only into `-nostdlib` payloads; a hosted binary links libc instead.
+
+## Testing and fuzzing
+
+`make test` runs the unit tests and `make fuzz` the fuzz targets, both under
+ASan/UBSan. The fuzz targets are `LLVMFuzzerTestOneInput` functions. On a host
+with clang, `make fuzz FUZZER=libfuzzer HOSTCC=clang FUZZ_TIME=<seconds>` runs
+coverage-guided libFuzzer over every target: each target gets `FUZZ_TIME`
+seconds (default 60), new corpus entries persist under `build/corpus/<target>/`
+so a later run resumes instead of starting over, and any crash is written to
+`build/crash/`. CI runs this as a weekly campaign over the restored corpus
+cache (and on manual dispatch); developer machines can run it any time. Without
+clang, `fuzz/fuzz_runner.c` drives a bounded mutational loop for `FUZZ_ITERS`
+iterations instead, writing the crashing input to `build/crash/<target>.bin` so
+a failure is reproducible.
+
+The targets and the surface each covers:
+
+| target            | surface                                                                          |
+| ----------------- | -------------------------------------------------------------------------------- |
+| `fuzz_messages`   | `MsgAuth`/`MsgTunData` CBOR decode with varying list capacities                  |
+| `fuzz_agent_info` | Emp3r0rAgent / AgentToken / EnrichedPeerList decode                              |
+| `fuzz_config`     | build-config decode (routes, malleable HTTP, custom headers)                     |
+| `fuzz_gzip`       | gzip header parser + miniz DEFLATE/INFLATE round-trip                            |
+| `fuzz_memfile`    | transparent memfs container decode + round-trip                                  |
+| `fuzz_bof`        | BOF loader ELF/relocation parser (real `coffloader_linux` provider)              |
+| `fuzz_elfload`    | in-memory ELF64 mapper + relocator (constructors/IFUNCs are recorded, not run)   |
+| `fuzz_encdec`     | decode → re-encode → decode round-trip for both envelopes                        |
+| `fuzz_secureconn` | frame length/padding parser, stream read, encode/decode (identity and stub AEAD) |
+| `fuzz_text`       | hex/base64url codecs, canonical auth string, signature encoding                  |
+| `fuzz_module`     | `c2_coff_invocation_parse`: base64 + nested CBOR COFF invocation                 |
+| `fuzz_strings`    | freestanding mem/str primitives vs. a byte-wise reference                        |
+| `fuzz_dynload`    | bounds-checked ELF dynamic-symbol resolver (SysV and GNU hash)                   |
+| `fuzz_maps`       | `/proc/self/maps` parser (same line machine as the file-backed finders)          |
+| `fuzz_rc4`        | RC4 keystream                                                                    |
+| `fuzz_packer`     | passphrase packing / key derivation                                              |
+| `fuzz_inet_aton`  | IP literal parser                                                                |
+
+Every target is compiled with `-fsanitize=address,undefined`; the property under
+test is that no input — however malformed or hostile — can over-read, overflow,
+recurse without a bound, or abort. The vendored tinycbor keeps its `assert`s
+enabled so a decoder invariant violation fails loudly in fuzzing rather than
+silently misbehaving in a release build.
+
+## Implementation status
 
 Implemented and tested in `src/`:
 
@@ -395,11 +423,34 @@ Still to come:
 - A self-contained mbedTLS HTTP/TLS client provider
   (`http_client_mbedtls.c`) and duplex channels.
 
----
+## C2 protocol specification
 
-# Protocol specification
+This section is the normative wire specification; the C headers in
+[`include/`](include/) are its machine-readable form. Anything not marked
+_PROPOSED_ must be implemented byte-for-byte by an interoperating agent.
+Changes to implemented behaviour must update this section, the headers and
+the Go side in the same commit.
 
-## 1. Conventions
+### C agent headers
+
+Everything here is a transcription of a Go constant or struct:
+
+| Header         | Go source                                                                  |
+| -------------- | -------------------------------------------------------------------------- |
+| `common.h`     | `core/internal/def/{config,def,msg_auth}.go`, §2/§4                        |
+| `crypto.h`     | `core/lib/crypto/aes.go`, `core/internal/transport/keyexchange.go`         |
+| `secureconn.h` | `core/internal/transport/crypto.go` (`SecureConn`)                         |
+| `messages.h`   | `core/internal/def/{msg_auth,agent,token}.go`                              |
+| `transport.h`  | `core/internal/def/config.go`, `core/internal/transport/c2channel_http.go` |
+
+CBOR is provided by vendored [Intel tinycbor](https://github.com/intel/tinycbor)
+(MIT, version 7.0) under `vendor/tinycbor/`; there is no hand-rolled codec.
+
+When the Go side changes, this document and the headers change in the same
+commit. All peers are built from the same batch, so there is no
+back-compatibility shim.
+
+### 1. Conventions
 
 | Term            | Meaning                                                          |
 | --------------- | ---------------------------------------------------------------- |
@@ -427,9 +478,9 @@ Encoding rules:
 
 ---
 
-## 2. Constants and key material
+### 2. Constants and key material
 
-### 2.1 Per-build pre-shared key (PSK)
+#### 2.1 Per-build pre-shared key (PSK)
 
 Both sides share a per-build PSK derived from the build-time `MagicString`:
 
@@ -452,7 +503,7 @@ The C2 patches `MagicString` (and optionally `QUICKey`) at build time with
 `-ldflags -X`. An interoperating agent **must** be built with the same
 `MagicString`.
 
-### 2.2 Route names
+#### 2.2 Route names
 
 Routing is carried in `MsgAuth.Capabilities` (§5), not in the URL path. The five
 route names are configuration values with these defaults:
@@ -468,7 +519,7 @@ route names are configuration values with these defaults:
 An operator may randomize these. An agent reads them from its config. Route
 matching on the server is trimmed + case-insensitive.
 
-### 2.3 Message tags
+#### 2.3 Message tags
 
 `MsgTunData.Tag` carries a routing/type label. Defined values:
 
@@ -484,7 +535,7 @@ matching on the server is trimmed + case-insensitive.
 Any other tag on the agent tunnel is interpreted as the agent's own tag and is
 **not trusted** by the server.
 
-### 2.4 Limits
+#### 2.4 Limits
 
 | Limit                          | Value                                            | Where enforced               |
 | ------------------------------ | ------------------------------------------------ | ---------------------------- |
@@ -500,9 +551,9 @@ Any other tag on the agent tunnel is interpreted as the agent's own tag and is
 
 ---
 
-## 3. Transport layer
+### 3. Transport layer
 
-### 3.1 Abstract contract
+#### 3.1 Abstract contract
 
 A channel turns a URL (or peer) into a bidirectional byte stream. The protocol
 layers above it see only `Read`/`Write`/`Close`. The **only** thing that selects
@@ -520,7 +571,7 @@ Two transport classes exist:
 The agent's `C2ChannelMode` selects the wrapper. A Go agent ships all wrappers;
 a minimal C agent only needs `http_poll` (§3.2) and/or one duplex wrapper.
 
-### 3.2 `http_poll` (default channel)
+#### 3.2 `http_poll` (default channel)
 
 Configuration (malleable profile):
 
@@ -560,7 +611,7 @@ Notes:
   `PollInterval` seconds, `Jitter` percent) after an empty poll; after data is
   received it performs a short randomized "blink" and polls again immediately.
 
-### 3.3 Other channels
+#### 3.3 Other channels
 
 `h2conn` uses an HTTP/2 duplex POST stream. `quic` is stock QUIC/HTTP-3 (ALPN
 `h3`) optionally with a keyed datagram obfuscation seeded from `QUICKey`/PSK.
@@ -572,11 +623,11 @@ then a duplex channel.
 
 ---
 
-## 4. SecureConn — framing and encryption
+### 4. SecureConn — framing and encryption
 
 Every byte stream is wrapped in `SecureConn` before any CBOR is written.
 
-### 4.1 Frame layout
+#### 4.1 Frame layout
 
 ```text
 frame  := uint32_be(enc_len) || enc_blob
@@ -610,7 +661,7 @@ Sender rules (MUST):
   the length it protects is authenticated. A hostile peer can only cause an
   early error, never a misparse.
 
-### 4.2 Key lifecycle
+#### 4.2 Key lifecycle
 
 1. A stream starts on the **PSK** (§2.1).
 2. The `checkin` and `msg` bootstrap routes stay on the PSK until the `msg`
@@ -628,12 +679,12 @@ direction keys, no per-frame counter). GCM nonces are random 12 bytes per frame.
 
 ---
 
-## 5. MsgAuth — the first envelope
+### 5. MsgAuth — the first envelope
 
 The **first** CBOR message on every new stream MUST be a `MsgAuth`. The server
 reads it as a single frame (≤ 8192 bytes), then routes.
 
-### 5.1 Schema
+#### 5.1 Schema
 
 | Key | Name              | CBOR type     | Notes                                                          |
 | --- | ----------------- | ------------- | -------------------------------------------------------------- |
@@ -648,7 +699,7 @@ reads it as a single frame (≤ 8192 bytes), then routes.
 | 19  | `StreamID`        | text          | optional; FTP token / WWW filename / proxy token               |
 | 20  | `ProtocolVersion` | int           | must equal `1` (current version)                               |
 
-### 5.2 Canonical auth string
+#### 5.2 Canonical auth string
 
 ```text
 caps      = copy of Capabilities, sorted lexicographically (duplicates kept)
@@ -671,14 +722,14 @@ strings.Join([]string{
 The agent signs `SHA-256(canonical)` with its P-256 key; the result is DER and
 base64url-encoded into `AgentProof`.
 
-### 5.3 IdentityToken
+#### 5.3 IdentityToken
 
 `IdentityToken` is `base64url(CA_signature)` where `CA_signature` is the CA's
 P-256 ECDSA/DER signature over the raw `AgentUUID` bytes (not the canonical
 string). It is issued at provision time (operator `sign_agent`, or embedded in
 the agent build). The agent presents the same token on every `MsgAuth`.
 
-### 5.4 Server verification order
+#### 5.4 Server verification order
 
 1. Structural checks: type, `ProtocolVersion == 1`, non-empty
    UUID/token/nonce, `Timestamp > 0`.
@@ -698,7 +749,7 @@ check-in and **rejects key rotation** (an operator must `forget_agent` to reset)
 
 ---
 
-## 6. Routes
+### 6. Routes
 
 The single recognized route capability selects the handler:
 
@@ -728,11 +779,11 @@ Rules:
 
 ---
 
-## 7. Message schemas
+### 7. Message schemas
 
 All messages below are CBOR map items with integer keys, carried one-per-frame.
 
-### 7.1 `MsgTunData`
+#### 7.1 `MsgTunData`
 
 The universal agent↔C2 message.
 
@@ -752,7 +803,7 @@ The universal agent↔C2 message.
 Field 9/10 are delivered inside a `peer_list` tagged message; field 10 is the
 `EnrichedPeerList` structure in §7.4.
 
-### 7.2 `Emp3r0rAgent` (check-in body)
+#### 7.2 `Emp3r0rAgent` (check-in body)
 
 Sent as the single payload after the `checkin` `MsgAuth`. The server treats
 every field as hostile, sanitizes strings, derives `Tag` from the verified UUID,
@@ -798,7 +849,7 @@ is a PEM-encoded PKIX P-256 public key; `UUIDSig` is the base64url CA
 Omit `LastSeen` (31) and `LastSeenRTT` (32) to avoid Go `time.Time`/`Duration`
 CBOR tag subtleties; the server sets `LastSeen` from the connection anyway.
 
-### 7.3 `AgentToken`
+#### 7.3 `AgentToken`
 
 Pushed as `agent_token` after PFS is established.
 
@@ -810,7 +861,7 @@ Pushed as `agent_token` after PFS is established.
 | 4   | `ExpiresAt`  | int (Unix)      |
 | 5   | `Signature`  | bytes           |
 
-### 7.4 `EnrichedPeerList`
+#### 7.4 `EnrichedPeerList`
 
 Pushed as `peer_list` after PFS is established.
 
@@ -834,7 +885,7 @@ Pushed as `peer_list` after PFS is established.
 
 ---
 
-## 8. Check-in flow
+### 8. Check-in flow
 
 ```text
 agent                                              C2
@@ -862,7 +913,7 @@ Notes:
 
 ---
 
-## 9. Message tunnel and PFS
+### 9. Message tunnel and PFS
 
 ```text
 agent                                              C2
@@ -881,20 +932,20 @@ agent                                              C2
   |<-- frame: MsgTunData (jobs / handshake keepalive)-|
 ```
 
-### 9.1 Hello detection
+#### 9.1 Hello detection
 
 The server treats a `MsgTunData` as a **hello** iff
 `Response == nil && len(CmdSlice) > 0`. The first hello of a session MUST carry
 `EphemPublicKey` (64 bytes: `X || Y`, each 32-byte big-endian, **not** SEC1
 compressed). Later hellos MUST omit it; a mid-session re-key offer is rejected.
 
-### 9.2 Public key serialization
+#### 9.2 Public key serialization
 
 ```text
 pub := X[32] || Y[32]     # each coordinate left-padded to 32 bytes
 ```
 
-### 9.3 Session key derivation
+#### 9.3 Session key derivation
 
 ```text
 shared = X coordinate of (peer_pub * own_priv), left-padded to 32 bytes
@@ -906,7 +957,7 @@ key    = HKDF-SHA256(ikm=shared, salt, info, L=32)
 Both sides use the **same** `info` (`client-session:<uuid>`); the server does not
 flip the label for its own role.
 
-### 9.4 Key switch ordering
+#### 9.4 Key switch ordering
 
 The server writes the `handshake` reply **still under the PSK**, then switches
 its `SecureConn` to the session key. The agent must therefore read the
@@ -914,7 +965,7 @@ its `SecureConn` to the session key. The agent must therefore read the
 the subsequent `peer_list` / `agent_token` frames. Any frame after `handshake`
 is session-key encrypted.
 
-### 9.5 Keepalive
+#### 9.5 Keepalive
 
 The agent re-sends a hello periodically (random 5–60 s sleep, with a bounded
 number of retries per cycle) and waits for a `handshake`-tagged reply under
@@ -925,7 +976,7 @@ server additionally accepts a fresh `MsgAuth` frame on the tunnel as a
 keepalive (it updates presence but sends no reply). Any authenticated frame
 resets the 10-minute silence timer.
 
-### 9.6 Jobs
+#### 9.6 Jobs
 
 Commands are `MsgTunData` with a non-empty `CmdSlice`. The server assigns a
 `JobID`; the agent replies with the same `JobID`, `CmdSlice=[commandName, ...]`,
@@ -933,7 +984,7 @@ and `Response` = output bytes. Job ownership is immutable on the server.
 
 ---
 
-## 10. Command and module semantics
+### 10. Command and module semantics
 
 The CBOR wire protocol is generic. Command names and payload delivery follow
 [`core/modules/module_development_guide.md`](../modules/module_development_guide.md).
@@ -960,7 +1011,7 @@ download, `ftp` upload, `!ls_dir`/`!stat`, and `coff` execution. SOCKS5
 
 ---
 
-## 11. Versioning and capabilities
+### 11. Versioning and capabilities
 
 `MsgAuth.ProtocolVersion` (key 20) carries the wire-format version. The server
 rejects any value other than `1` (`def.ProtocolVersion`), so a protocol bump is
@@ -979,7 +1030,7 @@ C agent. That is a server/operator change, not a wire change.
 
 ---
 
-## 12. Conformance vectors
+### 12. Conformance vectors
 
 Interoperability is only as good as the tests. Before a second implementation is
 trusted, generate and check in golden vectors (a Go generator should emit them;
@@ -1003,7 +1054,7 @@ missing `client-session:` prefix fails silently and is painful to debug.
 
 ---
 
-## 13. Security considerations
+### 13. Security considerations
 
 - **Bootstrap secrecy is weak by design.** The PSK is a build-time constant;
   everything before PFS is only as secret as `MagicString`. Do not send sensitive
@@ -1024,7 +1075,7 @@ missing `client-session:` prefix fails silently and is painful to debug.
 
 ---
 
-## Appendix A — Reference constants (Go source)
+### Appendix A — Reference constants (Go source)
 
 | Item                       | Location                                                                                 |
 | -------------------------- | ---------------------------------------------------------------------------------------- |
@@ -1041,7 +1092,7 @@ missing `client-session:` prefix fails silently and is painful to debug.
 | Agent client               | `core/internal/agent/base/c2transport/`                                                  |
 | C protocol headers         | `core/c_agent/include/` (this document as C declarations)                                |
 
-## Appendix B — Minimal C agent checklist
+### Appendix B — Minimal C agent checklist
 
 - [ ] `md5hex` + first 32 ASCII chars ⇒ PSK
 - [ ] AES-256-GCM with 12-byte random nonce, 16-byte tag
