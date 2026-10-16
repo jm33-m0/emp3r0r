@@ -50,6 +50,7 @@ include/
   c2_transport.h   build config, channel contract, agent session flow
   util/            generic utilities shared with the freestanding stager
     dynload.h        runtime dlopen/dlsym from libc + ELF symbol lookup
+    elfload.h        in-memory ELF64 mapping + relocation (no fd, no disk)
     rc4.h            RC4 stream cipher (payload obfuscation)
     packer.h         build-time config XOR + RC4 key derivation
     net_utils.h      raw-socket helpers (freestanding payloads)
@@ -62,7 +63,7 @@ src/               protocol layer shared by every provider
 src/crypto/        crypto providers (c2_crypto_<name>.c)
 src/gzip/          gzip providers (c2_gzip_<name>.c)
 src/transport/     transport + HTTP/TLS providers
-src/util/          implementations of include/util/ (debug, dynload, rc4, ...)
+src/util/          implementations of include/util/ (debug, dynload, elfload, rc4, ...)
 tests/             standalone unit tests (make test)
 fuzz/              LLVMFuzzerTestOneInput targets + fallback runner (make fuzz)
 vendor/tinycbor/   vendored CBOR codec (MIT, Intel tinycbor 7.0)
@@ -360,8 +361,10 @@ Implemented and tested in `src/`:
 - `c2_bof.c` — Beacon Object File runner for Linux: `c2_bof_pack_args` (the
   Windows COFFLoader wire format, including the NUL-terminated `z`/`Z` strings)
   and `c2_bof_run`, which pulls `coffloader_linux.<arch>.gz` into memfs on
-  demand and executes the BOF through the `coffloader_linux` provider. Fuzzed
-  (`fuzz/fuzz_bof.c`).
+  demand and executes the BOF through the `coffloader_linux` provider. The
+  loader image is mapped in memory by `src/util/elfload.c` (anonymous mmap +
+  dynamic relocations, the C counterpart of the Go agent's `memmod`), never via
+  an fd or disk. Fuzzed (`fuzz/fuzz_bof.c`).
 
 Still to come:
 

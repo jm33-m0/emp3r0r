@@ -138,7 +138,7 @@ TINYCBOR_SRC = vendor/tinycbor/cborencoder.c \
 # Protocol layer plus the selected providers. util/strings.c / util/system.c /
 # util/net_utils.c are freestanding-only (they override libc) and are excluded.
 PORTABLE_SRC = src/util/rc4.c src/util/packer.c src/util/dynload.c src/util/dynload_hosted.c \
-               src/util/debug.c src/c2_common.c src/c2_crypto.c \
+               src/util/elfload.c src/util/debug.c src/c2_common.c src/c2_crypto.c \
                src/c2_messages.c src/c2_agent_info.c src/c2_config.c \
                src/c2_secureconn.c src/c2_session.c src/c2_memfile.c \
                src/c2_bof.c src/c2_sysinfo.c src/c2_module.c \
@@ -193,10 +193,10 @@ CONFIG_SRC ?=
 # tinycbor translation units are never called by the agent. Dropping them by
 # name keeps the binary small even before --gc-sections.
 AGENT_COMMON_SRC = src/util/dynload.c src/util/dynload_hosted.c \
-                   src/c2_crypto.c src/c2_messages.c src/c2_agent_info.c \
-                   src/c2_config.c src/c2_secureconn.c src/c2_session.c \
-                   src/c2_memfile.c src/c2_bof.c src/c2_sysinfo.c \
-                   src/c2_module.c
+                   src/util/elfload.c src/c2_crypto.c src/c2_messages.c \
+                   src/c2_agent_info.c src/c2_config.c src/c2_secureconn.c \
+                   src/c2_session.c src/c2_memfile.c src/c2_bof.c \
+                   src/c2_sysinfo.c src/c2_module.c
 TINYCBOR_MIN_SRC = vendor/tinycbor/cborencoder.c vendor/tinycbor/cborparser.c
 
 AGENT_CONFIG_SRC =
@@ -260,7 +260,7 @@ endif
 BOF_MODULE_DIR = ../modules/coffloader_linux
 BOF_HELLO_DIR = ../modules/hello_linux
 ifneq ($(wildcard $(BOF_MODULE_DIR)/loader_linux.c),)
-  BOF_TEST = $(BUILD)/test_c2_bof
+  BOF_TEST = $(BUILD)/test_c2_bof $(BUILD)/test_c2_elfload
   BOF_FUZZ = $(BUILD)/fuzz_bof
 endif
 
@@ -352,12 +352,20 @@ $(BUILD)/hello_linux.o: $(BOF_HELLO_DIR)/hello_linux.c | $(BUILD)
 	$(MAKE) -C $(BOF_HELLO_DIR) clean >/dev/null
 
 $(BUILD)/test_c2_bof: tests/test_c2_bof.c src/c2_bof.c src/util/dynload.c \
-                      $(BUILD)/coffloader_linux.so $(BUILD)/hello_linux.o \
-                      tests/test.h | $(BUILD)
+                      src/util/elfload.c $(BUILD)/coffloader_linux.so \
+                      $(BUILD)/hello_linux.o tests/test.h | $(BUILD)
 	$(HOSTCC) $(TEST_CFLAGS) \
 	  -DBOF_LOADER_PATH='"$(BUILD)/coffloader_linux.so"' \
 	  -DBOF_OBJ_PATH='"$(BUILD)/hello_linux.o"' \
-	  tests/test_c2_bof.c src/c2_bof.c src/util/dynload.c -o $@
+	  tests/test_c2_bof.c src/c2_bof.c src/util/dynload.c \
+	  src/util/elfload.c -o $@
+
+$(BUILD)/test_c2_elfload: tests/test_c2_elfload.c src/util/elfload.c \
+                          src/util/dynload.c $(BUILD)/coffloader_linux.so \
+                          tests/test.h | $(BUILD)
+	$(HOSTCC) $(TEST_CFLAGS) \
+	  -DBOF_LOADER_PATH='"$(BUILD)/coffloader_linux.so"' \
+	  tests/test_c2_elfload.c src/util/elfload.c src/util/dynload.c -o $@
 
 $(BUILD)/test_c2_module: tests/test_c2_module.c tests/test.h \
                        src/c2_module.c src/c2_common.c \
@@ -458,10 +466,11 @@ $(BUILD)/fuzz_memfile: fuzz/fuzz_memfile.c $(FUZZ_DRIVER) src/c2_memfile.c \
 	$(HOSTCC) $(FUZZ_CFLAGS) $< $(FUZZ_DRIVER) src/c2_memfile.c $(GZIP_SRC) \
 		$(EXTRA_SRC) src/c2_crypto.c src/c2_common.c -o $@
 
-$(BUILD)/fuzz_bof: fuzz/fuzz_bof.c $(FUZZ_DRIVER) src/c2_bof.c src/util/dynload.c \
+$(BUILD)/fuzz_bof: fuzz/fuzz_bof.c $(FUZZ_DRIVER) src/c2_bof.c \
+                   src/util/dynload.c src/util/elfload.c \
                    $(BUILD)/coffloader_linux.so fuzz/fuzz_common.h | $(BUILD)
 	$(HOSTCC) $(FUZZ_CFLAGS) -DFUZZ_BOF_LOADER='"$(BUILD)/coffloader_linux.so"' \
-		$< $(FUZZ_DRIVER) src/c2_bof.c src/util/dynload.c -o $@
+		$< $(FUZZ_DRIVER) src/c2_bof.c src/util/dynload.c src/util/elfload.c -o $@
 
 $(BUILD)/fuzz_dynload: fuzz/fuzz_dynload.c $(FUZZ_DRIVER) src/util/dynload.c fuzz/fuzz_common.h | $(BUILD)
 	$(HOSTCC) $(FUZZ_CFLAGS) $< $(FUZZ_DRIVER) src/util/dynload.c -o $@

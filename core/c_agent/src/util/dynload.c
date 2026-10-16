@@ -191,6 +191,7 @@ static int dyn_read(const Mod *m, size_t off, DynInfo *out) {
 /* A dynamic symbol, copied out of the (possibly unaligned) symbol table. */
 typedef struct {
   uint32_t st_name;
+  uint8_t st_info;
   uint16_t st_shndx;
   unsigned long st_value;
 } SymInfo;
@@ -203,6 +204,7 @@ static int sym_read(const Mod *m, size_t sym_off, size_t idx, SymInfo *out) {
     return 0;
   const uint8_t *p = m->base + sym_off + idx * ELF64_SYM_SIZE;
   out->st_name = rd32(p);
+  out->st_info = p[4];
   out->st_shndx = (uint16_t)(p[6] | (p[7] << 8));
   out->st_value = rd64(p + 8);
   return 1;
@@ -454,6 +456,15 @@ static void *sym_addr(const Mod *m, const Seg *segs, int nsegs,
   return (void *)a;
 }
 
+/* Address plus the raw st_info byte (so an in-memory loader can recognise a
+ * GNU IFUNC and invoke its resolver, which a plain st_value cannot convey). */
+static void *sym_resolve(const Mod *m, const Seg *segs, int nsegs,
+                         const SymInfo *sym, uint8_t *out_type) {
+  if (out_type != NULL)
+    *out_type = sym->st_info;
+  return sym_addr(m, segs, nsegs, sym->st_value);
+}
+
 #if DYNLOAD_HASH_STYLE != DYNLOAD_HASH_SYSV
 /* GNU ELF string hash used by DT_GNU_HASH tables. */
 static uint32_t elf_gnu_hash(const char *name) {
@@ -469,7 +480,7 @@ static uint32_t elf_gnu_hash(const char *name) {
  */
 static void *resolve_sym_gnu(const Mod *m, const Seg *segs, int nsegs,
                              size_t sym_off, size_t str_off, const uint8_t *gp,
-                             const char *name) {
+                             const char *name, uint8_t *out_type) {
   if (!mod_has(m, gp, 16))
     return NULL;
   uint32_t nbuckets = rd32(gp);
@@ -521,7 +532,7 @@ static void *resolve_sym_gnu(const Mod *m, const Seg *segs, int nsegs,
       SymInfo sym;
       if (sym_read(m, sym_off, (size_t)symoffset + i, &sym) &&
           sym_named(m, segs, nsegs, str_off, &sym, name))
-        return sym_addr(m, segs, nsegs, sym.st_value);
+        return sym_resolve(m, segs, nsegs, &sym, out_type);
     }
     if (eh & 1)
       break; /* chain terminator */
@@ -530,7 +541,10 @@ static void *resolve_sym_gnu(const Mod *m, const Seg *segs, int nsegs,
 }
 #endif /* DYNLOAD_HASH_STYLE != DYNLOAD_HASH_SYSV */
 
-void *dynload_resolve_module(const void *base, size_t len, const char *name) {
+void *dynload_lookup_module(const void *base, size_t len, const char *name,
+                            uint8_t *out_type) {
+  if (out_type != NULL)
+    *out_type = 0;
   if (base == NULL || name == NULL || len < ELF64_EHDR_SIZE)
     return NULL;
 
@@ -648,7 +662,7 @@ void *dynload_resolve_module(const void *base, size_t len, const char *name) {
       if (!sym_read(&m, sym_off, i, &sym))
         break;
       if (sym_named(&m, segs, nsegs, str_off, &sym, name))
-        return sym_addr(&m, segs, nsegs, sym.st_value);
+        return sym_resolve(&m, segs, nsegs, &sym, out_type);
     }
     return NULL;
   }
@@ -658,12 +672,17 @@ void *dynload_resolve_module(const void *base, size_t len, const char *name) {
   if (ghash_v) {
     const uint8_t *gp = (const uint8_t *)mod_abs(&m, ghash_v);
     if (gp)
-      return resolve_sym_gnu(&m, segs, nsegs, sym_off, str_off, gp, name);
+      return resolve_sym_gnu(&m, segs, nsegs, sym_off, str_off, gp, name,
+                             out_type);
     return NULL;
   }
 #endif
 
   return NULL;
+}
+
+void *dynload_resolve_module(const void *base, size_t len, const char *name) {
+  return dynload_lookup_module(base, len, name, NULL);
 }
 
 void dynload_reset(dynload *dl) {

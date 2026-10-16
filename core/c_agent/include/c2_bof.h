@@ -6,9 +6,9 @@
  *
  * The loader itself is not linked into the agent: it is the `coffloader_linux`
  * dependency module (coffloader_linux.so), the Linux counterpart of the Windows
- * COFFLoader DLL. c2_bof_run maps the loader image from memory (a memfd, never
- * disk), dlopens it through dynload, calls its `bof_run` export with the object
- * and packed arguments, and closes it again.
+ * COFFLoader DLL. c2_bof_run maps the loader image from memory (anonymous
+ * mmap + dynamic relocations, never an fd or disk), calls its `bof_run` export
+ * with the object and packed arguments, and unmaps it again.
  *
  * The Go agent maps the same dependency with memmod (core/lib/coffloader), so
  * both agents execute BOFs through identical loader code.

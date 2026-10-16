@@ -2,6 +2,7 @@
 #define UTIL_DYNLOAD_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 /*
  * dynload.h — runtime resolution of libc's dl* entry points and stateless ELF
@@ -69,16 +70,23 @@ unsigned long dynload_maps_find(const char *text, size_t len,
 unsigned long dynload_find_libc(unsigned long *end);
 
 /*
- * Resolve a dynamic symbol `name` in the ELF image occupying [base, base+len).
- * Every header, table and pointer is bounds-checked against that range and the
- * module's PT_LOAD segments, so malformed or truncated input can only fail,
- * never read out of bounds. DT_* pointers may be relocated absolute addresses
- * (loaded module) or base-relative offsets (flat image); either is accepted.
- * Returns the relocated address, or NULL. Fuzzed by fuzz/fuzz_dynload.c.
+ * Resolve a dynamic symbol `name` in the ELF image occupying [base, base+len),
+ * storing the raw st_info byte in *out_type when non-NULL (the caller checks
+ * the low nibble against ELF STT_* — notably STT_GNU_IFUNC, whose st_value is a
+ * resolver rather than the callable address). Every header, table and pointer
+ * is bounds-checked against that range and the module's PT_LOAD segments, so
+ * malformed or truncated input can only fail, never read out of bounds. DT_*
+ * pointers may be relocated absolute addresses (loaded module) or base-relative
+ * offsets (flat image); either is accepted. Returns the relocated address or
+ * NULL. Fuzzed by fuzz/fuzz_dynload.c.
  *
  * Use dynload_find_module/dynload_find_libc to obtain a trusted range for a
  * loaded module.
  */
+void *dynload_lookup_module(const void *base, size_t len, const char *name,
+                            uint8_t *out_type);
+
+/* As dynload_lookup_module, ignoring the symbol type. */
 void *dynload_resolve_module(const void *base, size_t len, const char *name);
 
 /* ---- context API --------------------------------------------------------- */

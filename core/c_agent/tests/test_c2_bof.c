@@ -3,7 +3,8 @@
  *
  * The Makefile builds the real loader (`coffloader_linux.so`) and the real
  * `hello_linux` BOF at test time and passes their paths in, so this exercises
- * exactly the runtime path: memfd + dlopen + bof_run + argument packing.
+ * exactly the runtime path: in-memory mmap + relocations + bof_run + argument
+ * packing.
  */
 
 #include "c2_bof.h"

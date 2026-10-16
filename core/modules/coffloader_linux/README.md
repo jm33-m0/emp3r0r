@@ -19,7 +19,7 @@ The C2 hosts it as `coffloader_linux.<arch>.gz`; the agent maps it on demand.
 
 `loader_linux.c` is the canonical loader, mapped by both agents as the
 `coffloader_linux` dependency (the Go agent through `core/lib/coffloader`
-and `memmod`, the C agent through `dynload`):
+and `memmod`, the C agent through `core/c_agent/src/util/elfload.c`):
 
 - Parses an x86_64 `ET_REL` object.
 - Maps `SHF_ALLOC` sections into one anonymous, page-aligned region and applies
@@ -66,7 +66,8 @@ Built with `zig cc -target x86_64-linux-gnu.2.17 -shared -fPIC -O2 -ldl`; the
 ## Use
 
 The C agent fetches `coffloader_linux.<arch>.gz` into `memfs:///` on the first
-`bof` command and maps it with `dynload` for the duration of one BOF run:
+`bof` command and maps it in memory with `elfload` for the duration of one BOF
+run:
 
 ```text
 bof <object> [export] [args...]

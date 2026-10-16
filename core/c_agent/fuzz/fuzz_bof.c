@@ -12,7 +12,7 @@
 
 /* The loader reads arbitrary bytes as a relocatable object, so the property
  * under test is memory safety of the ELF/relocation parser. The real
- * coffloader_linux loader is loaded once and reused. */
+ * coffloader_linux image is read once and reused. */
 static uint8_t *g_loader = NULL;
 static size_t g_loader_len = 0;
 static int g_loader_tried = 0;

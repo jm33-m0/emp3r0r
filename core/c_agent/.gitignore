@@ -9,3 +9,4 @@ c2_config_embedded.c
 # artifacts, not tracked files.
 vendor/mbedtls/**/*.o
 vendor/mbedtls/**/*.a
+bear.config.json

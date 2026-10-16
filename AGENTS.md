@@ -107,6 +107,12 @@ In multi-operator mode the server is the trust root and operators are untrusted 
 - Use `crypto/rand` (or the project's crypto-backed helpers) for anything security-relevant; do not introduce `math/rand` for keys, nonces, or names.
 - Use I/O functions such as `WriteFileAgent` for agent side file I/O, utilizing `memfs`. No file write except disk spillage by `memfs`. No spawning subprocess on agent side unless explicitly allowed.
 
+## In-memory code loading
+
+- **Never use `memfd_create` (or `/proc/self/fd/N` + `dlopen`) to load code. It is a huge red flag.** The "no disk" justification is an illusion: on Linux everything is a file, and a `memfd` is a named kernel file object that detection keys on whether or not it ever reaches physical storage. Disk vs. non-disk matters very little; do not trade a real detection signal for a cosmetic one.
+- Load an in-memory image the way the Go agent does (`lib/memmod` / `lib/memdeps`): `mmap` it anonymously and apply its own relocations. In C use `src/util/elfload.c`; never `dlopen` a memory-backed fd.
+- `dlopen`/`dlsym` are for resolving symbols from libraries already present on the host, never as a mechanism to load an image you hold in memory.
+
 ## Payload Sanitization
 
 Everything that ships to a target (agent, shellcode, stagers, loaders, BOFs, DLLs, service executables) must read like a generic Windows/POSIX program when inspected. Assume a defender runs `strings`, dumps the exports, and greps for well-known names; the artifact must give them nothing to key on.
