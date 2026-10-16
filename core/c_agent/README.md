@@ -212,9 +212,9 @@ targets are `LLVMFuzzerTestOneInput` functions. On a host with clang,
 coverage-guided libFuzzer over every target: each target gets `FUZZ_TIME`
 seconds (default 60), new corpus entries persist under `build/corpus/<target>/`
 so a later run resumes instead of starting over, and any crash is written to
-`build/crash/`. This is what CI runs — a short pass per change and a long
-nightly campaign over the restored corpus cache. Without clang,
-`fuzz/fuzz_runner.c` drives a bounded mutational loop for `FUZZ_ITERS`
+`build/crash/`. CI runs this as a weekly campaign over the restored corpus
+cache (and on manual dispatch); developer machines can run it any time. Without
+clang, `fuzz/fuzz_runner.c` drives a bounded mutational loop for `FUZZ_ITERS`
 iterations instead, writing the crashing input to `build/crash/<target>.bin` so
 a failure is reproducible.
 

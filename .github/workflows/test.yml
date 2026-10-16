@@ -9,6 +9,12 @@ on:
     branches: [v5]
     paths:
       - "core/**"
+  schedule:
+    # Weekly, not daily: the corpus cache means each run continues where the
+    # previous one stopped, so a weekly campaign still accumulates coverage.
+    # Run it on demand from the Actions tab (workflow_dispatch) for more.
+    - cron: "0 3 * * 0"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -197,3 +203,53 @@ jobs:
           go tool cover -func=coverage.txt
           PERCENT=$(go tool cover -func=coverage.txt | grep total: | awk '{print $3}')
           echo "### Test Coverage: $PERCENT" >> $GITHUB_STEP_SUMMARY
+
+  fuzz:
+    name: Fuzz C agent (libFuzzer, ASan+UBSan)
+    runs-on: ubuntu-latest
+    # Fuzzing is too slow for every PR: run it on the nightly schedule and on
+    # manual dispatch only. Developers can run `make fuzz` locally any time.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    env:
+      # The corpus cache carries coverage between runs, so each weekly run
+      # continues where the previous one stopped instead of from the checked-in
+      # seeds. Keep this modest: the whole suite runs sequentially in CI.
+      FUZZ_TIME: "300"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # fuzz_bof links the real coffloader_linux module, whose Makefile builds
+      # with the project's pinned zig.
+      - name: Install zig (for the BOF fuzz target)
+        env:
+          ZIG_VERSION: "0.16.0"
+          ZIG_SHA256: "70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00"
+        run: |
+          wget -q "https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
+          echo "${ZIG_SHA256}  zig-x86_64-linux-${ZIG_VERSION}.tar.xz" | sha256sum -c -
+          tar -xf "zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
+          sudo mv "zig-x86_64-linux-${ZIG_VERSION}" /usr/local/zig
+          sudo ln -sf /usr/local/zig/zig /usr/local/bin/zig
+
+      - name: Restore cumulative fuzz corpus
+        uses: actions/cache@v4
+        with:
+          path: core/c_agent/build/corpus
+          key: cagent-fuzz-corpus-${{ github.sha }}
+          restore-keys: |
+            cagent-fuzz-corpus-
+
+      - name: Build and run the fuzzers
+        working-directory: ./core/c_agent
+        run: |
+          clang --version
+          make fuzz FUZZER=libfuzzer HOSTCC=clang FUZZ_TIME="$FUZZ_TIME"
+
+      - name: Upload crash artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cagent-fuzz-crashes
+          path: core/c_agent/build/crash/
+          if-no-files-found: ignore
