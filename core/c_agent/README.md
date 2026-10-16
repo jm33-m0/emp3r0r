@@ -88,6 +88,7 @@ make -C core/c_agent coverage        # gcov line coverage per source
 make -C core/c_agent test-mbedtls    # self-contained mbedTLS backend tests
 make -C core/c_agent vendor-mbedtls  # build the vendored mbedTLS static libs
 make -C core/c_agent fuzz            # fuzz targets (ASan/UBSan fallback runner)
+make -C core/c_agent fuzz FUZZER=libfuzzer HOSTCC=clang FUZZ_TIME=60  # libFuzzer
 ```
 
 `zig` (the project's pinned compiler, shipped with emp3r0r) builds the library
@@ -206,12 +207,16 @@ The vendored trees are source-only; their `.o`/`.a` files are build artifacts.
 
 `src/util/system.c` (raw-syscall libc replacements) and `src/util/strings.c` are linked
 only into `-nostdlib` payloads; a hosted binary links libc instead. The fuzz
-targets are `LLVMFuzzerTestOneInput` functions, so `make fuzz CC=clang
-HOSTCC=clang FUZZER=libfuzzer` runs them under libFuzzer where clang is
-available; otherwise `fuzz/fuzz_runner.c` drives a bounded mutational loop. The
-fallback runner loads every file under `fuzz/corpus/<target>/` as a seed, grows
-its corpus at runtime, persists new entries under `build/corpus/`, and writes
-the crashing input to `build/crash/<target>.bin` so a failure is reproducible.
+targets are `LLVMFuzzerTestOneInput` functions. On a host with clang,
+`make fuzz FUZZER=libfuzzer HOSTCC=clang FUZZ_TIME=<seconds>` runs
+coverage-guided libFuzzer over every target: each target gets `FUZZ_TIME`
+seconds (default 60), new corpus entries persist under `build/corpus/<target>/`
+so a later run resumes instead of starting over, and any crash is written to
+`build/crash/`. This is what CI runs — a short pass per change and a long
+nightly campaign over the restored corpus cache. Without clang,
+`fuzz/fuzz_runner.c` drives a bounded mutational loop for `FUZZ_ITERS`
+iterations instead, writing the crashing input to `build/crash/<target>.bin` so
+a failure is reproducible.
 
 The targets and the surface each covers:
 
@@ -223,9 +228,12 @@ The targets and the surface each covers:
 | `fuzz_gzip` | gzip header parser + miniz DEFLATE/INFLATE round-trip |
 | `fuzz_memfile` | transparent memfs container decode + round-trip |
 | `fuzz_bof` | BOF loader ELF/relocation parser (real `coffloader_linux` provider) |
+| `fuzz_elfload` | in-memory ELF64 mapper + relocator (constructors/IFUNCs are recorded, not run) |
 | `fuzz_encdec` | decode → re-encode → decode round-trip for both envelopes |
 | `fuzz_secureconn` | frame length/padding parser, stream read, encode/decode (identity and stub AEAD) |
 | `fuzz_text` | hex/base64url codecs, canonical auth string, signature encoding |
+| `fuzz_module` | `c2_coff_invocation_parse`: base64 + nested CBOR COFF invocation |
+| `fuzz_strings` | freestanding mem/str primitives vs. a byte-wise reference |
 | `fuzz_dynload` | bounds-checked ELF dynamic-symbol resolver (SysV and GNU hash) |
 | `fuzz_maps` | `/proc/self/maps` parser (same line machine as the file-backed finders) |
 | `fuzz_rc4` | RC4 keystream |
@@ -237,6 +245,22 @@ test is that no input — however malformed or hostile — can over-read, overfl
 recurse without a bound, or abort. The vendored tinycbor keeps its `assert`s
 enabled so a decoder invariant violation fails loudly in fuzzing rather than
 silently misbehaving in a release build.
+
+### Recovering from faulty images
+
+Untrusted code paths are guarded so a malformed payload fails one operation
+instead of taking the agent down:
+
+- `src/util/elfload.c` catches SIGSEGV/SIGBUS/SIGILL/SIGFPE while an image's
+  IFUNC/IRELATIVE resolvers and constructors run, and while its dynamic symbol
+  table is searched. A fault becomes a rejected image (`elfload_map` returns
+  NULL, `elfload_sym` returns NULL) with the previous signal handlers restored
+  on every path; a private signal stack lets a runaway constructor be caught
+  too. The fuzz build defines `ELFLOAD_NO_EXEC`, which records rather than
+  calls image-supplied addresses so ASan/UBSan can still see the fault.
+- The `coffloader_linux` loader (`core/modules/coffloader_linux`) wraps BOF
+  execution in the same kind of guard and restores the host handlers
+  afterwards.
 
 The headers are C99 and freestanding-friendly: only `<stdint.h>` and
 `<stddef.h>`. They carry no implementation, no allocation, and no dependency on

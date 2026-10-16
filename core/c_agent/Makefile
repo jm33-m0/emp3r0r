@@ -362,10 +362,17 @@ $(BUILD)/test_bof: tests/test_bof.c src/bof.c src/util/dynload.c \
 
 $(BUILD)/test_elfload: tests/test_elfload.c src/util/elfload.c \
                           src/util/dynload.c $(BUILD)/coffloader_linux.so \
-                          tests/test.h | $(BUILD)
+                          $(BUILD)/faulty_ctor.so tests/test.h | $(BUILD)
 	$(HOSTCC) $(TEST_CFLAGS) \
 	  -DBOF_LOADER_PATH='"$(BUILD)/coffloader_linux.so"' \
+	  -DFAULTY_CTOR_PATH='"$(BUILD)/faulty_ctor.so"' \
 	  tests/test_elfload.c src/util/elfload.c src/util/dynload.c -o $@
+
+# Deliberately faulting constructor, for the loader crash-guard regression test.
+# -nostdlib keeps the image free of undefined crt symbols the loader would have
+# to resolve before it can reach the constructor.
+$(BUILD)/faulty_ctor.so: tests/faulty_ctor.c | $(BUILD)
+	$(HOSTCC) -shared -fPIC -O0 -nostdlib -o $@ $<
 
 $(BUILD)/test_module: tests/test_module.c tests/test.h \
                        src/module.c src/common.c \
@@ -396,15 +403,33 @@ $(BUILD)/test_sysinfo: tests/test_sysinfo.c tests/test.h \
 		$(TINYCBOR_SRC) -o $@
 
 # ---- fuzzing ---------------------------------------------------------------
-# Default: the fallback mutational runner + sanitizers. For libFuzzer:
-#   make fuzz CC=clang HOSTCC=clang FUZZER=libfuzzer
+# Coverage-guided fuzzing with libFuzzer is the primary mode:
+#
+#   make fuzz FUZZER=libfuzzer HOSTCC=clang CC=clang
+#
+# It runs every target for FUZZ_TIME seconds (default 60) and persists newly
+# discovered inputs under $(FUZZ_OUT)/<target>, so a later run resumes instead
+# of starting over. Crashes land in $(BUILD)/crash/. Set FUZZ_ARGS to add
+# libFuzzer flags (e.g. FUZZ_ARGS='-jobs=4 -workers=4 -runs=1000000').
+#
+# Without clang the dependency-free mutational runner exercises the same
+# targets under ASan/UBSan for FUZZ_ITERS iterations.
 FUZZER ?= runner
 ifeq ($(FUZZER),libfuzzer)
   FUZZ_LINK = -fsanitize=fuzzer,address,undefined
   FUZZ_DRIVER =
+  FUZZ_TIME ?= 60
+  FUZZ_ARGS ?= -max_total_time=$(FUZZ_TIME) -print_final_stats=1 \
+               -artifact_prefix=$(abspath $(BUILD)/crash)/
+  # libFuzzer takes corpus directories; the output corpus comes first so new
+  # units are persisted there and the checked-in seed dir is never modified.
+  FUZZ_INPUTS = $$out $$(test -d $(FUZZ_CORPUS)/$$name && echo $(FUZZ_CORPUS)/$$name)
 else
   FUZZ_LINK = -fsanitize=address,undefined -fno-omit-frame-pointer
   FUZZ_DRIVER = fuzz/fuzz_runner.c
+  FUZZ_ARGS ?=
+  # The fallback runner takes individual seed files and ignores directories.
+  FUZZ_INPUTS = $$out $$(ls $(FUZZ_CORPUS)/$$name/* 2>/dev/null || true)
 endif
 
 FUZZ_CFLAGS = $(WARN) -O1 -g $(INCLUDES) $(FUZZ_LINK)
@@ -415,15 +440,15 @@ FUZZ_OUT ?= $(BUILD)/corpus
 fuzz: $(BUILD)/fuzz_rc4 $(BUILD)/fuzz_packer $(BUILD)/fuzz_inet_aton \
       $(BUILD)/fuzz_messages $(BUILD)/fuzz_agent_info $(BUILD)/fuzz_config \
       $(BUILD)/fuzz_secureconn $(BUILD)/fuzz_text $(BUILD)/fuzz_encdec \
-      $(GZIP_FUZZ) $(BOF_FUZZ) $(BUILD)/fuzz_dynload $(BUILD)/fuzz_maps
+      $(GZIP_FUZZ) $(BOF_FUZZ) $(BUILD)/fuzz_dynload $(BUILD)/fuzz_maps \
+      $(BUILD)/fuzz_module $(BUILD)/fuzz_strings $(BUILD)/fuzz_elfload
 	@set -e; mkdir -p $(BUILD)/crash; \
 	for t in $^; do \
 	  name=$$(basename $$t); name=$${name#fuzz_}; \
-	  seeds=$$(ls $(FUZZ_CORPUS)/$$name/* 2>/dev/null || true); \
 	  out=$(FUZZ_OUT)/$$name; mkdir -p $$out; \
-	  echo "--- $$t ($$(echo $$seeds | wc -w) seed files)"; \
+	  echo "--- $$t"; \
 	  FUZZ_ITERS=$(FUZZ_ITERS) FUZZ_CORPUS_OUT=$$out \
-	    FUZZ_CRASH=$(BUILD)/crash/$$name.bin ./$$t $$seeds; \
+	    FUZZ_CRASH=$(BUILD)/crash/$$name.bin ./$$t $(FUZZ_ARGS) $(FUZZ_INPUTS); \
 	done
 
 $(BUILD)/fuzz_rc4: fuzz/fuzz_rc4.c $(FUZZ_DRIVER) src/util/rc4.c fuzz/fuzz_common.h | $(BUILD)
@@ -469,7 +494,8 @@ $(BUILD)/fuzz_memfile: fuzz/fuzz_memfile.c $(FUZZ_DRIVER) src/memfile.c \
 $(BUILD)/fuzz_bof: fuzz/fuzz_bof.c $(FUZZ_DRIVER) src/bof.c \
                    src/util/dynload.c src/util/elfload.c \
                    $(BUILD)/coffloader_linux.so fuzz/fuzz_common.h | $(BUILD)
-	$(HOSTCC) $(FUZZ_CFLAGS) -DFUZZ_BOF_LOADER='"$(BUILD)/coffloader_linux.so"' \
+	$(HOSTCC) $(FUZZ_CFLAGS) -DELFLOAD_NO_EXEC \
+		-DFUZZ_BOF_LOADER='"$(BUILD)/coffloader_linux.so"' \
 		$< $(FUZZ_DRIVER) src/bof.c src/util/dynload.c src/util/elfload.c -o $@
 
 $(BUILD)/fuzz_dynload: fuzz/fuzz_dynload.c $(FUZZ_DRIVER) src/util/dynload.c fuzz/fuzz_common.h | $(BUILD)
@@ -477,6 +503,21 @@ $(BUILD)/fuzz_dynload: fuzz/fuzz_dynload.c $(FUZZ_DRIVER) src/util/dynload.c fuz
 
 $(BUILD)/fuzz_maps: fuzz/fuzz_maps.c $(FUZZ_DRIVER) src/util/dynload.c fuzz/fuzz_common.h | $(BUILD)
 	$(HOSTCC) $(FUZZ_CFLAGS) $< $(FUZZ_DRIVER) src/util/dynload.c -o $@
+
+$(BUILD)/fuzz_module: fuzz/fuzz_module.c $(FUZZ_DRIVER) src/module.c \
+                      src/common.c $(TINYCBOR_SRC) fuzz/fuzz_common.h | $(BUILD)
+	$(HOSTCC) $(FUZZ_CFLAGS) $< $(FUZZ_DRIVER) src/module.c \
+		src/common.c $(TINYCBOR_SRC) -o $@
+
+$(BUILD)/fuzz_strings: fuzz/fuzz_strings.c $(FUZZ_DRIVER) src/util/strings.c fuzz/fuzz_common.h | $(BUILD)
+	$(HOSTCC) $(FUZZ_CFLAGS) -fno-builtin $< $(FUZZ_DRIVER) src/util/strings.c -o $@
+
+# The image is untrusted, so the fuzz build records (rather than runs)
+# image-supplied constructors and IFUNC/IRELATIVE resolvers.
+$(BUILD)/fuzz_elfload: fuzz/fuzz_elfload.c $(FUZZ_DRIVER) src/util/elfload.c \
+                       src/util/dynload.c fuzz/fuzz_common.h | $(BUILD)
+	$(HOSTCC) $(FUZZ_CFLAGS) -DELFLOAD_NO_EXEC $< $(FUZZ_DRIVER) \
+		src/util/elfload.c src/util/dynload.c -o $@
 
 # ---- coverage --------------------------------------------------------------
 # `make coverage` rebuilds the unit tests with gcov (sanitizers off) and prints

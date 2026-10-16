@@ -20,6 +20,10 @@
 #define BOF_LOADER_PATH ""
 #endif
 
+#ifndef FAULTY_CTOR_PATH
+#define FAULTY_CTOR_PATH ""
+#endif
+
 static uint8_t *slurp(const char *path, size_t *len) {
   FILE *f = fopen(path, "rb");
   if (f == NULL)
@@ -92,8 +96,26 @@ static void test_reject(void) {
   CHECK(err[0] != '\0' && err[0] != 'x');
 }
 
+/* A valid image whose constructor faults must be rejected by the crash guard
+ * without taking the test process down. */
+static void test_faulty_ctor(void) {
+  if (FAULTY_CTOR_PATH[0] == '\0')
+    return;
+  size_t len = 0;
+  uint8_t *image = slurp(FAULTY_CTOR_PATH, &len);
+  CHECK(image != NULL && len > 0);
+  if (image == NULL)
+    return;
+  char err[160];
+  elfload_module *m = elfload_map(image, len, err, sizeof(err));
+  CHECK(m == NULL);
+  CHECK(strcmp(err, "constructor crashed") == 0);
+  free(image);
+}
+
 int main(void) {
   test_reject();
+  test_faulty_ctor();
 
   if (BOF_LOADER_PATH[0] == '\0') {
     printf("%s: loader not provided, skipped runtime part\n", __FILE__);
@@ -113,6 +135,40 @@ int main(void) {
   CHECK(before >= 0);
 
   char err[160];
+
+  /* Regression: a PT_LOAD with no access flags used to be mprotected
+   * PROT_NONE; when it covered the image (ELF header included) every later
+   * symbol lookup read unmapped memory. Patch the real image's first PT_LOAD
+   * and require rejection. */
+  {
+    uint8_t *bad = (uint8_t *)malloc(len);
+    CHECK(bad != NULL);
+    if (bad != NULL) {
+      memcpy(bad, image, len);
+      uint64_t phoff = 0;
+      uint16_t phentsize = 0, phnum = 0;
+      memcpy(&phoff, bad + 32, sizeof(phoff));
+      memcpy(&phentsize, bad + 54, sizeof(phentsize));
+      memcpy(&phnum, bad + 56, sizeof(phnum));
+      int patched = 0;
+      for (uint16_t i = 0; i < phnum &&
+                           phoff + (uint64_t)phentsize * (i + 1) <= len;
+           i++) {
+        uint8_t *p = bad + phoff + (size_t)i * phentsize;
+        uint32_t type = 0;
+        memcpy(&type, p, sizeof(type));
+        if (type == 1 /* PT_LOAD */) {
+          memset(p + 4, 0, 4); /* p_flags = 0 */
+          patched = 1;
+          break;
+        }
+      }
+      CHECK(patched);
+      CHECK(elfload_map(bad, len, err, sizeof(err)) == NULL);
+      free(bad);
+    }
+  }
+
   elfload_module *m = elfload_map(image, len, err, sizeof(err));
   CHECK(m != NULL);
   if (m != NULL) {

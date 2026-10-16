@@ -14,6 +14,8 @@
 #include "util/dynload.h"
 
 #include <stdint.h>
+#include <setjmp.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
@@ -159,13 +161,85 @@ static uint64_t rd64(const uint8_t *p) {
 
 static size_t align_down(size_t v, size_t a) { return v & ~(a - 1); }
 
+#ifndef ELFLOAD_NO_EXEC
+/* ---- crash guard ---------------------------------------------------------
+ * A faulty image must not take the agent down. An image-supplied IFUNC
+ * resolver or constructor can jump anywhere or fault; while one runs we catch
+ * SIGSEGV/SIGBUS/SIGILL/SIGFPE and turn the fault into a clean rejection
+ * instead of a process-wide crash. The guard is process-wide and not
+ * re-entrant, matching elfload_map's single-threaded use; the BOF loader has
+ * its own guard around execution. SA_ONSTACK plus a private stack lets a
+ * constructor that overflows the stack be caught too. */
+static sigjmp_buf g_guard_env;
+static volatile sig_atomic_t g_guard_active;
+static struct sigaction g_guard_old[32];
+static const int g_guard_sigs[] = {SIGSEGV, SIGBUS, SIGILL, SIGFPE};
+#define G_GUARD_NSIG (sizeof(g_guard_sigs) / sizeof(g_guard_sigs[0]))
+
+static void guard_handler(int sig, siginfo_t *info, void *ctx) {
+  if (g_guard_active)
+    siglongjmp(g_guard_env, 1);
+  /* A signal from outside the guarded region: hand it back to whoever owned
+   * the handler before us. */
+  if (sig > 0 && sig < 32) {
+    struct sigaction *old = &g_guard_old[sig];
+    if ((old->sa_flags & SA_SIGINFO) && old->sa_sigaction != NULL) {
+      old->sa_sigaction(sig, info, ctx);
+      return;
+    }
+    if (old->sa_handler != SIG_IGN && old->sa_handler != SIG_DFL) {
+      old->sa_handler(sig);
+      return;
+    }
+  }
+  signal(sig, SIG_DFL);
+  raise(sig);
+}
+
+static void guard_install(void) {
+  static char altstack[64 * 1024];
+  static int altstack_ready;
+  if (!altstack_ready) {
+    stack_t ss;
+    memset(&ss, 0, sizeof(ss));
+    ss.ss_sp = altstack;
+    ss.ss_size = sizeof(altstack);
+    if (sigaltstack(&ss, NULL) == 0)
+      altstack_ready = 1;
+  }
+
+  struct sigaction sa;
+  memset(&sa, 0, sizeof(sa));
+  sa.sa_sigaction = guard_handler;
+  sa.sa_flags = SA_SIGINFO | SA_NODEFER | SA_ONSTACK;
+  for (size_t i = 0; i < G_GUARD_NSIG; i++)
+    sigaction(g_guard_sigs[i], &sa, &g_guard_old[g_guard_sigs[i]]);
+  g_guard_active = 0;
+}
+
+static void guard_restore(void) {
+  g_guard_active = 0;
+  for (size_t i = 0; i < G_GUARD_NSIG; i++)
+    sigaction(g_guard_sigs[i], &g_guard_old[g_guard_sigs[i]], NULL);
+}
+#endif /* !ELFLOAD_NO_EXEC */
+
 /* ---- host symbol resolution --------------------------------------------- */
 
 /* A GNU IFUNC's st_value is its resolver, not the callable implementation:
- * invoke it exactly as the dynamic linker does. */
+ * invoke it exactly as the dynamic linker does.
+ *
+ * ELFLOAD_NO_EXEC is defined only by the fuzz harness (fuzz/fuzz_elfload.c):
+ * a hostile image can point an IFUNC/IRELATIVE entry at any address, so the
+ * fuzzer records the resolver instead of calling attacker-chosen code. The
+ * shipped agent never defines it. */
 static void *ifunc_resolve(void *resolver) {
+#ifdef ELFLOAD_NO_EXEC
+  return resolver;
+#else
   typedef void *(*ifunc_fn)(void);
   return ((ifunc_fn)resolver)();
+#endif
 }
 
 static void *host_symbol(const char *name) {
@@ -269,7 +343,24 @@ static int wr32(uint8_t *map, size_t map_len, uint64_t off, uint32_t v) {
 static int wr_irelative(uint8_t *map, size_t map_len, uint64_t off,
                         uint64_t base, int64_t addend) {
   void *resolver = (void *)(uintptr_t)(base + (uint64_t)addend);
-  return wr64(map, map_len, off, (uint64_t)(uintptr_t)ifunc_resolve(resolver));
+#ifdef ELFLOAD_NO_EXEC
+  /* Fuzz builds record the resolver instead of calling it. */
+  return wr64(map, map_len, off, (uint64_t)(uintptr_t)resolver);
+#else
+  void *resolved = resolver;
+  guard_install();
+  if (sigsetjmp(g_guard_env, 1) == 0) {
+    g_guard_active = 1;
+    resolved = ifunc_resolve(resolver);
+    g_guard_active = 0;
+  } else {
+    g_guard_active = 0;
+    guard_restore();
+    return 0;
+  }
+  guard_restore();
+  return wr64(map, map_len, off, (uint64_t)(uintptr_t)resolved);
+#endif
 }
 
 static int apply_reloc(elfload_module *m, uint64_t off, uint32_t type,
@@ -411,7 +502,21 @@ static void flush_icache(void *start, void *end) {
 
 /* ---- initializers -------------------------------------------------------- */
 
-static void run_init(elfload_module *m, const init_info *init) {
+static int run_init(elfload_module *m, const init_info *init) {
+#ifdef ELFLOAD_NO_EXEC
+  /* Fuzz builds do not execute image-supplied constructors (see
+   * ifunc_resolve). */
+  (void)m;
+  (void)init;
+  return 1;
+#else
+  guard_install();
+  if (sigsetjmp(g_guard_env, 1) != 0) {
+    g_guard_active = 0;
+    guard_restore();
+    return 0;
+  }
+  g_guard_active = 1;
   typedef void (*init_fn)(int, char **, char **);
   if (init->init != 0 && init->init <= m->map_len)
     ((init_fn)(m->map + init->init))(0, NULL, NULL);
@@ -420,12 +525,20 @@ static void run_init(elfload_module *m, const init_info *init) {
       init->init_array_sz <= m->map_len - init->init_array) {
     size_t count = (size_t)(init->init_array_sz / sizeof(uint64_t));
     const uint8_t *arr = m->map + init->init_array;
+    /* The array was relocated above, so its entries are absolute runtime
+     * addresses; bound-check them against the mapping, not its length. */
+    uint64_t base = (uint64_t)(uintptr_t)m->map;
     for (size_t i = 0; i < count; i++) {
       uint64_t fn = rd64(arr + i * sizeof(uint64_t));
-      if (fn != 0 && fn != UINT64_MAX && fn <= m->map_len)
-        ((init_fn)(m->map + fn))(0, NULL, NULL);
+      if (fn != 0 && fn != UINT64_MAX && fn >= base &&
+          fn < base + m->map_len)
+        ((init_fn)(uintptr_t)fn)(0, NULL, NULL);
     }
   }
+  g_guard_active = 0;
+  guard_restore();
+  return 1;
+#endif
 }
 
 /* ---- mapping ------------------------------------------------------------- */
@@ -498,6 +611,13 @@ elfload_module *elfload_map(const uint8_t *image, size_t len, char *err,
       if (filesz > memsz || offset > len || filesz > len - offset ||
           vaddr > UINT64_MAX - memsz) {
         set_err(err, err_cap, "malformed loadable segment");
+        return NULL;
+      }
+      /* A segment with no access flags would mprotect its range PROT_NONE;
+       * one covering the image (ELF header included) would make the mapped
+       * module unreadable for every later symbol lookup. Reject it. */
+      if (prot_from_flags(flags) == 0) {
+        set_err(err, err_cap, "loadable segment has no access permissions");
         return NULL;
       }
       if (vaddr + memsz > max_vaddr)
@@ -667,14 +787,36 @@ elfload_module *elfload_map(const uint8_t *image, size_t len, char *err,
   m->map_len = map_len;
   m->machine = machine;
 
-  run_init(m, &init);
+  if (!run_init(m, &init)) {
+    munmap(map, map_len);
+    free(m);
+    set_err(err, err_cap, "constructor crashed");
+    return NULL;
+  }
   return m;
 }
 
 void *elfload_sym(const elfload_module *m, const char *name) {
   if (m == NULL || name == NULL)
     return NULL;
+#ifdef ELFLOAD_NO_EXEC
+  /* Fuzz builds let ASan/UBSan see the fault instead of swallowing it. */
   return dynload_resolve_module(m->map, m->map_len, name);
+#else
+  void *sym = NULL;
+  guard_install();
+  if (sigsetjmp(g_guard_env, 1) == 0) {
+    g_guard_active = 1;
+    sym = dynload_resolve_module(m->map, m->map_len, name);
+    g_guard_active = 0;
+  } else {
+    g_guard_active = 0;
+    guard_restore();
+    return NULL;
+  }
+  guard_restore();
+  return sym;
+#endif
 }
 
 void elfload_free(elfload_module *m) {
