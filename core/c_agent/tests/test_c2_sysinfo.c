@@ -10,7 +10,9 @@
 
 #include "test.h"
 
+#include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 static int str_eq(c2_str s, const char *lit) {
   size_t n = strlen(lit);
@@ -48,7 +50,14 @@ int main(void) {
   CHECK(info.hostname.ptr != NULL && info.hostname.len > 0);
   CHECK(info.name.ptr != NULL && info.name.len > 0);
   CHECK(info.user.ptr != NULL && str_has(info.user, "uid="));
-  CHECK(info.groups.ptr != NULL);
+  /* getgroups() gives only supplementary groups and is empty in a minimal
+   * container; the primary GID must still be reported, like Go's GroupIds. */
+  CHECK(info.groups.ptr != NULL && info.groups.len > 0);
+  {
+    char primary_gid[32];
+    snprintf(primary_gid, sizeof(primary_gid), "%u", (unsigned)getgid());
+    CHECK(str_has(info.groups, primary_gid));
+  }
   CHECK(info.uptime.ptr != NULL && info.uptime.len > 0);
   CHECK(info.cwd.ptr != NULL && info.cwd.len > 0);
   CHECK(str_eq(info.c2host, "127.0.0.1:8080"));
