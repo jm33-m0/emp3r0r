@@ -13,7 +13,7 @@
  * loaded libraries, and the segments are made executable. The mapping is
  * released with elfload_free.
  *
- * Used by c2_bof.c to run the coffloader_linux dependency entirely in memory.
+ * Used by bof.c to run the coffloader_linux dependency entirely in memory.
  */
 
 typedef struct elfload_module elfload_module;

@@ -245,7 +245,7 @@ func GenerateCAgentWorkflow(opts AgentConfig, providers CAgentProviders, signAge
 	if err := os.MkdirAll(buildDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create build dir: %w", err)
 	}
-	configSrcPath := filepath.Join(buildDir, "c2_config_embedded.c")
+	configSrcPath := filepath.Join(buildDir, "config_embedded.c")
 	if err := os.WriteFile(configSrcPath, cagent.EmbeddedConfigSource(payload, def.MagicString, def.BuildVersion), 0o600); err != nil {
 		return nil, fmt.Errorf("write config source: %w", err)
 	}
@@ -259,9 +259,9 @@ func GenerateCAgentWorkflow(opts AgentConfig, providers CAgentProviders, signAge
 
 	// The executable and the shared object are distinct make outputs; raw PIC is
 	// the shared object wrapped by malasada.
-	built := filepath.Join(buildDir, "c2_agent")
+	built := filepath.Join(buildDir, "agent")
 	if cAgentMakeTarget(providers.Format) == "so" {
-		built = filepath.Join(buildDir, "c2_agent.so")
+		built = filepath.Join(buildDir, "agent.so")
 	}
 	if !util.IsFileExist(built) {
 		return nil, fmt.Errorf("build reported success but %s was not produced", built)
@@ -279,7 +279,7 @@ func GenerateCAgentWorkflow(opts AgentConfig, providers CAgentProviders, signAge
 		}
 	case "shellcode":
 		// malasada turns the PIC shared object into a loader-wrapped raw PIC
-		// blob; the exported entry is main (see c2_agent.c).
+		// blob; the exported entry is main (see agent.c).
 		outFile += ".bin"
 		if data, err = tools.ConvertSharedObjectToShellcode(built, "main", true); err != nil {
 			return nil, fmt.Errorf("convert C agent to shellcode: %w", err)

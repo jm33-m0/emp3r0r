@@ -1,4 +1,4 @@
-#include "c2_bof.h"
+#include "bof.h"
 
 #include "fuzz_common.h"
 

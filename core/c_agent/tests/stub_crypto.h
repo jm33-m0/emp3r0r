@@ -10,7 +10,7 @@
  * `rng_state` is caller-owned and used for nonces/padding.
  */
 
-#include "c2_crypto.h"
+#include "crypto.h"
 
 void stub_crypto_init(c2_crypto_backend *be, uint32_t *rng_state);
 

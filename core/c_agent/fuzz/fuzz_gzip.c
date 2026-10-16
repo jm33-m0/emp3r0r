@@ -1,4 +1,4 @@
-#include "c2_gzip.h"
+#include "gzip.h"
 
 #include "fuzz_common.h"
 

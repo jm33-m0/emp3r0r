@@ -12,7 +12,7 @@ func TestEmbeddedConfigSource(t *testing.T) {
 	src := string(EmbeddedConfigSource(blob, "magic", "1.2.3"))
 
 	for _, want := range []string{
-		"#include \"c2_embedded_config.h\"",
+		"#include \"embedded_config.h\"",
 		"const uint8_t c2_embedded_config[]",
 		"0x00, 0x7f, 0xff, 0x61, 0x0a, 0x22, 0x5c,",
 		"const size_t c2_embedded_config_len = 7;",

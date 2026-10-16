@@ -405,7 +405,7 @@ The point of the indirection is that no caller can hold a mapping it might
 cache; a dependency image exists only while its user is executing.
 
 The C agent has no `memdeps` layer: its BOF runner
-(`core/c_agent/src/c2_bof.c`) resolves the `coffloader_linux` dependency
+(`core/c_agent/src/bof.c`) resolves the `coffloader_linux` dependency
 itself, pulling `coffloader_linux.<arch>.gz` into memfs on first use and
 mapping it in memory with `src/util/elfload.c` (anonymous mmap + dynamic
 relocations, the C counterpart of the Go agent's `memmod`) for the duration of

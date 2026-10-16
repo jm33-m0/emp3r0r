@@ -8,7 +8,7 @@
 #
 #   make agent CRYPTO=mbedtls GZIP=miniz HTTP=libcurl
 #
-# Each group is implemented by src/<group>/c2_<group>_<name>.c; drop a new file
+# Each group is implemented by src/<group>/<name>.c; drop a new file
 # in and build with <GROUP>=<name> to add your own backend.
 
 # zig is the project's compiler (shipped with emp3r0r, pinned in core/build.py),
@@ -91,10 +91,10 @@ GZIP ?= miniz
 HTTP ?= libcurl
 TRANSPORT ?= http_poll
 
-CRYPTO_SRC = src/crypto/c2_crypto_$(CRYPTO).c
-GZIP_SRC = src/gzip/c2_gzip_$(GZIP).c
-HTTP_SRC = src/transport/c2_http_client_$(HTTP).c
-TRANSPORT_SRC = src/transport/c2_transport_$(TRANSPORT).c
+CRYPTO_SRC = src/crypto/$(CRYPTO).c
+GZIP_SRC = src/gzip/$(GZIP).c
+HTTP_SRC = src/transport/http_client_$(HTTP).c
+TRANSPORT_SRC = src/transport/$(TRANSPORT).c
 
 # Vendored mbedTLS (self-contained), linked only when CRYPTO=mbedtls. See
 # vendor/mbedtls/README.emp3r0r.md; the .a files are gitignored build artifacts.
@@ -121,7 +121,7 @@ ifeq ($(GZIP),miniz)
 endif
 
 # Project headers are found with `-iquote` (quote includes only) and are
-# addressed as "c2_<name>.h" or "util/<name>.h", so a bare <strings.h> from
+# addressed as "<name>.h" or "util/<name>.h", so a bare <strings.h> from
 # glibc can never be intercepted. Vendor headers keep -I so both "cbor.h" and
 # <cbor.h> work.
 INCLUDES = -iquote include -Ivendor/tinycbor -Ivendor/miniz $(MINIZ_DEFS) \
@@ -138,10 +138,10 @@ TINYCBOR_SRC = vendor/tinycbor/cborencoder.c \
 # Protocol layer plus the selected providers. util/strings.c / util/system.c /
 # util/net_utils.c are freestanding-only (they override libc) and are excluded.
 PORTABLE_SRC = src/util/rc4.c src/util/packer.c src/util/dynload.c src/util/dynload_hosted.c \
-               src/util/elfload.c src/util/debug.c src/c2_common.c src/c2_crypto.c \
-               src/c2_messages.c src/c2_agent_info.c src/c2_config.c \
-               src/c2_secureconn.c src/c2_session.c src/c2_memfile.c \
-               src/c2_bof.c src/c2_sysinfo.c src/c2_module.c \
+               src/util/elfload.c src/util/debug.c src/common.c src/crypto.c \
+               src/messages.c src/agent_info.c src/config.c \
+               src/secureconn.c src/session.c src/memfile.c \
+               src/bof.c src/sysinfo.c src/module.c \
                $(GZIP_SRC) $(CRYPTO_SRC) $(TRANSPORT_SRC) $(HTTP_SRC) \
                $(EXTRA_SRC)
 
@@ -164,12 +164,12 @@ $(MBEDTLS_CRYPTO_LIB):
 vendor-mbedtls: $(MBEDTLS_CRYPTO_LIB)
 
 # ---- hosted static library -------------------------------------------------
-lib: $(BUILD)/libc2agent.a
+lib: $(BUILD)/libagent.a
 
 $(BUILD):
 	mkdir -p $(BUILD)
 
-$(BUILD)/libc2agent.a: $(PORTABLE_SRC) $(TINYCBOR_SRC) | $(BUILD)
+$(BUILD)/libagent.a: $(PORTABLE_SRC) $(TINYCBOR_SRC) | $(BUILD)
 	@rm -rf $(BUILD)/lib && mkdir -p $(BUILD)/lib
 	@set -e; for s in $(PORTABLE_SRC) $(TINYCBOR_SRC); do \
 		o=$(BUILD)/lib/$$(basename $$s .c).o; \
@@ -182,7 +182,7 @@ $(BUILD)/libc2agent.a: $(PORTABLE_SRC) $(TINYCBOR_SRC) | $(BUILD)
 # as a generated C translation unit. The Go C2 renders it (lib/cagent) and
 # passes its path here, so building the agent needs no Python or Go toolchain:
 #
-#   make agent CONFIG_SRC=/path/to/c2_config_embedded.c
+#   make agent CONFIG_SRC=/path/to/config_embedded.c
 #
 # Without CONFIG_SRC the agent links with weak empty defaults and exits at
 # startup (it has nothing to decrypt).
@@ -193,10 +193,10 @@ CONFIG_SRC ?=
 # tinycbor translation units are never called by the agent. Dropping them by
 # name keeps the binary small even before --gc-sections.
 AGENT_COMMON_SRC = src/util/dynload.c src/util/dynload_hosted.c \
-                   src/util/elfload.c src/c2_crypto.c src/c2_messages.c \
-                   src/c2_agent_info.c src/c2_config.c src/c2_secureconn.c \
-                   src/c2_session.c src/c2_memfile.c src/c2_bof.c \
-                   src/c2_sysinfo.c src/c2_module.c
+                   src/util/elfload.c src/crypto.c src/messages.c \
+                   src/agent_info.c src/config.c src/secureconn.c \
+                   src/session.c src/memfile.c src/bof.c \
+                   src/sysinfo.c src/module.c
 TINYCBOR_MIN_SRC = vendor/tinycbor/cborencoder.c vendor/tinycbor/cborparser.c
 
 AGENT_CONFIG_SRC =
@@ -204,7 +204,7 @@ ifneq ($(strip $(CONFIG_SRC)),)
   AGENT_CONFIG_SRC = $(CONFIG_SRC)
 endif
 AGENT_SRC = $(AGENT_COMMON_SRC) $(GZIP_SRC) $(CRYPTO_SRC) $(TRANSPORT_SRC) \
-            $(HTTP_SRC) $(EXTRA_SRC) $(TINYCBOR_MIN_SRC) src/c2_agent.c \
+            $(HTTP_SRC) $(EXTRA_SRC) $(TINYCBOR_MIN_SRC) src/agent.c \
             $(AGENT_CONFIG_SRC)
 
 # Release flags: shrink for size, one section per function/data so
@@ -219,9 +219,9 @@ AGENT_LDFLAGS = -Wl,--gc-sections -Wl,--build-id=none -Wl,-z,noexecstack -s
 # binutils strip; it is best-effort so the build still works without it.
 STRIP ?= strip
 
-agent: $(BUILD)/c2_agent
+agent: $(BUILD)/agent
 
-$(BUILD)/c2_agent: $(AGENT_SRC) $(EXTRA_LIBS) | $(BUILD)
+$(BUILD)/agent: $(AGENT_SRC) $(EXTRA_LIBS) | $(BUILD)
 	$(CC) $(WARN) $(AGENT_CFLAGS) $(INCLUDES) $(HOSTED_CFLAGS) $(AGENT_LDFLAGS) \
 	  $(AGENT_SRC) $(EXTRA_LIBS) -o $@
 	@command -v $(STRIP) >/dev/null 2>&1 && \
@@ -230,7 +230,7 @@ $(BUILD)/c2_agent: $(AGENT_SRC) $(EXTRA_LIBS) | $(BUILD)
 # ---- shared object ---------------------------------------------------------
 # The same agent as a PIC ET_DYN, for in-process loading (dlopen/injection) and
 # as the input to malasada (raw PIC). main stays exported in .dynsym (see
-# c2_agent.c); -Wl,-u,main keeps it even with --gc-sections, and a normal
+# agent.c); -Wl,-u,main keeps it even with --gc-sections, and a normal
 # -s strip keeps .dynsym while dropping the rest. Unlike the executable, the
 # shared object keeps a PT_NOTE (build-id): malasada repurposes a PT_NOTE or
 # PT_GNU_EH_FRAME into the executable segment for its stage0 stub, and the
@@ -239,9 +239,9 @@ AGENT_SO_CFLAGS = $(AGENT_CFLAGS) -fPIC
 AGENT_SO_LDFLAGS = -shared -Wl,--gc-sections -Wl,--build-id \
                    -Wl,-z,noexecstack -Wl,-u,main -s
 
-so: $(BUILD)/c2_agent.so
+so: $(BUILD)/agent.so
 
-$(BUILD)/c2_agent.so: $(AGENT_SRC) $(EXTRA_LIBS) | $(BUILD)
+$(BUILD)/agent.so: $(AGENT_SRC) $(EXTRA_LIBS) | $(BUILD)
 	$(CC) $(WARN) $(AGENT_SO_CFLAGS) $(INCLUDES) $(HOSTED_CFLAGS) \
 	  $(AGENT_SO_LDFLAGS) $(AGENT_SRC) $(EXTRA_LIBS) -o $@
 
@@ -250,7 +250,7 @@ $(BUILD)/c2_agent.so: $(AGENT_SRC) $(EXTRA_LIBS) | $(BUILD)
 # strings.c (which would override libc's strstr/strcmp). The gzip round-trip
 # test only makes sense when a real gzip provider is selected.
 ifeq ($(GZIP),miniz)
-  GZIP_TEST = $(BUILD)/test_c2_gzip $(BUILD)/test_c2_memfile
+  GZIP_TEST = $(BUILD)/test_gzip $(BUILD)/test_memfile
   GZIP_FUZZ = $(BUILD)/fuzz_gzip $(BUILD)/fuzz_memfile
 endif
 
@@ -260,22 +260,22 @@ endif
 BOF_MODULE_DIR = ../modules/coffloader_linux
 BOF_HELLO_DIR = ../modules/hello_linux
 ifneq ($(wildcard $(BOF_MODULE_DIR)/loader_linux.c),)
-  BOF_TEST = $(BUILD)/test_c2_bof $(BUILD)/test_c2_elfload
+  BOF_TEST = $(BUILD)/test_bof $(BUILD)/test_elfload
   BOF_FUZZ = $(BUILD)/fuzz_bof
 endif
 
 test: $(BUILD)/test_strings $(BUILD)/test_rc4 $(BUILD)/test_packer \
       $(BUILD)/test_net_parse $(BUILD)/test_dynload \
-      $(BUILD)/test_c2_auth $(BUILD)/test_c2_messages \
-      $(BUILD)/test_c2_agent_info $(BUILD)/test_c2_config \
-      $(BUILD)/test_c2_sysinfo $(BUILD)/test_c2_module \
-      $(BUILD)/test_c2_secureconn $(GZIP_TEST) $(BOF_TEST) \
-      $(BUILD)/test_c2_crypto_openssl
+      $(BUILD)/test_auth $(BUILD)/test_messages \
+      $(BUILD)/test_agent_info $(BUILD)/test_config \
+      $(BUILD)/test_sysinfo $(BUILD)/test_module \
+      $(BUILD)/test_secureconn $(GZIP_TEST) $(BOF_TEST) \
+      $(BUILD)/test_crypto_openssl
 	@set -e; for t in $^; do echo "--- $$t"; ./$$t; done
 
 # The self-contained backend is only built when mbedTLS is vendored.
-test-mbedtls: vendor-mbedtls $(BUILD)/test_c2_crypto_mbedtls
-	@echo "--- $(BUILD)/test_c2_crypto_mbedtls"; ./$(BUILD)/test_c2_crypto_mbedtls
+test-mbedtls: vendor-mbedtls $(BUILD)/test_crypto_mbedtls
+	@echo "--- $(BUILD)/test_crypto_mbedtls"; ./$(BUILD)/test_crypto_mbedtls
 
 $(BUILD)/test_strings: tests/test_strings.c src/util/strings.c tests/test.h | $(BUILD)
 	$(HOSTCC) $(TEST_CFLAGS) -fno-builtin $< src/util/strings.c -o $@
@@ -292,54 +292,54 @@ $(BUILD)/test_net_parse: tests/test_net_parse.c src/util/net_utils.c tests/test.
 $(BUILD)/test_dynload: tests/test_dynload.c src/util/dynload.c src/util/dynload_hosted.c tests/test.h | $(BUILD)
 	$(HOSTCC) $(TEST_CFLAGS) $< src/util/dynload.c src/util/dynload_hosted.c -o $@
 
-C2_TEST_SRC = src/c2_messages.c src/c2_agent_info.c src/c2_config.c \
-              src/c2_crypto.c src/c2_common.c $(TINYCBOR_SRC)
+C2_TEST_SRC = src/messages.c src/agent_info.c src/config.c \
+              src/crypto.c src/common.c $(TINYCBOR_SRC)
 STUB_SRC = tests/stub_crypto.c
 
-CRYPTO_COMMON_SRC = src/c2_crypto.c src/c2_common.c
+CRYPTO_COMMON_SRC = src/crypto.c src/common.c
 
-$(BUILD)/test_c2_crypto_openssl: tests/test_c2_crypto.c tests/test.h \
+$(BUILD)/test_crypto_openssl: tests/test_crypto.c tests/test.h \
                                   $(CRYPTO_COMMON_SRC) \
-                                  src/crypto/c2_crypto_openssl.c \
+                                  src/crypto/openssl.c \
                                   src/util/dynload.c src/util/dynload_hosted.c | $(BUILD)
-	$(HOSTCC) $(TEST_CFLAGS) tests/test_c2_crypto.c $(CRYPTO_COMMON_SRC) \
-		src/crypto/c2_crypto_openssl.c src/util/dynload.c src/util/dynload_hosted.c -o $@
+	$(HOSTCC) $(TEST_CFLAGS) tests/test_crypto.c $(CRYPTO_COMMON_SRC) \
+		src/crypto/openssl.c src/util/dynload.c src/util/dynload_hosted.c -o $@
 
-$(BUILD)/test_c2_crypto_mbedtls: tests/test_c2_crypto.c tests/test.h \
+$(BUILD)/test_crypto_mbedtls: tests/test_crypto.c tests/test.h \
                                  $(CRYPTO_COMMON_SRC) \
-                                 src/crypto/c2_crypto_mbedtls.c \
+                                 src/crypto/mbedtls.c \
                                  $(MBEDTLS_CRYPTO_LIB) | $(BUILD)
-	$(HOSTCC) $(TEST_CFLAGS) $(MBEDTLS_INC) tests/test_c2_crypto.c \
-		$(CRYPTO_COMMON_SRC) src/crypto/c2_crypto_mbedtls.c \
+	$(HOSTCC) $(TEST_CFLAGS) $(MBEDTLS_INC) tests/test_crypto.c \
+		$(CRYPTO_COMMON_SRC) src/crypto/mbedtls.c \
 		$(MBEDTLS_CRYPTO_LIB) -o $@
 
-$(BUILD)/test_c2_auth: tests/test_c2_auth.c $(C2_TEST_SRC) tests/test.h | $(BUILD)
+$(BUILD)/test_auth: tests/test_auth.c $(C2_TEST_SRC) tests/test.h | $(BUILD)
 	$(HOSTCC) $(TEST_CFLAGS) $< $(C2_TEST_SRC) -o $@
 
-$(BUILD)/test_c2_messages: tests/test_c2_messages.c $(C2_TEST_SRC) tests/test.h | $(BUILD)
+$(BUILD)/test_messages: tests/test_messages.c $(C2_TEST_SRC) tests/test.h | $(BUILD)
 	$(HOSTCC) $(TEST_CFLAGS) $< $(C2_TEST_SRC) -o $@
 
-$(BUILD)/test_c2_agent_info: tests/test_c2_agent_info.c tests/test.h \
-                             src/c2_agent_info.c src/c2_common.c \
+$(BUILD)/test_agent_info: tests/test_agent_info.c tests/test.h \
+                             src/agent_info.c src/common.c \
                              $(TINYCBOR_SRC) | $(BUILD)
-	$(HOSTCC) $(TEST_CFLAGS) tests/test_c2_agent_info.c src/c2_agent_info.c \
-		src/c2_common.c $(TINYCBOR_SRC) -o $@
+	$(HOSTCC) $(TEST_CFLAGS) tests/test_agent_info.c src/agent_info.c \
+		src/common.c $(TINYCBOR_SRC) -o $@
 
-$(BUILD)/test_c2_config: tests/test_c2_config.c tests/test.h \
-                         src/c2_config.c src/c2_crypto.c src/c2_common.c \
-                         src/crypto/c2_crypto_openssl.c \
+$(BUILD)/test_config: tests/test_config.c tests/test.h \
+                         src/config.c src/crypto.c src/common.c \
+                         src/crypto/openssl.c \
                          src/util/dynload.c src/util/dynload_hosted.c \
                          $(TINYCBOR_SRC) | $(BUILD)
-	$(HOSTCC) $(TEST_CFLAGS) tests/test_c2_config.c src/c2_config.c \
-		src/c2_crypto.c src/c2_common.c src/crypto/c2_crypto_openssl.c \
+	$(HOSTCC) $(TEST_CFLAGS) tests/test_config.c src/config.c \
+		src/crypto.c src/common.c src/crypto/openssl.c \
 		src/util/dynload.c src/util/dynload_hosted.c $(TINYCBOR_SRC) -o $@
 
-$(BUILD)/test_c2_secureconn: tests/test_c2_secureconn.c src/c2_secureconn.c src/c2_common.c $(STUB_SRC) tests/test.h | $(BUILD)
-	$(HOSTCC) $(TEST_CFLAGS) $< src/c2_secureconn.c src/c2_common.c $(STUB_SRC) -o $@
+$(BUILD)/test_secureconn: tests/test_secureconn.c src/secureconn.c src/common.c $(STUB_SRC) tests/test.h | $(BUILD)
+	$(HOSTCC) $(TEST_CFLAGS) $< src/secureconn.c src/common.c $(STUB_SRC) -o $@
 
-$(BUILD)/test_c2_gzip: tests/test_c2_gzip.c $(GZIP_SRC) $(EXTRA_SRC) \
-                       src/c2_common.c tests/test.h | $(BUILD)
-	$(HOSTCC) $(TEST_CFLAGS) $< $(GZIP_SRC) $(EXTRA_SRC) src/c2_common.c -o $@
+$(BUILD)/test_gzip: tests/test_gzip.c $(GZIP_SRC) $(EXTRA_SRC) \
+                       src/common.c tests/test.h | $(BUILD)
+	$(HOSTCC) $(TEST_CFLAGS) $< $(GZIP_SRC) $(EXTRA_SRC) src/common.c -o $@
 
 $(BUILD)/coffloader_linux.so: $(BOF_MODULE_DIR)/loader_linux.c | $(BUILD)
 	$(MAKE) -C $(BOF_MODULE_DIR) >/dev/null
@@ -351,48 +351,48 @@ $(BUILD)/hello_linux.o: $(BOF_HELLO_DIR)/hello_linux.c | $(BUILD)
 	cp $(BOF_HELLO_DIR)/hello_linux.o $@
 	$(MAKE) -C $(BOF_HELLO_DIR) clean >/dev/null
 
-$(BUILD)/test_c2_bof: tests/test_c2_bof.c src/c2_bof.c src/util/dynload.c \
+$(BUILD)/test_bof: tests/test_bof.c src/bof.c src/util/dynload.c \
                       src/util/elfload.c $(BUILD)/coffloader_linux.so \
                       $(BUILD)/hello_linux.o tests/test.h | $(BUILD)
 	$(HOSTCC) $(TEST_CFLAGS) \
 	  -DBOF_LOADER_PATH='"$(BUILD)/coffloader_linux.so"' \
 	  -DBOF_OBJ_PATH='"$(BUILD)/hello_linux.o"' \
-	  tests/test_c2_bof.c src/c2_bof.c src/util/dynload.c \
+	  tests/test_bof.c src/bof.c src/util/dynload.c \
 	  src/util/elfload.c -o $@
 
-$(BUILD)/test_c2_elfload: tests/test_c2_elfload.c src/util/elfload.c \
+$(BUILD)/test_elfload: tests/test_elfload.c src/util/elfload.c \
                           src/util/dynload.c $(BUILD)/coffloader_linux.so \
                           tests/test.h | $(BUILD)
 	$(HOSTCC) $(TEST_CFLAGS) \
 	  -DBOF_LOADER_PATH='"$(BUILD)/coffloader_linux.so"' \
-	  tests/test_c2_elfload.c src/util/elfload.c src/util/dynload.c -o $@
+	  tests/test_elfload.c src/util/elfload.c src/util/dynload.c -o $@
 
-$(BUILD)/test_c2_module: tests/test_c2_module.c tests/test.h \
-                       src/c2_module.c src/c2_common.c \
+$(BUILD)/test_module: tests/test_module.c tests/test.h \
+                       src/module.c src/common.c \
                        $(TINYCBOR_SRC) | $(BUILD)
-	$(HOSTCC) $(TEST_CFLAGS) tests/test_c2_module.c src/c2_module.c \
-		src/c2_common.c $(TINYCBOR_SRC) -o $@
+	$(HOSTCC) $(TEST_CFLAGS) tests/test_module.c src/module.c \
+		src/common.c $(TINYCBOR_SRC) -o $@
 
-$(BUILD)/test_c2_memfile: tests/test_c2_memfile.c tests/test.h \
-                          src/c2_memfile.c $(GZIP_SRC) $(EXTRA_SRC) \
-                          src/c2_crypto.c src/c2_common.c \
-                          src/crypto/c2_crypto_openssl.c \
+$(BUILD)/test_memfile: tests/test_memfile.c tests/test.h \
+                          src/memfile.c $(GZIP_SRC) $(EXTRA_SRC) \
+                          src/crypto.c src/common.c \
+                          src/crypto/openssl.c \
                           src/util/dynload.c src/util/dynload_hosted.c | $(BUILD)
-	$(HOSTCC) $(TEST_CFLAGS) tests/test_c2_memfile.c src/c2_memfile.c \
-		$(GZIP_SRC) $(EXTRA_SRC) src/c2_crypto.c src/c2_common.c \
-		src/crypto/c2_crypto_openssl.c src/util/dynload.c src/util/dynload_hosted.c -o $@
+	$(HOSTCC) $(TEST_CFLAGS) tests/test_memfile.c src/memfile.c \
+		$(GZIP_SRC) $(EXTRA_SRC) src/crypto.c src/common.c \
+		src/crypto/openssl.c src/util/dynload.c src/util/dynload_hosted.c -o $@
 
-$(BUILD)/test_c2_sysinfo: tests/test_c2_sysinfo.c tests/test.h \
-                          src/c2_sysinfo.c src/c2_memfile.c \
-                          src/c2_messages.c src/c2_agent_info.c \
-                          src/c2_crypto.c src/c2_common.c $(GZIP_SRC) \
-                          $(EXTRA_SRC) src/crypto/c2_crypto_openssl.c \
+$(BUILD)/test_sysinfo: tests/test_sysinfo.c tests/test.h \
+                          src/sysinfo.c src/memfile.c \
+                          src/messages.c src/agent_info.c \
+                          src/crypto.c src/common.c $(GZIP_SRC) \
+                          $(EXTRA_SRC) src/crypto/openssl.c \
                           src/util/dynload.c src/util/dynload_hosted.c \
                           $(TINYCBOR_SRC) | $(BUILD)
-	$(HOSTCC) $(TEST_CFLAGS) tests/test_c2_sysinfo.c src/c2_sysinfo.c \
-		src/c2_memfile.c src/c2_messages.c src/c2_agent_info.c \
-		src/c2_crypto.c src/c2_common.c $(GZIP_SRC) $(EXTRA_SRC) \
-		src/crypto/c2_crypto_openssl.c src/util/dynload.c src/util/dynload_hosted.c \
+	$(HOSTCC) $(TEST_CFLAGS) tests/test_sysinfo.c src/sysinfo.c \
+		src/memfile.c src/messages.c src/agent_info.c \
+		src/crypto.c src/common.c $(GZIP_SRC) $(EXTRA_SRC) \
+		src/crypto/openssl.c src/util/dynload.c src/util/dynload_hosted.c \
 		$(TINYCBOR_SRC) -o $@
 
 # ---- fuzzing ---------------------------------------------------------------
@@ -445,9 +445,9 @@ $(BUILD)/fuzz_config: fuzz/fuzz_config.c $(FUZZ_DRIVER) $(C2_TEST_SRC) fuzz/fuzz
 	$(HOSTCC) $(FUZZ_CFLAGS) $< $(FUZZ_DRIVER) $(C2_TEST_SRC) -o $@
 
 $(BUILD)/fuzz_secureconn: fuzz/fuzz_secureconn.c $(FUZZ_DRIVER) $(STUB_SRC) \
-                         src/c2_secureconn.c src/c2_common.c fuzz/fuzz_common.h | $(BUILD)
+                         src/secureconn.c src/common.c fuzz/fuzz_common.h | $(BUILD)
 	$(HOSTCC) $(FUZZ_CFLAGS) -Itests $< $(FUZZ_DRIVER) $(STUB_SRC) \
-		src/c2_secureconn.c src/c2_common.c -o $@
+		src/secureconn.c src/common.c -o $@
 
 $(BUILD)/fuzz_text: fuzz/fuzz_text.c $(FUZZ_DRIVER) $(C2_TEST_SRC) fuzz/fuzz_common.h | $(BUILD)
 	$(HOSTCC) $(FUZZ_CFLAGS) $< $(FUZZ_DRIVER) $(C2_TEST_SRC) -o $@
@@ -456,21 +456,21 @@ $(BUILD)/fuzz_encdec: fuzz/fuzz_encdec.c $(FUZZ_DRIVER) $(C2_TEST_SRC) fuzz/fuzz
 	$(HOSTCC) $(FUZZ_CFLAGS) $< $(FUZZ_DRIVER) $(C2_TEST_SRC) -o $@
 
 $(BUILD)/fuzz_gzip: fuzz/fuzz_gzip.c $(FUZZ_DRIVER) $(GZIP_SRC) $(EXTRA_SRC) \
-                    src/c2_common.c fuzz/fuzz_common.h | $(BUILD)
+                    src/common.c fuzz/fuzz_common.h | $(BUILD)
 	$(HOSTCC) $(FUZZ_CFLAGS) $< $(FUZZ_DRIVER) $(GZIP_SRC) $(EXTRA_SRC) \
-		src/c2_common.c -o $@
+		src/common.c -o $@
 
-$(BUILD)/fuzz_memfile: fuzz/fuzz_memfile.c $(FUZZ_DRIVER) src/c2_memfile.c \
-                       $(GZIP_SRC) $(EXTRA_SRC) src/c2_crypto.c \
-                       src/c2_common.c fuzz/fuzz_common.h | $(BUILD)
-	$(HOSTCC) $(FUZZ_CFLAGS) $< $(FUZZ_DRIVER) src/c2_memfile.c $(GZIP_SRC) \
-		$(EXTRA_SRC) src/c2_crypto.c src/c2_common.c -o $@
+$(BUILD)/fuzz_memfile: fuzz/fuzz_memfile.c $(FUZZ_DRIVER) src/memfile.c \
+                       $(GZIP_SRC) $(EXTRA_SRC) src/crypto.c \
+                       src/common.c fuzz/fuzz_common.h | $(BUILD)
+	$(HOSTCC) $(FUZZ_CFLAGS) $< $(FUZZ_DRIVER) src/memfile.c $(GZIP_SRC) \
+		$(EXTRA_SRC) src/crypto.c src/common.c -o $@
 
-$(BUILD)/fuzz_bof: fuzz/fuzz_bof.c $(FUZZ_DRIVER) src/c2_bof.c \
+$(BUILD)/fuzz_bof: fuzz/fuzz_bof.c $(FUZZ_DRIVER) src/bof.c \
                    src/util/dynload.c src/util/elfload.c \
                    $(BUILD)/coffloader_linux.so fuzz/fuzz_common.h | $(BUILD)
 	$(HOSTCC) $(FUZZ_CFLAGS) -DFUZZ_BOF_LOADER='"$(BUILD)/coffloader_linux.so"' \
-		$< $(FUZZ_DRIVER) src/c2_bof.c src/util/dynload.c src/util/elfload.c -o $@
+		$< $(FUZZ_DRIVER) src/bof.c src/util/dynload.c src/util/elfload.c -o $@
 
 $(BUILD)/fuzz_dynload: fuzz/fuzz_dynload.c $(FUZZ_DRIVER) src/util/dynload.c fuzz/fuzz_common.h | $(BUILD)
 	$(HOSTCC) $(FUZZ_CFLAGS) $< $(FUZZ_DRIVER) src/util/dynload.c -o $@

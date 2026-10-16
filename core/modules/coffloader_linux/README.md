@@ -48,7 +48,7 @@ returned to the caller through `char **out`.
 
 ## Arguments
 
-`core/c_agent/src/c2_bof.c` packs arguments in the Windows COFFLoader wire
+`core/c_agent/src/bof.c` packs arguments in the Windows COFFLoader wire
 format before calling `bof_run`: a leading `uint32` body length, then per
 argument `int32`, `int16`, a length-prefixed **NUL-terminated** `char *`
 (`z`/`cstr`/`S`), a length-prefixed NUL-terminated UTF-16LE `wchar_t *`

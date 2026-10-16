@@ -1,7 +1,7 @@
 # Vendored miniz (self-contained gzip)
 
 Single-file amalgamation of [miniz](https://github.com/richgel999/miniz) used by
-`src/c2_gzip.c` for gzip compression/decompression.
+`src/gzip/miniz.c` for gzip compression/decompression.
 
 - Upstream: https://github.com/richgel999/miniz
 - Version: **3.1.2**

@@ -1,4 +1,4 @@
-#include "c2_memfile.h"
+#include "memfile.h"
 
 #include "fuzz_common.h"
 

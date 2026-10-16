@@ -1,5 +1,5 @@
-#include "c2_common.h"
-#include "c2_messages.h"
+#include "common.h"
+#include "messages.h"
 
 #include "fuzz_common.h"
 

@@ -4,7 +4,7 @@ build/
 # The Go C2 renders the build-time config into build/ (see c_agent_builder.go
 # and the Makefile's CONFIG_SRC). build/ already ignores it; name the file too
 # so a manual CONFIG_SRC that lands elsewhere cannot be committed.
-c2_config_embedded.c
+config_embedded.c
 # mbedTLS is vendored as source; its compiled libraries/objects are build
 # artifacts, not tracked files.
 vendor/mbedtls/**/*.o

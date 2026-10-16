@@ -1,4 +1,4 @@
-#include "c2_secureconn.h"
+#include "secureconn.h"
 
 #include "stub_crypto.h"
 

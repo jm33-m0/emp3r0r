@@ -2,7 +2,7 @@
 
 This directory is a **pruned** copy of the upstream mbedTLS release used by the
 C agent when the target has no system crypto/TLS library (`libcrypto`). The
-OpenSSL backend in `src/c2_crypto_openssl.c` is preferred when libcrypto can be
+OpenSSL backend in `src/crypto/openssl.c` is preferred when libcrypto can be
 loaded; this one guarantees the agent still runs without it.
 
 - Upstream: https://github.com/Mbed-TLS/mbedtls

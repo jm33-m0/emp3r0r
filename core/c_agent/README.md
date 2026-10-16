@@ -23,13 +23,13 @@ Related reading:
 
 Everything here is a transcription of a Go constant or struct:
 
-| Header            | Go source                                                                  |
-| ----------------- | -------------------------------------------------------------------------- |
-| `c2_common.h`     | `core/internal/def/{config,def,msg_auth}.go`, §2/§4                        |
-| `c2_crypto.h`     | `core/lib/crypto/aes.go`, `core/internal/transport/keyexchange.go`         |
-| `c2_secureconn.h` | `core/internal/transport/crypto.go` (`SecureConn`)                         |
-| `c2_messages.h`   | `core/internal/def/{msg_auth,agent,token}.go`                              |
-| `c2_transport.h`  | `core/internal/def/config.go`, `core/internal/transport/c2channel_http.go` |
+| Header        | Go source                                                                  |
+| ------------- | -------------------------------------------------------------------------- |
+| `common.h`    | `core/internal/def/{config,def,msg_auth}.go`, §2/§4                        |
+| `crypto.h`    | `core/lib/crypto/aes.go`, `core/internal/transport/keyexchange.go`         |
+| `secureconn.h` | `core/internal/transport/crypto.go` (`SecureConn`)                         |
+| `messages.h`  | `core/internal/def/{msg_auth,agent,token}.go`                              |
+| `transport.h` | `core/internal/def/config.go`, `core/internal/transport/c2channel_http.go` |
 
 CBOR is provided by vendored [Intel tinycbor](https://github.com/intel/tinycbor)
 (MIT, version 7.0) under `vendor/tinycbor/`; there is no hand-rolled codec.
@@ -42,13 +42,13 @@ back-compatibility shim.
 
 ```
 include/
-  c2_protocol.h    umbrella: include this for the protocol
-  c2_common.h      constants, limits, status, byte-order + hex/base64url
-  c2_crypto.h      crypto backend contract (AES-GCM, SHA-256, HKDF, P-256)
-  c2_secureconn.h  SecureConn framing + key lifecycle
-  c2_messages.h    MsgAuth, MsgTunData, Emp3r0rAgent, AgentToken, peers
-  c2_transport.h   build config, channel contract, agent session flow
-  util/            generic utilities shared with the freestanding stager
+  protocol.h     umbrella: include this for the protocol
+  common.h       constants, limits, status, byte-order + hex/base64url
+  crypto.h       crypto backend contract (AES-GCM, SHA-256, HKDF, P-256)
+  secureconn.h   SecureConn framing + key lifecycle
+  messages.h     MsgAuth, MsgTunData, Emp3r0rAgent, AgentToken, peers
+  transport.h    build config, channel contract, agent session flow
+  util/          generic utilities shared with the freestanding stager
     dynload.h        runtime dlopen/dlsym from libc + ELF symbol lookup
     elfload.h        in-memory ELF64 mapping + relocation (no fd, no disk)
     rc4.h            RC4 stream cipher (payload obfuscation)
@@ -59,9 +59,9 @@ include/
     utils.h          mmap constants + freestanding libc shims
     debug.h          DEBUG-gated logging macros
 src/               protocol layer shared by every provider
-  c2_cbor_util.h   private tinycbor glue shared by the message codecs
-src/crypto/        crypto providers (c2_crypto_<name>.c)
-src/gzip/          gzip providers (c2_gzip_<name>.c)
+  cbor_util.h      private tinycbor glue shared by the message codecs
+src/crypto/        crypto providers (<name>.c)
+src/gzip/          gzip providers (<name>.c)
 src/transport/     transport + HTTP/TLS providers
 src/util/          implementations of include/util/ (debug, dynload, elfload, rc4, ...)
 tests/             standalone unit tests (make test)
@@ -71,18 +71,18 @@ vendor/miniz/      vendored DEFLATE/INFLATE gzip backend (MIT, miniz 3.1.2)
 vendor/mbedtls/    vendored self-contained crypto/TLS (Apache-2.0), opt-in
 ```
 
-The `c2_*` headers and sources are the protocol contract. Everything under
-`include/util/` and `src/util/` is a generic utility shared with the
-freestanding stager in `core/modules/stager_linux/`, which includes it from
+The headers and sources in `include/` and `src/` are the protocol contract.
+Everything under `include/util/` and `src/util/` is a generic utility shared with
+the freestanding stager in `core/modules/stager_linux/`, which includes it from
 here. Utility headers are namespaced under `util/` so a bare name cannot
 shadow a system header (e.g. `util/strings.h` vs `<strings.h>`).
 
 ### Building, testing and fuzzing
 
 ```sh
-make -C core/c_agent lib             # hosted static library (libc2agent.a)
+make -C core/c_agent lib             # hosted static library (libagent.a)
 make -C core/c_agent agent           # hosted reference agent executable
-make -C core/c_agent so              # hosted shared object (c2_agent.so, PIC)
+make -C core/c_agent so              # hosted shared object (agent.so, PIC)
 make -C core/c_agent test            # unit tests (gcc + ASan/UBSan)
 make -C core/c_agent coverage        # gcov line coverage per source
 make -C core/c_agent test-mbedtls    # self-contained mbedTLS backend tests
@@ -147,7 +147,7 @@ this automatically; a manual build renders the same file and passes its path:
 
 ```sh
 # config.bin is the encrypted CBOR blob the Go builder produces (def.AgentConfig)
-make -C core/c_agent agent CONFIG_SRC=/path/to/c2_config_embedded.c
+make -C core/c_agent agent CONFIG_SRC=/path/to/config_embedded.c
 ```
 
 Without `CONFIG_SRC` the agent links with weak empty defaults and exits at
@@ -196,11 +196,11 @@ make -C core/c_agent agent CRYPTO=mbedtls GZIP=none
 To add your own backend, drop a file implementing the interface into the
 matching directory and build with `<GROUP>=<name>`:
 
-- `c2_crypto.h` — `c2_crypto_open` / `c2_crypto_close` returning a
+- `crypto.h` — `c2_crypto_open` / `c2_crypto_close` returning a
   `c2_crypto_backend`.
-- `c2_gzip.h` — `c2_gzip_bound` / `c2_gzip_compress` / `c2_gzip_decompress`.
-- `c2_http_client.h` — `c2_http_client_perform`.
-- `c2_transport.h` — `c2_transport_create` / `c2_transport_name`.
+- `gzip.h` — `c2_gzip_bound` / `c2_gzip_compress` / `c2_gzip_decompress`.
+- `http_client.h` — `c2_http_client_perform`.
+- `transport.h` — `c2_transport_create` / `c2_transport_name`.
 
 The vendored trees are source-only; their `.o`/`.a` files are build artifacts.
 
@@ -311,54 +311,54 @@ key = PBKDF2-HMAC-SHA256(password = MagicString, salt, 100000, 32)
 
 Implemented and tested in `src/`:
 
-- `c2_common.c` — status strings.
-- `c2_messages.c` — `c2_auth_canonical` (sorts/dedups like Go) plus the
+- `common.c` — status strings.
+- `messages.c` — `c2_auth_canonical` (sorts/dedups like Go) plus the
   `MsgAuth` and `MsgTunData` codecs on top of vendored tinycbor. `MsgAuth`
   encoding is pinned byte-for-byte to the Go encoder; the Go `MsgTunData`
   vector is decoded field by field. Fuzzed (`fuzz/fuzz_messages.c`).
-- `c2_agent_info.c` — `Emp3r0rAgent` (check-in body), `AgentToken` and
-  `EnrichedPeerList` codecs; `c2_config.c` — `c2_config_decrypt`
+- `agent_info.c` — `Emp3r0rAgent` (check-in body), `AgentToken` and
+  `EnrichedPeerList` codecs; `config.c` — `c2_config_decrypt`
   (PBKDF2 + AES-GCM) and `c2_agent_config_decode` with route/channel defaults.
   Fuzzed (`fuzz/fuzz_agent_info.c`, `fuzz/fuzz_config.c`) and tested
-  (`tests/test_c2_agent_info.c`, `tests/test_c2_config.c`).
-- `c2_crypto.c` — PSK (`hexMD5(magic)[0:32]`), HKDF session-key derivation and
+  (`tests/test_agent_info.c`, `tests/test_config.c`).
+- `crypto.c` — PSK (`hexMD5(magic)[0:32]`), HKDF session-key derivation and
   the P-256 public-key PEM encoder.
-- `src/crypto/c2_crypto_openssl.c` — `c2_crypto_backend` over the system
+- `src/crypto/openssl.c` — `c2_crypto_backend` over the system
   libcrypto, resolved with `dynload.h` (no link-time or header dependency).
-- `src/crypto/c2_crypto_mbedtls.c` — the same backend over the vendored,
+- `src/crypto/mbedtls.c` — the same backend over the vendored,
   self-contained mbedTLS (`CRYPTO=mbedtls`).
-- `src/gzip/c2_gzip_miniz.c` — gzip writer/reader over the vendored miniz
+- `src/gzip/miniz.c` — gzip writer/reader over the vendored miniz
   (self-contained DEFLATE/INFLATE); the FTP upload wire requirement and
   `!custom_module` download. `GZIP=none` stubs it out.
-- `c2_secureconn.c` — frame codec, padding strip, zero-length-frame skip and
+- `secureconn.c` — frame codec, padding strip, zero-length-frame skip and
   key switch, tested over an in-memory stream with a deterministic stub AEAD.
   `c2_secureconn_read_msg` reads exactly one frame (one CBOR message).
-- `c2_session.c` — the check-in / msg-tunnel / job loop over `c2_transport`.
-- `src/transport/c2_transport_http_poll.c` — the `http_poll` channel over
-  `c2_http_client`, with `src/transport/c2_http_client_libcurl.c` (system
+- `session.c` — the check-in / msg-tunnel / job loop over `c2_transport`.
+- `src/transport/http_poll.c` — the `http_poll` channel over
+  `c2_http_client`, with `src/transport/http_client_libcurl.c` (system
   libcurl via `dynload`) as the default provider.
-- `src/c2_agent.c` — the reference agent: embedded config; the
+- `src/agent.c` — the reference agent: embedded config; the
   filesystem/navigation commands the operator expects (`ls`/`ls_dir` return
   CBOR `[]util.Dentry`, `stat` returns CBOR `util.FileStat`, `pwd`, `cd`,
   `cat`); `mem_write`/`mem_read`/`mem_ls`; `download`; `custom_module` (the C2's
   BOF module dispatch); `bof`. It reconnects on
   tunnel loss and sends keepalive hellos, and reports output like the Go
   agent's `NotifyC2`.
-- `c2_module.c` — `c2_coff_invocation_parse` decodes the base64 CBOR
+- `module.c` — `c2_coff_invocation_parse` decodes the base64 CBOR
   `def.ResolvedInvocation` the C2 sends with `!custom_module` and turns the
   COFF part into the loader tokens (`z`/`Z`/`i`/`s`/`b`) the BOF runner packs,
   so a Linux `coff` module runs exactly like the Go agent's `ModuleHandler`.
-  Tested (`tests/test_c2_module.c`).
-- `c2_sysinfo.c` — `c2_gather_agent_info` builds the `Emp3r0rAgent` check-in
+  Tested (`tests/test_module.c`).
+- `sysinfo.c` — `c2_gather_agent_info` builds the `Emp3r0rAgent` check-in
   body from host facts with the same fields as the Go agent's
   `GatherSystemDetails` (GOOS/GOArch, OS/kernel/arch, user/groups/root, process,
   uptime, IPs, memfs listing, transport label), so module dispatch and the
   operator see an identical target.
-- `c2_memfile.c` — the in-memory file cache: every entry is gzip-compressed and
+- `memfile.c` — the in-memory file cache: every entry is gzip-compressed and
   AES-GCM-encrypted with the config file password, and `c2_memfile_write` /
   `c2_memfile_read` are transparent (plaintext in, plaintext out). Mirrors the
   Go agent's memfs with no disk access. Fuzzed (`fuzz/fuzz_memfile.c`).
-- `c2_bof.c` — Beacon Object File runner for Linux: `c2_bof_pack_args` (the
+- `bof.c` — Beacon Object File runner for Linux: `c2_bof_pack_args` (the
   Windows COFFLoader wire format, including the NUL-terminated `z`/`Z` strings)
   and `c2_bof_run`, which pulls `coffloader_linux.<arch>.gz` into memfs on
   demand and executes the BOF through the `coffloader_linux` provider. The
@@ -369,7 +369,7 @@ Implemented and tested in `src/`:
 Still to come:
 
 - A self-contained mbedTLS HTTP/TLS client provider
-  (`c2_http_client_mbedtls.c`) and duplex channels.
+  (`http_client_mbedtls.c`) and duplex channels.
 
 ---
 
