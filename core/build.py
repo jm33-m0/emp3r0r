@@ -55,8 +55,13 @@ Agent feature selection options (combinable with any build command):
   --agent-slim        Build the smallest agent: plain HTTP polling + crypto/tls,
                       no optional subsystems.
 
+Garble option:
+  --garble PATH       Use a custom garble executable instead of the one on PATH,
+                      e.g. a patched build with a different fingerprint.
+
 Environment variables:
   EMP3R0R_DISABLE_GARBLE=1   Disable garble obfuscation for non-debug builds
+  EMP3R0R_GARBLE=PATH        Use a custom garble executable for release builds
   PREFIX=/usr/local          Custom install prefix
   EMP3R0R_VERSION            Override the release version (default: the
                              `const Version` in core/internal/def/def.go)
@@ -71,6 +76,7 @@ import hashlib
 import os
 import pathlib
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -1141,6 +1147,27 @@ def resolve_mod_opt(
     return ""
 
 
+def resolve_garble() -> str:
+    """Return the shell-quoted garble executable used for release builds.
+
+    ``EMP3R0R_GARBLE`` (from ``--garble``) takes precedence over the builder
+    image's garble, so a user can plug in a patched/forked binary that does not
+    carry the vanilla garble fingerprint.
+    """
+    custom = os.environ.get("EMP3R0R_GARBLE", "").strip()
+    candidate = os.path.expanduser(custom) if custom else "garble"
+    garble = shutil.which(candidate)
+    if not garble:
+        if custom:
+            log_error(f"Custom garble not found or not executable: {custom}")
+        log_error("garble not found. It should be installed in the builder container.")
+    if custom:
+        log_info(f"Using custom garble: {garble}")
+    else:
+        log_info("Using garble for obfuscation")
+    return shlex.quote(str(pathlib.Path(garble).resolve()))
+
+
 def resolve_gobuild(
     go_bin: str, mod_opt: str, debug: bool, ldflags: str
 ) -> tuple[str, str, str]:
@@ -1163,12 +1190,7 @@ def resolve_gobuild(
         log_info("Garble disabled by EMP3R0R_DISABLE_GARBLE, using plain go build")
         return go_bin, f"build {mod_opt}".strip(), ldflags
 
-    log_info("Using garble for obfuscation")
-    if not shutil.which("garble"):
-        log_error(
-            "garble not found. It should be installed in the builder container."
-        )
-    return "garble", f"-tiny -seed=random build {mod_opt}".strip(), ldflags
+    return resolve_garble(), f"-tiny -seed=random build {mod_opt}".strip(), ldflags
 
 
 # ---------------------------------------------------------------------------
@@ -2096,6 +2118,16 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--garble",
+        metavar="PATH",
+        default="",
+        help=(
+            "Use this custom garble executable instead of the one on PATH, e.g. "
+            "a patched build with a different fingerprint. Mirrors "
+            "EMP3R0R_GARBLE."
+        ),
+    )
+    parser.add_argument(
         "--list-agent-tags",
         action="store_true",
         help="Print the available agent feature tags and exit",
@@ -2210,6 +2242,9 @@ def main() -> None:
     # persisted by resolve_magic_string, so later builds can omit it.
     if args.magic_string:
         os.environ["EMP3R0R_MAGIC_STRING"] = args.magic_string
+
+    if args.garble:
+        os.environ["EMP3R0R_GARBLE"] = args.garble
 
     core_dir = pathlib.Path(__file__).resolve().parent
     prefix = os.environ.get("PREFIX", "/usr/local")

@@ -177,6 +177,7 @@ Reload the config after editing it:
 tmux source-file /usr/local/lib/emp3r0r/tmux/.tmux.conf
 ```
 
+> [!NOTE]
 > <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>r</kbd> sources `~/.tmux.conf`, which the
 > container does not create, so it will not pick up the bundled config.
 

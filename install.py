@@ -40,6 +40,10 @@ PROXY_NS_CAPS = (
 # kit ships the upstream default and the installer drops it here.
 PROXY_NS_SYSTEM_CONFIG = pathlib.Path("/etc/proxy-ns/config.json")
 
+# A custom garble is bind-mounted here and selected through EMP3R0R_GARBLE, so
+# the builder image's vanilla garble stays untouched.
+CUSTOM_GARBLE_CONTAINER_PATH = "/usr/local/bin/garble-custom"
+
 # What each opt-in agent feature tag enables. Keep in sync with core/build.py
 # and the //go:build constraints across core/.
 AGENT_TAG_DOCS: dict[str, str] = {
@@ -55,8 +59,8 @@ AGENT_TAG_DOCS: dict[str, str] = {
     "with_uring": "io_uring file-transfer acceleration (sync fallback)",
 }
 
-# The default full build enables every feature; --agent-slim selects the
-# minimal agent (plain HTTP polling + crypto/tls, no optional subsystems).
+# The installer defaults to a slim, x86-64-only build for speed; --agent-tags
+# selects an exact feature set and --full enables every feature.
 ALL_AGENT_TAGS = (
     "with_mesh with_kcp with_h2conn with_quic with_utls "
     "with_doh with_ech with_cdnproxy with_netlink with_uring"
@@ -72,9 +76,9 @@ def agent_tag_reference() -> str:
         lines.append(f"  {tag:<{width}}  {desc}")
     lines.append("")
     lines.append(
-        f"--agent-slim builds: {SLIM_AGENT_TAGS or '(no optional features)'}"
+        f"installer default builds: {SLIM_AGENT_TAGS or '(no optional features)'}"
     )
-    lines.append(f"the default full build enables: {ALL_AGENT_TAGS}")
+    lines.append(f"--full enables: {ALL_AGENT_TAGS}")
     return "\n".join(lines)
 
 
@@ -236,9 +240,7 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
             sudo.append("-n")
         os.execvp(
             "sudo",
-            sudo
-            + [sys.executable, str(kit_dir / "install.py")]
-            + sys.argv[1:],
+            sudo + [sys.executable, str(kit_dir / "install.py")] + sys.argv[1:],
         )
 
     bin_dir = prefix_path / "bin"
@@ -327,9 +329,7 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
         log_warn("Donut not found in kit; skipping donut installation")
 
     proxy_ns_src = kit_dir / "lib" / "emp3r0r" / "bin" / "proxy-ns"
-    proxy_ns_cfg_src = (
-        kit_dir / "lib" / "emp3r0r" / "etc" / "proxy-ns" / "config.json"
-    )
+    proxy_ns_cfg_src = kit_dir / "lib" / "emp3r0r" / "etc" / "proxy-ns" / "config.json"
     if proxy_ns_src.is_file():
         log_info("Installing proxy-ns...")
         proxy_ns_dst = data_dir / "bin" / "proxy-ns"
@@ -362,9 +362,7 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
             ["setcap", "cap_net_admin=eip", str(data_dir / "emp3r0r-cc")], check=False
         )
     else:
-        log_warn(
-            "setcap not found; tun2socks will require running emp3r0r as root"
-        )
+        log_warn("setcap not found; tun2socks will require running emp3r0r as root")
     remove_obsolete_wireguard_config()
 
     cc_bin = data_dir / "emp3r0r-cc"
@@ -451,6 +449,18 @@ def needs_selinux_relabel() -> bool:
     return pathlib.Path("/sys/fs/selinux/enforce").exists()
 
 
+def resolve_custom_garble(path: str) -> str:
+    """Return the absolute path of a usable host garble binary, or ""."""
+    if not path:
+        return ""
+    resolved = pathlib.Path(path).expanduser().resolve()
+    if not resolved.is_file():
+        log_error(f"Custom garble not found: {path}")
+    if not os.access(resolved, os.X_OK):
+        log_error(f"Custom garble is not executable: {resolved}")
+    return str(resolved)
+
+
 def check_host_deps(repo_root: pathlib.Path) -> None:
     missing = []
     for tool in ["tar", "zstd"]:
@@ -498,9 +508,7 @@ def builder_image_ref(repo_root: pathlib.Path) -> str:
     try:
         digest = hashlib.sha256(dockerfile.read_bytes()).hexdigest()[:12]
     except OSError as e:
-        log_warn(
-            f"Could not hash {dockerfile}: {e}; using the unversioned builder tag"
-        )
+        log_warn(f"Could not hash {dockerfile}: {e}; using the unversioned builder tag")
         return "emp3r0r-builder"
     return f"emp3r0r-builder:{digest}"
 
@@ -548,6 +556,7 @@ def docker_build(
     build_arg: str,
     disable_garble: bool,
     extra_build_flags: str = "",
+    garble_path: str = "",
 ) -> None:
     log_info(f"Using local source: {repo_root}")
 
@@ -587,6 +596,9 @@ def docker_build(
 
     build_env = []
     build_env.extend(["-e", f"EMP3R0R_MAGIC_STRING={ensure_magic_string()}"])
+    if garble_path:
+        log_info(f"Using custom garble: {garble_path}")
+        build_env.extend(["-e", f"EMP3R0R_GARBLE={CUSTOM_GARBLE_CONTAINER_PATH}"])
     if version := read_def_version(repo_root):
         # Pin the version build.py embeds so the container build cannot drift
         # from the release-please-managed constant in def.go.
@@ -599,8 +611,8 @@ def docker_build(
         build_env.extend(["-e", "EMP3R0R_DRY_RUN=1"])
         build_arg += " --dry-run"
 
-    # Append any extra target/feature flags (--lightweight / --targets /
-    # --agent-slim / --agent-tags ...).
+    # Append any extra target/feature flags (--full / --targets / --agent-tags
+    # ...). The installer defaults to a lightweight, slim build.
     full_build_arg = build_arg
     if extra_build_flags:
         full_build_arg = f"{build_arg} {extra_build_flags}"
@@ -624,10 +636,20 @@ def docker_build(
 
     # ':z' asks the engine to relabel the source tree as shared container
     # content; without it SELinux hosts get "permission denied" on /src.
+    selinux_relabel = needs_selinux_relabel()
     mount_opts = ""
-    if needs_selinux_relabel():
+    if selinux_relabel:
         mount_opts = ":z"
         log_info("SELinux detected; relabeling the bind mount (:z)")
+
+    custom_garble_mount = []
+    if garble_path:
+        # A bind-mounted file also needs a shared label on SELinux hosts.
+        ro_opts = ":ro,z" if selinux_relabel else ":ro"
+        custom_garble_mount = [
+            "-v",
+            f"{garble_path}:{CUSTOM_GARBLE_CONTAINER_PATH}{ro_opts}",
+        ]
 
     run_args = [
         container_engine,
@@ -635,6 +657,7 @@ def docker_build(
         "--rm",
         "-v",
         f"{repo_root}:/src{mount_opts}",
+        *custom_garble_mount,
         *build_env,
         builder_image,
         "/bin/bash",
@@ -673,9 +696,7 @@ def export_operator_image(
     out = core_dir / "emp3r0r-operator-image.tar.zst"
     tar_path = core_dir / "emp3r0r-operator-image.tar"
     log_info(f"Exporting {image} to {out} (this can take a few minutes)...")
-    res = run_cmd(
-        [container_engine, "save", "-o", str(tar_path), image], check=False
-    )
+    res = run_cmd([container_engine, "save", "-o", str(tar_path), image], check=False)
     if res.returncode != 0 or IS_DRY_RUN:
         if not IS_DRY_RUN:
             log_warn("Operator image export failed")
@@ -754,6 +775,16 @@ def parse_args() -> argparse.Namespace:
         help="Release build without garble obfuscation",
     )
     parser.add_argument(
+        "--garble",
+        metavar="PATH",
+        default="",
+        help=(
+            "Use this custom garble binary instead of the builder's vanilla "
+            "garble, e.g. a patched build with a different fingerprint. PATH "
+            "is mounted read-only into the build container."
+        ),
+    )
+    parser.add_argument(
         "--prefix",
         default="/usr/local",
         help="Install prefix (default: /usr/local)",
@@ -767,6 +798,15 @@ def parse_args() -> argparse.Namespace:
         "--no-operator-image",
         action="store_true",
         help="Do not build/export the operator container image",
+    )
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help=(
+            "Build every agent target with every optional feature (slow). "
+            "The default is a lightweight, slim build; use --targets or "
+            "--agent-tags to opt into specific extras instead."
+        ),
     )
     parser.add_argument(
         "--operator-kit",
@@ -796,23 +836,14 @@ def parse_args() -> argparse.Namespace:
         "build container. C2 binaries (cc, cat, listener) are always built. "
         "These flags are forwarded verbatim to core/build.py.",
     )
-    tgt_excl = tgt_group.add_mutually_exclusive_group()
-    tgt_excl.add_argument(
-        "--lightweight",
-        action="store_true",
-        default=False,
-        help=(
-            "Build only linux/amd64 and windows/amd64 exe/dll targets. "
-            "Fastest preset — ideal for development or x86-64-only deployments."
-        ),
-    )
-    tgt_excl.add_argument(
+    tgt_group.add_argument(
         "--targets",
         metavar="OS/ARCH[,OS/ARCH,...]",
         default="",
         help=(
             "Comma-separated list of OS/arch targets, e.g. "
-            "'linux/amd64,windows/amd64,windows/386'."
+            "'linux/amd64,windows/amd64,windows/386'. The default is "
+            "linux/amd64 and windows/amd64; --full builds every target."
         ),
     )
 
@@ -824,23 +855,14 @@ def parse_args() -> argparse.Namespace:
         "These flags are forwarded verbatim to core/build.py.",
     )
     feat_group.add_argument(
-        "--agent-slim",
-        action="store_true",
-        default=False,
-        help=(
-            "Build the smallest agent: plain HTTP polling with crypto/tls and no "
-            "optional subsystems. Ignored when --agent-tags is also given."
-        ),
-    )
-    feat_group.add_argument(
         "--agent-tags",
         metavar="TAGS",
         default="",
         help=(
             "Exact space-separated feature tags for every agent payload, e.g. "
-            "'with_quic with_utls'. Selects only those features; the default "
-            "full build enables all of them. See the tag reference below or "
-            "--list-agent-tags."
+            "'with_quic with_utls'. The installer default is a slim agent with "
+            "no optional features; --full enables all of them. See the tag "
+            "reference below or --list-agent-tags."
         ),
     )
     parser.add_argument(
@@ -860,18 +882,20 @@ def collect_extra_build_flags(args: argparse.Namespace) -> str:
     as a single argument.
     """
     flags = []
-    if getattr(args, "lightweight", False):
-        flags.append("--lightweight")
-    elif getattr(args, "targets", ""):
+    full = getattr(args, "full", False)
+    targets = getattr(args, "targets", "")
+    if targets:
         # Shell-quote so the comma-separated value survives the env var.
-        flags.append(f"--targets {args.targets}")
-    if getattr(args, "agent_slim", False):
-        flags.append("--agent-slim")
+        flags.append(f"--targets {targets}")
+    elif not full:
+        flags.append("--lightweight")
     agent_tags = getattr(args, "agent_tags", "").strip()
     if agent_tags:
         # Quote the tag set so word-splitting yields one flag with many tags
         # when the build container expands EMP3R0R_BUILD_ARG.
         flags.append(f'--agent-tags "{agent_tags}"')
+    elif not full:
+        flags.append("--agent-slim")
     return " ".join(flags)
 
 
@@ -934,8 +958,14 @@ def main() -> None:
         container_engine = detect_container_engine()
         check_host_deps(script_dir)
         log_info("Starting emp3r0r installation (Docker-based build from local source)")
+        garble_path = resolve_custom_garble(args.garble)
         docker_build(
-            container_engine, script_dir, build_arg, disable_garble, extra_build_flags
+            container_engine,
+            script_dir,
+            build_arg,
+            disable_garble,
+            extra_build_flags,
+            garble_path,
         )
         install_from_operator_kit(
             cached_kit, args.prefix, script_dir / "core", container_engine, build_image

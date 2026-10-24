@@ -21,10 +21,28 @@ git clone --depth=1 https://github.com/jm33-m0/emp3r0r.git && cd emp3r0r
 ```
 
 The installer builds everything in a throwaway container and prepares the
-operator kit. Useful flags: `--lightweight` (Linux/Windows amd64 only, fastest),
-`--targets OS/ARCH,...`, `--agent-slim` / `--agent-tags` (choose which optional
-agent features to compile in, to shrink the implant and reduce fingerprinting),
-`--debug`, `--skip-build`.
+operator kit. By default it builds a fast, slim kit: only linux/amd64 and
+windows/amd64 targets, with a minimal agent (plain HTTP polling over
+`crypto/tls`, no optional subsystems).
+
+Opt into more when you need it:
+
+- `--full` builds every target with every agent feature (slowest).
+- `--targets OS/ARCH,...` adds specific targets, e.g.
+  `--targets linux/amd64,linux/arm64,windows/amd64`.
+- `--agent-tags 'with_quic with_utls'` compiles in exactly those optional agent
+  features; `--list-agent-tags` prints the reference (see
+  [Choosing the C2 transport and agent features](#choosing-the-c2-transport-and-agent-features)).
+- `--garble PATH` uses your own garble binary (for example a patched build with
+  a different fingerprint) instead of the builder's vanilla garble.
+- `--debug`, `--skip-build` and `--no-operator-image` control the rest of the
+  build.
+
+> [!NOTE]
+> You can `--disable-garble` to build faster if you prefer.
+> [Garble](https://github.com/burrowers/garble) obfuscates the (Go) agent
+> builds but also introduces its own fingerprint; give `--garble PATH` a custom
+> build to replace it.
 
 Launch the server:
 
@@ -57,9 +75,10 @@ emp3r0r server --c2-hosts 1.2.3.4 --add-operator dave erin
 Names must be unique and free of control characters; they are used in the
 console and the audit log.
 
-> **WireGuard subnet warning.** Your local services are reachable by all
-> operators and the server over the WireGuard subnet; firewall the ones you do
-> not want exposed. The server prints this warning on startup.
+> [!WARNING]
+> Your local services are reachable by all operators and the server over the
+> WireGuard subnet; firewall the ones you do not want exposed. The server prints
+> this warning on startup.
 
 #### Multiple operators
 
@@ -241,23 +260,27 @@ nodes) routes through a peer that shares a usable transport instead of assuming
 everyone runs the local default. `smb` is only accepted for Windows payloads;
 kcp/mtls work everywhere.
 
+> [!NOTE]
+> Only Linux is supported as of now.
+
 #### Choosing the C2 transport and agent features
 
-Optional agent subsystems are **opt-in** with `with_*` Go build tags. The default
-full build enables every feature, so a normal release agent already has all of
-them. To build a leaner agent, select exactly what it needs with `--agent-tags`;
-`install.py --list-agent-tags` prints the reference. `--agent-slim` selects the
-smallest agent: plain HTTP polling with `crypto/tls` and no optional subsystems.
+Optional agent subsystems are **opt-in** with `with_*` Go build tags. By
+default the installer builds a slim agent (plain HTTP polling with
+`crypto/tls`, no optional subsystems) for linux/amd64 and windows/amd64 only.
+Select exactly what an agent needs with `--agent-tags`, or use `--full` for the
+full build (every target, every feature). `install.py --list-agent-tags` prints
+the reference.
 
-| Scenario | Build tags |
-| --- | --- |
-| Smallest agent, least strings | `--agent-slim` |
-| Randomized TLS fingerprint (uTLS) | `with_utls` |
-| HTTP/2 streaming C2 | `with_h2conn` |
-| QUIC C2 with the per-build static key | `with_quic` |
-| ECH behind an ECH-capable CDN | `with_doh with_ech with_utls` |
-| P2P mesh (relay + gossip) | `with_mesh with_kcp` |
-| Everything (default full build) | `with_mesh with_kcp with_h2conn with_quic with_utls with_doh with_ech with_cdnproxy with_netlink with_uring` |
+| Scenario                              | Build tags                                                                                                   |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Smallest agent, least strings         | default (no tags)                                                                                            |
+| Randomized TLS fingerprint (uTLS)     | `with_utls`                                                                                                  |
+| HTTP/2 streaming C2                   | `with_h2conn`                                                                                                |
+| QUIC C2 with the per-build static key | `with_quic`                                                                                                  |
+| ECH behind an ECH-capable CDN         | `with_doh with_ech with_utls`                                                                                |
+| P2P mesh (relay + gossip)             | `with_mesh with_kcp`                                                                                         |
+| Everything (full build)               | `with_mesh with_kcp with_h2conn with_quic with_utls with_doh with_ech with_cdnproxy with_netlink with_uring` |
 
 CDN fronting is not a build-time choice: every CDN fronts plain HTTP(S), so set
 `--cc` to the CDN hostname and use the default `http_poll` transport (`with_h2conn`
@@ -367,15 +390,15 @@ The prefix is **<kbd>Ctrl</kbd>+<kbd>x</kbd>** (the default
 <kbd>Ctrl</kbd>+<kbd>b</kbd> is unbound). A few keys worth memorising right
 away:
 
-| Keys | Action |
-| --- | --- |
-| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>c</kbd> | new window |
-| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>z</kbd> | zoom / maximize the current pane |
-| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>_</kbd> / <kbd>-</kbd> | split top/bottom / left/right |
-| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>h</kbd>/<kbd>j</kbd>/<kbd>k</kbd>/<kbd>l</kbd> | move between panes |
-| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>x</kbd> / <kbd>&amp;</kbd> | kill pane / window |
-| <kbd>Shift</kbd>+drag | select with the terminal, i.e. copy to the OS clipboard |
-| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>?</kbd> | list every key binding |
+| Keys                                                                             | Action                                                  |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>c</kbd>                                        | new window                                              |
+| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>z</kbd>                                        | zoom / maximize the current pane                        |
+| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>_</kbd> / <kbd>-</kbd>                         | split top/bottom / left/right                           |
+| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>h</kbd>/<kbd>j</kbd>/<kbd>k</kbd>/<kbd>l</kbd> | move between panes                                      |
+| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>x</kbd> / <kbd>&amp;</kbd>                     | kill pane / window                                      |
+| <kbd>Shift</kbd>+drag                                                            | select with the terminal, i.e. copy to the OS clipboard |
+| <kbd>Ctrl</kbd>+<kbd>x</kbd> <kbd>?</kbd>                                        | list every key binding                                  |
 
 The full reference -- mouse and clipboard, all window/pane/session keys, copy
 mode, and everything this config changes versus stock tmux -- is in
