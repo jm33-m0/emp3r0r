@@ -14,6 +14,7 @@ import (
 // usable as-is by both client and server, for both carrier styles.
 func TestRandomMalleableHTTPConfigIsComplete(t *testing.T) {
 	paths := map[string]struct{}{}
+	staticPaths := 0
 	for i := 0; i < 200; i++ {
 		cfg := RandomMalleableHTTPConfig()
 
@@ -22,6 +23,19 @@ func TestRandomMalleableHTTPConfigIsComplete(t *testing.T) {
 		}
 		if len(cfg.CustomHeaders) == 0 {
 			t.Fatalf("profile %d: empty CustomHeaders", i)
+		}
+		if cfg.CustomHeaders["Accept-Encoding"] != "" {
+			t.Fatalf("profile %d: advertised an encoding the C transports cannot decode: %v", i, cfg.CustomHeaders)
+		}
+		for _, obvious := range []string{"beacon", "telemetry", "agent", "c2/", "/c2"} {
+			if strings.Contains(strings.ToLower(cfg.C2Path), obvious) {
+				t.Fatalf("profile %d: obvious C2 path %q", i, cfg.C2Path)
+			}
+		}
+		if strings.HasSuffix(cfg.C2Path, ".js") || strings.HasSuffix(cfg.C2Path, ".css") ||
+			strings.HasSuffix(cfg.C2Path, ".woff2") || strings.HasSuffix(cfg.C2Path, ".svg") ||
+			strings.HasSuffix(cfg.C2Path, ".webp") {
+			staticPaths++
 		}
 		if cfg.CustomHeaders["User-Agent"] == "" || cfg.CustomHeaders["Accept"] == "" {
 			t.Fatalf("profile %d: browser headers incomplete: %v", i, cfg.CustomHeaders)
@@ -59,6 +73,9 @@ func TestRandomMalleableHTTPConfigIsComplete(t *testing.T) {
 
 	if len(paths) < 2 {
 		t.Fatalf("random profiles did not vary the C2 path: %v", paths)
+	}
+	if staticPaths == 0 {
+		t.Fatal("random profiles never selected a static-asset cover path")
 	}
 }
 
