@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
-	"time"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/uuid"
@@ -93,41 +93,26 @@ func IsArchValid(payloadType, archChoice string) bool {
 type AgentBuildConfig struct {
 	PayloadType  string
 	Arch         string
-	Timestamp    time.Time
 	WorkSpace    string
 	AgentUUID    string // Provided by operator (generated locally)
 	AgentUUIDSig string // Provided by operator (signed by server)
 }
 
-// GenerateFilePaths determines stub and output file paths
-func GenerateFilePaths(cfg AgentBuildConfig) (stubFile, outFile string) {
-	t := cfg.Timestamp
+// GenerateFilePaths determines stub and output file paths. The output name is
+// derived from the agent's target and runtime config, not from a timestamp, so
+// a build can be identified from its filename alone.
+func GenerateFilePaths(cfg AgentBuildConfig, runtimeConfig *def.Config) (stubFile, outFile string) {
 	switch cfg.PayloadType {
-	case "linux_executable":
+	case PayloadTypeLinuxExecutable:
 		stubFile = fmt.Sprintf("stub-%s", cfg.Arch)
-		outFile = fmt.Sprintf("%s/agent_linux_%s_%d-%d-%d_%d-%d-%d",
-			cfg.WorkSpace, cfg.Arch,
-			t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second())
-	case "windows_executable":
+	case PayloadTypeWindowsExecutable:
 		stubFile = fmt.Sprintf("stub-win-%s", cfg.Arch)
-		outFile = fmt.Sprintf("%s/agent_windows_%s_%d-%d-%d_%d-%d-%d.exe",
-			cfg.WorkSpace, cfg.Arch,
-			t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second())
-	case "windows_dll":
+	case PayloadTypeWindowsDLL:
 		stubFile = fmt.Sprintf("stub-win-%s.dll", cfg.Arch)
-		outFile = fmt.Sprintf("%s/agent_windows_%s_%d-%d-%d_%d-%d-%d.dll",
-			cfg.WorkSpace, cfg.Arch,
-			t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second())
-	case "linux_so":
+	case PayloadTypeLinuxSO:
 		stubFile = fmt.Sprintf("stub-%s.so", cfg.Arch)
-		outFile = fmt.Sprintf("%s/agent_linux_so_%s_%d-%d-%d_%d-%d-%d.so",
-			cfg.WorkSpace, cfg.Arch,
-			t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second())
 	}
-
-	// Set full path for stub
-	stubFile = fmt.Sprintf("%s/%s", cfg.WorkSpace, stubFile)
-	return stubFile, outFile
+	return filepath.Join(cfg.WorkSpace, stubFile), filepath.Join(cfg.WorkSpace, agentArtifactName(cfg, runtimeConfig))
 }
 
 // EncryptAgentConfig generates UUID, signs it, marshals config to CBOR, and encrypts
@@ -194,7 +179,7 @@ type BuildAgentResult struct {
 // This is the main entry point for agent generation business logic
 func BuildAgent(cfg AgentBuildConfig, runtimeConfig *def.Config) (*BuildAgentResult, error) {
 	// 1. Generate file paths
-	stubFile, outFile := GenerateFilePaths(cfg)
+	stubFile, outFile := GenerateFilePaths(cfg, runtimeConfig)
 
 	// 2. Check stub exists
 	if !util.IsExist(stubFile) {
@@ -263,7 +248,6 @@ func GenerateAgentWorkflow(opts AgentConfig, payloadType, archChoice string, sig
 	buildCfg := AgentBuildConfig{
 		PayloadType:  payloadType,
 		Arch:         archChoice,
-		Timestamp:    time.Now(),
 		WorkSpace:    live.EmpWorkSpace,
 		AgentUUID:    agentUUID,
 		AgentUUIDSig: sig,

@@ -131,6 +131,37 @@ func setupCAgentBuildEnv(t *testing.T) {
 // artifact. It is skipped unless the pinned zig toolchain and the C agent
 // source are available, and is otherwise covered end to end by the stager
 // suite's TestCAgentEndToEnd.
+func TestCAgentArtifactName(t *testing.T) {
+	agentUUID := "11111111-2222-4333-8444-555555555555"
+	runtimeConfig := &def.Config{
+		CCAddress:  "https://c2.example.com",
+		CCHTTPPort: "8080",
+		DoHServer:  "https://1.1.1.1/dns-query",
+	}
+	providers := CAgentProviders{
+		Crypto:    "mbedtls",
+		Gzip:      "none",
+		Transport: "http_raw",
+		Dynload:   "auto",
+		Glibc:     "2.17",
+		Libc:      "glibc",
+		Arch:      "arm64",
+		Format:    "so",
+	}
+	want := "c_agent_linux_arm64_so_glibc-2.17_http-raw_mbedtls_none_auto_" +
+		"doh-1.1.1.1_c2.example.com_8080_11111111.so"
+	if got := cAgentArtifactName(providers, runtimeConfig, agentUUID); got != want {
+		t.Fatalf("artifact name = %q, want %q", got, want)
+	}
+
+	// Empty provider fields must describe the Makefile defaults, not an empty
+	// or timestamped name.
+	wantDefault := "c_agent_linux_amd64_exe_glibc-2.17_libcurl_openssl_miniz_libc-dl_11111111"
+	if got := cAgentArtifactName(CAgentProviders{}, nil, agentUUID); got != wantDefault {
+		t.Fatalf("default artifact name = %q, want %q", got, wantDefault)
+	}
+}
+
 func TestGenerateCAgentWorkflow(t *testing.T) {
 	setupCAgentBuildEnv(t)
 
@@ -141,7 +172,7 @@ func TestGenerateCAgentWorkflow(t *testing.T) {
 	if !util.IsFileExist(res.OutputFile) {
 		t.Fatalf("output not produced: %s", res.OutputFile)
 	}
-	if !strings.HasPrefix(filepath.Base(res.OutputFile), "aquila_linux_amd64_") {
+	if !strings.HasPrefix(filepath.Base(res.OutputFile), "c_agent_linux_amd64_exe_glibc-2.17_") {
 		t.Errorf("unexpected output name %q", res.OutputFile)
 	}
 	if res.AgentUUID == "" || res.ConfigSize == 0 {
@@ -182,7 +213,7 @@ func TestGenerateCAgentCrossArch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateCAgentWorkflow(arm64/musl): %v", err)
 	}
-	if !strings.HasPrefix(filepath.Base(res.OutputFile), "aquila_linux_arm64_") {
+	if !strings.HasPrefix(filepath.Base(res.OutputFile), "c_agent_linux_arm64_exe_musl_") {
 		t.Errorf("unexpected output name %q", res.OutputFile)
 	}
 	f, err := elf.Open(res.OutputFile)

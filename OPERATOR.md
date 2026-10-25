@@ -237,6 +237,17 @@ generate --type windows_executable --arch amd64 --cc your.domain.com \
   --p2p --p2p-transport smb
 ```
 
+Generated payloads use feature-based names instead of timestamps, so the
+filename describes what is inside it and two builds with different
+configuration cannot overwrite each other by accident. The filename ends in a
+short random ID so even two builds with identical configuration stay distinct.
+
+The Go agent name follows
+`agent_<os>_<arch>_<kind>_<channel>_<mesh>_<features>_<host>_<port>_<id>`;
+features such as `kcp`, `ncsi`, `stager`, `persistent-router`, `doh`, `ech`,
+`cdn`, `proxy`, poll/jitter, mesh relay/gossip ports and bootstrap peer count
+are added when enabled. The C agent uses the `c_agent_linux_...` prefix.
+
 #### Native C agent
 
 The native C agent has its own `generate_c` command, built on demand from
@@ -270,8 +281,8 @@ under `malleable_c2`; an incomplete profile is replaced with a complete random
 one when an agent is generated. The same profile applies to every HTTP
 transport.
 
-Output: `aquila_linux_<arch>_<timestamp>` (`.so` / `.bin` for `--format so` /
-`--format shellcode`).
+Output: `c_agent_linux_<arch>_<format>_<libc>_<transport>_<crypto>_<gzip>_<dynload>_..._<host>_<port>_<id>`.
+The extension is `.so` for `--format so` and `.bin` for `--format shellcode`.
 
 Mesh nodes may run different transports. Each agent advertises the transport and
 port its relay listens on, and dialers always use the _peer's_ advertised

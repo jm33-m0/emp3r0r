@@ -2,6 +2,8 @@ package builder
 
 import (
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
@@ -170,6 +172,14 @@ func TestAgentConfigFlow(t *testing.T) {
 }
 
 func TestGenerateFilePaths(t *testing.T) {
+	agentUUID := "11111111-2222-4333-8444-555555555555"
+	runtimeConfig := &def.Config{
+		CCAddress:     "c2.example.com",
+		C2ChannelMode: def.C2ChannelModePlainHTTP,
+		CCHTTPPort:    "8080",
+		PollInterval:  60,
+		Jitter:        20,
+	}
 	tests := []struct {
 		name        string
 		payloadType string
@@ -179,57 +189,107 @@ func TestGenerateFilePaths(t *testing.T) {
 	}{
 		{
 			name:        "Linux executable",
-			payloadType: "linux_executable",
+			payloadType: PayloadTypeLinuxExecutable,
 			arch:        "amd64",
 			wantStub:    "stub-amd64",
-			wantOut:     "agent_linux_amd64_",
+			wantOut:     "agent_linux_amd64_exe_http-poll_standalone_poll-60_jitter-20_c2.example.com_8080",
 		},
 		{
 			name:        "Windows executable",
-			payloadType: "windows_executable",
+			payloadType: PayloadTypeWindowsExecutable,
 			arch:        "amd64",
 			wantStub:    "stub-win-amd64",
-			wantOut:     "agent_windows_amd64_",
+			wantOut:     "agent_windows_amd64_exe_http-poll_standalone_poll-60_jitter-20_c2.example.com_8080.exe",
 		},
 		{
 			name:        "Windows DLL",
-			payloadType: "windows_dll",
+			payloadType: PayloadTypeWindowsDLL,
 			arch:        "386",
 			wantStub:    "stub-win-386.dll",
-			wantOut:     "agent_windows_386_",
+			wantOut:     "agent_windows_386_dll_http-poll_standalone_poll-60_jitter-20_c2.example.com_8080.dll",
 		},
 		{
 			name:        "Linux SO",
-			payloadType: "linux_so",
+			payloadType: PayloadTypeLinuxSO,
 			arch:        "arm64",
 			wantStub:    "stub-arm64.so",
-			wantOut:     "agent_linux_so_arm64_",
+			wantOut:     "agent_linux_arm64_so_http-poll_standalone_poll-60_jitter-20_c2.example.com_8080.so",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpDir, _ := os.MkdirTemp("", "emp3r0r_path_test")
-			defer os.RemoveAll(tmpDir)
-
 			cfg := AgentBuildConfig{
 				PayloadType: tt.payloadType,
 				Arch:        tt.arch,
-				WorkSpace:   tmpDir,
+				WorkSpace:   t.TempDir(),
+				AgentUUID:   agentUUID,
 			}
 
-			stubFile, outFile := GenerateFilePaths(cfg)
+			stubFile, outFile := GenerateFilePaths(cfg, runtimeConfig)
 
-			// Check stub file contains expected pattern
-			if !contains(stubFile, tt.wantStub) {
-				t.Errorf("Stub file mismatch. Got %s, want to contain %s", stubFile, tt.wantStub)
+			if got := filepath.Base(stubFile); got != tt.wantStub {
+				t.Errorf("stub file = %q, want %q", got, tt.wantStub)
 			}
-
-			// Check output file contains expected pattern
-			if !contains(outFile, tt.wantOut) {
-				t.Errorf("Output file mismatch. Got %s, want to contain %s", outFile, tt.wantOut)
+			ext := payloadExtension(tt.payloadType)
+			wantOut := strings.TrimSuffix(tt.wantOut, ext) + "_11111111" + ext
+			if got := filepath.Base(outFile); got != wantOut {
+				t.Errorf("output file = %q, want %q", got, wantOut)
 			}
 		})
+	}
+}
+
+func TestGenerateFilePathsFeatureRich(t *testing.T) {
+	agentUUID := "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
+	runtimeConfig := &def.Config{
+		CCAddress:         "https://c2.example.com:8443",
+		C2ChannelMode:     def.C2ChannelModeH2Conn,
+		CCH2Port:          "8443",
+		IsP2PEnabled:      true,
+		IsDirectC2Enabled: true,
+		P2PTransport:      "mtls",
+		P2PRelayPort:      "50000",
+		MeshGossipPort:    "50001",
+		InitialPeers:      []string{"1.2.3.4:7946"},
+		UseKCP:            true,
+		EnableNCSI:        true,
+		IsRunByStager:     true,
+		PersistentRouter:  true,
+		DoHServer:         "https://1.1.1.1/dns-query",
+		ECHServerName:     "c2.example.com",
+		CDNProxy:          "wss://cdn.example.com/ws",
+		C2TransportProxy:  "socks5://127.0.0.1:9050",
+	}
+	cfg := AgentBuildConfig{
+		PayloadType: PayloadTypeWindowsDLL,
+		Arch:        "amd64",
+		WorkSpace:   t.TempDir(),
+		AgentUUID:   agentUUID,
+	}
+	want := "agent_windows_amd64_dll_h2conn_gateway-mtls_kcp_ncsi_stager_persistent-router_" +
+		"doh-1.1.1.1_ech-c2.example.com_cdn-cdn.example.com_proxy-socks5_" +
+		"relay-50000_gossip-50001_peers-1_c2.example.com-8443_aaaaaaaa.dll"
+	_, outFile := GenerateFilePaths(cfg, runtimeConfig)
+	if got := filepath.Base(outFile); got != want {
+		t.Fatalf("output file = %q, want %q", got, want)
+	}
+
+	quicCfg := AgentBuildConfig{
+		PayloadType: PayloadTypeLinuxExecutable,
+		Arch:        "amd64",
+		WorkSpace:   t.TempDir(),
+		AgentUUID:   agentUUID,
+	}
+	quicRuntime := &def.Config{
+		CCAddress:     "c2.example.com",
+		C2ChannelMode: def.C2ChannelModeQUIC,
+		CCH2Port:      "443",
+	}
+	_, quicOut := GenerateFilePaths(quicCfg, quicRuntime)
+	wantQuicSuffix := "_c2.example.com_443_aaaaaaaa"
+	if got := filepath.Base(quicOut); !strings.HasSuffix(got, wantQuicSuffix) {
+		t.Fatalf("QUIC output file = %q, want suffix %q", got, wantQuicSuffix)
 	}
 }
 

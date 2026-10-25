@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
@@ -282,24 +281,16 @@ func GenerateCAgentWorkflow(opts AgentConfig, providers CAgentProviders, signAge
 		return nil, fmt.Errorf("build reported success but %s was not produced", built)
 	}
 
-	now := time.Now()
-	arch := providers.Arch
-	if arch == "" {
-		arch = CAgentArches[0]
-	}
-	outFile := filepath.Join(live.EmpWorkSpace, fmt.Sprintf("aquila_linux_%s_%d-%d-%d_%d-%d-%d",
-		arch, now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second()))
+	outFile := filepath.Join(live.EmpWorkSpace, cAgentArtifactName(providers, live.RuntimeConfig, agentUUID))
 	var data []byte
 	switch providers.Format {
 	case "so":
-		outFile += ".so"
 		if data, err = os.ReadFile(built); err != nil {
 			return nil, fmt.Errorf("read built C agent: %w", err)
 		}
 	case "shellcode":
 		// malasada turns the PIC shared object into a loader-wrapped raw PIC
 		// blob; the exported entry is main (see agent.c).
-		outFile += ".bin"
 		if data, err = tools.ConvertSharedObjectToShellcode(built, "main", true); err != nil {
 			return nil, fmt.Errorf("convert C agent to shellcode: %w", err)
 		}
