@@ -1698,7 +1698,9 @@ def package_operator_bundle(prefix: str, core_dir: pathlib.Path) -> None:
             f"  tar -I zstd -xpf {operator_bundle_name} && ./emp3r0r-operator-kit/install.py"
         )
         log_success("Or run the operator from a container (recommended on Windows):")
-        log_success("  install.py builds and exports emp3r0r-operator-image.tar.zst")
+        log_success(
+            "  install.py --operator-image builds and exports emp3r0r-operator-image.tar.zst"
+        )
         log_success("  transfer it, then on the operator machine: docker load -i <file>")
         log_success("  Full operator guide: OPERATOR.md")
 

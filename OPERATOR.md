@@ -35,7 +35,7 @@ Opt into more when you need it:
   [Choosing the C2 transport and agent features](#choosing-the-c2-transport-and-agent-features)).
 - `--garble PATH` uses your own garble binary (for example a patched build with
   a different fingerprint) instead of the builder's vanilla garble.
-- `--debug`, `--skip-build` and `--no-operator-image` control the rest of the
+- `--debug`, `--skip-build` and `--operator-image` control the rest of the
   build.
 
 > [!NOTE]
@@ -165,9 +165,9 @@ emp3r0r client --c2-port 13377 \
 
 #### Windows (container)
 
-`install.py` is Linux-only, but you do not build the image by hand: running
-`./install.py` on the build host builds the operator image and exports it to
-`core/emp3r0r-operator-image.tar.zst`. Pass `--no-operator-image` to skip that.
+`install.py` is Linux-only. To use the Windows container, run
+`./install.py --operator-image` on the build host; it builds the operator image
+and exports it to `core/emp3r0r-operator-image.tar.zst`.
 
 **1. Move the image to the operator machine.** On the build host, after
 `./install.py`:
@@ -202,8 +202,8 @@ docker run -it --rm -v emp3r0r-operator:/root/.emp3r0r emp3r0r-operator:latest `
 - The container runs as root, so drop `sudo` from any hint the console prints.
 - The image is only tagged `latest`; tag the imported image however you like.
 
-If the image was not exported (for example you passed `--no-operator-image`),
-you can build it on any Docker host from the kit instead:
+If the image was not exported (for example you did not pass
+`--operator-image`), you can build it on any Docker host from the kit instead:
 
 ```bash
 tar --zstd -xpf emp3r0r-operator-kit.tar.zst

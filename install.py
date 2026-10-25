@@ -8,8 +8,8 @@ Can be executed in two modes:
 1. Repository Root Mode (building from source):
    Uses Docker (or Podman) as a throwaway build container to compile emp3r0r
    from the LOCAL source tree, installs the resulting binaries, and builds the
-   operator kit plus a loadable operator container image
-   (core/emp3r0r-operator-image.tar.zst).
+   operator kit. Pass --operator-image to also build and export a loadable
+   operator container image (core/emp3r0r-operator-image.tar.zst).
 
 2. Operator Kit Mode (installing on operator machine):
    Installs pre-compiled binaries into PREFIX (/usr/local), configures tmux,
@@ -795,9 +795,9 @@ def parse_args() -> argparse.Namespace:
         help="Skip Docker build; reinstall from the last cached build",
     )
     parser.add_argument(
-        "--no-operator-image",
+        "--operator-image",
         action="store_true",
-        help="Do not build/export the operator container image",
+        help="Also build/export the operator container image",
     )
     parser.add_argument(
         "--full",
@@ -939,7 +939,7 @@ def main() -> None:
     # Build any extra target/feature flags to pass into core/build.py.
     extra_build_flags = collect_extra_build_flags(args)
 
-    build_image = not args.no_operator_image
+    build_image = args.operator_image
 
     if args.skip_build:
         log_info("--skip-build: skipping Docker build, using cached operator kit")
