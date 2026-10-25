@@ -112,6 +112,17 @@ func TestSharedModuleDirsMirrored(t *testing.T) {
 	if err != nil || string(mirroredAgent) != "agent-marker" {
 		t.Fatalf("mirrored c_agent/marker.txt content mismatch: %q, %v", mirroredAgent, err)
 	}
+
+	// A workspace copy belongs to the operator: later loads must not refresh
+	// (and overwrite) it from the install prefix.
+	if err := os.WriteFile(marker, []byte("prefix-updated"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	loadModFromDirs()
+	kept, err := os.ReadFile(filepath.Join(workspace, "modules", "common", "shared_marker.txt"))
+	if err != nil || string(kept) != "shared-marker" {
+		t.Fatalf("workspace shared copy was overwritten: %q, %v", kept, err)
+	}
 }
 
 // TestStagedLoaderSmwVendoredInSync locks the SilentMoonwalk sources vendored

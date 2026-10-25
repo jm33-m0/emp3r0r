@@ -526,7 +526,9 @@ func loadModFromDirs() {
 		for _, mod_search_dir := range live.ModuleDirs {
 			src := filepath.Join(mod_search_dir, shared)
 			dst := filepath.Join(live.EmpWorkSpace, "modules", shared)
-			if util.IsExist(src) && src != dst {
+			// Keep an operator-owned workspace copy instead of refreshing it
+			// from the read-only install prefix on every startup.
+			if util.IsExist(src) && src != dst && !util.IsExist(dst) {
 				_ = os.MkdirAll(filepath.Dir(dst), 0o700)
 				_ = util.Copy(src, dst)
 			}
@@ -537,7 +539,7 @@ func loadModFromDirs() {
 	for _, mod_search_dir := range live.ModuleDirs {
 		src := filepath.Clean(filepath.Join(mod_search_dir, "..", "c_agent"))
 		dst := filepath.Join(live.EmpWorkSpace, "c_agent")
-		if util.IsExist(src) && src != dst {
+		if util.IsExist(src) && src != dst && !util.IsExist(dst) {
 			_ = os.MkdirAll(filepath.Dir(dst), 0o700)
 			_ = util.Copy(src, dst)
 		}
@@ -555,6 +557,15 @@ func loadModFromDirs() {
 // success, and an error when the config is unusable (in which case the dir's
 // modules are unregistered so a broken config is never exposed).
 func loadModuleDir(moduleDir string) ([]string, error) {
+	// An operator-owned workspace copy wins over the installed tree: it may
+	// contain edits or local build fixes, and the installed tree is read-only.
+	wsDir := filepath.Join(live.EmpWorkSpace, "modules", filepath.Base(moduleDir))
+	absDir, _ := filepath.Abs(moduleDir)
+	absWsDir, _ := filepath.Abs(wsDir)
+	if absDir != absWsDir && util.IsFileExist(filepath.Join(wsDir, "config.json")) {
+		return loadModuleDir(wsDir)
+	}
+
 	configFile := filepath.Join(moduleDir, "config.json")
 	configs, readConfigErr := readModConfigs(configFile)
 	if readConfigErr != nil {
@@ -590,32 +601,38 @@ func registerModuleConfig(moduleDir string, config *def.ModuleConfig, copiedPath
 		}
 	}()
 
-	// module path, eg. ~/.emp3r0r/modules/foo
+	// module path, eg. ~/.emp3r0r/modules/foo. The installed prefix is
+	// root-owned and read-only to the operator, so an existing workspace copy
+	// is authoritative: operators can edit it and keep the changes. Only a
+	// module that has no workspace copy is copied (when it needs a build).
 	config.Path = moduleDir
-	if config.IsLocal || config.Build != "" {
+	wsDir := filepath.Join(live.EmpWorkSpace, "modules", filepath.Base(moduleDir))
+	absConfigPath, _ := filepath.Abs(config.Path)
+	absWsDir, _ := filepath.Abs(wsDir)
+	if absConfigPath != absWsDir && util.IsFileExist(filepath.Join(wsDir, "config.json")) {
+		logging.Debugf("Module %s: preferring workspace copy %s", config.Name, wsDir)
+		config.Path = wsDir
+		*copiedPath = wsDir
+		*hasCopied = true
+	} else if config.IsLocal || config.Build != "" {
 		if *hasCopied {
 			config.Path = *copiedPath
+		} else if absConfigPath == absWsDir {
+			logging.Debugf("Module %s is already in workspace, skipping copy", config.Name)
+			*copiedPath = wsDir
+			*hasCopied = true
 		} else {
-			mod_dir := filepath.Join(live.EmpWorkSpace, "modules", filepath.Base(moduleDir))
-			absConfigPath, _ := filepath.Abs(config.Path)
-			absModDir, _ := filepath.Abs(mod_dir)
-			if absConfigPath == absModDir {
-				logging.Debugf("Module %s is already in workspace, skipping copy", config.Name)
-				*copiedPath = mod_dir
-				*hasCopied = true
-			} else {
-				err := os.MkdirAll(mod_dir, 0o700)
-				if err != nil {
-					return fmt.Errorf("failed to create %s: %v", mod_dir, err)
-				}
-				err = util.Copy(config.Path, mod_dir)
-				if err != nil {
-					return fmt.Errorf("copying %s to %s: %v", config.Path, mod_dir, err)
-				}
-				config.Path = mod_dir
-				*copiedPath = mod_dir
-				*hasCopied = true
+			err := os.MkdirAll(wsDir, 0o700)
+			if err != nil {
+				return fmt.Errorf("failed to create %s: %v", wsDir, err)
 			}
+			err = util.Copy(config.Path, wsDir)
+			if err != nil {
+				return fmt.Errorf("copying %s to %s: %v", config.Path, wsDir, err)
+			}
+			config.Path = wsDir
+			*copiedPath = wsDir
+			*hasCopied = true
 		}
 	}
 

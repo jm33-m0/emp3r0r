@@ -156,14 +156,19 @@ At startup the C2 scans these directories in order:
 1. `<EMP_DATA_DIR>/modules` (installed modules),
 2. `<EmpWorkSpace>/modules` (operator workspace).
 
-Later directories override earlier ones. A directory is a module only if it
-contains a `config.json`; the manifest may be a single object or an array of
-objects (a suite).
+Later directories override earlier ones. An existing operator-workspace copy
+is preferred over the installed tree and is never overwritten from it: the
+installed tree is root-owned and read-only to the operator, while the workspace
+copy is where local edits and build fixes live. Delete the workspace copy to
+pick up a newly installed version. A directory is a module only if it contains
+a `config.json`; the manifest may be a single object or an array of objects (a
+suite).
 
 Shared headers and helpers live in `core/modules/bof_common/` (BOF headers)
 and `core/modules/common/` (cross-platform C sources such as RC4 and the
-indirect-syscall stubs). The C2 copies both into the operator workspace so
-module build scripts can reference them by relative path.
+indirect-syscall stubs). The C2 copies both into the operator workspace, when
+no workspace copy exists yet, so module build scripts can reference them by
+relative path.
 
 A file watcher reloads changed manifests at runtime and re-registers the
 affected commands, so you usually do not need to restart the C2 after editing

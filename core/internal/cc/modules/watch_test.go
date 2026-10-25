@@ -273,18 +273,20 @@ func TestModuleWatchReconcileLogsOnlyChanges(t *testing.T) {
 	}
 }
 
-func TestModuleWatchLocalModuleReloadNoLoop(t *testing.T) {
-	// A local (is_local) module lives in a "prefix" search dir and is copied
-	// into the workspace when loaded. Editing its prefix config must reload it
-	// exactly once — the workspace copy we create ourselves must not be
-	// reported as another change (no reload loop, no log spam).
+func TestModuleWatchPrefersWorkspaceCopy(t *testing.T) {
+	// A local module is copied into the workspace on first load. Once that
+	// operator-owned copy exists, later loads and prefix edits must keep using
+	// it instead of overwriting it from the installed (root-owned) tree.
 	searchDir, workspace := newWatchTestRoot(t)
 	defer setTestModuleDirs(t, searchDir, workspace)()
+	wsModules := filepath.Join(workspace, "modules")
+	live.ModuleDirs = []string{searchDir, wsModules}
 
 	def.Modules.Delete("watch_local")
 	deleteModuleRunner("watch_local")
 
-	body := `{
+	body := func(tag string) string {
+		return fmt.Sprintf(`{
 		"name": "watch_local",
 		"comment": "local hot reload test %s",
 		"is_local": true,
@@ -292,49 +294,59 @@ func TestModuleWatchLocalModuleReloadNoLoop(t *testing.T) {
 		"agent_config": {"exec": "", "files": []},
 		"parameters": [],
 		"invocation": {"argv": [{"literal": "x.sh"}]}
-	}`
-	dir := writeModule(t, searchDir, "watch_local", fmt.Sprintf(body, "v1"))
-	if err := os.WriteFile(filepath.Join(dir, "x.sh"), []byte("#!/bin/sh\necho hi\n"), 0o755); err != nil {
+	}`, tag)
+	}
+
+	prefixDir := writeModule(t, searchDir, "watch_local", body("v1"))
+	if err := os.WriteFile(filepath.Join(prefixDir, "x.sh"), []byte("#!/bin/sh\necho hi\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	InitModules()
 
-	val, ok := def.Modules.Load("watch_local")
-	if !ok || val.(*def.ModuleConfig).Comment != "local hot reload test v1" {
-		t.Fatalf("local module not loaded: ok=%v", ok)
+	wsPath := filepath.Join(wsModules, "watch_local")
+	loaded := func() *def.ModuleConfig {
+		val, ok := def.Modules.Load("watch_local")
+		if !ok {
+			t.Fatal("watch_local not loaded")
+		}
+		return val.(*def.ModuleConfig)
 	}
-	// Path must point at the workspace copy
-	wsPath := filepath.Join(workspace, "modules", "watch_local")
-	if val.(*def.ModuleConfig).Path != wsPath {
-		t.Fatalf("local module Path = %q, want workspace copy %q", val.(*def.ModuleConfig).Path, wsPath)
+	if got := loaded(); got.Path != wsPath || got.Comment != "local hot reload test v1" {
+		t.Fatalf("initial load = %+v, want workspace copy %s with v1", got, wsPath)
+	}
+
+	// The operator edits the workspace copy; a reload must keep it.
+	writeModule(t, wsModules, "watch_local", body("v2"))
+	InitModules()
+	if got := loaded(); got.Path != wsPath || got.Comment != "local hot reload test v2" {
+		t.Fatalf("after workspace edit = %+v, want workspace copy %s with v2", got, wsPath)
 	}
 
 	StartModuleWatch()
 	defer StopModuleWatch()
 
-	// edit the prefix config -> reload (and re-copy) exactly once
-	writeModule(t, searchDir, "watch_local", fmt.Sprintf(body, "v2"))
+	// Editing the install-prefix config must not override the workspace copy.
+	writeModule(t, searchDir, "watch_local", body("v3"))
+	time.Sleep(700 * time.Millisecond)
+	if got := loaded(); got.Comment != "local hot reload test v2" {
+		t.Fatalf("prefix edit overrode workspace copy: %+v", got)
+	}
+
+	// Editing the workspace copy is still picked up by the watcher.
+	writeModule(t, wsModules, "watch_local", body("v4"))
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		if val, ok := def.Modules.Load("watch_local"); ok &&
-			val.(*def.ModuleConfig).Comment == "local hot reload test v2" {
+		if loaded().Comment == "local hot reload test v4" {
 			break
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
-	if val, ok := def.Modules.Load("watch_local"); !ok || val.(*def.ModuleConfig).Comment != "local hot reload test v2" {
-		t.Fatalf("local module not reloaded after prefix config edit")
+	if got := loaded(); got.Comment != "local hot reload test v4" {
+		t.Fatalf("workspace edit not reloaded: %+v", got)
 	}
-	// workspace copy config must reflect the edit
-	data, err := os.ReadFile(filepath.Join(wsPath, "config.json"))
-	if err != nil || !strings.Contains(string(data), "local hot reload test v2") {
-		t.Fatalf("workspace copy not refreshed: %v", err)
-	}
-
-	// wait a beat: a reload loop would keep flipping the comment back / spamming
-	time.Sleep(700 * time.Millisecond)
-	if val, ok := def.Modules.Load("watch_local"); !ok || val.(*def.ModuleConfig).Comment != "local hot reload test v2" {
-		t.Fatalf("module regressed after quiet period: %+v", val)
+	data, err := os.ReadFile(filepath.Join(prefixDir, "config.json"))
+	if err != nil || !strings.Contains(string(data), "local hot reload test v3") {
+		t.Fatalf("prefix config was unexpectedly rewritten: %v", err)
 	}
 }
 
