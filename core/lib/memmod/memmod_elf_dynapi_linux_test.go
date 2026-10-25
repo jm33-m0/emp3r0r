@@ -7,6 +7,29 @@ import (
 	"testing"
 )
 
+func TestLibcPathScoreUsesModuleBasename(t *testing.T) {
+	tests := []struct {
+		path string
+		want int
+	}{
+		// Generated artifacts must never be mistaken for libc, even though
+		// their names contain "glibc" (which contains "libc").
+		{"/tmp/c_agent_linux_amd64_exe_glibc-2.17_libcurl_openssl_miniz_libc-dl_11111111", -1},
+		{"/tmp/agent_linux_amd64_exe_http-poll_standalone_c2.example.com_8080_11111111", -1},
+		{"/tmp/libc.so.bak", -1},
+		{"/usr/lib/x86_64-linux-gnu/libc.so.6", 100},
+		{"/lib/x86_64-linux-gnu/libc-2.31.so", 95},
+		{"/lib/ld-musl-x86_64.so.1", 90},
+		{"/lib/libc.musl-x86_64.so.1", 90},
+		{"/lib64/ld-linux-x86-64.so.2", 80},
+	}
+	for _, tt := range tests {
+		if got := libcPathScore(tt.path); got != tt.want {
+			t.Errorf("libcPathScore(%q) = %d, want %d", tt.path, got, tt.want)
+		}
+	}
+}
+
 func fakeSymbolLookup(symbols map[string]uintptr) func(string) (uintptr, error) {
 	return func(symbol string) (uintptr, error) {
 		if addr, ok := symbols[symbol]; ok && addr != 0 {

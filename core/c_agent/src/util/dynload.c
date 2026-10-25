@@ -322,6 +322,7 @@ static int maps_line(MapsReader *r, char *out, size_t cap) {
  * means the fuzzer exercises the same logic the stager runs. */
 typedef struct {
   const char *needle;
+  size_t needle_len;
   int found;
   int done;
   unsigned long base;
@@ -329,8 +330,48 @@ typedef struct {
   char want[512];
 } MapsScan;
 
+/* Last path component. Module matching is anchored to this, never to the full
+ * path: an agent installed as .../glibc-2.17/... must not look like libc. */
+static const char *maps_line_basename(const char *path) {
+  const char *base = path;
+  if (path == NULL)
+    return NULL;
+  for (const char *p = path; *p; p++)
+    if (*p == '/')
+      base = p + 1;
+  return base;
+}
+
+/* Bounded prefix compare; freestanding builds do not link strncmp. */
+static int maps_has_prefix(const char *s, const char *prefix, size_t len) {
+  for (size_t i = 0; i < len; i++)
+    if (s[i] != prefix[i])
+      return 0;
+  return 1;
+}
+
+/* Match a module basename by its SONAME prefix. A boundary is required so
+ * "libc.so" matches libc.so.6 but not libc.so.bak, and "libc-" matches
+ * libc-2.31.so but not an unrelated name that merely starts with those bytes. */
+static int maps_name_matches(const char *base, const char *needle, size_t len) {
+  if (base == NULL || needle == NULL || len == 0 ||
+      !maps_has_prefix(base, needle, len))
+    return 0;
+  char next = base[len];
+  if (next == '\0')
+    return 1;
+  if (needle[len - 1] == '-')
+    return next >= '0' && next <= '9';
+  if (len >= 3 && strcmp(needle + len - 3, ".so") == 0)
+    return next == '.' && base[len + 1] >= '0' && base[len + 1] <= '9';
+  if (strstr(needle, "musl") != NULL)
+    return next == '-' || next == '.';
+  return next == '.' || next == '-' || next == '_';
+}
+
 static void maps_scan_init(MapsScan *s, const char *needle) {
   s->needle = needle;
+  s->needle_len = needle ? strlen(needle) : 0;
   s->found = 0;
   s->done = 0;
   s->base = 0;
@@ -343,7 +384,7 @@ static void maps_scan_line(MapsScan *s, const char *line) {
     return;
   const char *path = maps_line_path(line);
   if (!s->found) {
-    if (path && *path && strstr(path, s->needle)) {
+    if (maps_name_matches(maps_line_basename(path), s->needle, s->needle_len)) {
       s->base = parse_hex(line);
       s->end = maps_line_end(line);
       copy_str(s->want, sizeof(s->want), path);
@@ -363,7 +404,7 @@ static void maps_scan_line(MapsScan *s, const char *line) {
  * arbitrary text; the file-backed finders use the same maps_scan_line(). */
 unsigned long dynload_maps_find(const char *text, size_t len,
                                 const char *needle, unsigned long *mod_end) {
-  if (text == NULL || needle == NULL)
+  if (text == NULL || needle == NULL || needle[0] == '\0')
     return 0;
   MapsScan s;
   char line[512];
@@ -388,9 +429,11 @@ unsigned long dynload_maps_find(const char *text, size_t len,
   return s.found ? s.base : 0;
 }
 
-/* Base of the first mapping whose pathname contains `needle`, and the end of
- * that module's contiguous mapping run when `mod_end` is non-NULL. */
+/* Base of the first mapping whose basename starts with `needle`, and the end
+ * of that module's contiguous mapping run when `mod_end` is non-NULL. */
 static unsigned long maps_find(const char *needle, unsigned long *mod_end) {
+  if (needle == NULL || needle[0] == '\0')
+    return 0;
   MapsReader r;
   char line[512];
   MapsScan s;
@@ -406,7 +449,7 @@ static unsigned long maps_find(const char *needle, unsigned long *mod_end) {
 }
 
 unsigned long dynload_find_module(const char *needle, unsigned long *end) {
-  return needle ? maps_find(needle, end) : 0;
+  return maps_find(needle, end);
 }
 
 unsigned long dynload_find_libc(unsigned long *end) {

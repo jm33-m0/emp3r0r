@@ -1,0 +1,2 @@
+55d0f000-55d10000 r-xp 00000000 08:01 1 /tmp/c_agent_linux_amd64_exe_glibc-2.17_libcurl_openssl_miniz_libc-dl_11111111
+5600f000-56010000 r-xp 00000000 08:01 2 /tmp/agent_linux_amd64_exe_http-poll_standalone_c2.example.com_8080_11111111

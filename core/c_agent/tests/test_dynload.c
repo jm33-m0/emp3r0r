@@ -125,6 +125,32 @@ int main(void) {
     CHECK(dynload_maps_find(maps, 20, "libc.so", &mend) == 0);
   }
 
+  /* Regression: the full path used to be searched for "libc", so an agent
+   * named .../glibc-2.17/... was selected as libc. Match the basename only. */
+  {
+    static const char agent_maps[] =
+        "55d0f000-55d10000 r-xp 00000000 08:01 1 "
+        "/tmp/c_agent_linux_amd64_exe_glibc-2.17_libcurl_openssl_miniz_"
+        "libc-dl_11111111\n"
+        "5600f000-56010000 r-xp 00000000 08:01 2 "
+        "/tmp/agent_linux_amd64_exe_glibc-2.17_11111111\n";
+    size_t alen = sizeof(agent_maps) - 1;
+    unsigned long aend = 0;
+    CHECK(dynload_maps_find(agent_maps, alen, "libc.so", &aend) == 0);
+    CHECK(dynload_maps_find(agent_maps, alen, "libc-", &aend) == 0);
+    CHECK(dynload_maps_find(agent_maps, alen, "libc.musl", &aend) == 0);
+  }
+  {
+    static const char libc_dash_maps[] =
+        "7f0000000000-7f0000020000 r-xp 00000000 08:01 2 "
+        "/lib/x86_64-linux-gnu/libc-2.31.so\n";
+    size_t lmlen = sizeof(libc_dash_maps) - 1;
+    unsigned long lmend = 0;
+    CHECK(dynload_maps_find(libc_dash_maps, lmlen, "libc-", &lmend) ==
+          0x7f0000000000UL);
+    CHECK(lmend == 0x7f0000020000UL);
+  }
+
   /* A synthetic, fully valid image resolves the defined symbol. */
   uint8_t mod[0x200];
   size_t mn = build_module(mod, sizeof(mod));

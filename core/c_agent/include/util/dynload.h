@@ -50,16 +50,18 @@ void dynload_reset(dynload *dl);
 /* ---- stateless ELF helpers ---------------------------------------------- */
 
 /*
- * First mapping in /proc/self/maps whose pathname contains `needle` (e.g.
+ * First mapping in /proc/self/maps whose basename starts with `needle` (e.g.
  * "libc.so" or "libc-"). Returns its base and, when `end` is non-NULL, stores
  * the end of the module's contiguous mapping run. Returns 0 when not found.
+ * The full path is never searched, so an agent filename containing "libc"
+ * cannot be mistaken for libc.
  */
 unsigned long dynload_find_module(const char *needle, unsigned long *end);
 
 /*
  * Pure parser over a length-delimited /proc/self/maps buffer (the input need
- * not be NUL-terminated): first mapping whose pathname contains `needle`, with
- * the module's mapping end in `*end`. The file-backed finders use the same
+ * not be NUL-terminated): first mapping whose basename starts with `needle`,
+ * with the module's mapping end in `*end`. The file-backed finders use the same
  * parser; exposed so the unit test and fuzz/fuzz_maps.c can drive it with
  * arbitrary text.
  */

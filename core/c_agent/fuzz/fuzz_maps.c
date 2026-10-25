@@ -18,7 +18,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   for (size_t i = 0; i < sizeof(needles) / sizeof(needles[0]); i++)
     (void)dynload_maps_find((const char *)data, size, needles[i], &end);
 
-  /* A needle taken from the input exercises strstr on arbitrary haystacks. */
+  /* A needle taken from the input exercises basename matching on arbitrary
+   * haystacks. */
   char needle[64];
   size_t n = size < sizeof(needle) - 1 ? size : sizeof(needle) - 1;
   if (n) {

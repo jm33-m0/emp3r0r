@@ -1746,18 +1746,44 @@ func resolveRuntimeAPISymbol(modules []runtimeELFModule, symbol string) (uintptr
 	return 0, fmt.Errorf("symbol %q not found in runtime modules", symbol)
 }
 
-func libcPathScore(path string) int {
-	p := strings.ToLower(path)
+// moduleBasenameMatches reports whether a /proc/self/maps basename begins with
+// one of the known SONAME prefixes. Matching is anchored to the basename, not
+// the full path: an agent stored as .../glibc-2.17/... must not be scored as
+// libc merely because the path contains "libc".
+func moduleBasenameMatches(name, prefix string) bool {
+	if !strings.HasPrefix(name, prefix) {
+		return false
+	}
+	rest := name[len(prefix):]
+	if rest == "" {
+		return true
+	}
 	switch {
-	case strings.Contains(p, "libc.so"):
+	case strings.HasSuffix(prefix, "-"):
+		return rest[0] >= '0' && rest[0] <= '9'
+	case strings.HasSuffix(prefix, ".so"):
+		return len(rest) > 1 && rest[0] == '.' && rest[1] >= '0' && rest[1] <= '9'
+	case strings.Contains(prefix, "musl"):
+		return rest[0] == '-' || rest[0] == '.'
+	default:
+		return rest[0] == '.' || rest[0] == '-' || rest[0] == '_'
+	}
+}
+
+func libcPathScore(path string) int {
+	name := strings.ToLower(filepath.Base(path))
+	switch {
+	case moduleBasenameMatches(name, "libc.so"):
 		return 100
-	case strings.Contains(p, "libc-"):
+	case moduleBasenameMatches(name, "libc-"):
 		return 95
-	case strings.Contains(p, "ld-musl"):
+	case moduleBasenameMatches(name, "ld-musl"):
 		return 90
-	case strings.Contains(p, "musl"):
+	case moduleBasenameMatches(name, "libc.musl"):
+		return 90
+	case moduleBasenameMatches(name, "musl"):
 		return 85
-	case strings.Contains(p, "ld-linux"):
+	case moduleBasenameMatches(name, "ld-linux"):
 		return 80
 	default:
 		return -1
