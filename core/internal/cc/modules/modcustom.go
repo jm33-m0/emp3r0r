@@ -85,10 +85,20 @@ func moduleCustom(ctx *c2context.C2Context) {
 		}
 	}
 
-	// build module on C2
+	// Build the module on the C2. A module with a build command always rebuilds
+	// before use; a precompiled suite (for example a Windows BOF collection)
+	// builds its x86/x64 payloads on first use when they are missing.
 	if config.Build != "" {
 		logging.Infof("Building %s...", config.Name)
 		out, err := build_module(config, ctx.Flags)
+		if err != nil {
+			logging.Errorf("Build module %s: %v", config.Name, err)
+			return
+		}
+		logging.Infof("Module output:\n%s", out)
+	} else if moduleFilesMissing(config) && util.IsFileExist(filepath.Join(config.Path, "make_all.sh")) {
+		logging.Infof("Building missing payloads for %s...", config.Name)
+		out, err := build_make_all(config)
 		if err != nil {
 			logging.Errorf("Build module %s: %v", config.Name, err)
 			return
@@ -99,6 +109,49 @@ func moduleCustom(ctx *c2context.C2Context) {
 	// Every agent module runs in memory; there is no on-disk/fork-and-run
 	// path. handleInMemoryModule re-encodes the invocation for the agent.
 	handleInMemoryModule(ctx, *config, payload_type, invocation, peerIP)
+}
+
+// moduleFilesMissing reports whether any payload the module declares is not
+// present in its (workspace) directory.
+func moduleFilesMissing(config *def.ModuleConfig) bool {
+	for _, file := range config.AgentConfig.Files {
+		if !util.IsFileExist(filepath.Join(config.Path, file)) {
+			return true
+		}
+	}
+	return false
+}
+
+// build_make_all builds a module suite on demand. Multi-BOF suites ship a
+// make_all.sh that compiles both the x86 and x64 payloads; the module builder
+// runs it when the declared payloads are missing, with the zig shims first on
+// PATH so no host compiler is required.
+func build_make_all(config *def.ModuleConfig) (out []byte, err error) {
+	makeAll := filepath.Join(config.Path, "make_all.sh")
+	if !util.IsFileExist(makeAll) {
+		return nil, fmt.Errorf("module %s has no make_all.sh to build its payloads", config.Name)
+	}
+	buildEnv, err := moduleBuildEnv()
+	if err != nil {
+		return nil, fmt.Errorf("prepare module toolchain: %w", err)
+	}
+
+	if err := os.Chdir(config.Path); err != nil {
+		return nil, err
+	}
+	defer func() {
+		if chdirErr := os.Chdir(live.EmpWorkSpace); chdirErr != nil {
+			logging.Warningf("Failed changing directory to %s: %v", live.EmpWorkSpace, chdirErr)
+		}
+	}()
+
+	cmd := exec.Command("bash", "./make_all.sh")
+	cmd.Env = buildEnv
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		return out, fmt.Errorf("%s (%v)", out, err)
+	}
+	return out, nil
 }
 
 // build_module builds a local module using `build.sh`, passing flags as args to `./build.sh`
@@ -131,8 +184,18 @@ func build_module(config *def.ModuleConfig, flags map[string]string) (out []byte
 	}
 	build_cmd := fmt.Sprintf("%s%s", config.Build, invoc_args)
 
+	// Every module build uses the zig toolchain shipped with emp3r0r. The
+	// shims also pin generic Linux C builds to glibc 2.17 and route the
+	// Makefiles' hardcoded mingw compiler names through zig.
+	buildEnv, err := moduleBuildEnv()
+	if err != nil {
+		return out, fmt.Errorf("prepare module toolchain: %w", err)
+	}
+
 	// build module
-	out, err = exec.Command("sh", "-c", build_cmd).CombinedOutput()
+	cmd := exec.Command("sh", "-c", build_cmd)
+	cmd.Env = buildEnv
+	out, err = cmd.CombinedOutput()
 	if err != nil {
 		err = fmt.Errorf("%s (%v)", out, err)
 		return out, err
@@ -395,11 +458,18 @@ func ensureModuleDependencyHosted(ctx *c2context.C2Context, depName string) erro
 		return fmt.Errorf("dependency module %q ships no %s payload (found %s)", depName, arch, fileArch)
 	}
 
-	// Dependencies that build from source (e.g. libbpf, coffloader_linux) may
-	// not have their payload yet; build it now with empty flags.
-	if !util.IsFileExist(filepath.Join(config.Path, payloadFile)) && config.Build != "" {
-		if _, err := build_module(config, nil); err != nil {
-			return fmt.Errorf("building dependency %q: %w", depName, err)
+	// Dependencies may not have their payload yet. Build it now: a module with
+	// a build command uses that, while a BOF suite uses make_all.sh to build
+	// both its x86 and x64 payloads.
+	if !util.IsFileExist(filepath.Join(config.Path, payloadFile)) {
+		if config.Build != "" {
+			if _, err := build_module(config, nil); err != nil {
+				return fmt.Errorf("building dependency %q: %w", depName, err)
+			}
+		} else if util.IsFileExist(filepath.Join(config.Path, "make_all.sh")) {
+			if _, err := build_make_all(config); err != nil {
+				return fmt.Errorf("building dependency %q: %w", depName, err)
+			}
 		}
 	}
 
@@ -603,8 +673,9 @@ func registerModuleConfig(moduleDir string, config *def.ModuleConfig, copiedPath
 
 	// module path, eg. ~/.emp3r0r/modules/foo. The installed prefix is
 	// root-owned and read-only to the operator, so an existing workspace copy
-	// is authoritative: operators can edit it and keep the changes. Only a
-	// module that has no workspace copy is copied (when it needs a build).
+	// is authoritative: operators can edit it and keep the changes. Local
+	// modules, modules with a build command, and buildable suites with a
+	// make_all.sh are copied when no workspace copy exists yet.
 	config.Path = moduleDir
 	wsDir := filepath.Join(live.EmpWorkSpace, "modules", filepath.Base(moduleDir))
 	absConfigPath, _ := filepath.Abs(config.Path)
@@ -614,7 +685,7 @@ func registerModuleConfig(moduleDir string, config *def.ModuleConfig, copiedPath
 		config.Path = wsDir
 		*copiedPath = wsDir
 		*hasCopied = true
-	} else if config.IsLocal || config.Build != "" {
+	} else if config.IsLocal || config.Build != "" || util.IsFileExist(filepath.Join(moduleDir, "make_all.sh")) {
 		if *hasCopied {
 			config.Path = *copiedPath
 		} else if absConfigPath == absWsDir {

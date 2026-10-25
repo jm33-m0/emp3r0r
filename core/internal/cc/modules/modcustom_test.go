@@ -597,7 +597,8 @@ func TestInitModulesLoadsRepoModules(t *testing.T) {
 		dirName := filepath.Base(filepath.Dir(cfg))
 		for _, config := range configs {
 			expectedPath := filepath.Dir(cfg)
-			if config.IsLocal || config.Build != "" {
+			moduleDir := filepath.Dir(cfg)
+			if config.IsLocal || config.Build != "" || util.IsExist(filepath.Join(moduleDir, "make_all.sh")) {
 				expectedPath = filepath.Join(tmpWorkspace, "modules", dirName)
 			}
 			expected[config.Name] = expectedMod{

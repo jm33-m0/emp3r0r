@@ -273,9 +273,12 @@ Notes:
 
 ## 6. Building modules
 
-`core/build.py` scans `core/modules/*/make_all.sh` and runs each one
-automatically; you do not need to edit `build.py` to add a module. A minimal
-build script:
+Modules are not compiled during installation. The C2 copies buildable modules
+into the operator workspace, which takes precedence over the installed tree,
+and builds them there on demand. A module with a `build` command rebuilds
+before every execution; a precompiled suite with a `make_all.sh` builds when
+one of its declared payloads is missing (for example a Windows BOF collection
+builds both the x86 and x64 objects on first use). A minimal suite script:
 
 ```bash
 #!/bin/bash
@@ -283,18 +286,15 @@ set -e
 make -C src/MyBof -j"$(nproc)"
 ```
 
-Keep compiled artifacts in the source tree and reference them by relative path
+Keep compiled artifacts next to the sources and reference them by relative path
 in `agent_config.files`. Do not copy them elsewhere.
 
-`make_all.sh` is for suites that need compiling ahead of time. A single-file
-Starlark module needs no build step.
-
-The `build` manifest field is separate: it is a command the C2 runs
-immediately before each execution, with the current flags appended, and is
-used by local C2 modules (`loader_windows` uses `bash ./build.sh`). Toolchain
-requirements for those modules are documented in their own READMEs; the
-Windows loader, for example, needs zig and nasm (both installed by `build.py`
-and shipped in the operator kit), plus a native C compiler.
+Every module build uses the zig toolchain shipped with emp3r0r. The C2 writes
+small compiler shims under `<workspace>/.module-toolchain/bin` (never into the
+system PATH or `/usr`) so Makefiles that hardcode `gcc`, `clang` or the
+`*-w64-mingw32-*` cross compilers still resolve to zig. Generic Linux C builds
+are pinned to glibc 2.17; mingw shims target `x86_64-windows-gnu` and
+`x86-windows-gnu`. A single-file Starlark module needs no build step.
 
 A BOF is freestanding, position-independent code with no runtime, so build it
 with **no sanitizer instrumentation**: `zig cc` enables its default

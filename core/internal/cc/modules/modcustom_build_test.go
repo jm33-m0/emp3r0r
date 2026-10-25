@@ -142,9 +142,9 @@ func TestBuildModuleReturnsFailure(t *testing.T) {
 		t.Fatalf("getwd: %v", err)
 	}
 	origWorkspace := live.EmpWorkSpace
-	// build_module chdirs back to live.EmpWorkSpace; point it at the real cwd
-	// so the process working directory is not left inside a deleted temp dir.
-	live.EmpWorkSpace = origWD
+	// build_module chdirs back to live.EmpWorkSpace; the deferred chdir below
+	// restores the real cwd before this temp workspace is removed.
+	live.EmpWorkSpace = t.TempDir()
 	defer func() {
 		_ = os.Chdir(origWD)
 		live.EmpWorkSpace = origWorkspace
@@ -170,9 +170,9 @@ func TestEnsureModuleDependencyHostedSurfacesBuildFailure(t *testing.T) {
 		t.Fatalf("getwd: %v", err)
 	}
 	paths.WWWRoot = t.TempDir()
-	// build_module chdirs back to live.EmpWorkSpace; point it at the real cwd
-	// so the process working directory is not left inside a deleted temp dir.
-	live.EmpWorkSpace = origWD
+	// build_module chdirs back to live.EmpWorkSpace; the deferred chdir below
+	// restores the real cwd before this temp workspace is removed.
+	live.EmpWorkSpace = t.TempDir()
 	defer func() {
 		_ = os.Chdir(origWD)
 		paths.WWWRoot = origWWWRoot

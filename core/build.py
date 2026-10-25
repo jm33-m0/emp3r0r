@@ -5,8 +5,9 @@ from __future__ import annotations
 emp3r0r Core Build and Installation Script (Python)
 ---------------------------------------------------
 Builds C2 server binaries (CC, cat, listener), agent stubs (pure Go & CGO),
-shared objects, BOFs, and custom modules. Performs local system installation,
-operator bundle packaging, and uninstallation.
+and shared objects; installs module sources for on-demand builds in the operator
+workspace. Performs local system installation, operator bundle packaging, and
+uninstallation.
 
 Usage:
   python3 build.py [COMMAND] [OPTIONS]
@@ -706,8 +707,8 @@ def record_malasada_stage0_size(core_dir: pathlib.Path) -> None:
 
     The stager maps only the stage0 shellcode executable and keeps the
     appended agent payload read-only, so it needs stage0's length at build
-    time. The module is built from the installed modules/ tree (no vendor/),
-    hence this is captured while the vendored binary is still available.
+    time. The module is built from its workspace copy (which does not ship
+    vendor/), hence this is captured while the vendored binary is available.
     """
     stage0 = core_dir / MALASADA_STAGE0_REL
     if not stage0.is_file():
@@ -1578,38 +1579,10 @@ def build(
             build_opt,
         )
 
-    # ── Modules (make_all.sh) — always run, target-filtering not applicable ──
-    # Native modules are OS/arch-agnostic build artefacts (BOFs, etc.) so we
-    # do not suppress them based on the target filter.
-    log_info("Building complex modules with make_all.sh...")
-    modules_dir = core_dir / "modules"
-    module_env = os.environ.copy()
-    module_env["EMP3R0R_DEBUG"] = "1" if arg1 == "--debug" else "0"
-    if modules_dir.is_dir():
-        for mod_dir in modules_dir.iterdir():
-            make_all = mod_dir / "make_all.sh"
-            if mod_dir.is_dir() and make_all.is_file():
-                log_info(
-                    f"Running make_all.sh in {mod_dir.name} ({'debug' if arg1 == '--debug' else 'release'})"
-                )
-                try:
-                    make_all.chmod(0o755)
-                except Exception:
-                    pass
-                res = run_cmd(
-                    ["./make_all.sh"], check=False, cwd=mod_dir, env=module_env
-                )
-                if res.returncode != 0:
-                    log_warn(
-                        f"Failed to build modules in {mod_dir.name} via make_all.sh"
-                    )
-
-    log_info("Building Linux test BOFs")
-    hello_linux = modules_dir / "hello_linux"
-    if hello_linux.is_dir():
-        res = run_cmd(["make", "-C", str(hello_linux)], check=False)
-        if res.returncode != 0:
-            log_warn("Failed to build hello_linux module")
+    # Modules are not compiled during installation. Buildable modules are
+    # copied into the operator workspace, which takes precedence over this
+    # installed tree, and are built there on demand with the shipped zig
+    # toolchain.
 
 
 def find_installed_prefix(prefix: str) -> pathlib.Path:
