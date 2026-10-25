@@ -472,3 +472,16 @@ func TestResolveAgentUUIDByTagFallbackForStaleRecord(t *testing.T) {
 		t.Fatalf("fallback resolve = %q, %v, %v; want %q, true, nil", got, found, err, uuid)
 	}
 }
+
+func TestCloseAgentDBClearsGlobal(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "agents.db")
+	if err := InitAgentDB(dbPath); err != nil {
+		t.Fatalf("InitAgentDB: %v", err)
+	}
+	if err := CloseAgentDB(); err != nil {
+		t.Fatalf("CloseAgentDB: %v", err)
+	}
+	if AgentDB != nil {
+		t.Fatal("AgentDB still points at a closed connection")
+	}
+}

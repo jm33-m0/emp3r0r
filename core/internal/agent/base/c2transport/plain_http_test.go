@@ -17,6 +17,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/paths"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/server"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -39,50 +40,99 @@ func waitForPort(addr string, deadline time.Time) error {
 	}
 }
 
-// waitForUDPPort waits until addr is bound by another process. UDP is
-// connectionless, so readiness is observed by failing to bind the same address
-// ourselves rather than by dialing it.
-func waitForUDPPort(addr string, deadline time.Time) error {
+// waitForTLSPort waits until a TLS listener completes a handshake. Testing with
+// a plain TCP dial produces spurious "TLS handshake error: EOF" logs and can
+// report ready before the certificate/HTTP2 stack is actually serving.
+func waitForTLSPort(addr string, deadline time.Time) error {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
-	udpAddr, err := net.ResolveUDPAddr("udp", addr)
-	if err != nil {
-		return err
-	}
+	dialer := &net.Dialer{Timeout: 500 * time.Millisecond}
 	for {
-		conn, listenErr := net.ListenUDP("udp", udpAddr)
-		if listenErr != nil {
-			return nil // bound by the C2 already
-		}
-		_ = conn.Close()
 		if time.Now().After(deadline) {
-			return fmt.Errorf("timeout waiting for %s to be bound", addr)
+			return fmt.Errorf("timeout waiting for TLS listener %s", addr)
+		}
+		conn, err := tls.DialWithDialer(dialer, "tcp", addr, &tls.Config{InsecureSkipVerify: true}) // test-only readiness probe
+		if err == nil {
+			_ = conn.Close()
+			return nil
 		}
 		<-ticker.C
 	}
 }
 
+func freeTCPPort(t *testing.T) int {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("reserve TCP port: %v", err)
+	}
+	defer ln.Close()
+	return ln.Addr().(*net.TCPAddr).Port
+}
+
+func freeUDPPort(t *testing.T) int {
+	t.Helper()
+	pc, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	if err != nil {
+		t.Fatalf("reserve UDP port: %v", err)
+	}
+	defer pc.Close()
+	return pc.LocalAddr().(*net.UDPAddr).Port
+}
+
 func runCheckinACK(t *testing.T, mode string, quicStandardKey bool) {
 	t.Helper()
 	transport.SetQUICStandardKey(quicStandardKey)
+	t.Cleanup(func() { transport.SetQUICStandardKey(false) })
 
-	tmpDir, err := os.MkdirTemp("", "agent_http_poll_test")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
+	// The package shares process-wide agent/C2 state. Snapshot every global this
+	// test mutates and restore it only after the server goroutine has stopped;
+	// otherwise a slow handler from this test can race the next test's setup.
+	origLiveRuntime := live.RuntimeConfig
+	origEmpWorkSpace := live.EmpWorkSpace
+	origWWWRoot := paths.WWWRoot
+	origCCAddr := def.CCAddress
+	origHTTPClient := def.HTTPClient
+	origCommonRuntime := common.RuntimeConfig
+	origAgentKey := agentutils.AgentKey
+	origCACrtPEM := transport.GetCACrtPEM()
+	origCaCrtFile := transport.CaCrtFile
+	origCaKeyFile := transport.CaKeyFile
+	origServerCrtFile := transport.ServerCrtFile
+	origServerKeyFile := transport.ServerKeyFile
+	origTransportWorkSpace := transport.EmpWorkSpace
+	t.Cleanup(func() {
+		live.RuntimeConfig = origLiveRuntime
+		live.EmpWorkSpace = origEmpWorkSpace
+		paths.WWWRoot = origWWWRoot
+		def.CCAddress = origCCAddr
+		def.HTTPClient = origHTTPClient
+		common.RuntimeConfig = origCommonRuntime
+		agentutils.AgentKey = origAgentKey
+		transport.SetCACrtPEM(origCACrtPEM)
+		transport.CaCrtFile = origCaCrtFile
+		transport.CaKeyFile = origCaKeyFile
+		transport.ServerCrtFile = origServerCrtFile
+		transport.ServerKeyFile = origServerKeyFile
+		transport.EmpWorkSpace = origTransportWorkSpace
+	})
+
+	// Stop any endpoint left by an earlier test before initializing the DB.
+	network.StopEmpServers()
+	if agents.AgentDB != nil {
+		_ = agents.CloseAgentDB()
 	}
-	defer os.RemoveAll(tmpDir)
-	defer network.StopEmpServers()
-	defer server.MarkOperatorOffline("test-operator")
 
+	tmpDir := t.TempDir()
 	caCertFile := filepath.Join(tmpDir, "ca-cert.pem")
 	caKeyFile := filepath.Join(tmpDir, "ca-key.pem")
 	serverCertFile := filepath.Join(tmpDir, "server-cert.pem")
 	serverKeyFile := filepath.Join(tmpDir, "server-key.pem")
 
-	if _, err = transport.GenCerts(nil, caCertFile, caKeyFile, "", "", true); err != nil {
+	if _, err := transport.GenCerts(nil, caCertFile, caKeyFile, "", "", true); err != nil {
 		t.Fatalf("Failed to generate CA: %v", err)
 	}
-	if _, err = transport.GenCerts([]string{"127.0.0.1"}, serverCertFile, serverKeyFile, caKeyFile, caCertFile, false); err != nil {
+	if _, err := transport.GenCerts([]string{"127.0.0.1"}, serverCertFile, serverKeyFile, caKeyFile, caCertFile, false); err != nil {
 		t.Fatalf("Failed to generate server cert: %v", err)
 	}
 
@@ -97,20 +147,18 @@ func runCheckinACK(t *testing.T, mode string, quicStandardKey bool) {
 	transport.ServerKeyFile = serverKeyFile
 	transport.EmpWorkSpace = tmpDir
 	live.EmpWorkSpace = tmpDir
-
-	tlsListener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("Failed to reserve TLS port: %v", err)
+	paths.WWWRoot = filepath.Join(tmpDir, "www")
+	if err := os.MkdirAll(paths.WWWRoot, 0o700); err != nil {
+		t.Fatalf("create WWW root: %v", err)
 	}
-	tlsPort := tlsListener.Addr().(*net.TCPAddr).Port
-	tlsListener.Close()
 
-	httpListener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("Failed to reserve HTTP port: %v", err)
+	tlsPort := freeTCPPort(t)
+	if mode == def.C2ChannelModeQUIC {
+		// QUIC needs a free UDP port; a TCP reservation says nothing about UDP
+		// and made the QUIC subtests intermittently collide with another socket.
+		tlsPort = freeUDPPort(t)
 	}
-	httpPort := httpListener.Addr().(*net.TCPAddr).Port
-	httpListener.Close()
+	httpPort := freeTCPPort(t)
 
 	live.RuntimeConfig = &def.Config{
 		CCH2Port:        fmt.Sprintf("%d", tlsPort),
@@ -135,35 +183,68 @@ func runCheckinACK(t *testing.T, mode string, quicStandardKey bool) {
 			CloseValue:    "close=1",
 		},
 	}
-
-	// Clear in place: reassigning `= sync.Map{}` would race any handler
-	// goroutine from an earlier test still Load/Range-ing the old instance.
 	live.ClearAgents()
 
-	serverDone := make(chan error, 1)
-	go func() { serverDone <- server.StartC2AgentTLSServer() }()
-	server.MarkOperatorOnline("test-operator")
-	defer func() {
+	// Initialize the trust store before any listener accepts a request. The
+	// server used to do this lazily on its startup goroutine, so a fast first
+	// check-in could race ahead of table creation and be rejected with EOF.
+	// The DB is also why the old test started the TLS server even for http_poll;
+	// initialize it explicitly and start only the transport under test.
+	if err := agents.InitAgentDB(filepath.Join(tmpDir, "agents.db")); err != nil {
+		t.Fatalf("InitAgentDB: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = agents.CloseAgentDB()
+		live.ClearAgents()
+	})
+
+	// The dispatcher rejects an unknown agent when no operator is online; this
+	// test only needs the check-in path, so register a placeholder and remove it
+	// in cleanup instead of leaking operator state.
+	const testOperator = "c2transport-checkin-test"
+	server.MarkOperatorOnline(testOperator)
+	t.Cleanup(func() { server.MarkOperatorOffline(testOperator) })
+
+	serverDone := make(chan struct{})
+	startErr := make(chan error, 1)
+	go func() {
+		defer close(serverDone)
+		switch mode {
+		case def.C2ChannelModePlainHTTP:
+			server.StartC2HTTPServer()
+		case def.C2ChannelModeQUIC:
+			startErr <- server.StartC2AgentTLSServer()
+		default:
+			_ = server.StartC2AgentTLSServer()
+		}
+	}()
+	t.Cleanup(func() {
 		network.StopEmpServers()
-		// Join the server goroutine. Without this a later test can race with
-		// its read of live.RuntimeConfig (and CACrtPEM) while shutting down.
 		select {
 		case <-serverDone:
 		case <-time.After(5 * time.Second):
+			t.Errorf("C2 %s server did not stop within 5s", mode)
 		}
-	}()
+	})
+
 	switch mode {
 	case def.C2ChannelModePlainHTTP:
-		go server.StartC2HTTPServer()
 		if err := waitForPort(fmt.Sprintf("127.0.0.1:%d", httpPort), time.Now().Add(10*time.Second)); err != nil {
 			t.Fatalf("Plain HTTP server did not become ready: %v", err)
 		}
 	case def.C2ChannelModeQUIC:
-		if err := waitForUDPPort(fmt.Sprintf("127.0.0.1:%d", tlsPort), time.Now().Add(10*time.Second)); err != nil {
-			t.Fatalf("QUIC C2 server did not become ready: %v", err)
+		// StartC2AgentTLSServer returns after the QUIC listener is bound; no
+		// bind-probing loop is needed (and probing was itself racy).
+		select {
+		case err := <-startErr:
+			if err != nil {
+				t.Fatalf("QUIC C2 server did not start: %v", err)
+			}
+		case <-time.After(10 * time.Second):
+			t.Fatal("QUIC C2 server did not start within 10s")
 		}
 	default:
-		if err := waitForPort(fmt.Sprintf("127.0.0.1:%d", tlsPort), time.Now().Add(10*time.Second)); err != nil {
+		if err := waitForTLSPort(fmt.Sprintf("127.0.0.1:%d", tlsPort), time.Now().Add(10*time.Second)); err != nil {
 			t.Fatalf("TLS C2 server did not become ready: %v", err)
 		}
 	}
@@ -203,7 +284,7 @@ func runCheckinACK(t *testing.T, mode string, quicStandardKey bool) {
 		t.Fatalf("Failed to append CA cert")
 	}
 
-	if mode == "http_poll" {
+	if mode == def.C2ChannelModePlainHTTP {
 		def.CCAddress = fmt.Sprintf("http://127.0.0.1:%d", httpPort)
 		def.HTTPClient = transport.CreateEmp3r0rHTTPClient(def.CCAddress, "")
 		if def.HTTPClient == nil {
@@ -212,12 +293,16 @@ func runCheckinACK(t *testing.T, mode string, quicStandardKey bool) {
 		if tr, ok := def.HTTPClient.Transport.(*http.Transport); ok {
 			tr.TLSClientConfig = &tls.Config{RootCAs: certPool}
 		}
+		def.HTTPClient.Timeout = 15 * time.Second
 	} else {
 		def.CCAddress = fmt.Sprintf("https://127.0.0.1:%d", tlsPort)
-		def.HTTPClient = &http.Client{Transport: &http.Transport{
-			TLSClientConfig:   &tls.Config{RootCAs: certPool, NextProtos: []string{"h2"}},
-			ForceAttemptHTTP2: true,
-		}}
+		def.HTTPClient = &http.Client{
+			Timeout: 15 * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig:   &tls.Config{RootCAs: certPool, NextProtos: []string{"h2"}},
+				ForceAttemptHTTP2: true,
+			},
+		}
 	}
 
 	agentInfo := &def.Emp3r0rAgent{
