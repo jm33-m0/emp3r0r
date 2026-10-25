@@ -240,6 +240,42 @@ def copy2_atomic(src: pathlib.Path, dst: pathlib.Path) -> None:
     os.replace(tmp, dst)
 
 
+def secure_installed_path(path: pathlib.Path, recursive: bool = False) -> None:
+    """Make an installed path root-owned and writable by root only.
+
+    Operators need to read and execute these files, and buildable modules are
+    copied into their workspace before use, so directories/executables stay
+    0755 and ordinary files become 0644. Symlinks are re-owned without
+    following them.
+    """
+    if IS_DRY_RUN or os.name != "posix" or not hasattr(os, "chown"):
+        return
+
+    def _secure(p: pathlib.Path) -> None:
+        if p.is_symlink():
+            try:
+                os.lchown(p, 0, 0)
+            except OSError as e:
+                log_warn(f"Could not secure symlink {p}: {e}")
+            return
+        try:
+            mode = p.stat().st_mode
+            p.chmod(0o755 if p.is_dir() or mode & 0o111 else 0o644)
+        except OSError as e:
+            log_warn(f"Could not secure permissions on {p}: {e}")
+            return
+        try:
+            os.chown(p, 0, 0)
+        except OSError as e:
+            log_warn(f"Could not change owner of {p}: {e}")
+
+    _secure(path)
+    if recursive and path.is_dir() and not path.is_symlink():
+        for dirpath, dirnames, filenames in os.walk(path):
+            for name in dirnames + filenames:
+                _secure(pathlib.Path(dirpath) / name)
+
+
 def read_def_version(core_dir: pathlib.Path) -> str:
     """Return the release version from the Go source.
 
@@ -425,6 +461,7 @@ def link_system_command(target: pathlib.Path, name: str) -> None:
         if symlink.is_symlink() or symlink.exists():
             symlink.unlink(missing_ok=True)
         symlink.symlink_to(target)
+        secure_installed_path(symlink)
         log_info(f"Linked {name} executable to {symlink}")
     except OSError as e:
         log_warn(f"Could not symlink {symlink}: {e}")
@@ -1816,6 +1853,14 @@ def do_install(prefix: str, temp_dir: pathlib.Path, core_dir: pathlib.Path) -> N
     # nasm ships with emp3r0r so the Windows loader and Crystal-Kit can
     # assemble their SilentMoonwalk stubs on the operator host.
     install_nasm(data_dir)
+
+    # The install tree is root-owned and read-only to operators; buildable
+    # modules are copied into their workspace before they are used.
+    secure_installed_path(data_dir, recursive=True)
+    for name in ["emp3r0r", "emp3r0r-listener"]:
+        binary_path = bin_dir / name
+        if binary_path.exists():
+            secure_installed_path(binary_path)
 
     is_container = (
         pathlib.Path("/.dockerenv").exists()

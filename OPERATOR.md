@@ -411,3 +411,8 @@ The operator workspace is `~/.emp3r0r` (override with `EMP3R0R_WORKSPACE`). It
 holds `emp3r0r.json`, the WireGuard keys, `file-get/` downloads, generated
 payloads and `emp3r0r.log`. Mount it (or use a named volume) if you want this
 state to survive container recreation.
+
+Files installed under the prefix are root-owned and writable only by root.
+Buildable modules are copied into the workspace, where they stay editable; an
+existing workspace copy takes priority over the installed copy, so delete it
+to pick up a newly installed version.

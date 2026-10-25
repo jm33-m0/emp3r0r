@@ -186,6 +186,42 @@ def copy2_atomic(src: pathlib.Path, dst: pathlib.Path) -> None:
     os.replace(tmp, dst)
 
 
+def secure_installed_path(path: pathlib.Path, recursive: bool = False) -> None:
+    """Make an installed path root-owned and writable by root only.
+
+    Operators need to read and execute these files, and buildable modules are
+    copied into their workspace before use, so directories/executables stay
+    0755 and ordinary files become 0644. Symlinks are re-owned without
+    following them.
+    """
+    if IS_DRY_RUN or os.name != "posix" or not hasattr(os, "chown"):
+        return
+
+    def _secure(p: pathlib.Path) -> None:
+        if p.is_symlink():
+            try:
+                os.lchown(p, 0, 0)
+            except OSError as e:
+                log_warn(f"Could not secure symlink {p}: {e}")
+            return
+        try:
+            mode = p.stat().st_mode
+            p.chmod(0o755 if p.is_dir() or mode & 0o111 else 0o644)
+        except OSError as e:
+            log_warn(f"Could not secure permissions on {p}: {e}")
+            return
+        try:
+            os.chown(p, 0, 0)
+        except OSError as e:
+            log_warn(f"Could not change owner of {p}: {e}")
+
+    _secure(path)
+    if recursive and path.is_dir() and not path.is_symlink():
+        for dirpath, dirnames, filenames in os.walk(path):
+            for name in dirnames + filenames:
+                _secure(pathlib.Path(dirpath) / name)
+
+
 # ===========================================================================
 # Mode 1: Operator Kit Direct Installer
 # ===========================================================================
@@ -200,6 +236,7 @@ def link_usr_local_bin(target: pathlib.Path) -> None:
         symlink.unlink(missing_ok=True)
     try:
         symlink.symlink_to(target)
+        secure_installed_path(symlink)
         log_info(f"Linked {target.name} to /usr/local/bin/{target.name}")
     except OSError as e:
         log_warn(f"Could not symlink /usr/local/bin/{target.name}: {e}")
@@ -349,6 +386,14 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
         log_info(f"  sudo setcap {PROXY_NS_CAPS} {proxy_ns_dst}")
     else:
         log_warn("proxy-ns not found in kit; skipping proxy-ns installation")
+
+    # The install tree is root-owned and read-only to operators; buildable
+    # modules are copied into their workspace before they are used.
+    secure_installed_path(data_dir, recursive=True)
+    for binary in ["emp3r0r", "emp3r0r-listener"]:
+        binary_path = bin_dir / binary
+        if binary_path.exists():
+            secure_installed_path(binary_path)
 
     # tun2socks creates a kernel TUN device and installs routes, so emp3r0r-cc
     # needs CAP_NET_ADMIN to use it without root. WireGuard itself runs in
