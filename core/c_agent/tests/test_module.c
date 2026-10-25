@@ -76,6 +76,24 @@ int main(void) {
   CHECK_EQ_LONG(tokens[3].len, 5);
   CHECK_BYTES(tokens[3].ptr, "b6869", 5);
 
+  /* Regression: Go marshals a no-argument ResolvedCoffInvocation with a nil
+   * Args slice as CBOR null. Most SA_linux BOFs have no parameters, and the
+   * decoder used to reject them with "bad invocation". */
+  {
+    static const uint8_t no_args[] = {0xa1, 0x04, 0xa2, 0x01, 0x62,
+                                      0x67, 0x6f, 0x02, 0xf6};
+    char no_args_b64[64];
+    size_t n = c2_base64url_encode(no_args, sizeof(no_args), no_args_b64,
+                                   sizeof(no_args_b64));
+    CHECK(n > 0);
+    rst = c2_coff_invocation_parse(no_args_b64, n, export_name,
+                                   sizeof(export_name), tokens, &tokenc, 8,
+                                   tbuf, sizeof(tbuf), &tbuf_used);
+    CHECK_EQ_LONG(rst, C2_OK);
+    CHECK(strcmp(export_name, "go") == 0);
+    CHECK_EQ_LONG(tokenc, 0);
+  }
+
   /* Malformed base64 and a truncated CBOR body must fail, not crash. */
   CHECK(c2_coff_invocation_parse("!!!!", 4, export_name, sizeof(export_name),
                                  tokens, &tokenc, 8, tbuf, sizeof(tbuf),

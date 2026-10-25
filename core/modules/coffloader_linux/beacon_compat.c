@@ -177,8 +177,23 @@ void BeaconDataParse(datap *parser, char *buffer, int size) {
     return;
   parser->original = buffer;
   parser->buffer = buffer;
-  parser->length = size;
-  parser->size = size;
+  parser->length = 0;
+  parser->size = 0;
+  if (buffer == NULL || size < 4)
+    return;
+
+  /* The loader's argument buffer starts with a uint32 body length, matching
+   * the Windows COFFLoader ABI and hello_linux's in-BOF helper. BOFs pass the
+   * whole buffer to BeaconDataParse, so skip that prefix and clamp the body to
+   * the supplied size before exposing it to BeaconData* accessors. */
+  uint32_t body_len;
+  memcpy(&body_len, buffer, 4);
+  size_t available = (size_t)size - 4;
+  if (body_len > available)
+    body_len = (uint32_t)available;
+  parser->buffer = buffer + 4;
+  parser->length = (int)body_len;
+  parser->size = (int)body_len;
 }
 
 int BeaconDataInt(datap *parser) {

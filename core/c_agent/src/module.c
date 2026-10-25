@@ -197,6 +197,15 @@ c2_status c2_coff_invocation_parse(const char *b64, size_t b64len,
           export_name[en] = '\0';
         }
       } else if (ckey == 2) { /* Args */
+        /* Go encodes a nil []ResolvedCoffArg as CBOR null. No-argument BOFs
+         * (most SA_linux modules) use that form, so treat it as an empty
+         * argument list instead of rejecting the invocation. */
+        if (cbor_value_is_null(&coff)) {
+          st = c2_cbor_map_skip(&coff);
+          if (st != C2_OK)
+            break;
+          continue;
+        }
         if (!cbor_value_is_array(&coff)) {
           st = C2_ERR_PROTO;
           break;

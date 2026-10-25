@@ -276,6 +276,46 @@ func runCAgentEndToEnd(t *testing.T, format string) {
 	if got := runC2Command(t, agent, doneChan, &agentOut, customCmd); !strings.Contains(got, "Hello BOF Tester!") {
 		t.Fatalf("custom_module output = %q\nAgent output:\n%s", got, agentOut.String())
 	}
+
+	// Regression: SA_linux BOFs with no parameters marshal a nil Args slice as
+	// CBOR null, and their BeaconDataParse callers expect the packed buffer to
+	// start with a body-length prefix. Both used to break C-agent execution.
+	if cAgentTestLibc() != "musl" {
+		saInv := def.ResolvedInvocation{Coff: &def.ResolvedCoffInvocation{Export: "go"}}
+		saBytes, err := cbor.Marshal(saInv)
+		if err != nil {
+			t.Fatalf("marshal SA invocation: %v", err)
+		}
+		saB64 := base64.StdEncoding.EncodeToString(saBytes)
+		saChecksum := crypto.SHA256SumFile(filepath.Join(paths.WWWRoot, "sa_linux_pwd.amd64.gz"))
+		saCmd := fmt.Sprintf(
+			"!custom_module --mod_name sa_linux_pwd --type coff --file_to_download sa_linux_pwd.amd64.gz --checksum %s --invocation %s",
+			saChecksum, strconv.Quote(saB64))
+		if got := runC2Command(t, agent, doneChan, &agentOut, saCmd); !strings.Contains(got, "/tmp") {
+			t.Fatalf("SA custom_module output = %q\nAgent output:\n%s", got, agentOut.String())
+		}
+
+		catFile := filepath.Join(tmpDir, "sa-linux-cat.txt")
+		if err := os.WriteFile(catFile, []byte("sa-linux-cat-ok"), 0o600); err != nil {
+			t.Fatalf("write SA cat input: %v", err)
+		}
+		catInv := def.ResolvedInvocation{Coff: &def.ResolvedCoffInvocation{
+			Export: "go",
+			Args:   []def.ResolvedCoffArg{{WireType: "z", Value: catFile}},
+		}}
+		catBytes, err := cbor.Marshal(catInv)
+		if err != nil {
+			t.Fatalf("marshal SA cat invocation: %v", err)
+		}
+		catB64 := base64.StdEncoding.EncodeToString(catBytes)
+		catChecksum := crypto.SHA256SumFile(filepath.Join(paths.WWWRoot, "sa_linux_cat.amd64.gz"))
+		catCmd := fmt.Sprintf(
+			"!custom_module --mod_name sa_linux_cat --type coff --file_to_download sa_linux_cat.amd64.gz --checksum %s --invocation %s",
+			catChecksum, strconv.Quote(catB64))
+		if got := runC2Command(t, agent, doneChan, &agentOut, catCmd); !strings.Contains(got, "sa-linux-cat-ok") {
+			t.Fatalf("SA cat custom_module output = %q\nAgent output:\n%s", got, agentOut.String())
+		}
+	}
 }
 
 // runC2Command sends one command to the C agent and waits for its response.
@@ -349,6 +389,10 @@ func hostBOFModules(t *testing.T) {
 	}
 	host("modules/coffloader_linux", "coffloader_linux.so", "coffloader_linux.amd64.gz", coffArgs...)
 	host("modules/hello_linux", "hello_linux.o", "hello_linux.amd64.gz", helloArgs...)
+	if cAgentTestLibc() != "musl" {
+		host("modules/SA_linux", "SA/src/pwd.o", "sa_linux_pwd.amd64.gz")
+		host("modules/SA_linux", "SA/src/cat.o", "sa_linux_cat.amd64.gz")
+	}
 }
 
 // startCAgentOperator connects a minimal operator message tunnel to the C2 and
