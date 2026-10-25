@@ -127,8 +127,8 @@ func runCAgentEndToEnd(t *testing.T, format string) {
 	live.ClearAgents()
 	time.Sleep(100 * time.Millisecond)
 
-	// Build through the real operator path (generate --type aquila): config
-	// rendering, writable-source staging and the zig build are all exercised.
+	// Build through the real operator path: config rendering, writable-source
+	// staging and the zig build are all exercised.
 	agentArgv := buildCAgent(t, tmpDir, format)
 
 	// --- Start the real C2 ---

@@ -89,6 +89,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 
 		// this command will be used to generate an agent binary
 		rootCmd.AddCommand(gen_agent_cmd())
+		rootCmd.AddCommand(gen_c_cmd())
 
 		setDebuglevelCmd := &cobra.Command{
 			Use:     "debug",
@@ -575,6 +576,21 @@ func exitEmp3r0r(_ *console.Console) {
 	live.Exit(0)
 }
 
+// defaultC2Address prefers the configured C2 address, then a non-loopback
+// name from the server certificate. Shared by the Go and C agent generators.
+func defaultC2Address() string {
+	addr := live.RuntimeConfig.CCAddress
+	if addr != "" && addr != "127.0.0.1" && addr != "localhost" {
+		return addr
+	}
+	for _, host := range transport.NamesInCert(transport.ServerCrtFile) {
+		if host != "127.0.0.1" && host != "localhost" {
+			return host
+		}
+	}
+	return ""
+}
+
 func gen_agent_cmd() *cobra.Command {
 	genAgentCmd := &cobra.Command{
 		Use:     "generate",
@@ -598,20 +614,8 @@ func gen_agent_cmd() *cobra.Command {
 
 	// Group 2: C2 Connectivity & Transport
 	cc_hosts := transport.NamesInCert(transport.ServerCrtFile)
-	default_cc := live.RuntimeConfig.CCAddress
-	if default_cc == "127.0.0.1" || default_cc == "localhost" {
-		default_cc = ""
-	}
-	if default_cc == "" {
-		for _, h := range cc_hosts {
-			if h != "127.0.0.1" && h != "localhost" {
-				default_cc = h
-				break
-			}
-		}
-	}
 
-	genAgentCmd.Flags().StringP("cc", "", default_cc, "C2 server address (Required)")
+	genAgentCmd.Flags().StringP("cc", "", defaultC2Address(), "C2 server address (Required)")
 	genAgentCmd.Flags().StringP("c2-channel-mode", "", def.C2ChannelModeDefault, fmt.Sprintf("C2 channel wrapper mode. Available: %s", strings.Join(transport.AllC2ChannelModesDetailed(), ";")))
 	genAgentCmd.Flags().BoolP("quic-standard-key", "", false, "QUIC mode only: disable the custom static-key datagram obfuscation and speak stock QUIC (interoperable with HTTP/3 endpoints, but exposes the Initial/ClientHello to observers)")
 	genAgentCmd.Flags().StringP("cc-http-port", "", live.RuntimeConfig.CCHTTPPort, "Port for HTTP Polling/Beaconing C2 transport")
@@ -643,19 +647,6 @@ func gen_agent_cmd() *cobra.Command {
 	genAgentCmd.Flags().IntP("operator-idle-timeout", "", 1800, "Operator idle timeout in seconds before C2 refuses agent connections (0 disables idle timeout)")
 	addFlagToGroup("Stealth & Connectivity Options", "stager", "NCSI", "operator-idle-timeout")
 
-	// Group 6: providers for the native C agent (payload type c_linux). The C
-	// agent is built on demand from core/c_agent with only the selected backend
-	// linked in; these are ignored for every other payload type.
-	genAgentCmd.Flags().StringP("crypto", "", builder.CAgentCryptoProviders[0], fmt.Sprintf("C agent (--type c_linux) crypto provider. Available: %v", builder.CAgentCryptoProviders))
-	genAgentCmd.Flags().StringP("libc", "", builder.CAgentLibcs[0], fmt.Sprintf("C agent (--type c_linux) C library to link. Available: %v", builder.CAgentLibcs))
-	genAgentCmd.Flags().StringP("format", "", builder.CAgentFormats[0], fmt.Sprintf("C agent (--type c_linux) output format. Available: %v", builder.CAgentFormats))
-	genAgentCmd.Flags().StringP("gzip", "", builder.CAgentGzipProviders[0], fmt.Sprintf("C agent (--type c_linux) compression provider. Available: %v", builder.CAgentGzipProviders))
-	genAgentCmd.Flags().StringP("http", "", builder.CAgentHTTPProviders[0], fmt.Sprintf("C agent (--type c_linux) HTTP(S) client provider. Available: %v", builder.CAgentHTTPProviders))
-	genAgentCmd.Flags().StringP("transport", "", builder.CAgentTransportProviders[0], fmt.Sprintf("C agent (--type c_linux) transport provider. Available: %v", builder.CAgentTransportProviders))
-	genAgentCmd.Flags().StringP("dynload", "", builder.CAgentDynloadModes[0], fmt.Sprintf("C agent (--type c_linux) libc dynamic-loader symbols. Available: %v", builder.CAgentDynloadModes))
-	genAgentCmd.Flags().StringP("glibc-version", "", builder.CAgentGlibcVersions[0], fmt.Sprintf("C agent (--type c_linux) oldest glibc ABI to link against. Available: %v", builder.CAgentGlibcVersions))
-	addFlagToGroup("C Agent Options (--type aquila)", "crypto", "libc", "format", "gzip", "http", "transport", "dynload", "glibc-version")
-
 	// Force user to specify CC address
 	genAgentCmd.MarkFlagRequired("cc")
 
@@ -679,7 +670,6 @@ Example:
 		"Beaconing Options (HTTP Mode)",
 		"Mesh networking (P2P) Options",
 		"Stealth & Connectivity Options",
-		"C Agent Options (--type aquila)",
 	}
 
 	// help and usage functions
@@ -757,14 +747,6 @@ Example:
 		"ech":             carapace.ActionValues(),
 		"proxy":           carapace.ActionValues("socks5://127.0.0.1:9050", "socks5://"),
 		"c2-channel-mode": carapace.ActionValues(transport.AllC2ChannelModes()...),
-		"crypto":          carapace.ActionValues(builder.CAgentCryptoProviders...),
-		"libc":            carapace.ActionValues(builder.CAgentLibcs...),
-		"format":          carapace.ActionValues(builder.CAgentFormats...),
-		"gzip":            carapace.ActionValues(builder.CAgentGzipProviders...),
-		"http":            carapace.ActionValues(builder.CAgentHTTPProviders...),
-		"transport":       carapace.ActionValues(builder.CAgentTransportProviders...),
-		"dynload":         carapace.ActionValues(builder.CAgentDynloadModes...),
-		"glibc-version":   carapace.ActionValues(builder.CAgentGlibcVersions...),
 		"p2p-transport":   carapace.ActionValues(transport.AllTransportNames()...),
 	})
 	return genAgentCmd

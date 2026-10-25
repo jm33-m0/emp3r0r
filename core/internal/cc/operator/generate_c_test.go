@@ -1,28 +1,39 @@
 package operator
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/builder"
 )
 
-func TestGenerateCmdHasCAgentFlags(t *testing.T) {
+func TestGenerateCmdDoesNotOfferCAgent(t *testing.T) {
 	cmd := gen_agent_cmd()
-	for _, f := range []string{"type", "arch", "cc", "crypto", "libc", "format", "gzip", "http", "transport", "dynload", "glibc-version"} {
-		if cmd.Flags().Lookup(f) == nil {
-			t.Errorf("generate: missing flag --%s", f)
+	for _, name := range []string{"libc", "crypto", "format", "gzip", "transport", "dynload", "glibc-version"} {
+		if cmd.Flags().Lookup(name) != nil {
+			t.Errorf("generate should not define C agent flag --%s", name)
 		}
 	}
+	if slices.Contains(builder.PayloadTypeList, "aquila") || slices.Contains(builder.PayloadTypeList, "c_linux") {
+		t.Errorf("C agent must not be a Go generate payload type: %v", builder.PayloadTypeList)
+	}
+}
 
-	found := false
-	for _, p := range builder.PayloadTypeList {
-		if p == builder.PayloadTypeAquila {
-			found = true
-			break
+func TestGenerateCAgentCmdHasFlags(t *testing.T) {
+	cmd := gen_c_cmd()
+	for _, name := range []string{"type", "arch", "cc", "cc-http-port", "crypto", "format", "gzip", "transport", "dynload", "glibc-version"} {
+		if cmd.Flags().Lookup(name) == nil {
+			t.Errorf("generate_c: missing flag --%s", name)
 		}
 	}
-	if !found {
-		t.Errorf("%s is not offered in builder.PayloadTypeList", builder.PayloadTypeAquila)
+	if got := cmd.Flags().Lookup("type").DefValue; got != builder.CAgentLibcs[0] {
+		t.Errorf("--type default = %q, want libc %q", got, builder.CAgentLibcs[0])
+	}
+	if got := cmd.Flags().Lookup("arch").DefValue; got != builder.CAgentArches[0] {
+		t.Errorf("--arch default = %q, want %q", got, builder.CAgentArches[0])
+	}
+	if cmd.Flags().Lookup("c2-channel-mode") != nil {
+		t.Error("C agent only implements http_poll; it must not expose --c2-channel-mode")
 	}
 }
 

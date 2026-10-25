@@ -2,7 +2,7 @@
  * agent.c — reference hosted C agent.
  *
  * Ties the protocol layers together into a runnable agent:
- *   embedded config -> crypto backend -> http_poll transport -> session flow.
+ *   embedded config -> crypto backend -> selected transport -> session flow.
  * It checks in with the same host profile the Go agent reports
  * (agentutils.GatherSystemDetails, see sysinfo.c), brings up the message
  * tunnel, runs the filesystem/navigation commands the operator expects

@@ -1,15 +1,16 @@
 /*
- * http_client_libcurl.c — c2_http_client provider over the system libcurl.
+ * transport_libcurl.c — http_poll over the host's libcurl.
  *
- * libcurl is resolved at runtime with dynload.h (the same mechanism the stager
- * uses), so there is no build-time dependency on curl and the small stable ABI
- * subset is declared inline. libcurl also provides the TLS stack for an https
- * URL. This is the default `HTTP=libcurl` provider.
+ * libcurl is resolved at runtime with dynload.h (the same mechanism the
+ * freestanding stager uses), so there is no build-time dependency on curl.
+ * libcurl also provides the TLS stack for an https URL. This transport is
+ * selected with TRANSPORT=libcurl and supplies hp_http_perform() to the shared
+ * http_poll state machine.
  */
 
 #define _POSIX_C_SOURCE 200809L
 
-#include "http_client.h"
+#include "http_poll.h"
 
 #include "util/dynload.h"
 
@@ -153,7 +154,7 @@ static size_t write_cb(char *ptr, size_t size, size_t nmemb, void *ud) {
   return total;
 }
 
-c2_status c2_http_client_perform(const c2_http_request *req) {
+c2_status hp_http_perform(const hp_http_request *req) {
   if (req == NULL || req->url == NULL || req->method == NULL ||
       req->resp == NULL || req->resp_len == NULL || req->status == NULL)
     return C2_ERR_ARG;
@@ -211,3 +212,5 @@ c2_status c2_http_client_perform(const c2_http_request *req) {
   *req->resp_len = rb.len;
   return C2_OK;
 }
+
+const char *c2_transport_name(void) { return "libcurl"; }

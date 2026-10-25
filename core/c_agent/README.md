@@ -5,7 +5,7 @@ object or raw PIC payload that speaks the same C2 protocol and runs the same
 command/module surface. It lives in `core/c_agent/`, builds with the project's
 pinned `zig` toolchain, and links no crypto or HTTP library at build time —
 `libcrypto`/`libcurl` are resolved at runtime through `src/util/dynload.c` when
-`CRYPTO=openssl`/`HTTP=libcurl`.
+`CRYPTO=openssl` and the selected transport needs libcurl.
 
 This document is the agent's manual. The [C2 protocol
 specification](#c2-protocol-specification) is its final section and is
@@ -49,6 +49,7 @@ Related reading:
 make -C core/c_agent lib             # hosted static library (libagent.a)
 make -C core/c_agent agent           # hosted reference agent executable
 make -C core/c_agent so              # hosted shared object (agent.so, PIC)
+make -C core/c_agent agent ARCH=arm64 LIBC=musl  # cross-build
 make -C core/c_agent test            # unit tests (gcc + ASan/UBSan)
 make -C core/c_agent coverage        # gcov line coverage per source
 make -C core/c_agent test-mbedtls    # self-contained mbedTLS backend tests
@@ -56,6 +57,10 @@ make -C core/c_agent vendor-mbedtls  # build the vendored mbedTLS static libs
 make -C core/c_agent fuzz            # fuzz targets (ASan/UBSan fallback runner)
 make -C core/c_agent fuzz FUZZER=libfuzzer HOSTCC=clang FUZZ_TIME=60  # libFuzzer
 ```
+
+`ARCH` selects the hosted target (`amd64`, `386`, `arm`, `arm64`, `riscv64`);
+the Makefile maps it to the corresponding zig target. `riscv64` requires
+`LIBC=musl` because zig has no riscv64 glibc 2.17 target.
 
 `zig` (the project's pinned compiler, shipped with emp3r0r) builds the library
 and the agent. The unit tests and fuzzers run under ASan/UBSan, which zig cannot
@@ -66,7 +71,7 @@ SAN=` builds them with zig without sanitizers.
 
 The hosted agent links a C library dynamically and pins it for portability.
 `LIBC` selects which, and two further knobs tune the glibc build (all exposed
-to the operator as `generate --type aquila --libc … --glibc-version …
+to the operator as `generate_c --type … --arch … --glibc-version …
 --dynload …`):
 
 - `LIBC` (default `glibc`) picks the C library. `glibc` uses zig's bundled glibc
@@ -102,16 +107,26 @@ providers, selected at build time (the same model as
 | Libc      | `LIBC`      | `glibc`     | `glibc` · `musl`                                                  |
 | Crypto    | `CRYPTO`    | `openssl`   | `openssl` (system libcrypto via `dynload`) · `mbedtls` (vendored) |
 | Gzip      | `GZIP`      | `miniz`     | `miniz` (vendored) · `none`                                       |
-| HTTP/TLS  | `HTTP`      | `libcurl`   | `libcurl` (system libcurl via `dynload`)                          |
-| Transport | `TRANSPORT` | `http_poll` | `http_poll`                                                       |
+| Transport | `TRANSPORT` | `libcurl`   | `libcurl` · `http_raw` · `libssl` · `transport_<name>.c` you add   |
+
+A transport owns its full wire implementation, including HTTP/TLS or raw
+TCP/UDP; there is no separate HTTP provider selector.
+
+- `libcurl`: malleable HTTP-poll over the host's libcurl (`dynload`); `http://`
+  and `https://`.
+- `http_raw`: self-contained HTTP-poll over libc TCP sockets; plain `http://`
+  only.
+- `libssl`: self-contained HTTP-poll over libc TCP sockets, adding TLS through
+  the host's libssl/libcrypto for `https://` URLs.
 
 The default build pulls in nothing but the protocol code at build time:
-libcrypto and libcurl are resolved at runtime and the vendored miniz is a small
-single file. A fully self-contained agent (no system SSL dependency) is built
-with `CRYPTO=mbedtls`; a build that does not need gzip uses `GZIP=none`.
+libcrypto and the selected transport's libraries are resolved at runtime and the
+vendored miniz is a small single file. A fully self-contained agent (no system
+SSL dependency) is built with `CRYPTO=mbedtls TRANSPORT=http_raw`; a build that
+does not need gzip uses `GZIP=none`.
 
 ```sh
-make -C core/c_agent agent CRYPTO=mbedtls GZIP=none
+make -C core/c_agent agent CRYPTO=mbedtls GZIP=none TRANSPORT=http_raw
 ```
 
 To add your own backend, drop a file implementing the interface into the
@@ -120,8 +135,13 @@ matching directory and build with `<GROUP>=<name>`:
 - `crypto.h` — `c2_crypto_open` / `c2_crypto_close` returning a
   `c2_crypto_backend`.
 - `gzip.h` — `c2_gzip_bound` / `c2_gzip_compress` / `c2_gzip_decompress`.
-- `http_client.h` — `c2_http_client_perform`.
-- `transport.h` — `c2_transport_create` / `c2_transport_name`.
+- `transport.h` — `c2_transport_create` / `c2_transport_name`. Add a transport
+  as `src/transport/transport_<name>.c`; it may use raw sockets, a
+  self-contained protocol implementation, or load a library such as libcurl or
+  libssl at runtime. It is selected with `TRANSPORT=<name>`. A fully custom
+  transport implements both functions itself. A transport that only supplies
+  `hp_http_perform()` reuses the shared HTTP-poll state machine; add its name to
+  `HTTP_POLL_TRANSPORTS` in the Makefile so `http_poll.c` is linked.
 
 The vendored trees are source-only; their `.o`/`.a` files are build artifacts.
 
@@ -143,14 +163,18 @@ startup (nothing to decrypt).
 
 ### Operator console
 
-From the operator console, the same build is a payload type of `generate`
-(`--type aquila`, the C agent's name); it reuses the C2's config plumbing so
-the embedded config is encrypted under the C2's own `MagicString`:
+From the operator console, the same build uses the C agent's own `generate_c`
+command, so `--type` means the libc variant and `--arch` means the C toolchain
+target. It reuses the C2's config plumbing so the embedded config is encrypted
+under the C2's own `MagicString`:
 
 ```text
-generate --type aquila --cc your.domain.com
-  --libc glibc|musl --crypto openssl|mbedtls --gzip miniz|none --http libcurl --transport http_poll
+generate_c --type glibc|musl --arch amd64|386|arm|arm64|riscv64 --cc your.domain.com
+  --crypto openssl|mbedtls --gzip miniz|none --transport libcurl|http_raw|libssl
 ```
+
+`riscv64` requires `--type musl`; `--format shellcode` is `amd64` + `glibc`
+only.
 
 ## Code layout
 
@@ -176,7 +200,7 @@ src/               protocol layer shared by every provider
   cbor_util.h      private tinycbor glue shared by the message codecs
 src/crypto/        crypto providers (<name>.c)
 src/gzip/          gzip providers (<name>.c)
-src/transport/     transport + HTTP/TLS providers
+src/transport/     modular transports (each owns its HTTP/TCP/UDP wire stack)
 src/util/          implementations of include/util/ (debug, dynload, elfload, rc4, ...)
 tests/             standalone unit tests (make test)
 fuzz/              LLVMFuzzerTestOneInput targets + fallback runner (make fuzz)
@@ -207,7 +231,7 @@ a particular crypto or HTTP library. Two backend contracts are abstracted out:
 ## Output formats
 
 The same agent is emitted in three formats (also exposed to the operator as
-`generate --type aquila --format exe|so|shellcode`):
+`generate_c --format exe|so|shellcode`):
 
 - `agent` — a hosted executable.
 - `so` — a PIC `ET_DYN` shared object exporting `main`, for `dlopen`/
@@ -386,9 +410,12 @@ Implemented and tested in `src/`:
   key switch, tested over an in-memory stream with a deterministic stub AEAD.
   `c2_secureconn_read_msg` reads exactly one frame (one CBOR message).
 - `session.c` — the check-in / msg-tunnel / job loop over `c2_transport`.
-- `src/transport/http_poll.c` — the `http_poll` channel over
-  `c2_http_client`, with `src/transport/http_client_libcurl.c` (system
-  libcurl via `dynload`) as the default provider.
+- `src/transport/http_poll.c` — the shared malleable HTTP-poll state machine.
+  It is paired with a selected transport: `transport_libcurl.c` (libcurl via
+  `dynload`), `transport_http_raw.c` (libc TCP sockets), or
+  `transport_libssl.c` (libc TCP sockets plus libssl via `dynload` for HTTPS).
+  A new transport is another `src/transport/transport_<name>.c`; it can be raw
+  TCP/UDP, self-contained HTTP/TLS, or load its own library.
 - `src/agent.c` — the reference agent: embedded config; the
   filesystem/navigation commands the operator expects (`ls`/`ls_dir` return
   CBOR `[]util.Dentry`, `stat` returns CBOR `util.FileStat`, `pwd`, `cd`,
@@ -420,8 +447,7 @@ Implemented and tested in `src/`:
 
 Still to come:
 
-- A self-contained mbedTLS HTTP/TLS client provider
-  (`http_client_mbedtls.c`) and duplex channels.
+- Duplex channel transports beyond the HTTP-poll family.
 
 ## C2 protocol specification
 

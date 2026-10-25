@@ -6,10 +6,12 @@
 # mirroring core/modules/stager_linux's TRANSPORT=<name> model. Select them on
 # the command line, e.g.:
 #
-#   make agent CRYPTO=mbedtls GZIP=miniz HTTP=libcurl
+#   make agent CRYPTO=mbedtls GZIP=miniz TRANSPORT=libcurl
 #
 # Each group is implemented by src/<group>/<name>.c; drop a new file
-# in and build with <GROUP>=<name> to add your own backend.
+# in and build with <GROUP>=<name> to add your own backend. A transport owns
+# its own wire implementation (HTTP/TCP/UDP, raw sockets or a dynamically
+# loaded library), so there is no separate HTTP selector.
 
 # zig is the project's compiler (shipped with emp3r0r, pinned in core/build.py),
 # so it builds the library and agent. `CC = zig cc` (not `?=`) forces it even
@@ -20,6 +22,25 @@ AR ?= ar
 WARN = -Wall -Wextra -Werror -std=c99
 
 # ---- hosted ABI ------------------------------------------------------------
+# ARCH selects the target architecture the hosted agent and library are
+# cross-built for. The names are the operator-facing Go-style names; zig uses
+# its own target spelling, mapped below. Only architectures the hosted agent
+# supports are listed.
+ARCH ?= amd64
+ifeq ($(ARCH),amd64)
+  ZIG_ARCH = x86_64
+else ifeq ($(ARCH),386)
+  ZIG_ARCH = x86
+else ifeq ($(ARCH),arm)
+  ZIG_ARCH = arm
+else ifeq ($(ARCH),arm64)
+  ZIG_ARCH = aarch64
+else ifeq ($(ARCH),riscv64)
+  ZIG_ARCH = riscv64
+else
+  $(error unsupported ARCH=$(ARCH); available: amd64, 386, arm, arm64, riscv64)
+endif
+
 # LIBC selects the C library the hosted agent and library link:
 #   glibc (default) : glibc, dynamically linked and pinned to GLIBC_VERSION.
 #   musl            : musl, dynamically linked against zig's bundled musl.
@@ -75,26 +96,52 @@ ifeq ($(LIBC),musl)
 endif
 
 ifeq ($(LIBC),musl)
-  HOSTED_TARGET ?= -target x86_64-linux-musl -dynamic
+  ifeq ($(ARCH),arm)
+    HOSTED_TARGET ?= -target arm-linux-musleabihf -dynamic
+  else
+    HOSTED_TARGET ?= -target $(ZIG_ARCH)-linux-musl -dynamic
+  endif
+else ifeq ($(ARCH),arm)
+  HOSTED_TARGET ?= -target arm-linux-gnueabihf.$(GLIBC_VERSION)
 else
-  HOSTED_TARGET ?= -target x86_64-linux-gnu.$(GLIBC_VERSION)
+  HOSTED_TARGET ?= -target $(ZIG_ARCH)-linux-gnu.$(GLIBC_VERSION)
 endif
+
+# zig cannot provide riscv64 glibc at the project's oldest supported ABI.
+ifeq ($(ARCH),riscv64)
+  ifneq ($(LIBC),musl)
+    $(error ARCH=riscv64 requires LIBC=musl: zig has no riscv64 glibc 2.17 target)
+  endif
+endif
+
 HOSTED_CFLAGS = $(HOSTED_TARGET) $(DYNLOAD_MODE_CFLAG)
 
 # ---- provider selection ----------------------------------------------------
 # CRYPTO:    openssl (default, system libcrypto via dynload) | mbedtls (vendored)
 # GZIP:      miniz (default, vendored) | none
-# HTTP:      libcurl (default, system libcurl via dynload)
-# TRANSPORT: http_poll (default)
+# TRANSPORT: libcurl (default, HTTP poll via dynload) | http_raw (raw TCP) |
+#            libssl (raw TCP + TLS via dynload) | transport_<name>.c you add
 CRYPTO ?= openssl
 GZIP ?= miniz
-HTTP ?= libcurl
-TRANSPORT ?= http_poll
+TRANSPORT ?= libcurl
 
 CRYPTO_SRC = src/crypto/$(CRYPTO).c
 GZIP_SRC = src/gzip/$(GZIP).c
-HTTP_SRC = src/transport/http_client_$(HTTP).c
-TRANSPORT_SRC = src/transport/$(TRANSPORT).c
+TRANSPORT_SRC = src/transport/transport_$(TRANSPORT).c
+# Transports that only supply the HTTP engine reuse the shared http_poll state
+# machine. A fully custom transport implements c2_transport_create() and
+# c2_transport_name() itself and needs no entry here.
+HTTP_POLL_TRANSPORTS := libcurl http_raw libssl
+TRANSPORT_CFLAG =
+TRANSPORT_SUPPORT_SRC =
+ifneq ($(filter $(TRANSPORT),$(HTTP_POLL_TRANSPORTS)),)
+  TRANSPORT_SUPPORT_SRC = src/transport/http_poll.c
+endif
+ifeq ($(TRANSPORT),libssl)
+  TRANSPORT_SUPPORT_SRC += src/transport/transport_http_raw.c
+  TRANSPORT_CFLAG = -DHP_HTTP_RAW_AS_HELPER=1
+endif
+HOSTED_CFLAGS += $(TRANSPORT_CFLAG)
 
 # Vendored mbedTLS (self-contained), linked only when CRYPTO=mbedtls. See
 # vendor/mbedtls/README.emp3r0r.md; the .a files are gitignored build artifacts.
@@ -142,7 +189,7 @@ PORTABLE_SRC = src/util/rc4.c src/util/packer.c src/util/dynload.c src/util/dynl
                src/messages.c src/agent_info.c src/config.c \
                src/secureconn.c src/session.c src/memfile.c \
                src/bof.c src/sysinfo.c src/module.c \
-               $(GZIP_SRC) $(CRYPTO_SRC) $(TRANSPORT_SRC) $(HTTP_SRC) \
+               $(GZIP_SRC) $(CRYPTO_SRC) $(TRANSPORT_SRC) $(TRANSPORT_SUPPORT_SRC) \
                $(EXTRA_SRC)
 
 SAN ?= -fsanitize=address,undefined -fno-omit-frame-pointer
@@ -159,7 +206,8 @@ all: lib
 
 # ---- vendored mbedTLS ------------------------------------------------------
 $(MBEDTLS_CRYPTO_LIB):
-	$(MAKE) -C $(MBEDTLS_DIR)/library libmbedcrypto.a libmbedtls.a
+	$(MAKE) -C $(MBEDTLS_DIR)/library \
+		CC="$(CC) $(HOSTED_TARGET)" libmbedcrypto.a libmbedtls.a
 
 vendor-mbedtls: $(MBEDTLS_CRYPTO_LIB)
 
@@ -203,8 +251,8 @@ AGENT_CONFIG_SRC =
 ifneq ($(strip $(CONFIG_SRC)),)
   AGENT_CONFIG_SRC = $(CONFIG_SRC)
 endif
-AGENT_SRC = $(AGENT_COMMON_SRC) $(GZIP_SRC) $(CRYPTO_SRC) $(TRANSPORT_SRC) \
-            $(HTTP_SRC) $(EXTRA_SRC) $(TINYCBOR_MIN_SRC) src/agent.c \
+AGENT_SRC = $(AGENT_COMMON_SRC) $(GZIP_SRC) $(CRYPTO_SRC) $(TRANSPORT_SRC) $(TRANSPORT_SUPPORT_SRC) \
+            $(EXTRA_SRC) $(TINYCBOR_MIN_SRC) src/agent.c \
             $(AGENT_CONFIG_SRC)
 
 # Release flags: shrink for size, one section per function/data so

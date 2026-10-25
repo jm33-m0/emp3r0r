@@ -18,21 +18,21 @@ func TestCAgentBuildArgs(t *testing.T) {
 	args := cAgentBuildArgs("/src", "/tmp/cfg.c", CAgentProviders{
 		Crypto:    "mbedtls",
 		Gzip:      "none",
-		HTTP:      "libcurl",
-		Transport: "http_poll",
+		Transport: "libcurl",
 		Dynload:   "auto",
 		Glibc:     "2.17",
 		Libc:      "musl",
+		Arch:      "arm64",
 	})
 	joined := strings.Join(args, " ")
 	for _, want := range []string{
 		"-C /src",
 		"agent",
 		"CONFIG_SRC=/tmp/cfg.c",
+		"ARCH=arm64",
 		"CRYPTO=mbedtls",
 		"GZIP=none",
-		"HTTP=libcurl",
-		"TRANSPORT=http_poll",
+		"TRANSPORT=libcurl",
 		"DYNLOAD_MODE=auto",
 		"GLIBC_VERSION=2.17",
 		"LIBC=musl",
@@ -46,7 +46,7 @@ func TestCAgentBuildArgs(t *testing.T) {
 func TestCAgentBuildArgsOmitsEmptyProviders(t *testing.T) {
 	args := cAgentBuildArgs("/src", "/cfg", CAgentProviders{})
 	joined := strings.Join(args, " ")
-	for _, unwanted := range []string{"CRYPTO=", "GZIP=", "HTTP=", "TRANSPORT=", "DYNLOAD_MODE=", "GLIBC_VERSION=", "LIBC="} {
+	for _, unwanted := range []string{"ARCH=", "CRYPTO=", "GZIP=", "TRANSPORT=", "DYNLOAD_MODE=", "GLIBC_VERSION=", "LIBC="} {
 		if strings.Contains(joined, unwanted) {
 			t.Errorf("empty provider should be omitted, got %q", joined)
 		}
@@ -71,26 +71,28 @@ func TestValidateCAgentProviders(t *testing.T) {
 	if err := validateCAgentProviders(CAgentProviders{}); err != nil {
 		t.Fatalf("empty providers should be valid (Makefile defaults): %v", err)
 	}
-	valid := CAgentProviders{Crypto: "openssl", Gzip: "miniz", HTTP: "libcurl", Transport: "http_poll", Dynload: "auto", Glibc: "2.17", Libc: "glibc", Format: "so"}
+	valid := CAgentProviders{Crypto: "openssl", Gzip: "miniz", Transport: "libcurl", Dynload: "auto", Glibc: "2.17", Libc: "glibc", Arch: "arm64", Format: "so"}
 	if err := validateCAgentProviders(valid); err != nil {
 		t.Fatalf("valid providers rejected: %v", err)
 	}
-	validMusl := CAgentProviders{Transport: "http_poll", Dynload: "public", Libc: "musl"}
+	validMusl := CAgentProviders{Transport: "libcurl", Dynload: "public", Libc: "musl", Arch: "riscv64"}
 	if err := validateCAgentProviders(validMusl); err != nil {
 		t.Fatalf("valid musl providers rejected: %v", err)
 	}
 	for _, bad := range []CAgentProviders{
 		{Crypto: "bogus"},
 		{Gzip: "zlib"},
-		{HTTP: "raw"},
-		{Transport: "h2conn"},
+		{Transport: "quic"},
 		{Dynload: "magic"},
 		{Glibc: "1.0"},
 		{Libc: "uclibc"},
+		{Arch: "mips"},
 		{Libc: "musl", Dynload: "libc_dl"},
 		{Libc: "musl", Dynload: "auto"},
 		{Format: "elf"},
 		{Libc: "musl", Format: "shellcode"},
+		{Arch: "arm64", Format: "shellcode"},
+		{Libc: "glibc", Arch: "riscv64"},
 	} {
 		if err := validateCAgentProviders(bad); err == nil {
 			t.Errorf("expected error for %+v", bad)
@@ -139,7 +141,7 @@ func TestGenerateCAgentWorkflow(t *testing.T) {
 	if !util.IsFileExist(res.OutputFile) {
 		t.Fatalf("output not produced: %s", res.OutputFile)
 	}
-	if !strings.HasPrefix(filepath.Base(res.OutputFile), "aquila_linux_") {
+	if !strings.HasPrefix(filepath.Base(res.OutputFile), "aquila_linux_amd64_") {
 		t.Errorf("unexpected output name %q", res.OutputFile)
 	}
 	if res.AgentUUID == "" || res.ConfigSize == 0 {
@@ -166,6 +168,30 @@ func TestGenerateCAgentMuslDynamic(t *testing.T) {
 	}
 	if !strings.Contains(interp, "ld-musl") {
 		t.Fatalf("musl build interpreter = %q, want ld-musl", interp)
+	}
+}
+
+// TestGenerateCAgentCrossArch pins that --arch reaches the C agent Makefile
+// and produces an artifact for that target rather than the build host.
+func TestGenerateCAgentCrossArch(t *testing.T) {
+	setupCAgentBuildEnv(t)
+
+	res, err := GenerateCAgentWorkflow(AgentConfig{}, CAgentProviders{
+		Libc: "musl", Dynload: "public", Arch: "arm64",
+	}, nil)
+	if err != nil {
+		t.Fatalf("GenerateCAgentWorkflow(arm64/musl): %v", err)
+	}
+	if !strings.HasPrefix(filepath.Base(res.OutputFile), "aquila_linux_arm64_") {
+		t.Errorf("unexpected output name %q", res.OutputFile)
+	}
+	f, err := elf.Open(res.OutputFile)
+	if err != nil {
+		t.Fatalf("open cross-built agent: %v", err)
+	}
+	defer f.Close()
+	if f.Machine != elf.EM_AARCH64 {
+		t.Errorf("ELF machine = %v, want AARCH64", f.Machine)
 	}
 }
 

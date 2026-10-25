@@ -1,21 +1,22 @@
 /*
- * http_poll.c — the default C2 channel.
+ * http_poll.c — shared malleable HTTP-poll state machine.
  *
  * One virtual bidirectional stream is simulated over request/response HTTP:
  * init POST -> GET long-polls (reads) -> POSTs (writes) -> close POST. Routing
  * is still carried in MsgAuth, never in the URL, so the channel is just a byte
  * pipe and SecureConn does the framing.
  *
- * The SSL stack is not here: every request goes through http_client.h, whose
- * provider (libcurl, mbedTLS, raw sockets, ...) is selected at build time. This
- * file is only the http_poll state machine.
+ * The selected transport (transport_<name>.c) supplies exactly one operation,
+ * hp_http_perform(); this file owns the HTTP-poll protocol on top of it. That
+ * lets a transport be a raw TCP client, a dynamically loaded libcurl, or any
+ * other implementation without duplicating the state machine.
  */
 
 #define _POSIX_C_SOURCE 200809L
 
 #include "transport.h"
 
-#include "http_client.h"
+#include "http_poll.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -212,7 +213,7 @@ static int hp_request(hp_ctx *h, int kind, const uint8_t *body, size_t body_len,
     return -1;
   }
 
-  c2_http_request req;
+  hp_http_request req;
   memset(&req, 0, sizeof(req));
   req.url = h->url;
   req.method = (kind == 0) ? "GET" : "POST";
@@ -227,7 +228,7 @@ static int hp_request(hp_ctx *h, int kind, const uint8_t *body, size_t body_len,
   req.timeout_s = (kind == 0) ? 90 : 30;
   req.ca_pem = h->ca_pem;
 
-  c2_status st = c2_http_client_perform(&req);
+  c2_status st = hp_http_perform(&req);
   hdr_free(&headers);
   return st == C2_OK ? 0 : -1;
 }
@@ -388,5 +389,3 @@ c2_transport c2_transport_create(const c2_agent_config *cfg) {
   t.ctx = (void *)(cfg ? &cfg->ca_pem : NULL);
   return t;
 }
-
-const char *c2_transport_name(void) { return "http_poll"; }

@@ -23,10 +23,6 @@ const (
 	PayloadTypeWindowsExecutable = "windows_executable"
 	PayloadTypeWindowsDLL        = "windows_dll"
 	PayloadTypeLinuxSO           = "linux_so"
-	// PayloadTypeAquila selects the native C agent.
-	PayloadTypeAquila = "aquila"
-	// PayloadTypeCLinux is the descriptive alias for the same payload.
-	PayloadTypeCLinux = "c_linux"
 )
 
 var PayloadTypeList = []string{
@@ -34,7 +30,6 @@ var PayloadTypeList = []string{
 	PayloadTypeLinuxSO,
 	PayloadTypeWindowsExecutable,
 	PayloadTypeWindowsDLL,
-	PayloadTypeAquila,
 }
 
 // PayloadGOOS returns the target GOOS for a payload type. It is the single place
@@ -88,10 +83,6 @@ func IsArchValid(payloadType, archChoice string) bool {
 		list = ArchListWindowsDLL
 	case PayloadTypeLinuxSO:
 		list = ArchListLinuxSO
-	case PayloadTypeAquila, PayloadTypeCLinux:
-		// The C agent is built by zig for the operator's host here, so any
-		// known arch is accepted (and currently ignored by the build).
-		list = ArchListAll
 	default:
 		list = ArchListAll
 	}

@@ -22,8 +22,7 @@ import (
 var (
 	CAgentCryptoProviders    = []string{"openssl", "mbedtls"}
 	CAgentGzipProviders      = []string{"miniz", "none"}
-	CAgentHTTPProviders      = []string{"libcurl"}
-	CAgentTransportProviders = []string{"http_poll"}
+	CAgentTransportProviders = []string{"libcurl", "http_raw", "libssl"}
 	// DYNLOAD_MODE picks the libc symbols dynload resolves: libc_dl
 	// (__libc_dlopen_mode, glibc < 2.34), public (dlopen, glibc >= 2.34) or
 	// auto (libc_dl with a runtime fallback to the public names).
@@ -34,6 +33,11 @@ var (
 	// LIBC picks the C library the hosted agent links: glibc (pinned via
 	// GLIBC_VERSION) or musl (zig's bundled musl, stable ABI).
 	CAgentLibcs = []string{"glibc", "musl"}
+	// CAgentArches are the Linux targets the C agent Makefile knows how to
+	// map to a zig target. The operator command exposes --arch independently
+	// of the Go agent's ArchListAll so C-only toolchain targets can be added
+	// without widening what the Go builder accepts.
+	CAgentArches = []string{"amd64", "386", "arm", "arm64", "riscv64"}
 	// CAgentFormats selects the artifact the build produces: a hosted
 	// executable, a shared object (dlopen/injection), or the shared object
 	// wrapped as malasada raw PIC (shellcode).
@@ -45,11 +49,11 @@ var (
 type CAgentProviders struct {
 	Crypto    string // CRYPTO=
 	Gzip      string // GZIP=
-	HTTP      string // HTTP=
 	Transport string // TRANSPORT=
 	Dynload   string // DYNLOAD_MODE=
 	Glibc     string // GLIBC_VERSION=
 	Libc      string // LIBC=
+	Arch      string // ARCH=
 	Format    string // exe|so|shellcode (post-build artifact)
 }
 
@@ -65,9 +69,9 @@ type cAgentProviderSpec struct {
 
 func cAgentProviderSpecs(p CAgentProviders) []cAgentProviderSpec {
 	return []cAgentProviderSpec{
+		{group: "arch", varname: "ARCH", value: p.Arch, allowed: CAgentArches},
 		{group: "crypto", varname: "CRYPTO", value: p.Crypto, allowed: CAgentCryptoProviders},
 		{group: "gzip", varname: "GZIP", value: p.Gzip, allowed: CAgentGzipProviders},
-		{group: "http", varname: "HTTP", value: p.HTTP, allowed: CAgentHTTPProviders},
 		{group: "transport", varname: "TRANSPORT", value: p.Transport, allowed: CAgentTransportProviders},
 		{group: "dynload", varname: "DYNLOAD_MODE", value: p.Dynload, allowed: CAgentDynloadModes},
 		{group: "glibc", varname: "GLIBC_VERSION", value: p.Glibc, allowed: CAgentGlibcVersions},
@@ -155,10 +159,21 @@ func validateCAgentProviders(p CAgentProviders) error {
 	if p.Format != "" && !slices.Contains(CAgentFormats, p.Format) {
 		return fmt.Errorf("invalid format %q (available: %v)", p.Format, CAgentFormats)
 	}
-	// malasada's stage0 resolves glibc's ld-linux by hardcoded path, so raw PIC
-	// is glibc-only. The musl .so itself is fine (dlopen it directly).
-	if p.Libc == "musl" && p.Format == "shellcode" {
-		return fmt.Errorf("raw PIC (malasada) is glibc-only; use format=exe or so with libc=musl")
+	// malasada's stage0 resolves glibc's ld-linux by hardcoded path for x86_64,
+	// so raw PIC is glibc/amd64-only. The shared objects themselves are fine on
+	// every supported C agent target.
+	if p.Format == "shellcode" {
+		if p.Libc == "musl" {
+			return fmt.Errorf("raw PIC (malasada) is glibc-only; use format=exe or so with libc=musl")
+		}
+		if p.Arch != "" && p.Arch != "amd64" {
+			return fmt.Errorf("raw PIC (malasada) is amd64-only; use format=exe or so with arch=%s", p.Arch)
+		}
+	}
+	// zig cannot provide glibc for riscv64 at the project's oldest supported
+	// ABI (2.17); the C agent follows the module toolchain and uses musl there.
+	if p.Arch == "riscv64" && p.Libc == "glibc" {
+		return fmt.Errorf("arch riscv64 requires libc musl: zig has no riscv64 glibc 2.17 target")
 	}
 	return nil
 }
@@ -268,8 +283,12 @@ func GenerateCAgentWorkflow(opts AgentConfig, providers CAgentProviders, signAge
 	}
 
 	now := time.Now()
-	outFile := filepath.Join(live.EmpWorkSpace, fmt.Sprintf("aquila_linux_%d-%d-%d_%d-%d-%d",
-		now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second()))
+	arch := providers.Arch
+	if arch == "" {
+		arch = CAgentArches[0]
+	}
+	outFile := filepath.Join(live.EmpWorkSpace, fmt.Sprintf("aquila_linux_%s_%d-%d-%d_%d-%d-%d",
+		arch, now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second()))
 	var data []byte
 	switch providers.Format {
 	case "so":

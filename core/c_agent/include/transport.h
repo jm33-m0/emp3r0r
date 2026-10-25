@@ -9,11 +9,9 @@
  *   c2_agent_config  ->  c2_transport  ->  c2_secureconn  ->  c2_messages
  *   (bootstrap data)     (http_poll)     (framing+crypto)    (CBOR)
  *
- * The channel is abstracted behind c2_stream (see secureconn.h): an
- * http_poll implementation, a libcurl/libssl helper, or a duplex transport all
- * appear identical to the protocol. A reference http_poll and libcrypto
- * backend are the intended next step; the stager's dynload.h already shows how
- * to resolve libcurl/libssl without linking them.
+ * The channel is abstracted behind c2_stream (see secureconn.h). A transport
+ * owns its full wire implementation: raw TCP/UDP, self-contained HTTP/TLS, or
+ * an HTTP stack loaded from the host (libcurl/libssl) through dynload.h.
  */
 
 #include "common.h"
@@ -181,13 +179,16 @@ typedef struct {
 
 /*
  * Transport provider contract. Exactly one provider is compiled in, selected
- * with `TRANSPORT=<name>`: src/transport/c2_transport_<name>.c. The provider
- * owns its context; the session passes the profile and a resolved URL to
- * c2_transport_ops.open for every stream.
+ * with `TRANSPORT=<name>`: src/transport/transport_<name>.c. The provider owns
+ * its context
+ * and its complete wire implementation; the session passes the profile and a
+ * resolved URL to c2_transport_ops.open for every stream.
  *
- *   http_poll (default): request/response HTTP over c2_http_client.
+ * Built-ins: libcurl (HTTP/HTTPS via dynload), http_raw (plain HTTP over libc
+ * sockets), and libssl (plain HTTP plus HTTPS via libssl/libcrypto). Each owns
+ * its complete wire implementation, so there is no separate HTTP selector.
  *
- * Add a provider by dropping src/transport/c2_transport_<name>.c into the tree
+ * Add a provider by dropping src/transport/transport_<name>.c into the tree
  * and building with TRANSPORT=<name>.
  */
 c2_transport c2_transport_create(const c2_agent_config *cfg);
