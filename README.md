@@ -18,13 +18,13 @@ A C2 framework for Linux and Windows. Agents run in memory, keep working when li
 
 ## What is emp3r0r?
 
-emp3r0r started as a Linux post-exploitation framework with interactive remote shells and autonomous network pivoting. I add things I learn, keep the parts that are useful during red team work, and remove the parts that only look good in a demo. Over time it grew into a multi-operator C2 with modular agents, a P2P mesh, and in-memory execution on both Linux and Windows.
+emp3r0r started as a Linux post-exploitation framework with interactive remote shells and autonomous network pivoting. Over time it grew into a multi-operator C2 with modular agents, a P2P mesh, and in-memory execution on both Linux and Windows.
 
 ## Features
 
 ### Scriptable agents
 
-Every agent has an embedded Starlark engine. A module can add post-exploitation logic without rebuilding the agent or uploading an interpreter. Scripts run inside the agent process and use built-in APIs for file I/O, HTTP, process execution, and other common work. On Windows they can call Win32 functions directly through the agent's API proxy.
+Every agent has an embedded Starlark engine. A module can add post-exploitation logic without rebuilding the agent or uploading an interpreter. Scripts run inside the agent process and use built-in APIs for file I/O, HTTP, process execution, and other common work. They can also call Win32 functions and Linux syscalls through the agent's API proxy. When a script needs an API that is not already present, it can load a DLL or SO from encrypted memfs or the C2 with [`mem_load_library`](#in-memory-library-loader), call its exports, and unload it when done. [Linux eBPF modules](#linux-modules-and-ebpf) use the same path to load `libbpf`.
 
 Modules are a Starlark file and a small JSON manifest. The agent loads them in memory and does not spawn Python, Bash, PowerShell, or another command interpreter.
 
@@ -62,13 +62,15 @@ The repository ships Kerbeus-BOF, Remote-OPs, and a Situational Awareness suite.
 
 The PE side follows WireGuard's `memmod`. The ELF side follows [Sliver](https://github.com/BishopFox/sliver) and [sliverarmory/reflektor](https://github.com/sliverarmory/reflektor). `memdeps` sits on top: a module declares a dependency, the agent gets it from encrypted memfs or the C2, maps it for one operation, then unmaps it.
 
+[Starlark modules](#scriptable-agents) can use the same loader directly with `mem_load_library`. They are not limited to APIs that are already loaded in the agent or target process.
+
 ### Linux modules and eBPF
 
-Linux modules are Starlark scripts with access to the kernel through libbpf. The agent maps `libbpf` when a module needs it and exposes its API as Go-backed builtins. A script can enumerate BPF objects, attach programs, manage maps and links, and start or stop uprobes.
+Linux modules are Starlark scripts with access to the kernel through libbpf. The agent maps `libbpf` when a module needs it and exposes its API as Go-backed builtins. This uses the same on-demand loader that [`mem_load_library`](#in-memory-library-loader) exposes; libbpf is just another shared object the module asks for. A script can enumerate BPF objects, attach programs, manage maps and links, and start or stop uprobes.
 
 [`ssh_harvest`](./core/modules/ssh_harvest/) is the worked example. It finds a pattern in `sshd`, attaches a long-lived uprobe, streams captured credentials, and keeps the probe running until `--disable`. It uses no ptrace, breakpoints, or temporary files.
 
-The same loader can map any `.so` a module declares or supplies. Scripts can also map bytes directly with `mem_load_library`.
+The loader can map any `.so` a module declares or supplies, including raw bytes provided by the script.
 
 ### Windows tokens and Kerberos
 
