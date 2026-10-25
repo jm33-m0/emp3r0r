@@ -389,6 +389,8 @@ The targets and the surface each covers:
 | `fuzz_rc4`        | RC4 keystream                                                                    |
 | `fuzz_packer`     | passphrase packing / key derivation                                              |
 | `fuzz_inet_aton`  | IP literal parser                                                                |
+| `fuzz_doh`        | DoH DNS wire answer parser (A/AAAA, names, compression pointers)                 |
+| `fuzz_http_raw`   | raw HTTP response/Content-Length/chunked parser and URL parser                   |
 
 Every target is compiled with `-fsanitize=address,undefined`; the property under
 test is that no input — however malformed or hostile — can over-read, overflow,

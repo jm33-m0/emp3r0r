@@ -497,7 +497,8 @@ fuzz: $(BUILD)/fuzz_rc4 $(BUILD)/fuzz_packer $(BUILD)/fuzz_inet_aton \
       $(BUILD)/fuzz_messages $(BUILD)/fuzz_agent_info $(BUILD)/fuzz_config \
       $(BUILD)/fuzz_secureconn $(BUILD)/fuzz_text $(BUILD)/fuzz_encdec \
       $(GZIP_FUZZ) $(BOF_FUZZ) $(BUILD)/fuzz_dynload $(BUILD)/fuzz_maps \
-      $(BUILD)/fuzz_module $(BUILD)/fuzz_strings $(BUILD)/fuzz_elfload
+      $(BUILD)/fuzz_module $(BUILD)/fuzz_strings $(BUILD)/fuzz_elfload \
+      $(BUILD)/fuzz_doh $(BUILD)/fuzz_http_raw
 	@set -e; mkdir -p $(BUILD)/crash; \
 	for t in $^; do \
 	  name=$$(basename $$t); name=$${name#fuzz_}; \
@@ -567,6 +568,20 @@ $(BUILD)/fuzz_module: fuzz/fuzz_module.c $(FUZZ_DRIVER) src/module.c \
 
 $(BUILD)/fuzz_strings: fuzz/fuzz_strings.c $(FUZZ_DRIVER) src/util/strings.c fuzz/fuzz_common.h | $(BUILD)
 	$(HOSTCC) $(FUZZ_CFLAGS) -fno-builtin $< $(FUZZ_DRIVER) src/util/strings.c -o $@
+
+$(BUILD)/fuzz_doh: fuzz/fuzz_doh.c $(FUZZ_DRIVER) src/util/doh.c \
+                  src/util/dynload.c src/util/dynload_hosted.c \
+                  fuzz/fuzz_common.h | $(BUILD)
+	$(HOSTCC) $(FUZZ_CFLAGS) -DDOH_FUZZ $< $(FUZZ_DRIVER) \
+		src/util/doh.c src/util/dynload.c src/util/dynload_hosted.c -o $@
+
+$(BUILD)/fuzz_http_raw: fuzz/fuzz_http_raw.c $(FUZZ_DRIVER) \
+                        src/transport/transport_http_raw.c src/util/doh.c \
+                        src/util/dynload.c src/util/dynload_hosted.c \
+                        fuzz/fuzz_common.h | $(BUILD)
+	$(HOSTCC) $(FUZZ_CFLAGS) -DHTTP_RAW_FUZZ -Isrc/transport $< $(FUZZ_DRIVER) \
+		src/transport/transport_http_raw.c src/util/doh.c \
+		src/util/dynload.c src/util/dynload_hosted.c -o $@
 
 # The image is untrusted, so the fuzz build records (rather than runs)
 # image-supplied constructors and IFUNC/IRELATIVE resolvers.

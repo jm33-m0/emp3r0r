@@ -397,3 +397,16 @@ int c2_doh_resolve(const c2_str *doh_url, const char *host, const char *port,
   (void)resolve_type(url, host, 28, pnum, socktype, out);
   return out->count > 0 ? 0 : -1;
 }
+
+#ifdef DOH_FUZZ
+int c2_doh_fuzz_parse(const uint8_t *data, size_t len) {
+  if (data == NULL || len < 12)
+    return 0;
+  uint16_t id = rd16(data);
+  uint16_t qtype = (len & 1) ? 28 : 1;
+  c2_doh_addrs out;
+  memset(&out, 0, sizeof(out));
+  (void)parse_response(data, len, id, qtype, 443, SOCK_STREAM, &out);
+  return 0;
+}
+#endif

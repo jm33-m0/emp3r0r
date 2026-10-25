@@ -40,6 +40,11 @@ typedef struct {
 int c2_doh_resolve(const c2_str *doh_url, const char *host, const char *port,
                    int socktype, c2_doh_addrs *out);
 
+#ifdef DOH_FUZZ
+/* Fuzz entry point: parse `data` as a DNS wire response without networking. */
+int c2_doh_fuzz_parse(const uint8_t *data, size_t len);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

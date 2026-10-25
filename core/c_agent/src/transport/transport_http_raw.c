@@ -42,7 +42,9 @@ static int bb_reserve(bytebuf *b, size_t extra) {
 }
 
 static int bb_put(bytebuf *b, const void *data, size_t len) {
-  if (bb_reserve(b, len) != 0)
+  if (len == 0)
+    return 0;
+  if (data == NULL || bb_reserve(b, len) != 0)
     return -1;
   memcpy(b->p + b->len, data, len);
   b->len += len;
@@ -233,16 +235,22 @@ static int header_value(const char *headers, size_t headers_len,
   size_t nlen = strlen(name);
   size_t pos = 0;
   while (pos < headers_len) {
-    size_t end = pos;
-    while (end + 1 <= headers_len &&
-           !(headers[end] == '\r' && headers[end + 1] == '\n'))
-      end++;
     const char *line = headers + pos;
-    size_t line_len = end - pos;
-    if (line_len > nlen && line[nlen] == ':' &&
-        ci_eq_n(line, nlen, name)) {
-      const char *v = line + nlen + 1;
-      size_t vlen = line_len - nlen - 1;
+    const char *nl = memchr(line, '\n', headers_len - pos);
+    if (nl == NULL)
+      return 0;
+    size_t line_len = (size_t)(nl - line);
+    if (line_len > 0 && line[line_len - 1] == '\r')
+      line_len--;
+    const char *colon = memchr(line, ':', line_len);
+    if (colon != NULL) {
+      size_t name_len = (size_t)(colon - line);
+      if (name_len != nlen || !ci_eq_n(line, name_len, name)) {
+        pos = (size_t)(nl - headers) + 1;
+        continue;
+      }
+      const char *v = colon + 1;
+      size_t vlen = line_len - name_len - 1;
       while (vlen > 0 && (*v == ' ' || *v == '\t')) {
         v++;
         vlen--;
@@ -255,7 +263,7 @@ static int header_value(const char *headers, size_t headers_len,
       out[vlen] = '\0';
       return 1;
     }
-    pos = end + 2;
+    pos = (size_t)(nl - headers) + 1;
   }
   return 0;
 }
@@ -312,6 +320,7 @@ static c2_status parse_response(hp_http_request *req, const uint8_t *raw,
   if (hdr_end == NULL)
     return C2_ERR_IO;
   size_t headers_len = (size_t)(hdr_end - text);
+  size_t headers_scan = headers_len + 2; /* include the final header CRLF */
   const char *status_line = text;
   if (headers_len < 12 || strncmp(status_line, "HTTP/", 5) != 0)
     return C2_ERR_IO;
@@ -324,7 +333,7 @@ static c2_status parse_response(hp_http_request *req, const uint8_t *raw,
   const uint8_t *body = (const uint8_t *)(hdr_end + 4);
   size_t body_len = raw_len - (size_t)(body - raw);
   char hval[128];
-  int has_len = header_value(text, headers_len, "Content-Length", hval,
+  int has_len = header_value(text, headers_scan, "Content-Length", hval,
                              sizeof(hval));
   if (has_len < 0)
     return C2_ERR_IO;
@@ -342,7 +351,7 @@ static c2_status parse_response(hp_http_request *req, const uint8_t *raw,
     return C2_OK;
   }
 
-  int chunked = header_value(text, headers_len, "Transfer-Encoding", hval,
+  int chunked = header_value(text, headers_scan, "Transfer-Encoding", hval,
                              sizeof(hval));
   if (chunked < 0)
     return C2_ERR_IO;
@@ -499,4 +508,46 @@ c2_status hp_http_perform(const hp_http_request *req) {
 }
 
 const char *c2_transport_name(void) { return "http_raw"; }
+#endif
+
+#ifdef HTTP_RAW_FUZZ
+/* Fuzz entry points for the response parser and URL parser. Both operate on
+ * untrusted bytes; the parser must never read past the supplied buffer. */
+int c2_http_raw_fuzz_parse(const uint8_t *data, size_t len) {
+  if (data == NULL)
+    return 0;
+  uint8_t *raw = (uint8_t *)malloc(len + 1);
+  if (raw == NULL)
+    return 0;
+  memcpy(raw, data, len);
+  raw[len] = '\0';
+  uint8_t resp[64u * 1024u];
+  size_t resp_len = 0;
+  long status = 0;
+  hp_http_request req;
+  memset(&req, 0, sizeof(req));
+  req.resp = resp;
+  req.resp_cap = sizeof(resp);
+  req.resp_len = &resp_len;
+  req.status = &status;
+  (void)parse_response(&req, raw, len);
+  free(raw);
+  return 0;
+}
+
+int c2_http_raw_fuzz_url(const uint8_t *data, size_t len) {
+  if (data == NULL)
+    return 0;
+  char *url = (char *)malloc(len + 1);
+  if (url == NULL)
+    return 0;
+  memcpy(url, data, len);
+  url[len] = '\0';
+  char host[256], port[16], path[2048], authority[300];
+  int tls = 0;
+  (void)hp_http_parse_url(url, host, sizeof(host), port, sizeof(port), path,
+                          sizeof(path), authority, sizeof(authority), &tls);
+  free(url);
+  return 0;
+}
 #endif

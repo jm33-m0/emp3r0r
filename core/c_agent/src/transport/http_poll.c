@@ -328,12 +328,12 @@ static c2_status hp_open(void *ctx, const char *url,
   if (url == NULL || profile == NULL || out == NULL)
     return C2_ERR_ARG;
 
-  hp_ctx *h = (hp_ctx *)calloc(1, sizeof(*h));
-  if (h == NULL)
-    return C2_ERR_NOMEM;
   const c2_agent_config *cfg = (const c2_agent_config *)ctx;
   if (cfg == NULL)
     return C2_ERR_ARG;
+  hp_ctx *h = (hp_ctx *)calloc(1, sizeof(*h));
+  if (h == NULL)
+    return C2_ERR_NOMEM;
   h->cfg = cfg;
   size_t ulen = strlen(url);
   h->url = (char *)malloc(ulen + 1);
