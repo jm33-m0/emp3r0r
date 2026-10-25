@@ -5,6 +5,13 @@ A Linux **Beacon Object File** loader, the Linux counterpart of the Windows
 nothing invokes it directly, it is hosted by the C2 as
 `coffloader_linux.<arch>.gz` and mapped by the C agent on demand.
 
+## Source layout
+
+- `loader_linux.c` — ELF object mapping, relocations, signal handling and the
+  exported `bof_run`/`bof_free`/`bof_last_error` ABI.
+- `beacon_compat.c` / `beacon_compat.h` — the Beacon API shims BOFs resolve
+  against, plus the captured output buffer.
+
 ## What it does
 
 A Linux BOF module depends on it. The dependency is injected automatically from
@@ -16,6 +23,9 @@ other dependency (it is not duplicated):
 ```
 
 The C2 hosts it as `coffloader_linux.<arch>.gz`; the agent maps it on demand.
+Linux BOFs need libc symbol resolution, so they require a dynamically linked
+Linux agent with libc mapped. A statically linked agent returns a clear
+`statically linked` error instead of trying to map the loader.
 
 `loader_linux.c` is the canonical loader, mapped by both agents as the
 `coffloader_linux` dependency (the Go agent through `core/lib/coffloader`
@@ -26,7 +36,8 @@ and `memmod`, the C agent through `core/c_agent/src/util/elfload.c`):
   the `R_X86_64_64/32/32S/PC32/PLT32` relocations.
 - Resolves undefined symbols to the mocked Beacon API first, then to the host
   process (`dlsym(RTLD_DEFAULT, …)`), building a 16-byte `movabs/jmp` trampoline
-  for each.
+  for each. `getEnviron` and `getOSName` from the TrustedSec compatibility layer
+  are mocked too.
 - Applies `W^X` per section and executes the requested entry point.
 - Catches `SIGSEGV`/`SIGBUS`/`SIGILL`/`SIGFPE` during execution and returns an
   error instead of killing the agent.
@@ -41,10 +52,11 @@ input is rejected with an error, never a crash.
 
 ## Beacon API
 
-The loader mocks the subset of the Beacon API that BOFs commonly use:
+The loader implements the Beacon compatibility API that BOFs commonly use:
 `BeaconPrintf`, `BeaconOutput`, `BeaconDataParse`, `BeaconDataInt`,
-`BeaconDataShort`, `BeaconDataLength` and `BeaconDataExtract`. Their output is
-returned to the caller through `char **out`.
+`BeaconDataShort`, `BeaconDataLength`, `BeaconDataExtract`, the
+`BeaconFormat*` family, `BeaconIsAdmin`, `swap_endianess`, `getEnviron` and
+`getOSName`. Their output is returned to the caller through `char **out`.
 
 ## Arguments
 

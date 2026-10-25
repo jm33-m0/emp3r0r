@@ -1,0 +1,402 @@
+[
+  {
+    "name": "sa_cat_linux",
+    "author": "TrustedSec",
+    "date": "2022-05-16",
+    "comment": "Print a file's contents",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "dependencies": [
+      "coffloader_linux"
+    ],
+    "parameters": [
+      {
+        "name": "file",
+        "description": "File to read",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      }
+    ],
+    "agent_config": {
+      "exec": "",
+      "type": "coff",
+      "files": [
+        "SA/src/cat.o"
+      ]
+    },
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_chmod_linux",
+    "author": "TrustedSec",
+    "date": "2022-05-16",
+    "comment": "Change a file's permissions",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "dependencies": [
+      "coffloader_linux"
+    ],
+    "parameters": [
+      {
+        "name": "permissions",
+        "description": "Octal mode, e.g. 755",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "file",
+        "description": "Target file",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      }
+    ],
+    "agent_config": {
+      "exec": "",
+      "type": "coff",
+      "files": [
+        "SA/src/chmod.o"
+      ]
+    },
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_env_linux",
+    "author": "TrustedSec",
+    "date": "2022-05-16",
+    "comment": "Print the process environment",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "dependencies": [
+      "coffloader_linux"
+    ],
+    "parameters": [],
+    "agent_config": {
+      "exec": "",
+      "type": "coff",
+      "files": [
+        "SA/src/env.o"
+      ]
+    },
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_find_linux",
+    "author": "TrustedSec",
+    "date": "2022-05-16",
+    "comment": "Find files by name under a directory",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "dependencies": [
+      "coffloader_linux"
+    ],
+    "parameters": [
+      {
+        "name": "path",
+        "description": "Directory to search",
+        "default": "/tmp",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "name",
+        "description": "File name to match",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "file",
+        "description": "Optional path filter",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "maxdepth",
+        "description": "Maximum recursion depth (-1 = unlimited)",
+        "default": "-1",
+        "type": "int",
+        "required": false
+      },
+      {
+        "name": "action",
+        "description": "0 = print, 1 = cat, 2 = readlink",
+        "default": "0",
+        "type": "int",
+        "required": false
+      },
+      {
+        "name": "match",
+        "description": "1 = substring match, 0 = exact match",
+        "default": "1",
+        "type": "int",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "",
+      "type": "coff",
+      "files": [
+        "SA/src/find.o"
+      ]
+    },
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_grep_linux",
+    "author": "TrustedSec",
+    "date": "2022-05-16",
+    "comment": "Search file contents under a directory",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "dependencies": [
+      "coffloader_linux"
+    ],
+    "parameters": [
+      {
+        "name": "path",
+        "description": "Directory to search",
+        "default": "/tmp",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "needle",
+        "description": "Text to search for",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "file",
+        "description": "Optional file-name filter",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      },
+      {
+        "name": "maxdepth",
+        "description": "Maximum recursion depth (-1 = unlimited)",
+        "default": "-1",
+        "type": "int",
+        "required": false
+      },
+      {
+        "name": "action",
+        "description": "Reserved (upstream find action)",
+        "default": "0",
+        "type": "int",
+        "required": false
+      },
+      {
+        "name": "match",
+        "description": "Reserved (upstream match mode)",
+        "default": "0",
+        "type": "int",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "",
+      "type": "coff",
+      "files": [
+        "SA/src/grep.o"
+      ]
+    },
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_id_linux",
+    "author": "TrustedSec",
+    "date": "2022-05-16",
+    "comment": "Print UID, GID, and supplementary groups",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "dependencies": [
+      "coffloader_linux"
+    ],
+    "parameters": [],
+    "agent_config": {
+      "exec": "",
+      "type": "coff",
+      "files": [
+        "SA/src/id.o"
+      ]
+    },
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_ifconfig_linux",
+    "author": "TrustedSec",
+    "date": "2022-05-16",
+    "comment": "List network interfaces and addresses",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "dependencies": [
+      "coffloader_linux"
+    ],
+    "parameters": [],
+    "agent_config": {
+      "exec": "",
+      "type": "coff",
+      "files": [
+        "SA/src/ifconfig.o"
+      ]
+    },
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_pwd_linux",
+    "author": "TrustedSec",
+    "date": "2022-05-16",
+    "comment": "Print the current working directory",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "dependencies": [
+      "coffloader_linux"
+    ],
+    "parameters": [],
+    "agent_config": {
+      "exec": "",
+      "type": "coff",
+      "files": [
+        "SA/src/pwd.o"
+      ]
+    },
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_tasklist_linux",
+    "author": "TrustedSec",
+    "date": "2022-05-16",
+    "comment": "List processes and executable paths",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "dependencies": [
+      "coffloader_linux"
+    ],
+    "parameters": [],
+    "agent_config": {
+      "exec": "",
+      "type": "coff",
+      "files": [
+        "SA/src/tasklist.o"
+      ]
+    },
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_uname_linux",
+    "author": "TrustedSec",
+    "date": "2022-05-16",
+    "comment": "Print system information",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "dependencies": [
+      "coffloader_linux"
+    ],
+    "parameters": [],
+    "agent_config": {
+      "exec": "",
+      "type": "coff",
+      "files": [
+        "SA/src/uname.o"
+      ]
+    },
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_walk_linux",
+    "author": "TrustedSec",
+    "date": "2022-05-16",
+    "comment": "Walk a directory tree",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "dependencies": [
+      "coffloader_linux"
+    ],
+    "parameters": [
+      {
+        "name": "maxdepth",
+        "description": "Maximum recursion depth",
+        "default": "2",
+        "type": "int",
+        "required": false
+      },
+      {
+        "name": "path",
+        "description": "Directory to walk",
+        "default": "/tmp",
+        "type": "cstr",
+        "required": true
+      }
+    ],
+    "agent_config": {
+      "exec": "",
+      "type": "coff",
+      "files": [
+        "SA/src/walk.o"
+      ]
+    },
+    "invocation": {
+      "coff_export": "go"
+    }
+  },
+  {
+    "name": "sa_whoami_linux",
+    "author": "TrustedSec",
+    "date": "2022-05-16",
+    "comment": "Print the current UID/EUID and privilege level",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "dependencies": [
+      "coffloader_linux"
+    ],
+    "parameters": [],
+    "agent_config": {
+      "exec": "",
+      "type": "coff",
+      "files": [
+        "SA/src/whoami.o"
+      ]
+    },
+    "invocation": {
+      "coff_export": "go"
+    }
+  }
+]

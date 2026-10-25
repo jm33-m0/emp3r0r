@@ -121,6 +121,42 @@ void go(char *args, int size) { datap p; BeaconDataParse(&p, args, size); int id
 	}
 }
 
+// TestBeaconFormatCompatibility drives the Beacon compatibility format API
+// through a real BOF, including reset and bounded appends.
+func TestBeaconFormatCompatibility(t *testing.T) {
+	wireLinuxLoader(t)
+
+	const src = `#include <stdint.h>
+#include "beacon_api.h"
+void go(char *args, int len) {
+  (void)args;
+  (void)len;
+  formatp f;
+  BeaconFormatAlloc(&f, 64);
+  BeaconFormatAppend(&f, "hello", 5);
+  BeaconFormatPrintf(&f, " %s %d", "world", 7);
+  int n = 0;
+  char *s = BeaconFormatToString(&f, &n);
+  BeaconPrintf(CALLBACK_OUTPUT, "fmt=%s len=%d", s, n);
+  BeaconFormatReset(&f);
+  BeaconFormatAppend(&f, "x", 1);
+  s = BeaconFormatToString(&f, &n);
+  BeaconPrintf(CALLBACK_OUTPUT, " reset=%s len=%d", s, n);
+  BeaconFormatFree(&f);
+}`
+	payload := compileBOF(t, src, "../../modules/SA_linux/includes")
+	out, err := RunLinuxCOFF(payload, "go", nil, 0)
+	if err != nil {
+		t.Fatalf("RunLinuxCOFF(format): %v", err)
+	}
+	if !strings.Contains(out, "fmt=hello world 7 len=13") {
+		t.Fatalf("format output = %q", out)
+	}
+	if !strings.Contains(out, "reset=x len=1") {
+		t.Fatalf("format reset output = %q", out)
+	}
+}
+
 // TestSALinuxBOF builds and runs one of the vendored TrustedSec SA Linux BOFs.
 // It exercises the real libc symbol resolution path (uname/getOSName), not just
 // the Beacon compatibility API.

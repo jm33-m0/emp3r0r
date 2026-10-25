@@ -697,6 +697,7 @@ Pair with the `scshell` BOF to execute an uploaded file on the target.
 | `hello_linux`                   | Minimal Linux BOF and `config.json`.                                                                                       |
 | `procinfo`                      | Minimal Linux Starlark module that reads `/proc`.                                                                          |
 | `SA/`                           | A suite of Windows Starlark modules, including token inspection in `whoami.star`.                                          |
+| `SA_linux/`                     | TrustedSec ELFLoader SA BOFs ported to Linux; requires a dynamically linked agent with libc.                               |
 | `cifs/`                         | Token/ticket-aware SMB I/O.                                                                                                |
 | `kkyum/`                        | Multi-file Starlark module loading a kernel driver from a companion `.sys` cached in memfs (`module_files_memfs`).         |
 | `injection/`                    | Remote thread injection under an operator-selected token.                                                                  |
@@ -718,5 +719,6 @@ Pair with the `scshell` BOF to execute an uploaded file on the target.
 | Module registered but never runs; "does not support …" | `platform` does not match the agent OS and is not `Generic`. Only applies to agent modules — local (`is_local`) modules are exempt.        |
 | Manifest fails to load                                 | A parameter has no `description`, or a non-local module's `agent_config.type` is missing or not `coff`/`starlark`/`dll`/`so`.              |
 | `option X is required`                                 | The flag was empty and the parameter is `required`.                                                                                        |
+| Linux BOF reports `statically linked`                  | The agent has no libc mapped; Linux BOFs require a dynamically linked Linux agent.                                                          |
 | Starlark receives the wrong values                     | Starlark parameters are positional strings in declaration order; remember that `argv`/`main` include any `invocation.argv` literals first. |
 | `unknown arg prefix` / `unsupported COFF wire type`    | A BOF parameter uses a `type` not listed in §5.                                                                                            |

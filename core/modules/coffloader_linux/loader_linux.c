@@ -12,6 +12,8 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#include "beacon_compat.h"
+
 #pragma GCC visibility push(hidden)
 
 static int set_err(char **err_out, const char *msg) {
@@ -70,134 +72,6 @@ static int cstr_ok(const char *base, size_t total, uint64_t off) {
     return 0;
   }
   return memchr(base + off, 0, total - (size_t)off) != NULL;
-}
-
-// BOF Mock API State
-static char *bof_out_buf = NULL;
-static size_t bof_out_len = 0;
-static size_t bof_out_cap = 0;
-
-static void bof_out_append(const char *data, size_t len) {
-  if (len == 0)
-    return;
-  if (bof_out_len + len + 1 > bof_out_cap) {
-    size_t new_cap = bof_out_cap * 2;
-    if (new_cap < bof_out_len + len + 1)
-      new_cap = bof_out_len + len + 4096;
-    char *new_buf = realloc(bof_out_buf, new_cap);
-    if (!new_buf)
-      return;
-    bof_out_buf = new_buf;
-    bof_out_cap = new_cap;
-  }
-  memcpy(bof_out_buf + bof_out_len, data, len);
-  bof_out_len += len;
-  bof_out_buf[bof_out_len] = '\0';
-}
-
-void BeaconPrintf(int type, const char *fmt, ...) {
-  va_list ap;
-  va_start(ap, fmt);
-  int needed = vsnprintf(NULL, 0, fmt, ap);
-  va_end(ap);
-
-  if (needed < 0)
-    return;
-  char *buf = malloc(needed + 1);
-  if (!buf)
-    return;
-
-  va_start(ap, fmt);
-  vsnprintf(buf, needed + 1, fmt, ap);
-  va_end(ap);
-
-  bof_out_append(buf, needed);
-  bof_out_append("\n", 1);
-  free(buf);
-}
-
-void BeaconOutput(int type, const char *data, int len) {
-  if (data == NULL || len <= 0)
-    return;
-  bof_out_append(data, (size_t)len);
-}
-
-// Data parse APIs
-typedef struct {
-  char *original;
-  char *buffer;
-  int length;
-  int size;
-} datap;
-
-void BeaconDataParse(datap *parser, char *buffer, int size) {
-  parser->original = buffer;
-  parser->buffer = buffer;
-  parser->length = size;
-  parser->size = size;
-}
-
-int BeaconDataInt(datap *parser) {
-  if (parser->length < 4)
-    return 0;
-  int v;
-  memcpy(&v, parser->buffer, 4);
-  parser->buffer += 4;
-  parser->length -= 4;
-  return v;
-}
-
-short BeaconDataShort(datap *parser) {
-  if (parser->length < 2)
-    return 0;
-  short v;
-  memcpy(&v, parser->buffer, 2);
-  parser->buffer += 2;
-  parser->length -= 2;
-  return v;
-}
-
-int BeaconDataLength(datap *parser) { return parser->length; }
-
-char *BeaconDataExtract(datap *parser, int *size) {
-  if (parser->length < 4) {
-    if (size)
-      *size = 0;
-    return NULL;
-  }
-  int len;
-  memcpy(&len, parser->buffer, 4);
-  parser->buffer += 4;
-  parser->length -= 4;
-  if (len > parser->length || len < 0) {
-    if (size)
-      *size = 0;
-    return NULL;
-  }
-  char *out = parser->buffer;
-  parser->buffer += len;
-  parser->length -= len;
-  if (size)
-    *size = len;
-  return out;
-}
-
-void *mocked_apis(const char *sym_name) {
-  if (strcmp(sym_name, "BeaconPrintf") == 0)
-    return BeaconPrintf;
-  if (strcmp(sym_name, "BeaconOutput") == 0)
-    return BeaconOutput;
-  if (strcmp(sym_name, "BeaconDataParse") == 0)
-    return BeaconDataParse;
-  if (strcmp(sym_name, "BeaconDataInt") == 0)
-    return BeaconDataInt;
-  if (strcmp(sym_name, "BeaconDataShort") == 0)
-    return BeaconDataShort;
-  if (strcmp(sym_name, "BeaconDataLength") == 0)
-    return BeaconDataLength;
-  if (strcmp(sym_name, "BeaconDataExtract") == 0)
-    return BeaconDataExtract;
-  return NULL;
 }
 
 // Global mutex to serialize BOF execution and protect signal handler state
@@ -448,7 +322,7 @@ bof_run_impl(const uint8_t *obj_buf, size_t object_size, const char *func_name,
       const char *sym_name = strtab + sym.st_name;
 
       if (sym.st_shndx == SHN_UNDEF) {
-        void *handle = mocked_apis(sym_name);
+        void *handle = beacon_api_lookup(sym_name);
         if (!handle) {
           handle = dlsym(RTLD_DEFAULT, sym_name);
         }
@@ -602,9 +476,7 @@ bof_run_impl(const uint8_t *obj_buf, size_t object_size, const char *func_name,
   typedef void (*func_ptr)(uint8_t *, int);
   int status = 0;
 
-  bof_out_buf = NULL;
-  bof_out_len = 0;
-  bof_out_cap = 0;
+  beacon_output_reset();
 
   if (sigsetjmp(bof_env, 1) == 0) {
     is_in_bof = 1;
@@ -622,27 +494,18 @@ bof_run_impl(const uint8_t *obj_buf, size_t object_size, const char *func_name,
     sigaction(handled_sigs[i], &old_sa[handled_sigs[i]], NULL);
   }
 
-  if (status == 0) {
-    if (out_buf) {
-      if (bof_out_buf) {
-        *out_buf = bof_out_buf;
-      } else {
-        *out_buf = (char *)malloc(1);
-        if (*out_buf) {
-          (*out_buf)[0] = '\0';
-        }
-      }
+  if (status == 0 && out_buf != NULL) {
+    char *captured = beacon_output_take();
+    if (captured != NULL) {
+      *out_buf = captured;
     } else {
-      if (bof_out_buf)
-        free(bof_out_buf);
+      *out_buf = (char *)malloc(1);
+      if (*out_buf != NULL)
+        (*out_buf)[0] = '\0';
     }
   } else {
-    if (bof_out_buf)
-      free(bof_out_buf);
+    beacon_output_reset();
   }
-  bof_out_buf = NULL;
-  bof_out_len = 0;
-  bof_out_cap = 0;
 
   munmap(mem_base, total_size);
   free(sec_offsets);

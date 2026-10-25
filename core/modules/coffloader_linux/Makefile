@@ -11,12 +11,12 @@ CC = zig cc
 ZIG_TARGET ?= x86_64-linux-gnu.2.17
 CFLAGS = -O2 -fPIC -Wall
 TARGET = coffloader_linux.so
-SOURCE = loader_linux.c
+SOURCES = loader_linux.c beacon_compat.c
 
 all: $(TARGET)
 
-$(TARGET): $(SOURCE)
-	$(CC) -target $(ZIG_TARGET) -shared $(CFLAGS) -o $@ $(SOURCE) -ldl
+$(TARGET): $(SOURCES)
+	$(CC) -target $(ZIG_TARGET) -shared $(CFLAGS) -o $@ $(SOURCES) -ldl
 	@command -v strip >/dev/null 2>&1 && \
 	  strip --remove-section=.comment $@ || true
 
