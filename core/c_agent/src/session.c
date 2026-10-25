@@ -383,7 +383,7 @@ c2_status c2_session_hello(c2_agent_session *s, c2_secureconn *msg,
     s->pfs_pending = 1;
   }
 
-  char job_id[40];
+  char job_id[40] = {0};
   rand_uuid(s->be, job_id, sizeof(job_id));
   memcpy(s->hello_job_id, job_id, sizeof(s->hello_job_id));
 

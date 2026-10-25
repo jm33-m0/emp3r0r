@@ -242,8 +242,8 @@ CONFIG_SRC ?=
 # and the c2_status_str table are stager/test-only; four of the six vendored
 # tinycbor translation units are never called by the agent. Dropping them by
 # name keeps the binary small even before --gc-sections.
-AGENT_COMMON_SRC = src/util/dynload.c src/util/dynload_hosted.c src/util/doh.c \
-                   src/util/elfload.c src/crypto.c src/messages.c \
+AGENT_COMMON_SRC = src/agent_args.c src/util/dynload.c src/util/dynload_hosted.c \
+                   src/util/doh.c src/util/elfload.c src/crypto.c src/messages.c \
                    src/agent_info.c src/config.c src/secureconn.c \
                    src/session.c src/memfile.c src/bof.c \
                    src/sysinfo.c src/module.c
@@ -475,7 +475,8 @@ ifeq ($(FUZZER),libfuzzer)
   FUZZ_LINK = -fsanitize=fuzzer,address,undefined
   FUZZ_DRIVER =
   FUZZ_TIME ?= 60
-  FUZZ_ARGS ?= -max_total_time=$(FUZZ_TIME) -print_final_stats=1 \
+  FUZZ_ARGS ?= -max_total_time=$(FUZZ_TIME) -max_len=65536 \
+               -dict=$(abspath fuzz/cagent.dict) -print_final_stats=1 \
                -artifact_prefix=$(abspath $(BUILD)/crash)/
   # libFuzzer takes corpus directories; the output corpus comes first so new
   # units are persisted there and the checked-in seed dir is never modified.
@@ -495,6 +496,8 @@ FUZZ_OUT ?= $(BUILD)/corpus
 
 fuzz: $(BUILD)/fuzz_rc4 $(BUILD)/fuzz_packer $(BUILD)/fuzz_inet_aton \
       $(BUILD)/fuzz_messages $(BUILD)/fuzz_agent_info $(BUILD)/fuzz_config \
+      $(BUILD)/fuzz_config_decrypt $(BUILD)/fuzz_session \
+      $(BUILD)/fuzz_command_args $(BUILD)/fuzz_http_poll \
       $(BUILD)/fuzz_secureconn $(BUILD)/fuzz_text $(BUILD)/fuzz_encdec \
       $(GZIP_FUZZ) $(BOF_FUZZ) $(BUILD)/fuzz_dynload $(BUILD)/fuzz_maps \
       $(BUILD)/fuzz_module $(BUILD)/fuzz_strings $(BUILD)/fuzz_elfload \
@@ -526,6 +529,29 @@ $(BUILD)/fuzz_agent_info: fuzz/fuzz_agent_info.c $(FUZZ_DRIVER) $(C2_TEST_SRC) f
 $(BUILD)/fuzz_config: fuzz/fuzz_config.c $(FUZZ_DRIVER) $(C2_TEST_SRC) fuzz/fuzz_common.h | $(BUILD)
 	$(HOSTCC) $(FUZZ_CFLAGS) $< $(FUZZ_DRIVER) $(C2_TEST_SRC) -o $@
 
+$(BUILD)/fuzz_config_decrypt: fuzz/fuzz_config_decrypt.c $(FUZZ_DRIVER) \
+                               src/config.c src/crypto.c src/common.c \
+                               $(STUB_SRC) $(TINYCBOR_SRC) fuzz/fuzz_common.h | $(BUILD)
+	$(HOSTCC) $(FUZZ_CFLAGS) -Itests $< $(FUZZ_DRIVER) src/config.c \
+		src/crypto.c src/common.c $(STUB_SRC) $(TINYCBOR_SRC) -o $@
+
+$(BUILD)/fuzz_session: fuzz/fuzz_session.c $(FUZZ_DRIVER) $(C2_TEST_SRC) \
+                       src/session.c src/secureconn.c $(GZIP_SRC) $(EXTRA_SRC) \
+                       $(STUB_SRC) fuzz/fuzz_common.h | $(BUILD)
+	$(HOSTCC) $(FUZZ_CFLAGS) -Itests $< $(FUZZ_DRIVER) $(C2_TEST_SRC) \
+		src/session.c src/secureconn.c $(GZIP_SRC) $(EXTRA_SRC) \
+		$(STUB_SRC) -o $@
+
+$(BUILD)/fuzz_command_args: fuzz/fuzz_command_args.c $(FUZZ_DRIVER) \
+                            src/agent_args.c fuzz/fuzz_common.h | $(BUILD)
+	$(HOSTCC) $(FUZZ_CFLAGS) $< $(FUZZ_DRIVER) src/agent_args.c -o $@
+
+$(BUILD)/fuzz_http_poll: fuzz/fuzz_http_poll.c $(FUZZ_DRIVER) \
+                         src/transport/http_poll.c src/common.c \
+                         fuzz/fuzz_common.h | $(BUILD)
+	$(HOSTCC) $(FUZZ_CFLAGS) -Isrc/transport $< $(FUZZ_DRIVER) \
+		src/transport/http_poll.c src/common.c -o $@
+
 $(BUILD)/fuzz_secureconn: fuzz/fuzz_secureconn.c $(FUZZ_DRIVER) $(STUB_SRC) \
                          src/secureconn.c src/common.c fuzz/fuzz_common.h | $(BUILD)
 	$(HOSTCC) $(FUZZ_CFLAGS) -Itests $< $(FUZZ_DRIVER) $(STUB_SRC) \
@@ -544,9 +570,9 @@ $(BUILD)/fuzz_gzip: fuzz/fuzz_gzip.c $(FUZZ_DRIVER) $(GZIP_SRC) $(EXTRA_SRC) \
 
 $(BUILD)/fuzz_memfile: fuzz/fuzz_memfile.c $(FUZZ_DRIVER) src/memfile.c \
                        $(GZIP_SRC) $(EXTRA_SRC) src/crypto.c \
-                       src/common.c fuzz/fuzz_common.h | $(BUILD)
-	$(HOSTCC) $(FUZZ_CFLAGS) $< $(FUZZ_DRIVER) src/memfile.c $(GZIP_SRC) \
-		$(EXTRA_SRC) src/crypto.c src/common.c -o $@
+                       src/common.c $(STUB_SRC) fuzz/fuzz_common.h | $(BUILD)
+	$(HOSTCC) $(FUZZ_CFLAGS) -Itests $< $(FUZZ_DRIVER) src/memfile.c \
+		$(GZIP_SRC) $(EXTRA_SRC) src/crypto.c src/common.c $(STUB_SRC) -o $@
 
 $(BUILD)/fuzz_bof: fuzz/fuzz_bof.c $(FUZZ_DRIVER) src/bof.c \
                    src/util/dynload.c src/util/elfload.c \
