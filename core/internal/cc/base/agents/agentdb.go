@@ -291,14 +291,10 @@ func EndSession(uuid string) error {
 	return err
 }
 
-// CloseAgentDB closes the database connection and clears the global so a
-// later caller cannot observe a non-nil but closed handle (tests and embedders
-// stop and restart the C2 in the same process).
+// CloseAgentDB closes the database connection
 func CloseAgentDB() error {
-	db := AgentDB
-	AgentDB = nil
-	if db != nil {
-		return db.Close()
+	if AgentDB != nil {
+		return AgentDB.Close()
 	}
 	return nil
 }
