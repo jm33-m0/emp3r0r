@@ -1,5 +1,26 @@
 # Changelog
 
+## [5.4.0](https://github.com/jm33-m0/emp3r0r/compare/v5.3.0...v5.4.0) (2026-10-25)
+
+
+### Features
+
+* **bof:** add SA linux BOFs (TrustedSec) ([7eb92ff](https://github.com/jm33-m0/emp3r0r/commit/7eb92ff82e5bd58661c6c2bf0dd37cb154ae8415))
+* **c_agent:** DoH support for domain resolution ([c9f6972](https://github.com/jm33-m0/emp3r0r/commit/c9f69727423e21e360e803aa829e9558d27f45dd))
+* **c_agent:** refactor C agent build ([4969c66](https://github.com/jm33-m0/emp3r0r/commit/4969c66df02c527f93ad5b3a81c1c2d4ede23608))
+* descriptive payload naming ([9b69129](https://github.com/jm33-m0/emp3r0r/commit/9b691292815848c6446ea7a468fd7f5928c3d2e8))
+
+
+### Bug Fixes
+
+* **bof:** C agent BOF arg parsing error ([9e36816](https://github.com/jm33-m0/emp3r0r/commit/9e368167f29fa05092d2fa03d25ed5616509a66c))
+* **bof:** c agent cant run BOFs ([c31e39d](https://github.com/jm33-m0/emp3r0r/commit/c31e39de9c08b363d2120ae696f85d830ced49b0))
+* **bof:** linux bof loader should report clear error for static agents ([aa5d03c](https://github.com/jm33-m0/emp3r0r/commit/aa5d03c9faad7170efebb98029d1642bd5b18161))
+* **c_agent:** apply HTTP profile from config block ([272f12e](https://github.com/jm33-m0/emp3r0r/commit/272f12ec884655abc0c8dcc6960259ff2ef7a5f7))
+* **http:** improve http profile ([5ecace0](https://github.com/jm33-m0/emp3r0r/commit/5ecace045ef85de7fca0aa29f43a6844e5d9ae12))
+* **memmod:** match only module basenames to avoid matching wrong files with the same needle ([ab47c5c](https://github.com/jm33-m0/emp3r0r/commit/ab47c5c3d4778f508fc4db6ff8a80c3349466ea3))
+* **module:** modules in the operator-writable workspace takes precedence ([9be4730](https://github.com/jm33-m0/emp3r0r/commit/9be473074db7b67d94a97661997a477dc28afecb))
+
 ## [5.3.0](https://github.com/jm33-m0/emp3r0r/compare/v5.2.2...v5.3.0) (2026-10-16)
 
 
