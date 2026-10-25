@@ -183,6 +183,9 @@ func TestBuildModuleReturnsFailure(t *testing.T) {
 // TestEnsureModuleDependencyHostedSurfacesBuildFailure pins that a dependency
 // whose build fails is reported as a build failure, not as a missing payload.
 func TestEnsureModuleDependencyHostedSurfacesBuildFailure(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("module build runs via sh, not available on windows")
+	}
 	origWWWRoot := paths.WWWRoot
 	origWorkspace := live.EmpWorkSpace
 	origWD, err := os.Getwd()
