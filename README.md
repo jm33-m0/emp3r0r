@@ -1,4 +1,4 @@
-<img align="left" width="150" height="150" alt="emp3r0r" src="https://github.com/user-attachments/assets/65550dfb-ea5a-49e8-a036-8c7df349f5f4" />
+<img align="left" width="120" height="120" alt="emp3r0r" src="img/emp3r0r.svg" />
 
 ### emp3r0r
 
