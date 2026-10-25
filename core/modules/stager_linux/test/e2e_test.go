@@ -29,6 +29,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/paths"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/jobs"
@@ -215,6 +216,17 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+// freeTCPPort returns a currently free loopback TCP port.
+func freeTCPPort(t *testing.T) int {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("reserve TCP port: %v", err)
+	}
+	defer ln.Close()
+	return ln.Addr().(*net.TCPAddr).Port
+}
+
 // waitForC2Listener blocks until a TCP listener accepts connections on addr, or
 // fails the test. The stager-run agent exits on the first failed preflight (by
 // design, so the Go runtime is torn down for the supervisor), so the C2 must be
@@ -333,10 +345,10 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	if os.Getenv("EMP3R0R_RACE_ON") == "1" {
 		t.Skip("Skipping test: race detector is enabled")
 	}
-	// The C2 half of this test is the test binary itself, and every subtest
-	// needs the h2conn TLS listener (http_poll still waits on it too). Without
-	// the tag the server is a stub and the listener never comes up, so fail
-	// fast with an actionable message instead of a 30s wait.
+	// The C2 half of this test is the test binary itself, and the h2conn
+	// subtests need the TLS/h2 listener. Without the tag the server is a stub
+	// and the listener never comes up, so fail fast with an actionable message
+	// instead of a 30s wait.
 	if _, err := transport.GetC2ChannelWrapper(def.C2ChannelModeH2Conn); err != nil {
 		t.Fatalf("h2conn channel is not compiled in; run with -tags 'with_h2conn ...': %v", err)
 	}
@@ -434,14 +446,37 @@ func TestPackerEndToEnd(t *testing.T) {
 func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	t.Helper()
 
+	// This test mutates process-wide C2 state. Restore it after the server
+	// goroutine has stopped, or the next subtest can race the old listener.
+	origLiveRuntime := live.RuntimeConfig
+	origEmpWorkSpace := live.EmpWorkSpace
+	origIsServer := live.IsServer
+	origEmpConfigFile := live.EmpConfigFile
+	origWWWRoot := paths.WWWRoot
+	origCACrtPEM := transport.GetCACrtPEM()
+	origCaCrtFile := transport.CaCrtFile
+	origCaKeyFile := transport.CaKeyFile
+	origServerCrtFile := transport.ServerCrtFile
+	origServerKeyFile := transport.ServerKeyFile
+	origTransportWorkSpace := transport.EmpWorkSpace
+	t.Cleanup(func() {
+		live.RuntimeConfig = origLiveRuntime
+		live.EmpWorkSpace = origEmpWorkSpace
+		live.IsServer = origIsServer
+		live.EmpConfigFile = origEmpConfigFile
+		paths.WWWRoot = origWWWRoot
+		transport.SetCACrtPEM(origCACrtPEM)
+		transport.CaCrtFile = origCaCrtFile
+		transport.CaKeyFile = origCaKeyFile
+		transport.ServerCrtFile = origServerCrtFile
+		transport.ServerKeyFile = origServerKeyFile
+		transport.EmpWorkSpace = origTransportWorkSpace
+	})
+
 	// -----------------------------------------------------------------------
 	// 1. Setup workspace
 	// -----------------------------------------------------------------------
-	tmpDir, err := os.MkdirTemp("", "stager_test_*")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := t.TempDir()
 	logging.Infof("Test workspace: %s", tmpDir)
 
 	// -----------------------------------------------------------------------
@@ -455,8 +490,26 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	//    Must happen before malasada conversion so we can embed the real config
 	//    into the .so before compression.
 	// -----------------------------------------------------------------------
-	c2Port := util.RandInt(50000, 60000)
+	network.StopEmpServers()
+	if agents.AgentDB != nil {
+		_ = agents.CloseAgentDB()
+	}
+
+	usedPorts := map[int]bool{}
+	nextPort := func() int {
+		for {
+			port := freeTCPPort(t)
+			if !usedPorts[port] {
+				usedPorts[port] = true
+				return port
+			}
+		}
+	}
+	c2Port := nextPort()
+	c2HttpPort := nextPort()
+	stagerListenerPort := nextPort()
 	c2PortStr := fmt.Sprintf("%d", c2Port)
+	c2HttpPortStr := fmt.Sprintf("%d", c2HttpPort)
 
 	live.EmpWorkSpace = tmpDir
 	live.IsServer = true
@@ -466,11 +519,15 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	transport.ServerCrtFile = filepath.Join(tmpDir, "server-cert.pem")
 	transport.ServerKeyFile = filepath.Join(tmpDir, "server-key.pem")
 	live.EmpConfigFile = filepath.Join(tmpDir, "emp3r0r.json")
+	paths.WWWRoot = filepath.Join(tmpDir, "www")
+	if err := os.MkdirAll(paths.WWWRoot, 0o700); err != nil {
+		t.Fatalf("Failed to create WWW root: %v", err)
+	}
 
-	if err = config.InitCertsAndConfig(); err != nil {
+	if err := config.InitCertsAndConfig(); err != nil {
 		t.Fatalf("Failed to init certs and config: %v", err)
 	}
-	if err = config.GenC2Certs("127.0.0.1"); err != nil {
+	if err := config.GenC2Certs("127.0.0.1"); err != nil {
 		t.Fatalf("Failed to generate C2 certs: %v", err)
 	}
 
@@ -488,7 +545,6 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 		t.Fatalf("Failed to sign UUID: %v", err)
 	}
 
-	c2HttpPortStr := fmt.Sprintf("%d", c2Port+1)
 	preflightURL := fmt.Sprintf("http://127.0.0.1:%s/preflight-test", c2HttpPortStr)
 	if mode == def.C2ChannelModeH2Conn {
 		preflightURL = fmt.Sprintf("https://127.0.0.1:%s/preflight-test", c2PortStr)
@@ -526,7 +582,17 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	// Clear in place: reassigning `= sync.Map{}` would race any handler
 	// goroutine from an earlier test still Load/Range-ing the old instance.
 	live.ClearAgents()
-	time.Sleep(100 * time.Millisecond)
+
+	// Create the trust store before any listener accepts a request. Starting
+	// the TLS server used to do this lazily, which raced the first check-in on
+	// http_poll runs and produced a spurious EOF.
+	if err := agents.InitAgentDB(filepath.Join(tmpDir, "agents.db")); err != nil {
+		t.Fatalf("Failed to initialize agent database: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = agents.CloseAgentDB()
+		live.ClearAgents()
+	})
 
 	// -----------------------------------------------------------------------
 	// 4. Encrypt config and patch the placeholder into the raw .so.
@@ -608,36 +674,42 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	logging.Successf("Malasada payload ready")
 
 	// -----------------------------------------------------------------------
-	// 6. Start C2 server
+	// 6. Start only the C2 transport this subtest uses.
 	// -----------------------------------------------------------------------
 	server.OPERATORS.Store("dummy", nil)
-	if network.EmpTLSServer != nil {
-		network.EmpTLSServer.Shutdown(network.EmpTLSServerCtx)
-		time.Sleep(500 * time.Millisecond)
-	}
+	t.Cleanup(func() { server.OPERATORS.Delete("dummy") })
+
+	serverDone := make(chan struct{})
 	go func() {
-		logging.Infof("Starting C2 server on port %s", c2PortStr)
-		server.StartC2AgentTLSServer()
+		defer close(serverDone)
+		switch mode {
+		case def.C2ChannelModePlainHTTP:
+			server.StartC2HTTPServer()
+		default:
+			logging.Infof("Starting C2 server on port %s", c2PortStr)
+			_ = server.StartC2AgentTLSServer()
+		}
 	}()
-	if mode == "http_poll" {
-		go server.StartC2HTTPServer()
-	}
-	defer func() {
+	t.Cleanup(func() {
 		network.StopEmpServers()
 		if network.EmpKCPCancel != nil {
 			network.EmpKCPCancel()
 		}
-	}()
+		select {
+		case <-serverDone:
+		case <-time.After(5 * time.Second):
+			t.Errorf("C2 %s server did not stop within 5s", mode)
+		}
+	})
 
 	// Wait until the endpoint the agent actually dials is accepting
 	// connections: for http_poll that is the plain-HTTP port, for h2conn the
-	// TLS/h2 port. Starting a new stack shuts the previous one down first, so
-	// the old listener closing and the new one binding is not instantaneous.
-	// The stager-run agent exits on the first failed preflight, so this must be
-	// true before the runner is launched.
-	waitForC2Listener(t, fmt.Sprintf("127.0.0.1:%s", c2PortStr))
-	if mode == "http_poll" {
+	// TLS/h2 port. The stager-run agent exits on the first failed preflight, so
+	// this must be true before the runner is launched.
+	if mode == def.C2ChannelModePlainHTTP {
 		waitForC2Listener(t, fmt.Sprintf("127.0.0.1:%s", c2HttpPortStr))
+	} else {
+		waitForC2Listener(t, fmt.Sprintf("127.0.0.1:%s", c2PortStr))
 	}
 
 	// -----------------------------------------------------------------------
@@ -657,7 +729,6 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	//
 	// Both variants are run identically: mmap RWX, copy, call offset 0.
 	// -----------------------------------------------------------------------
-	stagerListenerPort := util.RandInt(60001, 65000)
 	stagerPortStr := fmt.Sprintf("%d", stagerListenerPort)
 	stagerKey := "password123"
 
