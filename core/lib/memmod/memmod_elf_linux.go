@@ -1430,6 +1430,22 @@ func resolveFromRuntimeModules(modules []runtimeELFModule, name string) (uintptr
 	return 0, fmt.Errorf("symbol %q not found in loaded ELF modules", name)
 }
 
+// LinuxLibcMapped reports whether the process has a libc shared object mapped.
+// In-memory Linux ELF modules normally depend on libc, so a statically linked
+// agent cannot load them: there is no libc for the resolver to bind against.
+func LinuxLibcMapped() bool {
+	modules, err := runtimeModules()
+	if err != nil {
+		return false
+	}
+	for _, module := range modules {
+		if libcPathScore(module.path) >= 90 {
+			return true
+		}
+	}
+	return false
+}
+
 func runtimeModules() ([]runtimeELFModule, error) {
 	if runtime.GOOS != "linux" {
 		// The Linux implementation uses procfs only as a symbol/bootstrap

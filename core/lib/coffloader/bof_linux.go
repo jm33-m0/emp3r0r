@@ -26,10 +26,14 @@ const maxLoaderOutput = 16 << 20
 
 // RunLinuxCOFF executes an x86_64 ELF BOF payload on Linux through the
 // coffloader_linux dependency. The dependency is resolved, mapped, used once,
-// and unmapped by memdeps.Use.
+// and unmapped by memdeps.Use. The loader itself links libc, so a statically
+// linked agent (no libc mapped) is rejected with an explanatory error.
 func RunLinuxCOFF(payload []byte, export string, args []CoffArg, _ uintptr) (string, error) {
 	if len(payload) == 0 {
 		return "", fmt.Errorf("empty payload")
+	}
+	if !memmod.LinuxLibcMapped() {
+		return "", fmt.Errorf("Linux BOF modules require libc symbol resolution, but this agent is statically linked (no libc is mapped). Use a dynamically linked Linux agent to run Linux BOFs")
 	}
 
 	packedArgs, err := PackCoffArgs(args)

@@ -93,6 +93,9 @@ jobs:
         run: |
           go test -v -tags "$BUILD_TAGS" ./lib/memmod -count=1
           go test -v -tags "$BUILD_TAGS" ./lib/script -count=1
+          # A static agent has no libc for the Linux BOF loader; pin the clear
+          # diagnostic instead of letting an unresolved-symbol dump escape.
+          go test -v -tags "$BUILD_TAGS" ./lib/coffloader -count=1
 
       - name: Run shellcode stager lifecycle test (cgo, no race)
         if: runner.os == 'Linux'

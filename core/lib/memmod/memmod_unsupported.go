@@ -14,6 +14,9 @@ type Module struct{}
 // BaseAddr is present so callers can build on every platform.
 func (module *Module) BaseAddr() uintptr { return 0 }
 
+// LinuxLibcMapped reports that no libc can be mapped on unsupported platforms.
+func LinuxLibcMapped() bool { return false }
+
 // LoadLibrary reports that in-memory shared-library loading is unavailable.
 func LoadLibrary(data []byte) (*Module, error) {
 	_ = data

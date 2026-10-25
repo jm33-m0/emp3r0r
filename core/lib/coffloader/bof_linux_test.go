@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/memdeps"
+	"github.com/jm33-m0/emp3r0r/core/lib/memmod"
 )
 
 const linuxLoaderModule = "../../modules/coffloader_linux"
@@ -22,6 +23,9 @@ func wireLinuxLoader(t *testing.T) {
 	t.Helper()
 	if runtime.GOARCH != "amd64" {
 		t.Skip("linux BOF loader test only supports amd64")
+	}
+	if !memmod.LinuxLibcMapped() {
+		t.Skip("Linux BOF tests need a dynamically linked agent with libc mapped")
 	}
 	if _, err := exec.LookPath("zig"); err != nil {
 		t.Skip("zig not found in PATH")
@@ -117,6 +121,50 @@ void go(char *args, int size) { datap p; BeaconDataParse(&p, args, size); int id
 	}
 }
 
+// TestSALinuxBOF builds and runs one of the vendored TrustedSec SA Linux BOFs.
+// It exercises the real libc symbol resolution path (uname/getOSName), not just
+// the Beacon compatibility API.
+func TestSALinuxBOF(t *testing.T) {
+	wireLinuxLoader(t)
+
+	moduleDir := "../../modules/SA_linux"
+	if _, err := os.Stat(filepath.Join(moduleDir, "Makefile")); err != nil {
+		t.Skipf("SA_linux module not found: %v", err)
+	}
+	build := exec.Command("make", "-C", moduleDir)
+	if out, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("build SA_linux: %v\n%s", err, out)
+	}
+	t.Cleanup(func() {
+		_ = exec.Command("make", "-C", moduleDir, "clean").Run()
+	})
+
+	payload, err := os.ReadFile(filepath.Join(moduleDir, "SA/src/uname.o"))
+	if err != nil {
+		t.Fatalf("read uname.o: %v", err)
+	}
+	out, err := RunLinuxCOFF(payload, "go", nil, 0)
+	if err != nil {
+		t.Fatalf("RunLinuxCOFF(uname): %v", err)
+	}
+	if !strings.Contains(out, "Linux") {
+		t.Fatalf("uname output = %q, want Linux", out)
+	}
+
+	// env exercises the loader's getEnviron mock.
+	payload, err = os.ReadFile(filepath.Join(moduleDir, "SA/src/env.o"))
+	if err != nil {
+		t.Fatalf("read env.o: %v", err)
+	}
+	out, err = RunLinuxCOFF(payload, "go", nil, 0)
+	if err != nil {
+		t.Fatalf("RunLinuxCOFF(env): %v", err)
+	}
+	if !strings.Contains(out, "PATH=") {
+		t.Fatalf("env output = %q, want PATH", out)
+	}
+}
+
 // TestHelloLinuxBOF runs the repository's Linux BOF module end to end.
 func TestHelloLinuxBOF(t *testing.T) {
 	wireLinuxLoader(t)
@@ -150,5 +198,21 @@ func TestHelloLinuxBOF(t *testing.T) {
 	// A malformed object must fail cleanly rather than crash.
 	if _, err := RunLinuxCOFF([]byte("\x7fELF\x02\x01\x01\x00garbage"), "go", nil, 0); err == nil {
 		t.Fatal("expected an error for a malformed object")
+	}
+}
+
+// TestRunLinuxCOFFStaticAgentError pins the diagnostic for a statically linked
+// agent: it has no libc to bind the BOF loader against, so it must fail with a
+// clear explanation instead of an unresolved-symbol dump.
+func TestRunLinuxCOFFStaticAgentError(t *testing.T) {
+	if memmod.LinuxLibcMapped() {
+		t.Skip("agent is dynamically linked; the static-agent diagnostic does not apply")
+	}
+	_, err := RunLinuxCOFF([]byte("not an ELF object"), "go", nil, 0)
+	if err == nil {
+		t.Fatal("expected an error for a statically linked agent")
+	}
+	if !strings.Contains(err.Error(), "statically linked") || !strings.Contains(err.Error(), "libc") {
+		t.Fatalf("error does not explain the static-agent limitation: %v", err)
 	}
 }
