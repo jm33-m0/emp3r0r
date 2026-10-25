@@ -18,14 +18,14 @@
 
 #include "http_poll.h"
 
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
-/* ------------------------------------------------------------------------- */
-/* Header building                                                            */
-/* ------------------------------------------------------------------------- */
+/* kind: 0 = READ (GET), 1 = WRITE, 2 = INIT, 3 = CLOSE (POST). */
+enum { HP_REQ_READ = 0, HP_REQ_WRITE = 1, HP_REQ_INIT = 2, HP_REQ_CLOSE = 3 };
 
 typedef struct {
   char **lines;
@@ -201,9 +201,9 @@ static int pending_append(hp_ctx *h, const uint8_t *data, size_t len) {
   return 0;
 }
 
-static int hp_request(hp_ctx *h, int kind, const uint8_t *body, size_t body_len,
-                      uint8_t *resp, size_t resp_cap, size_t *resp_len,
-                      long *status) {
+static int hp_request(hp_ctx *h, int kind, const uint8_t *body,
+                      size_t body_len, uint8_t *resp, size_t resp_cap,
+                      size_t *resp_len, long *status) {
   *resp_len = 0;
   *status = 0;
 
@@ -216,7 +216,7 @@ static int hp_request(hp_ctx *h, int kind, const uint8_t *body, size_t body_len,
   hp_http_request req;
   memset(&req, 0, sizeof(req));
   req.url = h->url;
-  req.method = (kind == 0) ? "GET" : "POST";
+  req.method = (kind == HP_REQ_READ) ? "GET" : "POST";
   req.headers = (const char *const *)headers.lines;
   req.header_count = headers.count;
   req.body = body;
@@ -225,7 +225,7 @@ static int hp_request(hp_ctx *h, int kind, const uint8_t *body, size_t body_len,
   req.resp_cap = resp_cap;
   req.resp_len = resp_len;
   req.status = status;
-  req.timeout_s = (kind == 0) ? 90 : 30;
+  req.timeout_s = (kind == HP_REQ_READ) ? 90 : 30;
   req.ca_pem = h->ca_pem;
 
   c2_status st = hp_http_perform(&req);
@@ -254,7 +254,7 @@ static long hp_read(void *ctx, uint8_t *buf, size_t cap) {
     }
     size_t rlen = 0;
     long status = 0;
-    if (hp_request(h, 0, NULL, 0, resp, 64u * 1024u, &rlen, &status) != 0) {
+    if (hp_request(h, HP_REQ_READ, NULL, 0, resp, 64u * 1024u, &rlen, &status) != 0) {
       sleep_ms(200); /* transient network error: back off and retry */
       continue;
     }
@@ -290,7 +290,7 @@ static long hp_write(void *ctx, const uint8_t *buf, size_t len) {
     return C2_ERR_NOMEM;
   size_t rlen = 0;
   long status = 0;
-  int rc = hp_request(h, 1, buf, len, resp, 64u * 1024u, &rlen, &status);
+  int rc = hp_request(h, HP_REQ_WRITE, buf, len, resp, 64u * 1024u, &rlen, &status);
   if (rc != 0 || status != 200) {
     free(resp);
     return C2_ERR_IO;
@@ -312,7 +312,7 @@ static void hp_close(void *ctx) {
   if (resp != NULL) {
     size_t rlen = 0;
     long status = 0;
-    (void)hp_request(h, 3, NULL, 0, resp, 4096, &rlen, &status);
+    (void)hp_request(h, HP_REQ_CLOSE, NULL, 0, resp, 4096, &rlen, &status);
     free(resp);
   }
   free(h->pending);
@@ -368,7 +368,7 @@ static c2_status hp_open(void *ctx, const char *url,
   }
   size_t rlen = 0;
   long status = 0;
-  int rc = hp_request(h, 2, NULL, 0, resp, 4096, &rlen, &status);
+  int rc = hp_request(h, HP_REQ_INIT, NULL, 0, resp, 4096, &rlen, &status);
   free(resp);
   if (rc != 0 || status != 200) {
     free(h->url);

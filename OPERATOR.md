@@ -261,7 +261,10 @@ Available `--type`: `glibc`, `musl`. Available `--arch`: `amd64`, `386`, `arm`,
 `arm64`, `riscv64`. `riscv64` requires `--type musl`; `--format shellcode`
 requires `amd64` + `glibc`. Available `--transport`: `libcurl` (default,
 HTTP/HTTPS), `http_raw` (plain HTTP, no external libraries), `libssl` (plain
-HTTP plus HTTPS via libssl).
+HTTP plus HTTPS via libssl). The malleable HTTP profile is configured in
+`emp3r0r.json` under `malleable_c2`; an incomplete profile is replaced with a
+complete random one when an agent is generated. The same profile applies to
+every HTTP transport.
 
 Output: `aquila_linux_<arch>_<timestamp>` (`.so` / `.bin` for `--format so` /
 `--format shellcode`).

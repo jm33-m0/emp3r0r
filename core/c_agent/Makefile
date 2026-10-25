@@ -11,7 +11,8 @@
 # Each group is implemented by src/<group>/<name>.c; drop a new file
 # in and build with <GROUP>=<name> to add your own backend. A transport owns
 # its own wire implementation (HTTP/TCP/UDP, raw sockets or a dynamically
-# loaded library), so there is no separate HTTP selector.
+# loaded library), so there is no separate HTTP selector. The malleable HTTP
+# profile itself comes from the C2-embedded config, not from a build provider.
 
 # zig is the project's compiler (shipped with emp3r0r, pinned in core/build.py),
 # so it builds the library and agent. `CC = zig cc` (not `?=`) forces it even
