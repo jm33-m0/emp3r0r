@@ -13,6 +13,24 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 )
 
+// installTestZig places a harmless fake zig in the installed toolchain path so
+// tests that only exercise shell command construction do not depend on a real
+// zig binary. Any actual compiler invocation fails loudly.
+func installTestZig(t *testing.T) {
+	t.Helper()
+	origData := live.EmpDataDir
+	dataDir := t.TempDir()
+	zigDir := filepath.Join(dataDir, "zig")
+	if err := os.MkdirAll(zigDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(zigDir, "zig"), []byte("#!/bin/sh\necho 'fake zig invoked unexpectedly' >&2\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	live.EmpDataDir = dataDir
+	t.Cleanup(func() { live.EmpDataDir = origData })
+}
+
 // TestShellQuote verifies the POSIX single-quote escaping used before
 // interpolating module option values into the `sh -c` build command line.
 // Every value must arrive as exactly one word, whatever shell metacharacters
@@ -74,6 +92,7 @@ func TestBuildModuleShellQuotesFlags(t *testing.T) {
 	}
 	origWorkspace := live.EmpWorkSpace
 	live.EmpWorkSpace = t.TempDir()
+	installTestZig(t)
 	defer func() {
 		_ = os.Chdir(origWD)
 		live.EmpWorkSpace = origWorkspace
@@ -145,6 +164,7 @@ func TestBuildModuleReturnsFailure(t *testing.T) {
 	// build_module chdirs back to live.EmpWorkSpace; the deferred chdir below
 	// restores the real cwd before this temp workspace is removed.
 	live.EmpWorkSpace = t.TempDir()
+	installTestZig(t)
 	defer func() {
 		_ = os.Chdir(origWD)
 		live.EmpWorkSpace = origWorkspace
@@ -173,6 +193,7 @@ func TestEnsureModuleDependencyHostedSurfacesBuildFailure(t *testing.T) {
 	// build_module chdirs back to live.EmpWorkSpace; the deferred chdir below
 	// restores the real cwd before this temp workspace is removed.
 	live.EmpWorkSpace = t.TempDir()
+	installTestZig(t)
 	defer func() {
 		_ = os.Chdir(origWD)
 		paths.WWWRoot = origWWWRoot

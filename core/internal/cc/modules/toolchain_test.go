@@ -14,6 +14,15 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 )
 
+// skipToolchainUnderRace keeps zig/build integration tests in the dedicated
+// non-race CI step; they exercise external toolchains, not Go concurrency.
+func skipToolchainUnderRace(t *testing.T) {
+	t.Helper()
+	if os.Getenv("EMP3R0R_RACE_ON") == "1" {
+		t.Skip("skipping: zig toolchain tests run in the non-race integration step")
+	}
+}
+
 // newInstalledTestLayout creates a realistic installation layout: the
 // installed tree lives under <prefix>/lib/emp3r0r with the shipped zig next to
 // it, and the operator workspace is a separate directory. It returns the
@@ -61,6 +70,7 @@ func newInstalledTestLayout(t *testing.T) (dataDir, workspace string) {
 }
 
 func TestModuleToolchainUsesShippedZig(t *testing.T) {
+	skipToolchainUnderRace(t)
 	if runtime.GOOS != "linux" {
 		t.Skip("module toolchain shims are Linux-only")
 	}
@@ -150,6 +160,7 @@ func TestModuleToolchainUsesShippedZig(t *testing.T) {
 }
 
 func TestBuildMakeAllBuildsBothWindowsArchesWithZig(t *testing.T) {
+	skipToolchainUnderRace(t)
 	dataDir, workspace := newInstalledTestLayout(t)
 	origWD, err := os.Getwd()
 	if err != nil {

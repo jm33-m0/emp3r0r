@@ -47,14 +47,6 @@ jobs:
         working-directory: ./core
         run: go mod tidy
 
-      - name: Run tests (Linux, with race & coverage)
-        if: runner.os == 'Linux'
-        working-directory: ./core
-        env:
-          EMP3R0R_RACE_ON: "1"
-        run: |
-          go test -v -race -tags "$BUILD_TAGS" "-coverprofile=coverage.txt" -covermode=atomic ./...
-
       - name: Install zig (for BOF loader and shellcode stager tests)
         if: runner.os == 'Linux'
         env:
@@ -67,8 +59,16 @@ jobs:
           sudo mv "zig-x86_64-linux-${ZIG_VERSION}" /usr/local/zig
           sudo ln -sf /usr/local/zig/zig /usr/local/bin/zig
 
-      # zig must be installed before this step: TestZigCompiledBOF skips when
-      # zig is absent, so installing it later silently disabled the test.
+      - name: Run tests (Linux, with race & coverage)
+        if: runner.os == 'Linux'
+        working-directory: ./core
+        env:
+          EMP3R0R_RACE_ON: "1"
+        run: |
+          go test -v -race -tags "$BUILD_TAGS" "-coverprofile=coverage.txt" -covermode=atomic ./...
+
+      # These tests run outside -race: in-memory BOF loading conflicts with
+      # checkptr, and the zig build tests only need a normal build pass.
       - name: Run Linux BOF loader and integration test (cgo)
         if: runner.os == 'Linux'
         working-directory: ./core
@@ -80,8 +80,7 @@ jobs:
           go test -v -tags "$BUILD_TAGS" ./lib/memmod -count=1
           go test -v -tags "$BUILD_TAGS" ./lib/script -count=1
           go test -v -tags "$BUILD_TAGS" ./internal/cc/modules -count=1
-          # The builder's zig-dependent tests build the C agent; run them here
-          # where zig is installed (the main ./... run above would skip them).
+          # Repeat the zig-dependent builder tests without the race detector.
           go test -v -tags "$BUILD_TAGS" ./internal/cc/builder -count=1
 
       - name: Run memmod ELF loader tests without cgo (Linux)

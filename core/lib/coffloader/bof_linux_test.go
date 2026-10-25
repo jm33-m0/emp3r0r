@@ -24,6 +24,9 @@ func wireLinuxLoader(t *testing.T) {
 	if runtime.GOARCH != "amd64" {
 		t.Skip("linux BOF loader test only supports amd64")
 	}
+	if os.Getenv("EMP3R0R_RACE_ON") == "1" {
+		t.Skip("skipping: race detector checkptr conflicts with in-memory BOF execution")
+	}
 	if !memmod.LinuxLibcMapped() {
 		t.Skip("Linux BOF tests need a dynamically linked agent with libc mapped")
 	}
