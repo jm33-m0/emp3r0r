@@ -2,7 +2,7 @@
 
 ### emp3r0r
 
-**A self-healing, memory-only C2 for Linux and Windows — agents that survive broken links, never touch disk, and script their way through the Win32 API.**
+A C2 framework for Linux and Windows. Agents run in memory, keep working when links break, and can be extended with scripts.
 
 <br clear="all" />
 
@@ -14,201 +14,115 @@
 ![GitHub License](https://img.shields.io/github/license/jm33-m0/emp3r0r)
 [![GitHub release](https://img.shields.io/github/release/jm33-m0/emp3r0r.svg)](https://github.com/jm33-m0/emp3r0r/releases)
 
----
-
 <img width="1925" height="1147" alt="emp3r0r-readme" src="https://github.com/user-attachments/assets/945aef28-1c07-4701-a6d9-b8029ad8251e" />
 
 ## What is emp3r0r?
 
-emp3r0r is a post-exploitation framework and C2 built for Linux and Windows environments where stealth and resilience aren't optional. Instead of assuming a reliable connection back to one server, agents form a self-healing mesh that keeps working when links break. Instead of asking the target for Python or PowerShell, they execute everything in memory. And instead of limiting you to one platform's tricks, emp3r0r runs Windows BOFs, Linux objects, and Starlark scripts — all fileless, all in-process.
+emp3r0r started as a Linux post-exploitation framework with interactive remote shells and autonomous network pivoting. I add things I learn, keep the parts that are useful during red team work, and remove the parts that only look good in a demo. Over time it grew into a multi-operator C2 with modular agents, a P2P mesh, and in-memory execution on both Linux and Windows.
 
----
+## Features
 
-## Key Highlights & Unique Features
+### Scriptable agents
 
-### 🐍 Scriptable Agents (Embedded Starlark Engine & Win32 API Proxy)
+Every agent has an embedded Starlark engine. A module can add post-exploitation logic without rebuilding the agent or uploading an interpreter. Scripts run inside the agent process and use built-in APIs for file I/O, HTTP, process execution, and other common work. On Windows they can call Win32 functions directly through the agent's API proxy.
 
-Every agent carries its own scripting engine, so you can drop in new post-exploitation logic without compiling or shipping binaries.
+Modules are a Starlark file and a small JSON manifest. The agent loads them in memory and does not spawn Python, Bash, PowerShell, or another command interpreter.
 
-- Scripts run entirely in memory — no Python, Bash, or PowerShell required on the target, and no command interpreters spawned.
-- A full set of built-in APIs covers file I/O, HTTP, command execution, and more, straight from script code.
-- On Windows, scripts can call native Win32 functions directly — the agent proxies straight into system DLLs.
-- Modules are plain Starlark files with a small JSON manifest, so adding your own is easy and fileless.
+### Agent identity
 
-**Why this matters:** writing and extending agent functionality becomes as simple as editing a script, with none of the footprint of dropping an interpreter or a new binary on the target.
+The first successful check-in pins the agent's public key and signed UUID. Later check-ins must use the same identity. A different key or signature is rejected instead of quietly replacing the old agent. Removing an agent is an operator decision.
 
----
+C2 and peer connections use ephemeral ECDH keys for each session. A compromised long-term key cannot decrypt traffic from earlier sessions.
 
-### 🔐 TOFU Cryptographic Identity Pinning
+### P2P mesh
 
-Agents bind their identity to a cryptographic key the first time they talk to you — and that binding never changes.
+Agents can discover each other and relay traffic through a gossip mesh. Peer links use camouflage mTLS 1.3, Windows SMB named pipes, or KCP over UDP, and every hop is encrypted. If a relay dies or the C2 becomes unreachable, traffic can move through another peer.
 
-- Re-enrollment with different credentials is treated as an impostor and rejected.
-- Removing an agent is an explicit operator decision, not something a stolen key can do quietly.
+Files can also move directly between peers. The agent keeps fetched files in encrypted memfs and serves them to peers on request. If no peer has a file, the agent fetches it from the C2.
 
-**Why this matters:** session hijacking and agent cloning simply don't happen; every agent you talk to is the one you enrolled.
+### Listeners and stagers
 
----
+The C2 supports HTTP, TCP, and UDP listeners. The HTTP transport has configurable request profiles. The Linux stager is small, talks to the kernel through direct syscalls, and needs no libc on the target. Stager transports and packers are pluggable, so initial access can use whichever channel the target allows.
 
-### 🔒 Perfect Forward Secrecy (PFS)
+Stages and agents avoid RWX mappings. Code is mapped with the permissions it actually needs.
 
-Every C2 and peer link uses ephemeral ECDH keys with session-derived encryption keys.
+### BOF, ELF, and PICO modules
 
-**Why this matters:** even if a long-term key is compromised later, it can't be used to decrypt traffic that already passed.
+Compiled C modules run in the agent process on both platforms:
 
----
+- Windows COFF/BOF objects with typed argument packing.
+- Linux ELF relocatable objects loaded from memory.
+- Crystal-Kit PICO modules with SilentMoonwalk call stack spoofing.
 
-### 🕸️ Autonomous P2P Gossip Mesh Network
+The repository ships Kerbeus-BOF, Remote-OPs, and a Situational Awareness suite. Running a BOF does not start another process or write the object to disk.
 
-Agents discover each other and relay traffic through a gossip mesh, so the operation doesn't collapse when one link or one server disappears.
+### In-memory library loader
 
-- Peers connect over camouflage mTLS 1.3, Windows SMB named pipes, or reliable UDP (KCP), with every hop encrypted.
-- Traffic routes around dead relays automatically — no manual proxy surgery mid-operation.
-- Segments with no direct C2 access still stay reachable through their neighbors.
+`memmod` maps shared libraries into the agent's address space and calls their exports in place. On Windows it loads PE DLLs. On Linux it loads ELF `.so` files and applies relocations, imports, and symbol lookups without `LoadLibrary` or `dlopen`.
 
-**Why this matters:** the network does the pivoting for you. Cut a link, lose a box, or block the C2 — agents re-route on their own.
+The PE side follows WireGuard's `memmod`. The ELF side follows [Sliver](https://github.com/BishopFox/sliver) and [sliverarmory/reflektor](https://github.com/sliverarmory/reflektor). `memdeps` sits on top: a module declares a dependency, the agent gets it from encrypted memfs or the C2, maps it for one operation, then unmaps it.
 
----
+### Linux modules and eBPF
 
-### 📂 P2P Filesystem
+Linux modules are Starlark scripts with access to the kernel through libbpf. The agent maps `libbpf` when a module needs it and exposes its API as Go-backed builtins. A script can enumerate BPF objects, attach programs, manage maps and links, and start or stop uprobes.
 
-Files move between agents directly, not just through the C2.
+[`ssh_harvest`](./core/modules/ssh_harvest/) is the worked example. It finds a pattern in `sshd`, attaches a long-lived uprobe, streams captured credentials, and keeps the probe running until `--disable`. It uses no ptrace, breakpoints, or temporary files.
 
-- Transfers ride encrypted peer-to-peer tunnels, so internal networks don't bottleneck on your server.
-- Files are cached in agent memory as encrypted blobs and served to peers on demand.
-- If no peer has a file, the agent fetches it from the C2 automatically.
+The same loader can map any `.so` a module declares or supplies. Scripts can also map bytes directly with `mem_load_library`.
 
-**Why this matters:** delivery is fast and mostly invisible to the C2 channel — ideal for egress-restricted environments.
+### Windows tokens and Kerberos
 
----
+On Windows, emp3r0r can use an access token from another process for Go modules, Starlark, and BOFs. Modules accept `--token` for an existing token, `--user` for a disposable netonly session, and `--ticket` for a Kerberos ticket.
 
-### 📡 Multi-Protocol Listeners & Pluggable Stagers
+A netonly session keeps the agent's local identity and borrows the target user only for outbound authentication. A ticket can be imported into the same session, so the network identity becomes the ticket's identity while the local process stays unchanged. Because the session is disposable, the credential material can be purged when the operation is done.
 
-Getting an agent in is treated as seriously as keeping it alive.
+### Pivoting
 
-- HTTP, TCP, and UDP listeners with reliable framing and customizable HTTP profiles.
-- A roughly 2KB stager built on direct Linux syscalls — no libc, no toolchain on the target.
-- Pluggable stager transports and self-unpacking packers let you blend initial access into whatever channel your target allows, and defeat static signature matching along the way.
-- Stage and agent code respect read/write/execute discipline — never RWX.
+The C2 can run a SOCKS5 listener that relays through an agent. The operator can use it from inside the WireGuard tunnel or start `tun2socks` with a route. For example:
 
-**Why this matters:** small, adaptable, and memory-hygienic initial access means you can land on hosts that would otherwise be out of reach.
+```text
+socks_start 1080
+tun2socks start --route 10.10.0.0/24
+```
 
----
+Only the listed subnet goes through the agent. Everything else keeps using the operator's normal connection. Tools that do not support a proxy can still reach the agent-side network.
 
-### 🧩 Native Cross-Platform BOF & PICO Support (COFF, ELF & PICO)
+### C2 transport
 
-Run compiled C modules in-process on either platform:
+Agents can use beacon-style HTTP polling, streaming HTTP/2, or a QUIC UDP channel. HTTP/2 and QUIC are build-time options (`with_h2conn`, `with_quic`). QUIC obfuscates datagrams with a per-build key by default. The `--quic-standard-key` flag disables that and speaks stock QUIC.
 
-- Windows COFF/BOF binaries with typed argument packing.
-- Linux ELF relocatable objects loaded straight into agent memory.
-- Crystal-Kit PICO modules with SilentMoonwalk callstack spoofing.
-- Kerbeus-BOF, Remote-OPs, and a Situational Awareness suite ship ready to use.
+HTTP polling uses a malleable request profile from the C2 config. TLS fingerprints can be randomized with uTLS. Behind an ECH-capable CDN, `--doh` and `--ech` hide the inner SNI from the ClientHello. Control messages use CBOR rather than JSON.
 
-**Why this matters:** BOFs are only as good as their loader — emp3r0r runs them in-process with no new process and no trace left behind, on both Linux and Windows.
+### Modular agent builds
 
----
+Agent features are selected at build time with `with_*` tags. The installer builds a slim kit by default: Linux and Windows amd64 agents with plain HTTP polling and no optional subsystems. `--full` builds every target and every feature. `--agent-tags` selects an exact feature set, and `--list-agent-tags` prints the available tags.
 
-### 🧬 In-Memory Library Loader (memmod)
+C2 server binaries keep the full feature set, so one server can handle every agent variant.
 
-Native libraries are mapped into the agent's own address space and called there — no `LoadLibrary`, no `dlopen`, no file ever hits disk.
+### Experimental C agent
 
-- `memmod` loads PE DLLs on Windows and ELF `.so` on Linux, handling relocations, imports, and export calls in-process.
-- It builds on proven upstream work: WireGuard's `memmod` PE loader and the [Sliver C2](https://github.com/BishopFox/sliver) / [sliverarmory/reflektor](https://github.com/sliverarmory/reflektor) ELF loader and call machinery.
-- `memdeps` sits above it: a declared dependency is resolved from encrypted memfs/C2, mapped only for the operation that needs it, and unmapped on return.
+There is an experimental C agent for Linux. Its executable is around 100 KB. The beacon contains only the core C2 protocol. Everything else, including crypto, compression, transport, dynamic loading, and the BOF loader, is modular. Runtime libraries and the BOF loader are loaded on demand, used, then removed from memory, just as the Go agent handles its dependencies.
 
-**Why this matters:** extending the agent with native code doesn't require a new binary, a loader service, or a file on disk.
+```bash
+generate_c --type glibc --arch amd64 --cc your.domain.com
+```
 
----
+### Encrypted memory storage
 
-### 🐧 Linux Modules & eBPF
+Agent file operations use an in-memory AES-GCM encrypted filesystem. Large files spill to disk only as encrypted blobs with no identifying headers. Agents that take part in the P2P mesh cache files in this filesystem and share them with peers.
 
-Linux modules are Starlark scripts that can reach all the way into the kernel. The agent maps `libbpf` on demand and exposes its API to scripts as Go-backed builtins, so a module can enumerate, attach to, and tear down eBPF objects with no compiler and no child process.
+## Quick start
 
-- The builtins mirror libbpf: `ebpf_progs`, `ebpf_maps`, `ebpf_links`, `ebpf_detach`, `ebpf_map_wipe`, `ebpf_code_offset`, and the long-lived `ebpf_uprobe_start`/`ebpf_uprobe_stop`.
-- [`ssh_harvest`](./core/modules/ssh_harvest/) is the worked example: it locates a pattern in `sshd`, attaches a long-lived uprobe, streams captured credentials live, and holds it until `--disable` — no ptrace, no breakpoints, no disk.
-- libbpf is not the only option: the same on-demand loader handles any `.so` a module declares or supplies, and scripts can map bytes directly with `mem_load_library`.
+See [OPERATOR.md](./OPERATOR.md) for installation, operator setup, container notes, tmux keybindings, and agent generation.
 
-**Why this matters:** kernel-level tradecraft is a script plus a library the agent maps only while it needs it, then drops.
+## Documentation
 
----
+- [Operator guide](./OPERATOR.md)
+- [Module development guide](./core/modules/module_development_guide.md)
+- [Testing guide](./TESTING.md)
+- [Security policy](./SECURITY.md)
+- [Changelog](./CHANGELOG.md)
 
-### 🔑 Windows Tokens, Netonly Sessions & Kerberos Tickets (PTT)
+## Support
 
-Once you're on a Windows host, emp3r0r lets you _become_ the users on it — without ever dropping a tool.
-
-- Steal an access token from any running process and use it everywhere: Go modules, Starlark, BOFs.
-- Create disposable netonly sessions with a module's `--user` flag: they keep your agent's own identity and only borrow the target user's for outbound access — any password works, nothing is ever validated.
-- Import Kerberos tickets with the `--ticket` flag for full pass-the-ticket: your network identity becomes the ticket's (say, the Domain Admin) while your local identity never changes.
-- Every token-aware module accepts `--token`, `--user`, and `--ticket`, so switching identity is one flag away — including creating a session and loading a ticket in a single command.
-- Tickets live per logon session, so the DA material stays quarantined in a disposable session you can purge, and the agent process itself stays clean.
-
-**Why this matters:** lateral movement to machines running no agent at all — SMB shares, service control, CIFS — becomes a normal part of your workflow, authenticated as the user you've borrowed, not as a tool on disk.
-
----
-
-### 🧦 SOCKS5 Pivoting & Operator-Side tun2socks
-
-Pivot without burning another implant: the C2 runs a SOCKS5 proxy that relays through the agent you select, and the operator side can go one step further with a transparent TUN device.
-
-- `socks_start 1080` runs a SOCKS5 endpoint on the C2's WireGuard address that tunnels through the chosen agent; reach it from inside the tunnel, or let `tun2socks` dial it for you.
-- `tun2socks start --route 10.10.0.0/24` creates a TUN device that routes only the subnets you name through that proxy — everything else keeps using your normal connection.
-- The result looks like it originates from the agent, with no per-tool proxy configuration.
-
-**Why this matters:** reach entire agent-side networks transparently — curl a DC, use any tool — with egress that appears to come from the target network, not your operator box.
-
----
-
-### 🎭 Pluggable C2 Transport, uTLS JA3 Evasion & CBOR Protocol
-
-- Choose beacon-style HTTP polling, streaming HTTP/2, or a QUIC UDP channel — HTTP/2 and QUIC are opt-in build tags (`with_h2conn`, `with_quic`). The QUIC channel obfuscates every datagram with a per-build static key by default; the `--quic-standard-key` generate flag opts out and speaks stock QUIC (interoperable with HTTP/3 endpoints). Every channel supports malleable profiles.
-- TLS fingerprints are randomized with uTLS, so the channel doesn't stand out in network telemetry.
-- Behind an ECH-capable CDN edge, `--ech` (with `--doh`) encrypts the inner SNI so the real C2 hostname never appears in the ClientHello.
-- Control traffic rides a compact CBOR protocol — smaller, faster, and harder to parse than JSON.
-
-**Why this matters:** the C2 channel is made to look like ordinary traffic and stay lean on the wire.
-
----
-
-### 🪶 Modular Agents — Opt In To What You Need
-
-Every unused subsystem is another dependency and another string for a defender to find. Optional agent subsystems are opt-in with `with_*` build tags, so a payload carries only what the mission needs.
-
-- `--agent-tags 'with_quic with_utls'` compiles in exactly those features; `--list-agent-tags` prints the full reference. The default full build enables every feature; `--agent-slim` builds the minimal agent (plain HTTP polling with `crypto/tls`, no optional subsystems).
-- C2 server binaries always keep the full feature set, so one C2 serves every agent flavour.
-- Pick tags by scenario.
-
-**Why this matters:** a smaller implant has a shorter string table and fewer third-party dependencies for EDR and AV to key on, while still speaking the full C2 protocol.
-
----
-
-### 💾 Encrypted Memory-First Storage
-
-- Agent file operations run against an in-memory, AES-GCM-encrypted virtual filesystem; large data spills to disk only as encrypted blobs with no identifiable headers.
-- P2P-capable agents cache what they fetch and share it with peers, shrinking C2 traffic further.
-
-**Why this matters:** even disk is treated as hostile — the agent keeps no plaintext artifacts around to find.
-
----
-
-## Quick Start
-
-See [OPERATOR.md](./OPERATOR.md) for the full deployment and operator guide:
-C2 server installation, operator setup (native Linux or the recommended Windows
-container), container capabilities, tmux keybindings and agent payload
-generation.
-
----
-
-## Documentation & Resources
-
-- 🖥️ **Operator Guide:** [OPERATOR.md](./OPERATOR.md)
-- 🛠️ **Module Development Guide:** [core/modules/module_development_guide.md](./core/modules/module_development_guide.md)
-- 🧪 **Testing Guide:** [TESTING.md](./TESTING.md)
-- 📝 **Security Policy:** [SECURITY.md](./SECURITY.md)
-- 📜 **Changelog:** [CHANGELOG.md](./CHANGELOG.md)
-
----
-
-## Support Development
-
-If emp3r0r has proven valuable in your security research and testing, consider supporting its continued development via [GitHub Sponsors](https://github.com/sponsors/jm33-m0).
+If emp3r0r is useful in your security research or testing, you can support development through [GitHub Sponsors](https://github.com/sponsors/jm33-m0).

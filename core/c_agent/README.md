@@ -102,12 +102,12 @@ Every external dependency sits behind a small interface and one or more
 providers, selected at build time (the same model as
 `core/modules/stager_linux`'s `TRANSPORT=<name>`):
 
-| Group     | Selector    | Default     | Providers                                                         |
-| --------- | ----------- | ----------- | ----------------------------------------------------------------- |
-| Libc      | `LIBC`      | `glibc`     | `glibc` · `musl`                                                  |
-| Crypto    | `CRYPTO`    | `openssl`   | `openssl` (system libcrypto via `dynload`) · `mbedtls` (vendored) |
-| Gzip      | `GZIP`      | `miniz`     | `miniz` (vendored) · `none`                                       |
-| Transport | `TRANSPORT` | `libcurl`   | `libcurl` · `http_raw` · `libssl` · `transport_<name>.c` you add   |
+| Group     | Selector    | Default   | Providers                                                         |
+| --------- | ----------- | --------- | ----------------------------------------------------------------- |
+| Libc      | `LIBC`      | `glibc`   | `glibc` · `musl`                                                  |
+| Crypto    | `CRYPTO`    | `openssl` | `openssl` (system libcrypto via `dynload`) · `mbedtls` (vendored) |
+| Gzip      | `GZIP`      | `miniz`   | `miniz` (vendored) · `none`                                       |
+| Transport | `TRANSPORT` | `libcurl` | `libcurl` · `http_raw` · `libssl` · `transport_<name>.c` you add  |
 
 A transport owns its full wire implementation, including HTTP/TLS or raw
 TCP/UDP; there is no separate HTTP provider selector.
@@ -136,7 +136,6 @@ DoH support (`CURLOPT_DOH_URL`) and does not call the raw-socket resolver.
 DoH is optional and runtime-only; no extra library is linked at build time. If
 libcurl is unavailable on the target, DoH resolution fails rather than silently
 falling back to plaintext DNS.
-
 
 ```sh
 make -C core/c_agent agent CRYPTO=mbedtls GZIP=none TRANSPORT=http_raw
@@ -190,37 +189,6 @@ generate_c --type glibc|musl --arch amd64|386|arm|arm64|riscv64 --cc your.domain
 only.
 
 ## Code layout
-
-```
-include/
-  protocol.h     umbrella: include this for the protocol
-  common.h       constants, limits, status, byte-order + hex/base64url
-  crypto.h       crypto backend contract (AES-GCM, SHA-256, HKDF, P-256)
-  secureconn.h   SecureConn framing + key lifecycle
-  messages.h     MsgAuth, MsgTunData, Emp3r0rAgent, AgentToken, peers
-  transport.h    build config, channel contract, agent session flow
-  util/          generic utilities shared with the freestanding stager
-    dynload.h        runtime dlopen/dlsym from libc + ELF symbol lookup
-    elfload.h        in-memory ELF64 mapping + relocation (no fd, no disk)
-    rc4.h            RC4 stream cipher (payload obfuscation)
-    packer.h         build-time config XOR + RC4 key derivation
-    net_utils.h      raw-socket helpers (freestanding payloads)
-    syscalls.h       x86_64 syscall wrappers + ELF types
-    strings.h        freestanding mem/string replacements
-    utils.h          mmap constants + freestanding libc shims
-    debug.h          DEBUG-gated logging macros
-src/               protocol layer shared by every provider
-  cbor_util.h      private tinycbor glue shared by the message codecs
-src/crypto/        crypto providers (<name>.c)
-src/gzip/          gzip providers (<name>.c)
-src/transport/     modular transports (each owns its HTTP/TCP/UDP wire stack)
-src/util/          implementations of include/util/ (debug, dynload, elfload, rc4, ...)
-tests/             standalone unit tests (make test)
-fuzz/              LLVMFuzzerTestOneInput targets + fallback runner (make fuzz)
-vendor/tinycbor/   vendored CBOR codec (MIT, Intel tinycbor 7.0)
-vendor/miniz/      vendored DEFLATE/INFLATE gzip backend (MIT, miniz 3.1.2)
-vendor/mbedtls/    vendored self-contained crypto/TLS (Apache-2.0), opt-in
-```
 
 The headers and sources in `include/` and `src/` are the protocol contract; the
 [header-to-Go-source table](#c-agent-headers) lives in the [protocol
