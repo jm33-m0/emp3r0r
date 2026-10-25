@@ -1,6 +1,6 @@
 [
   {
-    "name": "sa_cat_linux",
+    "name": "sa_linux_cat",
     "author": "TrustedSec",
     "date": "2022-05-16",
     "comment": "Print a file's contents",
@@ -31,7 +31,7 @@
     }
   },
   {
-    "name": "sa_chmod_linux",
+    "name": "sa_linux_chmod",
     "author": "TrustedSec",
     "date": "2022-05-16",
     "comment": "Change a file's permissions",
@@ -69,7 +69,7 @@
     }
   },
   {
-    "name": "sa_env_linux",
+    "name": "sa_linux_env",
     "author": "TrustedSec",
     "date": "2022-05-16",
     "comment": "Print the process environment",
@@ -92,7 +92,7 @@
     }
   },
   {
-    "name": "sa_find_linux",
+    "name": "sa_linux_find",
     "author": "TrustedSec",
     "date": "2022-05-16",
     "comment": "Find files by name under a directory",
@@ -158,7 +158,7 @@
     }
   },
   {
-    "name": "sa_grep_linux",
+    "name": "sa_linux_grep",
     "author": "TrustedSec",
     "date": "2022-05-16",
     "comment": "Search file contents under a directory",
@@ -224,7 +224,7 @@
     }
   },
   {
-    "name": "sa_id_linux",
+    "name": "sa_linux_id",
     "author": "TrustedSec",
     "date": "2022-05-16",
     "comment": "Print UID, GID, and supplementary groups",
@@ -247,7 +247,7 @@
     }
   },
   {
-    "name": "sa_ifconfig_linux",
+    "name": "sa_linux_ifconfig",
     "author": "TrustedSec",
     "date": "2022-05-16",
     "comment": "List network interfaces and addresses",
@@ -270,7 +270,7 @@
     }
   },
   {
-    "name": "sa_pwd_linux",
+    "name": "sa_linux_pwd",
     "author": "TrustedSec",
     "date": "2022-05-16",
     "comment": "Print the current working directory",
@@ -293,7 +293,7 @@
     }
   },
   {
-    "name": "sa_tasklist_linux",
+    "name": "sa_linux_tasklist",
     "author": "TrustedSec",
     "date": "2022-05-16",
     "comment": "List processes and executable paths",
@@ -316,7 +316,7 @@
     }
   },
   {
-    "name": "sa_uname_linux",
+    "name": "sa_linux_uname",
     "author": "TrustedSec",
     "date": "2022-05-16",
     "comment": "Print system information",
@@ -339,7 +339,7 @@
     }
   },
   {
-    "name": "sa_walk_linux",
+    "name": "sa_linux_walk",
     "author": "TrustedSec",
     "date": "2022-05-16",
     "comment": "Walk a directory tree",
@@ -377,7 +377,7 @@
     }
   },
   {
-    "name": "sa_whoami_linux",
+    "name": "sa_linux_whoami",
     "author": "TrustedSec",
     "date": "2022-05-16",
     "comment": "Print the current UID/EUID and privilege level",
