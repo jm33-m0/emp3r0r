@@ -146,6 +146,7 @@ c2_status c2_agent_config_decode(CborValue *r, c2_agent_config *cfg) {
       C2_CASE_TEXT(C2_KEY_CFG_CAPEM, cfg, ca_pem);
       C2_CASE_TEXT(C2_KEY_CFG_CA_FINGERPRINT, cfg, ca_fingerprint);
       C2_CASE_TEXT(C2_KEY_CFG_C2_TRANSPORT_PROXY, cfg, c2_transport_proxy);
+      C2_CASE_TEXT(C2_KEY_CFG_DOH_SERVER, cfg, doh_server);
       C2_CASE_TEXT(C2_KEY_CFG_AGENT_UUID, cfg, agent_uuid);
       C2_CASE_TEXT(C2_KEY_CFG_AGENT_UUID_SIG, cfg, agent_uuid_sig);
       C2_CASE_TEXT(C2_KEY_CFG_AGENT_TAG, cfg, agent_tag);

@@ -27,7 +27,8 @@ int hp_http_parse_url(const char *url, char *host, size_t host_cap, char *port,
                       char *authority, size_t auth_cap, int *tls);
 
 /* Connect a TCP socket to host:port, returning the fd or -1. */
-int hp_http_tcp_connect(const char *host, const char *port, int timeout_s);
+int hp_http_tcp_connect(const char *host, const char *port, int timeout_s,
+                        const c2_str *doh_url);
 
 /* Perform one request/response over an already connected hp_http_io. */
 c2_status hp_http_exchange(const hp_http_request *req, const char *path,

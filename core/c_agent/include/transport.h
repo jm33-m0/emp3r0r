@@ -95,6 +95,7 @@ enum {
   C2_KEY_CFG_CAPEM = 24,
   C2_KEY_CFG_CA_FINGERPRINT = 25,
   C2_KEY_CFG_C2_TRANSPORT_PROXY = 26,
+  C2_KEY_CFG_DOH_SERVER = 28,
   C2_KEY_CFG_AGENT_UUID = 32,
   C2_KEY_CFG_AGENT_UUID_SIG = 33,
   C2_KEY_CFG_AGENT_TAG = 34,
@@ -118,6 +119,7 @@ typedef struct {
   c2_str ca_pem;
   c2_str ca_fingerprint;
   c2_str c2_transport_proxy;
+  c2_str doh_server;
   c2_str agent_uuid;
   c2_str agent_uuid_sig; /* base64url CA token over the UUID */
   c2_str agent_tag;

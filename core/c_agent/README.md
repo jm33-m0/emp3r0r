@@ -125,6 +125,19 @@ vendored miniz is a small single file. A fully self-contained agent (no system
 SSL dependency) is built with `CRYPTO=mbedtls TRANSPORT=http_raw`; a build that
 does not need gzip uses `GZIP=none`.
 
+### DNS and DoH
+
+`http_raw` and `libssl` normally resolve the C2 host through libc
+`getaddrinfo()`. When the embedded config has `doh_server`, they instead resolve
+through DNS-over-HTTPS: a minimal DNS wire query is POSTed to the resolver URL
+with a libcurl loaded at runtime. The `libcurl` transport uses libcurl's native
+DoH support (`CURLOPT_DOH_URL`) and does not call the raw-socket resolver.
+
+DoH is optional and runtime-only; no extra library is linked at build time. If
+libcurl is unavailable on the target, DoH resolution fails rather than silently
+falling back to plaintext DNS.
+
+
 ```sh
 make -C core/c_agent agent CRYPTO=mbedtls GZIP=none TRANSPORT=http_raw
 ```

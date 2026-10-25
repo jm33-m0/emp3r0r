@@ -29,6 +29,7 @@ typedef struct hp_http_request {
   long *status;                 /* set to the HTTP status code */
   long timeout_s;               /* whole-request timeout */
   const c2_str *ca_pem;         /* PEM CA to verify against; may be NULL */
+  const c2_str *doh_server;     /* DoH resolver URL; may be NULL/empty */
 } hp_http_request;
 
 c2_status hp_http_perform(const hp_http_request *req);

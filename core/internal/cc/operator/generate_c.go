@@ -29,6 +29,7 @@ func gen_c_cmd() *cobra.Command {
 	cmd.Flags().StringP("arch", "a", builder.CAgentArches[0], fmt.Sprintf("Target architecture, available: %v", builder.CAgentArches))
 	cmd.Flags().String("cc", defaultC2Address(), "C2 server address (Required)")
 	cmd.Flags().String("cc-http-port", live.RuntimeConfig.CCHTTPPort, "Port for HTTP Polling/Beaconing C2 transport")
+	cmd.Flags().String("doh", "", "DNS over HTTPS resolver URL. Example: https://1.1.1.1/dns-query")
 
 	cmd.Flags().String("crypto", builder.CAgentCryptoProviders[0], fmt.Sprintf("Crypto provider. Available: %v", builder.CAgentCryptoProviders))
 	cmd.Flags().String("format", builder.CAgentFormats[0], fmt.Sprintf("Output format. Available: %v", builder.CAgentFormats))
@@ -65,6 +66,7 @@ func CmdGenerateCAgent(cmd *cobra.Command, _ []string) {
 	opts := builder.AgentConfig{
 		CCAddress:     getStringOptPtr(cmd, "cc"),
 		CCHTTPPort:    getStringOptPtr(cmd, "cc-http-port"),
+		DoHServer:     getStringOptPtr(cmd, "doh"),
 		C2ChannelMode: &channelMode,
 	}
 	providers := builder.CAgentProviders{

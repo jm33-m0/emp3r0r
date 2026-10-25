@@ -186,6 +186,7 @@ TINYCBOR_SRC = vendor/tinycbor/cborencoder.c \
 # Protocol layer plus the selected providers. util/strings.c / util/system.c /
 # util/net_utils.c are freestanding-only (they override libc) and are excluded.
 PORTABLE_SRC = src/util/rc4.c src/util/packer.c src/util/dynload.c src/util/dynload_hosted.c \
+               src/util/doh.c \
                src/util/elfload.c src/util/debug.c src/common.c src/crypto.c \
                src/messages.c src/agent_info.c src/config.c \
                src/secureconn.c src/session.c src/memfile.c \
@@ -241,7 +242,7 @@ CONFIG_SRC ?=
 # and the c2_status_str table are stager/test-only; four of the six vendored
 # tinycbor translation units are never called by the agent. Dropping them by
 # name keeps the binary small even before --gc-sections.
-AGENT_COMMON_SRC = src/util/dynload.c src/util/dynload_hosted.c \
+AGENT_COMMON_SRC = src/util/dynload.c src/util/dynload_hosted.c src/util/doh.c \
                    src/util/elfload.c src/crypto.c src/messages.c \
                    src/agent_info.c src/config.c src/secureconn.c \
                    src/session.c src/memfile.c src/bof.c \
@@ -316,7 +317,7 @@ endif
 test: $(BUILD)/test_strings $(BUILD)/test_rc4 $(BUILD)/test_packer \
       $(BUILD)/test_net_parse $(BUILD)/test_dynload \
       $(BUILD)/test_auth $(BUILD)/test_messages \
-      $(BUILD)/test_agent_info $(BUILD)/test_config \
+      $(BUILD)/test_agent_info $(BUILD)/test_config $(BUILD)/test_doh \
       $(BUILD)/test_sysinfo $(BUILD)/test_module \
       $(BUILD)/test_secureconn $(GZIP_TEST) $(BOF_TEST) \
       $(BUILD)/test_crypto_openssl
@@ -367,6 +368,12 @@ $(BUILD)/test_auth: tests/test_auth.c $(C2_TEST_SRC) tests/test.h | $(BUILD)
 
 $(BUILD)/test_messages: tests/test_messages.c $(C2_TEST_SRC) tests/test.h | $(BUILD)
 	$(HOSTCC) $(TEST_CFLAGS) $< $(C2_TEST_SRC) -o $@
+
+$(BUILD)/test_doh: tests/test_doh.c src/util/doh.c src/common.c \
+                   src/util/dynload.c src/util/dynload_hosted.c \
+                   tests/test.h | $(BUILD)
+	$(HOSTCC) $(TEST_CFLAGS) tests/test_doh.c src/util/doh.c src/common.c \
+		src/util/dynload.c src/util/dynload_hosted.c -o $@
 
 $(BUILD)/test_agent_info: tests/test_agent_info.c tests/test.h \
                              src/agent_info.c src/common.c \

@@ -286,7 +286,7 @@ static c2_status hp_http_ssl_perform(const hp_http_request *req, const char *hos
   if (tls_load() != 0)
     return C2_ERR_UNSUPPORTED;
 
-  int fd = hp_http_tcp_connect(host, port, (int)req->timeout_s);
+  int fd = hp_http_tcp_connect(host, port, (int)req->timeout_s, req->doh_server);
   if (fd < 0)
     return C2_ERR_IO;
 

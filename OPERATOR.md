@@ -251,6 +251,8 @@ generate_c --cc your.domain.com --crypto mbedtls --gzip none
 # libssl (raw TCP + TLS)
 generate_c --cc your.domain.com --transport http_raw
 generate_c --cc your.domain.com --transport libssl
+# resolve the C2 host over DNS-over-HTTPS
+generate_c --cc your.domain.com --doh https://1.1.1.1/dns-query
 # musl target (Alpine and other musl hosts); dynload follows the library
 generate_c --type musl --arch arm64 --cc your.domain.com
 # artifact formats: exe (default), so (dlopen/injection), shellcode (malasada PIC)
@@ -261,10 +263,12 @@ Available `--type`: `glibc`, `musl`. Available `--arch`: `amd64`, `386`, `arm`,
 `arm64`, `riscv64`. `riscv64` requires `--type musl`; `--format shellcode`
 requires `amd64` + `glibc`. Available `--transport`: `libcurl` (default,
 HTTP/HTTPS), `http_raw` (plain HTTP, no external libraries), `libssl` (plain
-HTTP plus HTTPS via libssl). The malleable HTTP profile is configured in
-`emp3r0r.json` under `malleable_c2`; an incomplete profile is replaced with a
-complete random one when an agent is generated. The same profile applies to
-every HTTP transport.
+HTTP plus HTTPS via libssl). `--doh` resolves the C2 host over DNS-over-HTTPS
+(libcurl transport uses its native DoH; `http_raw`/`libssl` use a runtime-loaded
+libcurl DoH client). The malleable HTTP profile is configured in `emp3r0r.json`
+under `malleable_c2`; an incomplete profile is replaced with a complete random
+one when an agent is generated. The same profile applies to every HTTP
+transport.
 
 Output: `aquila_linux_<arch>_<timestamp>` (`.so` / `.bin` for `--format so` /
 `--format shellcode`).

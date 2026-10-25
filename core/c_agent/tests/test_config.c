@@ -81,6 +81,7 @@ static size_t build_full_config(uint8_t *buf, size_t cap, int pairs) {
   enc_text(&m, C2_KEY_CFG_CAPEM, "-----BEGIN CERTIFICATE-----");
   enc_text(&m, C2_KEY_CFG_CA_FINGERPRINT, "ab:cd");
   enc_text(&m, C2_KEY_CFG_C2_TRANSPORT_PROXY, "socks5://127.0.0.1:9050");
+  enc_text(&m, C2_KEY_CFG_DOH_SERVER, "https://1.1.1.1/dns-query");
   enc_text(&m, C2_KEY_CFG_AGENT_UUID, "uuid-1");
   enc_text(&m, C2_KEY_CFG_AGENT_UUID_SIG, "sig");
   enc_text(&m, C2_KEY_CFG_AGENT_TAG, "abcd1234");
@@ -104,7 +105,7 @@ int main(void) {
 
   /* Full config: every communication key is decoded, nested maps included. */
   {
-    size_t n = build_full_config(buf, sizeof(buf), 20);
+    size_t n = build_full_config(buf, sizeof(buf), 21);
     memset(&cfg, 0, sizeof(cfg));
     c2_str hk[4], hv[4];
     cfg.http.header_keys = hk;
@@ -117,6 +118,7 @@ int main(void) {
     CHECK(c2_str_equal(cfg.password, "sekret"));
     CHECK(c2_str_equal(cfg.ca_fingerprint, "ab:cd"));
     CHECK(c2_str_equal(cfg.c2_transport_proxy, "socks5://127.0.0.1:9050"));
+    CHECK(c2_str_equal(cfg.doh_server, "https://1.1.1.1/dns-query"));
     CHECK(c2_str_equal(cfg.agent_uuid, "uuid-1"));
     CHECK(c2_str_equal(cfg.agent_tag, "abcd1234"));
     CHECK(c2_str_equal(cfg.c2_channel_mode, "h2conn"));
@@ -201,7 +203,7 @@ int main(void) {
     c2_crypto_backend *be = c2_crypto_open();
     CHECK(be != NULL);
     if (be != NULL) {
-      size_t n = build_full_config(buf, sizeof(buf), 20);
+      size_t n = build_full_config(buf, sizeof(buf), 21);
       uint8_t enc[4096];
       size_t enc_len = 0;
       c2_str magic = c2_str_lit("test-magic");

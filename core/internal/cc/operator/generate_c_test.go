@@ -21,7 +21,7 @@ func TestGenerateCmdDoesNotOfferCAgent(t *testing.T) {
 
 func TestGenerateCAgentCmdHasFlags(t *testing.T) {
 	cmd := gen_c_cmd()
-	for _, name := range []string{"type", "arch", "cc", "cc-http-port", "crypto", "format", "gzip", "transport", "dynload", "glibc-version"} {
+	for _, name := range []string{"type", "arch", "cc", "cc-http-port", "doh", "crypto", "format", "gzip", "transport", "dynload", "glibc-version"} {
 		if cmd.Flags().Lookup(name) == nil {
 			t.Errorf("generate_c: missing flag --%s", name)
 		}

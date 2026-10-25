@@ -12,6 +12,8 @@
 
 #include "http_wire.h"
 
+#include "util/doh.h"
+
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
@@ -421,7 +423,28 @@ c2_status hp_http_exchange(const hp_http_request *req, const char *path,
   return st;
 }
 
-int hp_http_tcp_connect(const char *host, const char *port, int timeout_s) {
+int hp_http_tcp_connect(const char *host, const char *port, int timeout_s,
+                        const c2_str *doh_url) {
+  if (doh_url != NULL && doh_url->ptr != NULL && doh_url->len > 0) {
+    c2_doh_addrs resolved;
+    if (c2_doh_resolve(doh_url, host, port, SOCK_STREAM, &resolved) != 0)
+      return -1;
+    int fd = -1;
+    for (size_t i = 0; i < resolved.count; i++) {
+      const c2_doh_addr *a = &resolved.addrs[i];
+      fd = socket(a->family, a->socktype, a->protocol);
+      if (fd < 0)
+        continue;
+      set_io_timeout(fd, timeout_s);
+      if (connect_with_timeout(fd, (const struct sockaddr *)&a->addr,
+                               a->addr_len, timeout_s) == 0)
+        break;
+      close(fd);
+      fd = -1;
+    }
+    return fd;
+  }
+
   struct addrinfo hints;
   memset(&hints, 0, sizeof(hints));
   hints.ai_socktype = SOCK_STREAM;
@@ -460,7 +483,7 @@ c2_status hp_http_raw_perform(const hp_http_request *req) {
   if (tls)
     return C2_ERR_UNSUPPORTED; /* the libssl transport handles https */
 
-  int fd = hp_http_tcp_connect(host, port, (int)req->timeout_s);
+  int fd = hp_http_tcp_connect(host, port, (int)req->timeout_s, req->doh_server);
   if (fd < 0)
     return C2_ERR_IO;
 

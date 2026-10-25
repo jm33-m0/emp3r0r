@@ -41,7 +41,7 @@ typedef struct {
   uint8_t *pending;
   size_t plen;
   size_t poff;
-  const c2_str *ca_pem;
+  const c2_agent_config *cfg; /* CA and DoH settings */
 } hp_ctx;
 
 static void hdr_free(hdr_list *h) {
@@ -226,7 +226,8 @@ static int hp_request(hp_ctx *h, int kind, const uint8_t *body,
   req.resp_len = resp_len;
   req.status = status;
   req.timeout_s = (kind == HP_REQ_READ) ? 90 : 30;
-  req.ca_pem = h->ca_pem;
+  req.ca_pem = &h->cfg->ca_pem;
+  req.doh_server = &h->cfg->doh_server;
 
   c2_status st = hp_http_perform(&req);
   hdr_free(&headers);
@@ -330,7 +331,10 @@ static c2_status hp_open(void *ctx, const char *url,
   hp_ctx *h = (hp_ctx *)calloc(1, sizeof(*h));
   if (h == NULL)
     return C2_ERR_NOMEM;
-  h->ca_pem = (const c2_str *)ctx;
+  const c2_agent_config *cfg = (const c2_agent_config *)ctx;
+  if (cfg == NULL)
+    return C2_ERR_ARG;
+  h->cfg = cfg;
   size_t ulen = strlen(url);
   h->url = (char *)malloc(ulen + 1);
   if (h->url == NULL) {
@@ -386,6 +390,6 @@ static const c2_transport_ops hp_transport_ops = {hp_open};
 c2_transport c2_transport_create(const c2_agent_config *cfg) {
   c2_transport t;
   t.ops = &hp_transport_ops;
-  t.ctx = (void *)(cfg ? &cfg->ca_pem : NULL);
+  t.ctx = (void *)cfg;
   return t;
 }

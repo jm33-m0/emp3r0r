@@ -55,6 +55,7 @@ struct curl_blob {
 #define CURLOPT_HTTPGET (CURLOPTTYPE_LONG + 80)
 #define CURLOPT_SSL_VERIFYHOST (CURLOPTTYPE_LONG + 81)
 #define CURLOPT_NOSIGNAL (CURLOPTTYPE_LONG + 99)
+#define CURLOPT_DOH_URL (CURLOPTTYPE_OBJECTPOINT + 279)
 #define CURLOPT_CAINFO_BLOB (CURLOPTTYPE_BLOB + 309)
 #define CURL_BLOB_COPY 1
 #define CURLINFO_RESPONSE_CODE 0x200002
@@ -189,6 +190,22 @@ c2_status hp_http_perform(const hp_http_request *req) {
     struct curl_blob blob = {(void *)req->ca_pem->ptr, req->ca_pem->len,
                              CURL_BLOB_COPY};
     g_curl.easy_setopt(easy, CURLOPT_CAINFO_BLOB, &blob);
+  }
+  if (req->doh_server != NULL && req->doh_server->ptr != NULL &&
+      req->doh_server->len > 0) {
+    char doh_url[512];
+    if (req->doh_server->len >= sizeof(doh_url)) {
+      g_curl.easy_cleanup(easy);
+      g_curl.slist_free_all(headers);
+      return C2_ERR_OVERFLOW;
+    }
+    memcpy(doh_url, req->doh_server->ptr, req->doh_server->len);
+    doh_url[req->doh_server->len] = '\0';
+    if (g_curl.easy_setopt(easy, CURLOPT_DOH_URL, doh_url) != CURLE_OK) {
+      g_curl.easy_cleanup(easy);
+      g_curl.slist_free_all(headers);
+      return C2_ERR_UNSUPPORTED;
+    }
   }
 
   if (strcmp(req->method, "GET") == 0) {
