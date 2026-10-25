@@ -331,8 +331,10 @@ coverage-guided libFuzzer over every target: each target gets `FUZZ_TIME`
 seconds (default 60), new corpus entries persist under `build/corpus/<target>/`
 so a later run resumes instead of starting over, and any crash is written to
 `build/crash/`. CI runs this as a weekly campaign over the restored corpus
-cache (and on manual dispatch); developer machines can run it any time. Without
-clang, `fuzz/fuzz_runner.c` drives a bounded mutational loop for `FUZZ_ITERS`
+cache (and on manual dispatch); developer machines can run it any time. libFuzzer
+also gets `fuzz/cagent.dict` and a 64 KiB input ceiling, so it can pass exact
+protocol tokens instead of rediscovering them byte by byte. Without clang,
+`fuzz/fuzz_runner.c` drives a bounded mutational loop for `FUZZ_ITERS`
 iterations instead, writing the crashing input to `build/crash/<target>.bin` so
 a failure is reproducible.
 
@@ -343,8 +345,11 @@ The targets and the surface each covers:
 | `fuzz_messages`   | `MsgAuth`/`MsgTunData` CBOR decode with varying list capacities                  |
 | `fuzz_agent_info` | Emp3r0rAgent / AgentToken / EnrichedPeerList decode                              |
 | `fuzz_config`     | build-config decode (routes, malleable HTTP, custom headers)                     |
+| `fuzz_config_decrypt` | PBKDF2/AES-GCM config container + decrypt → decode (stubbed KDF)             |
+| `fuzz_session`    | SecureConn → `MsgTunData` decode, hello → handshake → PFS key switch             |
+| `fuzz_command_args` | command-slice path/flag/arg parsing with arbitrary capacities                  |
 | `fuzz_gzip`       | gzip header parser + miniz DEFLATE/INFLATE round-trip                            |
-| `fuzz_memfile`    | transparent memfs container decode + round-trip                                  |
+| `fuzz_memfile`    | memfs container decode + unencrypted/encrypted round-trip (stubbed KDF/AEAD)     |
 | `fuzz_bof`        | BOF loader ELF/relocation parser (real `coffloader_linux` provider)              |
 | `fuzz_elfload`    | in-memory ELF64 mapper + relocator (constructors/IFUNCs are recorded, not run)   |
 | `fuzz_encdec`     | decode → re-encode → decode round-trip for both envelopes                        |
@@ -359,6 +364,7 @@ The targets and the surface each covers:
 | `fuzz_inet_aton`  | IP literal parser                                                                |
 | `fuzz_doh`        | DoH DNS wire answer parser (A/AAAA, names, compression pointers)                 |
 | `fuzz_http_raw`   | raw HTTP response/Content-Length/chunked parser and URL parser                   |
+| `fuzz_http_poll`  | shared HTTP-poll state machine (init/read/write/close, buffering, status paths)  |
 
 Every target is compiled with `-fsanitize=address,undefined`; the property under
 test is that no input — however malformed or hostile — can over-read, overflow,
@@ -406,6 +412,8 @@ Implemented and tested in `src/`:
   BOF module dispatch); `bof`. It reconnects on
   tunnel loss and sends keepalive hellos, and reports output like the Go
   agent's `NotifyC2`.
+- `src/agent_args.c` — command-slice path/flag/argument parsing, kept separate
+  from the handlers so `fuzz_command_args` can exercise it without side effects.
 - `module.c` — `c2_coff_invocation_parse` decodes the base64 CBOR
   `def.ResolvedInvocation` the C2 sends with `!custom_module` and turns the
   COFF part into the loader tokens (`z`/`Z`/`i`/`s`/`b`) the BOF runner packs,

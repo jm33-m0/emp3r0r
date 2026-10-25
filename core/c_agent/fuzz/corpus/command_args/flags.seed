@@ -1,0 +1,9 @@
+!custom_module
+--type
+coff
+--mod_name
+x
+--file_to_download
+x.gz
+--invocation
+AAAA

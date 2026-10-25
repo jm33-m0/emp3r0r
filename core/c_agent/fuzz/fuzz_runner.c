@@ -34,7 +34,7 @@
 
 extern int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size);
 
-#define MAX_INPUT 4096
+#define MAX_INPUT 65536
 #define MAX_CORPUS 256
 
 typedef struct {
