@@ -3,6 +3,7 @@
  * Adapted from TrustedSec ELFLoader's beacon_compatibility.c (BSD; see
  * core/modules/SA_linux/LICENSE.txt), with bounds checks and a working reset.
  */
+#include <dlfcn.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -11,8 +12,6 @@
 #include <unistd.h>
 
 #include "beacon_compat.h"
-
-extern char **environ;
 
 #pragma GCC visibility push(hidden)
 
@@ -227,7 +226,13 @@ char *BeaconDataExtract(datap *parser, int *size) {
   return out;
 }
 
-static char **get_environ(void) { return environ; }
+static char **get_environ(void) {
+  /* Resolve the data symbol through dlsym instead of taking a direct
+   * relocation on `environ`: the C agent's in-memory ELF loader resolves
+   * function imports from host libc but not weak data symbols. */
+  char ***envp = (char ***)dlsym(RTLD_DEFAULT, "environ");
+  return envp != NULL ? *envp : NULL;
+}
 static const char *get_os_name(void) { return "lin"; }
 
 static const struct {
