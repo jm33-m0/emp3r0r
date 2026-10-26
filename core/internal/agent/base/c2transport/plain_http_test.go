@@ -80,7 +80,7 @@ func freeUDPPort(t *testing.T) int {
 	return pc.LocalAddr().(*net.UDPAddr).Port
 }
 
-func runCheckinACK(t *testing.T, mode string, quicStandardKey bool) {
+func runCheckinACK(t *testing.T, mode string, quicStandardKey, httpPollOverTLS bool) {
 	t.Helper()
 	transport.SetQUICStandardKey(quicStandardKey)
 	t.Cleanup(func() { transport.SetQUICStandardKey(false) })
@@ -209,10 +209,12 @@ func runCheckinACK(t *testing.T, mode string, quicStandardKey bool) {
 	startErr := make(chan error, 1)
 	go func() {
 		defer close(serverDone)
-		switch mode {
-		case def.C2ChannelModePlainHTTP:
+		switch {
+		case mode == def.C2ChannelModePlainHTTP && !httpPollOverTLS:
 			server.StartC2HTTPServer()
-		case def.C2ChannelModeQUIC:
+		case mode == def.C2ChannelModePlainHTTP && httpPollOverTLS:
+			_ = server.StartC2TLSStreamServer()
+		case mode == def.C2ChannelModeQUIC:
 			startErr <- server.StartC2AgentTLSServer()
 		default:
 			_ = server.StartC2AgentTLSServer()
@@ -227,12 +229,12 @@ func runCheckinACK(t *testing.T, mode string, quicStandardKey bool) {
 		}
 	})
 
-	switch mode {
-	case def.C2ChannelModePlainHTTP:
+	switch {
+	case mode == def.C2ChannelModePlainHTTP && !httpPollOverTLS:
 		if err := waitForPort(fmt.Sprintf("127.0.0.1:%d", httpPort), time.Now().Add(10*time.Second)); err != nil {
 			t.Fatalf("Plain HTTP server did not become ready: %v", err)
 		}
-	case def.C2ChannelModeQUIC:
+	case mode == def.C2ChannelModeQUIC:
 		// StartC2AgentTLSServer returns after the QUIC listener is bound; no
 		// bind-probing loop is needed (and probing was itself racy).
 		select {
@@ -285,15 +287,18 @@ func runCheckinACK(t *testing.T, mode string, quicStandardKey bool) {
 	}
 
 	if mode == def.C2ChannelModePlainHTTP {
-		def.CCAddress = fmt.Sprintf("http://127.0.0.1:%d", httpPort)
-		def.HTTPClient = transport.CreateEmp3r0rHTTPClient(def.CCAddress, "")
-		if def.HTTPClient == nil {
-			t.Fatalf("Failed to create plain HTTP client")
+		if httpPollOverTLS {
+			def.CCAddress = fmt.Sprintf("https://127.0.0.1:%d", tlsPort)
+		} else {
+			def.CCAddress = fmt.Sprintf("http://127.0.0.1:%d", httpPort)
 		}
-		if tr, ok := def.HTTPClient.Transport.(*http.Transport); ok {
-			tr.TLSClientConfig = &tls.Config{RootCAs: certPool}
+		def.HTTPClient = &http.Client{
+			Timeout: 15 * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig:   &tls.Config{RootCAs: certPool},
+				ForceAttemptHTTP2: true,
+			},
 		}
-		def.HTTPClient.Timeout = 15 * time.Second
 	} else {
 		def.CCAddress = fmt.Sprintf("https://127.0.0.1:%d", tlsPort)
 		def.HTTPClient = &http.Client{
@@ -337,9 +342,13 @@ func TestPlainHTTPCheckinACK(t *testing.T) {
 		mode := mode
 		t.Run(mode, func(t *testing.T) {
 			requireH2Conn(t, mode)
-			runCheckinACK(t, mode, false)
+			runCheckinACK(t, mode, false, false)
 		})
 	}
+}
+
+func TestHTTPPollOverTLSFrontend(t *testing.T) {
+	runCheckinACK(t, def.C2ChannelModePlainHTTP, false, true)
 }
 
 // requireH2Conn skips a subtest when it targets the h2conn channel but the

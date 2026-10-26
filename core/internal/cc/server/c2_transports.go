@@ -15,8 +15,10 @@ type c2TransportStarter struct {
 }
 
 // c2TransportStarters is the complete set of agent-facing transports a C2
-// serves. The server starts all of them: the channel mode in an agent's build
-// selects how that agent dials in, and must not decide which listeners exist.
+// serves. The TLS frontend covers both h2conn and http_poll; the plain HTTP
+// listener is kept separately for proxies and direct polling. The channel mode
+// in an agent's build selects how that agent dials in, and must not decide
+// which listeners exist.
 func c2TransportStarters() []c2TransportStarter {
 	return []c2TransportStarter{
 		{
@@ -27,8 +29,8 @@ func c2TransportStarters() []c2TransportStarter {
 			},
 		},
 		{
-			name:  "h2conn",
-			start: func(context.Context) error { return StartC2H2StreamServer() },
+			name:  "tls",
+			start: func(context.Context) error { return StartC2TLSStreamServer() },
 		},
 		{
 			name:  "quic",

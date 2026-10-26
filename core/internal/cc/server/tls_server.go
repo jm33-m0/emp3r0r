@@ -19,14 +19,12 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
-// StartC2AgentTLSServer starts the single C2 listener selected by
+// StartC2AgentTLSServer starts the single C2 endpoint selected by
 // C2ChannelMode. It is used by tests and embedders that exercise one transport
 // at a time; production ServerMain serves all compiled transports through
 // startAllC2Transports, because an agent's channel mode must not decide which
-// listeners the server exposes.
-// It returns an error when the configured mode is not compiled into this build,
-// so callers learn the transport is unavailable instead of waiting for a
-// listener that never binds.
+// listeners the server exposes. The h2conn/http_poll modes use the TLS
+// frontend; QUIC returns an error when it is not compiled into the build.
 func StartC2AgentTLSServer() error {
 	prepareC2ServerPrerequisites()
 
@@ -38,7 +36,7 @@ func StartC2AgentTLSServer() error {
 		return StartC2QUICServer()
 	}
 	if mode == def.C2ChannelModeH2Conn || mode == def.C2ChannelModeDefault || mode == def.C2ChannelModePlainHTTP {
-		return StartC2H2StreamServer()
+		return StartC2TLSStreamServer()
 	}
 	return startRawC2TLSServer()
 }
@@ -71,12 +69,11 @@ func setupC2TLSListener() net.Listener {
 	network.EmpTLSServerCtx = ctx
 	network.EmpTLSServerCancel = cancel
 
-	cert, err := tls.LoadX509KeyPair(transport.ServerCrtFile, transport.ServerKeyFile)
-	if err != nil {
+	if err := transport.ReloadServerTLSCert(); err != nil {
 		logging.Fatalf("StartC2AgentTLSServer: load TLS keypair: %v", err)
 	}
 	tlsCfg := &tls.Config{
-		Certificates: []tls.Certificate{cert},
+		GetCertificate: transport.GetServerTLSCert,
 		CurvePreferences: []tls.CurveID{
 			tls.CurveP256,
 			tls.X25519,

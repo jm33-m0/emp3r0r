@@ -50,6 +50,41 @@ func allowClientRequest(req *http.Request) bool {
 	return ipLimiter.getLimiter(ip).Allow() && globalLimiter.Allow()
 }
 
+// c2HTTPPollPath returns the malleable path http_poll clients dial.
+func c2HTTPPollPath() string {
+	if path := live.RuntimeConfig.MalleableC2.C2Path; path != "" {
+		return path
+	}
+	return "/"
+}
+
+// handleC2HTTPPoll serves one http_poll request. It is shared by the plain
+// HTTP listener and the TLS frontend so both expose exactly the same backend.
+func handleC2HTTPPoll(w http.ResponseWriter, req *http.Request) {
+	if !transport.IsActiveHTTPServerSession(req, &live.RuntimeConfig.MalleableC2) {
+		if !allowClientRequest(req) {
+			logging.Warningf("C2 HTTP Server: rate limit exceeded for %s", req.RemoteAddr)
+			transport.WriteBareStatus(w, http.StatusTooManyRequests)
+			return
+		}
+	}
+
+	stream, err := transport.HandleHTTPServerSession(w, req, &live.RuntimeConfig.MalleableC2)
+	if err == transport.ErrPollingRequest {
+		// It was a polling internal multiplexing request, handled successfully
+		return
+	}
+	if err != nil {
+		logging.Errorf("C2 HTTP Server Accept error from %s: %v", req.RemoteAddr, err)
+		return
+	}
+	if stream != nil {
+		// New session established, start C2 dispatch pipeline
+		logging.Debugf("C2 HTTP Server: new session started from %s", req.RemoteAddr)
+		go cborStreamAccept(transport.NewStreamTransport(stream, req.RemoteAddr))
+	}
+}
+
 // StartC2HTTPServer starts the plain HTTP transport server.
 func StartC2HTTPServer() {
 	if live.RuntimeConfig.CCHTTPPort == "" {
@@ -65,34 +100,8 @@ func StartC2HTTPServer() {
 	mux := http.NewServeMux()
 	preflightPath := registerPreflightFeature(mux)
 
-	c2Path := live.RuntimeConfig.MalleableC2.C2Path
-	if c2Path == "" {
-		c2Path = "/"
-	}
-	mux.HandleFunc(c2Path, func(w http.ResponseWriter, req *http.Request) {
-		if !transport.IsActiveHTTPServerSession(req, &live.RuntimeConfig.MalleableC2) {
-			if !allowClientRequest(req) {
-				logging.Warningf("C2 HTTP Server: rate limit exceeded for %s", req.RemoteAddr)
-				transport.WriteBareStatus(w, http.StatusTooManyRequests)
-				return
-			}
-		}
-
-		stream, err := transport.HandleHTTPServerSession(w, req, &live.RuntimeConfig.MalleableC2)
-		if err == transport.ErrPollingRequest {
-			// It was a polling internal multiplexing request, handled successfully
-			return
-		}
-		if err != nil {
-			logging.Errorf("C2 HTTP Server Accept error from %s: %v", req.RemoteAddr, err)
-			return
-		}
-		if stream != nil {
-			// New session established, start C2 dispatch pipeline
-			logging.Debugf("C2 HTTP Server: new session started from %s", req.RemoteAddr)
-			go cborStreamAccept(transport.NewStreamTransport(stream, req.RemoteAddr))
-		}
-	})
+	c2Path := c2HTTPPollPath()
+	mux.HandleFunc(c2Path, handleC2HTTPPoll)
 
 	// Hide the Go net/http default 404 ("404 page not found"): unregistered
 	// paths must not advertise that a Go server is behind this port. The C2 and

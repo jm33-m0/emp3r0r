@@ -440,22 +440,34 @@ func (s *HTTPServerStream) isClosing() bool {
 // sessions keep the unbounded read so large transfers over slow links work.
 var anonymousBodyReadTimeout = 10 * time.Second
 
+// HTTPServerSessionID extracts the client-chosen http_poll session id from a
+// request. It is shared by the request router and the session handler so the
+// TLS frontend can distinguish an http_poll request from an h2conn stream
+// before either backend sees it.
+func HTTPServerSessionID(req *http.Request, config *def.MalleableHTTPConfig) string {
+	if req == nil || config == nil || config.SessionHeader == "" {
+		return ""
+	}
+	if strings.EqualFold(config.SessionHeader, "Cookie") {
+		name := strings.SplitN(config.SessionValue, "=", 2)[0]
+		if name == "" {
+			return ""
+		}
+		cookie, err := req.Cookie(name)
+		if err != nil {
+			return ""
+		}
+		return cookie.Value
+	}
+	return req.Header.Get(config.SessionHeader)
+}
+
 func HandleHTTPServerSession(w http.ResponseWriter, req *http.Request, config *def.MalleableHTTPConfig) (stream *HTTPServerStream, err error) {
 	if config == nil {
 		return nil, errors.New("HandleHTTPServerSession: missing malleable config")
 	}
 
-	// Parse Session ID
-	sessionID := ""
-	if strings.EqualFold(config.SessionHeader, "Cookie") {
-		c2_cookie, cookieErr := req.Cookie(strings.Split(config.SessionValue, "=")[0])
-		if cookieErr == nil {
-			sessionID = c2_cookie.Value
-		}
-	} else {
-		sessionID = req.Header.Get(config.SessionHeader)
-	}
-
+	sessionID := HTTPServerSessionID(req, config)
 	if sessionID == "" {
 		return nil, ErrPollingRequest
 	}
@@ -682,15 +694,7 @@ func IsActiveHTTPServerSession(req *http.Request, config *def.MalleableHTTPConfi
 	if config == nil {
 		return false
 	}
-	sessionID := ""
-	if strings.EqualFold(config.SessionHeader, "Cookie") {
-		c2_cookie, cookieErr := req.Cookie(strings.Split(config.SessionValue, "=")[0])
-		if cookieErr == nil {
-			sessionID = c2_cookie.Value
-		}
-	} else {
-		sessionID = req.Header.Get(config.SessionHeader)
-	}
+	sessionID := HTTPServerSessionID(req, config)
 	if sessionID == "" {
 		return false
 	}

@@ -54,14 +54,16 @@ func ServerMain(wg_port int, hosts string, operatorNames, addOperators []string,
 	time.Sleep(3 * time.Second)
 
 	// Start every compiled agent transport, not only the one selected for the
-	// agent build: http_poll, h2conn, QUIC and KCP may all be compiled in.
+	// agent build: http_poll, the TLS frontend (h2conn + http_poll), QUIC and
+	// KCP may all be compiled in.
 	go startAllC2Transports()
 
 	// Highlight the key ports for easy identification
 	logging.Successf("\n🎯 ════════════════════ C2 SERVER PORTS ═══════════════════════════")
-	logging.Successf("   📡 C2 Agent Port (TLS):  %s", live.RuntimeConfig.CCH2Port)
-	logging.Successf("   📡 C2 Agent Port (HTTP): %s", live.RuntimeConfig.CCHTTPPort)
-	logging.Successf("   🔄 KCP C2 Port (UDP):    %s", live.RuntimeConfig.P2PRelayPort)
+	logging.Successf("   📡 C2 Agent Port (h2conn/http_poll TLS): %s", live.RuntimeConfig.CCH2Port)
+	logging.Successf("   📡 C2 Agent Port (http_poll plain):      %s", live.RuntimeConfig.CCHTTPPort)
+	logging.Successf("   📡 C2 Agent Port (QUIC UDP):             %s", live.RuntimeConfig.CCH2Port)
+	logging.Successf("   🔄 KCP C2 Port (UDP):                    %s", live.RuntimeConfig.P2PRelayPort)
 	logging.Successf("   🌐 Operator Port (WG):   %d", wg_port+1)
 	logging.Successf("   🔧 WireGuard Port:       %d", wg_port)
 	logging.Successf("══════════════════════════════════════════════════════════════════\n")

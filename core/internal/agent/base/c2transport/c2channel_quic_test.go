@@ -26,7 +26,7 @@ func TestQUICCheckinACK(t *testing.T) {
 		{"standard-key", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			runCheckinACK(t, def.C2ChannelModeQUIC, tc.standard)
+			runCheckinACK(t, def.C2ChannelModeQUIC, tc.standard, false)
 		})
 	}
 }

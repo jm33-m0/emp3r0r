@@ -23,12 +23,11 @@ import (
 func StartC2QUICServer() error {
 	network.StopEmpQUICServer()
 
-	cert, err := tls.LoadX509KeyPair(transport.ServerCrtFile, transport.ServerKeyFile)
-	if err != nil {
+	if err := transport.ReloadServerTLSCert(); err != nil {
 		return fmt.Errorf("StartC2QUICServer: load TLS keypair: %w", err)
 	}
 	tlsCfg := &tls.Config{
-		Certificates:     []tls.Certificate{cert},
+		GetCertificate:   transport.GetServerTLSCert,
 		NextProtos:       []string{transport.QUICALPN},
 		MinVersion:       tls.VersionTLS13,
 		CurvePreferences: []tls.CurveID{tls.CurveP256, tls.X25519},
