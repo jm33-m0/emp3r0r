@@ -34,15 +34,16 @@ import (
 )
 
 // TestCAgentEndToEnd drives the native C agent against the real Go C2 in every
-// deliverable form: it builds core/c_agent's reference agent (executable and
-// malasada raw PIC) with an encrypted config generated at build time, runs it,
-// and requires a full check-in, a command round-trip and transparent memfs file
-// IO. This is the C agent's real-world interoperability test.
+// deliverable form: it builds core/c_agent's reference agent (executable,
+// malasada raw PIC and a locally embedded PIC loaded by stager_linux) with an
+// encrypted config generated at build time, runs it, and requires a full
+// check-in, a command round-trip and transparent memfs file IO. This is the C
+// agent's real-world interoperability test.
 func TestCAgentEndToEnd(t *testing.T) {
-	formats := []string{"exe", "shellcode"}
+	formats := []string{"exe", "shellcode", "local-pic", "local-exe", "local-so"}
 	if cAgentTestLibc() == "musl" {
 		// malasada's stage0 resolves glibc's ld-linux by hardcoded path, so the
-		// raw PIC format is glibc-only; musl covers the executable (and .so).
+		// raw PIC/local formats are glibc-only; musl covers the executable.
 		formats = []string{"exe"}
 	}
 	for _, format := range formats {
@@ -52,29 +53,11 @@ func TestCAgentEndToEnd(t *testing.T) {
 	}
 }
 
-// runCAgentEndToEnd is the shared body for one agent format. format selects the
-// artifact the builder produces (exe or shellcode) and how it is launched: an
-// executable directly, or a raw PIC blob through a small mmap launcher.
-func runCAgentEndToEnd(t *testing.T, format string) {
-	if os.Getenv("CGO_ENABLED") != "1" {
-		t.Skip("Skipping test: CGO_ENABLED is not set to 1")
-	}
-	if os.Getenv("EMP3R0R_RACE_ON") == "1" {
-		t.Skip("Skipping test: race detector is enabled")
-	}
-	if _, err := exec.LookPath("zig"); err != nil {
-		t.Skipf("zig is required to build the C agent (the project compiler): %v", err)
-	}
-	// The C2 half is this test binary; the plain-HTTP server is the C agent's
-	// transport, so the h2conn channel is not needed here.
-
-	tmpDir, err := os.MkdirTemp("", "c_agent_e2e_*")
-	if err != nil {
-		t.Fatalf("create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tmpDir)
-
-	// --- C2 workspace, certs and ports (http_poll only) ---
+// setupCAgentWorkspace initialises the C2 workspace, certificates and runtime
+// config used by the C agent e2e tests. Servers are started separately so a
+// test can delay them (for example to observe a sleep-mask cycle first).
+func setupCAgentWorkspace(t *testing.T, tmpDir string) string {
+	t.Helper()
 	c2Port := util.RandInt(50000, 60000)
 	c2PortStr := fmt.Sprintf("%d", c2Port)
 	c2HTTPPortStr := fmt.Sprintf("%d", c2Port+1)
@@ -88,10 +71,10 @@ func runCAgentEndToEnd(t *testing.T, format string) {
 	transport.ServerKeyFile = filepath.Join(tmpDir, "server-key.pem")
 	live.EmpConfigFile = filepath.Join(tmpDir, "emp3r0r.json")
 
-	if err = config.InitCertsAndConfig(); err != nil {
+	if err := config.InitCertsAndConfig(); err != nil {
 		t.Fatalf("init certs and config: %v", err)
 	}
-	if err = config.GenC2Certs("127.0.0.1"); err != nil {
+	if err := config.GenC2Certs("127.0.0.1"); err != nil {
 		t.Fatalf("generate C2 certs: %v", err)
 	}
 	caCertData, err := os.ReadFile(transport.CaCrtFile)
@@ -126,12 +109,13 @@ func runCAgentEndToEnd(t *testing.T, format string) {
 	}
 	live.ClearAgents()
 	time.Sleep(100 * time.Millisecond)
+	return c2HTTPPortStr
+}
 
-	// Build through the real operator path: config rendering, writable-source
-	// staging and the zig build are all exercised.
-	agentArgv := buildCAgent(t, tmpDir, format)
-
-	// --- Start the real C2 ---
+// startCAgentC2 starts the real C2 servers for the C agent e2e tests and
+// returns a cleanup function.
+func startCAgentC2(t *testing.T, c2HTTPPortStr string) func() {
+	t.Helper()
 	server.OPERATORS.Store("dummy", nil)
 	if network.EmpTLSServer != nil {
 		network.EmpTLSServer.Shutdown(network.EmpTLSServerCtx)
@@ -139,13 +123,68 @@ func runCAgentEndToEnd(t *testing.T, format string) {
 	}
 	go server.StartC2AgentTLSServer()
 	go server.StartC2HTTPServer()
-	defer func() {
+	waitForC2Listener(t, fmt.Sprintf("127.0.0.1:%s", c2HTTPPortStr))
+	return func() {
 		network.StopEmpServers()
 		if network.EmpKCPCancel != nil {
 			network.EmpKCPCancel()
 		}
-	}()
-	waitForC2Listener(t, fmt.Sprintf("127.0.0.1:%s", c2HTTPPortStr))
+	}
+}
+
+// requireCAgentE2E centralises the environment gates shared by the C agent e2e
+// tests.
+func requireCAgentE2E(t *testing.T) {
+	t.Helper()
+	if os.Getenv("CGO_ENABLED") != "1" {
+		t.Skip("Skipping test: CGO_ENABLED is not set to 1")
+	}
+	if os.Getenv("EMP3R0R_RACE_ON") == "1" {
+		t.Skip("Skipping test: race detector is enabled")
+	}
+	if _, err := exec.LookPath("zig"); err != nil {
+		t.Skipf("zig is required to build the C agent (the project compiler): %v", err)
+	}
+}
+
+// runCAgentEndToEnd is the shared body for one agent format. format selects the
+// artifact the builder produces (exe or shellcode) or a local-stager variant
+// (raw PIC, hosted executable or shared object) and how it is launched.
+func runCAgentEndToEnd(t *testing.T, format string) {
+	requireCAgentE2E(t)
+	// The C2 half is this test binary; the plain-HTTP server is the C agent's
+	// transport, so the h2conn channel is not needed here.
+
+	tmpDir, err := os.MkdirTemp("", "c_agent_e2e_*")
+	if err != nil {
+		t.Fatalf("create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	c2HTTPPortStr := setupCAgentWorkspace(t, tmpDir)
+
+	// Build through the real operator path: config rendering, writable-source
+	// staging and the zig build are all exercised.
+	var agentArgv []string
+	if strings.HasPrefix(format, "local-") {
+		// Build the same malasada PIC the shellcode test uses, then embed it in
+		// a stager that has no downloader/transport at all. Exercise every
+		// stager output format: flat PIC, hosted ELF and shared object.
+		stagerFormat := strings.TrimPrefix(format, "local-")
+		switch stagerFormat {
+		case "pic":
+			stagerFormat = "raw"
+		case "exe":
+			stagerFormat = "executable"
+		}
+		res := buildCAgentResult(t, tmpDir, "shellcode", true)
+		agentArgv = buildLocalStager(t, tmpDir, res.OutputFile, stagerFormat)
+	} else {
+		agentArgv = buildCAgent(t, tmpDir, format)
+	}
+
+	// --- Start the real C2 ---
+	defer startCAgentC2(t, c2HTTPPortStr)()
 
 	// --- Run the C agent ---
 	var agentOut bytes.Buffer
@@ -161,30 +200,7 @@ func runCAgentEndToEnd(t *testing.T, format string) {
 	go func() { doneChan <- cmd.Wait() }()
 
 	// --- Wait for check-in ---
-	var agent *def.Emp3r0rAgent
-	deadline := time.Now().Add(60 * time.Second)
-	for time.Now().Before(deadline) {
-		live.RangeAgents(func(rec *live.AgentRecord) bool {
-			if rec.Agent.Tag != "" && rec.Control != nil && rec.Control.Conn != nil {
-				agent = rec.Agent
-				return false
-			}
-			return true
-		})
-		if agent != nil {
-			break
-		}
-		select {
-		case werr := <-doneChan:
-			t.Fatalf("C agent exited before check-in: %v.\nOutput:\n%s", werr, agentOut.String())
-		default:
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-	if agent == nil {
-		t.Fatalf("C agent did not check in within 60s.\nOutput:\n%s", agentOut.String())
-	}
-	logging.Successf("C agent checked in: tag=%s", agent.Tag)
+	agent := waitForCAgentCheckin(t, doneChan, &agentOut, 60*time.Second)
 
 	// The C agent must report the same identity fields as the Go agent. GOOS is
 	// what lets the C2 dispatch modules (BOFs refuse to run without it).
@@ -318,6 +334,36 @@ func runCAgentEndToEnd(t *testing.T, format string) {
 	}
 }
 
+// waitForCAgentCheckin waits until the C2 records a live C agent session.
+func waitForCAgentCheckin(t *testing.T, doneChan <-chan error, agentOut *bytes.Buffer, timeout time.Duration) *def.Emp3r0rAgent {
+	t.Helper()
+	var agent *def.Emp3r0rAgent
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		live.RangeAgents(func(rec *live.AgentRecord) bool {
+			if rec.Agent.Tag != "" && rec.Control != nil && rec.Control.Conn != nil {
+				agent = rec.Agent
+				return false
+			}
+			return true
+		})
+		if agent != nil {
+			break
+		}
+		select {
+		case werr := <-doneChan:
+			t.Fatalf("C agent exited before check-in: %v.\nOutput:\n%s", werr, agentOut.String())
+		default:
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if agent == nil {
+		t.Fatalf("C agent did not check in within %v.\nOutput:\n%s", timeout, agentOut.String())
+	}
+	logging.Successf("C agent checked in: tag=%s", agent.Tag)
+	return agent
+}
+
 // runC2Command sends one command to the C agent and waits for its response.
 func runC2Command(t *testing.T, agent *def.Emp3r0rAgent, doneChan <-chan error, agentOut *bytes.Buffer, cmd string) string {
 	t.Helper()
@@ -437,6 +483,18 @@ func startCAgentOperator(t *testing.T, opPort int) {
 // mmap loader (buildPICLoader).
 func buildCAgent(t *testing.T, tmpDir, format string) []string {
 	t.Helper()
+	res := buildCAgentResult(t, tmpDir, format, false)
+	if format == "shellcode" {
+		return []string{buildPICLoader(t, tmpDir), res.OutputFile}
+	}
+	return []string{res.OutputFile}
+}
+
+// buildCAgentResult builds the C agent and returns the artifact metadata. The
+// stager flag is set for agents that will be loaded by stager_linux so they
+// cooperate with its sleep mask and identity hand-over.
+func buildCAgentResult(t *testing.T, tmpDir, format string, stager bool) *builder.BuildAgentResult {
+	t.Helper()
 	coreDir, err := filepath.Abs(filepath.Join("..", "..", ".."))
 	if err != nil {
 		t.Fatalf("resolve core dir: %v", err)
@@ -453,17 +511,94 @@ func buildCAgent(t *testing.T, tmpDir, format string) []string {
 		dynload = "public"
 	}
 	res, err := builder.GenerateCAgentWorkflow(
-		builder.AgentConfig{CCAddress: &ccAddr},
+		builder.AgentConfig{CCAddress: &ccAddr, IsStager: stager},
 		builder.CAgentProviders{Dynload: dynload, Format: format, Libc: libc},
 		func(u string) (string, error) { return signUUID(u, transport.CaKeyFile) },
 	)
 	if err != nil {
 		t.Fatalf("GenerateCAgentWorkflow(%s): %v", format, err)
 	}
-	if format == "shellcode" {
-		return []string{buildPICLoader(t, tmpDir), res.OutputFile}
+	return res
+}
+
+// buildLocalStager builds stager_linux with the C agent PIC embedded, rather
+// than downloaded, and returns the argv that launches the selected stager
+// format (raw PIC, hosted executable or shared object).
+func buildLocalStager(t *testing.T, tmpDir, picPath, stagerFormat string) []string {
+	t.Helper()
+	stagerDir, err := filepath.Abs("..")
+	if err != nil {
+		t.Fatalf("resolve stager dir: %v", err)
 	}
-	return []string{res.OutputFile}
+	build := exec.Command("./build.sh",
+		"--stager-format", stagerFormat,
+		"--payload-source", "local",
+		"--payload-file", picPath)
+	build.Dir = stagerDir
+	build.Env = append(os.Environ(), "CGO_ENABLED=0")
+	if out, buildErr := build.CombinedOutput(); buildErr != nil {
+		t.Fatalf("build local stager (%s): %v\n%s", stagerFormat, buildErr, out)
+	}
+
+	artifact := "stager.bin"
+	launcher := ""
+	switch stagerFormat {
+	case "executable":
+		artifact = "stager"
+	case "so":
+		artifact = "stager.so"
+		launcher = buildSOStagerLoader(t, tmpDir)
+	default:
+		launcher = buildPICLoader(t, tmpDir)
+	}
+	data, err := os.ReadFile(filepath.Join(stagerDir, artifact))
+	if err != nil {
+		t.Fatalf("read local stager %s: %v", artifact, err)
+	}
+	outPath := filepath.Join(tmpDir, "stager-local-"+filepath.Base(artifact))
+	if err := os.WriteFile(outPath, data, 0o755); err != nil {
+		t.Fatalf("copy local stager: %v", err)
+	}
+	if launcher == "" {
+		return []string{outPath}
+	}
+	return []string{launcher, outPath}
+}
+
+// buildSOStagerLoader builds the dlopen launcher for a stager shared object.
+func buildSOStagerLoader(t *testing.T, dir string) string {
+	t.Helper()
+	src := filepath.Join(dir, "so_loader.c")
+	code := `#define _GNU_SOURCE
+#include <dlfcn.h>
+#include <stdio.h>
+int main(int argc, char **argv) {
+  if (argc < 2) {
+    fprintf(stderr, "usage: %s <stager.so>\n", argv[0]);
+    return 2;
+  }
+  void *h = dlopen(argv[1], RTLD_NOW);
+  if (!h) {
+    fprintf(stderr, "dlopen: %s\n", dlerror());
+    return 2;
+  }
+  int (*entry)(void) = (int (*)(void))dlsym(h, "main");
+  if (!entry) {
+    fprintf(stderr, "dlsym(main): %s\n", dlerror());
+    return 2;
+  }
+  return entry();
+}
+`
+	if err := os.WriteFile(src, []byte(code), 0o600); err != nil {
+		t.Fatalf("write so loader: %v", err)
+	}
+	out := filepath.Join(dir, "so_loader")
+	build := exec.Command("zig", "cc", "-O2", "-o", out, src, "-ldl")
+	if buildOut, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("build so loader: %v\n%s", err, buildOut)
+	}
+	return out
 }
 
 // cAgentTestLibc is the C library the e2e links the agent (and its BOF modules)

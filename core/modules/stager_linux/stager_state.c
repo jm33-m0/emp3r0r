@@ -31,12 +31,15 @@ void stager_state_init(void) {
     __builtin_trap();
 
   st = (struct stager_state *)ret;
-  st->self = st;
+  st->pub.self = st;
   st->syscall_gadget = _SYSCALL_GADGET_UNRESOLVED;
+#ifndef STAGER_PAYLOAD_LOCAL
   /* The mapping is zero-filled by the kernel; reset the dynload cache through
    * its own API so the struct layout stays owned by dynload.c and the next
-   * dynload_open resolves lazily. */
+   * dynload_open resolves lazily. Local payloads have no downloader and link
+   * no dynload code at all. */
   dynload_reset(&st->dl);
+#endif
 
   /* Install the block as the GS base so get_stager_state() can find it without
    * reserving a general-purpose register. */

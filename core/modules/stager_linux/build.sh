@@ -8,7 +8,10 @@ DOWNLOAD_HOST="127.0.0.1"
 DOWNLOAD_PORT="8000"
 DOWNLOAD_PATH="/"
 DOWNLOAD_KEY=""
+PAYLOAD="download"
+PAYLOAD_FILE=""
 UNPACKER="rc4"
+MASK="xor"
 DYNLOAD_MODE="public"
 HASH_STYLE="auto"
 ECH="off"
@@ -50,8 +53,20 @@ while [[ $# -gt 0 ]]; do
     DOWNLOAD_KEY="$2"
     shift 2
     ;;
+  --payload-source | --payload_source)
+    PAYLOAD="$2"
+    shift 2
+    ;;
+  --payload-file | --payload_file)
+    PAYLOAD_FILE="$2"
+    shift 2
+    ;;
   --unpacker)
     UNPACKER="$2"
+    shift 2
+    ;;
+  --mask)
+    MASK="$2"
     shift 2
     ;;
   --dynload-mode | --dynload_mode)
@@ -95,7 +110,10 @@ while [[ $# -gt 0 ]]; do
       --download-port | --download_port) DOWNLOAD_PORT="$val" ;;
       --download-path | --download_path) DOWNLOAD_PATH="$val" ;;
       --download-key | --download_key) DOWNLOAD_KEY="$val" ;;
+      --payload-source | --payload_source) PAYLOAD="$val" ;;
+      --payload-file | --payload_file) PAYLOAD_FILE="$val" ;;
       --unpacker) UNPACKER="$val" ;;
+      --mask) MASK="$val" ;;
       --dynload-mode | --dynload_mode) DYNLOAD_MODE="$val" ;;
       --hash-style | --hash_style) HASH_STYLE="$val" ;;
       --ech) ECH="$val" ;;
@@ -116,12 +134,17 @@ echo "[+] Building shellcode stager with options:"
 echo "    Format:        $STAGER_FORMAT"
 echo "    Transport:     $TRANSPORT"
 echo "    Unpacker:      $UNPACKER"
+echo "    Sleep Mask:    $MASK"
 echo "    Dynload Mode:  $DYNLOAD_MODE"
 echo "    Hash Style:    $HASH_STYLE"
 echo "    Download Host: $DOWNLOAD_HOST"
 echo "    Download Port: $DOWNLOAD_PORT"
 echo "    Download Path: $DOWNLOAD_PATH"
 echo "    Download Key:  [SET]"
+echo "    Payload:       $PAYLOAD"
+if [[ "$PAYLOAD" == "local" ]]; then
+  echo "    Payload File:  ${PAYLOAD_FILE:-[MISSING]}"
+fi
 # ECH only affects the libssl transport; ignored by the raw-socket transports.
 case "$ECH" in 1|on|true|yes) ECH_ENABLE=1 ;; *) ECH_ENABLE=0 ;; esac
 echo "    ECH:           $ECH (libssl transport only)"
@@ -130,6 +153,18 @@ echo "    ECH:           $ECH (libssl transport only)"
 # ephemeral identity key across restarts. Accept on/off-style values.
 case "$SUPERVISE" in 1|on|true|yes) SUPERVISE_ENABLE=1 ;; *) SUPERVISE_ENABLE=0 ;; esac
 echo "    Supervise:     $SUPERVISE"
+
+case "$PAYLOAD" in
+download | local) ;;
+*)
+  echo "[-] Unsupported payload source: $PAYLOAD (use download or local)" >&2
+  exit 1
+  ;;
+esac
+if [[ "$PAYLOAD" == "local" && ! -f "$PAYLOAD_FILE" ]]; then
+  echo "[-] payload-source=local requires --payload-file <prebuilt C agent PIC>" >&2
+  exit 1
+fi
 
 # Clean previous build artifacts
 make clean
@@ -160,8 +195,11 @@ make "$MAKE_TARGET" $DEBUG_FLAG \
   DOWNLOAD_PORT="$DOWNLOAD_PORT" \
   DOWNLOAD_PATH="$DOWNLOAD_PATH" \
   DOWNLOAD_KEY="$DOWNLOAD_KEY" \
+  PAYLOAD="$PAYLOAD" \
+  PAYLOAD_FILE="$PAYLOAD_FILE" \
   TRANSPORT="$TRANSPORT" \
   UNPACKER="$UNPACKER" \
+  MASK="$MASK" \
   DYNLOAD_MODE="$DYNLOAD_MODE" \
   HASH_STYLE="$HASH_STYLE" \
   ECH="$ECH_ENABLE" \

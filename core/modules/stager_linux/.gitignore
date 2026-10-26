@@ -10,3 +10,5 @@ unpack_stub.elf
 unpack_stub.bin
 malasada_stage0_len.mk
 *.o
+tests/test_mask
+local_payload.h

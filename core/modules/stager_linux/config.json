@@ -47,10 +47,30 @@
       "type": "cstr"
     },
     {
+      "name": "payload-source",
+      "description": "Where the stager gets the agent PIC: 'download' (default, downloads it through the selected transport) or 'local' (embed a prebuilt C agent PIC at build time and compile out the downloader/transport)",
+      "default": "download",
+      "choices": ["download", "local"],
+      "type": "cstr"
+    },
+    {
+      "name": "payload-file",
+      "description": "Path to the prebuilt C agent PIC when payload-source=local, eg. the output of generate_c --format shellcode",
+      "default": "",
+      "type": "cstr"
+    },
+    {
       "name": "unpacker",
       "description": "Packing algorithm used for the self-unpacking packed format (rc4: encrypted, lzss: compressed)",
       "default": "rc4",
       "choices": ["rc4", "lzss"],
+      "type": "cstr"
+    },
+    {
+      "name": "mask",
+      "description": "Sleep-mask provider compiled into the stager: 'xor' (default) XORs the agent image in place while it sleeps. Add mask_<name>.c to the module and build with mask=<name>",
+      "default": "xor",
+      "choices": ["xor"],
       "type": "cstr"
     },
     {
