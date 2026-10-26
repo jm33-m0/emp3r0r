@@ -332,7 +332,10 @@ Each C2 transport is selected per agent with `generate --c2-channel-mode`:
 `http_poll` (plain HTTP polling, always available), `h2conn` (HTTP/2 duplex, needs
 `with_h2conn`), or `quic` (needs `with_quic`). The runtime HTTP transport uses
 `crypto/tls` unless the agent was built with `with_utls`. C2 server binaries are
-always built with every tag, so a single server can serve every agent flavour.
+always built with every tag and start every compiled listener (`http_poll`,
+`h2conn`, `quic` and `kcp`) automatically, so a single server can serve every
+agent flavour. `c2_channel_mode` only selects the default used for generated
+agents; it does not disable the other listeners.
 
 #### QUIC transport
 
@@ -355,9 +358,11 @@ emp3r0r generate --type linux_executable --arch amd64 --cc c2.example.com \
   --c2-channel-mode quic --quic-standard-key
 ```
 
-The C2 enables the QUIC listener by setting `"c2_channel_mode": "quic"` in
-`emp3r0r.json` (the same field that selects `http_poll`/`h2conn`) before
-starting the server.
+The C2 starts the QUIC listener automatically when it is built with
+`with_quic`; there is no need to set `"c2_channel_mode": "quic"` on the server.
+Make sure the server's `quic_standard_key` setting matches the agent build
+(custom-key by default, stock QUIC when the agent was generated with
+`--quic-standard-key`), then restart the server after changing it.
 
 #### Hiding the C2 name behind a CDN (ECH)
 

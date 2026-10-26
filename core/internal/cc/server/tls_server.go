@@ -19,11 +19,14 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
-// StartC2AgentTLSServer starts the C2 server entrypoint.
-// The default h2 stream mode uses a separate HTTP/h2 stream server; the raw TLS core
-// remains available for non-HTTP stream modes. It returns an error when the
-// configured mode is not compiled into this build, so callers learn the
-// transport is unavailable instead of waiting for a listener that never binds.
+// StartC2AgentTLSServer starts the single C2 listener selected by
+// C2ChannelMode. It is used by tests and embedders that exercise one transport
+// at a time; production ServerMain serves all compiled transports through
+// startAllC2Transports, because an agent's channel mode must not decide which
+// listeners the server exposes.
+// It returns an error when the configured mode is not compiled into this build,
+// so callers learn the transport is unavailable instead of waiting for a
+// listener that never binds.
 func StartC2AgentTLSServer() error {
 	prepareC2ServerPrerequisites()
 

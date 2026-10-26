@@ -616,7 +616,7 @@ func gen_agent_cmd() *cobra.Command {
 	cc_hosts := transport.NamesInCert(transport.ServerCrtFile)
 
 	genAgentCmd.Flags().StringP("cc", "", defaultC2Address(), "C2 server address (Required)")
-	genAgentCmd.Flags().StringP("c2-channel-mode", "", def.C2ChannelModeDefault, fmt.Sprintf("C2 channel wrapper mode. Available: %s", strings.Join(transport.AllC2ChannelModesDetailed(), ";")))
+	genAgentCmd.Flags().StringP("c2-channel-mode", "", def.C2ChannelModeDefault, fmt.Sprintf("Agent C2 channel wrapper mode; the server listens on every compiled transport. Available: %s", strings.Join(transport.AllC2ChannelModesDetailed(), ";")))
 	genAgentCmd.Flags().BoolP("quic-standard-key", "", false, "QUIC mode only: disable the custom static-key datagram obfuscation and speak stock QUIC (interoperable with HTTP/3 endpoints, but exposes the Initial/ClientHello to observers)")
 	genAgentCmd.Flags().StringP("cc-http-port", "", live.RuntimeConfig.CCHTTPPort, "Port for HTTP Polling/Beaconing C2 transport")
 	genAgentCmd.Flags().StringP("proxy", "", "", "Hard coded proxy URL for agent's C2 transport. Example: socks5://127.0.0.1:9050")

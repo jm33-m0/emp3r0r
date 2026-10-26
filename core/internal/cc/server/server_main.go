@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,7 +10,6 @@ import (
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/relay"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/wireguard"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
@@ -49,24 +47,15 @@ func ServerMain(wg_port int, hosts string, operatorNames, addOperators []string,
 	}
 	defer agents.CloseAgentDB()
 
-	// start all services
-	network.EmpKCPCtx, network.EmpKCPCancel = context.WithCancel(context.Background())
-	go func() {
-		if err := KCPC2ListenAndServe(network.EmpKCPCtx, network.EmpKCPCancel); err != nil {
-			logging.Errorf("KCP C2 listener unavailable: %v", err)
-		}
-	}()
 	// Bring the userspace WireGuard stack up first so the operator-facing
 	// listeners can be bound on it.
 	wg(wg_port, operatorNames, addOperators, operatorsSet)
 	go tarConfig(hosts)
 	time.Sleep(3 * time.Second)
-	go func() {
-		if err := StartC2AgentTLSServer(); err != nil {
-			logging.Errorf("C2 agent listener unavailable: %v", err)
-		}
-	}()
-	go StartC2HTTPServer()
+
+	// Start every compiled agent transport, not only the one selected for the
+	// agent build: http_poll, h2conn, QUIC and KCP may all be compiled in.
+	go startAllC2Transports()
 
 	// Highlight the key ports for easy identification
 	logging.Successf("\n🎯 ════════════════════ C2 SERVER PORTS ═══════════════════════════")
