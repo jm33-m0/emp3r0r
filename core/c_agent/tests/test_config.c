@@ -34,6 +34,11 @@ static void enc_int(CborEncoder *m, uint64_t k, int64_t v) {
   CHECK(cbor_encode_int(m, v) == CborNoError);
 }
 
+static void enc_bool(CborEncoder *m, uint64_t k, int v) {
+  CHECK(cbor_encode_uint(m, k) == CborNoError);
+  CHECK(cbor_encode_boolean(m, v != 0) == CborNoError);
+}
+
 static void enc_routes(CborEncoder *m) {
   CHECK(cbor_encode_uint(m, C2_KEY_CFG_C2_ROUTES) == CborNoError);
   CborEncoder r;
@@ -90,6 +95,7 @@ static size_t build_full_config(uint8_t *buf, size_t cap, int pairs) {
   enc_int(&m, C2_KEY_CFG_PADDING_MAX, 64);
   enc_int(&m, C2_KEY_CFG_JITTER, 20);
   enc_int(&m, C2_KEY_CFG_POLL_INTERVAL, 10);
+  enc_bool(&m, C2_KEY_CFG_IS_RUN_BY_STAGER, 1);
   enc_text(&m, C2_KEY_CFG_C2_CHANNEL_MODE, "h2conn");
   enc_text(&m, C2_KEY_CFG_SNI, "example.com");
   enc_routes(&m);
@@ -105,7 +111,7 @@ int main(void) {
 
   /* Full config: every communication key is decoded, nested maps included. */
   {
-    size_t n = build_full_config(buf, sizeof(buf), 21);
+    size_t n = build_full_config(buf, sizeof(buf), 22);
     memset(&cfg, 0, sizeof(cfg));
     c2_str hk[4], hv[4];
     cfg.http.header_keys = hk;
@@ -128,6 +134,7 @@ int main(void) {
     CHECK_EQ_LONG(cfg.padding_max, 64);
     CHECK_EQ_LONG(cfg.jitter, 20);
     CHECK_EQ_LONG(cfg.poll_interval, 10);
+    CHECK_EQ_LONG(cfg.is_run_by_stager, 1);
     CHECK(c2_str_equal(cfg.routes.checkin, "r-checkin"));
     CHECK(c2_str_equal(cfg.routes.www, "r-www"));
     CHECK(c2_str_equal(cfg.http.c2_path, "/api/v1"));
@@ -203,7 +210,7 @@ int main(void) {
     c2_crypto_backend *be = c2_crypto_open();
     CHECK(be != NULL);
     if (be != NULL) {
-      size_t n = build_full_config(buf, sizeof(buf), 21);
+      size_t n = build_full_config(buf, sizeof(buf), 22);
       uint8_t enc[4096];
       size_t enc_len = 0;
       c2_str magic = c2_str_lit("test-magic");

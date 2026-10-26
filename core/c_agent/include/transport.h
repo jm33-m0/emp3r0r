@@ -103,6 +103,7 @@ enum {
   C2_KEY_CFG_PADDING_MIN = 55,
   C2_KEY_CFG_PADDING_MAX = 56,
   C2_KEY_CFG_JITTER = 57,
+  C2_KEY_CFG_IS_RUN_BY_STAGER = 59,
   C2_KEY_CFG_POLL_INTERVAL = 61,
   C2_KEY_CFG_C2_ROUTES = 75,
   C2_KEY_CFG_C2_CHANNEL_MODE = 76,
@@ -131,6 +132,7 @@ typedef struct {
   int32_t padding_max;
   int32_t poll_interval;
   int32_t jitter;
+  int is_run_by_stager;
 
   /* Per-build PSK seed. Patched at build time with -ldflags -X; it MUST match
    * the C2's MagicString or no frame decrypts. */

@@ -51,6 +51,7 @@ Examples:
 	cmd.Flags().String("transport", builder.CAgentTransportProviders[0], fmt.Sprintf("Transport provider. Available: %v", builder.CAgentTransportProviders))
 	cmd.Flags().String("dynload", builder.CAgentDynloadModes[0], fmt.Sprintf("libc dynamic-loader symbols. Available: %v", builder.CAgentDynloadModes))
 	cmd.Flags().String("glibc-version", builder.CAgentGlibcVersions[0], fmt.Sprintf("Oldest glibc ABI to link against. Available: %v", builder.CAgentGlibcVersions))
+	cmd.Flags().String("bof", "1", "Include COFF/BOF support (1) or compile it out (0)")
 
 	cmd.MarkFlagRequired("cc")
 
@@ -66,6 +67,7 @@ Examples:
 		"transport":     carapace.ActionValues(builder.CAgentTransportProviders...),
 		"dynload":       carapace.ActionValues(builder.CAgentDynloadModes...),
 		"glibc-version": carapace.ActionValues(builder.CAgentGlibcVersions...),
+		"bof":           carapace.ActionValues("1", "0"),
 	})
 	return cmd
 }
@@ -94,6 +96,7 @@ func CmdGenerateCAgent(cmd *cobra.Command, _ []string) {
 		Libc:      libc,
 		Arch:      flagString(cmd, "arch"),
 		Format:    flagString(cmd, "format"),
+		Bof:       flagString(cmd, "bof"),
 	}
 
 	res, err := builder.GenerateCAgentWorkflow(opts, providers, client.SignAgent)

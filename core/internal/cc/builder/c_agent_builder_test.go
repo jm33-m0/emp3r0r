@@ -23,6 +23,7 @@ func TestCAgentBuildArgs(t *testing.T) {
 		Glibc:     "2.17",
 		Libc:      "musl",
 		Arch:      "arm64",
+		Bof:       "0",
 	})
 	joined := strings.Join(args, " ")
 	for _, want := range []string{
@@ -36,6 +37,7 @@ func TestCAgentBuildArgs(t *testing.T) {
 		"DYNLOAD_MODE=auto",
 		"GLIBC_VERSION=2.17",
 		"LIBC=musl",
+		"BOF=0",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("build args missing %q: %v", want, args)
@@ -46,7 +48,7 @@ func TestCAgentBuildArgs(t *testing.T) {
 func TestCAgentBuildArgsOmitsEmptyProviders(t *testing.T) {
 	args := cAgentBuildArgs("/src", "/cfg", CAgentProviders{})
 	joined := strings.Join(args, " ")
-	for _, unwanted := range []string{"ARCH=", "CRYPTO=", "GZIP=", "TRANSPORT=", "DYNLOAD_MODE=", "GLIBC_VERSION=", "LIBC="} {
+	for _, unwanted := range []string{"ARCH=", "CRYPTO=", "GZIP=", "TRANSPORT=", "DYNLOAD_MODE=", "GLIBC_VERSION=", "LIBC=", "BOF="} {
 		if strings.Contains(joined, unwanted) {
 			t.Errorf("empty provider should be omitted, got %q", joined)
 		}
@@ -93,6 +95,7 @@ func TestValidateCAgentProviders(t *testing.T) {
 		{Libc: "musl", Format: "shellcode"},
 		{Arch: "arm64", Format: "shellcode"},
 		{Libc: "glibc", Arch: "riscv64"},
+		{Bof: "maybe"},
 	} {
 		if err := validateCAgentProviders(bad); err == nil {
 			t.Errorf("expected error for %+v", bad)

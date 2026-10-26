@@ -54,6 +54,7 @@ type CAgentProviders struct {
 	Libc      string // LIBC=
 	Arch      string // ARCH=
 	Format    string // exe|so|shellcode (post-build artifact)
+	Bof       string // BOF=0|1 (1 keeps the COFF/BOF command surface)
 }
 
 // cAgentProviderSpec maps one operator choice to its Makefile variable. A
@@ -75,6 +76,7 @@ func cAgentProviderSpecs(p CAgentProviders) []cAgentProviderSpec {
 		{group: "dynload", varname: "DYNLOAD_MODE", value: p.Dynload, allowed: CAgentDynloadModes},
 		{group: "glibc", varname: "GLIBC_VERSION", value: p.Glibc, allowed: CAgentGlibcVersions},
 		{group: "libc", varname: "LIBC", value: p.Libc, allowed: CAgentLibcs},
+		{group: "bof", varname: "BOF", value: p.Bof, allowed: []string{"0", "1"}},
 	}
 }
 

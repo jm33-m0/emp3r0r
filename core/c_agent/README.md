@@ -56,6 +56,7 @@ make -C core/c_agent test-mbedtls    # self-contained mbedTLS backend tests
 make -C core/c_agent vendor-mbedtls  # build the vendored mbedTLS static libs
 make -C core/c_agent fuzz            # fuzz targets (ASan/UBSan fallback runner)
 make -C core/c_agent fuzz FUZZER=libfuzzer HOSTCC=clang FUZZ_TIME=60  # libFuzzer
+make -C core/c_agent agent BOF=0    # compile out the COFF/BOF runner
 ```
 
 `ARCH` selects the hosted target (`amd64`, `386`, `arm`, `arm64`, `riscv64`);
@@ -110,7 +111,11 @@ providers, selected at build time (the same model as
 | Transport | `TRANSPORT` | `libcurl` | `libcurl` · `http_raw` · `libssl` · `transport_<name>.c` you add  |
 
 A transport owns its full wire implementation, including HTTP/TLS or raw
-TCP/UDP; there is no separate HTTP provider selector.
+TCP/UDP; there is no separate HTTP provider selector. The DoH resolver source is
+linked only for the raw-socket transports (`http_raw`, `libssl`); `libcurl`
+uses its native DoH support. `BOF=0` omits `bof.c`, `module.c` and
+`util/elfload.c`, and the `bof` / `!custom_module` command names fall through to
+the normal unsupported-command reply.
 
 - `libcurl`: malleable HTTP-poll over the host's libcurl (`dynload`); `http://`
   and `https://`.
@@ -294,6 +299,37 @@ key = PBKDF2-HMAC-SHA256(password = MagicString, salt, 100000, 32)
      gunzips it (`core/internal/cc/base/ftp/handler_ftp.go`). This is a wire
      requirement, not a convention: an uncompressed stream is rejected.
 
+### Stager cooperation
+
+A C agent delivered by `core/modules/stager_linux` can be masked in place while
+it sleeps. The agent is a shared object/PIC loaded into the stager's process, so
+there is no helper process or descriptor: the stager keeps its mask code in its
+own mapping and publishes the entry point in the GS state block it already
+installs. The agent reads that block once (`c2_stager_mask_bind`) and calls the
+function from its existing sleep cycle. The mask code makes every anonymous ELF
+image (the mapped agent and any decompressed copy malasada left behind)
+writable, XORs them with a fresh random key, sleeps, restores them, and returns
+to the agent.
+
+Mask providers live in `core/modules/stager_linux/mask_<name>.c` and are
+selected with `MASK=<name>` (`--mask` from the module build). The default
+`mask_xor.c` is the reference implementation; a provider only has to implement
+`stager_mask_sleep(unsigned seconds, uintptr_t probe)`.
+
+The stager can also carry the agent PIC itself instead of downloading it:
+build with `--payload-source local --payload-file <prebuilt PIC>`. That path
+embeds an RC4-encrypted copy of the PIC and compiles the downloader, its
+transports and the listener configuration out of the stager.
+
+The contract is deliberately small: the agent must join or stop every other
+thread before calling `c2_stager_masked_sleep`, because the stub masks the image
+in place on the caller's thread. The reference agent is single-threaded.
+
+In supervision mode the parent still caches the identity scalar across recycles
+(FD 100 in, FD 101 out; see [`include/agent_identity.h`](include/agent_identity.h)).
+A child that has no masker falls back to a clean exit so the parent can reclaim
+the whole process; with a masker it keeps running and masks instead.
+
 ## Hardening
 
 ### Recovering from faulty images
@@ -399,6 +435,10 @@ Implemented and tested in `src/`:
   key switch, tested over an in-memory stream with a deterministic stub AEAD.
   `c2_secureconn_read_msg` reads exactly one frame (one CBOR message).
 - `session.c` — the check-in / msg-tunnel / job loop over `c2_transport`.
+- `stager_iface.c` / `agent_identity.c` — cooperation with the stager sleep
+  mask and supervisor: read the mask entry point from the shared stager state
+  block, and restore/export the pinned identity scalar through FDs 100/101
+  across recycled lifecycles.
 - `src/transport/http_poll.c` — the shared malleable HTTP-poll state machine.
   It is paired with a selected transport: `transport_libcurl.c` (libcurl via
   `dynload`), `transport_http_raw.c` (libc TCP sockets), or

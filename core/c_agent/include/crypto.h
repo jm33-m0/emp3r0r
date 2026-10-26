@@ -79,6 +79,14 @@ typedef struct c2_crypto_backend {
                         uint8_t pub[C2_P256_PUB_BYTES]);
 
   /*
+   * Derive the P-256 public key X||Y for an existing 32-byte scalar. Used to
+   * restore the exact identity key cached by a supervising launcher; must
+   * reject zero/out-of-range scalars and the point at infinity.
+   */
+  int (*ec_p256_pub_from_priv)(void *ctx, const uint8_t priv[C2_P256_PRIV_BYTES],
+                               uint8_t pub[C2_P256_PUB_BYTES]);
+
+  /*
    * ECDSA P-256 over SHA-256(message), signature encoded as ASN.1 DER
    * SEQUENCE { INTEGER r, INTEGER s }. This is exactly what the C2 expects in
    * MsgAuth.AgentProof and MsgTunData.AgentUUIDSig (then base64url-encoded).

@@ -168,6 +168,40 @@ done:
   return ok ? 0 : -1;
 }
 
+static int mb_pub_from_priv(void *vctx,
+                            const uint8_t priv[C2_P256_PRIV_BYTES],
+                            uint8_t pub[C2_P256_PUB_BYTES]) {
+  mbedtls_ctx *c = (mbedtls_ctx *)vctx;
+  mbedtls_ecp_group grp;
+  mbedtls_mpi d;
+  mbedtls_ecp_point q;
+  uint8_t sec1[1 + C2_P256_PUB_BYTES];
+  size_t olen = 0;
+  mbedtls_mpi_init(&d);
+  mbedtls_ecp_point_init(&q);
+  if (load_p256(&grp) != 0)
+    return -1;
+  int ok = 0;
+  if (mbedtls_mpi_read_binary(&d, priv, C2_P256_PRIV_BYTES) != 0)
+    goto done;
+  if (mbedtls_ecp_check_privkey(&grp, &d) != 0)
+    goto done;
+  if (mbedtls_ecp_mul(&grp, &q, &d, &grp.G, mbedtls_ctr_drbg_random,
+                      &c->drbg) != 0)
+    goto done;
+  if (mbedtls_ecp_point_write_binary(&grp, &q, MBEDTLS_ECP_PF_UNCOMPRESSED,
+                                     &olen, sec1, sizeof(sec1)) != 0 ||
+      olen != sizeof(sec1))
+    goto done;
+  memcpy(pub, sec1 + 1, C2_P256_PUB_BYTES);
+  ok = 1;
+done:
+  mbedtls_ecp_point_free(&q);
+  mbedtls_mpi_free(&d);
+  mbedtls_ecp_group_free(&grp);
+  return ok ? 0 : -1;
+}
+
 static int mb_ecdh(void *vctx, const uint8_t priv[C2_P256_PRIV_BYTES],
                    const uint8_t peer_pub[C2_P256_PUB_BYTES],
                    uint8_t shared[C2_P256_COORD_BYTES]) {
@@ -306,6 +340,7 @@ c2_crypto_backend *c2_crypto_open(void) {
   be->pbkdf2_sha256 = mb_pbkdf2;
   be->ecdh_p256 = mb_ecdh;
   be->ec_p256_keygen = mb_keygen;
+  be->ec_p256_pub_from_priv = mb_pub_from_priv;
   be->ecdsa_p256_sign_der = mb_ecdsa_sign;
   be->ecdsa_p256_verify_der = mb_ecdsa_verify;
   return be;

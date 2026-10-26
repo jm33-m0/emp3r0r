@@ -128,6 +128,15 @@ static int stub_ec_keygen(void *ctx, uint8_t priv[C2_P256_PRIV_BYTES],
   return 0;
 }
 
+static int stub_pub_from_priv(void *ctx,
+                              const uint8_t priv[C2_P256_PRIV_BYTES],
+                              uint8_t pub[C2_P256_PUB_BYTES]) {
+  (void)ctx;
+  for (size_t i = 0; i < C2_P256_PUB_BYTES; i++)
+    pub[i] = (uint8_t)(priv[i % C2_P256_PRIV_BYTES] ^ (uint8_t)(i * 13u + 5u));
+  return 0;
+}
+
 static int stub_ecdh(void *ctx, const uint8_t priv[C2_P256_PRIV_BYTES],
                      const uint8_t peer_pub[C2_P256_PUB_BYTES],
                      uint8_t shared[C2_P256_COORD_BYTES]) {
@@ -161,6 +170,7 @@ void stub_crypto_init(c2_crypto_backend *be, uint32_t *rng_state) {
   be->pbkdf2_sha256 = stub_pbkdf2;
   be->hkdf_sha256 = stub_hkdf;
   be->ec_p256_keygen = stub_ec_keygen;
+  be->ec_p256_pub_from_priv = stub_pub_from_priv;
   be->ecdh_p256 = stub_ecdh;
   be->ecdsa_p256_sign_der = stub_sign;
 }

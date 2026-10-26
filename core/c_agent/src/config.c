@@ -157,6 +157,12 @@ c2_status c2_agent_config_decode(CborValue *r, c2_agent_config *cfg) {
       C2_CASE_INT32(C2_KEY_CFG_POLL_INTERVAL, cfg, poll_interval);
       C2_CASE_TEXT(C2_KEY_CFG_C2_CHANNEL_MODE, cfg, c2_channel_mode);
       C2_CASE_TEXT(C2_KEY_CFG_SNI, cfg, sni);
+    case C2_KEY_CFG_IS_RUN_BY_STAGER: {
+      int v = 0;
+      if ((st = c2_cbor_read_bool(&map, &v)) == C2_OK)
+        cfg->is_run_by_stager = v;
+      break;
+    }
     case C2_KEY_CFG_C2_ROUTES:
       st = decode_routes(&map, &cfg->routes);
       break;

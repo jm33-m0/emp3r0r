@@ -429,6 +429,43 @@ done:
   return ok ? 0 : -1;
 }
 
+static int os_pub_from_priv(void *vctx,
+                            const uint8_t priv[C2_P256_PRIV_BYTES],
+                            uint8_t pub[C2_P256_PUB_BYTES]) {
+  openssl_ctx *c = (openssl_ctx *)vctx;
+  EC_GROUP *group = c->EC_GROUP_new_by_curve_name(C2_NID_X9_62_PRIME256V1);
+  BN_CTX *bn = c->BN_CTX_new();
+  BIGNUM *d = NULL;
+  EC_POINT *p = NULL;
+  uint8_t sec1[1 + C2_P256_PUB_BYTES];
+  int ok = 0;
+  if (group == NULL || bn == NULL)
+    goto done;
+  d = c->BN_bin2bn(priv, C2_P256_PRIV_BYTES, NULL);
+  p = c->EC_POINT_new(group);
+  if (d == NULL || p == NULL)
+    goto done;
+  /* d == 0 (and any out-of-range value that reduces to zero) yields the point
+   * at infinity, which point2oct below rejects. */
+  if (c->EC_POINT_mul(group, p, d, NULL, NULL, bn) != 1)
+    goto done;
+  if (c->EC_POINT_point2oct(group, p, C2_POINT_CONVERSION_UNCOMPRESSED, sec1,
+                            sizeof(sec1), bn) != sizeof(sec1))
+    goto done;
+  memcpy(pub, sec1 + 1, C2_P256_PUB_BYTES);
+  ok = 1;
+done:
+  if (p)
+    c->EC_POINT_free(p);
+  if (d)
+    c->BN_free(d);
+  if (bn)
+    c->BN_CTX_free(bn);
+  if (group)
+    c->EC_GROUP_free(group);
+  return ok ? 0 : -1;
+}
+
 static int os_ecdh(void *vctx, const uint8_t priv[C2_P256_PRIV_BYTES],
                    const uint8_t peer_pub[C2_P256_PUB_BYTES],
                    uint8_t shared[C2_P256_COORD_BYTES]) {
@@ -602,6 +639,7 @@ c2_crypto_backend *c2_crypto_open(void) {
   be->pbkdf2_sha256 = os_pbkdf2;
   be->ecdh_p256 = os_ecdh;
   be->ec_p256_keygen = os_ec_keygen;
+  be->ec_p256_pub_from_priv = os_pub_from_priv;
   be->ecdsa_p256_sign_der = os_ecdsa_sign;
   be->ecdsa_p256_verify_der = os_ecdsa_verify;
   return be;

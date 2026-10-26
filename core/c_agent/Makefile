@@ -157,6 +157,24 @@ MINIZ_DEFS = -DMINIZ_NO_ARCHIVE_APIS -DMINIZ_NO_ARCHIVE_WRITING_APIS \
              -DMINIZ_NO_STDIO -DMINIZ_NO_ZLIB_APIS \
              -DMINIZ_NO_ZLIB_COMPATIBLE_NAMES
 
+# Optional BOF support. BOF=0 compiles out the COFF runner, its ELF loader and
+# the module-invocation parser; the corresponding command names then fall
+# through to the normal "unsupported command" reply.
+BOF ?= 1
+ifeq ($(BOF),1)
+  BOF_SRC = src/bof.c src/module.c src/util/elfload.c
+else
+  BOF_SRC =
+endif
+
+# DoH is implemented by the raw-socket transports and by libssl (which reuses
+# the raw HTTP helper). libcurl uses its native CURLOPT_DOH_URL support, so the
+# standalone resolver is not linked in that build.
+DOH_SRC ?=
+ifneq ($(TRANSPORT),libcurl)
+  DOH_SRC = src/util/doh.c
+endif
+
 EXTRA_SRC =
 EXTRA_LIBS =
 EXTRA_INCLUDES =
@@ -186,11 +204,11 @@ TINYCBOR_SRC = vendor/tinycbor/cborencoder.c \
 # Protocol layer plus the selected providers. util/strings.c / util/system.c /
 # util/net_utils.c are freestanding-only (they override libc) and are excluded.
 PORTABLE_SRC = src/util/rc4.c src/util/packer.c src/util/dynload.c src/util/dynload_hosted.c \
-               src/util/doh.c \
-               src/util/elfload.c src/util/debug.c src/common.c src/crypto.c \
+               src/util/debug.c src/common.c src/crypto.c \
                src/messages.c src/agent_info.c src/config.c \
                src/secureconn.c src/session.c src/memfile.c \
-               src/bof.c src/sysinfo.c src/module.c \
+               src/sysinfo.c src/agent_identity.c src/stager_iface.c \
+               $(BOF_SRC) $(DOH_SRC) \
                $(GZIP_SRC) $(CRYPTO_SRC) $(TRANSPORT_SRC) $(TRANSPORT_SUPPORT_SRC) \
                $(EXTRA_SRC)
 
@@ -243,17 +261,18 @@ CONFIG_SRC ?=
 # tinycbor translation units are never called by the agent. Dropping them by
 # name keeps the binary small even before --gc-sections.
 AGENT_COMMON_SRC = src/agent_args.c src/util/dynload.c src/util/dynload_hosted.c \
-                   src/util/doh.c src/util/elfload.c src/crypto.c src/messages.c \
+                   src/crypto.c src/messages.c \
                    src/agent_info.c src/config.c src/secureconn.c \
-                   src/session.c src/memfile.c src/bof.c \
-                   src/sysinfo.c src/module.c
+                   src/session.c src/memfile.c src/sysinfo.c \
+                   src/agent_identity.c src/stager_iface.c
 TINYCBOR_MIN_SRC = vendor/tinycbor/cborencoder.c vendor/tinycbor/cborparser.c
 
 AGENT_CONFIG_SRC =
 ifneq ($(strip $(CONFIG_SRC)),)
   AGENT_CONFIG_SRC = $(CONFIG_SRC)
 endif
-AGENT_SRC = $(AGENT_COMMON_SRC) $(GZIP_SRC) $(CRYPTO_SRC) $(TRANSPORT_SRC) $(TRANSPORT_SUPPORT_SRC) \
+AGENT_SRC = $(AGENT_COMMON_SRC) $(BOF_SRC) $(DOH_SRC) \
+            $(GZIP_SRC) $(CRYPTO_SRC) $(TRANSPORT_SRC) $(TRANSPORT_SUPPORT_SRC) \
             $(EXTRA_SRC) $(TINYCBOR_MIN_SRC) src/agent.c \
             $(AGENT_CONFIG_SRC)
 
@@ -261,7 +280,8 @@ AGENT_SRC = $(AGENT_COMMON_SRC) $(GZIP_SRC) $(CRYPTO_SRC) $(TRANSPORT_SRC) $(TRA
 # --gc-sections can drop what the agent never calls, no unwind tables, stripped
 # symbols, no build-id. -DNDEBUG drops assert machinery (and its __FILE__ and
 # message strings); the fuzzers keep asserts so an invariant violation is loud.
-AGENT_CFLAGS = -Os -DNDEBUG -ffunction-sections -fdata-sections -fno-ident \
+AGENT_CFLAGS = -Os -DNDEBUG -DC2_AGENT_ENABLE_BOF=$(BOF) \
+               -ffunction-sections -fdata-sections -fno-ident \
                -fno-asynchronous-unwind-tables -fno-unwind-tables \
                -fno-stack-protector -fvisibility=hidden
 AGENT_LDFLAGS = -Wl,--gc-sections -Wl,--build-id=none -Wl,-z,noexecstack -s
@@ -315,11 +335,13 @@ ifneq ($(wildcard $(BOF_MODULE_DIR)/loader_linux.c),)
 endif
 
 test: $(BUILD)/test_strings $(BUILD)/test_rc4 $(BUILD)/test_packer \
-      $(BUILD)/test_net_parse $(BUILD)/test_dynload \
+      $(BUILD)/test_net_parse $(BUILD)/test_dynload $(BUILD)/test_maps \
       $(BUILD)/test_auth $(BUILD)/test_messages \
       $(BUILD)/test_agent_info $(BUILD)/test_config $(BUILD)/test_doh \
       $(BUILD)/test_sysinfo $(BUILD)/test_module \
-      $(BUILD)/test_secureconn $(GZIP_TEST) $(BOF_TEST) \
+      $(BUILD)/test_secureconn $(BUILD)/test_identity \
+      $(BUILD)/test_stager_iface \
+      $(GZIP_TEST) $(BOF_TEST) \
       $(BUILD)/test_crypto_openssl
 	@set -e; for t in $^; do echo "--- $$t"; ./$$t; done
 
@@ -341,6 +363,9 @@ $(BUILD)/test_net_parse: tests/test_net_parse.c src/util/net_utils.c tests/test.
 
 $(BUILD)/test_dynload: tests/test_dynload.c src/util/dynload.c src/util/dynload_hosted.c tests/test.h | $(BUILD)
 	$(HOSTCC) $(TEST_CFLAGS) $< src/util/dynload.c src/util/dynload_hosted.c -o $@
+
+$(BUILD)/test_maps: tests/test_maps.c tests/test.h src/util/maps.c | $(BUILD)
+	$(HOSTCC) $(TEST_CFLAGS) $< src/util/maps.c -o $@
 
 C2_TEST_SRC = src/messages.c src/agent_info.c src/config.c \
               src/crypto.c src/common.c $(TINYCBOR_SRC)
@@ -445,6 +470,15 @@ $(BUILD)/test_memfile: tests/test_memfile.c tests/test.h \
 		$(GZIP_SRC) $(EXTRA_SRC) src/crypto.c src/common.c \
 		src/crypto/openssl.c src/util/dynload.c src/util/dynload_hosted.c -o $@
 
+$(BUILD)/test_identity: tests/test_identity.c tests/test.h src/agent_identity.c \
+                         $(STUB_SRC) | $(BUILD)
+	$(HOSTCC) $(TEST_CFLAGS) -Itests tests/test_identity.c src/agent_identity.c \
+		$(STUB_SRC) -o $@
+
+$(BUILD)/test_stager_iface: tests/test_stager_iface.c tests/test.h \
+                              src/stager_iface.c | $(BUILD)
+	$(HOSTCC) $(TEST_CFLAGS) tests/test_stager_iface.c src/stager_iface.c -o $@
+
 $(BUILD)/test_sysinfo: tests/test_sysinfo.c tests/test.h \
                           src/sysinfo.c src/memfile.c \
                           src/messages.c src/agent_info.c \
@@ -500,6 +534,7 @@ fuzz: $(BUILD)/fuzz_rc4 $(BUILD)/fuzz_packer $(BUILD)/fuzz_inet_aton \
       $(BUILD)/fuzz_command_args $(BUILD)/fuzz_http_poll \
       $(BUILD)/fuzz_secureconn $(BUILD)/fuzz_text $(BUILD)/fuzz_encdec \
       $(GZIP_FUZZ) $(BOF_FUZZ) $(BUILD)/fuzz_dynload $(BUILD)/fuzz_maps \
+      $(BUILD)/fuzz_mask_maps \
       $(BUILD)/fuzz_module $(BUILD)/fuzz_strings $(BUILD)/fuzz_elfload \
       $(BUILD)/fuzz_doh $(BUILD)/fuzz_http_raw
 	@set -e; mkdir -p $(BUILD)/crash; \
@@ -586,6 +621,9 @@ $(BUILD)/fuzz_dynload: fuzz/fuzz_dynload.c $(FUZZ_DRIVER) src/util/dynload.c fuz
 
 $(BUILD)/fuzz_maps: fuzz/fuzz_maps.c $(FUZZ_DRIVER) src/util/dynload.c fuzz/fuzz_common.h | $(BUILD)
 	$(HOSTCC) $(FUZZ_CFLAGS) $< $(FUZZ_DRIVER) src/util/dynload.c -o $@
+
+$(BUILD)/fuzz_mask_maps: fuzz/fuzz_mask_maps.c $(FUZZ_DRIVER) src/util/maps.c fuzz/fuzz_common.h | $(BUILD)
+	$(HOSTCC) $(FUZZ_CFLAGS) $< $(FUZZ_DRIVER) src/util/maps.c -o $@
 
 $(BUILD)/fuzz_module: fuzz/fuzz_module.c $(FUZZ_DRIVER) src/module.c \
                       src/common.c $(TINYCBOR_SRC) fuzz/fuzz_common.h | $(BUILD)

@@ -123,6 +123,14 @@ static void test_p256(c2_crypto_backend *be) {
   CHECK(memcmp(a_priv, b_priv, sizeof(a_priv)) != 0);
   CHECK(memcmp(a_pub, b_pub, sizeof(a_pub)) != 0);
 
+  /* Restoring a cached scalar must reproduce the exact public key. */
+  uint8_t a_pub2[C2_P256_PUB_BYTES];
+  CHECK_EQ_LONG(be->ec_p256_pub_from_priv(be->ctx, a_priv, a_pub2), 0);
+  CHECK_BYTES(a_pub, a_pub2, sizeof(a_pub));
+  uint8_t zero_priv[C2_P256_PRIV_BYTES];
+  memset(zero_priv, 0, sizeof(zero_priv));
+  CHECK(be->ec_p256_pub_from_priv(be->ctx, zero_priv, a_pub2) != 0);
+
   /* ECDH must be symmetric. */
   uint8_t ab[C2_P256_COORD_BYTES], ba[C2_P256_COORD_BYTES];
   CHECK_EQ_LONG(be->ecdh_p256(be->ctx, a_priv, b_pub, ab), 0);
