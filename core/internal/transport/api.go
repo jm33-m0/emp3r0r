@@ -30,10 +30,10 @@ const (
 	OperatorSendCommand = OperatorRoot + "/send_command"
 	// OperatorForgetAgent
 	OperatorForgetAgent = OperatorRoot + "/forget_agent"
-	// OperatorGetCA
-	OperatorGetCA = OperatorRoot + "/get_ca"
 	// OperatorSignAgent
 	OperatorSignAgent = OperatorRoot + "/sign_agent"
+	// OperatorEnsureCert adds names to the C2 TLS certificate and reloads it
+	OperatorEnsureCert = OperatorRoot + "/ensure_cert"
 	// OperatorRegisterFTPStream
 	OperatorRegisterFTPStream = OperatorRoot + "/register_ftp_stream"
 	// OperatorUnregisterFTPStream

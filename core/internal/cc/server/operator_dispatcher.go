@@ -54,10 +54,10 @@ func operationDispatcher(w http.ResponseWriter, r *http.Request) {
 		handleUpdateOperatorIdleConfig(w, r)
 	case transport.OperatorResume:
 		handleResumeOperator(w, r)
-	case transport.OperatorGetCA:
-		handleGetCA(w, r)
 	case transport.OperatorSignAgent:
 		handleSignAgent(w, r)
+	case transport.OperatorEnsureCert:
+		handleEnsureCert(w, r)
 	case transport.OperatorSocks5Start:
 		handleSocks5Start(w, r)
 	case transport.OperatorSocks5Stop:

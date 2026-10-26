@@ -238,3 +238,26 @@ func TestInitConfig_KCP(t *testing.T) {
 		t.Errorf("KCP def.CCAddress mismatch: got %s, want %s", def.CCAddress, expectedCCAddr)
 	}
 }
+
+func TestInitConfig_ExplicitTLSURL(t *testing.T) {
+	// An explicit https URL is how http_poll goes through a TLS-terminating
+	// front proxy or the C2 TLS frontend. It must not be rewritten to http.
+	RuntimeConfig = &def.Config{}
+	def.CCAddress = ""
+
+	cfg := &def.Config{
+		CCAddress:     "https://front.example.com:443",
+		C2ChannelMode: def.C2ChannelModePlainHTTP,
+	}
+
+	cborData, _ := cbor.Marshal(cfg)
+	encryptedData, _ := crypto.AES_GCM_Encrypt([]byte(def.MagicString), cborData)
+	def.AgentConfig = encryptedData
+
+	if err := InitConfig(); err != nil {
+		t.Fatalf("InitConfig failed: %v", err)
+	}
+	if want := "https://front.example.com:443"; def.CCAddress != want {
+		t.Errorf("explicit TLS def.CCAddress = %q, want %q", def.CCAddress, want)
+	}
+}

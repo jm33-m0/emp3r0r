@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -202,8 +203,13 @@ func readJSONConfig(jsonData []byte, cfg *def.Config) error {
 	}
 	def.NormalizeC2Routes(&cfg.C2Routes)
 
-	// The stored address is host-only; the transport layer expects a URL.
-	def.CCAddress = fmt.Sprintf("https://%s", cfg.CCAddress)
+	// The stored address is normally host-only, but an explicit URL is kept so
+	// front-proxy/TLS deployments can carry scheme and port through.
+	if strings.Contains(cfg.CCAddress, "://") {
+		def.CCAddress = cfg.CCAddress
+	} else {
+		def.CCAddress = fmt.Sprintf("https://%s", cfg.CCAddress)
+	}
 
 	return nil
 }

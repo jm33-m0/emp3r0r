@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -232,35 +233,76 @@ func InitCertsAndConfig() error {
 	return nil
 }
 
+// c2CertMu serializes certificate generation/reload. GenCerts writes the
+// certificate and key as two files, so a concurrent reader must never observe
+// a half-written pair.
+var c2CertMu sync.Mutex
+
+// GenC2Certs ensures the C2 TLS certificate covers hosts_str. It preserves the
+// existing SANs, adds the requested names plus localhost, regenerates only when
+// the set changes, and reloads the in-process certificate used by TLS/QUIC
+// handshakes. It is used both at startup and by the operator certificate API.
 func GenC2Certs(hosts_str string) error {
-	// generate C2 TLS cert for given host names
-	var hosts []string
-	hosts = strings.Fields(hosts_str)
+	c2CertMu.Lock()
+	defer c2CertMu.Unlock()
 
-	// Check if certs exist
-	if util.IsFileExist(transport.ServerCrtFile) && util.IsFileExist(transport.ServerKeyFile) {
-		logging.Infof("C2 certs already exist, skipping generation")
-		return nil
-	}
-
-	// if C2 server TLS cert not found, generate new ones
-	logging.Warningf("C2 TLS cert not found, generating a new one")
-	hosts = append(hosts, def.Localhost) // sometimes we need to connect to a relay that listens on localhost
-	hosts = append(hosts, "localhost")   // sometimes we need to connect to a relay that listens on localhost
-
-	// validate host names
-	for _, host := range hosts {
+	requested := make([]string, 0)
+	for _, host := range strings.Fields(hosts_str) {
+		host = strings.ToLower(strings.TrimSpace(host))
+		if host == "" {
+			continue
+		}
 		if !netutil.ValidateHostName(host) {
 			return fmt.Errorf("invalid host name: %s", host)
 		}
+		requested = append(requested, host)
 	}
 
-	// generate C2 TLS cert
-	_, certErr := transport.GenCerts(hosts, transport.ServerCrtFile, transport.ServerKeyFile, transport.CaKeyFile, transport.CaCrtFile, false)
-	if certErr != nil {
+	certExists := util.IsFileExist(transport.ServerCrtFile) && util.IsFileExist(transport.ServerKeyFile)
+	existing := transport.NamesInCert(transport.ServerCrtFile)
+
+	seen := make(map[string]struct{}, len(existing)+len(requested)+2)
+	hosts := make([]string, 0, len(existing)+len(requested)+2)
+	changed := !certExists
+	add := func(host string) {
+		host = strings.ToLower(strings.TrimSpace(host))
+		if host == "" {
+			return
+		}
+		if _, ok := seen[host]; ok {
+			return
+		}
+		seen[host] = struct{}{}
+		hosts = append(hosts, host)
+	}
+	for _, host := range existing {
+		add(host)
+	}
+	for _, host := range requested {
+		if _, ok := seen[host]; !ok {
+			changed = true
+		}
+		add(host)
+	}
+	for _, host := range []string{def.Localhost, "localhost"} {
+		if _, ok := seen[host]; !ok {
+			changed = true
+		}
+		add(host)
+	}
+
+	if !changed {
+		return transport.ReloadServerTLSCert()
+	}
+	logging.Warningf("Updating C2 TLS certificate for %v", hosts)
+	if _, certErr := transport.GenCerts(hosts, transport.ServerCrtFile, transport.ServerKeyFile,
+		transport.CaKeyFile, transport.CaCrtFile, false); certErr != nil {
 		return fmt.Errorf("generating C2 TLS cert: %v", certErr)
 	}
-
+	if err := transport.ReloadServerTLSCert(); err != nil {
+		return fmt.Errorf("reloading C2 TLS certificate: %w", err)
+	}
+	logging.Successf("C2 TLS certificate updated for %v", hosts)
 	return nil
 }
 

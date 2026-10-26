@@ -25,6 +25,12 @@ type SignRequest struct {
 	Content []byte `cbor:"1,keyasint"` // content to sign (usually UUID)
 }
 
+// EnsureCertRequest asks the C2 to add host names to its TLS certificate and
+// reload the certificate used by new TLS/QUIC handshakes.
+type EnsureCertRequest struct {
+	Hosts []string `cbor:"1,keyasint"`
+}
+
 // OperatorIdleConfig updates server-side operator-idle settings.
 type OperatorIdleConfig struct {
 	OperatorIdleTimeout int `cbor:"1,keyasint"` // seconds; 0 disables idle-based rejection

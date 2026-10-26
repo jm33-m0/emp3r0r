@@ -17,6 +17,25 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
+// c2AddressHost extracts the hostname the server certificate must cover from
+// either a bare host or a full http(s) URL.
+func c2AddressHost(addr string) string {
+	if u, err := url.Parse(addr); err == nil && u.Hostname() != "" {
+		return u.Hostname()
+	}
+	return addr
+}
+
+// c2BaseURL returns the URL agents use for the selected channel. An explicit
+// URL (including scheme and port) wins; otherwise the host and the channel's
+// default port are combined.
+func c2BaseURL(addr, scheme, port string) string {
+	if u, err := url.Parse(addr); err == nil && u.Scheme != "" && u.Host != "" {
+		return strings.TrimSuffix(addr, "/")
+	}
+	return fmt.Sprintf("%s://%s:%s", scheme, addr, port)
+}
+
 // AgentConfig represents the options provided by a user (via CLI, Web UI, API)
 // to generate a new agent configuration payload.
 type AgentConfig struct {
@@ -66,23 +85,24 @@ func MakeConfig(opts AgentConfig) error {
 		live.RuntimeConfig.CCAddress = *opts.CCAddress
 	}
 	live.RuntimeConfig.CCAddress = strings.TrimSuffix(live.RuntimeConfig.CCAddress, "/")
+	ccHost := c2AddressHost(live.RuntimeConfig.CCAddress)
 	logging.Infof("C2 server name: %s", live.RuntimeConfig.CCAddress)
 	existingNames := transport.NamesInCert(transport.ServerCrtFile)
 
-	if !slices.Contains(existingNames, live.RuntimeConfig.CCAddress) && live.RuntimeConfig.CCAddress != "" {
-		logging.Warningf("Name '%s' is not covered by our server cert, fetching new certs from server", live.RuntimeConfig.CCAddress)
+	if !slices.Contains(existingNames, ccHost) && ccHost != "" {
+		logging.Warningf("Name '%s' is not covered by our server cert, updating it on the C2", ccHost)
 
-		certs, err := client.GetCerts()
+		certs, err := client.EnsureCerts([]string{ccHost})
 		if err != nil {
-			return fmt.Errorf("failed to get certs from server: %v", err)
+			return fmt.Errorf("failed to update C2 certificate for %s: %w", ccHost, err)
 		}
 
-		// Save certs
+		// Save the updated CA/server certificate bundle locally.
 		if err := os.WriteFile(transport.CaCrtFile, certs["ca_crt"], 0o644); err != nil {
-			return fmt.Errorf("failed to save CA cert: %v", err)
+			return fmt.Errorf("failed to save CA cert: %w", err)
 		}
 		if err := os.WriteFile(transport.ServerCrtFile, certs["server_crt"], 0o644); err != nil {
-			return fmt.Errorf("failed to save Server cert: %v", err)
+			return fmt.Errorf("failed to save Server cert: %w", err)
 		}
 	}
 
@@ -179,26 +199,26 @@ func MakeConfig(opts AgentConfig) error {
 	// modes lack a TLS/TCP C2 endpoint, so preflight is served on the HTTP port
 	// for them; every other mode also has the h2 TLS listener.
 	plainPreflight := live.RuntimeConfig.C2ChannelMode == def.C2ChannelModePlainHTTP || live.RuntimeConfig.C2ChannelMode == def.C2ChannelModeQUIC
+	preflightScheme := "https"
+	preflightPort := live.RuntimeConfig.CCH2Port
+	if plainPreflight {
+		preflightScheme = "http"
+		preflightPort = live.RuntimeConfig.CCHTTPPort
+	}
+	preflightBase := c2BaseURL(live.RuntimeConfig.CCAddress, preflightScheme, preflightPort)
 	if live.RuntimeConfig.PreflightURL == "" {
 		// generate new if empty
-		if plainPreflight {
-			live.RuntimeConfig.PreflightURL = fmt.Sprintf("http://%s:%s/%s", live.RuntimeConfig.CCAddress, live.RuntimeConfig.CCHTTPPort, util.RandStr(util.RandInt(5, 10)))
-		} else {
-			live.RuntimeConfig.PreflightURL = fmt.Sprintf("https://%s:%s/%s", live.RuntimeConfig.CCAddress, live.RuntimeConfig.CCH2Port, util.RandStr(util.RandInt(5, 10)))
-		}
-	} else {
+		live.RuntimeConfig.PreflightURL = fmt.Sprintf("%s/%s", strings.TrimSuffix(preflightBase, "/"), util.RandStr(util.RandInt(5, 10)))
+	} else if u, err := url.Parse(live.RuntimeConfig.PreflightURL); err == nil {
 		// synchronise host and port with CCAddress
-		u, err := url.Parse(live.RuntimeConfig.PreflightURL)
-		if err == nil {
-			if plainPreflight {
-				u.Host = fmt.Sprintf("%s:%s", live.RuntimeConfig.CCAddress, live.RuntimeConfig.CCHTTPPort)
-				u.Scheme = "http"
-			} else {
-				u.Host = fmt.Sprintf("%s:%s", live.RuntimeConfig.CCAddress, live.RuntimeConfig.CCH2Port)
-				u.Scheme = "https"
-			}
-			live.RuntimeConfig.PreflightURL = u.String()
+		if cc, ccErr := url.Parse(live.RuntimeConfig.CCAddress); ccErr == nil && cc.Scheme != "" && cc.Host != "" {
+			u.Scheme = cc.Scheme
+			u.Host = cc.Host
+		} else {
+			u.Scheme = preflightScheme
+			u.Host = fmt.Sprintf("%s:%s", live.RuntimeConfig.CCAddress, preflightPort)
 		}
+		live.RuntimeConfig.PreflightURL = u.String()
 	}
 	if live.RuntimeConfig.PreflightIntervalMin == 0 {
 		live.RuntimeConfig.PreflightIntervalMin = util.RandInt(30, 120)

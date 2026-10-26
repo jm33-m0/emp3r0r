@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,7 +17,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/wireguard"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
-	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -495,50 +493,6 @@ func handleUnregisterFTPStream(wrt http.ResponseWriter, req *http.Request) {
 	wrt.WriteHeader(http.StatusOK)
 }
 
-func handleGetCA(wrt http.ResponseWriter, req *http.Request) {
-	defer func() {
-		if r := recover(); r != nil {
-			logging.Errorf("handleGetCA panicked: %v", r)
-			http.Error(wrt, "Internal server error", http.StatusInternalServerError)
-		}
-	}()
-	if _, ok := requireOperatorIdentity(wrt, req); !ok {
-		return
-	}
-	caData, err := os.ReadFile(transport.CaCrtFile)
-	if err != nil {
-		logging.Errorf("Failed to read CA cert: %v", err)
-		http.Error(wrt, "Failed to read CA cert", http.StatusInternalServerError)
-		return
-	}
-
-	serverCrtData, err := os.ReadFile(transport.ServerCrtFile)
-	if err != nil {
-		logging.Errorf("Failed to read Server cert: %v", err)
-		http.Error(wrt, "Failed to read Server cert", http.StatusInternalServerError)
-		return
-	}
-
-	resp := map[string][]byte{
-		"ca_crt":     caData,
-		"server_crt": serverCrtData,
-	}
-
-	data, err := cbor.Marshal(resp)
-	if err != nil {
-		logging.Errorf("Failed to marshal certs: %v", err)
-		http.Error(wrt, "Failed to marshal response", http.StatusInternalServerError)
-		return
-	}
-
-	wrt.Header().Set("Content-Type", "application/cbor")
-	wrt.WriteHeader(http.StatusOK)
-	wrt.Write(data)
-}
-
-// readOperatorTunnel decodes and dispatches operator relay frames until the
-// connection fails or ctx is cancelled. It is shared by the websocket operator
-// handler and RegisterOperatorConn.
 func readOperatorTunnel(ctx context.Context, conn net.Conn, session string) {
 	decoder := cbor.NewDecoder(conn)
 	for {

