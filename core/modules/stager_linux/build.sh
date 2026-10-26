@@ -208,4 +208,16 @@ make "$MAKE_TARGET" $DEBUG_FLAG \
   SUPERVISE_SLEEP_MIN="$SUPERVISE_SLEEP_MIN" \
   SUPERVISE_SLEEP_MAX="$SUPERVISE_SLEEP_MAX"
 
+case "$MAKE_TARGET" in
+raw) ARTIFACT="stager.bin" ;;
+executable) ARTIFACT="stager" ;;
+so) ARTIFACT="stager.so" ;;
+packed) ARTIFACT="stager-packed.bin" ;;
+esac
+if [[ ! -f "$ARTIFACT" ]]; then
+  echo "[-] build finished without producing $ARTIFACT" >&2
+  exit 1
+fi
+
 echo "[+] Stager build complete."
+printf '[+] generated payload: %s (%s bytes)\n' "$(pwd)/$ARTIFACT" "$(wc -c <"$ARTIFACT" | tr -d '[:space:]')"

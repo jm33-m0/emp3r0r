@@ -74,7 +74,8 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 	result := res.BuildResult
 	logging.Infof("Generated agent UUID: %s", util.AgentRef(result.AgentUUID))
 	logging.Debugf("Config payload: %d bytes", result.ConfigSize)
-	logging.Successf("Generated %s from %s and %s", result.OutputFile, result.StubFile, live.EmpConfigFile)
+	logging.Successf("Generated %s (%d bytes) from %s and %s",
+		result.OutputFile, util.FileSize(result.OutputFile), result.StubFile, live.EmpConfigFile)
 	logging.Infof("Agent transport: %s", generatedAgentTransport())
 
 	if live.RuntimeConfig.IsP2PEnabled {
@@ -95,7 +96,7 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 	if res.ShellcodeErr != nil {
 		logging.Warningf("%v", res.ShellcodeErr)
 	} else if res.ShellcodeFile != "" {
-		logging.Infof("Converted %s into shellcode at %s", result.OutputFile, res.ShellcodeFile)
+		logging.Successf("Generated shellcode: %s (%d bytes)", res.ShellcodeFile, util.FileSize(res.ShellcodeFile))
 		if payloadType == builder.PayloadTypeLinuxSO {
 			logging.Infof("Look into stager module to deliver this shellcode")
 		}

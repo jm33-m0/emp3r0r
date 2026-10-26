@@ -105,7 +105,7 @@ func CmdGenerateCAgent(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	logging.Successf("Generated C agent: %s", res.OutputFile)
+	logging.Successf("Generated C agent: %s (%d bytes)", res.OutputFile, util.FileSize(res.OutputFile))
 	logging.Infof("C agent UUID: %s", util.AgentRef(res.AgentUUID))
 	logging.Infof("Config payload: %d bytes, encrypted with the C2 MagicString", res.ConfigSize)
 	endpoint := cAgentEndpoint(live.RuntimeConfig.CCAddress, live.RuntimeConfig.CCHTTPPort)

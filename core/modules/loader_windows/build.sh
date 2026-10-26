@@ -496,7 +496,7 @@ fi
 
 cp "$BUILT" "$OUTPUT_ABS"
 SIZE="$(wc -c <"$OUTPUT_ABS" | tr -d '[:space:]')"
-echo "[+] wrote $OUTPUT_ABS ($SIZE bytes)"
+echo "[+] generated payload: $OUTPUT_ABS ($SIZE bytes)"
 if command -v sha256sum >/dev/null 2>&1; then
   echo "    sha256: $(sha256sum "$OUTPUT_ABS" | awk '{print $1}')"
 elif command -v shasum >/dev/null 2>&1; then

@@ -54,6 +54,7 @@ func moduleCustom(ctx *c2context.C2Context) {
 				return
 			}
 			logging.Infof("Module output:\n%s", out)
+			logGeneratedPayloads(out)
 		}
 		logging.Infof("%s will run as a plugin on C2, no files will be executed on target", config.Name)
 		return
@@ -96,6 +97,7 @@ func moduleCustom(ctx *c2context.C2Context) {
 			return
 		}
 		logging.Infof("Module output:\n%s", out)
+		logGeneratedPayloads(out)
 	} else if moduleFilesMissing(config) && util.IsFileExist(filepath.Join(config.Path, "make_all.sh")) {
 		logging.Infof("Building missing payloads for %s...", config.Name)
 		out, err := build_make_all(config)
@@ -104,6 +106,7 @@ func moduleCustom(ctx *c2context.C2Context) {
 			return
 		}
 		logging.Infof("Module output:\n%s", out)
+		logGeneratedPayloads(out)
 	}
 
 	// Every agent module runs in memory; there is no on-disk/fork-and-run
@@ -202,6 +205,30 @@ func build_module(config *def.ModuleConfig, flags map[string]string) (out []byte
 	}
 
 	return out, err
+}
+
+// generatedPayloadMarker is the stable line module build scripts use to report
+// the artifact they produced. The path and byte count are included verbatim so
+// the operator sees exactly what was written.
+const generatedPayloadMarker = "[+] generated payload: "
+
+// generatedPayloadLines extracts the payload summaries from a module build log.
+func generatedPayloadLines(out []byte) []string {
+	var payloads []string
+	for _, line := range strings.Split(string(out), "\n") {
+		if payload, ok := strings.CutPrefix(strings.TrimSpace(line), generatedPayloadMarker); ok && payload != "" {
+			payloads = append(payloads, payload)
+		}
+	}
+	return payloads
+}
+
+// logGeneratedPayloads highlights the artifact paths and sizes reported by a
+// module build. The raw build output above it remains available for details.
+func logGeneratedPayloads(out []byte) {
+	for _, payload := range generatedPayloadLines(out) {
+		logging.Successf("Generated payload: %s", payload)
+	}
 }
 
 // shellQuote quotes a value for safe interpolation into a POSIX shell command.
