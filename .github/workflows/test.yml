@@ -59,6 +59,11 @@ jobs:
           sudo mv "zig-x86_64-linux-${ZIG_VERSION}" /usr/local/zig
           sudo ln -sf /usr/local/zig/zig /usr/local/bin/zig
 
+      - name: Run C agent unit tests
+        if: runner.os == 'Linux'
+        working-directory: ./core/c_agent
+        run: make test
+
       - name: Run tests (Linux, with race & coverage)
         if: runner.os == 'Linux'
         working-directory: ./core
@@ -106,16 +111,34 @@ jobs:
           # (default full feature set), so both must use the same feature tags.
           cd test && go test -v -tags "$BUILD_TAGS" -count=1 -timeout 3m -run TestAgentEndToEndLifecycle
 
+      - name: Run stager payload embedding and sleep-mask e2e tests
+        if: runner.os == 'Linux'
+        working-directory: ./core/modules/stager_linux
+        env:
+          CGO_ENABLED: 1
+        run: |
+          # TestEmbedPayloadHeader checks the randomized local payload header.
+          # TestCAgentSleepMask runs the C agent through a locally embedded
+          # stager, lets its first check-in fail so it enters the sleep mask,
+          # then inspects the process while the mask is active.
+          cd test && go test -v -tags "$BUILD_TAGS" -count=1 -timeout 6m \
+            -run 'TestEmbedPayloadHeader|TestCAgentSleepMask'
+
+      - name: Run stager sleep-mask stub test
+        if: runner.os == 'Linux'
+        working-directory: ./core/modules/stager_linux
+        run: make test-mask
+
       - name: Run C agent end-to-end test (cgo, no race)
         if: runner.os == 'Linux'
         working-directory: ./core/modules/stager_linux
         env:
           CGO_ENABLED: 1
         run: |
-          # Builds core/c_agent's reference agent in both deliverable formats
-          # (executable and malasada raw PIC; system libcrypto and libcurl are
-          # resolved with dlopen) and drives each against the real C2: check-in,
-          # a live command round-trip and the BOF path.
+          # Builds core/c_agent's reference agent as an executable, malasada
+          # raw PIC, and locally embedded stager PIC (raw/exe/so); system
+          # libcrypto and libcurl are resolved with dlopen. Each form must
+          # check in, run commands and execute a BOF against the real C2.
           cd test && go test -v -tags "$BUILD_TAGS" -count=1 -timeout 5m -run TestCAgentEndToEnd
 
       # A musl agent can only be exercised on a real musl host. Keep the job on
