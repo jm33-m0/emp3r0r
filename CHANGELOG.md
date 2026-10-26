@@ -1,5 +1,16 @@
 # Changelog
 
+## [5.4.1](https://github.com/jm33-m0/emp3r0r/compare/v5.4.0...v5.4.1) (2026-10-26)
+
+
+### Bug Fixes
+
+* **c2:** non-http transports are not started automatically ([73f6bc5](https://github.com/jm33-m0/emp3r0r/commit/73f6bc5bb05ee6afccfd566dba8e9f4eff06f547))
+* **c2:** renew TLS certificates and support explicit https C2 URLs ([a9b1924](https://github.com/jm33-m0/emp3r0r/commit/a9b1924b5db3ae36a0f352c9d0d0db5dfe9a7b39))
+* **c2:** serve h2conn and http_poll from the TLS frontend ([32e037b](https://github.com/jm33-m0/emp3r0r/commit/32e037bbc4ca004c715c589a8b867ad617f91f5e))
+* **operator:** document transport ports and add generate completions ([c13b339](https://github.com/jm33-m0/emp3r0r/commit/c13b3393603f6eec2ec67fb8a37fbe9c1e787061))
+* **shell:** restore shell prompt to display useful info ([edcf263](https://github.com/jm33-m0/emp3r0r/commit/edcf26374f8612cfc5806945efddbed7f6486024))
+
 ## [5.4.0](https://github.com/jm33-m0/emp3r0r/compare/v5.3.0...v5.4.0) (2026-10-25)
 
 

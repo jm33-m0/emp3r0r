@@ -34,7 +34,7 @@ var (
 
 // Version is the release version. release-please (release-type: go) updates
 // this exact declaration, so keep the `const Version = "x.y.z"` form.
-const Version = "5.4.0"
+const Version = "5.4.1"
 
 // BuildVersion is the version a running binary reports: the release version
 // plus the build timestamp, injected at build time with -ldflags -X. The zero
