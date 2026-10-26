@@ -22,6 +22,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/reeflective/console"
 )
 
@@ -169,37 +170,132 @@ func highLighter(line []rune) string {
 	return highlightedStr.String()
 }
 
-// SetDynamicPrompt set prompt with target and working-directory info
+const (
+	promptRawLimit  = 2048 // cap hostile metadata before sanitizing it
+	promptUserLimit = 96
+	promptHostLimit = 128
+	promptCWDLimit  = 256
+	promptUnknown   = "unknown"
+)
+
+// promptClean bounds and sanitizes one agent-controlled value for display.
+// Agent metadata is hostile: it must never carry terminal escapes, control
+// bytes, or unbounded text into the operator console.
+func promptClean(value string, limit int) string {
+	if len(value) > promptRawLimit {
+		value = value[:promptRawLimit]
+	}
+	clean := util.SanitizeOneLine(value)
+	if limit <= 0 {
+		return clean
+	}
+	runes := []rune(clean)
+	if len(runes) > limit {
+		clean = string(runes[:limit]) + "..."
+	}
+	return clean
+}
+
+// promptAgentUser extracts the account/domain portion of the verbose user
+// metadata ("NAME (home), uid=..., gid=..."). On Windows NAME is normally
+// DOMAIN\user, so the domain is displayed with the account.
+func promptAgentUser(agent *def.Emp3r0rAgent) string {
+	if agent == nil {
+		return promptUnknown
+	}
+	raw := promptClean(agent.User, promptRawLimit)
+	if raw != "" && !strings.HasPrefix(strings.ToLower(raw), "not available") {
+		fields := strings.Fields(raw)
+		if len(fields) > 0 {
+			name := strings.TrimSuffix(strings.Trim(fields[0], "()[],"), ",")
+			if name != "" {
+				return promptClean(name, promptUserLimit)
+			}
+		}
+	}
+
+	// Fallback to Name ("host/user" or "host/DOMAIN/user"). The part after
+	// the first separator keeps the domain when the agent reported one.
+	name := promptClean(agent.Name, promptRawLimit)
+	if i := strings.IndexAny(name, "/\\"); i >= 0 && i+1 < len(name) {
+		if user := promptClean(name[i+1:], promptUserLimit); user != "" {
+			return user
+		}
+	}
+	return promptUnknown
+}
+
+// promptAgentHost returns the target hostname, falling back to the first
+// component of Name when Hostname is absent.
+func promptAgentHost(agent *def.Emp3r0rAgent) string {
+	if agent == nil {
+		return promptUnknown
+	}
+	if host := promptClean(agent.Hostname, promptHostLimit); host != "" {
+		return host
+	}
+	name := promptClean(agent.Name, promptRawLimit)
+	if i := strings.IndexAny(name, "/\\"); i > 0 {
+		if host := promptClean(name[:i], promptHostLimit); host != "" {
+			return host
+		}
+	}
+	return promptUnknown
+}
+
+func promptAgentCWD(agent *def.Emp3r0rAgent) string {
+	if agent == nil {
+		return promptUnknown
+	}
+	if cwd := promptClean(agent.CWD, promptCWDLimit); cwd != "" {
+		return cwd
+	}
+	return promptUnknown
+}
+
+// promptAgentTag accepts only the C2-derived identifier shape. An invalid tag
+// must never reach the console, even if a future trust boundary regresses.
+func promptAgentTag(agent *def.Emp3r0rAgent) string {
+	if agent != nil && util.IsAgentID(agent.Tag) {
+		return agent.Tag
+	}
+	return promptUnknown
+}
+
+// promptAgentIdentity returns sanitized user, host, and cwd components.
+func promptAgentIdentity(agent *def.Emp3r0rAgent) (user, host, cwd string) {
+	return promptAgentUser(agent), promptAgentHost(agent), promptAgentCWD(agent)
+}
+
+// SetDynamicPrompt set prompt with target and working-directory info.
+// Every agent-derived component is sanitized and bounded before it is placed
+// in the prompt; none of it is interpreted as a command or format string.
 func SetDynamicPrompt() string {
 	shortName := "local" // if no target is selected
 	prompt_arrow := color.New(color.Bold, color.FgHiCyan).Sprintf("\n$ ")
 	prompt_name := color.New(color.Bold, color.FgBlack, color.BgHiWhite).Sprint(AppName)
 	transport := color.New(color.FgRed).Sprint("local")
-	cwd := color.New(color.FgHiBlue).Sprint("cwd:local")
+	target := color.New(color.FgHiBlue).Sprint("cwd:local")
 
 	if active := live.GetActiveAgent(); active != nil {
-		// The prompt shows the unified short identifier; the human-readable
-		// name is available in the agent list and completions.
-		shortName = active.Tag
+		shortName = promptAgentTag(active)
 		if active.HasRoot {
-			prompt_arrow = color.New(color.Bold, color.FgHiGreen).Sprint("\n# ")
+			prompt_arrow = color.New(color.Bold, color.FgHiGreen).Sprintf("\n# ")
 			prompt_name = color.New(color.Bold, color.FgBlack, color.BgHiGreen).Sprint(AppName)
 		}
 		transport = getTransport(active.Transport)
-		if active.CWD != "" {
-			cwd = color.New(color.FgHiBlue).Sprint(active.CWD)
-		} else {
-			cwd = color.New(color.FgHiBlue).Sprint("cwd:unknown")
-		}
+		user, host, cwd := promptAgentIdentity(active)
+		identity := color.New(color.FgCyan).Sprintf("%s@%s", user, host)
+		target = identity + ":" + color.New(color.FgHiBlue).Sprint(cwd)
 	}
 	agent_name := color.New(color.FgCyan, color.Underline).Sprint(shortName)
 
 	dynamicPrompt := fmt.Sprintf(
-		"%s - %s @%s (%s) "+prompt_arrow,
+		"%s - %s @%s %s "+prompt_arrow,
 		prompt_name,
 		transport,
 		agent_name,
-		cwd,
+		target,
 	)
 	return dynamicPrompt
 }
