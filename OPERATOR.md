@@ -337,6 +337,25 @@ always built with every tag and start every compiled listener (`http_poll`,
 agent flavour. `c2_channel_mode` only selects the default used for generated
 agents; it does not disable the other listeners.
 
+The TLS listener on the C2 port is a frontend: it terminates TLS once and routes
+requests by the malleable http_poll session header to the polling backend, and
+sessionless `POST` streams to h2conn. This means `http_poll` can use HTTPS either
+directly against the C2 TLS port or through an nginx/CDN that terminates TLS.
+For a TLS-terminating front proxy, pass an explicit URL to `generate --cc`
+(for example `--cc https://front.example.com`); the scheme is preserved and the
+agent negotiates TLS transparently. If the name is not covered by the C2 TLS
+certificate, generation asks the server to add it to the certificate and reload
+the certificate used by new TLS/QUIC handshakes.
+
+Port summary:
+
+| Listener                            | Transport                              |
+| ----------------------------------- | -------------------------------------- |
+| `cc_http_port` / `CCHTTPPort` (TCP) | plain HTTP `http_poll`                 |
+| `CCH2Port` (TCP)                    | TLS frontend: `h2conn` and `http_poll` |
+| `CCH2Port` (UDP)                    | QUIC                                   |
+| P2P relay port (UDP)                | KCP tunnel into the TLS frontend       |
+
 #### QUIC transport
 
 The QUIC channel is a byte stream over UDP whose datagrams are obfuscated with a

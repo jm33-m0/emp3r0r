@@ -2,6 +2,7 @@ package operator
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/carapace-sh/carapace"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
@@ -22,12 +23,25 @@ func gen_c_cmd() *cobra.Command {
 		GroupID: "agent",
 		Short:   "Generate the native C agent",
 		Example: "generate_c --type glibc --arch amd64 --cc your.domain.com",
-		Run:     CmdGenerateCAgent,
+		Long: `Generate the native C agent.
+
+The C agent implements http_poll only. With a bare --cc hostname it dials the
+plain HTTP listener on --cc-http-port. With an explicit https:// URL it uses
+TLS through the C2 TLS frontend or an external TLS front proxy. TLS requires
+--transport libcurl (default) or --transport libssl; http_raw is plain HTTP
+only. If the C2 certificate does not cover the new name, the server adds it
+there and reloads the certificate for new TLS/QUIC handshakes.
+
+Examples:
+  generate_c --cc c2.example.com --type glibc --arch amd64
+  generate_c --cc https://front.example.com --type glibc --arch amd64 --transport libssl
+  generate_c --cc https://c2.example.com:8443 --type glibc --arch amd64 --transport libcurl`,
+		Run: CmdGenerateCAgent,
 	}
 
 	cmd.Flags().StringP("type", "t", builder.CAgentLibcs[0], fmt.Sprintf("C library variant, available: %v", builder.CAgentLibcs))
 	cmd.Flags().StringP("arch", "a", builder.CAgentArches[0], fmt.Sprintf("Target architecture, available: %v", builder.CAgentArches))
-	cmd.Flags().String("cc", defaultC2Address(), "C2 server address (Required)")
+	cmd.Flags().String("cc", defaultC2Address(), "C2 hostname, or an explicit http(s) URL for TLS (Required)")
 	cmd.Flags().String("cc-http-port", live.RuntimeConfig.CCHTTPPort, "Port for HTTP Polling/Beaconing C2 transport")
 	cmd.Flags().String("doh", "", "DNS over HTTPS resolver URL. Example: https://1.1.1.1/dns-query")
 
@@ -43,7 +57,9 @@ func gen_c_cmd() *cobra.Command {
 	carapace.Gen(cmd).FlagCompletion(carapace.ActionMap{
 		"type":          carapace.ActionValues(builder.CAgentLibcs...),
 		"arch":          carapace.ActionValues(builder.CAgentArches...),
-		"cc":            carapace.ActionValues(),
+		"cc":            carapace.ActionValues(c2AddressCompletions()...),
+		"cc-http-port":  carapace.ActionValues(c2PortCompletions()...),
+		"doh":           carapace.ActionValues("https://1.1.1.1/dns-query", "https://8.8.8.8/dns-query", "https://9.9.9.9/dns-query"),
 		"crypto":        carapace.ActionValues(builder.CAgentCryptoProviders...),
 		"format":        carapace.ActionValues(builder.CAgentFormats...),
 		"gzip":          carapace.ActionValues(builder.CAgentGzipProviders...),
@@ -89,6 +105,12 @@ func CmdGenerateCAgent(cmd *cobra.Command, _ []string) {
 	logging.Successf("Generated C agent: %s", res.OutputFile)
 	logging.Infof("C agent UUID: %s", util.AgentRef(res.AgentUUID))
 	logging.Infof("Config payload: %d bytes, encrypted with the C2 MagicString", res.ConfigSize)
+	endpoint := cAgentEndpoint(live.RuntimeConfig.CCAddress, live.RuntimeConfig.CCHTTPPort)
+	logging.Infof("C agent transport: channel=http_poll transport=%s endpoint=%s",
+		providers.Transport, endpoint)
+	if strings.HasPrefix(endpoint, "https://") && providers.Transport == "http_raw" {
+		logging.Warningf("http_raw does not support TLS; use --transport libcurl or --transport libssl")
+	}
 }
 
 func flagString(cmd *cobra.Command, name string) string {
@@ -105,4 +127,14 @@ func cAgentDynloadForLibc(libc, dynload string, dynloadSet bool) string {
 		return "public"
 	}
 	return dynload
+}
+
+// cAgentEndpoint describes the URL baked into the C agent. An explicit URL
+// carries its own scheme and port; a bare host uses the plain HTTP port.
+func cAgentEndpoint(cc, httpPort string) string {
+	cc = strings.TrimSuffix(cc, "/")
+	if strings.Contains(cc, "://") {
+		return cc
+	}
+	return fmt.Sprintf("http://%s:%s", cc, httpPort)
 }

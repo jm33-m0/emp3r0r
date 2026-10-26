@@ -596,8 +596,32 @@ func gen_agent_cmd() *cobra.Command {
 		Use:     "generate",
 		GroupID: "agent",
 		Short:   "Generate an agent binary or implant",
-		Example: "generate --type linux_executable --arch amd64",
-		Run:     CmdGenerateAgent,
+		Example: "generate --cc c2.example.com --type linux_executable --arch amd64",
+		Long: `Generate a Go agent payload.
+
+Choose how the agent reaches the C2:
+  http_poll  Plain HTTP polling (default). The agent dials --cc-http-port
+             (CCHTTPPort). With an explicit https URL it uses TLS through the
+             TLS frontend or an external TLS front proxy.
+  h2conn     HTTP/2 duplex over TLS. The agent dials CCH2Port, the TLS frontend.
+             That frontend also accepts http_poll over TLS.
+  quic       QUIC over UDP. The agent dials CCH2Port on UDP.
+  --kcp      Carry the selected TLS transport through the KCP relay port.
+
+The C2 starts every compiled listener automatically: http_poll, the TLS
+frontend (h2conn + http_poll), QUIC, and KCP. Use --cc with a bare hostname to
+use CCHTTPPort for http_poll and CCH2Port for h2conn/quic. To use a TLS
+front proxy (nginx, CDN, or the C2 TLS frontend directly), pass an explicit URL
+such as --cc https://front.example.com; the scheme and port are preserved and
+TLS is negotiated transparently. If the C2 certificate does not cover the new
+name, the server adds it there, reloads the certificate for new TLS/QUIC
+handshakes, and returns the updated certificate to the generator.
+
+Examples:
+  generate --cc c2.example.com --type linux_executable --arch amd64
+  generate --cc c2.example.com --type linux_executable --arch amd64 --c2-channel-mode h2conn
+  generate --cc https://front.example.com --type linux_executable --arch amd64`,
+		Run: CmdGenerateAgent,
 	}
 
 	// Helper to add flags to groups
@@ -613,9 +637,7 @@ func gen_agent_cmd() *cobra.Command {
 	addFlagToGroup("Payload & Target Options", "type", "arch")
 
 	// Group 2: C2 Connectivity & Transport
-	cc_hosts := transport.NamesInCert(transport.ServerCrtFile)
-
-	genAgentCmd.Flags().StringP("cc", "", defaultC2Address(), "C2 server address (Required)")
+	genAgentCmd.Flags().StringP("cc", "", defaultC2Address(), "C2 hostname, or an explicit http(s) URL for a TLS front proxy (Required)")
 	genAgentCmd.Flags().StringP("c2-channel-mode", "", def.C2ChannelModeDefault, fmt.Sprintf("Agent C2 channel wrapper mode; the server listens on every compiled transport. Available: %s", strings.Join(transport.AllC2ChannelModesDetailed(), ";")))
 	genAgentCmd.Flags().BoolP("quic-standard-key", "", false, "QUIC mode only: disable the custom static-key datagram obfuscation and speak stock QUIC (interoperable with HTTP/3 endpoints, but exposes the Initial/ClientHello to observers)")
 	genAgentCmd.Flags().StringP("cc-http-port", "", live.RuntimeConfig.CCHTTPPort, "Port for HTTP Polling/Beaconing C2 transport")
@@ -652,7 +674,9 @@ func gen_agent_cmd() *cobra.Command {
 
 	// Help Template for flag grouping
 	genAgentCmd.SetHelpTemplate(`{{.Short}}
-
+{{if .Long}}
+{{.Long}}
+{{end}}
 Usage:
   {{.CommandPath}} [flags]
 
@@ -741,7 +765,8 @@ Example:
 	carapace.Gen(genAgentCmd).FlagCompletion(carapace.ActionMap{
 		"type":            carapace.ActionValues(builder.PayloadTypeList...),
 		"arch":            carapace.ActionValues(builder.ArchListAll...),
-		"cc":              carapace.ActionValues(cc_hosts...),
+		"cc":              carapace.ActionValues(c2AddressCompletions()...),
+		"cc-http-port":    carapace.ActionValues(c2PortCompletions()...),
 		"cdn":             carapace.ActionValues("wss://", "ws://"),
 		"doh":             carapace.ActionValues("https://1.1.1.1/dns-query", "https://8.8.8.8/dns-query", "https://9.9.9.9/dns-query"),
 		"ech":             carapace.ActionValues(),

@@ -3,10 +3,13 @@ package operator
 import (
 	"bytes"
 	"context"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/reeflective/console"
 	"github.com/spf13/cobra"
 )
@@ -85,5 +88,70 @@ func TestConsoleMenuMismatchFix(t *testing.T) {
 
 	if !executed {
 		t.Error("Test command was not executed; the active menu did not resolve the commands")
+	}
+}
+
+func TestGenerateCommandsDocumentTransportPorts(t *testing.T) {
+	generate := gen_agent_cmd()
+	for _, want := range []string{
+		"http_poll", "h2conn", "quic",
+		"CCHTTPPort", "CCH2Port",
+		"https://front.example.com",
+		"--cc-http-port",
+	} {
+		if !strings.Contains(generate.Long, want) {
+			t.Errorf("generate help does not mention %q", want)
+		}
+	}
+
+	generateC := gen_c_cmd()
+	for _, want := range []string{"http_poll", "--cc-http-port", "https://", "libssl", "libcurl"} {
+		if !strings.Contains(generateC.Long, want) {
+			t.Errorf("generate_c help does not mention %q", want)
+		}
+	}
+}
+
+func TestCAgentEndpointPreservesTLSURL(t *testing.T) {
+	if got := cAgentEndpoint("https://front.example.com:8443/", "8080"); got != "https://front.example.com:8443" {
+		t.Fatalf("cAgentEndpoint(TLS URL) = %q", got)
+	}
+	if got := cAgentEndpoint("c2.example.com", "8080"); got != "http://c2.example.com:8080" {
+		t.Fatalf("cAgentEndpoint(host) = %q", got)
+	}
+}
+
+func TestC2AddressAndPortCompletions(t *testing.T) {
+	previous := live.RuntimeConfig
+	live.RuntimeConfig = &def.Config{
+		CCAddress:  "c2.example.com",
+		CCHTTPPort: "8080",
+		CCH2Port:   "8443",
+	}
+	t.Cleanup(func() { live.RuntimeConfig = previous })
+
+	addresses := c2AddressCompletions()
+	for _, want := range []string{
+		"c2.example.com",
+		"https://c2.example.com",
+		"http://c2.example.com",
+		"https://c2.example.com:8443",
+		"http://c2.example.com:8080",
+	} {
+		if !slices.Contains(addresses, want) {
+			t.Errorf("c2AddressCompletions() missing %q: %v", want, addresses)
+		}
+	}
+
+	ports := c2PortCompletions()
+	for _, want := range []string{"8080", "8443", "443"} {
+		if !slices.Contains(ports, want) {
+			t.Errorf("c2PortCompletions() missing %q: %v", want, ports)
+		}
+	}
+
+	live.RuntimeConfig.CCAddress = "https://front.example.com"
+	if got := c2AddressCompletions(); !slices.Contains(got, "https://front.example.com") {
+		t.Errorf("c2AddressCompletions() did not preserve explicit URL: %v", got)
 	}
 }

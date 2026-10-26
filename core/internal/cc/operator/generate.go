@@ -1,8 +1,12 @@
 package operator
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/builder"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -71,6 +75,7 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 	logging.Infof("Generated agent UUID: %s", util.AgentRef(result.AgentUUID))
 	logging.Debugf("Config payload: %d bytes", result.ConfigSize)
 	logging.Successf("Generated %s from %s and %s", result.OutputFile, result.StubFile, live.EmpConfigFile)
+	logging.Infof("Agent transport: %s", generatedAgentTransport())
 
 	if live.RuntimeConfig.IsP2PEnabled {
 		logging.Successf("P2P Mesh Configured for Agent:")
@@ -119,4 +124,31 @@ func getStringSliceOptPtr(cmd *cobra.Command, name string) *[]string {
 		return &val
 	}
 	return nil
+}
+
+// generatedAgentTransport describes the endpoint baked into a generated Go
+// agent, including the port that channel actually dials.
+func generatedAgentTransport() string {
+	mode := live.RuntimeConfig.C2ChannelMode
+	if mode == "" {
+		mode = def.C2ChannelModeDefault
+	}
+	addr := strings.TrimSuffix(live.RuntimeConfig.CCAddress, "/")
+	explicitURL := strings.Contains(addr, "://")
+
+	var endpoint string
+	switch {
+	case live.RuntimeConfig.UseKCP:
+		endpoint = fmt.Sprintf("KCP relay %s:%s", addr, live.RuntimeConfig.P2PRelayPort)
+	case explicitURL:
+		endpoint = addr
+	case mode == def.C2ChannelModePlainHTTP:
+		endpoint = fmt.Sprintf("http://%s:%s", addr, live.RuntimeConfig.CCHTTPPort)
+	case mode == def.C2ChannelModeQUIC:
+		endpoint = fmt.Sprintf("%s:%s/UDP", addr, live.RuntimeConfig.CCH2Port)
+	default:
+		endpoint = fmt.Sprintf("https://%s:%s", addr, live.RuntimeConfig.CCH2Port)
+	}
+
+	return fmt.Sprintf("channel=%s endpoint=%s", mode, endpoint)
 }
