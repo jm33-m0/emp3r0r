@@ -245,8 +245,6 @@ c2_status c2_msgtun_encode(CborEncoder *w, const c2_msgtun *m) {
     pairs++;
   if (m->ephem_public_key.len)
     pairs++;
-  if (m->peer_list.count)
-    pairs++;
 
   CborEncoder map;
   c2_status st = c2_cbor_ec(cbor_encoder_create_map(w, &map, pairs));
@@ -279,10 +277,6 @@ c2_status c2_msgtun_encode(CborEncoder *w, const c2_msgtun *m) {
       (st = c2_cbor_write_bytes(&map, C2_KEY_TUN_EPHEM_PUBLIC,
                                 m->ephem_public_key)) != C2_OK)
     return st;
-  if (m->peer_list.count &&
-      (st = c2_cbor_write_str_list(&map, C2_KEY_TUN_PEER_LIST,
-                                   &m->peer_list)) != C2_OK)
-    return st;
   return c2_cbor_ec(cbor_encoder_close_container(w, &map));
 }
 
@@ -310,7 +304,12 @@ c2_status c2_msgtun_decode(CborValue *r, c2_msgtun *m) {
       C2_CASE_TEXT(C2_KEY_TUN_AGENT_UUID, m, agent_uuid);
       C2_CASE_TEXT(C2_KEY_TUN_AGENT_UUID_SIG, m, agent_uuid_sig);
       C2_CASE_BYTES(C2_KEY_TUN_EPHEM_PUBLIC, m, ephem_public_key);
-      C2_CASE_STR_LIST(C2_KEY_TUN_PEER_LIST, m, peer_list);
+    case C2_KEY_TUN_ENRICHED_PEER_LIST:
+      if (m->enriched_peer_list)
+        st = c2_enriched_peer_list_decode(&map, m->enriched_peer_list);
+      else
+        st = c2_cbor_map_skip(&map);
+      break;
     default:
       st = c2_cbor_map_skip(&map);
       break;

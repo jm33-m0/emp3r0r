@@ -330,14 +330,13 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 					// This ensures the layout is encrypted with the ephemeral session key and
 					// we are talking to a successfully authenticated agent.
 					if pfsEstablished {
-						enrichedList, peerList, collectErr := collectEnrichedPeerList()
+						enrichedList, collectErr := collectEnrichedPeerList()
 						if collectErr != nil {
 							logging.Warningf("handleMessageTunnel: collectEnrichedPeerList for %s: %v", agent.Name, collectErr)
 						}
-						if len(peerList) > 0 || enrichedList != nil {
+						if enrichedList != nil {
 							peerMsg := def.MsgTunData{
 								Tag:              def.TagPeerList,
-								PeerList:         peerList,
 								EnrichedPeerList: enrichedList,
 							}
 							if err := encoder.Encode(peerMsg); err != nil {

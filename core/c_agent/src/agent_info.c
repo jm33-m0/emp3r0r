@@ -414,9 +414,6 @@ c2_status c2_enriched_peer_list_decode(CborValue *r, c2_enriched_peer_list *l) {
       st = c2_cbor_dc(cbor_value_leave_container(&map, &arr));
       break;
     }
-    case C2_KEY_PEER_LIST_SIGNATURE:
-      st = c2_cbor_read_bytes(&map, &l->signature);
-      break;
     default:
       st = c2_cbor_map_skip(&map);
       break;

@@ -261,11 +261,11 @@ int main(void) {
     CHECK(c2_agent_token_decode(NULL, &t) == C2_ERR_ARG);
   }
 
-  /* EnrichedPeerList with two peers and a signature. */
+  /* EnrichedPeerList with two peers. */
   {
     CborEncoder e, m, arr;
     cbor_encoder_init(&e, buf, sizeof(buf), 0);
-    CHECK(cbor_encoder_create_map(&e, &m, 2) == CborNoError);
+    CHECK(cbor_encoder_create_map(&e, &m, 1) == CborNoError);
     CHECK(cbor_encode_uint(&m, C2_KEY_PEER_LIST_PEERS) == CborNoError);
     CHECK(cbor_encoder_create_array(&m, &arr, 2) == CborNoError);
     for (int i = 0; i < 2; i++) {
@@ -279,9 +279,6 @@ int main(void) {
       CHECK(cbor_encoder_close_container(&arr, &pm) == CborNoError);
     }
     CHECK(cbor_encoder_close_container(&m, &arr) == CborNoError);
-    CHECK(cbor_encode_uint(&m, C2_KEY_PEER_LIST_SIGNATURE) == CborNoError);
-    CHECK(cbor_encode_byte_string(&m, (const uint8_t *)"sig", 3) ==
-          CborNoError);
     CHECK(cbor_encoder_close_container(&e, &m) == CborNoError);
     size_t n = cbor_encoder_get_buffer_size(&e, buf);
 
@@ -302,7 +299,6 @@ int main(void) {
     CHECK(c2_str_equal(l.peers[0].uuid, "peer1"));
     CHECK(c2_str_equal(l.peers[1].uuid, "peer2"));
     CHECK_EQ_LONG(l.peers[1].last_seen, 1700000001);
-    CHECK_EQ_LONG(l.signature.len, 3);
   }
 
   /* Peers = CBOR null (Go nil slice) decodes as an empty list. */

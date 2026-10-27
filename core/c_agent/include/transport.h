@@ -222,9 +222,8 @@ typedef struct {
    * valid until the next c2_session_read. */
   uint8_t *rxbuf;
   size_t rxcap;
-  /* Backing storage for the decoded command/peer string lists. */
+  /* Backing storage for the decoded command string list. */
   c2_str rx_cmd_items[C2_SESSION_LIST_MAX];
-  c2_str rx_peer_items[C2_SESSION_LIST_MAX];
 } c2_agent_session;
 
 /*

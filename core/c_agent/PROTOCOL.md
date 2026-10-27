@@ -102,7 +102,7 @@ matching on the server is trimmed + case-insensitive.
 | ------------------------------ | ------------- | -------------------------------------------------- |
 | `checkin-ok`                   | C2 → agent    | check-in accepted (the ACK)                        |
 | `handshake`                    | C2 → agent    | hello reply, carries server ephemeral public key   |
-| `peer_list`                    | C2 → agent    | `MsgTunData.PeerList` / `EnrichedPeerList` push    |
+| `peer_list`                    | C2 → agent    | `MsgTunData.EnrichedPeerList` push                 |
 | `agent_token`                  | C2 → agent    | CBOR `AgentToken` push (mesh router authorization) |
 | `ftp_relay_data:<token>` etc.  | C2 ↔ operator | operator-tunnel relay frames (not agent wire)      |
 | `proxy_relay_*`, `www_relay_*` | C2 ↔ operator | operator-tunnel relay frames (not agent wire)      |
@@ -372,11 +372,11 @@ The universal agent↔C2 message.
 | 6   | `AgentUUID`        | text          | agent identity                                                       |
 | 7   | `AgentUUIDSig`     | text          | base64url(agent-key signature over `AgentUUID`)                      |
 | 8   | `EphemPublicKey`   | bytes         | agent ephemeral P-256 pubkey on the first hello                      |
-| 9   | `PeerList`         | array of text | C2 push: gossip peers                                                |
-| 10  | `EnrichedPeerList` | map           | C2 push: CA-signed enriched peers                                    |
+| 10  | `EnrichedPeerList` | map           | C2 push: peers (see §7.4; key 9 retired)                             |
 
-Field 9/10 are delivered inside a `peer_list` tagged message; field 10 is the
-`EnrichedPeerList` structure in §7.4.
+Field 10 is delivered inside a `peer_list` tagged message and is the
+`EnrichedPeerList` structure in §7.4. It is authenticated by the PFS tunnel and
+carries no separate signature.
 
 ### 7.2 `Emp3r0rAgent` (check-in body)
 
@@ -443,10 +443,9 @@ Pushed as `agent_token` after PFS is established.
 
 Pushed as `peer_list` after PFS is established.
 
-| Key | Name        | Type                                          |
-| --- | ----------- | --------------------------------------------- |
-| 1   | `Peers`     | array of `EnrichedPeer`                       |
-| 2   | `Signature` | bytes (CA signature over the CBOR of `Peers`) |
+| Key | Name        | Type                          |
+| --- | ----------- | ----------------------------- |
+| 1   | `Peers`     | array of `EnrichedPeer`       |
 
 `EnrichedPeer`:
 

@@ -26,23 +26,19 @@ static c2_status dec_auth(const uint8_t *buf, size_t len, c2_msgauth *m) {
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   uint8_t buf[8192];
 
-  c2_str cmds1[4], peers1[4];
+  c2_str cmds1[4];
   c2_msgtun t1 = {0};
   t1.cmd_slice.items = cmds1;
   t1.cmd_slice.cap = 4;
-  t1.peer_list.items = peers1;
-  t1.peer_list.cap = 4;
   if (dec_tun(data, size, &t1) == C2_OK) {
     CborEncoder enc;
     cbor_encoder_init(&enc, buf, sizeof(buf), 0);
     if (c2_msgtun_encode(&enc, &t1) == C2_OK) {
       size_t n = cbor_encoder_get_buffer_size(&enc, buf);
-      c2_str cmds2[4], peers2[4];
+      c2_str cmds2[4];
       c2_msgtun t2 = {0};
       t2.cmd_slice.items = cmds2;
       t2.cmd_slice.cap = 4;
-      t2.peer_list.items = peers2;
-      t2.peer_list.cap = 4;
       (void)dec_tun(buf, n, &t2);
     }
   }

@@ -51,7 +51,7 @@ type Emp3r0rAgent struct {
 	OfflineGrace   int           `cbor:"44,keyasint"` // agent-chosen removal grace in seconds; 0 means remove immediately
 }
 
-// EnrichedPeer holds detailed peer information signed by C2
+// EnrichedPeer holds detailed peer information pushed by C2.
 type EnrichedPeer struct {
 	UUID           string   `cbor:"1,keyasint"`
 	IPs            []string `cbor:"2,keyasint"`
@@ -63,10 +63,11 @@ type EnrichedPeer struct {
 	P2PTransport   string   `cbor:"8,keyasint"` // transport the peer's relay listens on
 }
 
-// EnrichedPeerList represents the C2 CA-signed list of active peers
+// EnrichedPeerList is the C2-provided list of active peers. The payload is
+// authenticated by the PFS-encrypted tunnel, so it does not carry a separate
+// CA signature.
 type EnrichedPeerList struct {
-	Peers     []EnrichedPeer `cbor:"1,keyasint"`
-	Signature []byte         `cbor:"2,keyasint"` // CA signature over CBOR of Peers
+	Peers []EnrichedPeer `cbor:"1,keyasint"`
 }
 
 // AgentProcess process info of our agent
@@ -88,8 +89,7 @@ type MsgTunData struct {
 	AgentUUID        string            `cbor:"6,keyasint"`  // agent UUID for robust identification
 	AgentUUIDSig     string            `cbor:"7,keyasint"`  // agent UUID signature for verification
 	EphemPublicKey   []byte            `cbor:"8,keyasint"`  // ephemeral public key for ECDH key exchange
-	PeerList         []string          `cbor:"9,keyasint"`  // pushed by CC to help with discovery
-	EnrichedPeerList *EnrichedPeerList `cbor:"10,keyasint"` // C2 CA-signed enriched peer list
+	EnrichedPeerList *EnrichedPeerList `cbor:"10,keyasint"` // C2-provided peer list
 }
 
 // TokenEntry is one entry of a !list_tokens response, marshaled as CBOR by

@@ -12,9 +12,8 @@ static const char kMsgauthHex[] =
     "0f656e6f6e636510826663322d6d736763626f66116763484a7662325912440102030413"
     "6673747265616d1401";
 static const char kMsgtunHex[] =
-    "aa01656a6f622d31028267216c735f646972642f746d700344deadbeef04646162636405"
-    "600669757569642d31323334076463326c6e08440908070609826831302e302e302e3168"
-    "31302e302e302e320af6";
+    "a901656a6f622d31028267216c735f646972642f746d700344deadbeef0464616263"
+    "6405600669757569642d31323334076463326c6e0844090807060af6";
 
 static size_t unhex(const char *hex, uint8_t *out, size_t cap) {
   long n = c2_hex_decode(hex, strlen(hex), out, cap);
@@ -98,12 +97,9 @@ int main(void) {
     uint8_t enc[256];
     size_t enc_len = unhex(kMsgtunHex, enc, sizeof(enc));
     c2_str cmds[4];
-    c2_str peers[4];
     c2_msgtun m = {0};
     m.cmd_slice.items = cmds;
     m.cmd_slice.cap = 4;
-    m.peer_list.items = peers;
-    m.peer_list.cap = 4;
     CHECK(decode_msgtun(enc, enc_len, &m) == C2_OK);
     CHECK(c2_str_equal(m.job_id, "job-1"));
     CHECK_EQ_LONG(m.cmd_slice.count, 2);
@@ -117,15 +113,12 @@ int main(void) {
     CHECK(c2_str_equal(m.agent_uuid_sig, "c2ln"));
     CHECK_EQ_LONG(m.ephem_public_key.len, 4);
     CHECK(m.ephem_public_key.ptr[0] == 9);
-    CHECK_EQ_LONG(m.peer_list.count, 2);
-    CHECK(c2_str_equal(m.peer_list.items[1], "10.0.0.2"));
     CHECK(m.enriched_peer_list == NULL);
   }
 
   /* MsgTunData: encode then decode round-trip (no null field 10). */
   {
     c2_str cmds[1] = {c2_str_lit("!stat")};
-    c2_str peers[1] = {c2_str_lit("10.0.0.9")};
     c2_msgtun m = {0};
     m.job_id = c2_str_lit("job-2");
     m.cmd_slice.items = cmds;
@@ -136,26 +129,19 @@ int main(void) {
     m.agent_uuid = c2_str_lit("uuid-1234");
     m.agent_uuid_sig = c2_str_lit("c2ln");
     m.ephem_public_key = c2_bytes_of("\x09\x08\x07\x06", 4);
-    m.peer_list.items = peers;
-    m.peer_list.count = 1;
-    m.peer_list.cap = 1;
 
     CborEncoder enc;
     cbor_encoder_init(&enc, buf, sizeof(buf), 0);
     CHECK(c2_msgtun_encode(&enc, &m) == C2_OK);
     size_t n = cbor_encoder_get_buffer_size(&enc, buf);
 
-    c2_str dcmds[2], dpeers[2];
+    c2_str dcmds[2];
     c2_msgtun d = {0};
     d.cmd_slice.items = dcmds;
     d.cmd_slice.cap = 2;
-    d.peer_list.items = dpeers;
-    d.peer_list.cap = 2;
     CHECK(decode_msgtun(buf, n, &d) == C2_OK);
     CHECK(c2_str_equal(d.job_id, "job-2"));
     CHECK(d.response.len == 2 && d.response.ptr[0] == 'o');
-    CHECK_EQ_LONG(d.peer_list.count, 1);
-    CHECK(c2_str_equal(d.peer_list.items[0], "10.0.0.9"));
     CHECK(!c2_msgtun_is_hello(&d));
 
     /* A hello has an empty response and a non-empty command slice. */
@@ -165,6 +151,40 @@ int main(void) {
     hello.cmd_slice.count = 1;
     hello.cmd_slice.cap = 1;
     CHECK(c2_msgtun_is_hello(&hello));
+  }
+
+  /* MsgTunData: the enriched peer list decodes through the envelope. */
+  {
+    CborEncoder e, m, list, arr, pm;
+    cbor_encoder_init(&e, buf, sizeof(buf), 0);
+    CHECK(cbor_encoder_create_map(&e, &m, 1) == CborNoError);
+    CHECK(cbor_encode_uint(&m, C2_KEY_TUN_ENRICHED_PEER_LIST) == CborNoError);
+    CHECK(cbor_encoder_create_map(&m, &list, 1) == CborNoError);
+    CHECK(cbor_encode_uint(&list, C2_KEY_PEER_LIST_PEERS) == CborNoError);
+    CHECK(cbor_encoder_create_array(&list, &arr, 1) == CborNoError);
+    CHECK(cbor_encoder_create_map(&arr, &pm, 1) == CborNoError);
+    CHECK(cbor_encode_uint(&pm, C2_KEY_PEER_UUID) == CborNoError);
+    CHECK(cbor_encode_text_stringz(&pm, "peer1") == CborNoError);
+    CHECK(cbor_encoder_close_container(&arr, &pm) == CborNoError);
+    CHECK(cbor_encoder_close_container(&list, &arr) == CborNoError);
+    CHECK(cbor_encoder_close_container(&m, &list) == CborNoError);
+    CHECK(cbor_encoder_close_container(&e, &m) == CborNoError);
+    size_t n = cbor_encoder_get_buffer_size(&e, buf);
+
+    c2_enriched_peer peers[1] = {0};
+    c2_str ips[1][2], files[1][2];
+    peers[0].ips.items = ips[0];
+    peers[0].ips.cap = 2;
+    peers[0].files.items = files[0];
+    peers[0].files.cap = 2;
+    c2_enriched_peer_list list_out = {0};
+    list_out.peers = peers;
+    list_out.cap = 1;
+    c2_msgtun msg = {0};
+    msg.enriched_peer_list = &list_out;
+    CHECK(decode_msgtun(buf, n, &msg) == C2_OK);
+    CHECK_EQ_LONG(list_out.count, 1);
+    CHECK(c2_str_equal(peers[0].uuid, "peer1"));
   }
 
   /* Unknown keys are skipped, not rejected. */

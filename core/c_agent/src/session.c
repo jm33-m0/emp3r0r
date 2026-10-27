@@ -437,15 +437,11 @@ c2_status c2_session_read(c2_agent_session *s, c2_secureconn *msg,
   if (eof)
     return C2_ERR_IO; /* tunnel closed; the caller reconnects */
 
-  /* Give the decoder session-owned list storage so a job or peer push does not
+  /* Give the decoder session-owned list storage so a job response does not
    * fail just because the caller zeroed its c2_msgtun. */
   if (out->cmd_slice.items == NULL) {
     out->cmd_slice.items = s->rx_cmd_items;
     out->cmd_slice.cap = C2_SESSION_LIST_MAX;
-  }
-  if (out->peer_list.items == NULL) {
-    out->peer_list.items = s->rx_peer_items;
-    out->peer_list.cap = C2_SESSION_LIST_MAX;
   }
 
   CborParser p;

@@ -78,7 +78,7 @@ c2_status c2_msgauth_encode(CborEncoder *w, const c2_msgauth *m);
 c2_status c2_msgauth_decode(CborValue *r, c2_msgauth *m);
 
 /* ------------------------------------------------------------------------- */
-/* MsgTunData (CBOR keys 1..10)                                               */
+/* MsgTunData (CBOR keys 1..8, 10; key 9 retired)                          */
 /* ------------------------------------------------------------------------- */
 
 enum {
@@ -90,8 +90,7 @@ enum {
   C2_KEY_TUN_AGENT_UUID = 6,          /* text                               */
   C2_KEY_TUN_AGENT_UUID_SIG = 7,      /* text base64url(agent key sig)      */
   C2_KEY_TUN_EPHEM_PUBLIC = 8,        /* bytes agent ephemeral X||Y         */
-  C2_KEY_TUN_PEER_LIST = 9,           /* array of text                      */
-  C2_KEY_TUN_ENRICHED_PEER_LIST = 10, /* map (EnrichedPeerList)         */
+  C2_KEY_TUN_ENRICHED_PEER_LIST = 10, /* map (EnrichedPeerList)             */
 };
 
 typedef struct c2_enriched_peer c2_enriched_peer;
@@ -100,7 +99,6 @@ typedef struct {
   c2_enriched_peer *peers;
   size_t count;
   size_t cap;
-  c2_bytes signature;
 } c2_enriched_peer_list;
 
 typedef struct {
@@ -112,7 +110,6 @@ typedef struct {
   c2_str agent_uuid;
   c2_str agent_uuid_sig;
   c2_bytes ephem_public_key;
-  c2_str_list peer_list;
   c2_enriched_peer_list *enriched_peer_list; /* NULL when absent */
 } c2_msgtun;
 
@@ -299,7 +296,6 @@ enum {
 
 enum {
   C2_KEY_PEER_LIST_PEERS = 1,
-  C2_KEY_PEER_LIST_SIGNATURE = 2,
 };
 
 struct c2_enriched_peer {

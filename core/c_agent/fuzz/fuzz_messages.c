@@ -14,14 +14,11 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   /* Vary the list capacities, including zero, so the decoder's insufficient-
    * capacity path is exercised as well as the normal one. */
   size_t c1 = size % 9;
-  size_t c2 = (size / 9) % 9;
 
   if (cbor_parser_init(data, size, 0, &parser, &it) == CborNoError) {
     c2_msgtun t = {0};
     t.cmd_slice.items = items;
     t.cmd_slice.cap = c1;
-    t.peer_list.items = items;
-    t.peer_list.cap = c2;
     (void)c2_msgtun_decode(&it, &t);
   }
 

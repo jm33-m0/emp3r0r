@@ -2,7 +2,6 @@ package server
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
@@ -159,34 +158,18 @@ func fwdMsgToOperator(operatorSession string, msg def.MsgTunData) error {
 	return nil
 }
 
-// collectEnrichedPeerList gathers active agent peer info and signs it with the CA key.
-func collectEnrichedPeerList() (*def.EnrichedPeerList, []string, error) {
+// collectEnrichedPeerList gathers active agent peer info for mesh discovery.
+// The result is sent only over an established PFS tunnel, which authenticates
+// the payload; no separate CA signature is needed.
+func collectEnrichedPeerList() (*def.EnrichedPeerList, error) {
 	peers := make([]def.EnrichedPeer, 0)
-	simpleIPsMap := make(map[string]bool)
 
 	live.RangeAgents(func(rec *live.AgentRecord) bool {
 		agent := rec.Agent
 
-		fromIP := strings.Split(agent.From, ":")[0]
-		if fromIP != "" && fromIP != "127.0.0.1" {
-			simpleIPsMap[fromIP] = true
-		}
 		var lastSeen time.Time
 		if seenAt, ok := agents.AgentLastSeen(agent.UUID); ok {
 			lastSeen = seenAt
-		}
-		for _, ip := range agent.IPs {
-			if ip != "" && ip != "127.0.0.1" && !strings.HasPrefix(ip, "127.") {
-				simpleIPsMap[ip] = true
-			}
-		}
-
-		gossipPort := agent.MeshGossipPort
-		if gossipPort == "" {
-			gossipPort = "7946"
-		}
-		if fromIP != "" && fromIP != "127.0.0.1" {
-			simpleIPsMap[fmt.Sprintf("%s:%s", fromIP, gossipPort)] = true
 		}
 
 		p := def.EnrichedPeer{
@@ -203,27 +186,9 @@ func collectEnrichedPeerList() (*def.EnrichedPeerList, []string, error) {
 		return true
 	})
 
-	simpleIPList := make([]string, 0, len(simpleIPsMap))
-	for ip := range simpleIPsMap {
-		simpleIPList = append(simpleIPList, ip)
-	}
-
 	if len(peers) == 0 {
-		return nil, simpleIPList, nil
+		return nil, nil
 	}
 
-	cborBytes, err := cbor.Marshal(peers)
-	if err != nil {
-		return nil, simpleIPList, fmt.Errorf("marshal enriched peers: %w", err)
-	}
-
-	sig, err := transport.SignWithCAKey(cborBytes)
-	if err != nil {
-		return nil, simpleIPList, fmt.Errorf("sign enriched peers: %w", err)
-	}
-
-	return &def.EnrichedPeerList{
-		Peers:     peers,
-		Signature: sig,
-	}, simpleIPList, nil
+	return &def.EnrichedPeerList{Peers: peers}, nil
 }
