@@ -314,7 +314,7 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 		logging.Errorf("Compressing %s: %v", path, err)
 		return
 	}
-	logging.Infof("Created %.4fMB archive (%s) for module '%s'", float64(len(compressedBytes))/1024/1024, hosted_file, live.ActiveModule.Name)
+	logging.Infof("Created %s archive (%s) for module '%s'", util.FormatBytes(int64(len(compressedBytes))), hosted_file, live.ActiveModule.Name)
 	err = os.WriteFile(hosted_file, compressedBytes, 0o600)
 	if err != nil {
 		logging.Errorf("Writing %s: %v", hosted_file, err)
@@ -355,8 +355,8 @@ func hostModuleFile(moduleName, fileName, path string) (def.ResolvedModuleFile, 
 	if err := os.WriteFile(hostedPath, compressed, 0o600); err != nil {
 		return def.ResolvedModuleFile{}, fmt.Errorf("writing %s: %w", hostedPath, err)
 	}
-	logging.Infof("Hosted module companion %s as %s (%.4fMB)",
-		path, hostedPath, float64(len(compressed))/1024/1024)
+	logging.Infof("Hosted module companion %s as %s (%s)",
+		path, hostedPath, util.FormatBytes(int64(len(compressed))))
 
 	return def.ResolvedModuleFile{
 		Name:     hostedBase,
