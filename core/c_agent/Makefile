@@ -534,7 +534,7 @@ fuzz: $(BUILD)/fuzz_rc4 $(BUILD)/fuzz_packer $(BUILD)/fuzz_inet_aton \
       $(BUILD)/fuzz_command_args $(BUILD)/fuzz_http_poll \
       $(BUILD)/fuzz_secureconn $(BUILD)/fuzz_text $(BUILD)/fuzz_encdec \
       $(GZIP_FUZZ) $(BOF_FUZZ) $(BUILD)/fuzz_dynload $(BUILD)/fuzz_maps \
-      $(BUILD)/fuzz_mask_maps \
+      $(BUILD)/fuzz_mask_maps $(BUILD)/fuzz_mask_ranges \
       $(BUILD)/fuzz_module $(BUILD)/fuzz_strings $(BUILD)/fuzz_elfload \
       $(BUILD)/fuzz_doh $(BUILD)/fuzz_http_raw
 	@set -e; mkdir -p $(BUILD)/crash; \
@@ -624,6 +624,10 @@ $(BUILD)/fuzz_maps: fuzz/fuzz_maps.c $(FUZZ_DRIVER) src/util/dynload.c fuzz/fuzz
 
 $(BUILD)/fuzz_mask_maps: fuzz/fuzz_mask_maps.c $(FUZZ_DRIVER) src/util/maps.c fuzz/fuzz_common.h | $(BUILD)
 	$(HOSTCC) $(FUZZ_CFLAGS) $< $(FUZZ_DRIVER) src/util/maps.c -o $@
+
+$(BUILD)/fuzz_mask_ranges: fuzz/fuzz_mask_ranges.c $(FUZZ_DRIVER) \
+                           ../modules/stager_linux/mask_ranges.h fuzz/fuzz_common.h | $(BUILD)
+	$(HOSTCC) $(FUZZ_CFLAGS) -I../modules/stager_linux $< $(FUZZ_DRIVER) -o $@
 
 $(BUILD)/fuzz_module: fuzz/fuzz_module.c $(FUZZ_DRIVER) src/module.c \
                       src/common.c $(TINYCBOR_SRC) fuzz/fuzz_common.h | $(BUILD)

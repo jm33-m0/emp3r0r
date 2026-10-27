@@ -160,8 +160,10 @@
 #define SYS_sysctl 156
 #define SYS_prctl 157
 #define SYS_arch_prctl 158
-/* arch_prctl() selector used to install the stager state block as GS base. */
+/* arch_prctl() selectors used by the stager and its sleep mask. */
 #define ARCH_SET_GS 0x1001
+#define ARCH_GET_FS 0x1003
+#define ARCH_GET_GS 0x1004
 #define SYS_adjtimex 159
 #define SYS_setrlimit 160
 #define SYS_chroot 161

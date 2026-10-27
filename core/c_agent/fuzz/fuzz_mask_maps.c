@@ -23,6 +23,9 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       c2_fuzz_fail("unknown protection bit");
     if (maps[i].anonymous != 0 && maps[i].anonymous != 1)
       c2_fuzz_fail("anonymous flag is not boolean");
+    if (maps[i].special < C2_MAP_SPECIAL_NONE ||
+        maps[i].special > C2_MAP_SPECIAL_STACK)
+      c2_fuzz_fail("special map class out of range");
   }
 
   /* A smaller capacity must produce the same prefix, not a different parse. */
@@ -34,7 +37,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   for (size_t i = 0; i < small_n; i++) {
     if (small[i].start != maps[i].start || small[i].end != maps[i].end ||
         small[i].prot != maps[i].prot ||
-        small[i].anonymous != maps[i].anonymous)
+        small[i].anonymous != maps[i].anonymous ||
+        small[i].special != maps[i].special)
       c2_fuzz_fail("short parse differs from full parse");
   }
 

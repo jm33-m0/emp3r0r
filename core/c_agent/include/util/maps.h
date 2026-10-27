@@ -15,11 +15,16 @@
 
 #include "util/utils.h"
 
+#define C2_MAP_SPECIAL_NONE 0
+#define C2_MAP_SPECIAL_HEAP 1
+#define C2_MAP_SPECIAL_STACK 2
+
 struct c2_map {
   uintptr_t start;
   uintptr_t end;
   int prot;      /* PROT_READ / PROT_WRITE / PROT_EXEC bits */
-  int anonymous; /* 1 when the line has no pathname field */
+  int anonymous; /* 1 for process-private memory (pathless, heap, stack) */
+  int special;   /* C2_MAP_SPECIAL_* for named heap/stack mappings */
 };
 
 /* Parse at most `cap` mappings from `text`. Returns the number written. */

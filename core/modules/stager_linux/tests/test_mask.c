@@ -13,20 +13,20 @@
 #include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
 #include <sys/prctl.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
-typedef int (*mask_fn)(unsigned seconds, uintptr_t probe);
+typedef int (*mask_fn)(unsigned seconds, uintptr_t probe, void *stack_top,
+                       uintptr_t keep_start, uintptr_t keep_end);
 
-volatile unsigned char g_canary[64] __attribute__((aligned(64))) = {
-    0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xaa, 0xbb,
-    0xcc, 0xdd, 0xee, 0xff, 0x10, 0x21, 0x32, 0x43, 0x54, 0x65, 0x76, 0x87,
-    0x98, 0xa9, 0xba, 0xcb, 0xdc, 0xed, 0xfe, 0x0f, 0x5a, 0x5a, 0x5a, 0x5a,
-    0xa5, 0xa5, 0xa5, 0xa5, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-    0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14,
-    0x15, 0x16, 0x17, 0x18};
+#define CANARY_SIZE 64u
+#define STACK_SIZE (64u * 1024u)
+
+static volatile unsigned char *g_canary;
 
 static int read_mem(int fd, uintptr_t addr, void *buf, size_t len) {
   size_t off = 0;
@@ -46,11 +46,25 @@ int main(void) {
     fprintf(stderr, "dlopen: %s\n", dlerror());
     return 2;
   }
-  mask_fn mask = (mask_fn)dlsym(lib, "stager_mask_provider_sleep");
+  mask_fn mask = (mask_fn)dlsym(lib, "stager_mask_run_on_stack");
   if (mask == NULL) {
     fprintf(stderr, "dlsym: %s\n", dlerror());
     return 2;
   }
+  /* The canary lives on the process heap, which the provider masks. */
+  g_canary = malloc(CANARY_SIZE);
+  if (g_canary == NULL) {
+    fprintf(stderr, "malloc: %m\n");
+    return 2;
+  }
+  void *stack = mmap(NULL, STACK_SIZE, PROT_READ | PROT_WRITE,
+                     MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  if (stack == MAP_FAILED) {
+    fprintf(stderr, "mmap: %m\n");
+    return 2;
+  }
+  for (uintptr_t i = 0; i < CANARY_SIZE; i++)
+    g_canary[i] = (unsigned char)(0x11u * (unsigned)i + 0x5au);
 
   int go[2], ready[2];
   if (pipe(go) != 0 || pipe(ready) != 0)
@@ -73,9 +87,9 @@ int main(void) {
       _exit(3);
 
     uintptr_t addr = (uintptr_t)(void *)g_canary;
-    unsigned char before[sizeof(g_canary)];
-    unsigned char during[sizeof(g_canary)];
-    unsigned char after[sizeof(g_canary)];
+    unsigned char before[CANARY_SIZE];
+    unsigned char during[CANARY_SIZE];
+    unsigned char after[CANARY_SIZE];
     if (read_mem(fd, addr, before, sizeof(before)) != 0)
       _exit(4);
     if (write(ready[1], "R", 1) != 1)
@@ -108,7 +122,10 @@ int main(void) {
     return 2;
   close(ready[0]);
 
-  int rc = mask(2, (uintptr_t)(void *)&main);
+  uintptr_t keep_start = (uintptr_t)stack;
+  uintptr_t keep_end = keep_start + STACK_SIZE;
+  int rc = mask(2, (uintptr_t)(void *)main,
+                (void *)(keep_end & ~(uintptr_t)15), keep_start, keep_end);
   int status = 0;
   waitpid(child, &status, 0);
 

@@ -240,11 +240,13 @@ else ifeq ($(PAYLOAD),download)
 else
   $(error PAYLOAD=$(PAYLOAD) is not supported; use download or local)
 endif
+STUB_DEPS += $(MASK_DEPS)
 
 # Sleep-mask provider. mask.c is the contract glue; mask_<MASK>.c implements
 # stager_mask_sleep(). Add mask_<name>.c and build with MASK=<name>.
 MASK ?= xor
 MASK_SRC = mask_$(MASK).c
+MASK_DEPS = mask.h mask_ranges.h
 
 # Stub stage: the tiny resident entry point that acquires the agent PIC and
 # owns the agent lifecycle (including the supervisor). It owns decryption so
@@ -361,7 +363,7 @@ MASK_TEST_BIN = tests/test_mask
 test-mask: $(MASK_TEST_LIB) $(MASK_TEST_BIN)
 	./$(MASK_TEST_BIN)
 
-$(MASK_TEST_LIB): mask.c mask.h $(MASK_SRC) | tests
+$(MASK_TEST_LIB): mask.c $(MASK_DEPS) $(MASK_SRC) | tests
 	$(CC) -O2 -fPIC -shared -I. -I../../c_agent/include -o $@ mask.c $(MASK_SRC) $(MASK_EXTRA_SRC)
 
 $(MASK_TEST_BIN): tests/test_mask.c | tests

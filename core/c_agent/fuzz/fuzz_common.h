@@ -10,10 +10,11 @@
  * c2_fuzz_fail() so a sanitizer/exit code catches them.
  */
 
+#include <stdio.h>
 #include <stdlib.h>
 
 static inline void c2_fuzz_fail(const char *why) {
-  (void)why;
+  fprintf(stderr, "fuzz invariant: %s\n", why);
   abort();
 }
 

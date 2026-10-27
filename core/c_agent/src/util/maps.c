@@ -31,8 +31,23 @@ static int parse_hex(const char *s, size_t len, size_t *pos, uintptr_t *out) {
   return any;
 }
 
-/* True when the line has no pathname after offset/dev/inode. */
-static int line_is_anonymous(const char *line, size_t len) {
+static int starts_with(const char *s, size_t len, const char *prefix) {
+  size_t i = 0;
+  while (prefix[i] != '\0') {
+    if (i >= len || s[i] != prefix[i])
+      return 0;
+    i++;
+  }
+  return 1;
+}
+
+/* Classify process-private memory. Returns 1 and sets *special for path-less
+ * mappings, [heap], [stack] and [stack:<tid>]. Named [anon:...] mappings are
+ * glibc/kernel runtime areas (rseq, shadow stack, ...), and [vdso]/[vvar]/
+ * [vsyscall] are kernel mappings; neither may be encrypted under the running
+ * thread. */
+static int line_is_anonymous(const char *line, size_t len, int *special) {
+  *special = C2_MAP_SPECIAL_NONE;
   size_t i = 0;
   while (i < len && line[i] != ' ')
     i++; /* start-end */
@@ -48,7 +63,23 @@ static int line_is_anonymous(const char *line, size_t len) {
   }
   while (i < len && (line[i] == ' ' || line[i] == '\t'))
     i++;
-  return i >= len || line[i] == '\n' || line[i] == '\r' || line[i] == '\0';
+  if (i >= len || line[i] == '\n' || line[i] == '\r' || line[i] == '\0')
+    return 1;
+
+  const char *path = line + i;
+  size_t plen = len - i;
+  while (plen > 0 && (path[plen - 1] == '\n' || path[plen - 1] == '\r'))
+    plen--;
+  if (starts_with(path, plen, "[heap]")) {
+    *special = C2_MAP_SPECIAL_HEAP;
+    return 1;
+  }
+  if (starts_with(path, plen, "[stack]") ||
+      starts_with(path, plen, "[stack:")) {
+    *special = C2_MAP_SPECIAL_STACK;
+    return 1;
+  }
+  return 0;
 }
 
 size_t c2_maps_parse(const char *text, size_t len, struct c2_map *maps,
@@ -82,7 +113,9 @@ size_t c2_maps_parse(const char *text, size_t len, struct c2_map *maps,
           maps[n].start = start;
           maps[n].end = finish;
           maps[n].prot = prot;
-          maps[n].anonymous = line_is_anonymous(text + off, end - off);
+          maps[n].special = C2_MAP_SPECIAL_NONE;
+          maps[n].anonymous =
+              line_is_anonymous(text + off, end - off, &maps[n].special);
           n++;
         }
       }

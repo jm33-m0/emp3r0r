@@ -54,6 +54,11 @@ func TestCAgentSleepMask(t *testing.T) {
 	masked := false
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
+		select {
+		case werr := <-doneChan:
+			t.Fatalf("stager exited before masking: %v\nOutput:\n%s", werr, out.String())
+		default:
+		}
 		if len(originals) == 0 {
 			if has, _ := procMemContains(pid, marker, true); has {
 				bases := findAnonymousELFs(pid)
@@ -106,7 +111,23 @@ func TestCAgentSleepMask(t *testing.T) {
 	defer startCAgentC2(t, httpPort)()
 	agent := waitForCAgentCheckin(t, doneChan, &out, 60*time.Second)
 
-	if has, _ := procMemContains(pid, marker, true); !has {
+	// The agent may enter its next masked cycle quickly after check-in; wait
+	// for the awake window instead of sampling once.
+	restored := false
+	deadline = time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if has, err := procMemContains(pid, marker, true); err == nil && has {
+			restored = true
+			break
+		}
+		select {
+		case werr := <-doneChan:
+			t.Fatalf("stager exited while waiting for restore: %v\nOutput:\n%s", werr, out.String())
+		default:
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+	if !restored {
 		t.Fatalf("agent plaintext marker did not return after the mask")
 	}
 	if got := runC2Command(t, agent, doneChan, &out, "pwd"); !strings.Contains(got, "current working directory:") {

@@ -36,6 +36,7 @@ int main(void) {
 
     CHECK_EQ_LONG(maps[3].prot, PROT_READ);
     CHECK_EQ_LONG(maps[3].anonymous, 0);
+    CHECK_EQ_LONG(maps[3].special, C2_MAP_SPECIAL_NONE);
 
     CHECK_EQ_LONG(maps[4].prot, PROT_READ | PROT_WRITE | PROT_EXEC);
     CHECK_EQ_LONG(maps[4].anonymous, 1);
@@ -54,6 +55,27 @@ int main(void) {
   CHECK_EQ_LONG(maps[0].start, 0xa000);
   CHECK_EQ_LONG(maps[0].end, 0xb000);
   CHECK_EQ_LONG(maps[0].anonymous, 1);
+
+  /* Heap/stack are maskable. Runtime/kernel named mappings are not. */
+  const char special[] =
+      "1000-2000 rw-p 00000000 00:00 0 [heap]\n"
+      "2000-3000 rw-p 00000000 00:00 0 [stack]\n"
+      "3000-4000 rw-p 00000000 00:00 0 [stack:123]\n"
+      "4000-5000 rw-p 00000000 00:00 0 [anon:rseq]\n"
+      "5000-6000 r--p 00000000 00:00 0 [vvar]\n"
+      "6000-7000 r-xp 00000000 00:00 0 [vdso]\n";
+  n = c2_maps_parse(special, sizeof(special) - 1, maps, 8);
+  CHECK_EQ_LONG(n, 6);
+  if (n == 6) {
+    CHECK_EQ_LONG(maps[0].anonymous, 1);
+    CHECK_EQ_LONG(maps[0].special, C2_MAP_SPECIAL_HEAP);
+    CHECK_EQ_LONG(maps[1].special, C2_MAP_SPECIAL_STACK);
+    CHECK_EQ_LONG(maps[2].special, C2_MAP_SPECIAL_STACK);
+    for (size_t i = 3; i < 6; i++) {
+      CHECK_EQ_LONG(maps[i].anonymous, 0);
+      CHECK_EQ_LONG(maps[i].special, C2_MAP_SPECIAL_NONE);
+    }
+  }
 
   /* Truncations cannot walk past the supplied length. */
   for (size_t i = 0; i < sizeof(text) - 1; i++)

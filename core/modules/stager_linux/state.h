@@ -18,6 +18,11 @@
 #include "stager_iface.h"
 #include "util/dynload.h"
 
+/* Dedicated stack for the mask stub, plus space for its local ranges/maps
+ * arrays and /proc/self/maps buffer. The whole mapping (state page + this
+ * stack) is excluded from masking. */
+#define STAGER_MASK_STACK_SIZE (64u * 1024u)
+
 struct stager_state {
   /* Published same-process ABI; self must stay at %gs:0 (see below). */
   struct c2_stager_public pub;
@@ -25,6 +30,8 @@ struct stager_state {
   size_t payload_size;
   void *syscall_gadget; /* resolved vDSO `syscall; ret` gadget */
   dynload dl;           /* runtime dlopen/dlsym/dlclose cache */
+  void *mask_stack_top; /* high address of the stable mask stack */
+  size_t state_map_len; /* length of the whole state+stack mapping */
 };
 
 /* Sentinel value for syscall_gadget before init_indirect_syscalls(). */
