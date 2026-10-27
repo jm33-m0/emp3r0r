@@ -445,7 +445,8 @@ static inline void *get_syscall_gadget(void) {
 #ifdef C2_SYSCALL_GADGET_EXTERN
 void init_indirect_syscalls(void);
 #else
-static inline void init_indirect_syscalls(void) {}
+static inline void init_indirect_syscalls(void) {
+}
 #endif
 
 /* ---- Syscall wrappers (unchanged interface, now use resolved gadget) ----

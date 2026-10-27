@@ -57,9 +57,14 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     check_terminated(out, cap);
   }
 
-  static const char *const flags[] = {
-      "--dst", "--path", "--mod_name", "--type", "--file_to_download",
-      "--checksum", "--invocation", "--name"};
+  static const char *const flags[] = {"--dst",
+                                      "--path",
+                                      "--mod_name",
+                                      "--type",
+                                      "--file_to_download",
+                                      "--checksum",
+                                      "--invocation",
+                                      "--name"};
   for (size_t i = 0; i < sizeof(flags) / sizeof(flags[0]); i++) {
     c2_cmd_pick_flag(&cmd, flags[i], out, cap);
     check_terminated(out, cap);

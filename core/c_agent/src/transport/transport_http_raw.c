@@ -51,7 +51,9 @@ static int bb_put(bytebuf *b, const void *data, size_t len) {
   return 0;
 }
 
-static int bb_puts(bytebuf *b, const char *s) { return bb_put(b, s, strlen(s)); }
+static int bb_puts(bytebuf *b, const char *s) {
+  return bb_put(b, s, strlen(s));
+}
 
 static int ci_eq_n(const char *a, size_t alen, const char *b) {
   size_t blen = strlen(b);
@@ -79,8 +81,8 @@ static int is_reserved_header(const char *line) {
 }
 
 /* Parse http://host[:port][/path]. Returns 0 on success. */
-int hp_http_parse_url(const char *url, char *host, size_t host_cap,
-                      char *port, size_t port_cap, char *path, size_t path_cap,
+int hp_http_parse_url(const char *url, char *host, size_t host_cap, char *port,
+                      size_t port_cap, char *path, size_t path_cap,
                       char *authority, size_t auth_cap, int *tls) {
   if (url == NULL)
     return -1;
@@ -333,8 +335,8 @@ static c2_status parse_response(hp_http_request *req, const uint8_t *raw,
   const uint8_t *body = (const uint8_t *)(hdr_end + 4);
   size_t body_len = raw_len - (size_t)(body - raw);
   char hval[128];
-  int has_len = header_value(text, headers_scan, "Content-Length", hval,
-                             sizeof(hval));
+  int has_len =
+      header_value(text, headers_scan, "Content-Length", hval, sizeof(hval));
   if (has_len < 0)
     return C2_ERR_IO;
   if (has_len > 0) {
@@ -351,8 +353,8 @@ static c2_status parse_response(hp_http_request *req, const uint8_t *raw,
     return C2_OK;
   }
 
-  int chunked = header_value(text, headers_scan, "Transfer-Encoding", hval,
-                             sizeof(hval));
+  int chunked =
+      header_value(text, headers_scan, "Transfer-Encoding", hval, sizeof(hval));
   if (chunked < 0)
     return C2_ERR_IO;
   if (chunked > 0 && ci_eq_n(hval, strlen(hval), "chunked")) {
@@ -492,7 +494,8 @@ c2_status hp_http_raw_perform(const hp_http_request *req) {
   if (tls)
     return C2_ERR_UNSUPPORTED; /* the libssl transport handles https */
 
-  int fd = hp_http_tcp_connect(host, port, (int)req->timeout_s, req->doh_server);
+  int fd =
+      hp_http_tcp_connect(host, port, (int)req->timeout_s, req->doh_server);
   if (fd < 0)
     return C2_ERR_IO;
 
@@ -507,7 +510,9 @@ c2_status hp_http_perform(const hp_http_request *req) {
   return hp_http_raw_perform(req);
 }
 
-const char *c2_transport_name(void) { return "http_raw"; }
+const char *c2_transport_name(void) {
+  return "http_raw";
+}
 #endif
 
 #ifdef HTTP_RAW_FUZZ

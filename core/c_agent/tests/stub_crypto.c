@@ -19,9 +19,10 @@ static uint64_t fnv1a(const uint8_t *p, size_t n, uint64_t h) {
 static void stub_tag(const uint8_t key[C2_AES_KEY_BYTES],
                      const uint8_t nonce[C2_GCM_NONCE_BYTES], const uint8_t *pt,
                      size_t n, uint8_t tag[C2_GCM_TAG_BYTES]) {
-  uint64_t h = fnv1a(pt, n, fnv1a(nonce, C2_GCM_NONCE_BYTES,
-                                 fnv1a(key, C2_AES_KEY_BYTES,
-                                       1469598103934665603ULL)));
+  uint64_t h =
+      fnv1a(pt, n,
+            fnv1a(nonce, C2_GCM_NONCE_BYTES,
+                  fnv1a(key, C2_AES_KEY_BYTES, 1469598103934665603ULL)));
   for (size_t i = 0; i < C2_GCM_TAG_BYTES; i++) {
     h ^= h >> 33;
     h *= 0xff51afd7ed558ccdULL;
@@ -84,10 +85,9 @@ static int stub_md5(void *ctx, const uint8_t *data, size_t len,
   return 0;
 }
 
-static int stub_pbkdf2(void *ctx, const uint8_t *password,
-                       size_t password_len, const uint8_t *salt,
-                       size_t salt_len, uint32_t iterations, uint8_t *out,
-                       size_t out_len) {
+static int stub_pbkdf2(void *ctx, const uint8_t *password, size_t password_len,
+                       const uint8_t *salt, size_t salt_len,
+                       uint32_t iterations, uint8_t *out, size_t out_len) {
   (void)ctx;
   uint64_t h = fnv1a(password, password_len, 1469598103934665603ULL);
   h = fnv1a(salt, salt_len, h);
@@ -128,8 +128,7 @@ static int stub_ec_keygen(void *ctx, uint8_t priv[C2_P256_PRIV_BYTES],
   return 0;
 }
 
-static int stub_pub_from_priv(void *ctx,
-                              const uint8_t priv[C2_P256_PRIV_BYTES],
+static int stub_pub_from_priv(void *ctx, const uint8_t priv[C2_P256_PRIV_BYTES],
                               uint8_t pub[C2_P256_PUB_BYTES]) {
   (void)ctx;
   for (size_t i = 0; i < C2_P256_PUB_BYTES; i++)

@@ -40,8 +40,7 @@ static inline c2_status c2_cbor_write_text(CborEncoder *w, uint64_t key,
   c2_status st = c2_cbor_write_key(w, key);
   if (st != C2_OK)
     return st;
-  return c2_cbor_ec(
-      cbor_encode_text_string(w, v.ptr ? v.ptr : "", v.len));
+  return c2_cbor_ec(cbor_encode_text_string(w, v.ptr ? v.ptr : "", v.len));
 }
 
 static inline c2_status c2_cbor_write_bytes(CborEncoder *w, uint64_t key,
@@ -49,8 +48,8 @@ static inline c2_status c2_cbor_write_bytes(CborEncoder *w, uint64_t key,
   c2_status st = c2_cbor_write_key(w, key);
   if (st != C2_OK)
     return st;
-  return c2_cbor_ec(cbor_encode_byte_string(
-      w, v.ptr ? v.ptr : (const uint8_t *)"", v.len));
+  return c2_cbor_ec(
+      cbor_encode_byte_string(w, v.ptr ? v.ptr : (const uint8_t *)"", v.len));
 }
 
 static inline c2_status c2_cbor_write_int(CborEncoder *w, uint64_t key,

@@ -12,8 +12,8 @@
  * read out of bounds. The file-backed stager finders run the same parser.
  */
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-  static const char *const needles[] = {
-      "libc.so", "libc-", "libc", "", "/usr/lib/x86_64-linux-gnu/libc.so.6"};
+  static const char *const needles[] = {"libc.so", "libc-", "libc", "",
+                                        "/usr/lib/x86_64-linux-gnu/libc.so.6"};
   unsigned long end = 0;
   for (size_t i = 0; i < sizeof(needles) / sizeof(needles[0]); i++)
     (void)dynload_maps_find((const char *)data, size, needles[i], &end);

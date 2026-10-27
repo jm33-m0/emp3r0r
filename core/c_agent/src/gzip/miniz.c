@@ -69,14 +69,12 @@ c2_status c2_gzip_compress(const uint8_t *in, size_t in_len, uint8_t *out,
     return C2_ERR_NOMEM;
 
   /* Fixed 10-byte header: no name/comment, mtime 0, OS = Unix. */
-  static const uint8_t header[GZIP_HEADER_BYTES] = {0x1f, 0x8b, 0x08, 0x00,
-                                                    0x00, 0x00, 0x00, 0x00,
-                                                    0x00, 0x03};
+  static const uint8_t header[GZIP_HEADER_BYTES] = {
+      0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03};
   memcpy(out, header, sizeof(header));
 
-  size_t csize = tdefl_compress_mem_to_mem(out + GZIP_HEADER_BYTES,
-                                           out_cap - GZIP_HEADER_BYTES, in,
-                                           in_len, 0);
+  size_t csize = tdefl_compress_mem_to_mem(
+      out + GZIP_HEADER_BYTES, out_cap - GZIP_HEADER_BYTES, in, in_len, 0);
   if (csize == 0)
     return C2_ERR_CRYPTO; /* tdefl returns 0 only on failure */
 

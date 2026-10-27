@@ -60,9 +60,9 @@ int main(void) {
   size_t tokenc = 0;
   char tbuf[4096];
   size_t tbuf_used = 0;
-  c2_status rst = c2_coff_invocation_parse(
-      b64, b64_len, export_name, sizeof(export_name), tokens, &tokenc, 8, tbuf,
-      sizeof(tbuf), &tbuf_used);
+  c2_status rst = c2_coff_invocation_parse(b64, b64_len, export_name,
+                                           sizeof(export_name), tokens, &tokenc,
+                                           8, tbuf, sizeof(tbuf), &tbuf_used);
   CHECK_EQ_LONG(rst, C2_OK);
 
   CHECK(strcmp(export_name, "go") == 0);
@@ -106,14 +106,14 @@ int main(void) {
    * used to re-enter the desynchronised map after a tinycbor error and read
    * out of bounds (minimized libFuzzer artifact a1 04 a2 02 8f bf 00 00 1b). */
   {
-    static const uint8_t bad[] = {0xa1, 0x04, 0xa2, 0x02, 0x8f, 0xbf,
-                                  0x00, 0x00, 0x1b};
+    static const uint8_t bad[] = {0xa1, 0x04, 0xa2, 0x02, 0x8f,
+                                  0xbf, 0x00, 0x00, 0x1b};
     char bad_b64[64];
     size_t n = c2_base64url_encode(bad, sizeof(bad), bad_b64, sizeof(bad_b64));
     CHECK(n > 0);
-    CHECK(c2_coff_invocation_parse(bad_b64, n, export_name,
-                                   sizeof(export_name), tokens, &tokenc, 8,
-                                   tbuf, sizeof(tbuf), &tbuf_used) != C2_OK);
+    CHECK(c2_coff_invocation_parse(bad_b64, n, export_name, sizeof(export_name),
+                                   tokens, &tokenc, 8, tbuf, sizeof(tbuf),
+                                   &tbuf_used) != C2_OK);
   }
 
   /* A zero-length export buffer must be accepted without writing through it
@@ -131,16 +131,14 @@ int main(void) {
    * still accepted. */
   {
     static const uint8_t nan_double[] = {
-        0xa1, 0x04, 0xa2, 0x01, 0x62, 0x67, 0x6f, 0x02, 0x81, 0xa2,
-        0x01, 0x61, 0x73, 0x02, 0xfb, 0x7f, 0xf8, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00};
+        0xa1, 0x04, 0xa2, 0x01, 0x62, 0x67, 0x6f, 0x02, 0x81, 0xa2, 0x01, 0x61,
+        0x73, 0x02, 0xfb, 0x7f, 0xf8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
     static const uint8_t nan_float[] = {
         0xa1, 0x04, 0xa2, 0x01, 0x62, 0x67, 0x6f, 0x02, 0x81, 0xa2,
         0x01, 0x61, 0x73, 0x02, 0xfa, 0x7f, 0xc0, 0x00, 0x00};
     static const uint8_t inf_double[] = {
-        0xa1, 0x04, 0xa2, 0x01, 0x62, 0x67, 0x6f, 0x02, 0x81, 0xa2,
-        0x01, 0x61, 0x73, 0x02, 0xfb, 0x7f, 0xf0, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00};
+        0xa1, 0x04, 0xa2, 0x01, 0x62, 0x67, 0x6f, 0x02, 0x81, 0xa2, 0x01, 0x61,
+        0x73, 0x02, 0xfb, 0x7f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
     const uint8_t *cases[] = {nan_double, nan_float, inf_double};
     const size_t lens[] = {sizeof(nan_double), sizeof(nan_float),
                            sizeof(inf_double)};

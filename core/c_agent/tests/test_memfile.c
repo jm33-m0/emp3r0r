@@ -80,14 +80,12 @@ static void test_roundtrip_without_encryption(c2_crypto_backend *be) {
   /* ptr == NULL disables encryption (compression still applies). */
   c2_memfile_init(&m, be, c2_str_of(NULL, 0), 0);
   const uint8_t msg[] = "plain-but-still-compressed";
-  CHECK_EQ_LONG(c2_memfile_write(&m, c2_str_lit("memfs:///t"), msg,
-                                 sizeof(msg) - 1),
-                0);
+  CHECK_EQ_LONG(
+      c2_memfile_write(&m, c2_str_lit("memfs:///t"), msg, sizeof(msg) - 1), 0);
   uint8_t *back = NULL;
   size_t back_len = 0;
-  CHECK_EQ_LONG(c2_memfile_read_alloc(&m, c2_str_lit("memfs:///t"), &back,
-                                      &back_len),
-                0);
+  CHECK_EQ_LONG(
+      c2_memfile_read_alloc(&m, c2_str_lit("memfs:///t"), &back, &back_len), 0);
   CHECK_EQ_LONG(back_len, sizeof(msg) - 1);
   CHECK(back != NULL && memcmp(back, msg, sizeof(msg) - 1) == 0);
   free(back);

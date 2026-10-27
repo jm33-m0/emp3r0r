@@ -51,10 +51,9 @@ c2_status c2_derive_session_key(const c2_crypto_backend *be,
     memcpy(info + prefix_len, agent_uuid.ptr, agent_uuid.len);
   size_t info_len = prefix_len + agent_uuid.len;
 
-  int rc = be->hkdf_sha256(be->ctx, shared, C2_P256_COORD_BYTES,
-                           (const uint8_t *)salt, sizeof(salt) - 1,
-                           (const uint8_t *)info, info_len, out,
-                           C2_AES_KEY_BYTES);
+  int rc = be->hkdf_sha256(
+      be->ctx, shared, C2_P256_COORD_BYTES, (const uint8_t *)salt,
+      sizeof(salt) - 1, (const uint8_t *)info, info_len, out, C2_AES_KEY_BYTES);
   c2_secure_zero(info, sizeof(info));
   return rc == 0 ? C2_OK : C2_ERR_CRYPTO;
 }
@@ -75,8 +74,8 @@ static c2_status derive_password_key(const c2_crypto_backend *be,
   if (password.len > 0 && password.ptr == NULL)
     return C2_ERR_ARG;
   int rc = be->pbkdf2_sha256(be->ctx, (const uint8_t *)password.ptr,
-                             password.len, salt, salt_len, C2_PW_ITERATIONS, key,
-                             C2_AES_KEY_BYTES);
+                             password.len, salt, salt_len, C2_PW_ITERATIONS,
+                             key, C2_AES_KEY_BYTES);
   return rc == 0 ? C2_OK : C2_ERR_CRYPTO;
 }
 
@@ -166,9 +165,9 @@ c2_status c2_aes_gcm_decrypt_password(const c2_crypto_backend *be,
  * x509.ParsePKIXPublicKey, i.e. it must be exactly this structure.
  */
 static const uint8_t c2_spki_p256_prefix[27] = {
-    0x30, 0x59, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce,
-    0x3d, 0x02, 0x01, 0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d,
-    0x03, 0x01, 0x07, 0x03, 0x42, 0x00, 0x04};
+    0x30, 0x59, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48,
+    0xce, 0x3d, 0x02, 0x01, 0x06, 0x08, 0x2a, 0x86, 0x48,
+    0xce, 0x3d, 0x03, 0x01, 0x07, 0x03, 0x42, 0x00, 0x04};
 
 size_t c2_p256_pub_to_pem(const uint8_t pub[C2_P256_PUB_BYTES], char *out,
                           size_t cap) {

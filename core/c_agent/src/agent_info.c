@@ -210,9 +210,8 @@ c2_status c2_agent_info_encode(CborEncoder *w, const c2_agent_info *a) {
       (st = c2_cbor_write_bool(&map, C2_KEY_AGENT_HAS_INTERNET, a->internet)) !=
           C2_OK)
     return st;
-  if (a->has_ncsi &&
-      (st = c2_cbor_write_bool(&map, C2_KEY_AGENT_NCSI_ENABLED, a->ncsi)) !=
-          C2_OK)
+  if (a->has_ncsi && (st = c2_cbor_write_bool(&map, C2_KEY_AGENT_NCSI_ENABLED,
+                                              a->ncsi)) != C2_OK)
     return st;
   if (agent_process_set(&a->process) &&
       (st = write_agent_process(&map, C2_KEY_AGENT_PROCESS, &a->process)) !=
@@ -380,8 +379,7 @@ static c2_status read_enriched_peer(CborValue *it, c2_enriched_peer *p) {
   return c2_cbor_dc(cbor_value_leave_container(it, &map));
 }
 
-c2_status c2_enriched_peer_list_decode(CborValue *r,
-                                       c2_enriched_peer_list *l) {
+c2_status c2_enriched_peer_list_decode(CborValue *r, c2_enriched_peer_list *l) {
   if (r == NULL || l == NULL)
     return C2_ERR_ARG;
 

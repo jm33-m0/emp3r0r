@@ -40,9 +40,9 @@ static size_t build_module(uint8_t *b, size_t cap) {
   b[1] = 'E';
   b[2] = 'L';
   b[3] = 'F';
-  b[4] = 2; /* ELFCLASS64 */
-  b[5] = 1; /* ELFDATA2LSB */
-  b[6] = 1; /* EV_CURRENT */
+  b[4] = 2;            /* ELFCLASS64 */
+  b[5] = 1;            /* ELFDATA2LSB */
+  b[6] = 1;            /* EV_CURRENT */
   put16(b + 16, 3);    /* e_type ET_DYN */
   put16(b + 18, 0x3e); /* e_machine x86-64 */
   put32(b + 20, 1);    /* e_version */
@@ -113,11 +113,9 @@ int main(void) {
         "7f0000300000-7f0000301000 rw-p 00000000 08:01 3 /lib/libz.so.1\n";
     size_t mlen = sizeof(maps) - 1; /* excludes the trailing NUL */
     unsigned long mend = 0;
-    CHECK(dynload_maps_find(maps, mlen, "libc.so", &mend) ==
-          0x7f0000000000UL);
+    CHECK(dynload_maps_find(maps, mlen, "libc.so", &mend) == 0x7f0000000000UL);
     CHECK(mend == 0x7f0000204000UL);
-    CHECK(dynload_maps_find(maps, mlen, "libz.so", &mend) ==
-          0x7f0000300000UL);
+    CHECK(dynload_maps_find(maps, mlen, "libz.so", &mend) == 0x7f0000300000UL);
     CHECK(dynload_maps_find(maps, mlen, "no_such_lib", &mend) == 0);
     CHECK(dynload_maps_find(NULL, mlen, "libc.so", &mend) == 0);
     CHECK(dynload_maps_find(maps, mlen, NULL, &mend) == 0);

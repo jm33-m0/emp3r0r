@@ -42,7 +42,9 @@ static c2_status sb_puts(c2_sb *s, c2_str v) {
   return sb_put(s, v.ptr, v.len);
 }
 
-static c2_status sb_putc(c2_sb *s, char c) { return sb_put(s, &c, 1); }
+static c2_status sb_putc(c2_sb *s, char c) {
+  return sb_put(s, &c, 1);
+}
 
 static c2_status sb_put_i64(c2_sb *s, int64_t v) {
   char tmp[20];
@@ -165,16 +167,15 @@ c2_status c2_msgauth_encode(CborEncoder *w, const c2_msgauth *m) {
   if ((st = c2_cbor_write_str_list(&map, C2_KEY_AUTH_CAPABILITIES,
                                    &m->capabilities)) != C2_OK)
     return st;
-  if ((st = c2_cbor_write_text(&map, C2_KEY_AUTH_AGENT_PROOF, m->agent_proof)) !=
-      C2_OK)
+  if ((st = c2_cbor_write_text(&map, C2_KEY_AUTH_AGENT_PROOF,
+                               m->agent_proof)) != C2_OK)
     return st;
   if (m->ephem_public_key.len &&
       (st = c2_cbor_write_bytes(&map, C2_KEY_AUTH_EPHEM_PUBLIC,
                                 m->ephem_public_key)) != C2_OK)
     return st;
-  if (m->stream_id.len &&
-      (st = c2_cbor_write_text(&map, C2_KEY_AUTH_STREAM_ID, m->stream_id)) !=
-          C2_OK)
+  if (m->stream_id.len && (st = c2_cbor_write_text(&map, C2_KEY_AUTH_STREAM_ID,
+                                                   m->stream_id)) != C2_OK)
     return st;
   if ((st = c2_cbor_write_int(&map, C2_KEY_AUTH_PROTOCOL_VERSION,
                               m->protocol_version)) != C2_OK)
@@ -255,12 +256,11 @@ c2_status c2_msgtun_encode(CborEncoder *w, const c2_msgtun *m) {
       (st = c2_cbor_write_text(&map, C2_KEY_TUN_JOB_ID, m->job_id)) != C2_OK)
     return st;
   if (m->cmd_slice.count &&
-      (st = c2_cbor_write_str_list(&map, C2_KEY_TUN_CMD_SLICE, &m->cmd_slice)) !=
-          C2_OK)
+      (st = c2_cbor_write_str_list(&map, C2_KEY_TUN_CMD_SLICE,
+                                   &m->cmd_slice)) != C2_OK)
     return st;
-  if (m->response.len &&
-      (st = c2_cbor_write_bytes(&map, C2_KEY_TUN_RESPONSE, m->response)) !=
-          C2_OK)
+  if (m->response.len && (st = c2_cbor_write_bytes(&map, C2_KEY_TUN_RESPONSE,
+                                                   m->response)) != C2_OK)
     return st;
   if (m->tag.len &&
       (st = c2_cbor_write_text(&map, C2_KEY_TUN_TAG, m->tag)) != C2_OK)
@@ -268,9 +268,8 @@ c2_status c2_msgtun_encode(CborEncoder *w, const c2_msgtun *m) {
   if (m->time.len &&
       (st = c2_cbor_write_text(&map, C2_KEY_TUN_TIME, m->time)) != C2_OK)
     return st;
-  if (m->agent_uuid.len &&
-      (st = c2_cbor_write_text(&map, C2_KEY_TUN_AGENT_UUID, m->agent_uuid)) !=
-          C2_OK)
+  if (m->agent_uuid.len && (st = c2_cbor_write_text(&map, C2_KEY_TUN_AGENT_UUID,
+                                                    m->agent_uuid)) != C2_OK)
     return st;
   if (m->agent_uuid_sig.len &&
       (st = c2_cbor_write_text(&map, C2_KEY_TUN_AGENT_UUID_SIG,

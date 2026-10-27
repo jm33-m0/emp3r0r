@@ -14,8 +14,6 @@
 
 #include "beacon_compat.h"
 
-#pragma GCC visibility push(hidden)
-
 static int set_err(char **err_out, const char *msg) {
   if (!err_out || *err_out) {
     return -1;
@@ -119,10 +117,9 @@ static void bof_signal_handler(int sig, siginfo_t *info, void *ctx) {
 // bof_run_impl loads an x86_64 ELF ET_REL object and executes the requested
 // symbol. It is internal; the exported bof_run() wraps it with a stable,
 // machine-callable ABI (see below).
-static int
-bof_run_impl(const uint8_t *obj_buf, size_t object_size, const char *func_name,
-             const uint8_t *args_buf, int args_len, char **out_buf,
-             char **err_buf) {
+static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
+                        const char *func_name, const uint8_t *args_buf,
+                        int args_len, char **out_buf, char **err_buf) {
 
   // Serialize access
   pthread_mutex_lock(&bof_lock);
@@ -552,6 +549,6 @@ __attribute__((visibility("default"))) const char *bof_last_error(void) {
   return bof_err_buf;
 }
 
-__attribute__((visibility("default"))) void bof_free(char *p) { free(p); }
-
-#pragma GCC visibility pop
+__attribute__((visibility("default"))) void bof_free(char *p) {
+  free(p);
+}

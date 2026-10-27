@@ -20,17 +20,16 @@
 __attribute__((naked, used, visibility("default"))) int
 stager_mask_run_on_stack(unsigned seconds, uintptr_t probe, void *stack_top,
                          uintptr_t keep_start, uintptr_t keep_end) {
-  __asm__ __volatile__(
-      "pushq %rbp\n"
-      "movq %rsp, %rbp\n"
-      "movq %rdx, %rax\n"  /* stack_top */
-      "movq %rcx, %rdx\n"  /* keep_start -> arg 3 */
-      "movq %r8, %rcx\n"   /* keep_end -> arg 4 */
-      "movq %rax, %rsp\n"
-      "call stager_mask_provider_sleep\n"
-      "movq %rbp, %rsp\n"
-      "popq %rbp\n"
-      "ret\n");
+  __asm__ __volatile__("pushq %rbp\n"
+                       "movq %rsp, %rbp\n"
+                       "movq %rdx, %rax\n" /* stack_top */
+                       "movq %rcx, %rdx\n" /* keep_start -> arg 3 */
+                       "movq %r8, %rcx\n"  /* keep_end -> arg 4 */
+                       "movq %rax, %rsp\n"
+                       "call stager_mask_provider_sleep\n"
+                       "movq %rbp, %rsp\n"
+                       "popq %rbp\n"
+                       "ret\n");
 }
 
 int stager_mask_sleep(unsigned seconds, uintptr_t probe) {

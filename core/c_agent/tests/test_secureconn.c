@@ -1,7 +1,7 @@
 #include "secureconn.h"
 
-#include "test.h"
 #include "stub_crypto.h"
+#include "test.h"
 
 #include <stdlib.h>
 
@@ -33,7 +33,9 @@ static long ms_write(void *ctx, const uint8_t *buf, size_t len) {
   return (long)len;
 }
 
-static void ms_close(void *ctx) { (void)ctx; }
+static void ms_close(void *ctx) {
+  (void)ctx;
+}
 
 static const c2_stream_ops g_ms_ops = {ms_read, ms_write, ms_close};
 
@@ -57,7 +59,9 @@ static long ids_write(void *ctx, const uint8_t *buf, size_t len) {
   return ms_write(&((idlestream *)ctx)->inner, buf, len);
 }
 
-static void ids_close(void *ctx) { (void)ctx; }
+static void ids_close(void *ctx) {
+  (void)ctx;
+}
 
 static const c2_stream_ops g_ids_ops = {ids_read, ids_write, ids_close};
 
@@ -88,8 +92,7 @@ int main(void) {
     uint8_t *payload = NULL;
     size_t plen = 0;
     CHECK(c2_secureconn_decode_frame(&dec, frame + 4, frame_len - 4, plain,
-                                     sizeof(plain), &payload,
-                                     &plen) == C2_OK);
+                                     sizeof(plain), &payload, &plen) == C2_OK);
     CHECK_EQ_LONG(plen, strlen(msg));
     CHECK(memcmp(payload, msg, plen) == 0);
   }
@@ -102,14 +105,12 @@ int main(void) {
     uint8_t frame[256];
     size_t frame_len = 0;
     CHECK(c2_secureconn_encode_frame(&enc, (const uint8_t *)"x", 1, 100, frame,
-                                     sizeof(frame),
-                                     &frame_len) == C2_OK);
+                                     sizeof(frame), &frame_len) == C2_OK);
     uint8_t plain[256];
     uint8_t *payload = NULL;
     size_t plen = 0;
     CHECK(c2_secureconn_decode_frame(&dec, frame + 4, frame_len - 4, plain,
-                                     sizeof(plain), &payload,
-                                     &plen) == C2_OK);
+                                     sizeof(plain), &payload, &plen) == C2_OK);
     CHECK_EQ_LONG(plen, 1);
     CHECK(payload[0] == 'x');
   }
@@ -168,8 +169,7 @@ int main(void) {
     uint8_t frame[64];
     size_t frame_len = 0;
     CHECK(c2_secureconn_encode_frame(&enc, (const uint8_t *)"m", 1, 0, frame,
-                                     sizeof(frame),
-                                     &frame_len) == C2_OK);
+                                     sizeof(frame), &frame_len) == C2_OK);
     uint8_t plain[64];
     uint8_t *payload = NULL;
     size_t plen = 0;
@@ -235,7 +235,8 @@ int main(void) {
     c2_secureconn_init(&dec, &be, (c2_stream){&g_ids_ops, &s}, key);
 
     const char *msg = "after idle";
-    CHECK(c2_secureconn_write(&enc, (const uint8_t *)msg, strlen(msg)) == C2_OK);
+    CHECK(c2_secureconn_write(&enc, (const uint8_t *)msg, strlen(msg)) ==
+          C2_OK);
 
     uint8_t out[64];
     size_t outlen = 0;
@@ -263,7 +264,8 @@ int main(void) {
     c2_secureconn_init(&dec, &be, (c2_stream){&g_ids_ops, &s}, key);
 
     const char *msg = "download body";
-    CHECK(c2_secureconn_write(&enc, (const uint8_t *)msg, strlen(msg)) == C2_OK);
+    CHECK(c2_secureconn_write(&enc, (const uint8_t *)msg, strlen(msg)) ==
+          C2_OK);
 
     uint8_t out[64];
     CHECK_EQ_LONG(c2_secureconn_read(&dec, out, sizeof(out)),

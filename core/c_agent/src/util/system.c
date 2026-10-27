@@ -18,9 +18,13 @@ long write(int fd, const void *buf, size_t count) {
   return syscall3(SYS_write, fd, (long)buf, count);
 }
 
-long close(int fd) { return syscall1(SYS_close, fd); }
+long close(int fd) {
+  return syscall1(SYS_close, fd);
+}
 
-void exit(int error_code) { syscall1(SYS_exit, error_code); }
+void exit(int error_code) {
+  syscall1(SYS_exit, error_code);
+}
 
 int open(const char *path, int flags, ...) {
   va_list ap;

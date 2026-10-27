@@ -1,6 +1,6 @@
-#include "util/packer.h" /* DERIVED_KEY_LEN */
 #include "transport.h"
 #include "util/net_utils.h"
+#include "util/packer.h" /* DERIVED_KEY_LEN */
 #include "util/strings.h"
 #include "util/utils.h"
 
@@ -14,9 +14,8 @@
  * packet via a key hash before sending the blob in sequenced chunks. Every
  * packet starts with a one-byte type followed by a little-endian uint32: the
  * sequence number for data/ACK packets, and the key hash for the hello. */
-static size_t udp_download(const char *host, const char *port,
-                           const char *path, void *buffer, size_t capacity,
-                           const uint8_t *key) {
+static size_t udp_download(const char *host, const char *port, const char *path,
+                           void *buffer, size_t capacity, const uint8_t *key) {
   (void)path;
 
   struct sockaddr_in serv_addr;
@@ -83,8 +82,7 @@ static size_t udp_download(const char *host, const char *port,
         size_t body = (size_t)n - UDP_HEADER_SIZE;
         if (data_size + body > capacity)
           break;
-        memcpy((char *)buffer + data_size, temp_buffer + UDP_HEADER_SIZE,
-               body);
+        memcpy((char *)buffer + data_size, temp_buffer + UDP_HEADER_SIZE, body);
         data_size += body;
         expected_seq++;
 
@@ -108,7 +106,9 @@ static size_t udp_download(const char *host, const char *port,
   return data_size;
 }
 
-const char *transport_name(void) { return "udp"; }
+const char *transport_name(void) {
+  return "udp";
+}
 
 size_t transport_download(const char *host, const char *port, const char *path,
                           void *buffer, size_t capacity, const uint8_t *key) {

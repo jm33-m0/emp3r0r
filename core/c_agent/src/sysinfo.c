@@ -171,8 +171,8 @@ static void format_uptime(char *out, size_t cap) {
     fclose(f);
   }
   long long s = (long long)up;
-  snprintf(out, cap, "%lldd %lldh %lldm %llds", s / 86400,
-           (s % 86400) / 3600, (s % 3600) / 60, s % 60);
+  snprintf(out, cap, "%lldd %lldh %lldm %llds", s / 86400, (s % 86400) / 3600,
+           (s % 3600) / 60, s % 60);
 }
 
 static void proc_cmdline(pid_t pid, char *out, size_t cap) {
@@ -229,14 +229,16 @@ static void gather_ips(c2_sysinfo_store *st) {
     int fam = ifa->ifa_addr->sa_family;
     if (fam != AF_INET && fam != AF_INET6)
       continue;
-    void *src = (fam == AF_INET)
-                    ? (void *)&((struct sockaddr_in *)ifa->ifa_addr)->sin_addr
-                    : (void *)&((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr;
+    void *src =
+        (fam == AF_INET)
+            ? (void *)&((struct sockaddr_in *)ifa->ifa_addr)->sin_addr
+            : (void *)&((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr;
     char ip[INET6_ADDRSTRLEN] = {0};
     if (inet_ntop(fam, src, ip, sizeof(ip)) == NULL)
       continue;
     char entry[INET6_ADDRSTRLEN + 8];
-    snprintf(entry, sizeof(entry), "%s/%d", ip, mask_prefix_len(ifa->ifa_netmask));
+    snprintf(entry, sizeof(entry), "%s/%d", ip,
+             mask_prefix_len(ifa->ifa_netmask));
     list_push(st, entry);
   }
   freeifaddrs(ifaddr);
@@ -296,8 +298,8 @@ static c2_str groups_joined(c2_sysinfo_store *st, const char *username) {
   size_t off = 0;
   joined[0] = '\0';
   for (int i = 0; i < ng && off < sizeof(joined) - 1; i++) {
-    int n = snprintf(joined + off, sizeof(joined) - off, "%s%u",
-                     i ? "," : "", (unsigned)gids[i]);
+    int n = snprintf(joined + off, sizeof(joined) - off, "%s%u", i ? "," : "",
+                     (unsigned)gids[i]);
     if (n <= 0)
       break;
     off += (size_t)n;
@@ -363,7 +365,8 @@ c2_status c2_gather_agent_info(c2_agent_info *info, const c2_agent_config *cfg,
   host[sizeof(host) - 1] = '\0';
 
   struct passwd *pw = getpwuid(getuid());
-  const char *username = (pw != NULL && pw->pw_name != NULL) ? pw->pw_name : "unknown";
+  const char *username =
+      (pw != NULL && pw->pw_name != NULL) ? pw->pw_name : "unknown";
   const char *home = (pw != NULL && pw->pw_dir != NULL) ? pw->pw_dir : "";
 
   info->hostname = store_cstr(st, host);

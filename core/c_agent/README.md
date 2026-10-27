@@ -109,18 +109,13 @@ generate_c --type musl --arch arm64 --cc your.domain.com \
   --crypto mbedtls --gzip miniz --transport http_raw
 ```
 
-### Compilation database
+### clangd
 
-`make compiledb` writes `compile_commands.json` for clangd. Bear 3 does not
-recognise `zig cc` as a compiler, so `scripts/compiledb.sh` generates a
-`.bear-zig-cc` shim containing the `cc` subcommand and a `bear.config.json`
-that registers it. Both are host-specific and gitignored.
-
-```sh
-make -C core/c_agent compiledb
-make -C core/c_agent compiledb COMPILEDB_TARGETS="lib agent test"
-make -C core/c_agent compiledb ZIG=/opt/zig/zig BEAR=/usr/local/bin/bear
-```
+clangd reads `compile_flags.txt` for the agent's default flags and include
+paths, so no generated compilation database or external tool is required.
+`.clangd` disables unused-include cleanup, and `.clang-format` keeps the tree in
+the project style. The stager and Linux modules have their own
+`compile_flags.txt`.
 
 ## Test
 

@@ -179,9 +179,8 @@ c2_status c2_memfile_read(const c2_memfile *m, c2_str key, uint8_t *out,
     dec = (uint8_t *)malloc(e->blob_len);
     if (dec == NULL)
       return C2_ERR_NOMEM;
-    c2_status st = c2_aes_gcm_decrypt_password(m->be, m->password, e->blob,
-                                               e->blob_len, dec, e->blob_len,
-                                               &gz_len);
+    c2_status st = c2_aes_gcm_decrypt_password(
+        m->be, m->password, e->blob, e->blob_len, dec, e->blob_len, &gz_len);
     if (st != C2_OK) {
       c2_secure_zero(dec, e->blob_len);
       free(dec);
@@ -254,7 +253,9 @@ c2_status c2_memfile_remove(c2_memfile *m, c2_str key) {
   return C2_ERR_PROTO; /* not found */
 }
 
-size_t c2_memfile_count(const c2_memfile *m) { return m ? m->count : 0; }
+size_t c2_memfile_count(const c2_memfile *m) {
+  return m ? m->count : 0;
+}
 
 const char *c2_memfile_key_at(const c2_memfile *m, size_t i) {
   if (m == NULL || i >= m->count)
@@ -268,4 +269,6 @@ size_t c2_memfile_plain_len_at(const c2_memfile *m, size_t i) {
   return m->entries[i].plain_len;
 }
 
-size_t c2_memfile_bytes(const c2_memfile *m) { return m ? m->bytes : 0; }
+size_t c2_memfile_bytes(const c2_memfile *m) {
+  return m ? m->bytes : 0;
+}

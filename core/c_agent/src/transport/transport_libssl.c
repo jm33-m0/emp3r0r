@@ -120,18 +120,16 @@ static int tls_load(void) {
   if (g_tls.failed)
     return -1;
 
-  static const char *ssl_names[] = {"libssl.so.3", "libssl.so.1.1",
+  static const char *ssl_names[] = {"libssl.so.3",  "libssl.so.1.1",
                                     "libssl.so.10", "libssl.so.1.0.0",
-                                    "libssl.so", NULL};
-  static const char *crypto_names[] = {"libcrypto.so.3", "libcrypto.so.1.1",
-                                       "libcrypto.so.10",
-                                       "libcrypto.so.1.0.0", "libcrypto.so",
-                                       NULL};
+                                    "libssl.so",    NULL};
+  static const char *crypto_names[] = {"libcrypto.so.3",  "libcrypto.so.1.1",
+                                       "libcrypto.so.10", "libcrypto.so.1.0.0",
+                                       "libcrypto.so",    NULL};
   dynload *dl = dynload_hosted();
   for (size_t i = 0; ssl_names[i] != NULL && g_tls.ssl_lib == NULL; i++)
     g_tls.ssl_lib = dynload_open(dl, ssl_names[i], RTLD_LAZY | RTLD_LOCAL);
-  for (size_t i = 0;
-       crypto_names[i] != NULL && g_tls.crypto_lib == NULL; i++)
+  for (size_t i = 0; crypto_names[i] != NULL && g_tls.crypto_lib == NULL; i++)
     g_tls.crypto_lib =
         dynload_open(dl, crypto_names[i], RTLD_LAZY | RTLD_LOCAL);
   if (g_tls.ssl_lib == NULL || g_tls.crypto_lib == NULL)
@@ -144,7 +142,8 @@ static int tls_load(void) {
   LOAD_REQ(g_tls.ssl_lib, ctx_new, "SSL_CTX_new");
   LOAD_REQ(g_tls.ssl_lib, ctx_free, "SSL_CTX_free");
   LOAD_REQ(g_tls.ssl_lib, ctx_set_verify, "SSL_CTX_set_verify");
-  LOAD_OPT(g_tls.ssl_lib, ctx_default_paths, "SSL_CTX_set_default_verify_paths");
+  LOAD_OPT(g_tls.ssl_lib, ctx_default_paths,
+           "SSL_CTX_set_default_verify_paths");
   LOAD_OPT(g_tls.ssl_lib, ctx_set_cert_store, "SSL_CTX_set_cert_store");
   LOAD_REQ(g_tls.ssl_lib, ssl_new, "SSL_new");
   LOAD_REQ(g_tls.ssl_lib, ssl_free, "SSL_free");
@@ -280,13 +279,14 @@ static int tls_verify_config(SSL_CTX *ctx, SSL *ssl, const c2_str *ca_pem,
   return 0;
 }
 
-static c2_status hp_http_ssl_perform(const hp_http_request *req, const char *host,
-                                     const char *port, const char *path,
-                                     const char *authority) {
+static c2_status hp_http_ssl_perform(const hp_http_request *req,
+                                     const char *host, const char *port,
+                                     const char *path, const char *authority) {
   if (tls_load() != 0)
     return C2_ERR_UNSUPPORTED;
 
-  int fd = hp_http_tcp_connect(host, port, (int)req->timeout_s, req->doh_server);
+  int fd =
+      hp_http_tcp_connect(host, port, (int)req->timeout_s, req->doh_server);
   if (fd < 0)
     return C2_ERR_IO;
 
@@ -346,4 +346,6 @@ c2_status hp_http_perform(const hp_http_request *req) {
   return hp_http_ssl_perform(req, host, port, path, authority);
 }
 
-const char *c2_transport_name(void) { return "libssl"; }
+const char *c2_transport_name(void) {
+  return "libssl";
+}

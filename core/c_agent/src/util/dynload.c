@@ -143,7 +143,9 @@ static int name_eq(const uint8_t *s, size_t max, const char *name) {
   return 0;
 }
 
-static uint16_t rd16(const uint8_t *p) { return (uint16_t)(p[0] | (p[1] << 8)); }
+static uint16_t rd16(const uint8_t *p) {
+  return (uint16_t)(p[0] | (p[1] << 8));
+}
 
 static uint32_t rd32(const uint8_t *p) {
   return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) |
@@ -548,8 +550,7 @@ static void *resolve_sym_gnu(const Mod *m, const Seg *segs, int nsegs,
   const uint8_t *bloom = gp + off_bloom;
   const uint8_t *buckets = gp + off_buckets;
   const uint8_t *chains = gp + off_chains;
-  size_t chain_cap =
-      (m->len - (size_t)(chains - m->base)) / sizeof(uint32_t);
+  size_t chain_cap = (m->len - (size_t)(chains - m->base)) / sizeof(uint32_t);
 
   uint32_t h = elf_gnu_hash(name);
   /* Widen before the bloom shift: the hash itself is 32-bit but the shift

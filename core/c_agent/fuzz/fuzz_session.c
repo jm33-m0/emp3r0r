@@ -81,7 +81,9 @@ static long rb_write(void *ctx, const uint8_t *buf, size_t len) {
   return (long)len;
 }
 
-static void rb_close(void *ctx) { (void)ctx; }
+static void rb_close(void *ctx) {
+  (void)ctx;
+}
 
 static const c2_stream_ops g_rb_ops = {rb_read, rb_write, rb_close};
 

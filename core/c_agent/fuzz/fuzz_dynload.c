@@ -30,8 +30,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   if (buf == NULL)
     return 0;
 
-  static const char *const names[] = {"malloc", "free", "dlopen", "dlsym",
-                                      "g_free", "x"};
+  static const char *const names[] = {"malloc", "free",   "dlopen",
+                                      "dlsym",  "g_free", "x"};
   (void)dynload_resolve_module(
       buf, size, names[size % (sizeof(names) / sizeof(names[0]))]);
 

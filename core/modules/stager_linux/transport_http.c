@@ -96,7 +96,9 @@ done:
   return data_size;
 }
 
-const char *transport_name(void) { return "http"; }
+const char *transport_name(void) {
+  return "http";
+}
 
 size_t transport_download(const char *host, const char *port, const char *path,
                           void *buffer, size_t capacity, const uint8_t *key) {

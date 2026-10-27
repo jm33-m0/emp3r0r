@@ -9,14 +9,13 @@
 #include <string.h>
 
 int main(void) {
-  const char text[] =
-      "1000-2000 r-xp 00000000 00:00 0 /usr/bin/test\n"
-      "3000-4000 rw-p 00001000 00:00 0\n"
-      "5000-6000 ---p 00002000 00:00 0\n"
-      "7000-8000 r--p 00000000 00:00 0 [vdso]\n"
-      "not a maps line\n"
-      "9000-8000 rw-p 00000000 00:00 0\n"
-      "a000-b000 rwxp 00000000 00:00 0\n";
+  const char text[] = "1000-2000 r-xp 00000000 00:00 0 /usr/bin/test\n"
+                      "3000-4000 rw-p 00001000 00:00 0\n"
+                      "5000-6000 ---p 00002000 00:00 0\n"
+                      "7000-8000 r--p 00000000 00:00 0 [vdso]\n"
+                      "not a maps line\n"
+                      "9000-8000 rw-p 00000000 00:00 0\n"
+                      "a000-b000 rwxp 00000000 00:00 0\n";
 
   struct c2_map maps[8];
   size_t n = c2_maps_parse(text, sizeof(text) - 1, maps, 8);
@@ -57,13 +56,12 @@ int main(void) {
   CHECK_EQ_LONG(maps[0].anonymous, 1);
 
   /* Heap/stack are maskable. Runtime/kernel named mappings are not. */
-  const char special[] =
-      "1000-2000 rw-p 00000000 00:00 0 [heap]\n"
-      "2000-3000 rw-p 00000000 00:00 0 [stack]\n"
-      "3000-4000 rw-p 00000000 00:00 0 [stack:123]\n"
-      "4000-5000 rw-p 00000000 00:00 0 [anon:rseq]\n"
-      "5000-6000 r--p 00000000 00:00 0 [vvar]\n"
-      "6000-7000 r-xp 00000000 00:00 0 [vdso]\n";
+  const char special[] = "1000-2000 rw-p 00000000 00:00 0 [heap]\n"
+                         "2000-3000 rw-p 00000000 00:00 0 [stack]\n"
+                         "3000-4000 rw-p 00000000 00:00 0 [stack:123]\n"
+                         "4000-5000 rw-p 00000000 00:00 0 [anon:rseq]\n"
+                         "5000-6000 r--p 00000000 00:00 0 [vvar]\n"
+                         "6000-7000 r-xp 00000000 00:00 0 [vdso]\n";
   n = c2_maps_parse(special, sizeof(special) - 1, maps, 8);
   CHECK_EQ_LONG(n, 6);
   if (n == 6) {

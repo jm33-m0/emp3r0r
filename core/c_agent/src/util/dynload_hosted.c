@@ -11,4 +11,6 @@
 
 static dynload g_hosted;
 
-dynload *dynload_hosted(void) { return &g_hosted; }
+dynload *dynload_hosted(void) {
+  return &g_hosted;
+}

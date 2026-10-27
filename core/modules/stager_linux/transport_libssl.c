@@ -66,12 +66,12 @@
  *     Content-Length or close the connection (the built-in listener does).
  */
 
+#include "state.h"
+#include "transport.h"
 #include "util/debug.h"
 #include "util/dynload.h"
-#include "state.h"
 #include "util/net_utils.h"
 #include "util/strings.h"
-#include "transport.h"
 #include "util/utils.h"
 
 /* --------------------------------------------------------------------------
@@ -230,7 +230,8 @@ static int libssl_load(ssl_api *api) {
 
   size_t nsons = sizeof(LIBSONAMES) / sizeof(LIBSONAMES[0]);
   for (size_t i = 0; i < nsons; i++) {
-    api->lib = dynload_open(stager_dynload(), LIBSONAMES[i], RTLD_NOW | RTLD_LOCAL);
+    api->lib =
+        dynload_open(stager_dynload(), LIBSONAMES[i], RTLD_NOW | RTLD_LOCAL);
     if (api->lib) {
       debug_print("libssl: loaded %s\n", LIBSONAMES[i]);
       break;
@@ -239,31 +240,38 @@ static int libssl_load(ssl_api *api) {
   if (!api->lib)
     return 0;
 
-  api->init_ssl =
-      (openssl_init_ssl_fn)dynload_sym(stager_dynload(), api->lib, "OPENSSL_init_ssl");
-  api->library_init =
-      (ssl_library_init_fn)dynload_sym(stager_dynload(), api->lib, "SSL_library_init");
-  api->client_method =
-      (client_method_fn)dynload_sym(stager_dynload(), api->lib, "TLS_client_method");
+  api->init_ssl = (openssl_init_ssl_fn)dynload_sym(stager_dynload(), api->lib,
+                                                   "OPENSSL_init_ssl");
+  api->library_init = (ssl_library_init_fn)dynload_sym(
+      stager_dynload(), api->lib, "SSL_library_init");
+  api->client_method = (client_method_fn)dynload_sym(stager_dynload(), api->lib,
+                                                     "TLS_client_method");
   if (!api->client_method)
-    api->client_method =
-        (client_method_fn)dynload_sym(stager_dynload(), api->lib, "SSLv23_client_method");
-  api->ctx_new = (ssl_ctx_new_fn)dynload_sym(stager_dynload(), api->lib, "SSL_CTX_new");
-  api->ctx_free = (ssl_ctx_free_fn)dynload_sym(stager_dynload(), api->lib, "SSL_CTX_free");
-  api->ctx_set_verify =
-      (ssl_ctx_set_verify_fn)dynload_sym(stager_dynload(), api->lib, "SSL_CTX_set_verify");
+    api->client_method = (client_method_fn)dynload_sym(
+        stager_dynload(), api->lib, "SSLv23_client_method");
+  api->ctx_new =
+      (ssl_ctx_new_fn)dynload_sym(stager_dynload(), api->lib, "SSL_CTX_new");
+  api->ctx_free =
+      (ssl_ctx_free_fn)dynload_sym(stager_dynload(), api->lib, "SSL_CTX_free");
+  api->ctx_set_verify = (ssl_ctx_set_verify_fn)dynload_sym(
+      stager_dynload(), api->lib, "SSL_CTX_set_verify");
   api->ssl_new = (ssl_new_fn)dynload_sym(stager_dynload(), api->lib, "SSL_new");
-  api->ssl_free = (ssl_free_fn)dynload_sym(stager_dynload(), api->lib, "SSL_free");
-  api->set_fd = (ssl_set_fd_fn)dynload_sym(stager_dynload(), api->lib, "SSL_set_fd");
+  api->ssl_free =
+      (ssl_free_fn)dynload_sym(stager_dynload(), api->lib, "SSL_free");
+  api->set_fd =
+      (ssl_set_fd_fn)dynload_sym(stager_dynload(), api->lib, "SSL_set_fd");
   api->ctrl = (ssl_ctrl_fn)dynload_sym(stager_dynload(), api->lib, "SSL_ctrl");
-  api->connect = (ssl_connect_fn)dynload_sym(stager_dynload(), api->lib, "SSL_connect");
-  api->write = (ssl_write_fn)dynload_sym(stager_dynload(), api->lib, "SSL_write");
+  api->connect =
+      (ssl_connect_fn)dynload_sym(stager_dynload(), api->lib, "SSL_connect");
+  api->write =
+      (ssl_write_fn)dynload_sym(stager_dynload(), api->lib, "SSL_write");
   api->read = (ssl_read_fn)dynload_sym(stager_dynload(), api->lib, "SSL_read");
-  api->shutdown = (ssl_shutdown_fn)dynload_sym(stager_dynload(), api->lib, "SSL_shutdown");
+  api->shutdown =
+      (ssl_shutdown_fn)dynload_sym(stager_dynload(), api->lib, "SSL_shutdown");
 #if MALLEABLE_ENABLE_ECH
   /* Optional: only present on OpenSSL 4.0+. Its absence is not an error. */
-  api->set1_ech_config_list = (ssl_set1_ech_config_list_fn)dynload_sym(stager_dynload(), 
-      api->lib, "SSL_set1_ech_config_list");
+  api->set1_ech_config_list = (ssl_set1_ech_config_list_fn)dynload_sym(
+      stager_dynload(), api->lib, "SSL_set1_ech_config_list");
   api->ech_available = (api->set1_ech_config_list != NULL);
 #endif
 
@@ -591,7 +599,9 @@ cleanup:
   return result;
 }
 
-const char *transport_name(void) { return "libssl"; }
+const char *transport_name(void) {
+  return "libssl";
+}
 
 size_t transport_download(const char *host, const char *port, const char *path,
                           void *buffer, size_t capacity, const uint8_t *key) {

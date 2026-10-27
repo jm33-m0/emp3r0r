@@ -18,7 +18,6 @@
 
 #include "http_poll.h"
 
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -151,13 +150,11 @@ static int build_headers(const hp_ctx *h, int kind, hdr_list *out) {
   if (add_header(out, p->session_header, p->session_value, h->session, cookie,
                  sizeof(cookie)) != 0)
     return -1;
-  if (kind == 2 &&
-      add_header(out, p->init_header, p->init_value, h->session, cookie,
-                 sizeof(cookie)) != 0)
+  if (kind == 2 && add_header(out, p->init_header, p->init_value, h->session,
+                              cookie, sizeof(cookie)) != 0)
     return -1;
-  if (kind == 3 &&
-      add_header(out, p->close_header, p->close_value, h->session, cookie,
-                 sizeof(cookie)) != 0)
+  if (kind == 3 && add_header(out, p->close_header, p->close_value, h->session,
+                              cookie, sizeof(cookie)) != 0)
     return -1;
   if (cookie[0]) {
     size_t cl = strlen(cookie);
@@ -205,9 +202,9 @@ static long hp_read_timeout_s(const c2_agent_config *cfg) {
   return timeout;
 }
 
-static int hp_request(hp_ctx *h, int kind, const uint8_t *body,
-                      size_t body_len, uint8_t *resp, size_t resp_cap,
-                      size_t *resp_len, long *status) {
+static int hp_request(hp_ctx *h, int kind, const uint8_t *body, size_t body_len,
+                      uint8_t *resp, size_t resp_cap, size_t *resp_len,
+                      long *status) {
   *resp_len = 0;
   *status = 0;
 
@@ -298,7 +295,8 @@ static long hp_write(void *ctx, const uint8_t *buf, size_t len) {
     return C2_ERR_NOMEM;
   size_t rlen = 0;
   long status = 0;
-  int rc = hp_request(h, HP_REQ_WRITE, buf, len, resp, 64u * 1024u, &rlen, &status);
+  int rc =
+      hp_request(h, HP_REQ_WRITE, buf, len, resp, 64u * 1024u, &rlen, &status);
   if (rc != 0 || status != 200) {
     free(resp);
     return C2_ERR_IO;

@@ -1,0 +1,16 @@
+# clangd reads compile_flags.txt. If a generated compile_commands.json is used
+# instead, strip zig's versioned target: clangd does not understand the
+# `x86_64-linux-gnu.2.17` suffix.
+CompileFlags:
+  Remove: [-target]
+
+# Do not let the LSP rewrite includes: the C tree relies on the current include
+# order and on freestanding overrides in src/util.
+Diagnostics:
+  UnusedIncludes: None
+
+---
+If:
+  PathMatch: .*fuzz/fuzz_doh\.c
+CompileFlags:
+  Add: [-DDOH_FUZZ]

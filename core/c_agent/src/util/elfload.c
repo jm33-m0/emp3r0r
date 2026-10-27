@@ -13,9 +13,9 @@
 
 #include "util/dynload.h"
 
-#include <stdint.h>
 #include <setjmp.h>
 #include <signal.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
@@ -131,10 +131,9 @@ struct elfload_module {
  * and the dashed real filename are listed because /proc/self/maps shows the
  * latter on RHEL/CentOS (libpthread-2.17.so, not libpthread.so.0). */
 static const char *const host_libs[] = {
-    "libc.so",     "libc-",       "libc.musl",     "ld-musl",
-    "libdl.so",    "libdl-",      "libpthread.so", "libpthread-",
-    "librt.so",    "librt-",      "libm.so",       "libm-",
-    "libgcc_s.so", "libgcc_s-",
+    "libc.so", "libc-",         "libc.musl",   "ld-musl",   "libdl.so",
+    "libdl-",  "libpthread.so", "libpthread-", "librt.so",  "librt-",
+    "libm.so", "libm-",         "libgcc_s.so", "libgcc_s-",
 };
 
 static void set_err(char *err, size_t cap, const char *msg) {
@@ -159,7 +158,9 @@ static uint64_t rd64(const uint8_t *p) {
   return (uint64_t)rd32(p) | ((uint64_t)rd32(p + 4) << 32);
 }
 
-static size_t align_down(size_t v, size_t a) { return v & ~(a - 1); }
+static size_t align_down(size_t v, size_t a) {
+  return v & ~(a - 1);
+}
 
 #ifndef ELFLOAD_NO_EXEC
 /* ---- crash guard ---------------------------------------------------------
@@ -530,8 +531,7 @@ static int run_init(elfload_module *m, const init_info *init) {
     uint64_t base = (uint64_t)(uintptr_t)m->map;
     for (size_t i = 0; i < count; i++) {
       uint64_t fn = rd64(arr + i * sizeof(uint64_t));
-      if (fn != 0 && fn != UINT64_MAX && fn >= base &&
-          fn < base + m->map_len)
+      if (fn != 0 && fn != UINT64_MAX && fn >= base && fn < base + m->map_len)
         ((init_fn)(uintptr_t)fn)(0, NULL, NULL);
     }
   }
@@ -552,9 +552,9 @@ elfload_module *elfload_map(const uint8_t *image, size_t len, char *err,
     return NULL;
   }
   const uint8_t *e = image;
-  if (e[0] != ELFMAG0 || e[1] != ELFMAG1 || e[2] != ELFMAG2 || e[3] != ELFMAG3 ||
-      e[EI_CLASS] != ELFCLASS64 || e[EI_DATA] != ELFDATA2LSB ||
-      e[EI_VERSION] != EV_CURRENT) {
+  if (e[0] != ELFMAG0 || e[1] != ELFMAG1 || e[2] != ELFMAG2 ||
+      e[3] != ELFMAG3 || e[EI_CLASS] != ELFCLASS64 ||
+      e[EI_DATA] != ELFDATA2LSB || e[EI_VERSION] != EV_CURRENT) {
     set_err(err, err_cap, "not an ELF64 little-endian image");
     return NULL;
   }
@@ -751,11 +751,12 @@ elfload_module *elfload_map(const uint8_t *image, size_t len, char *err,
       return NULL;
     }
     elfload_module tmp = {map, map_len, machine};
-    rel_ok = apply_rela(&tmp, jmprel_v, pltrel_sz, symtab_off, strtab_off,
-                        strsz_s);
+    rel_ok =
+        apply_rela(&tmp, jmprel_v, pltrel_sz, symtab_off, strtab_off, strsz_s);
   }
   if (!rel_ok) {
-    set_err(err, err_cap, "relocation failed (unsupported type or unresolved symbol)");
+    set_err(err, err_cap,
+            "relocation failed (unsupported type or unresolved symbol)");
     munmap(map, map_len);
     return NULL;
   }
@@ -763,12 +764,12 @@ elfload_module *elfload_map(const uint8_t *image, size_t len, char *err,
   /* Apply per-segment W^X, then run constructors. */
   for (size_t i = 0; i < nsegs; i++) {
     size_t start = align_down((size_t)segs[i].vaddr, page);
-    size_t end = align_down((size_t)segs[i].vaddr + (size_t)segs[i].memsz + page - 1,
-                            page);
+    size_t end = align_down(
+        (size_t)segs[i].vaddr + (size_t)segs[i].memsz + page - 1, page);
     if (end > map_len)
       end = map_len;
-    if (end > start &&
-        mprotect(map + start, end - start, prot_from_flags(segs[i].flags)) != 0) {
+    if (end > start && mprotect(map + start, end - start,
+                                prot_from_flags(segs[i].flags)) != 0) {
       set_err(err, err_cap, "mprotect failed");
       munmap(map, map_len);
       return NULL;

@@ -40,7 +40,8 @@ int main(void) {
 
   c2_agent_info info;
   c2_sysinfo_store store;
-  CHECK_EQ_LONG(c2_gather_agent_info(&info, &cfg, NULL, "9.9.9", &store), C2_OK);
+  CHECK_EQ_LONG(c2_gather_agent_info(&info, &cfg, NULL, "9.9.9", &store),
+                C2_OK);
 
   /* The fields module selection and operator display depend on. */
   CHECK(str_eq(info.goos, "linux"));

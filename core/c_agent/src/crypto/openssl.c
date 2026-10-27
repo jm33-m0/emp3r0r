@@ -82,8 +82,8 @@ typedef struct {
   EC_POINT *(*EC_POINT_new)(const EC_GROUP *);
   void (*EC_POINT_free)(EC_POINT *);
   int (*EC_POINT_is_on_curve)(const EC_GROUP *, const EC_POINT *, BN_CTX *);
-  int (*EC_POINT_oct2point)(const EC_GROUP *, EC_POINT *,
-                            const unsigned char *, size_t, BN_CTX *);
+  int (*EC_POINT_oct2point)(const EC_GROUP *, EC_POINT *, const unsigned char *,
+                            size_t, BN_CTX *);
   int (*EC_POINT_point2oct)(const EC_GROUP *, const EC_POINT *, int,
                             unsigned char *, size_t, BN_CTX *);
   int (*EC_POINT_mul)(const EC_GROUP *, EC_POINT *, const BIGNUM *,
@@ -311,13 +311,12 @@ static int os_seal(void *vctx, const uint8_t key[C2_AES_KEY_BYTES],
   int outl = 0, tmpl = 0;
   if (c->EVP_EncryptInit_ex(ctx, c->EVP_aes_256_gcm(), NULL, NULL, NULL) != 1)
     goto done;
-  if (c->EVP_CIPHER_CTX_ctrl(ctx, C2_EVP_CTRL_GCM_SET_IVLEN,
-                             C2_GCM_NONCE_BYTES, NULL) != 1)
+  if (c->EVP_CIPHER_CTX_ctrl(ctx, C2_EVP_CTRL_GCM_SET_IVLEN, C2_GCM_NONCE_BYTES,
+                             NULL) != 1)
     goto done;
   if (c->EVP_EncryptInit_ex(ctx, NULL, NULL, key, nonce) != 1)
     goto done;
-  if (in_len > 0 &&
-      c->EVP_EncryptUpdate(ctx, out, &outl, in, (int)in_len) != 1)
+  if (in_len > 0 && c->EVP_EncryptUpdate(ctx, out, &outl, in, (int)in_len) != 1)
     goto done;
   if (c->EVP_EncryptFinal_ex(ctx, out + outl, &tmpl) != 1)
     goto done;
@@ -349,13 +348,12 @@ static int os_open(void *vctx, const uint8_t key[C2_AES_KEY_BYTES],
   int outl = 0, tmpl = 0;
   if (c->EVP_DecryptInit_ex(ctx, c->EVP_aes_256_gcm(), NULL, NULL, NULL) != 1)
     goto done;
-  if (c->EVP_CIPHER_CTX_ctrl(ctx, C2_EVP_CTRL_GCM_SET_IVLEN,
-                             C2_GCM_NONCE_BYTES, NULL) != 1)
+  if (c->EVP_CIPHER_CTX_ctrl(ctx, C2_EVP_CTRL_GCM_SET_IVLEN, C2_GCM_NONCE_BYTES,
+                             NULL) != 1)
     goto done;
   if (c->EVP_DecryptInit_ex(ctx, NULL, NULL, key, nonce) != 1)
     goto done;
-  if (ct_len > 0 &&
-      c->EVP_DecryptUpdate(ctx, out, &outl, in, (int)ct_len) != 1)
+  if (ct_len > 0 && c->EVP_DecryptUpdate(ctx, out, &outl, in, (int)ct_len) != 1)
     goto done;
   if (c->EVP_CIPHER_CTX_ctrl(ctx, C2_EVP_CTRL_GCM_SET_TAG, C2_GCM_TAG_BYTES,
                              (void *)(in + ct_len)) != 1)
@@ -413,8 +411,8 @@ static int os_ec_keygen(void *vctx, uint8_t priv[C2_P256_PRIV_BYTES],
   if (c->EC_KEY_generate_key(key) != 1)
     goto done;
   const BIGNUM *d = c->EC_KEY_get0_private_key(key);
-  if (d == NULL || os_bn2binpad(c, d, priv, C2_P256_PRIV_BYTES) !=
-                       (int)C2_P256_PRIV_BYTES)
+  if (d == NULL ||
+      os_bn2binpad(c, d, priv, C2_P256_PRIV_BYTES) != (int)C2_P256_PRIV_BYTES)
     goto done;
   const EC_GROUP *group = c->EC_KEY_get0_group(key);
   const EC_POINT *p = c->EC_KEY_get0_public_key(key);
@@ -429,8 +427,7 @@ done:
   return ok ? 0 : -1;
 }
 
-static int os_pub_from_priv(void *vctx,
-                            const uint8_t priv[C2_P256_PRIV_BYTES],
+static int os_pub_from_priv(void *vctx, const uint8_t priv[C2_P256_PRIV_BYTES],
                             uint8_t pub[C2_P256_PUB_BYTES]) {
   openssl_ctx *c = (openssl_ctx *)vctx;
   EC_GROUP *group = c->EC_GROUP_new_by_curve_name(C2_NID_X9_62_PRIME256V1);
@@ -603,10 +600,13 @@ fail:
 /* ------------------------------------------------------------------------- */
 
 c2_crypto_backend *c2_crypto_open(void) {
-  static const char *names[] = {
-      "libcrypto.so.3",     "libcrypto.so.1.1",   "libcrypto.so.10",
-      "libcrypto.so.1.0.0", "libcrypto.so.1.0.2", "libcrypto.so",
-      NULL};
+  static const char *names[] = {"libcrypto.so.3",
+                                "libcrypto.so.1.1",
+                                "libcrypto.so.10",
+                                "libcrypto.so.1.0.0",
+                                "libcrypto.so.1.0.2",
+                                "libcrypto.so",
+                                NULL};
   openssl_ctx *c = (openssl_ctx *)calloc(1, sizeof(*c));
   if (c == NULL)
     return NULL;

@@ -47,9 +47,9 @@ int main(void) {
   size_t out_len = 123;
   CHECK_EQ_LONG(rc4_decrypt_alloc(NULL, 4, key5, 5, &out, &out_len), -1);
   CHECK(out == NULL && out_len == 0);
-  CHECK_EQ_LONG(rc4_decrypt_alloc((const uint8_t *)"abcd", 4, key5, 5, &out,
-                                  &out_len),
-                0);
+  CHECK_EQ_LONG(
+      rc4_decrypt_alloc((const uint8_t *)"abcd", 4, key5, 5, &out, &out_len),
+      0);
   CHECK(out != NULL && out_len == 4);
   free(out);
 

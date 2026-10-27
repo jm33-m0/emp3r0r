@@ -82,10 +82,10 @@ static void test_reject(void) {
   buf[1] = 'E';
   buf[2] = 'L';
   buf[3] = 'F';
-  buf[4] = 2; /* ELFCLASS64 */
-  buf[5] = 1; /* ELFDATA2LSB */
-  buf[6] = 1; /* EV_CURRENT */
-  buf[16] = 3; /* ET_DYN */
+  buf[4] = 2;   /* ELFCLASS64 */
+  buf[5] = 1;   /* ELFDATA2LSB */
+  buf[6] = 1;   /* EV_CURRENT */
+  buf[16] = 3;  /* ET_DYN */
   buf[18] = 62; /* EM_X86_64 */
   CHECK(elfload_map(buf, sizeof(buf), NULL, 0) == NULL);
 
@@ -151,9 +151,8 @@ int main(void) {
       memcpy(&phentsize, bad + 54, sizeof(phentsize));
       memcpy(&phnum, bad + 56, sizeof(phnum));
       int patched = 0;
-      for (uint16_t i = 0; i < phnum &&
-                           phoff + (uint64_t)phentsize * (i + 1) <= len;
-           i++) {
+      for (uint16_t i = 0;
+           i < phnum && phoff + (uint64_t)phentsize * (i + 1) <= len; i++) {
         uint8_t *p = bad + phoff + (size_t)i * phentsize;
         uint32_t type = 0;
         memcpy(&type, p, sizeof(type));

@@ -13,8 +13,6 @@
 
 #include "beacon_compat.h"
 
-#pragma GCC visibility push(hidden)
-
 static char *output_buf = NULL;
 static size_t output_len = 0;
 static size_t output_cap = 0;
@@ -170,7 +168,9 @@ void BeaconFormatInt(formatp *format, int value) {
   format->buffer += 4;
 }
 
-int BeaconIsAdmin(void) { return geteuid() == 0; }
+int BeaconIsAdmin(void) {
+  return geteuid() == 0;
+}
 
 void BeaconDataParse(datap *parser, char *buffer, int size) {
   if (parser == NULL)
@@ -248,7 +248,9 @@ static char **get_environ(void) {
   char ***envp = (char ***)dlsym(RTLD_DEFAULT, "environ");
   return envp != NULL ? *envp : NULL;
 }
-static const char *get_os_name(void) { return "lin"; }
+static const char *get_os_name(void) {
+  return "lin";
+}
 
 static const struct {
   const char *name;
@@ -283,5 +285,3 @@ void *beacon_api_lookup(const char *name) {
   }
   return NULL;
 }
-
-#pragma GCC visibility pop

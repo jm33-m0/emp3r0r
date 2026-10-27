@@ -1,2 +1,3 @@
+# zig's versioned target ABI is not understood by clangd.
 CompileFlags:
-  Remove: [-fno-toplevel-reorder]
+  Remove: [-fno-toplevel-reorder, -target]

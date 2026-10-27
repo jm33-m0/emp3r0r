@@ -147,7 +147,8 @@ static int doh_post(const char *url, const uint8_t *query, size_t query_len,
     return -1;
 
   curl_slist *headers = NULL;
-  headers = g_curl.slist_append(headers, "Content-Type: application/dns-message");
+  headers =
+      g_curl.slist_append(headers, "Content-Type: application/dns-message");
   headers = g_curl.slist_append(headers, "Accept: application/dns-message");
 
   doh_resp rb = {resp, 0, resp_cap};
@@ -236,7 +237,6 @@ static int build_query(const char *host, uint16_t qtype, uint16_t id,
 static uint16_t rd16(const uint8_t *p) {
   return (uint16_t)(((uint16_t)p[0] << 8) | p[1]);
 }
-
 
 /* Skip a possibly compressed DNS name. */
 static int skip_name(const uint8_t *p, size_t len, size_t *pos) {

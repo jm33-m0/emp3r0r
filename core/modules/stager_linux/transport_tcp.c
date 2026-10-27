@@ -7,9 +7,8 @@
 
 /* Download the stage blob over raw TCP: the listener sends the encrypted blob
  * verbatim and closes the connection when done. */
-static size_t tcp_download(const char *host, const char *port,
-                           const char *path, void *buffer, size_t capacity,
-                           const uint8_t *key) {
+static size_t tcp_download(const char *host, const char *port, const char *path,
+                           void *buffer, size_t capacity, const uint8_t *key) {
   (void)path;
   (void)key;
 
@@ -41,7 +40,9 @@ static size_t tcp_download(const char *host, const char *port,
   return data_size;
 }
 
-const char *transport_name(void) { return "tcp"; }
+const char *transport_name(void) {
+  return "tcp";
+}
 
 size_t transport_download(const char *host, const char *port, const char *path,
                           void *buffer, size_t capacity, const uint8_t *key) {

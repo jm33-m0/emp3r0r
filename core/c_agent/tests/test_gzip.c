@@ -17,8 +17,7 @@
 static void roundtrip(const uint8_t *in, size_t len) {
   uint8_t *gz = malloc(c2_gzip_bound(len) + 16);
   size_t gz_len = 0;
-  CHECK_EQ_LONG(c2_gzip_compress(in, len, gz, c2_gzip_bound(len) + 16,
-                                 &gz_len),
+  CHECK_EQ_LONG(c2_gzip_compress(in, len, gz, c2_gzip_bound(len) + 16, &gz_len),
                 0);
   CHECK(gz_len > 8);
   CHECK(gz[0] == 0x1f && gz[1] == 0x8b); /* gzip magic */
@@ -54,8 +53,8 @@ int main(void) {
   bad[1] = 0x8b;
   uint8_t out[256];
   size_t out_len = 0;
-  c2_status st = c2_gzip_decompress(bad, sizeof(bad), out, sizeof(out),
-                                    &out_len);
+  c2_status st =
+      c2_gzip_decompress(bad, sizeof(bad), out, sizeof(out), &out_len);
   CHECK(st != C2_OK);
 
   TEST_DONE();

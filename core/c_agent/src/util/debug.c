@@ -4,7 +4,9 @@
 #include "util/debug.h"
 #include "util/utils.h"
 
-static void put_char(char c) { write(1, &c, 1); }
+static void put_char(char c) {
+  write(1, &c, 1);
+}
 
 static void put_str(const char *s) {
   if (!s) {
@@ -76,5 +78,7 @@ void debug_print(const char *format, ...) {
   va_end(args);
 }
 
-void perror(const char *s) { debug_print("Error: %s\n", s); }
+void perror(const char *s) {
+  debug_print("Error: %s\n", s);
+}
 #endif

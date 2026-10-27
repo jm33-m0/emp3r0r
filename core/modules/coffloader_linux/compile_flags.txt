@@ -1,0 +1,5 @@
+-O2
+-fPIC
+-Wall
+-I.
+-fvisibility=hidden

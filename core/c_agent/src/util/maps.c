@@ -54,7 +54,7 @@ static int line_is_anonymous(const char *line, size_t len, int *special) {
   while (i < len && line[i] == ' ')
     i++;
   while (i < len && line[i] != ' ')
-    i++; /* perms */
+    i++;                                    /* perms */
   for (int field = 0; field < 3; field++) { /* offset, dev, inode */
     while (i < len && line[i] == ' ')
       i++;

@@ -25,8 +25,8 @@
 
 #include <fcntl.h>
 #include <signal.h>
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -103,8 +103,7 @@ static void persist(const uint8_t *data, size_t len) {
   if (g_corpus_out == NULL || len == 0)
     return;
   char path[1024];
-  snprintf(path, sizeof(path), "%s/id_%06zu", g_corpus_out,
-           (size_t)rng());
+  snprintf(path, sizeof(path), "%s/id_%06zu", g_corpus_out, (size_t)rng());
   int fd = open(path, O_WRONLY | O_CREAT | O_EXCL, 0644);
   if (fd < 0)
     return;
@@ -197,9 +196,12 @@ int main(int argc, char **argv) {
     corpus_add(buf, n);
   }
   if (g_corpus_len == 0) {
-    static const uint8_t seeds[][8] = {
-        {0}, {0xff}, {1, 2, 3, 4, 5}, {'s', 'e', 'c', 'r', 'e', 't'},
-        {0x7f, 0, 0, 1}, {0x01, 0x02, 0x03, 0x04, 0x05}};
+    static const uint8_t seeds[][8] = {{0},
+                                       {0xff},
+                                       {1, 2, 3, 4, 5},
+                                       {'s', 'e', 'c', 'r', 'e', 't'},
+                                       {0x7f, 0, 0, 1},
+                                       {0x01, 0x02, 0x03, 0x04, 0x05}};
     for (size_t i = 0; i < sizeof(seeds) / sizeof(seeds[0]); i++)
       corpus_add(seeds[i], sizeof(seeds[i]));
   }

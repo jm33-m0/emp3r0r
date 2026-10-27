@@ -123,9 +123,9 @@ extern "C" {
 /* MsgTunData.Tag values                                                      */
 /* ------------------------------------------------------------------------- */
 
-#define C2_TAG_CHECKIN_OK "checkin-ok" /* C2 -> agent check-in ACK        */
-#define C2_TAG_HANDSHAKE "handshake"   /* C2 -> agent ECDH / keep-alive   */
-#define C2_TAG_PEER_LIST "peer_list"   /* C2 -> agent gossip peers        */
+#define C2_TAG_CHECKIN_OK "checkin-ok"   /* C2 -> agent check-in ACK        */
+#define C2_TAG_HANDSHAKE "handshake"     /* C2 -> agent ECDH / keep-alive   */
+#define C2_TAG_PEER_LIST "peer_list"     /* C2 -> agent gossip peers        */
 #define C2_TAG_AGENT_TOKEN "agent_token" /* C2 -> agent mesh token        */
 
 /* ------------------------------------------------------------------------- */
@@ -134,14 +134,14 @@ extern "C" {
 
 typedef enum {
   C2_OK = 0,
-  C2_ERR_ARG = -1,       /* invalid argument or buffer too small        */
-  C2_ERR_NOMEM = -2,     /* caller buffer exhausted                     */
-  C2_ERR_PROTO = -3,     /* malformed frame / CBOR / message            */
-  C2_ERR_CRYPTO = -4,    /* encrypt/decrypt/signature failure           */
-  C2_ERR_AUTH = -5,      /* identity, replay or CA verification failure */
-  C2_ERR_IO = -6,        /* transport read/write/close failure          */
-  C2_ERR_TIMEOUT = -7,   /* operation exceeded its deadline             */
-  C2_ERR_OVERFLOW = -8,  /* untrusted length/count out of range         */
+  C2_ERR_ARG = -1,      /* invalid argument or buffer too small        */
+  C2_ERR_NOMEM = -2,    /* caller buffer exhausted                     */
+  C2_ERR_PROTO = -3,    /* malformed frame / CBOR / message            */
+  C2_ERR_CRYPTO = -4,   /* encrypt/decrypt/signature failure           */
+  C2_ERR_AUTH = -5,     /* identity, replay or CA verification failure */
+  C2_ERR_IO = -6,       /* transport read/write/close failure          */
+  C2_ERR_TIMEOUT = -7,  /* operation exceeded its deadline             */
+  C2_ERR_OVERFLOW = -8, /* untrusted length/count out of range         */
   C2_ERR_UNSUPPORTED = -9,
 } c2_status;
 
@@ -263,8 +263,7 @@ static inline int c2_str_equal(c2_str a, const char *b) {
 }
 
 static inline int c2_str_equal_str(c2_str a, c2_str b) {
-  return a.len == b.len &&
-         (a.len == 0 || c2_ct_equal(a.ptr, b.ptr, a.len));
+  return a.len == b.len && (a.len == 0 || c2_ct_equal(a.ptr, b.ptr, a.len));
 }
 
 /* Bytewise lexicographic order, matching Go's strings.Compare / sort.Strings.

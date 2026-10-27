@@ -39,7 +39,8 @@ static c2_status dec_peers(const uint8_t *buf, size_t len,
 
 /* A c2_str from a string literal with a compile-time length (constant
  * initializer, unlike c2_str_lit which is an inline function). */
-#define STR(s) {(s), sizeof(s) - 1}
+#define STR(s)                                                                 \
+  { (s), sizeof(s) - 1 }
 
 /* Fill `a` with one value per field. The list arrays are static so the slices
  * stay valid after this function returns (the struct only borrows them). */

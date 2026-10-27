@@ -122,9 +122,8 @@ static int curl_load(void) {
   LOAD(slist_free_all, "curl_slist_free_all");
 #undef LOAD
 
-  curl_global_init_fn global_init =
-      (curl_global_init_fn)(uintptr_t)dynload_sym(&dl, g_curl.lib,
-                                                  "curl_global_init");
+  curl_global_init_fn global_init = (curl_global_init_fn)(uintptr_t)dynload_sym(
+      &dl, g_curl.lib, "curl_global_init");
   if (global_init != NULL)
     global_init(CURL_GLOBAL_ALL);
 
@@ -185,8 +184,7 @@ c2_status hp_http_perform(const hp_http_request *req) {
                      req->timeout_s > 0 ? req->timeout_s : 30L);
   g_curl.easy_setopt(easy, CURLOPT_SSL_VERIFYPEER, 1L);
   g_curl.easy_setopt(easy, CURLOPT_SSL_VERIFYHOST, 2L);
-  if (req->ca_pem != NULL && req->ca_pem->ptr != NULL &&
-      req->ca_pem->len > 0) {
+  if (req->ca_pem != NULL && req->ca_pem->ptr != NULL && req->ca_pem->len > 0) {
     struct curl_blob blob = {(void *)req->ca_pem->ptr, req->ca_pem->len,
                              CURL_BLOB_COPY};
     g_curl.easy_setopt(easy, CURLOPT_CAINFO_BLOB, &blob);
@@ -230,4 +228,6 @@ c2_status hp_http_perform(const hp_http_request *req) {
   return C2_OK;
 }
 
-const char *c2_transport_name(void) { return "libcurl"; }
+const char *c2_transport_name(void) {
+  return "libcurl";
+}

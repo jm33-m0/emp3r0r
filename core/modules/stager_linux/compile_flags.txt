@@ -1,0 +1,15 @@
+-Wall
+-Wextra
+-Os
+-fno-builtin
+-fno-stack-protector
+-fPIC
+-I.
+-I../../c_agent/include
+-I../common
+-DC2_SYSCALL_GADGET_EXTERN
+-DDYNLOAD_MODE=0
+-DDYNLOAD_HASH_STYLE=0
+-DSUPERVISE_SLEEP_MIN=5
+-DSUPERVISE_SLEEP_MAX=30
+-I../../c_agent/tests

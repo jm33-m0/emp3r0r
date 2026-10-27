@@ -81,9 +81,8 @@ static inline size_t mask_add_map_ex(uintptr_t start, uintptr_t end, int prot,
 static inline size_t mask_add_map(uintptr_t start, uintptr_t end, int prot,
                                   uintptr_t keep_start, uintptr_t keep_end,
                                   uintptr_t scratch_start,
-                                  uintptr_t scratch_end,
-                                  struct c2_map *ranges, size_t cap,
-                                  size_t n) {
+                                  uintptr_t scratch_end, struct c2_map *ranges,
+                                  size_t cap, size_t n) {
   const uintptr_t ex[2][2] = {{keep_start, keep_end},
                               {scratch_start, scratch_end}};
   return mask_add_map_ex(start, end, prot, ex, 2, ranges, cap, n);

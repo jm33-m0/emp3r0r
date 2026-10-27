@@ -32,7 +32,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     memset(export_name, 0xAA, sizeof(export_name));
     memset(buf, 0xBB, sizeof(buf));
     (void)c2_coff_invocation_parse(b64, b64len, export_name, export_cap, tokens,
-                                   &tokenc, tokens_cap, buf, buf_cap, &buf_used);
+                                   &tokenc, tokens_cap, buf, buf_cap,
+                                   &buf_used);
   }
 
   /* The input as base64 text, with full capacities. */

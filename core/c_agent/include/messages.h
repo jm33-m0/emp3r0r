@@ -34,15 +34,15 @@ typedef struct {
 /* ------------------------------------------------------------------------- */
 
 enum {
-  C2_KEY_AUTH_TYPE = 11,           /* text  must be C2_MSGAUTH_TYPE      */
-  C2_KEY_AUTH_AGENT_UUID = 12,     /* text                               */
-  C2_KEY_AUTH_IDENTITY_TOKEN = 13, /* text  base64url(CA sig over UUID)  */
-  C2_KEY_AUTH_TIMESTAMP = 14,      /* int   unix seconds                 */
-  C2_KEY_AUTH_NONCE = 15,          /* text  fresh, anti-replay           */
-  C2_KEY_AUTH_CAPABILITIES = 16,   /* array of text (1 route + features) */
-  C2_KEY_AUTH_AGENT_PROOF = 17,    /* text  base64url(ECDSA DER sig)     */
-  C2_KEY_AUTH_EPHEM_PUBLIC = 18,   /* bytes optional                     */
-  C2_KEY_AUTH_STREAM_ID = 19,      /* text  optional                     */
+  C2_KEY_AUTH_TYPE = 11,             /* text  must be C2_MSGAUTH_TYPE      */
+  C2_KEY_AUTH_AGENT_UUID = 12,       /* text                               */
+  C2_KEY_AUTH_IDENTITY_TOKEN = 13,   /* text  base64url(CA sig over UUID)  */
+  C2_KEY_AUTH_TIMESTAMP = 14,        /* int   unix seconds                 */
+  C2_KEY_AUTH_NONCE = 15,            /* text  fresh, anti-replay           */
+  C2_KEY_AUTH_CAPABILITIES = 16,     /* array of text (1 route + features) */
+  C2_KEY_AUTH_AGENT_PROOF = 17,      /* text  base64url(ECDSA DER sig)     */
+  C2_KEY_AUTH_EPHEM_PUBLIC = 18,     /* bytes optional                     */
+  C2_KEY_AUTH_STREAM_ID = 19,        /* text  optional                     */
   C2_KEY_AUTH_PROTOCOL_VERSION = 20, /* int must be C2_PROTOCOL_VERSION  */
 };
 
@@ -82,15 +82,15 @@ c2_status c2_msgauth_decode(CborValue *r, c2_msgauth *m);
 /* ------------------------------------------------------------------------- */
 
 enum {
-  C2_KEY_TUN_JOB_ID = 1,          /* text                               */
-  C2_KEY_TUN_CMD_SLICE = 2,       /* array of text                      */
-  C2_KEY_TUN_RESPONSE = 3,        /* bytes                              */
-  C2_KEY_TUN_TAG = 4,             /* text                               */
-  C2_KEY_TUN_TIME = 5,            /* text                               */
-  C2_KEY_TUN_AGENT_UUID = 6,      /* text                               */
-  C2_KEY_TUN_AGENT_UUID_SIG = 7,  /* text base64url(agent key sig)      */
-  C2_KEY_TUN_EPHEM_PUBLIC = 8,    /* bytes agent ephemeral X||Y         */
-  C2_KEY_TUN_PEER_LIST = 9,       /* array of text                      */
+  C2_KEY_TUN_JOB_ID = 1,              /* text                               */
+  C2_KEY_TUN_CMD_SLICE = 2,           /* array of text                      */
+  C2_KEY_TUN_RESPONSE = 3,            /* bytes                              */
+  C2_KEY_TUN_TAG = 4,                 /* text                               */
+  C2_KEY_TUN_TIME = 5,                /* text                               */
+  C2_KEY_TUN_AGENT_UUID = 6,          /* text                               */
+  C2_KEY_TUN_AGENT_UUID_SIG = 7,      /* text base64url(agent key sig)      */
+  C2_KEY_TUN_EPHEM_PUBLIC = 8,        /* bytes agent ephemeral X||Y         */
+  C2_KEY_TUN_PEER_LIST = 9,           /* array of text                      */
   C2_KEY_TUN_ENRICHED_PEER_LIST = 10, /* map (EnrichedPeerList)         */
 };
 
@@ -313,8 +313,7 @@ struct c2_enriched_peer {
   c2_str p2p_transport;
 };
 
-c2_status c2_enriched_peer_list_decode(CborValue *r,
-                                       c2_enriched_peer_list *l);
+c2_status c2_enriched_peer_list_decode(CborValue *r, c2_enriched_peer_list *l);
 
 /* ------------------------------------------------------------------------- */
 /* AgentUUIDSig helper                                                        */

@@ -1,0 +1,6 @@
+-fPIC
+-I../bof_common
+-fno-stack-protector
+-fvisibility=hidden
+-g0
+-fno-sanitize=all

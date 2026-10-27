@@ -76,10 +76,9 @@ static int mb_pbkdf2(void *vctx, const uint8_t *password, size_t password_len,
   (void)vctx;
   if (iterations > (uint32_t)UINT_MAX || out_len > (size_t)UINT32_MAX)
     return -1;
-  return mbedtls_pkcs5_pbkdf2_hmac_ext(MBEDTLS_MD_SHA256, password,
-                                       password_len, salt, salt_len,
-                                       (unsigned int)iterations,
-                                       (uint32_t)out_len, out) == 0
+  return mbedtls_pkcs5_pbkdf2_hmac_ext(
+             MBEDTLS_MD_SHA256, password, password_len, salt, salt_len,
+             (unsigned int)iterations, (uint32_t)out_len, out) == 0
              ? 0
              : -1;
 }
@@ -145,8 +144,7 @@ static int mb_keygen(void *vctx, uint8_t priv[C2_P256_PRIV_BYTES],
   if (load_p256(&grp) != 0)
     return -1;
   int ok = 0;
-  if (mbedtls_ecp_gen_privkey(&grp, &d, mbedtls_ctr_drbg_random,
-                              &c->drbg) != 0)
+  if (mbedtls_ecp_gen_privkey(&grp, &d, mbedtls_ctr_drbg_random, &c->drbg) != 0)
     goto done;
   if (mbedtls_ecp_mul(&grp, &q, &d, &grp.G, mbedtls_ctr_drbg_random,
                       &c->drbg) != 0)
@@ -168,8 +166,7 @@ done:
   return ok ? 0 : -1;
 }
 
-static int mb_pub_from_priv(void *vctx,
-                            const uint8_t priv[C2_P256_PRIV_BYTES],
+static int mb_pub_from_priv(void *vctx, const uint8_t priv[C2_P256_PRIV_BYTES],
                             uint8_t pub[C2_P256_PUB_BYTES]) {
   mbedtls_ctx *c = (mbedtls_ctx *)vctx;
   mbedtls_ecp_group grp;
@@ -295,8 +292,8 @@ static int mb_ecdsa_verify(void *vctx, const uint8_t pub[C2_P256_PUB_BYTES],
     goto fail;
   if (mbedtls_ecp_check_pubkey(&ec.grp, &ec.Q) != 0)
     goto fail;
-  int rc = mbedtls_ecdsa_read_signature(&ec, digest, sizeof(digest), sig,
-                                        sig_len);
+  int rc =
+      mbedtls_ecdsa_read_signature(&ec, digest, sizeof(digest), sig, sig_len);
   mbedtls_ecdsa_free(&ec);
   return rc == 0 ? 0 : -1;
 fail:

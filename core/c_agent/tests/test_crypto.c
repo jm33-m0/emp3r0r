@@ -59,9 +59,8 @@ static void test_hash_kdf(c2_crypto_backend *be) {
     uint8_t info[10] = {0xf0, 0xf1, 0xf2, 0xf3, 0xf4,
                         0xf5, 0xf6, 0xf7, 0xf8, 0xf9};
     uint8_t okm[42];
-    CHECK_EQ_LONG(be->hkdf_sha256(be->ctx, ikm, sizeof(ikm), salt,
-                                  sizeof(salt), info, sizeof(info), okm,
-                                  sizeof(okm)),
+    CHECK_EQ_LONG(be->hkdf_sha256(be->ctx, ikm, sizeof(ikm), salt, sizeof(salt),
+                                  info, sizeof(info), okm, sizeof(okm)),
                   0);
     check_hex(okm, sizeof(okm),
               "3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5b"
@@ -75,8 +74,9 @@ static void test_hash_kdf(c2_crypto_backend *be) {
                                     (const uint8_t *)"salt", 4, 1, dk,
                                     sizeof(dk)),
                   0);
-    check_hex(dk, sizeof(dk),
-              "120fb6cffcf8b32c43e7225256c4f837a86548c92ccc35480805987cb70be17b");
+    check_hex(
+        dk, sizeof(dk),
+        "120fb6cffcf8b32c43e7225256c4f837a86548c92ccc35480805987cb70be17b");
   }
 }
 
@@ -151,9 +151,8 @@ static void test_p256(c2_crypto_backend *be) {
                                         sizeof(sig), &sig_len),
                 0);
   CHECK(sig_len > 0 && sig_len <= sizeof(sig));
-  CHECK_EQ_LONG(be->ecdsa_p256_verify_der(be->ctx, a_pub, msg, msg_len, sig,
-                                          sig_len),
-                0);
+  CHECK_EQ_LONG(
+      be->ecdsa_p256_verify_der(be->ctx, a_pub, msg, msg_len, sig, sig_len), 0);
 
   /* Mutated message and mutated signature must both fail. */
   uint8_t msg2[sizeof(msg)];
@@ -162,8 +161,8 @@ static void test_p256(c2_crypto_backend *be) {
   CHECK(be->ecdsa_p256_verify_der(be->ctx, a_pub, msg2, msg_len, sig,
                                   sig_len) != 0);
   sig[sig_len / 2] ^= 0x01;
-  CHECK(be->ecdsa_p256_verify_der(be->ctx, a_pub, msg, msg_len, sig,
-                                  sig_len) != 0);
+  CHECK(be->ecdsa_p256_verify_der(be->ctx, a_pub, msg, msg_len, sig, sig_len) !=
+        0);
 }
 
 static void test_derivations(c2_crypto_backend *be) {

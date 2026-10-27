@@ -1,9 +1,9 @@
 #define _GNU_SOURCE
+#include "stage_abi.h"
+#include "transport.h"
 #include "util/debug.h"
 #include "util/packer.h"
-#include "stage_abi.h"
 #include "util/strings.h"
-#include "transport.h"
 #include "util/utils.h"
 
 /* Configurable Options - from Makefile */
@@ -95,7 +95,8 @@ void downloader_main(struct stager_payload *res) {
   /* Drop the unused reservation tail so the ciphertext mapping is only as
    * large as the payload. */
   if (cipher_size < MAX_STAGE_BLOB_SIZE)
-    munmap((uint8_t *)stage_blob + cipher_size, MAX_STAGE_BLOB_SIZE - cipher_size);
+    munmap((uint8_t *)stage_blob + cipher_size,
+           MAX_STAGE_BLOB_SIZE - cipher_size);
 
   debug_print("Stage0: downloaded %d bytes, handing off to stub\n",
               (int)downloaded_size);

@@ -63,8 +63,7 @@ struct unpack_header {
 /* Hidden visibility makes GCC emit a PC-relative reference (`lea sym(%rip)`)
  * instead of a GOT load that the linker would relax to an absolute address.
  * The stub is position-independent shellcode loaded at an arbitrary base. */
-extern struct unpack_header unpack_header
-    __attribute__((visibility("hidden")));
+extern struct unpack_header unpack_header __attribute__((visibility("hidden")));
 
 /* Minimal mmap (SYS_mmap = 9). One raw syscall per stub; the unpacked stager
  * resolves the vDSO gadget for all of its own syscalls afterwards. */

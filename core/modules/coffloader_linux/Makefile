@@ -9,7 +9,7 @@
 # module invocation; the build is idempotent.
 CC = zig cc
 ZIG_TARGET ?= x86_64-linux-gnu.2.17
-CFLAGS = -O2 -fPIC -Wall
+CFLAGS = -O2 -fPIC -Wall -fvisibility=hidden
 TARGET = coffloader_linux.so
 SOURCES = loader_linux.c beacon_compat.c
 

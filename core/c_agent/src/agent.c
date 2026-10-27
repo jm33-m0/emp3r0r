@@ -43,10 +43,10 @@
 #include "cbor.h"
 
 #include <dirent.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
@@ -87,8 +87,8 @@ static void wipe_rodata(const void *ptr, size_t len) {
   uintptr_t addr = (uintptr_t)ptr;
   uintptr_t start = addr & ~((uintptr_t)page - 1);
   uintptr_t end = (addr + len + (uintptr_t)page - 1) & ~((uintptr_t)page - 1);
-  if (mprotect((void *)start, (size_t)(end - start),
-               PROT_READ | PROT_WRITE) != 0)
+  if (mprotect((void *)start, (size_t)(end - start), PROT_READ | PROT_WRITE) !=
+      0)
     return;
   memset((void *)ptr, 0, len);
   (void)mprotect((void *)start, (size_t)(end - start), PROT_READ);
@@ -167,8 +167,7 @@ static unsigned c2_poll_sleep_seconds(const c2_crypto_backend *be,
   if (jitter > 100)
     jitter = 100;
 
-  uint32_t span =
-      (uint32_t)(((uint64_t)interval * (uint32_t)jitter) / 100u);
+  uint32_t span = (uint32_t)(((uint64_t)interval * (uint32_t)jitter) / 100u);
   if (span == 0)
     return interval;
 
@@ -904,8 +903,8 @@ __attribute__((visibility("default"))) int main(void) {
   {
     int64_t grace = cfg.offline_grace;
     if (grace <= 0) {
-      int32_t window = cfg.poll_window > 0 ? cfg.poll_window
-                                          : C2_DEFAULT_POLL_WINDOW;
+      int32_t window =
+          cfg.poll_window > 0 ? cfg.poll_window : C2_DEFAULT_POLL_WINDOW;
       unsigned interval = c2_poll_interval_seconds(&cfg);
       grace = (int64_t)interval + window + interval / 2;
     }

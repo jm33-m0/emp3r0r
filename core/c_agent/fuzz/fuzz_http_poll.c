@@ -45,8 +45,8 @@ c2_status hp_http_perform(const hp_http_request *req) {
   return C2_OK;
 }
 
-static void slice(const uint8_t *data, size_t size, size_t index,
-                  size_t pieces, c2_str *out) {
+static void slice(const uint8_t *data, size_t size, size_t index, size_t pieces,
+                  c2_str *out) {
   if (size == 0) {
     *out = c2_str_of(NULL, 0);
     return;

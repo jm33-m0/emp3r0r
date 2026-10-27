@@ -79,7 +79,9 @@ static inline void supervise_sleep(unsigned min_s, unsigned max_s) {
   } while (rc == -SUPERVISE_EINTR);
 }
 
-static inline void supervise_close(int fd) { (void)syscall1(SYS_close, fd); }
+static inline void supervise_close(int fd) {
+  (void)syscall1(SYS_close, fd);
+}
 
 static inline long supervise_write_all(int fd, const uint8_t *buf, size_t len) {
   size_t off = 0;

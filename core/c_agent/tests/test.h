@@ -12,7 +12,8 @@
 static int g_c2_tests_checks;
 static int g_c2_tests_failed;
 
-static void c2_test_check(int ok, const char *expr, const char *file, int line) {
+static void c2_test_check(int ok, const char *expr, const char *file,
+                          int line) {
   g_c2_tests_checks++;
   if (!ok) {
     g_c2_tests_failed++;

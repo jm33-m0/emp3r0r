@@ -38,7 +38,9 @@
 /* Small helpers                                                              */
 /* ------------------------------------------------------------------------- */
 
-static int64_t now_unix(void) { return (int64_t)time(NULL); }
+static int64_t now_unix(void) {
+  return (int64_t)time(NULL);
+}
 
 /* Go's MsgTunData.Time layout: "2006-01-02 15:04:05.999999999 -0700 MST".
  * The server only uses it for RTT, so UTC with nanoseconds is enough. */
@@ -77,10 +79,11 @@ static void rand_uuid(const c2_crypto_backend *be, char *out, size_t cap) {
     out[0] = '\0';
     return;
   }
-  snprintf(out, cap,
-           "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-           b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], b[9], b[10],
-           b[11], b[12], b[13], b[14], b[15]);
+  snprintf(
+      out, cap,
+      "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+      b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], b[9], b[10], b[11],
+      b[12], b[13], b[14], b[15]);
 }
 
 /* base64url(ECDSA_DER(priv, msg)). */
@@ -113,7 +116,8 @@ static c2_status build_url(const c2_agent_config *cfg, char *out, size_t cap) {
     return C2_ERR_ARG;
   int has_scheme = 0;
   for (size_t i = 0; i + 2 < base.len; i++) {
-    if (base.ptr[i] == ':' && base.ptr[i + 1] == '/' && base.ptr[i + 2] == '/') {
+    if (base.ptr[i] == ':' && base.ptr[i + 1] == '/' &&
+        base.ptr[i + 2] == '/') {
       has_scheme = 1;
       break;
     }
@@ -312,8 +316,8 @@ c2_status c2_session_checkin(c2_agent_session *s, const c2_agent_info *info) {
   c2_str_list caps = {caps_items, 1, 1};
 
   c2_secureconn sc;
-  c2_status st = c2_session_open_route(s, s->config->routes.checkin, c2_str_lit(""),
-                                       &caps, &sc);
+  c2_status st = c2_session_open_route(s, s->config->routes.checkin,
+                                       c2_str_lit(""), &caps, &sc);
   if (st != C2_OK)
     return st;
 
@@ -413,8 +417,7 @@ c2_status c2_session_hello(c2_agent_session *s, c2_secureconn *msg,
   st = c2_msgtun_encode(&enc, &m);
   if (st != C2_OK)
     return st;
-  return c2_secureconn_write(msg, buf,
-                             cbor_encoder_get_buffer_size(&enc, buf));
+  return c2_secureconn_write(msg, buf, cbor_encoder_get_buffer_size(&enc, buf));
 }
 
 c2_status c2_session_read(c2_agent_session *s, c2_secureconn *msg,
@@ -477,10 +480,8 @@ c2_status c2_session_read(c2_agent_session *s, c2_secureconn *msg,
 }
 
 c2_status c2_session_send_result(c2_agent_session *s, c2_secureconn *msg,
-                                 c2_str job_id,
-                                 const c2_str_list *cmd_slice,
-                                 const uint8_t *response,
-                                 size_t response_len) {
+                                 c2_str job_id, const c2_str_list *cmd_slice,
+                                 const uint8_t *response, size_t response_len) {
   if (s == NULL || msg == NULL || cmd_slice == NULL)
     return C2_ERR_ARG;
 

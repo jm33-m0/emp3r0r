@@ -22,12 +22,12 @@ void stager_state_init(void) {
   register long r8 __asm__("r8") = -1;
   register long r9 __asm__("r9") = 0;
 
-  __asm__ __volatile__("call *%1"
-                       : "=a"(ret)
-                       : "r"(gadget), "a"((long)SYS_mmap), "D"((long)0),
-                         "S"((long)map_len), "d"((long)(PROT_READ | PROT_WRITE)),
-                         "r"(r10), "r"(r8), "r"(r9)
-                       : "rcx", "r11", "memory");
+  __asm__ __volatile__(
+      "call *%1"
+      : "=a"(ret)
+      : "r"(gadget), "a"((long)SYS_mmap), "D"((long)0), "S"((long)map_len),
+        "d"((long)(PROT_READ | PROT_WRITE)), "r"(r10), "r"(r8), "r"(r9)
+      : "rcx", "r11", "memory");
   if (ret < 0)
     __builtin_trap();
 

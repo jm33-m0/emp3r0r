@@ -21,8 +21,8 @@
  * flips to RX just before entering the payload.
  */
 struct stager_payload {
-  char *data;   /* agent PIC, still RC4-encrypted (RW mmap) */
-  size_t size;  /* number of valid bytes in data */
+  char *data;                   /* agent PIC, still RC4-encrypted (RW mmap) */
+  size_t size;                  /* number of valid bytes in data */
   uint8_t key[DERIVED_KEY_LEN]; /* RC4 key for data */
 };
 

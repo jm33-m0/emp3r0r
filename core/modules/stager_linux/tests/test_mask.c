@@ -31,8 +31,8 @@ static volatile unsigned char *g_canary;
 static int read_mem(int fd, uintptr_t addr, void *buf, size_t len) {
   size_t off = 0;
   while (off < len) {
-    ssize_t n = pread(fd, (unsigned char *)buf + off, len - off,
-                      (off_t)(addr + off));
+    ssize_t n =
+        pread(fd, (unsigned char *)buf + off, len - off, (off_t)(addr + off));
     if (n <= 0)
       return -1;
     off += (size_t)n;
@@ -124,8 +124,8 @@ int main(void) {
 
   uintptr_t keep_start = (uintptr_t)stack;
   uintptr_t keep_end = keep_start + STACK_SIZE;
-  int rc = mask(2, (uintptr_t)(void *)main,
-                (void *)(keep_end & ~(uintptr_t)15), keep_start, keep_end);
+  int rc = mask(2, (uintptr_t)(void *)main, (void *)(keep_end & ~(uintptr_t)15),
+                keep_start, keep_end);
   int status = 0;
   waitpid(child, &status, 0);
 

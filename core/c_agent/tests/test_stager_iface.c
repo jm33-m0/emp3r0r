@@ -99,12 +99,11 @@ static int run_case(enum bind_case tc) {
     if (c2_stager_mask_bind() != 0 || c2_stager_mask_available() != 1 ||
         c2_stager_mask_bind() != 0)
       child_exit(orig_gs, 3);
-    if (c2_stager_masked_sleep(7) != 0 || g_calls != 1 ||
-        g_last_seconds != 7 || g_last_probe == 0)
+    if (c2_stager_masked_sleep(7) != 0 || g_calls != 1 || g_last_seconds != 7 ||
+        g_last_probe == 0)
       child_exit(orig_gs, 4);
     /* A zero duration is normalised to one second, never a busy spin. */
-    if (c2_stager_masked_sleep(0) != 0 || g_calls != 2 ||
-        g_last_seconds != 1)
+    if (c2_stager_masked_sleep(0) != 0 || g_calls != 2 || g_last_seconds != 1)
       child_exit(orig_gs, 6);
     child_exit(orig_gs, 0);
   }

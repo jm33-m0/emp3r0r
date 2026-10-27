@@ -298,7 +298,8 @@ static c2_status read_one_frame(c2_secureconn *sc, uint8_t **plain_out,
     uint8_t hdr[4];
     int eof_now = 0;
     int idle_now = 0;
-    c2_status st = read_exact(&sc->stream, hdr, sizeof(hdr), &eof_now, &idle_now);
+    c2_status st =
+        read_exact(&sc->stream, hdr, sizeof(hdr), &eof_now, &idle_now);
     if (st != C2_OK)
       return st;
     if (idle_now)

@@ -58,10 +58,9 @@ typedef struct c2_crypto_backend {
   /*
    * PBKDF2-HMAC-SHA256. Used only to decrypt the embedded build config.
    */
-  int (*pbkdf2_sha256)(void *ctx, const uint8_t *password,
-                       size_t password_len, const uint8_t *salt,
-                       size_t salt_len, uint32_t iterations, uint8_t *out,
-                       size_t out_len);
+  int (*pbkdf2_sha256)(void *ctx, const uint8_t *password, size_t password_len,
+                       const uint8_t *salt, size_t salt_len,
+                       uint32_t iterations, uint8_t *out, size_t out_len);
 
   /*
    * P-256 key agreement. `priv` is the 32-byte big-endian scalar, `peer_pub` is
@@ -83,7 +82,8 @@ typedef struct c2_crypto_backend {
    * restore the exact identity key cached by a supervising launcher; must
    * reject zero/out-of-range scalars and the point at infinity.
    */
-  int (*ec_p256_pub_from_priv)(void *ctx, const uint8_t priv[C2_P256_PRIV_BYTES],
+  int (*ec_p256_pub_from_priv)(void *ctx,
+                               const uint8_t priv[C2_P256_PRIV_BYTES],
                                uint8_t pub[C2_P256_PUB_BYTES]);
 
   /*
@@ -94,8 +94,7 @@ typedef struct c2_crypto_backend {
   int (*ecdsa_p256_sign_der)(void *ctx, const uint8_t priv[C2_P256_PRIV_BYTES],
                              const uint8_t *msg, size_t msg_len, uint8_t *sig,
                              size_t sig_cap, size_t *sig_len);
-  int (*ecdsa_p256_verify_der)(void *ctx,
-                               const uint8_t pub[C2_P256_PUB_BYTES],
+  int (*ecdsa_p256_verify_der)(void *ctx, const uint8_t pub[C2_P256_PUB_BYTES],
                                const uint8_t *msg, size_t msg_len,
                                const uint8_t *sig, size_t sig_len);
 
@@ -114,8 +113,7 @@ typedef struct c2_crypto_backend {
  * before the PFS handshake completes.
  */
 c2_status c2_psk_from_magic(const c2_crypto_backend *be, const char *magic,
-                            size_t magic_len,
-                            uint8_t psk[C2_AES_KEY_BYTES]);
+                            size_t magic_len, uint8_t psk[C2_AES_KEY_BYTES]);
 
 /*
  * Derive the 32-byte ephemeral session key from an ECDH shared secret:

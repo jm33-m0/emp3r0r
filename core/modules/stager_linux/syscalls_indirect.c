@@ -6,7 +6,9 @@
  * image is mapped RX, so there is no writable global). This is the external
  * gadget provider selected by -DC2_SYSCALL_GADGET_EXTERN.
  */
-void *get_syscall_gadget(void) { return get_stager_state()->syscall_gadget; }
+void *get_syscall_gadget(void) {
+  return get_stager_state()->syscall_gadget;
+}
 
 /* ---- vDSO gadget resolution (called once from init) ---- */
 
