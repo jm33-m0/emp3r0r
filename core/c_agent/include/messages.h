@@ -36,22 +36,22 @@ typedef struct {
 enum {
   C2_KEY_AUTH_TYPE = 11,           /* text  must be C2_MSGAUTH_TYPE      */
   C2_KEY_AUTH_AGENT_UUID = 12,     /* text                               */
-  C2_KEY_AUTH_IDENTITY_TOKEN = 13, /* text  base64url(CA sig over UUID)  */
+  C2_KEY_AUTH_IDENTITY_TOKEN = 13, /* bytes CA signature over UUID       */
   C2_KEY_AUTH_TIMESTAMP = 14,      /* int   unix seconds                 */
   C2_KEY_AUTH_NONCE = 15,          /* text  fresh, anti-replay           */
   C2_KEY_AUTH_ROUTE = 16,          /* text  exactly one route name       */
-  C2_KEY_AUTH_AGENT_PROOF = 17,    /* text  base64url(ECDSA DER sig)     */
+  C2_KEY_AUTH_AGENT_PROOF = 17,    /* bytes ECDSA DER signature          */
   C2_KEY_AUTH_STREAM_ID = 19,      /* text  optional                     */
 };
 
 typedef struct {
   c2_str type;
   c2_str agent_uuid;
-  c2_str identity_token;
+  c2_bytes identity_token;
   int64_t timestamp;
   c2_str nonce;
   c2_str route;
-  c2_str agent_proof;
+  c2_bytes agent_proof;
   c2_str stream_id;
 } c2_msgauth;
 
@@ -288,23 +288,5 @@ struct c2_enriched_peer {
 };
 
 c2_status c2_enriched_peer_list_decode(CborValue *r, c2_enriched_peer_list *l);
-
-/* ------------------------------------------------------------------------- */
-/* AgentUUIDSig helper                                                        */
-/* ------------------------------------------------------------------------- */
-
-/*
- * MsgTunData.AgentUUIDSig is base64url(ECDSA_DER(agent_key, AgentUUID)). This
- * helper signs `uuid` with the agent key and base64url-encodes the result,
- * which is what every MsgTunData and MsgAuth uses for its per-frame identity.
- */
-c2_status c2_sign_uuid_base64(const c2_crypto_backend *be,
-                              const uint8_t priv[C2_P256_PRIV_BYTES],
-                              c2_str uuid, char *out, size_t out_cap,
-                              size_t *out_len);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* C2_MESSAGES_H */

@@ -47,7 +47,6 @@ func (p *AgentProxyImpl) GatherSystemDetails() (map[string]any, error) {
 		"exes":             agent.Exes,
 		"cwd":              agent.CWD,
 		"uuid":             agent.UUID,
-		"uuid_sig":         agent.UUIDSig,
 		"public_key":       agent.PublicKey,
 		"c2_host":          agent.C2Host,
 		"mesh_route":       agent.MeshRoute,

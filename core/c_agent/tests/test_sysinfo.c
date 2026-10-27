@@ -34,7 +34,7 @@ int main(void) {
   memset(&cfg, 0, sizeof(cfg));
   cfg.cc_address = c2_str_lit("127.0.0.1:8080");
   cfg.agent_uuid = c2_str_lit("11111111-1111-1111-1111-111111111111");
-  cfg.agent_uuid_sig = c2_str_lit("sig");
+  cfg.agent_uuid_sig = c2_bytes_of("sig", 3);
   cfg.agent_tag = c2_str_lit("deadbeef");
   cfg.c2_channel_mode = c2_str_lit("http_poll");
 

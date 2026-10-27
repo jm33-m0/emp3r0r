@@ -233,7 +233,7 @@ func runSocks5PivotE2E(t *testing.T, mode string, expectRefused bool) {
 		C2Routes:      routes,
 		MalleableC2:   malleable,
 		AgentUUID:     agentUUID,
-		AgentUUIDSig:  agentSig,
+		AgentUUIDSig:  sigBytes(t, agentSig),
 		AgentTag:      agentTag,
 		CCTimeout:     10000,
 	}

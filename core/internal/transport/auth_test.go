@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/base64"
 	"encoding/pem"
 	"math/big"
 	"testing"
@@ -70,7 +69,7 @@ func TestVerifyMsgAuthRejectsMalformed(t *testing.T) {
 		a := &def.MsgAuth{
 			Type:          def.MsgAuthType,
 			AgentUUID:     "agent-1",
-			IdentityToken: base64.URLEncoding.EncodeToString(sig),
+			IdentityToken: sig,
 			Nonce:         "nonce",
 			Timestamp:     time.Now().Unix(),
 			Route:         "c2-msg",
@@ -103,7 +102,7 @@ func TestVerifyMsgAuthRejectsMalformed(t *testing.T) {
 		}
 	})
 	t.Run("missing identity token", func(t *testing.T) {
-		a := mk(func(m *def.MsgAuth) { m.IdentityToken = "" })
+		a := mk(func(m *def.MsgAuth) { m.IdentityToken = nil })
 		if err := VerifyMsgAuth(a); err == nil {
 			t.Fatal("expected error for missing identity token")
 		}
@@ -132,10 +131,10 @@ func TestVerifyMsgAuthRejectsMalformed(t *testing.T) {
 			t.Fatal("expected error for stale timestamp")
 		}
 	})
-	t.Run("undecodable identity token", func(t *testing.T) {
-		a := mk(func(m *def.MsgAuth) { m.IdentityToken = "!!!not-base64!!!" })
+	t.Run("invalid identity token", func(t *testing.T) {
+		a := mk(func(m *def.MsgAuth) { m.IdentityToken = []byte("invalid") })
 		if err := VerifyMsgAuth(a); err == nil {
-			t.Fatal("expected error for undecodable identity token")
+			t.Fatal("expected error for invalid identity token")
 		}
 	})
 	t.Run("signature over different agent", func(t *testing.T) {
@@ -162,7 +161,7 @@ func TestVerifyMsgAuthAcceptsValidToken(t *testing.T) {
 	auth := &def.MsgAuth{
 		Type:          def.MsgAuthType,
 		AgentUUID:     "agent-1",
-		IdentityToken: base64.URLEncoding.EncodeToString(sig),
+		IdentityToken: sig,
 		Nonce:         "nonce",
 		Timestamp:     time.Now().Unix(),
 		Route:         "c2-msg",

@@ -89,7 +89,7 @@ typedef struct c2_crypto_backend {
   /*
    * ECDSA P-256 over SHA-256(message), signature encoded as ASN.1 DER
    * SEQUENCE { INTEGER r, INTEGER s }. This is exactly what the C2 expects in
-   * MsgAuth.AgentProof and MsgTunData.AgentUUIDSig (then base64url-encoded).
+   * MsgAuth.AgentProof (raw bytes).
    */
   int (*ecdsa_p256_sign_der)(void *ctx, const uint8_t priv[C2_P256_PRIV_BYTES],
                              const uint8_t *msg, size_t msg_len, uint8_t *sig,

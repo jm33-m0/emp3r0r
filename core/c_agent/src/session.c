@@ -77,25 +77,17 @@ static void rand_uuid(const c2_crypto_backend *be, char *out, size_t cap) {
       b[12], b[13], b[14], b[15]);
 }
 
-/* base64url(ECDSA_DER(priv, msg)). */
-static c2_status sign_b64(const c2_crypto_backend *be,
+/* Raw ECDSA/DER signature over msg (MsgAuth.AgentProof). */
+static c2_status sign_der(const c2_crypto_backend *be,
                           const uint8_t priv[C2_P256_PRIV_BYTES], c2_str msg,
-                          char *out, size_t cap, size_t *out_len) {
-  uint8_t sig[72];
-  size_t sig_len = 0;
+                          uint8_t *out, size_t cap, size_t *out_len) {
   if (msg.len > 0 && msg.ptr == NULL)
     return C2_ERR_ARG;
   if (be->ecdsa_p256_sign_der(be->ctx, priv, (const uint8_t *)msg.ptr, msg.len,
-                              sig, sizeof(sig), &sig_len) != 0)
+                              out, cap, out_len) != 0)
     return C2_ERR_CRYPTO;
-  size_t n = c2_base64url_encode(sig, sig_len, out, cap);
-  if (n == 0)
-    return C2_ERR_NOMEM;
-  if (out_len)
-    *out_len = n;
   return C2_OK;
 }
-
 /* URL from the build config, mirroring the Go agent's framing:
  *   http_poll  -> http://<host>:<CCHTTPPort><C2Path>
  *   otherwise  -> https://<host>:<CCH2Port><C2Path>
@@ -252,13 +244,18 @@ c2_status c2_session_open_route(c2_agent_session *s, c2_str route,
     c2_secureconn_close(sc);
     return st;
   }
-  char proof[128];
+  uint8_t proof[72];
   size_t proof_len = 0;
-  st = sign_b64(s->be, s->agent_priv, c2_str_of(canonical, canon_len), proof,
+  st = sign_der(s->be, s->agent_priv, c2_str_of(canonical, canon_len), proof,
                 sizeof(proof), &proof_len);
   if (st != C2_OK) {
     c2_secureconn_close(sc);
     return st;
+  }
+
+  if (s->config->agent_uuid_sig.len == 0) {
+    c2_secureconn_close(sc);
+    return C2_ERR_AUTH;
   }
 
   c2_msgauth m;
@@ -269,7 +266,7 @@ c2_status c2_session_open_route(c2_agent_session *s, c2_str route,
   m.timestamp = ts;
   m.nonce = c2_str_of(nonce, 32);
   m.route = route;
-  m.agent_proof = c2_str_of(proof, proof_len);
+  m.agent_proof = c2_bytes_of(proof, proof_len);
   m.stream_id = stream_id;
 
   uint8_t buf[C2_SESSION_AUTH_MAX];

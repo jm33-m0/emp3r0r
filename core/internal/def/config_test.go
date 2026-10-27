@@ -54,7 +54,7 @@ func TestReadCBORConfigFull(t *testing.T) {
 		EnableNCSI:             false,
 		MeshGossipPort:         "9000",
 		AgentUUID:              "uuid",
-		AgentUUIDSig:           "sig",
+		AgentUUIDSig:           []byte("sig"),
 		AgentTag:               "tag",
 		CCTimeout:              5000,
 	}

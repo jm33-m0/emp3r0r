@@ -118,7 +118,7 @@ typedef struct {
   c2_str ca_pem;
   c2_str doh_server;
   c2_str agent_uuid;
-  c2_str agent_uuid_sig; /* base64url CA token over the UUID */
+  c2_bytes agent_uuid_sig; /* raw CA signature over the UUID */
   c2_str agent_tag;
   c2_str c2_channel_mode; /* "http_poll" (default), "h2conn", "quic", ... */
 

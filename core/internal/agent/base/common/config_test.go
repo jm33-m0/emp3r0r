@@ -137,8 +137,8 @@ func TestInitConfig_Comprehensive(t *testing.T) {
 	if RuntimeConfig.AgentUUID != originalCfg.AgentUUID {
 		t.Errorf("AgentUUID mismatch: got %s, want %s", RuntimeConfig.AgentUUID, originalCfg.AgentUUID)
 	}
-	if RuntimeConfig.AgentUUIDSig != originalCfg.AgentUUIDSig {
-		t.Errorf("AgentUUIDSig mismatch: got %s, want %s", RuntimeConfig.AgentUUIDSig, originalCfg.AgentUUIDSig)
+	if string(RuntimeConfig.AgentUUIDSig) != string(originalCfg.AgentUUIDSig) {
+		t.Errorf("AgentUUIDSig mismatch: got %x, want %x", RuntimeConfig.AgentUUIDSig, originalCfg.AgentUUIDSig)
 	}
 	if RuntimeConfig.AgentTag != originalCfg.AgentTag {
 		t.Errorf("AgentTag mismatch: got %s, want %s", RuntimeConfig.AgentTag, originalCfg.AgentTag)

@@ -102,7 +102,7 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 		return fmt.Errorf("forbidden: uuid mismatch")
 	}
 	target.UUID = auth.AgentUUID
-	target.UUIDSig = auth.IdentityToken
+	target.UUIDSig = base64.URLEncoding.EncodeToString(auth.IdentityToken)
 
 	// The operator-facing identifier is derived exclusively from the verified
 	// UUID. Overwrite whatever the agent reported so a hostile agent can never
@@ -170,15 +170,11 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 	}
 
 	if !isKnown {
-		if auth.AgentProof == "" {
+		if len(auth.AgentProof) == 0 {
 			return fmt.Errorf("forbidden: missing agent proof for first enrollment")
 		}
-		proof, decodeErr := base64.URLEncoding.DecodeString(auth.AgentProof)
-		if decodeErr != nil {
-			return fmt.Errorf("forbidden: bad agent proof encoding: %w", decodeErr)
-		}
 		canonical := transport.CanonicalAuthString(auth.AgentUUID, auth.Timestamp, auth.Nonce, auth.Route)
-		ok, verifyErr := transport.VerifySignatureWithPEM([]byte(target.PublicKey), []byte(canonical), proof)
+		ok, verifyErr := transport.VerifySignatureWithPEM([]byte(target.PublicKey), []byte(canonical), auth.AgentProof)
 		if verifyErr != nil || !ok {
 			return fmt.Errorf("forbidden: first enrollment proof invalid")
 		}

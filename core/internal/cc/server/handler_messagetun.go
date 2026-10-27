@@ -139,7 +139,7 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 					logging.Warningf("handleMessageTunnel: MsgAuth unknown agent %s", util.AgentRef(authAgentUUID))
 					return
 				}
-				if pinnedUUIDSig != "" && msgAuth.IdentityToken != "" && pinnedUUIDSig != msgAuth.IdentityToken {
+				if pinnedUUIDSig != "" && len(msgAuth.IdentityToken) > 0 && base64.URLEncoding.EncodeToString(msgAuth.IdentityToken) != pinnedUUIDSig {
 					logging.Warningf("handleMessageTunnel: MsgAuth token mismatch for %s", util.AgentRef(authAgentUUID))
 					return
 				}
@@ -147,17 +147,12 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 					logging.Warningf("handleMessageTunnel: MsgAuth missing pinned key for %s", util.AgentRef(authAgentUUID))
 					return
 				}
-				if msgAuth.AgentProof == "" {
+				if len(msgAuth.AgentProof) == 0 {
 					logging.Warningf("handleMessageTunnel: MsgAuth missing agent proof for %s", util.AgentRef(authAgentUUID))
 					return
 				}
-				proof, decodeErr := base64.URLEncoding.DecodeString(msgAuth.AgentProof)
-				if decodeErr != nil {
-					logging.Warningf("handleMessageTunnel: MsgAuth bad proof encoding for %s: %v", util.AgentRef(authAgentUUID), decodeErr)
-					return
-				}
 				canonical := transport.CanonicalAuthString(msgAuth.AgentUUID, msgAuth.Timestamp, msgAuth.Nonce, msgAuth.Route)
-				proofOK, proofErr := transport.VerifySignatureWithPEM([]byte(pinnedKey), []byte(canonical), proof)
+				proofOK, proofErr := transport.VerifySignatureWithPEM([]byte(pinnedKey), []byte(canonical), msgAuth.AgentProof)
 				if proofErr != nil || !proofOK {
 					logging.Warningf("handleMessageTunnel: MsgAuth pinned key proof failed for %s: %v", util.AgentRef(authAgentUUID), proofErr)
 					return

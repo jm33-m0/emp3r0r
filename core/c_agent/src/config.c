@@ -146,7 +146,7 @@ c2_status c2_agent_config_decode(CborValue *r, c2_agent_config *cfg) {
       C2_CASE_TEXT(C2_KEY_CFG_CAPEM, cfg, ca_pem);
       C2_CASE_TEXT(C2_KEY_CFG_DOH_SERVER, cfg, doh_server);
       C2_CASE_TEXT(C2_KEY_CFG_AGENT_UUID, cfg, agent_uuid);
-      C2_CASE_TEXT(C2_KEY_CFG_AGENT_UUID_SIG, cfg, agent_uuid_sig);
+      C2_CASE_BYTES(C2_KEY_CFG_AGENT_UUID_SIG, cfg, agent_uuid_sig);
       C2_CASE_TEXT(C2_KEY_CFG_AGENT_TAG, cfg, agent_tag);
       C2_CASE_INT32(C2_KEY_CFG_PADDING_MIN, cfg, padding_min);
       C2_CASE_INT32(C2_KEY_CFG_PADDING_MAX, cfg, padding_max);

@@ -3,26 +3,6 @@
 
 #include "fuzz_common.h"
 
-#include <string.h>
-
-static int fake_sign(void *ctx, const uint8_t priv[C2_P256_PRIV_BYTES],
-                     const uint8_t *msg, size_t msg_len, uint8_t *sig,
-                     size_t sig_cap, size_t *sig_len) {
-  (void)ctx;
-  (void)priv;
-  if (sig_cap == 0) {
-    *sig_len = 0;
-    return 0;
-  }
-  size_t n = msg_len % sig_cap;
-  for (size_t i = 0; i < n; i++) {
-    uint8_t byte = (msg && msg_len) ? msg[i % msg_len] : 0;
-    sig[i] = (uint8_t)(byte ^ (uint8_t)i);
-  }
-  *sig_len = n;
-  return 0;
-}
-
 /* Exercises the pure text codecs and the canonical auth string with arbitrary
  * bytes and lengths/capacities. */
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
@@ -65,20 +45,6 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     (void)c2_auth_canonical(
         c2_str_of("uuid", 4), (int64_t)size, c2_str_lit("n"),
         c2_str_of((const char *)data, size), canon, sizeof(canon), NULL);
-  }
-
-  /* Identity-signature helper with a fake signer, exercising the base64url
-   * encoding of a variable-length signature. */
-  {
-    c2_crypto_backend be;
-    memset(&be, 0, sizeof(be));
-    be.ecdsa_p256_sign_der = fake_sign;
-    uint8_t priv[C2_P256_PRIV_BYTES] = {0};
-    char sig_b64[256];
-    size_t sb = 0;
-    size_t cap = size % sizeof(sig_b64);
-    (void)c2_sign_uuid_base64(&be, priv, c2_str_of((const char *)data, size),
-                              sig_b64, cap, &sb);
   }
 
   return 0;

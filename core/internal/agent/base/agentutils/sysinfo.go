@@ -57,10 +57,6 @@ func GatherSystemDetails() *def.Emp3r0rAgent {
 		}
 	}
 
-	// Use CA-signed signature for check-in (proof of origin)
-	// The agent key will be used for subsequent message tunnel signing
-	info.UUIDSig = common.RuntimeConfig.AgentUUIDSig
-
 	info.Hostname = hostname
 	// Name is the human-readable label shown alongside the short identifier.
 	// use "/" as the separator and normalize any Windows domain backslash so

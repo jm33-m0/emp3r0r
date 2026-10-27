@@ -29,6 +29,12 @@ static void enc_text(CborEncoder *m, uint64_t k, const char *v) {
   CHECK(cbor_encode_text_stringz(m, v) == CborNoError);
 }
 
+static void enc_bytes(CborEncoder *m, uint64_t k, const char *v) {
+  CHECK(cbor_encode_uint(m, k) == CborNoError);
+  CHECK(cbor_encode_byte_string(m, (const uint8_t *)v, strlen(v)) ==
+        CborNoError);
+}
+
 static void enc_int(CborEncoder *m, uint64_t k, int64_t v) {
   CHECK(cbor_encode_uint(m, k) == CborNoError);
   CHECK(cbor_encode_int(m, v) == CborNoError);
@@ -86,7 +92,7 @@ static size_t build_full_config(uint8_t *buf, size_t cap, int pairs) {
   enc_text(&m, C2_KEY_CFG_CAPEM, "-----BEGIN CERTIFICATE-----");
   enc_text(&m, C2_KEY_CFG_DOH_SERVER, "https://1.1.1.1/dns-query");
   enc_text(&m, C2_KEY_CFG_AGENT_UUID, "uuid-1");
-  enc_text(&m, C2_KEY_CFG_AGENT_UUID_SIG, "sig");
+  enc_bytes(&m, C2_KEY_CFG_AGENT_UUID_SIG, "sig");
   enc_text(&m, C2_KEY_CFG_AGENT_TAG, "abcd1234");
   enc_int(&m, C2_KEY_CFG_PADDING_MIN, 16);
   enc_int(&m, C2_KEY_CFG_PADDING_MAX, 64);
@@ -120,6 +126,8 @@ int main(void) {
     CHECK(c2_str_equal(cfg.password, "sekret"));
     CHECK(c2_str_equal(cfg.doh_server, "https://1.1.1.1/dns-query"));
     CHECK(c2_str_equal(cfg.agent_uuid, "uuid-1"));
+    CHECK(cfg.agent_uuid_sig.len == 3 &&
+          memcmp(cfg.agent_uuid_sig.ptr, "sig", 3) == 0);
     CHECK(c2_str_equal(cfg.agent_tag, "abcd1234"));
     CHECK(c2_str_equal(cfg.c2_channel_mode, "h2conn"));
     CHECK_EQ_LONG(cfg.padding_min, 16);

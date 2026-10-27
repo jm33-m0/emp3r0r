@@ -1,7 +1,6 @@
 package c2transport
 
 import (
-	"encoding/base64"
 	"fmt"
 	"io"
 	"time"
@@ -34,13 +33,17 @@ func sendMsgAuthEnvelope(w io.Writer, route, streamID string) error {
 		return fmt.Errorf("sign MsgAuth: %w", err)
 	}
 
+	if len(cfg.AgentUUIDSig) == 0 {
+		return fmt.Errorf("missing identity token")
+	}
+
 	msg := def.MsgAuth{
 		Type:          def.MsgAuthType,
 		AgentUUID:     cfg.AgentUUID,
 		IdentityToken: cfg.AgentUUIDSig,
 		Nonce:         nonce,
 		Timestamp:     now,
-		AgentProof:    base64.URLEncoding.EncodeToString(sig),
+		AgentProof:    sig,
 		Route:         route,
 		StreamID:      streamID,
 	}

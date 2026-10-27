@@ -125,8 +125,8 @@ c2_status c2_msgauth_encode(CborEncoder *w, const c2_msgauth *m) {
   if ((st = c2_cbor_write_text(&map, C2_KEY_AUTH_AGENT_UUID, m->agent_uuid)) !=
       C2_OK)
     return st;
-  if ((st = c2_cbor_write_text(&map, C2_KEY_AUTH_IDENTITY_TOKEN,
-                               m->identity_token)) != C2_OK)
+  if ((st = c2_cbor_write_bytes(&map, C2_KEY_AUTH_IDENTITY_TOKEN,
+                                m->identity_token)) != C2_OK)
     return st;
   if ((st = c2_cbor_write_int(&map, C2_KEY_AUTH_TIMESTAMP, m->timestamp)) !=
       C2_OK)
@@ -135,8 +135,8 @@ c2_status c2_msgauth_encode(CborEncoder *w, const c2_msgauth *m) {
     return st;
   if ((st = c2_cbor_write_text(&map, C2_KEY_AUTH_ROUTE, m->route)) != C2_OK)
     return st;
-  if ((st = c2_cbor_write_text(&map, C2_KEY_AUTH_AGENT_PROOF,
-                               m->agent_proof)) != C2_OK)
+  if ((st = c2_cbor_write_bytes(&map, C2_KEY_AUTH_AGENT_PROOF,
+                                m->agent_proof)) != C2_OK)
     return st;
   if (m->stream_id.len && (st = c2_cbor_write_text(&map, C2_KEY_AUTH_STREAM_ID,
                                                    m->stream_id)) != C2_OK)
@@ -159,11 +159,11 @@ c2_status c2_msgauth_decode(CborValue *r, c2_msgauth *m) {
     switch (key) {
       C2_CASE_TEXT(C2_KEY_AUTH_TYPE, m, type);
       C2_CASE_TEXT(C2_KEY_AUTH_AGENT_UUID, m, agent_uuid);
-      C2_CASE_TEXT(C2_KEY_AUTH_IDENTITY_TOKEN, m, identity_token);
+      C2_CASE_BYTES(C2_KEY_AUTH_IDENTITY_TOKEN, m, identity_token);
       C2_CASE_INT(C2_KEY_AUTH_TIMESTAMP, m, timestamp);
       C2_CASE_TEXT(C2_KEY_AUTH_NONCE, m, nonce);
       C2_CASE_TEXT(C2_KEY_AUTH_ROUTE, m, route);
-      C2_CASE_TEXT(C2_KEY_AUTH_AGENT_PROOF, m, agent_proof);
+      C2_CASE_BYTES(C2_KEY_AUTH_AGENT_PROOF, m, agent_proof);
       C2_CASE_TEXT(C2_KEY_AUTH_STREAM_ID, m, stream_id);
     default:
       st = c2_cbor_map_skip(&map);
@@ -271,26 +271,3 @@ c2_status c2_msgtun_decode(CborValue *r, c2_msgtun *m) {
 /* ------------------------------------------------------------------------- */
 /* Identity signature helper                                                  */
 /* ------------------------------------------------------------------------- */
-
-c2_status c2_sign_uuid_base64(const c2_crypto_backend *be,
-                              const uint8_t priv[C2_P256_PRIV_BYTES],
-                              c2_str uuid, char *out, size_t out_cap,
-                              size_t *out_len) {
-  if (be == NULL || be->ecdsa_p256_sign_der == NULL || priv == NULL ||
-      out == NULL)
-    return C2_ERR_ARG;
-
-  uint8_t sig[80];
-  size_t sig_len = 0;
-  int rc = be->ecdsa_p256_sign_der(be->ctx, priv, (const uint8_t *)uuid.ptr,
-                                   uuid.len, sig, sizeof(sig), &sig_len);
-  if (rc != 0)
-    return C2_ERR_CRYPTO;
-
-  size_t n = c2_base64url_encode(sig, sig_len, out, out_cap);
-  if (n == 0)
-    return C2_ERR_NOMEM;
-  if (out_len)
-    *out_len = n;
-  return C2_OK;
-}

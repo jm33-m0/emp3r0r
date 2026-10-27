@@ -43,7 +43,7 @@ Encoding rules:
   definite-length; arrays are definite-length. A decoder MUST accept any valid
   ordering and both definite and indefinite lengths (the Go decoder does).
 - **Integers are big-endian** wherever raw bytes carry them (§4, §5.1).
-- **Base64** is URL-safe **with** padding: Go `base64.URLEncoding`
+- **Base64** (configuration/build fields only) is URL-safe **with** padding: Go `base64.URLEncoding`
   (`A–Z a–z 0–9 - _`, `=` padding).
 - **ECDSA** is P-256 (secp256r1). Signatures are **ASN.1 DER**-encoded
   `SEQUENCE { INTEGER r, INTEGER s }` over `SHA-256(message)`.
@@ -265,11 +265,11 @@ reads it as a single frame (≤ 8192 bytes), then routes.
 | --- | --------------- | --------- | -------------------------------------------------------------- |
 | 11  | `Type`          | text      | must equal `auth_v1`; carries the wire version                 |
 | 12  | `AgentUUID`     | text      | agent UUID                                                     |
-| 13  | `IdentityToken` | text      | base64url(CA signature over `AgentUUID`)                       |
+| 13  | `IdentityToken` | bytes     | CA signature over `AgentUUID`                                  |
 | 14  | `Timestamp`     | int       | Unix seconds                                                   |
 | 15  | `Nonce`         | text      | fresh random, anti-replay                                      |
 | 16  | `Route`         | text      | exactly one configured route name                              |
-| 17  | `AgentProof`    | text      | base64url(ECDSA agent-key signature over the canonical string) |
+| 17  | `AgentProof`    | bytes     | ECDSA agent-key signature over the canonical string            |
 | 19  | `StreamID`      | text      | optional; FTP token / WWW filename / proxy token               |
 
 Keys 18 (`EphemPublicKey`) and 20 (`ProtocolVersion`) are retired.
@@ -291,15 +291,15 @@ strings.Join([]string{
 }, "\n")
 ```
 
-The agent signs `SHA-256(canonical)` with its P-256 key; the result is DER and
-base64url-encoded into `AgentProof`.
+The agent signs `SHA-256(canonical)` with its P-256 key; the DER signature is
+carried as raw bytes in `AgentProof`.
 
 ### 5.3 IdentityToken
 
-`IdentityToken` is `base64url(CA_signature)` where `CA_signature` is the CA's
-P-256 ECDSA/DER signature over the raw `AgentUUID` bytes (not the canonical
-string). It is issued at provision time (operator `sign_agent`, or embedded in
-the agent build). The agent presents the same token on every `MsgAuth`.
+`IdentityToken` is the CA's P-256 ECDSA/DER signature over the raw
+`AgentUUID` bytes (not the canonical string), carried as raw bytes. It is
+issued at provision time (operator `sign_agent`, or embedded in the agent
+build). The agent presents the same token on every `MsgAuth`.
 
 ### 5.4 Server verification order
 

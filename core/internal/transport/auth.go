@@ -1,7 +1,6 @@
 package transport
 
 import (
-	"encoding/base64"
 	"fmt"
 	"strconv"
 	"strings"
@@ -40,7 +39,7 @@ func VerifyMsgAuth(auth *def.MsgAuth) error {
 	if auth.AgentUUID == "" {
 		return fmt.Errorf("empty AgentUUID")
 	}
-	if auth.IdentityToken == "" {
+	if len(auth.IdentityToken) == 0 {
 		return fmt.Errorf("missing CA identity token")
 	}
 	if auth.Nonce == "" {
@@ -54,11 +53,7 @@ func VerifyMsgAuth(auth *def.MsgAuth) error {
 		return fmt.Errorf("timestamp outside replay window")
 	}
 
-	caSig, err := base64.URLEncoding.DecodeString(auth.IdentityToken)
-	if err != nil {
-		return fmt.Errorf("decode identity token: %w", err)
-	}
-	ok, err := VerifySignatureWithCA([]byte(auth.AgentUUID), caSig)
+	ok, err := VerifySignatureWithCA([]byte(auth.AgentUUID), auth.IdentityToken)
 	if err != nil {
 		return fmt.Errorf("CA token verification failed: %w", err)
 	}

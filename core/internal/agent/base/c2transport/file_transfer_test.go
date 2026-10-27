@@ -598,7 +598,7 @@ func setupE2EFileTransfer(t *testing.T) *e2eFileTransferHarness {
 		C2Routes:      routes,
 		MalleableC2:   malleable,
 		AgentUUID:     agentUUID,
-		AgentUUIDSig:  agentSigB64,
+		AgentUUIDSig:  agentSig,
 		AgentTag:      agentTag,
 		CCTimeout:     10000,
 	}

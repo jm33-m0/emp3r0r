@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -142,7 +143,13 @@ func readJSONConfig(jsonData []byte, cfg *def.Config) error {
 	applyIfSet(&cfg.DoHServer, jCfg.DoHServer)
 	applyIfSet(&cfg.ECHServerName, jCfg.ECHServerName)
 	applyIfSet(&cfg.AgentUUID, jCfg.AgentUUID)
-	applyIfSet(&cfg.AgentUUIDSig, jCfg.AgentUUIDSig)
+	if jCfg.AgentUUIDSig != "" {
+		sig, err := base64.URLEncoding.DecodeString(jCfg.AgentUUIDSig)
+		if err != nil {
+			return fmt.Errorf("decode agent_uuid_sig: %w", err)
+		}
+		cfg.AgentUUIDSig = sig
+	}
 	applyIfSet(&cfg.AgentTag, jCfg.AgentTag)
 	applyIfSet(&cfg.CCTimeout, jCfg.CCTimeout)
 	applyIfSet(&cfg.PaddingMin, jCfg.PaddingMin)

@@ -9,7 +9,6 @@ import (
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/base64"
 	"fmt"
 	"net"
 	"net/http"
@@ -62,7 +61,7 @@ func assertInvalidCAIdentityRejected(t *testing.T, c2URL string, caCertData []by
 	msgAuth := def.MsgAuth{
 		Type:          def.MsgAuthType,
 		AgentUUID:     agentUUID,
-		IdentityToken: base64.URLEncoding.EncodeToString(forgedIdentityRaw),
+		IdentityToken: forgedIdentityRaw,
 		Timestamp:     time.Now().Unix(),
 		Nonce:         "bad-ca-nonce",
 		Route:         live.GetRuntimeConfig().C2Routes.Checkin,
@@ -198,7 +197,7 @@ func TestFullAgentLifecycle(t *testing.T) {
 		CCAddress:     c2URL,
 		C2ChannelMode: def.C2ChannelModeH2Conn,
 		AgentUUID:     agentUUID,
-		AgentUUIDSig:  agentSig,
+		AgentUUIDSig:  sigBytes(t, agentSig),
 		AgentTag:      agentTag,
 		CCTimeout:     5000,
 		C2Routes:      live.GetRuntimeConfig().C2Routes,
@@ -535,7 +534,7 @@ func TestCheckinWithRandomPaths(t *testing.T) {
 		CCAddress:     c2URL,
 		C2ChannelMode: def.C2ChannelModeH2Conn,
 		AgentUUID:     agentUUID,
-		AgentUUIDSig:  agentSig,
+		AgentUUIDSig:  sigBytes(t, agentSig),
 		AgentTag:      agentTag,
 		C2Routes:      live.GetRuntimeConfig().C2Routes,
 	}
@@ -677,7 +676,7 @@ func TestDynamicPrefix(t *testing.T) {
 		CCAddress:     c2URL,
 		C2ChannelMode: def.C2ChannelModeH2Conn,
 		AgentUUID:     agentUUID,
-		AgentUUIDSig:  agentSig,
+		AgentUUIDSig:  sigBytes(t, agentSig),
 		AgentTag:      agentUUID,
 		C2Routes:      live.GetRuntimeConfig().C2Routes,
 	}
@@ -825,7 +824,7 @@ func TestCheckinWithRandomPaths_Strict(t *testing.T) {
 		CCAddress:     c2URL,
 		C2ChannelMode: def.C2ChannelModeH2Conn,
 		AgentUUID:     agentUUID,
-		AgentUUIDSig:  agentSig,
+		AgentUUIDSig:  sigBytes(t, agentSig),
 		AgentTag:      agentTag,
 		C2Routes:      live.GetRuntimeConfig().C2Routes,
 	}

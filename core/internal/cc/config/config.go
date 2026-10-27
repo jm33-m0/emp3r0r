@@ -48,7 +48,7 @@ func SaveConfigJSON() (err error) {
 		DoHServer:              cfg.DoHServer,
 		ECHServerName:          cfg.ECHServerName,
 		AgentUUID:              cfg.AgentUUID,
-		AgentUUIDSig:           cfg.AgentUUIDSig,
+		AgentUUIDSig:           base64.URLEncoding.EncodeToString(cfg.AgentUUIDSig),
 		AgentTag:               cfg.AgentTag,
 		CCTimeout:              cfg.CCTimeout,
 		PaddingMin:             cfg.PaddingMin,
@@ -152,7 +152,7 @@ func InitConfigFile(cc_host string) (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to sign agent UUID: %v", err)
 	}
-	live.RuntimeConfig.AgentUUIDSig = base64.URLEncoding.EncodeToString(sig)
+	live.RuntimeConfig.AgentUUIDSig = sig
 	live.RuntimeConfig.AgentTag = util.GenAgentTag(live.RuntimeConfig.AgentUUID)
 
 	if live.RuntimeConfig.PaddingMin == 0 {

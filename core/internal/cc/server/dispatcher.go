@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"net"
 	"strings"
@@ -174,17 +173,12 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 			logging.Errorf("cborProtocolDispatch: agent %s has empty pinned key in DB", util.AgentRef(msgAuth.AgentUUID))
 			return
 		}
-		if msgAuth.AgentProof == "" {
+		if len(msgAuth.AgentProof) == 0 {
 			logging.Warningf("cborProtocolDispatch: agent %s is known but provided no AgentProof from %s", util.AgentRef(msgAuth.AgentUUID), remoteAddr)
 			return
 		}
-		proof, err := base64.URLEncoding.DecodeString(msgAuth.AgentProof)
-		if err != nil {
-			logging.Warningf("cborProtocolDispatch: decode agent proof failed for %s from %s: %v", util.AgentRef(msgAuth.AgentUUID), remoteAddr, err)
-			return
-		}
 		canonical := transport.CanonicalAuthString(msgAuth.AgentUUID, msgAuth.Timestamp, msgAuth.Nonce, msgAuth.Route)
-		ok, err := transport.VerifySignatureWithPEM([]byte(pinnedKey), []byte(canonical), proof)
+		ok, err := transport.VerifySignatureWithPEM([]byte(pinnedKey), []byte(canonical), msgAuth.AgentProof)
 		if err != nil || !ok {
 			msg := fmt.Sprintf("cborProtocolDispatch: pinned key verification failed for agent %s from %s (sig_ok=%v, err=%v)", util.AgentRef(msgAuth.AgentUUID), remoteAddr, ok, err)
 			logging.Warningf("%s", msg)

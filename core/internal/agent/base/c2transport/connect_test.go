@@ -66,6 +66,17 @@ func signUUID(uuid string, privKey *ecdsa.PrivateKey) (string, error) {
 	return base64.URLEncoding.EncodeToString(sig), nil
 }
 
+// sigBytes decodes the base64 test helper output for Config.AgentUUIDSig,
+// which carries the raw CA signature.
+func sigBytes(t *testing.T, b64 string) []byte {
+	t.Helper()
+	b, err := base64.URLEncoding.DecodeString(b64)
+	if err != nil {
+		t.Fatalf("decode signature: %v", err)
+	}
+	return b
+}
+
 func startTestC2Server(t *testing.T) {
 	t.Helper()
 	go server.StartC2AgentTLSServer()
@@ -181,7 +192,7 @@ func TestEstablishC2Connection(t *testing.T) {
 		CCAddress:     c2URL,
 		C2ChannelMode: def.C2ChannelModeH2Conn,
 		AgentUUID:     agentUUID,
-		AgentUUIDSig:  agentSig,
+		AgentUUIDSig:  sigBytes(t, agentSig),
 		AgentTag:      agentUUID, // Set AgentTag to match UUID for test
 		CCTimeout:     10000,     // Set timeout to 10 seconds
 		C2Routes:      live.GetRuntimeConfig().C2Routes,
@@ -414,7 +425,7 @@ func TestDuplicatedCheckin(t *testing.T) {
 		CCAddress:     c2URL,
 		C2ChannelMode: def.C2ChannelModeH2Conn,
 		AgentUUID:     agentUUID,
-		AgentUUIDSig:  agentSig,
+		AgentUUIDSig:  sigBytes(t, agentSig),
 		AgentTag:      agentUUID,
 		CCTimeout:     3000,
 		C2Routes:      live.GetRuntimeConfig().C2Routes,
@@ -587,7 +598,7 @@ func TestBackslashTag(t *testing.T) {
 		CCAddress:     c2URL,
 		C2ChannelMode: def.C2ChannelModeH2Conn,
 		AgentUUID:     agentUUID,
-		AgentUUIDSig:  agentSig,
+		AgentUUIDSig:  sigBytes(t, agentSig),
 		AgentTag:      agentTag,
 		C2Routes:      live.GetRuntimeConfig().C2Routes,
 	}
@@ -714,7 +725,7 @@ func TestEmptyUUID(t *testing.T) {
 		CCAddress:     c2URL,
 		C2ChannelMode: def.C2ChannelModeH2Conn,
 		AgentUUID:     agentUUID,
-		AgentUUIDSig:  agentSig,
+		AgentUUIDSig:  sigBytes(t, agentSig),
 		AgentTag:      agentTag,
 		C2Routes:      live.GetRuntimeConfig().C2Routes,
 	}
@@ -839,7 +850,7 @@ func TestNewAgentCheckin(t *testing.T) {
 		CCAddress:     c2URL,
 		C2ChannelMode: def.C2ChannelModeH2Conn,
 		AgentUUID:     agentUUID,
-		AgentUUIDSig:  agentSig,
+		AgentUUIDSig:  sigBytes(t, agentSig),
 		AgentTag:      agentTag,
 		C2Routes:      live.GetRuntimeConfig().C2Routes,
 	}

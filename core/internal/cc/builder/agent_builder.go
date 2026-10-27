@@ -2,6 +2,7 @@ package builder
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -121,7 +122,11 @@ func EncryptAgentConfig(cfg AgentBuildConfig) ([]byte, string, error) {
 
 	// use provided UUID and signature
 	configStruct.AgentUUID = cfg.AgentUUID
-	configStruct.AgentUUIDSig = cfg.AgentUUIDSig
+	sig, err := base64.URLEncoding.DecodeString(cfg.AgentUUIDSig)
+	if err != nil {
+		return nil, "", fmt.Errorf("decode agent UUID signature: %w", err)
+	}
+	configStruct.AgentUUIDSig = sig
 
 	// Marshal to CBOR
 	cborBytes, err := cbor.Marshal(configStruct)

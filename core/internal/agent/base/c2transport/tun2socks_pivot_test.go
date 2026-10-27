@@ -170,7 +170,7 @@ func startPivotStack(t *testing.T) (pivotAddr string) {
 		C2Routes:      routes,
 		MalleableC2:   malleable,
 		AgentUUID:     agentUUID,
-		AgentUUIDSig:  agentSig,
+		AgentUUIDSig:  sigBytes(t, agentSig),
 		AgentTag:      agentTag,
 		CCTimeout:     10000,
 	}

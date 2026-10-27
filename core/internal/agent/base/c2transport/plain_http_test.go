@@ -276,7 +276,7 @@ func runCheckinACK(t *testing.T, mode string, quicStandardKey, httpPollOverTLS b
 		CAPEM:           string(caCertData),
 		C2Routes:        live.GetRuntimeConfig().C2Routes,
 		AgentUUID:       agentUUID,
-		AgentUUIDSig:    agentSig,
+		AgentUUIDSig:    sigBytes(t, agentSig),
 		AgentTag:        agentUUID,
 		MalleableC2:     live.GetRuntimeConfig().MalleableC2,
 	}

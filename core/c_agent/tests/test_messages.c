@@ -8,8 +8,8 @@
  * exact structs the C2 marshals, so a divergence in key order or integer width
  * fails here. */
 static const char kMsgauthHex[] =
-    "a80b67617574685f76310c69757569642d313233340d67644739725a57340e1a6553f100"
-    "0f656e6f6e6365106663322d6d7367116763484a76623259136673747265616d";
+    "a80b67617574685f76310c69757569642d313233340d45746f6b656e0e1a6553f100"
+    "0f656e6f6e6365106663322d6d7367114570726f6f66136673747265616d";
 static const char kMsgtunHex[] =
     "a701656a6f622d31028267216c735f646972642f746d700344deadbeef0464616263"
     "64051b0000018bcfe568000844090807060af6";
@@ -47,11 +47,11 @@ int main(void) {
     c2_msgauth m = {0};
     m.type = c2_str_lit("auth_v1");
     m.agent_uuid = c2_str_lit("uuid-1234");
-    m.identity_token = c2_str_lit("dG9rZW4");
+    m.identity_token = c2_bytes_of("token", 5);
     m.timestamp = 1700000000;
     m.nonce = c2_str_lit("nonce");
     m.route = c2_str_lit("c2-msg");
-    m.agent_proof = c2_str_lit("cHJvb2Y");
+    m.agent_proof = c2_bytes_of("proof", 5);
     m.stream_id = c2_str_lit("stream");
 
     CborEncoder enc;
@@ -70,11 +70,12 @@ int main(void) {
     CHECK(decode_msgauth(enc, enc_len, &m) == C2_OK);
     CHECK(c2_str_equal(m.type, "auth_v1"));
     CHECK(c2_str_equal(m.agent_uuid, "uuid-1234"));
-    CHECK(c2_str_equal(m.identity_token, "dG9rZW4"));
+    CHECK(m.identity_token.len == 5 &&
+          memcmp(m.identity_token.ptr, "token", 5) == 0);
     CHECK_EQ_LONG(m.timestamp, 1700000000);
     CHECK(c2_str_equal(m.nonce, "nonce"));
     CHECK(c2_str_equal(m.route, "c2-msg"));
-    CHECK(c2_str_equal(m.agent_proof, "cHJvb2Y"));
+    CHECK(m.agent_proof.len == 5 && memcmp(m.agent_proof.ptr, "proof", 5) == 0);
     CHECK(c2_str_equal(m.stream_id, "stream"));
   }
 

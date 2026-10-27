@@ -96,7 +96,7 @@ func TestInitConfigFile(t *testing.T) {
 	}
 
 	// Check if AgentUUIDSig is set
-	if live.GetRuntimeConfig().AgentUUIDSig == "" {
+	if len(live.GetRuntimeConfig().AgentUUIDSig) == 0 {
 		t.Error("AgentUUIDSig is empty")
 	}
 
