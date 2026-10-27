@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"testing"
+	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -53,5 +54,31 @@ func TestProcessAgentResponseQuietSuppression(t *testing.T) {
 	}
 	if resp.ShouldShow {
 		t.Fatalf("--quiet list_sessions response must not be shown")
+	}
+}
+
+func TestProcessAgentResponseMeasuresBuiltinTurnaround(t *testing.T) {
+	agent := &def.Emp3r0rAgent{Tag: "time-test", UUID: "time-test-uuid"}
+	live.PublishAgent(&live.AgentRecord{Agent: agent, Control: &live.AgentControl{}})
+	defer live.ForgetAgent(agent.UUID)
+
+	const jobID = "time-test-job"
+	live.CmdTime.Store(jobID, time.Now().Add(-2*time.Second))
+	defer live.CmdTime.Delete(jobID)
+
+	resp, err := ProcessAgentResponse(&def.OperatorMsg{
+		Tag:      "time-test",
+		CmdSlice: []string{"!custom_module"},
+		Response: []byte("ok"),
+		JobID:    jobID,
+	})
+	if err != nil {
+		t.Fatalf("ProcessAgentResponse(custom_module): %v", err)
+	}
+	if !resp.IsBuiltin {
+		t.Fatal("custom_module should be a builtin command")
+	}
+	if resp.TimeSpent < time.Second {
+		t.Fatalf("builtin/module TimeSpent = %v, want at least 1s", resp.TimeSpent)
 	}
 }

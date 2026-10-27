@@ -265,7 +265,7 @@ func TestMessageTunnelCommandResponseWithOperator(t *testing.T) {
 	}()
 
 	setJobOwner("job-1", "test-operator")
-	live.CmdTime.Store("job-1", time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST"))
+	live.CmdTime.Store("job-1", time.Now())
 
 	dec := cbor.NewDecoder(serverSecure)
 	ctx, cancel := context.WithCancel(context.Background())

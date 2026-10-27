@@ -1004,7 +1004,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	logging.Infof("Verifying command execution...")
 	job := jobs.CreateJob("ls", "command", agent.Tag)
 	cmdID := job.ID
-	live.CmdTime.Store(cmdID, time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST"))
+	live.CmdTime.Store(cmdID, time.Now())
 	if err = agents.SendCmd("ls", cmdID, agent); err != nil {
 		t.Fatalf("Failed to send command to agent: %v", err)
 	}

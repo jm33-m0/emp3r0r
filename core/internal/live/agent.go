@@ -19,7 +19,7 @@ var (
 	// When a result arrives, the channel is closed so any waiter wakes up.
 	CmdResultsReady = sync.Map{}
 
-	// CmdTime store command time
+	// CmdTime stores the dispatch time (time.Time) for each job ID.
 	CmdTime sync.Map
 )
 

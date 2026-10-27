@@ -480,7 +480,7 @@ func (ls *socks5Listener) proxyToAgent(sock net.Conn, target string) error {
 
 	// Register the token with the job machinery so a dial-failure reported by
 	// the agent (JobID = token) wakes us up via CmdResultsReady.
-	live.CmdTime.Store(token, time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST"))
+	live.CmdTime.Store(token, time.Now())
 	resultCh := make(chan struct{})
 	live.CmdResultsReady.Store(token, resultCh)
 

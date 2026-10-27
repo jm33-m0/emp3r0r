@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/controllers"
@@ -18,6 +19,17 @@ type CommandHandler func(out []byte, target *def.Emp3r0rAgent) string
 
 // CommandHandlers maps command names to their handlers
 var CommandHandlers sync.Map // map[string]CommandHandler
+
+// commandReportsTime excludes only internal completion helpers. Modules and
+// actual operator commands report their elapsed time.
+func commandReportsTime(command string) bool {
+	switch command {
+	case def.C2CmdListDir, def.C2CmdStat:
+		return false
+	default:
+		return true
+	}
+}
 
 func init() {
 	CommandHandlers.Store("ps", CommandHandler(handlePS))
@@ -169,12 +181,11 @@ func processAgentData(data *def.OperatorMsg) {
 		color.HiMagentaString("%s", resp.Command),
 		color.HiWhiteString(stripped))
 
-	// Add latency info if available
-	if resp.TimeSpent > 0 {
-		if !resp.IsBuiltin {
-			agentOutput = fmt.Sprintf("%s\n%s", agentOutput,
-				color.HiCyanString("Latency: %s\n\n", resp.TimeSpent))
-		}
+	// Report command/module time. Completion helpers are internal plumbing and
+	// stay silent; real commands and modules report their turnaround.
+	if resp.TimeSpent > 0 && commandReportsTime(resp.Command) {
+		agentOutput = fmt.Sprintf("%s\n%s", agentOutput,
+			color.HiCyanString("Time spent: %s\n\n", resp.TimeSpent.Round(time.Millisecond)))
 	}
 
 	logging.Infof("%s", logging.Raw(agentOutput))

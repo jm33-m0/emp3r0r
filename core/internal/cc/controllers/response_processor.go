@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/jobs"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 )
@@ -80,16 +81,24 @@ func ProcessAgentResponse(data *def.OperatorMsg) (*ProcessedResponse, error) {
 	// Signal any waiting goroutine that a result is ready.
 	live.SignalCmdResultReady(data.JobID)
 
-	// Calculate time spent
+	// Calculate time spent. CmdTime is the authoritative start time; fall back
+	// to the job creation time for commands whose dispatch path did not record
+	// one.
+	var startTime time.Time
 	if val, ok := live.CmdTime.Load(data.JobID); ok {
-		if cmdtime, isString := val.(string); isString {
-			startTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", cmdtime)
-			if err == nil {
-				resp.TimeSpent = time.Since(startTime)
-				target.LastSeenRTT = resp.TimeSpent
-				target.LastSeen = time.Now()
-			}
+		if started, isTime := val.(time.Time); isTime {
+			startTime = started
 		}
+	}
+	if startTime.IsZero() {
+		if job := jobs.GetJob(data.JobID); job != nil {
+			startTime = job.Created
+		}
+	}
+	if !startTime.IsZero() {
+		resp.TimeSpent = time.Since(startTime)
+		target.LastSeenRTT = resp.TimeSpent
+		target.LastSeen = time.Now()
 	}
 
 	// Determine if output should be shown

@@ -234,7 +234,7 @@ func handleSendCommand(wrt http.ResponseWriter, req *http.Request) {
 	auditOperatorAction(operatorID, "command", util.AgentRef(agent.UUID), *operation.Command)
 
 	// Track the job ID so the message tunnel accepts the response
-	live.CmdTime.Store(*operation.JobID, time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST"))
+	live.CmdTime.Store(*operation.JobID, time.Now())
 
 	// Any accepted command resets the operator-idle timer.
 	touchOperatorCommand()

@@ -205,7 +205,7 @@ func (ls *socks5Listener) handleUDPAssociate(sock net.Conn) error {
 func (ls *socks5Listener) relayDNSQuery(agent *def.Emp3r0rAgent, query []byte, dnsServer string) ([]byte, error) {
 	token := socksProxyTokenPrefix + "dns-" + uuid.NewString()
 
-	live.CmdTime.Store(token, time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST"))
+	live.CmdTime.Store(token, time.Now())
 	resultCh := make(chan struct{})
 	live.CmdResultsReady.Store(token, resultCh)
 

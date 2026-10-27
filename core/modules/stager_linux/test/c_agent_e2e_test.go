@@ -416,7 +416,7 @@ func runC2Command(t *testing.T, agent *def.Emp3r0rAgent, doneChan <-chan error, 
 	t.Helper()
 	job := jobs.CreateJob(cmd, "command", agent.Tag)
 	cmdID := job.ID
-	live.CmdTime.Store(cmdID, time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST"))
+	live.CmdTime.Store(cmdID, time.Now())
 	deadline := time.Now().Add(30 * time.Second)
 	for {
 		if cAgentConnected(agent) {

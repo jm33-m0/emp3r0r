@@ -38,7 +38,7 @@ func ExecuteCommand(cmd, jobID, agentTag string) error {
 	// LastSeen; LastSeen reflects only agent activity, while operator idle is
 	// tracked separately via OnCommandSent.
 	now := time.Now()
-	live.CmdTime.Store(jobID, now.Format("2006-01-02 15:04:05.999999999 -0700 MST"))
+	live.CmdTime.Store(jobID, now)
 
 	// Send command asynchronously to avoid blocking
 	go func() {
