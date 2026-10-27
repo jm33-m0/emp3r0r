@@ -704,7 +704,8 @@ Pair with the `scshell` BOF to execute an uploaded file on the target.
 | `coffloader/`                   | The Windows in-memory COFF loader DLL (`dll` module).                                                                      |
 | `libbpf/`                       | Builds a self-contained `libbpf.so` (zig) used by the Go `core/lib/libbpf` loader and the `ebpf_*` builtins.               |
 | `ssh_harvest/`                  | eBPF uprobe credential capture: zig-compiled BPF object + `ebpf_code_offset`/`ebpf_uprobe_start`/`ebpf_uprobe_stop` from a Starlark module.                                        |
-| `loader_windows/`               | A local C2 module that builds a self-unpacking loader.                                                                     |
+| `loader_windows/`               | Local C2 module that builds a self-unpacking loader. User guide: [loader_windows.md](loader_windows.md).                    |
+| `stager_linux/`                 | Local C2 module that builds the Linux stager. User guide: [stager_linux.md](stager_linux.md).                               |
 | `CS-Situational-Awareness-BOF/` | A large third-party BOF suite imported as-is; every command is a top-level console command with one flag per BOF argument. |
 | `C2-Tool-Collection/`           | BOF suite with `choices`/`required` flags and a `make_all.sh` that builds a nested `BOF/` tree.                            |
 | `SQL-BOF/`                      | SQL Server BOF suite; fixed-value wrapper commands over a shared `togglemodule` BOF and a `binary` (base64) parameter.     |

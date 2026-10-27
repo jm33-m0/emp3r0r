@@ -330,8 +330,8 @@ deadline the agent reports for keeping its last-seen record after a disconnect;
 zero derives `interval + poll window + interval/2`. The C2 keeps the record
 until that per-agent deadline, so the operator list shows the real last-seen
 time instead of treating sleep as death. A `shellcode` artifact is marked
-stager-run; pass it to the Linux stager with `--agent-pic` to embed it and
-compile out the downloader.
+stager-run; pass it to the [Linux stager](stager_linux.md) with `--agent-pic`
+to embed it and compile out the downloader.
 
 Available `--type`: `glibc`, `musl`. Available `--arch`: `amd64`, `386`, `arm`,
 `arm64`, `riscv64`. `riscv64` requires `--type musl`; `--format shellcode`

@@ -1,160 +1,205 @@
-## Background and Environment
+# Agent Instructions
 
-- If you are in a Windows environment, check if there's WSL available. This project assumes its builder runs in Linux. Build and test your code in WSL in the container environment defined by `Dockerfile`. If the image is not already available, install `podman` and build `emp3r0r-builder` image from `Dockerfile`. Use it for all your work unless you have to dynamically test Windows builds. When testing, always sync the files to WSL's native FS for better performance.
-- This project is a Go codebase. Work from the module root (`core/` for the Go module). Read `README.md` and `docs/TESTING.md` before making changes. Keep responses concise and finish tasks rather than stopping early. Do not attempt reading the whole codebase before starting your work; only focus on relevant files and start coding as early as possible; expand code scanning while you are coding and fix errors accordingly.
-- Try not to `grep` from `stdout` of a command. Always prefer writing logs to disk before `grep`.
-- `install.py` and `build.py` are used to build release tarballs. Do NOT use them for testing as it would take too long to finish.
+## Environment
 
-## Build standards (C and payloads)
+- On Windows, use WSL. Build and test in the `emp3r0r-builder` container from
+  `Dockerfile`; install podman and build the image if it is missing. Use the
+  container for all work unless you must test a Windows build. Sync files to
+  WSL's native filesystem before testing.
+- The Go module root is `core/`. Read `README.md` and `docs/TESTING.md` before
+  changing code.
+- Do not read the whole codebase first. Find the relevant files, start coding,
+  and expand only as needed.
+- Do not filter live or long-running command output through `grep`, `head`, or
+  `tail`. Redirect complete stdout and stderr to a log file, then inspect it.
+  Keep stderr and the exit code.
+- Do not use `install.py` or `build.py` for tests. They build release tarballs
+  and are slow.
 
-- **`zig` is the project's compiler.** emp3r0r ships a pinned zig toolchain
-  (`core/build.py`: `REQUIRED_ZIG_VERSION`, `install_zig`). It is installed
-  under `<prefix>/lib/emp3r0r/zig`, symlinked to `/usr/local/bin/zig`, copied
-  into the operator kit (`package_operator_bundle`) and installed by
-  `install.py`, so the C2 can build C modules on any host. Prefer `zig cc`
-  (and `zig c++`/`zig ar`/`zig ranlib`) over a system toolchain, and keep the
-  version in sync with `Dockerfile` and `.github/workflows/test.yml`.
-- **`nasm` ships with the C2 and the operator kit** (`core/build.py`:
-  `install_nasm`). It is installed under `<prefix>/lib/emp3r0r/nasm`, symlinked
-  to `/usr/local/bin/nasm`, copied into the operator kit and installed by
-  `install.py`. The Windows loader (`loader_windows`) and Crystal-Kit assemble
-  their SilentMoonwalk stubs with it, so it must be present on the operator
-  host exactly like zig. The pre-compiled SilentMoonwalk object
-  (`lib/syscall/smw/desyncspoofer.syso`) is assembled by `assemble_smw` and
-  shipped in the kit's `build/` directory.
-- **All agent payloads that link C are built with zig.** `core/build.py` sets
-  `CC="zig cc -target ..."` per target:
-  - cgo Linux stubs (amd64/386/arm64/riscv64): `*-linux-musl`, statically
-    linked with musl.
-  - Linux shared objects: `*-linux-gnu.2.17` (`riscv64-linux-musl`), pinned to
-    the oldest supported glibc.
-  - Windows shared objects (DLLs): `*-windows-gnu`.
-  - Pure-Go stubs (`build_agent_pure`, `CGO_ENABLED=0`) and the C2 binaries do
-    not need a C compiler.
-    The builder image replaces mingw-w64 with `zig cc` shims, so anything that
-    expects `*-w64-mingw32-gcc` transparently uses zig as well.
-- **C modules use zig too**: the Linux stager, `libbpf`, `hello_linux`, and the
-  Windows loader default to `zig cc -target ...`.
-- **Freestanding, position-independent stages** (raw shellcode, embedded
-  downloader/blob stages, unpacker stubs) compile and link with `-nostdlib` and
-  pin no libc target: no runtime, no dynamic linker, no ABI dependency.
-- **Hosted artifacts that need a runtime** (Linux `SO`/`EXE` stagers, the agent
-  `c-shared` object) link glibc **dynamically**; never link glibc statically.
-  Pin the oldest ABI that provides the symbols the artifact uses, via a zig
-  target:
-  - `<arch>-linux-gnu.2.17` when relying on the pre-2.34 ABI (for example the
-    glibc-internal `__libc_dlopen_mode`).
-  - `<arch>-linux-gnu.2.34` when relying on `dlopen`/`dlsym`/`dlclose`, which
-    moved from `libdl.so.2` into `libc.so.6` in glibc 2.34.
-    Use the per-arch targets from `core/build.py` (`x86_64-linux-gnu.2.17`,
-    `aarch64-linux-gnu.2.17`, ...).
+## Build
 
-## Code style
+- Use the pinned zig toolchain for all C builds: `zig cc`, `zig c++`,
+  `zig ar`, and `zig ranlib`. Keep `REQUIRED_ZIG_VERSION` in `core/build.py`
+  in sync with `Dockerfile` and `.github/workflows/test.yml`.
+- Keep the nasm installed by `core/build.py` available for SilentMoonwalk
+  stubs in `loader_windows` and Crystal-Kit.
+- Build agent payloads that link C with zig. `core/build.py` sets
+  `CC="zig cc -target ..."`:
+  - Linux cgo stubs (amd64, 386, arm64, riscv64): `*-linux-musl`, static.
+  - Linux shared objects: `*-linux-gnu.2.17`; riscv64 uses `*-linux-musl`.
+  - Windows shared objects: `*-windows-gnu`.
+  - Pure-Go stubs and C2 binaries need no C compiler. The builder image maps
+    mingw-w64 compiler names to zig.
+- Build C modules with zig too: Linux stager, `libbpf`, `hello_linux`, and the
+  Windows loader.
+- Build freestanding position-independent stages with `-nostdlib` and no libc
+  target.
+- Link hosted artifacts (Linux `SO`/`EXE` stagers, the agent `c-shared` object)
+  against glibc dynamically, never statically. Pin the oldest ABI:
+  `*-linux-gnu.2.17` for `__libc_dlopen_mode`, `*-linux-gnu.2.34` for
+  `dlopen`/`dlsym`/`dlclose`. Use the per-arch targets in `core/build.py`.
 
-- Run `gofumpt -w` and `goimports -w` on every changed `.go` file. `gofmt` alone is not sufficient: the project expects the stricter gofumpt formatting and goimports group/ordering.
-- Verify the whole module still builds and the affected packages' tests pass after formatting.
-- When writing code, make it reusable. Avoid hardcoding and duplicated code at all costs.
-- Wrap errors with context: `fmt.Errorf("do x: %w", err)`. Match the surrounding file's style.
-- Do not introduce or keep `TestDummy`-style empty tests. Tests must assert real behavior; delete meaningless tests instead of faking coverage.
-- Write comments explaining why (concurrency safety, invariants, ordering), not what.
-- Keep code compiling on all supported platforms (`linux` and `windows`; operator/c2 run on `linux` only); platform-specific files use `//go:build` tags and must have working stubs for other platforms.
+## Code Style
+
+- Run `gofumpt -w` and `goimports -w` on every changed `.go` file.
+- Build the module and run the affected packages' tests after formatting.
+- Reuse code. Do not hardcode values or duplicate logic.
+- Wrap errors with context: `fmt.Errorf("do x: %w", err)`.
+- Write comments that explain why, not what.
+- Do not add empty tests. Tests must assert real behavior.
+- Keep code building on Linux and Windows; operator and C2 code is Linux-only.
+  Put platform code behind `//go:build` tags and provide stubs.
 
 ## Concurrency
 
-- Use `sync.Map` for state shared across goroutines; never a plain map.
-- Values stored in shared maps are immutable snapshots: copy, modify, publish. Never mutate a struct through a pointer obtained from a `sync.Map`.
-- Never reassign a `sync.Map` variable that other goroutines may still use; clear with `Delete`/`Clear`.
+- Use `sync.Map` for state shared across goroutines, never a plain map.
+- Store immutable snapshots in shared maps: copy, modify, publish. Do not
+  mutate a struct through a pointer read from a `sync.Map`.
+- Do not reassign a `sync.Map`; clear it with `Delete` or `Clear`.
 - Do not hold a lock during network or disk I/O.
-- Use `sync.Once` for one-time init and `sync/atomic` for shared counters/flags.
-- Run `go test -race` on packages you change.
+- Use `sync.Once` for one-time init and `sync/atomic` for shared counters and
+  flags.
+- Run `go test -race` on changed packages.
 
-## Secure Communication
+## Transport Security
 
-- TOFU should be enforced.
-- All communication data needs to CBOR-encoded and encrypted properly with PFS key.
-- Initial check-in phase is the only phase where static keys can be used. Sessions need to be re-keyed immediately after this phase.
-- Reject early in new check-ins if anything doesn't work; avoid executing more work such as CBOR decoding.
+- Enforce TOFU.
+- Encode all communication with CBOR and encrypt it with the PFS key.
+- Use static keys only for the initial check-in, then re-key the session.
+- Reject invalid new check-ins before running more work such as CBOR decoding.
 
-## Operator isolation (multi-operator mode)
+## Operator Isolation
 
-In multi-operator mode the server is the trust root and operators are untrusted relative to the server and to each other. Enforce every boundary on the server; never rely on the operator client to police itself. See `docs/SECURITY.md` for the threat model.
+- Treat the server as the trust root. Enforce every boundary on the server,
+  never in the operator client. See `docs/SECURITY.md`.
+- Derive operator identity from the authenticated WireGuard peer address
+  (`operatorIDFromRemote`). Trust the `operator_session` header only from
+  loopback.
+- Call `requireOperatorIdentity` on every operator-facing endpoint and return
+  401 for unidentified callers.
+- Use `acquireAgentLock` for single-owner agent claims. Return 409 for a second
+  claim or a command from a non-owner. Refuse `forget_agent` while another
+  operator owns the agent. Release locks on target switch, disconnect, and idle
+  timeout.
+- Keep job ownership immutable with `setJobOwner` (`LoadOrStore`).
+- Owner-check SOCKS5 pivots, FTP streams, and WWW relays, and list only the
+  caller's entries. Route agent-initiated work to the agent's owner with
+  `agentLockOwnerSession`; fall back to the sole online operator only in
+  single-operator mode.
+- Let only the server change the operator idle timeout in multi-operator mode
+  and refuse operator updates.
+- Let `sign_agent` sign only a validated UUID, never arbitrary content.
+- Bind SOCKS5 pivots only to loopback or the C2 WireGuard address.
+- Bound operator input and maps: request bodies (1 MiB), message-tunnel frames
+  (4 MiB), and per-operator FTP streams and SOCKS5 pivots. Cap and sweep
+  per-agent rate-limiter and replay caches.
+- Audit every operator action, including denials, with `auditOperatorAction`
+  in `~/.emp3r0r/operator_audit.log` (0600).
 
-- Operator identity is the provisioned WireGuard IP, derived from the authenticated peer address (`operatorIDFromRemote`). Trust the `operator_session` header only from loopback (local mode, embedders, tests), never from a network peer.
-- Every operator-facing endpoint must call `requireOperatorIdentity` and reject unidentified callers with 401.
-- Agent ownership is a per-agent single-owner lock (`acquireAgentLock`): a second claim is 409, a command is refused 409 unless the caller owns the agent, and `forget_agent` is refused while another operator owns the agent. Release an operator's locks on target switch, disconnect and idle timeout.
-- A job's owner is immutable (`setJobOwner` uses `LoadOrStore`), so one operator can never redirect another operator's command output.
-- SOCKS5 pivots, FTP streams and WWW relays are owner-checked. Route agent-initiated work (e.g. the WWW download relay) to the operator that owns the agent with `agentLockOwnerSession`; only fall back to "the sole online operator" for single-operator setups, never when several operators are online. A pivot or FTP listing shows only the caller's own entries.
-- The operator idle timeout is a server-wide policy: in multi-operator mode only the server may change it, and an operator update must be refused.
-- `sign_agent` signs only a validated UUID, never arbitrary content (the CA is not a signing oracle).
-- SOCKS5 pivots bind only loopback or the C2's WireGuard address, never a public interface.
-- Bound every operator-controlled input and map: request bodies (1 MiB), message-tunnel frames (4 MiB) and per-operator counts (FTP streams, SOCKS5 pivots). Cap and sweep per-agent rate-limiter/replay caches so a hostile peer cannot grow server memory without bound.
-- Record every operator action, including denials, in `~/.emp3r0r/operator_audit.log` (0600) via `auditOperatorAction`.
+## Agent Identity and tmux
 
-## Agent Identity and tmux UI
-
-- The agent's `Tag` is the operator-facing identifier: short lowercase hex derived only from the cryptographically verified UUID by `util.GenAgentTag`. The C2 derives it from the verified UUID at the trust boundary and overwrites any agent-reported tag.
-- Operators target and reference agents by tag (`target <tag>`, `forget_agent <tag>`, completion); the UUID is shown in the agent list for reference only. `forget_agent <tag>` must also resolve offline agents.
-- Logs that name an agent print both identifiers via `util.AgentRef(uuid)` (`<tag> (<uuid>)`); rejection notices name the tag to `forget_agent`.
-- Only pass `util.IsAgentID`-validated identifiers to tmux. The output pane is a plain reader; agent fields rendered there are sanitized and tmux format syntax (`#{...}`, `#(...)`) must never reach a tmux command.
+- Derive the operator-facing tag from the verified UUID with
+  `util.GenAgentTag`; overwrite any agent-reported tag.
+- Target agents by tag. Show the UUID for reference only. Make
+  `forget_agent <tag>` resolve offline agents, and name the tag in rejection
+  notices.
+- Log both identifiers with `util.AgentRef(uuid)`.
+- Pass only `util.IsAgentID`-validated identifiers to tmux. Sanitize agent
+  fields before rendering; never send tmux format syntax such as `#{...}` or
+  `#(...)` to a tmux command.
 
 ## Logging and I/O
 
-- Use the project's `lib/logging` package (`logging.Infof`, `Debugf`, `Warningf`, `Errorf`), never the stdlib `log`.
-- `logging` is no-op when compiled as release. When writing C, adopt the same logic, use a macro (`DEBUG`) to control logging behavior. Minimize string literals in the release binary.
-- Sanitize untrusted text before rendering or logging it; never print agent/remote-controlled bytes raw.
-- Treat all remote input as hostile: validate lengths, indexes, and types; never panic on malformed input. Guard before indexing slices derived from input.
-- Do not write files with predictable or brand-identifying names; prefer in-memory or opaque temporary storage (`memfs`).
-- Use `crypto/rand` (or the project's crypto-backed helpers) for anything security-relevant; do not introduce `math/rand` for keys, nonces, or names.
-- Use I/O functions such as `WriteFileAgent` for agent side file I/O, utilizing `memfs`. No file write except disk spillage by `memfs`. No spawning subprocess on agent side unless explicitly allowed.
+- Use `lib/logging` (`Infof`, `Debugf`, `Warningf`, `Errorf`), never the stdlib
+  `log`.
+- Keep release builds free of logging. In C, guard logging with `DEBUG` and
+  minimize string literals.
+- Sanitize untrusted text before logging or rendering it.
+- Validate lengths, indexes, and types from remote input. Never panic on
+  malformed input and guard before indexing.
+- Do not write files with predictable or brand-identifying names. Prefer
+  in-memory storage or `memfs`.
+- Use `crypto/rand` or the project's crypto helpers for keys, nonces, and
+  names, never `math/rand`.
+- Use `WriteFileAgent` and `memfs` for agent-side file I/O. Do not write files
+  outside `memfs` except its disk spillage. Do not spawn subprocesses on the
+  agent unless explicitly allowed.
 
-## In-memory code loading
+## In-Memory Code Loading
 
-- **Never use `memfd_create` (or `/proc/self/fd/N` + `dlopen`) to load code. It is a huge red flag.** The "no disk" justification is an illusion: on Linux everything is a file, and a `memfd` is a named kernel file object that detection keys on whether or not it ever reaches physical storage. Disk vs. non-disk matters very little; do not trade a real detection signal for a cosmetic one.
-- Load an in-memory image the way the Go agent does (`lib/memmod` / `lib/memdeps`): `mmap` it anonymously and apply its own relocations. In C use `src/util/elfload.c`; never `dlopen` a memory-backed fd.
-- `dlopen`/`dlsym` are for resolving symbols from libraries already present on the host, never as a mechanism to load an image you hold in memory.
+- Never use `memfd_create` or `/proc/self/fd/N` plus `dlopen` to load code. A
+  memfd is a named kernel object and a detection signal.
+- Map the image anonymously and apply its relocations yourself, as the Go agent
+  does in `lib/memmod` and `lib/memdeps`. In C, use `src/util/elfload.c`.
+- Use `dlopen` and `dlsym` only for libraries already present on the host, not
+  for an image held in memory.
 
-## Payload Sanitization
+## Artifact Strings
 
-Everything that ships to a target (agent, shellcode, stagers, loaders, BOFs, DLLs, service executables) must read like a generic Windows/POSIX program when inspected. Assume a defender runs `strings`, dumps the exports, and greps for well-known names; the artifact must give them nothing to key on.
-
-- Never embed project-identifying strings in a shipped artifact: no `emp3r0r`, `staged_loader`, module/tool names, technique names, or author handles. This includes service/mutex/event/pipe names and environment-variable names.
-- Do not hardcode a fallback name that identifies the project. Derive names from the host binary/module path, from build-time input, or from `crypto/rand` bytes; if none is available, fail instead of inventing a branded default.
-- Export and symbol names that a loader must resolve are part of the string table. Keep them generic (e.g. `Run`) or resolve by ordinal; do not name them after the module or technique.
-- Debug/logging text stays behind the release guard (`DEBUG` in C, the `lib/logging` release switch in Go); a string that only exists in debug builds must still not name the project.
-- Build scripts, module metadata, and C2-side log text may describe the module, but anything copied into an operator or target artifact must not.
+- Treat every shipped artifact (agent, shellcode, stager, loader, BOF, DLL, and
+  service executable) as inspectable by strings, exports, and symbol tables.
+- Do not embed project names, module or tool names, technique names, or author
+  handles. This includes service, mutex, event, pipe, and environment-variable
+  names.
+- Do not use a branded fallback name. Derive names from the host binary or
+  module path, build-time input, or `crypto/rand`; fail if none is available.
+- Keep exported symbols generic, such as `Run`, or resolve by ordinal.
+- Keep project names out of debug-only strings too. Build scripts, module
+  metadata, and C2 log text may describe the module; shipped artifacts must
+  not.
 
 ## Compatibility
 
-- No legacy/back-compat code: all binaries (agent, CC/operator, tools) must come from the same build batch. If wire format or a scheme changes, migrate everything in one change — do not keep old-path shims or "legacy" aliases.
+- Do not keep legacy or back-compat paths. Build every binary from the same
+  batch. If a wire format or scheme changes, migrate every producer and
+  consumer in one change.
 
 ## memfs
 
-- Only scheme is `memfs://` (e.g. `memfs:///test.bin`); emit it, never `mem://` or any other alias.
-- Flat map (`MemFileMap` under `MemFileLock`): no real dirs, just root `memfs:///`; path-like keys group by string prefix.
-- No `mkdir` on memfs (fail with error, see `MkdirAgent`). `ls` lists the root or a key prefix; `rm` deletes a key or a whole prefix, cleaning its spill files; never delete the root.
-- Over-budget writes spill AES-GCM-encrypted to unmarked `os.CreateTemp(dir, "")` files; keep disk I/O out of `MemFileLock`.
-- Never persisted; agent advertises keys via mesh gossip for peer pulls.
+- Use only the `memfs://` scheme, for example `memfs:///test.bin`.
+- Treat it as a flat map under `MemFileLock`. Use `memfs:///` as the root and
+  string prefixes as groups.
+- Do not create directories; `MkdirAgent` must fail. `ls` lists the root or a
+  key prefix. `rm` deletes a key or prefix and its spill files, never the root.
+- Spill over-budget writes as AES-GCM-encrypted `os.CreateTemp(dir, "")` files.
+  Keep disk I/O out of `MemFileLock`.
+- Never persist memfs. Advertise keys through mesh gossip for peer pulls.
 
-## Module System
+## Modules
 
-- Read `docs/module_development_guide.md`.
-- Read `./core/modules/`.
-- Tools such as `./core/cmd/bofrunner/` should be used for standalone testing. Create new tools if needed.
+- Read `docs/module_development_guide.md` before adding or changing a module.
+- Inspect `core/modules/` for an existing module to extend.
+- Use standalone tools such as `core/cmd/bofrunner/` for testing, and add a new
+  tool when needed.
+
+## Documentation
+
+- Put project guides in `docs/`. Keep the root `README.md`, `AGENTS.md`,
+  `CHANGELOG.md`, and `LICENSE` at the repository root.
+- Keep each component's or module's `README.md` in its directory. If it has a
+  guide in `docs/`, the README only links to that guide.
+- Write user-facing docs in `docs/` for usage only: prerequisites, commands,
+  options, output, and constraints. Leave internals out.
+- Add a `docs/<name>.md` page for a tool or module that operators configure or
+  run directly. Do not duplicate a docs page in a README.
+- Keep links relative and valid. Update every reference when moving, renaming,
+  or adding a doc.
 
 ## Testing
 
-- Fast loop: `go test ./lib/...` plus the packages you touched. Full suite may be slow (network/integration tests).
-- CI: `test.yml` defines how tests are run by GitHub Actions.
-- When fixing a bug, add a regression test that fails on the old behavior first.
+- Run `go test ./lib/...` plus the packages you changed. The full suite is
+  slower and includes network and integration tests.
+- Follow `.github/workflows/test.yml` for CI behavior.
+- When fixing a bug, add a regression test that fails before the fix.
+- Update tests when behavior changes and add tests for new behavior.
+- Exercise production code. Do not add dummy cases that only make tests pass.
 - Do not commit generated artifacts, compiled binaries, or scratch files.
-- Update tests or add new ones as you make changes.
-- Tests should not assume existing logic is correct. Focus on desired outcome of the functions and cover edge cases.
-- When writing tests, invoke production code as much as possible. Do not create dummy cases so tests can pass but no real code is tested. Actively correct tests that don't comply with this principle.
 
 ## Deliverables
 
-- Report what you have done.
-- List your assumptions and rationales.
+- Report what you changed.
+- List assumptions and their reasons.
 - Prefer small, focused commits with descriptive messages.
 - Do not commit unless asked.
-- Commits have to be signed. If your environment doesn't support signing, provide `git` commands so users can commit manually.
+- Sign commits. If signing is unavailable, provide the `git` commands for the
+  user to run.
