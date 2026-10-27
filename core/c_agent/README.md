@@ -188,7 +188,12 @@ under the C2's own `MagicString`:
 ```text
 generate_c --type glibc|musl --arch amd64|386|arm|arm64|riscv64 --cc your.domain.com
   --crypto openssl|mbedtls --gzip miniz|none --transport libcurl|http_raw|libssl
+  --interval 60 --jitter 50
 ```
+
+The beacon profile defaults to a 60s interval with 50% jitter, so the agent
+sleeps for a randomized 30–60s. Both values are embedded in the agent config
+and can be changed per build.
 
 `riscv64` requires `--type musl`; `--format shellcode` is `amd64` + `glibc`
 only.
@@ -309,7 +314,15 @@ installs. The agent reads that block once (`c2_stager_mask_bind`) and calls the
 function from its existing sleep cycle. The mask code makes every anonymous ELF
 image (the mapped agent and any decompressed copy malasada left behind)
 writable, XORs them with a fresh random key, sleeps, restores them, and returns
-to the agent.
+to the agent. The agent passes the selected sleep duration to the stub, which
+owns the timer; the stub runs from the stager's mapping, so its code remains
+available while the agent image is encrypted. The message tunnel stays open
+across the sleep and is kept alive with a hello after the stub wakes.
+
+The mask covers the anonymous ELF images, which is where the agent code and
+rodata live. Heap and stack are not XORed: the stub runs on the agent's thread
+and stack, so masking those would destroy its own call frame. Full memory
+masking would need a separate stub stack/thread or a supervising process.
 
 Mask providers live in `core/modules/stager_linux/mask_<name>.c` and are
 selected with `MASK=<name>` (`--mask` from the module build). The default
@@ -449,9 +462,9 @@ Implemented and tested in `src/`:
   filesystem/navigation commands the operator expects (`ls`/`ls_dir` return
   CBOR `[]util.Dentry`, `stat` returns CBOR `util.FileStat`, `pwd`, `cd`,
   `cat`); `mem_write`/`mem_read`/`mem_ls`; `download`; `custom_module` (the C2's
-  BOF module dispatch); `bof`. It reconnects on
-  tunnel loss and sends keepalive hellos, and reports output like the Go
-  agent's `NotifyC2`.
+  BOF module dispatch); `bof`. It keeps the message tunnel open, masks its
+  configured idle sleep, sends a keepalive after waking, reconnects on tunnel
+  loss, and reports output like the Go agent's `NotifyC2`.
 - `src/agent_args.c` — command-slice path/flag/argument parsing, kept separate
   from the handlers so `fuzz_command_args` can exercise it without side effects.
 - `module.c` — `c2_coff_invocation_parse` decodes the base64 CBOR

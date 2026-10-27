@@ -32,10 +32,14 @@ TLS through the C2 TLS frontend or an external TLS front proxy. TLS requires
 only. If the C2 certificate does not cover the new name, the server adds it
 there and reloads the certificate for new TLS/QUIC handshakes.
 
+The shellcode format is marked stager-run so stager_linux can bind its sleep
+mask; other formats stay standalone.
+
 Examples:
   generate_c --cc c2.example.com --type glibc --arch amd64
   generate_c --cc https://front.example.com --type glibc --arch amd64 --transport libssl
-  generate_c --cc https://c2.example.com:8443 --type glibc --arch amd64 --transport libcurl`,
+  generate_c --cc https://c2.example.com:8443 --type glibc --arch amd64 --transport libcurl
+  generate_c --cc c2.example.com --interval 60 --jitter 50`,
 		Run: CmdGenerateCAgent,
 	}
 
@@ -52,6 +56,8 @@ Examples:
 	cmd.Flags().String("dynload", builder.CAgentDynloadModes[0], fmt.Sprintf("libc dynamic-loader symbols. Available: %v", builder.CAgentDynloadModes))
 	cmd.Flags().String("glibc-version", builder.CAgentGlibcVersions[0], fmt.Sprintf("Oldest glibc ABI to link against. Available: %v", builder.CAgentGlibcVersions))
 	cmd.Flags().String("bof", "1", "Include COFF/BOF support (1) or compile it out (0)")
+	cmd.Flags().Int("interval", 60, "C2 beacon interval in seconds")
+	cmd.Flags().Int("jitter", 50, "Beacon jitter percentage (0-100); sleeps in [interval*(1-jitter%), interval]")
 
 	cmd.MarkFlagRequired("cc")
 
@@ -68,6 +74,8 @@ Examples:
 		"dynload":       carapace.ActionValues(builder.CAgentDynloadModes...),
 		"glibc-version": carapace.ActionValues(builder.CAgentGlibcVersions...),
 		"bof":           carapace.ActionValues("1", "0"),
+		"interval":      carapace.ActionValues("30", "60", "120", "300"),
+		"jitter":        carapace.ActionValues("0", "20", "50"),
 	})
 	return cmd
 }
@@ -80,13 +88,13 @@ func CmdGenerateCAgent(cmd *cobra.Command, _ []string) {
 	dynload := cAgentDynloadForLibc(libc, flagString(cmd, "dynload"), cmd.Flags().Changed("dynload"))
 	// The C agent implements only the http_poll channel mode, so it is fixed
 	// rather than exposed as a flag that would produce a non-working agent.
-	channelMode := def.C2ChannelModeDefault
-	opts := builder.AgentConfig{
-		CCAddress:     getStringOptPtr(cmd, "cc"),
-		CCHTTPPort:    getStringOptPtr(cmd, "cc-http-port"),
-		DoHServer:     getStringOptPtr(cmd, "doh"),
-		C2ChannelMode: &channelMode,
+	interval, _ := cmd.Flags().GetInt("interval")
+	jitter, _ := cmd.Flags().GetInt("jitter")
+	if err := validateCAgentPollTiming(interval, jitter); err != nil {
+		logging.Errorf("Invalid beacon timing: %v", err)
+		return
 	}
+	channelMode := def.C2ChannelModeDefault
 	providers := builder.CAgentProviders{
 		Crypto:    flagString(cmd, "crypto"),
 		Gzip:      flagString(cmd, "gzip"),
@@ -97,6 +105,17 @@ func CmdGenerateCAgent(cmd *cobra.Command, _ []string) {
 		Arch:      flagString(cmd, "arch"),
 		Format:    flagString(cmd, "format"),
 		Bof:       flagString(cmd, "bof"),
+	}
+	opts := builder.AgentConfig{
+		CCAddress:     getStringOptPtr(cmd, "cc"),
+		CCHTTPPort:    getStringOptPtr(cmd, "cc-http-port"),
+		DoHServer:     getStringOptPtr(cmd, "doh"),
+		C2ChannelMode: &channelMode,
+		PollInterval:  &interval,
+		Jitter:        &jitter,
+		// shellcode is the artifact stager_linux embeds for a local payload.
+		// Mark it so the agent binds the stager mask and identity FDs.
+		IsStager: cAgentStagerMode(providers.Format),
 	}
 
 	res, err := builder.GenerateCAgentWorkflow(opts, providers, client.SignAgent)
@@ -114,6 +133,25 @@ func CmdGenerateCAgent(cmd *cobra.Command, _ []string) {
 	if strings.HasPrefix(endpoint, "https://") && providers.Transport == "http_raw" {
 		logging.Warningf("http_raw does not support TLS; use --transport libcurl or --transport libssl")
 	}
+}
+
+// validateCAgentPollTiming rejects a beacon profile that would make the sleep
+// cycle non-random or nonsensical.
+func validateCAgentPollTiming(interval, jitter int) error {
+	if interval <= 0 {
+		return fmt.Errorf("interval must be greater than zero")
+	}
+	if jitter < 0 || jitter > 100 {
+		return fmt.Errorf("jitter must be between 0 and 100")
+	}
+	return nil
+}
+
+// cAgentStagerMode reports whether the selected artifact is the one embedded
+// by stager_linux. A standalone shellcode deployment simply finds no mask and
+// falls back to a normal sleep.
+func cAgentStagerMode(format string) bool {
+	return format == "shellcode"
 }
 
 func flagString(cmd *cobra.Command, name string) string {

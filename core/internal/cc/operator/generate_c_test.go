@@ -21,7 +21,7 @@ func TestGenerateCmdDoesNotOfferCAgent(t *testing.T) {
 
 func TestGenerateCAgentCmdHasFlags(t *testing.T) {
 	cmd := gen_c_cmd()
-	for _, name := range []string{"type", "arch", "cc", "cc-http-port", "doh", "crypto", "format", "gzip", "transport", "dynload", "glibc-version", "bof"} {
+	for _, name := range []string{"type", "arch", "cc", "cc-http-port", "doh", "crypto", "format", "gzip", "transport", "dynload", "glibc-version", "bof", "interval", "jitter"} {
 		if cmd.Flags().Lookup(name) == nil {
 			t.Errorf("generate_c: missing flag --%s", name)
 		}
@@ -32,8 +32,46 @@ func TestGenerateCAgentCmdHasFlags(t *testing.T) {
 	if got := cmd.Flags().Lookup("arch").DefValue; got != builder.CAgentArches[0] {
 		t.Errorf("--arch default = %q, want %q", got, builder.CAgentArches[0])
 	}
+	if got := cmd.Flags().Lookup("interval").DefValue; got != "60" {
+		t.Errorf("--interval default = %q, want 60", got)
+	}
+	if got := cmd.Flags().Lookup("jitter").DefValue; got != "50" {
+		t.Errorf("--jitter default = %q, want 50", got)
+	}
 	if cmd.Flags().Lookup("c2-channel-mode") != nil {
 		t.Error("C agent only implements http_poll; it must not expose --c2-channel-mode")
+	}
+}
+
+func TestValidateCAgentPollTiming(t *testing.T) {
+	for _, tc := range []struct {
+		interval, jitter int
+		ok               bool
+	}{
+		{60, 50, true},
+		{30, 0, true},
+		{120, 100, true},
+		{0, 20, false},
+		{-1, 20, false},
+		{60, -1, false},
+		{60, 101, false},
+	} {
+		err := validateCAgentPollTiming(tc.interval, tc.jitter)
+		if (err == nil) != tc.ok {
+			t.Errorf("validateCAgentPollTiming(%d, %d) error = %v, want ok=%v",
+				tc.interval, tc.jitter, err, tc.ok)
+		}
+	}
+}
+
+func TestCAgentStagerMode(t *testing.T) {
+	if !cAgentStagerMode("shellcode") {
+		t.Error("shellcode is the local stager payload and must enable stager mode")
+	}
+	for _, format := range []string{"exe", "so", ""} {
+		if cAgentStagerMode(format) {
+			t.Errorf("%q is not a stager-embedded artifact", format)
+		}
 	}
 }
 

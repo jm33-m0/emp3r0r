@@ -510,8 +510,15 @@ func buildCAgentResult(t *testing.T, tmpDir, format string, stager bool) *builde
 	if libc == "musl" {
 		dynload = "public"
 	}
+	// Keep the poll window short in tests; the production default is 60s.
+	pollInterval, jitter := 5, 20
 	res, err := builder.GenerateCAgentWorkflow(
-		builder.AgentConfig{CCAddress: &ccAddr, IsStager: stager},
+		builder.AgentConfig{
+			CCAddress:    &ccAddr,
+			IsStager:     stager,
+			PollInterval: &pollInterval,
+			Jitter:       &jitter,
+		},
 		builder.CAgentProviders{Dynload: dynload, Format: format, Libc: libc},
 		func(u string) (string, error) { return signUUID(u, transport.CaKeyFile) },
 	)

