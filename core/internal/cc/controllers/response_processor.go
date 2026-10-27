@@ -53,18 +53,12 @@ func ProcessAgentResponse(data *def.MsgTunData) (*ProcessedResponse, error) {
 		return resp, nil
 	}
 
-	// Find target agent
-	var target *def.Emp3r0rAgent
-	if data.AgentUUID != "" {
-		target = agents.GetAgentByUUID(data.AgentUUID)
-	}
+	// The C2 derives the agent tag from the authenticated UUID and overwrites
+	// this field at the trust boundary before forwarding the response.
+	target := agents.GetAgentByTag(data.Tag)
 	if target == nil {
-		target = agents.GetAgentByTag(data.Tag)
-	}
-
-	if target == nil {
-		return nil, fmt.Errorf("target %s (%s) cannot be found, message: %v",
-			data.Tag, data.AgentUUID, data.CmdSlice)
+		return nil, fmt.Errorf("target %s cannot be found, message: %v",
+			data.Tag, data.CmdSlice)
 	}
 
 	resp.Agent = target

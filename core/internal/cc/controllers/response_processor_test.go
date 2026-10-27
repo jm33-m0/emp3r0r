@@ -18,11 +18,10 @@ func TestProcessAgentResponseQuietSuppression(t *testing.T) {
 
 	msg := func(cmdSlice []string) *def.MsgTunData {
 		return &def.MsgTunData{
-			Tag:       "quiet-test",
-			AgentUUID: "quiet-test-uuid",
-			CmdSlice:  cmdSlice,
-			Response:  []byte("Cached tokens (1):\nS-1-5-21-1234-5678  quiet-test\\user\n"),
-			JobID:     "job-quiet-1",
+			Tag:      "quiet-test",
+			CmdSlice: cmdSlice,
+			Response: []byte("Cached tokens (1):\nS-1-5-21-1234-5678  quiet-test\\user\n"),
+			JobID:    "job-quiet-1",
 		}
 	}
 

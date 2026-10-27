@@ -86,8 +86,6 @@ func SanitizeMsgTunMetadata(m *def.MsgTunData) {
 		return
 	}
 	m.Tag = SanitizeOneLine(m.Tag)
-	m.AgentUUID = SanitizeOneLine(m.AgentUUID)
-	m.AgentUUIDSig = SanitizeOneLine(m.AgentUUIDSig)
 	m.JobID = SanitizeOneLine(m.JobID)
 	m.Time = SanitizeOneLine(m.Time)
 

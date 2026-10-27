@@ -50,7 +50,7 @@ func processKeyExchange(agentUUID string, msg *def.MsgTunData, pfsEstablished bo
 		}
 
 		// 4. Derive Session Key
-		sessionKey, err = transport.DeriveSessionKey(sharedSecret, msg.AgentUUID)
+		sessionKey, err = transport.DeriveSessionKey(sharedSecret, agentUUID)
 		if err != nil {
 			logging.Errorf("Handshake error: failed to derive session key: %v", err)
 			return nil, nil, err

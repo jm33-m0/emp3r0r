@@ -393,12 +393,6 @@ c2_status c2_session_hello(c2_agent_session *s, c2_secureconn *msg,
 
   char tbuf[48];
   size_t tlen = format_time(tbuf, sizeof(tbuf));
-  char uuidsig[128];
-  size_t uuidsig_len = 0;
-  c2_status st = sign_b64(s->be, s->agent_priv, s->config->agent_uuid, uuidsig,
-                          sizeof(uuidsig), &uuidsig_len);
-  if (st != C2_OK)
-    return st;
 
   c2_msgtun m;
   memset(&m, 0, sizeof(m));
@@ -406,15 +400,13 @@ c2_status c2_session_hello(c2_agent_session *s, c2_secureconn *msg,
   m.cmd_slice = cmd;
   m.tag = s->config->agent_tag;
   m.time = c2_str_of(tbuf, tlen);
-  m.agent_uuid = s->config->agent_uuid;
-  m.agent_uuid_sig = c2_str_of(uuidsig, uuidsig_len);
   if (send_ephem)
     m.ephem_public_key = c2_bytes_of(s->pfs_pub, C2_P256_PUB_BYTES);
 
   uint8_t buf[C2_SESSION_MSG_MAX];
   CborEncoder enc;
   cbor_encoder_init(&enc, buf, sizeof(buf), 0);
-  st = c2_msgtun_encode(&enc, &m);
+  c2_status st = c2_msgtun_encode(&enc, &m);
   if (st != C2_OK)
     return st;
   return c2_secureconn_write(msg, buf, cbor_encoder_get_buffer_size(&enc, buf));
@@ -481,16 +473,10 @@ c2_status c2_session_send_result(c2_agent_session *s, c2_secureconn *msg,
   if (s == NULL || msg == NULL || cmd_slice == NULL)
     return C2_ERR_ARG;
 
-  /* The C2 routes the reply by Tag/UUID; include the same identity the hello
-   * carries (a fresh signature over the UUID proves it is us). */
+  /* The C2 derives the agent tag from the authenticated MsgAuth stream and
+   * overwrites this field before forwarding the reply. */
   char tbuf[48];
   size_t tlen = format_time(tbuf, sizeof(tbuf));
-  char uuidsig[128];
-  size_t uuidsig_len = 0;
-  c2_status st = sign_b64(s->be, s->agent_priv, s->config->agent_uuid, uuidsig,
-                          sizeof(uuidsig), &uuidsig_len);
-  if (st != C2_OK)
-    return st;
 
   c2_msgtun m;
   memset(&m, 0, sizeof(m));
@@ -499,13 +485,11 @@ c2_status c2_session_send_result(c2_agent_session *s, c2_secureconn *msg,
   m.response = c2_bytes_of(response, response_len);
   m.tag = s->config->agent_tag;
   m.time = c2_str_of(tbuf, tlen);
-  m.agent_uuid = s->config->agent_uuid;
-  m.agent_uuid_sig = c2_str_of(uuidsig, uuidsig_len);
 
   uint8_t buf[C2_SESSION_MSG_MAX];
   CborEncoder enc;
   cbor_encoder_init(&enc, buf, sizeof(buf), 0);
-  st = c2_msgtun_encode(&enc, &m);
+  c2_status st = c2_msgtun_encode(&enc, &m);
   if (st != C2_OK)
     return st;
   return c2_secureconn_write_bulk(msg, buf,

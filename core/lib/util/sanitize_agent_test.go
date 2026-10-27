@@ -114,24 +114,20 @@ func TestSanitizeAgentMetadataNilIsSafe(t *testing.T) {
 func TestSanitizeMsgTunMetadataStripsHostileFields(t *testing.T) {
 	hostile := hostileMetadata("canary")
 	m := &def.MsgTunData{
-		Tag:          hostile,
-		AgentUUID:    hostile,
-		AgentUUIDSig: hostile,
-		JobID:        hostile,
-		Time:         hostile,
-		CmdSlice:     []string{hostile, "ls", hostile},
+		Tag:      hostile,
+		JobID:    hostile,
+		Time:     hostile,
+		CmdSlice: []string{hostile, "ls", hostile},
 	}
 
 	SanitizeMsgTunMetadata(m)
 
 	for name, value := range map[string]string{
-		"Tag":          m.Tag,
-		"AgentUUID":    m.AgentUUID,
-		"AgentUUIDSig": m.AgentUUIDSig,
-		"JobID":        m.JobID,
-		"Time":         m.Time,
-		"CmdSlice[0]":  m.CmdSlice[0],
-		"CmdSlice[2]":  m.CmdSlice[2],
+		"Tag":         m.Tag,
+		"JobID":       m.JobID,
+		"Time":        m.Time,
+		"CmdSlice[0]": m.CmdSlice[0],
+		"CmdSlice[2]": m.CmdSlice[2],
 	} {
 		assertClean(t, name, value)
 	}

@@ -369,10 +369,8 @@ The universal agent↔C2 message.
 | 3   | `Response`         | bytes         | command output / payload                                             |
 | 4   | `Tag`              | text          | see §2.3                                                             |
 | 5   | `Time`             | text          | agent clock, `2006-01-02 15:04:05.999999999 -0700 MST`; used for RTT |
-| 6   | `AgentUUID`        | text          | agent identity                                                       |
-| 7   | `AgentUUIDSig`     | text          | base64url(agent-key signature over `AgentUUID`)                      |
 | 8   | `EphemPublicKey`   | bytes         | agent ephemeral P-256 pubkey on the first hello                      |
-| 10  | `EnrichedPeerList` | map           | C2 push: peers (see §7.4; key 9 retired)                             |
+| 10  | `EnrichedPeerList` | map           | C2 push: peers (see §7.4; keys 6, 7, 9 retired)                      |
 
 Field 10 is delivered inside a `peer_list` tagged message and is the
 `EnrichedPeerList` structure in §7.4. It is authenticated by the PFS tunnel and
@@ -496,8 +494,8 @@ Notes:
 agent                                              C2
   |-- frame: MsgAuth(caps=[c2-msg]) --------------->|  PSK-encrypted, routed
   |-- frame: MsgTunData hello --------------------->|  Tag=agent tag, CmdSlice=[random],
-  |     JobID=uuid, EphemPublicKey=agent_pub,        |  Response=nil,
-  |     AgentUUID, AgentUUIDSig, Time                |  EphemPublicKey present
+  |     JobID=uuid, EphemPublicKey=agent_pub, Time   |  Response=nil,
+  |                                                  |  EphemPublicKey present
   |                                                  |  ECDH(P-256), derive session key
   |                                                  |  reply, then switch SecureConn key
   |<-- frame: MsgTunData{Tag:"handshake", -----------|  Response = server_pub (64 bytes)

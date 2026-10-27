@@ -239,10 +239,6 @@ c2_status c2_msgtun_encode(CborEncoder *w, const c2_msgtun *m) {
     pairs++;
   if (m->time.len)
     pairs++;
-  if (m->agent_uuid.len)
-    pairs++;
-  if (m->agent_uuid_sig.len)
-    pairs++;
   if (m->ephem_public_key.len)
     pairs++;
 
@@ -265,13 +261,6 @@ c2_status c2_msgtun_encode(CborEncoder *w, const c2_msgtun *m) {
     return st;
   if (m->time.len &&
       (st = c2_cbor_write_text(&map, C2_KEY_TUN_TIME, m->time)) != C2_OK)
-    return st;
-  if (m->agent_uuid.len && (st = c2_cbor_write_text(&map, C2_KEY_TUN_AGENT_UUID,
-                                                    m->agent_uuid)) != C2_OK)
-    return st;
-  if (m->agent_uuid_sig.len &&
-      (st = c2_cbor_write_text(&map, C2_KEY_TUN_AGENT_UUID_SIG,
-                               m->agent_uuid_sig)) != C2_OK)
     return st;
   if (m->ephem_public_key.len &&
       (st = c2_cbor_write_bytes(&map, C2_KEY_TUN_EPHEM_PUBLIC,
@@ -301,8 +290,6 @@ c2_status c2_msgtun_decode(CborValue *r, c2_msgtun *m) {
       C2_CASE_BYTES(C2_KEY_TUN_RESPONSE, m, response);
       C2_CASE_TEXT(C2_KEY_TUN_TAG, m, tag);
       C2_CASE_TEXT(C2_KEY_TUN_TIME, m, time);
-      C2_CASE_TEXT(C2_KEY_TUN_AGENT_UUID, m, agent_uuid);
-      C2_CASE_TEXT(C2_KEY_TUN_AGENT_UUID_SIG, m, agent_uuid_sig);
       C2_CASE_BYTES(C2_KEY_TUN_EPHEM_PUBLIC, m, ephem_public_key);
     case C2_KEY_TUN_ENRICHED_PEER_LIST:
       if (m->enriched_peer_list)

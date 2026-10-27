@@ -157,7 +157,7 @@ func TestProcessKeyExchangeNoMidSessionReKey(t *testing.T) {
 
 	// Initial handshake: a key offer is accepted and yields a session key plus
 	// the server's ephemeral public key as reply.
-	initial := &def.MsgTunData{Tag: "t", AgentUUID: "uuid-1", EphemPublicKey: offer}
+	initial := &def.MsgTunData{Tag: "t", EphemPublicKey: offer}
 	reply, sk, err := processKeyExchange("uuid-1", initial, false)
 	if err != nil {
 		t.Fatalf("initial handshake failed: %v", err)
@@ -171,7 +171,7 @@ func TestProcessKeyExchangeNoMidSessionReKey(t *testing.T) {
 
 	// Mid-session: the same offer must be rejected — the session key is pinned
 	// for the lifetime of the tunnel.
-	reKey := &def.MsgTunData{Tag: "t", AgentUUID: "uuid-1", EphemPublicKey: offer}
+	reKey := &def.MsgTunData{Tag: "t", EphemPublicKey: offer}
 	reply2, sk2, err := processKeyExchange("uuid-1", reKey, true)
 	if err == nil {
 		t.Fatalf("mid-session re-key was not rejected (reply=%d bytes, key=%d bytes)", len(reply2), len(sk2))
@@ -181,7 +181,7 @@ func TestProcessKeyExchangeNoMidSessionReKey(t *testing.T) {
 	}
 
 	// Keep-alive hello (no ephemeral key) after PFS is still fine.
-	reply3, sk3, err := processKeyExchange("uuid-1", &def.MsgTunData{Tag: "t", AgentUUID: "uuid-1"}, true)
+	reply3, sk3, err := processKeyExchange("uuid-1", &def.MsgTunData{Tag: "t"}, true)
 	if err != nil {
 		t.Fatalf("keep-alive after PFS failed: %v", err)
 	}

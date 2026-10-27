@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
@@ -42,6 +43,12 @@ func StartC2AgentTLSServer() error {
 }
 
 func prepareC2ServerPrerequisites() {
+	// Several transports may be started concurrently (and tests start them as
+	// goroutines). Serialize the shared one-time initialization so AgentDB is
+	// never written while another transport's handler is reading it.
+	c2PrereqMu.Lock()
+	defer c2PrereqMu.Unlock()
+
 	if agents.AgentDB == nil || agents.AgentDB.Ping() != nil {
 		dbPath := filepath.Join(live.EmpWorkSpace, "agents.db")
 		if err := agents.InitAgentDB(dbPath); err != nil {
@@ -62,6 +69,10 @@ func prepareC2ServerPrerequisites() {
 
 	transport.SetCACrtPEM([]byte(live.GetRuntimeConfig().CAPEM))
 }
+
+// c2PrereqMu guards prepareC2ServerPrerequisites across concurrently started
+// transports.
+var c2PrereqMu sync.Mutex
 
 func setupC2TLSListener() net.Listener {
 	network.StopEmpTLSServer()

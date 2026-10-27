@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"encoding/base64"
-	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -186,12 +185,8 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 				return
 			}
 			if authAgentUUID == "" {
-				resolvedUUID, authErr := validateInitialMsgIdentity(&msg)
-				if authErr != nil {
-					logging.Warningf("handleMessageTunnel: initial MsgTunData identity rejected: %v", authErr)
-					return
-				}
-				authAgentUUID = resolvedUUID
+				logging.Warningf("handleMessageTunnel: MsgTunData received before MsgAuth")
+				return
 			}
 			// Sanitize agent metadata at trust boundary (after CBOR decode)
 			util.SanitizeMsgTunMetadata(&msg)
@@ -223,16 +218,9 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 			// The operator-facing identifier is derived exclusively from the
 			// authenticated UUID; never trust the TAG the agent sent.
 			agent.Tag = util.GenAgentTag(authAgentUUID)
+			msg.Tag = agent.Tag
 
-			// SECURITY: prevent session hijacking where authenticated Agent A tries to send CBOR for Agent B
-			if msg.AgentUUID != "" && msg.AgentUUID != authAgentUUID {
-				logging.Warningf("SECURITY: Agent %s attempted to hijack session for UUID %s", util.AgentRef(authAgentUUID), util.AgentRef(msg.AgentUUID))
-				return
-			}
-			// msg.Tag is deliberately not trusted: the operator-facing identifier
-			// is always derived from the authenticated UUID above.
-
-			// Agent authentication is payload-authoritative via MsgAuth / signed MsgTunData.
+			// Agent authentication is payload-authoritative via MsgAuth.
 			// Announce an agent only once per registry lifetime. Reconnects after
 			// a masked sleep, and re-check-ins, must stay silent.
 			existing, known := live.LookupAgent(agent.UUID)
@@ -461,40 +449,4 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 			}
 		}
 	}
-}
-
-func validateInitialMsgIdentity(msg *def.MsgTunData) (string, error) {
-	if msg == nil {
-		return "", fmt.Errorf("nil message")
-	}
-	if msg.AgentUUID == "" {
-		return "", fmt.Errorf("empty AgentUUID")
-	}
-	if agents.AgentDB == nil {
-		return "", fmt.Errorf("trust store unavailable")
-	}
-	pinnedKey, _, found, err := agents.GetPinnedIdentity(msg.AgentUUID)
-	if err != nil {
-		return "", fmt.Errorf("identity lookup failed: %w", err)
-	}
-	if !found {
-		return "", fmt.Errorf("unknown agent %q", msg.AgentUUID)
-	}
-
-	if msg.AgentUUIDSig == "" {
-		return "", fmt.Errorf("missing payload identity proof")
-	}
-	proof, err := base64.URLEncoding.DecodeString(msg.AgentUUIDSig)
-	if err != nil {
-		return "", fmt.Errorf("decode payload proof: %w", err)
-	}
-
-	if pinnedKey == "" {
-		return "", fmt.Errorf("missing pinned public key for %q", msg.AgentUUID)
-	}
-	agentOK, err := transport.VerifySignatureWithPEM([]byte(pinnedKey), []byte(msg.AgentUUID), proof)
-	if err != nil || !agentOK {
-		return "", fmt.Errorf("agent identity proof invalid")
-	}
-	return msg.AgentUUID, nil
 }

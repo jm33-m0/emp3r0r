@@ -282,10 +282,9 @@ c2_status c2_session_read(c2_agent_session *s, c2_secureconn *msg,
 
 /*
  * Send a job result: same JobID and CmdSlice as the request, Response = output.
- * The frame is written as a bulk frame (no padding). The agent's Tag/UUID and a
- * fresh UUID signature are included, exactly like the Go agent's NotifyC2: the
- * C2 routes the reply by Tag/UUID, so a reply without them is dropped with
- * "target cannot be found".
+ * The frame is written as a bulk frame (no padding). The agent Tag identifies
+ * the sender; the C2 derives it from the authenticated MsgAuth stream and
+ * overwrites the field before forwarding the reply.
  */
 c2_status c2_session_send_result(c2_agent_session *s, c2_secureconn *msg,
                                  c2_str job_id, const c2_str_list *cmd_slice,
