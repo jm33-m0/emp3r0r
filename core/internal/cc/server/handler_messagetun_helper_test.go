@@ -80,11 +80,11 @@ func TestOperatorBroadcastNotPoisonedByWriteDeadline(t *testing.T) {
 	OPERATORS.Store(session, &operator_t{sessionID: session, conn: serverConn})
 	defer OPERATORS.Delete(session)
 
-	received := make(chan def.MsgTunData, 8)
+	received := make(chan def.OperatorMsg, 8)
 	go func() {
 		dec := cbor.NewDecoder(clientConn)
 		for {
-			var m def.MsgTunData
+			var m def.OperatorMsg
 			if err := dec.Decode(&m); err != nil {
 				return
 			}
@@ -93,7 +93,7 @@ func TestOperatorBroadcastNotPoisonedByWriteDeadline(t *testing.T) {
 	}()
 
 	// A targeted relay must reach the operator.
-	if err := fwdMsgToOperator(session, def.MsgTunData{Tag: "relay"}); err != nil {
+	if err := fwdMsgToOperator(session, def.OperatorMsg{Tag: "relay"}); err != nil {
 		t.Fatalf("fwdMsgToOperator: %v", err)
 	}
 	select {
@@ -115,7 +115,7 @@ func TestOperatorBroadcastNotPoisonedByWriteDeadline(t *testing.T) {
 	time.Sleep(3 * operatorWriteTimeout)
 
 	// The broadcast must recover by arming (and clearing) its own deadline.
-	if err := fwdMsg2Operators(def.MsgTunData{Tag: "SUCCESS", Response: []byte("knock knock")}); err != nil {
+	if err := fwdMsg2Operators(def.OperatorMsg{Tag: "SUCCESS", Response: []byte("knock knock")}); err != nil {
 		t.Fatalf("broadcast after a leaked write deadline expired: %v", err)
 	}
 	select {

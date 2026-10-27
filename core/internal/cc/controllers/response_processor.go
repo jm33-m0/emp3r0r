@@ -24,7 +24,7 @@ type ProcessedResponse struct {
 
 // ProcessAgentResponse processes agent data and returns structured response
 // This is pure business logic - no UI rendering
-func ProcessAgentResponse(data *def.MsgTunData) (*ProcessedResponse, error) {
+func ProcessAgentResponse(data *def.OperatorMsg) (*ProcessedResponse, error) {
 	resp := &ProcessedResponse{
 		JobID: data.JobID,
 	}

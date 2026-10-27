@@ -98,7 +98,7 @@ int main(void) {
     CHECK_EQ_LONG(m.time, 1700000000000);
     CHECK_EQ_LONG(m.ephem_public_key.len, 4);
     CHECK(m.ephem_public_key.ptr[0] == 9);
-    CHECK(m.enriched_peer_list == NULL);
+    CHECK(m.peer_list == NULL);
   }
 
   /* MsgTunData: encode then decode round-trip (no null field 10). */
@@ -143,7 +143,7 @@ int main(void) {
     CborEncoder e, m, list, arr, pm;
     cbor_encoder_init(&e, buf, sizeof(buf), 0);
     CHECK(cbor_encoder_create_map(&e, &m, 1) == CborNoError);
-    CHECK(cbor_encode_uint(&m, C2_KEY_TUN_ENRICHED_PEER_LIST) == CborNoError);
+    CHECK(cbor_encode_uint(&m, C2_KEY_TUN_PEER_LIST) == CborNoError);
     CHECK(cbor_encoder_create_map(&m, &list, 1) == CborNoError);
     CHECK(cbor_encode_uint(&list, C2_KEY_PEER_LIST_PEERS) == CborNoError);
     CHECK(cbor_encoder_create_array(&list, &arr, 1) == CborNoError);
@@ -156,17 +156,17 @@ int main(void) {
     CHECK(cbor_encoder_close_container(&e, &m) == CborNoError);
     size_t n = cbor_encoder_get_buffer_size(&e, buf);
 
-    c2_enriched_peer peers[1] = {0};
+    c2_peer peers[1] = {0};
     c2_str ips[1][2], files[1][2];
     peers[0].ips.items = ips[0];
     peers[0].ips.cap = 2;
     peers[0].files.items = files[0];
     peers[0].files.cap = 2;
-    c2_enriched_peer_list list_out = {0};
+    c2_peer_list list_out = {0};
     list_out.peers = peers;
     list_out.cap = 1;
     c2_msgtun msg = {0};
-    msg.enriched_peer_list = &list_out;
+    msg.peer_list = &list_out;
     CHECK(decode_msgtun(buf, n, &msg) == C2_OK);
     CHECK_EQ_LONG(list_out.count, 1);
     CHECK(c2_str_equal(peers[0].uuid, "peer1"));

@@ -218,7 +218,7 @@ func handleWWWRelayStream(conn io.ReadWriteCloser, agentUUID, streamID, remoteAd
 	defer wwwRelayStreams.Delete(streamID)
 	defer conn.Close()
 
-	if err := fwdMsgToOperator(ownerSession, def.MsgTunData{Tag: def.TagWWWRelayRequestPrefix + streamID}); err != nil {
+	if err := fwdMsgToOperator(ownerSession, def.OperatorMsg{Tag: def.TagWWWRelayRequestPrefix + streamID}); err != nil {
 		logging.Errorf("www relay: request forwarding failed for %q: %v", streamID, err)
 		return
 	}
@@ -256,7 +256,7 @@ func getOnlyOperatorSession() (string, error) {
 	return session, nil
 }
 
-func handleOperatorRelayFrame(operatorSession string, msg *def.MsgTunData) {
+func handleOperatorRelayFrame(operatorSession string, msg *def.OperatorMsg) {
 	if msg == nil {
 		return
 	}

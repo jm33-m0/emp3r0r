@@ -91,7 +91,7 @@ func handleFileUploadStream(conn *transport.SecureConn, agentUUID, streamID, rem
 		if n > 0 {
 			chunk := make([]byte, n)
 			copy(chunk, buf[:n])
-			msg := def.MsgTunData{Tag: relayTag, Response: chunk}
+			msg := def.OperatorMsg{Tag: relayTag, Response: chunk}
 			if sendErr := fwdMsgToOperator(sh.OperatorSession, msg); sendErr != nil {
 				logging.Errorf("handleFileUploadStream: relay chunk for token %q failed: %v", streamID, sendErr)
 				cancel()
@@ -102,10 +102,10 @@ func handleFileUploadStream(conn *transport.SecureConn, agentUUID, streamID, rem
 
 		if readErr != nil {
 			if readErr == io.EOF {
-				_ = fwdMsgToOperator(sh.OperatorSession, def.MsgTunData{Tag: doneTag})
+				_ = fwdMsgToOperator(sh.OperatorSession, def.OperatorMsg{Tag: doneTag})
 			} else {
 				logging.Warningf("handleFileUploadStream: relay stream %q read error from %s: %v", streamID, remoteAddr, readErr)
-				_ = fwdMsgToOperator(sh.OperatorSession, def.MsgTunData{Tag: errTag, Response: []byte(readErr.Error())})
+				_ = fwdMsgToOperator(sh.OperatorSession, def.OperatorMsg{Tag: errTag, Response: []byte(readErr.Error())})
 			}
 			break
 		}

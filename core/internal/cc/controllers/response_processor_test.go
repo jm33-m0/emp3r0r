@@ -16,8 +16,8 @@ func TestProcessAgentResponseQuietSuppression(t *testing.T) {
 	live.PublishAgent(&live.AgentRecord{Agent: agent, Control: &live.AgentControl{}})
 	defer live.ForgetAgent(agent.UUID)
 
-	msg := func(cmdSlice []string) *def.MsgTunData {
-		return &def.MsgTunData{
+	msg := func(cmdSlice []string) *def.OperatorMsg {
+		return &def.OperatorMsg{
 			Tag:      "quiet-test",
 			CmdSlice: cmdSlice,
 			Response: []byte("Cached tokens (1):\nS-1-5-21-1234-5678  quiet-test\\user\n"),

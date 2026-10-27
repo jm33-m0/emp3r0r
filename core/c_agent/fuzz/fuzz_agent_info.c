@@ -42,11 +42,11 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   }
 
   if (cbor_parser_init(data, size, 0, &parser, &it) == CborNoError) {
-    c2_enriched_peer peers[PEER_MAX];
+    c2_peer peers[PEER_MAX];
     c2_str peer_ips[PEER_MAX][IPS_PER_PEER];
     c2_str peer_files[PEER_MAX][IPS_PER_PEER];
     memset(peers, 0, sizeof(peers));
-    c2_enriched_peer_list l = {0};
+    c2_peer_list l = {0};
     l.peers = peers;
     l.cap = size % (PEER_MAX + 1);
     for (size_t i = 0; i < PEER_MAX; i++) {
@@ -55,7 +55,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
       peers[i].files.items = peer_files[i];
       peers[i].files.cap = IPS_PER_PEER;
     }
-    (void)c2_enriched_peer_list_decode(&it, &l);
+    (void)c2_peer_list_decode(&it, &l);
   }
 
   return 0;

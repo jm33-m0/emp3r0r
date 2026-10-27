@@ -184,7 +184,7 @@ c2_status c2_msgauth_decode(CborValue *r, c2_msgauth *m) {
 c2_status c2_msgtun_encode(CborEncoder *w, const c2_msgtun *m) {
   if (w == NULL || m == NULL)
     return C2_ERR_ARG;
-  if (m->enriched_peer_list)
+  if (m->peer_list)
     return C2_ERR_UNSUPPORTED; /* encoded by the peer-list codec */
 
   size_t pairs = 0;
@@ -232,8 +232,8 @@ c2_status c2_msgtun_decode(CborValue *r, c2_msgtun *m) {
   if (r == NULL || m == NULL)
     return C2_ERR_ARG;
 
-  if (m->enriched_peer_list)
-    m->enriched_peer_list->count = 0;
+  if (m->peer_list)
+    m->peer_list->count = 0;
 
   CborValue map;
   c2_status st = c2_cbor_map_enter(r, &map);
@@ -250,9 +250,9 @@ c2_status c2_msgtun_decode(CborValue *r, c2_msgtun *m) {
       C2_CASE_TEXT(C2_KEY_TUN_TAG, m, tag);
       C2_CASE_INT(C2_KEY_TUN_TIME, m, time);
       C2_CASE_BYTES(C2_KEY_TUN_EPHEM_PUBLIC, m, ephem_public_key);
-    case C2_KEY_TUN_ENRICHED_PEER_LIST:
-      if (m->enriched_peer_list)
-        st = c2_enriched_peer_list_decode(&map, m->enriched_peer_list);
+    case C2_KEY_TUN_PEER_LIST:
+      if (m->peer_list)
+        st = c2_peer_list_decode(&map, m->peer_list);
       else
         st = c2_cbor_map_skip(&map);
       break;

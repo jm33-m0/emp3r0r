@@ -51,8 +51,8 @@ type Emp3r0rAgent struct {
 	OfflineGrace   int           `cbor:"44,keyasint"` // agent-chosen removal grace in seconds; 0 means remove immediately
 }
 
-// EnrichedPeer holds detailed peer information pushed by C2.
-type EnrichedPeer struct {
+// Peer holds detailed peer information pushed by C2.
+type Peer struct {
 	UUID           string   `cbor:"1,keyasint"`
 	IPs            []string `cbor:"2,keyasint"`
 	From           string   `cbor:"3,keyasint"`
@@ -63,11 +63,11 @@ type EnrichedPeer struct {
 	P2PTransport   string   `cbor:"8,keyasint"` // transport the peer's relay listens on
 }
 
-// EnrichedPeerList is the C2-provided list of active peers. The payload is
+// PeerList is the C2-provided list of active peers. The payload is
 // authenticated by the PFS-encrypted tunnel, so it does not carry a separate
 // CA signature.
-type EnrichedPeerList struct {
-	Peers []EnrichedPeer `cbor:"1,keyasint"`
+type PeerList struct {
+	Peers []Peer `cbor:"1,keyasint"`
 }
 
 // AgentProcess process info of our agent
@@ -81,14 +81,14 @@ type AgentProcess struct {
 // MsgTunData data to send in the tunnel, between C&C and agent
 // this can also be used for operator to CC communication
 type MsgTunData struct {
-	JobID            string            `cbor:"1,keyasint"`  // job ID, to retrieve the response, or empty if not a command
-	CmdSlice         []string          `cbor:"2,keyasint"`  // command args, [0] is the command, or empty if not a command
-	Response         []byte            `cbor:"3,keyasint"`  // response from the agent, or message to operator
-	Tag              string            `cbor:"4,keyasint"`  // agent tag for agent->C2, or message type if sent to operator
-	Time             int64             `cbor:"5,keyasint"`  // Unix milliseconds, used for RTT
-	EphemPublicKey   []byte            `cbor:"8,keyasint"`  // ephemeral public key for ECDH key exchange
-	EnrichedPeerList *EnrichedPeerList `cbor:"10,keyasint"` // C2-provided peer list
-	AgentToken       *AgentToken       `cbor:"11,keyasint"` // mesh router authorization token
+	JobID          string      `cbor:"1,keyasint"`  // job ID, to retrieve the response, or empty if not a command
+	CmdSlice       []string    `cbor:"2,keyasint"`  // command args, [0] is the command, or empty if not a command
+	Response       []byte      `cbor:"3,keyasint"`  // response from the agent, or message to operator
+	Tag            string      `cbor:"4,keyasint"`  // agent tag for agent->C2, or message type if sent to operator
+	Time           int64       `cbor:"5,keyasint"`  // Unix milliseconds, used for RTT
+	EphemPublicKey []byte      `cbor:"8,keyasint"`  // ephemeral public key for ECDH key exchange
+	PeerList       *PeerList   `cbor:"10,keyasint"` // C2-provided peer list
+	AgentToken     *AgentToken `cbor:"11,keyasint"` // mesh router authorization token
 }
 
 // TokenEntry is one entry of a !list_tokens response, marshaled as CBOR by

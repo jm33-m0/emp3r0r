@@ -540,7 +540,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 
 	agentUUID := uuid.New().String()
 	agentTag := "test-stager-agent-" + agentUUID
-	agentSig, err := signUUID(agentUUID, transport.CaKeyFile)
+	agentSigB64, err := signUUID(agentUUID, transport.CaKeyFile)
 	if err != nil {
 		t.Fatalf("Failed to sign UUID: %v", err)
 	}
@@ -603,6 +603,10 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	// run of 0xff into a short back-reference — the literal placeholder no
 	// longer exists in the output blob.
 	// -----------------------------------------------------------------------
+	agentSig, err := base64.URLEncoding.DecodeString(agentSigB64)
+	if err != nil {
+		t.Fatalf("decode agent signature: %v", err)
+	}
 	cfg := &def.Config{
 		CCAddress:        "127.0.0.1",
 		CCH2Port:         c2PortStr,

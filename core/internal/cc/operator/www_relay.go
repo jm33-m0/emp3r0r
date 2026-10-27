@@ -13,7 +13,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-func handleWWWRelayMessage(data *def.MsgTunData) bool {
+func handleWWWRelayMessage(data *def.OperatorMsg) bool {
 	if data == nil {
 		return false
 	}
@@ -29,7 +29,7 @@ func handleWWWRelayMessage(data *def.MsgTunData) bool {
 func serveWWWRelay(streamID string) {
 	localized, err := util.SecureLocalPath(streamID)
 	if err != nil {
-		_ = client.SendMsgTunData(&def.MsgTunData{Tag: def.TagWWWRelayErrorPrefix + streamID, Response: []byte(err.Error())})
+		_ = client.SendOperatorMsg(&def.OperatorMsg{Tag: def.TagWWWRelayErrorPrefix + streamID, Response: []byte(err.Error())})
 		return
 	}
 	name := filepath.Base(localized)
@@ -37,7 +37,7 @@ func serveWWWRelay(streamID string) {
 
 	f, err := os.Open(path)
 	if err != nil {
-		_ = client.SendMsgTunData(&def.MsgTunData{Tag: def.TagWWWRelayErrorPrefix + streamID, Response: []byte(err.Error())})
+		_ = client.SendOperatorMsg(&def.OperatorMsg{Tag: def.TagWWWRelayErrorPrefix + streamID, Response: []byte(err.Error())})
 		return
 	}
 	defer f.Close()
@@ -48,16 +48,16 @@ func serveWWWRelay(streamID string) {
 		if n > 0 {
 			chunk := make([]byte, n)
 			copy(chunk, buf[:n])
-			if err := client.SendMsgTunData(&def.MsgTunData{Tag: def.TagWWWRelayDataPrefix + streamID, Response: chunk}); err != nil {
+			if err := client.SendOperatorMsg(&def.OperatorMsg{Tag: def.TagWWWRelayDataPrefix + streamID, Response: chunk}); err != nil {
 				logging.Errorf("WWW relay send failed for %q: %v", streamID, err)
 				return
 			}
 		}
 		if readErr != nil {
 			if readErr == io.EOF {
-				_ = client.SendMsgTunData(&def.MsgTunData{Tag: def.TagWWWRelayDonePrefix + streamID})
+				_ = client.SendOperatorMsg(&def.OperatorMsg{Tag: def.TagWWWRelayDonePrefix + streamID})
 			} else {
-				_ = client.SendMsgTunData(&def.MsgTunData{Tag: def.TagWWWRelayErrorPrefix + streamID, Response: []byte(readErr.Error())})
+				_ = client.SendOperatorMsg(&def.OperatorMsg{Tag: def.TagWWWRelayErrorPrefix + streamID, Response: []byte(readErr.Error())})
 			}
 			return
 		}

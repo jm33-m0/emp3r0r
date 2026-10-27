@@ -9,7 +9,7 @@
  * registration. These tests round-trip a fully populated struct through
  * c2_agent_info_encode / c2_agent_info_decode and assert every field survives,
  * then cover the optional-field, capacity and malformed-input paths plus the
- * AgentToken and EnrichedPeerList decoders.
+ * AgentToken and PeerList decoders.
  */
 
 static c2_status dec_info(const uint8_t *buf, size_t len, c2_agent_info *a) {
@@ -28,13 +28,12 @@ static c2_status dec_token(const uint8_t *buf, size_t len, c2_agent_token *t) {
   return c2_agent_token_decode(&it, t);
 }
 
-static c2_status dec_peers(const uint8_t *buf, size_t len,
-                           c2_enriched_peer_list *l) {
+static c2_status dec_peers(const uint8_t *buf, size_t len, c2_peer_list *l) {
   CborParser p;
   CborValue it;
   if (cbor_parser_init(buf, len, 0, &p, &it) != CborNoError)
     return C2_ERR_PROTO;
-  return c2_enriched_peer_list_decode(&it, l);
+  return c2_peer_list_decode(&it, l);
 }
 
 /* A c2_str from a string literal with a compile-time length (constant
@@ -248,7 +247,7 @@ int main(void) {
     CHECK(c2_agent_token_decode(NULL, &t) == C2_ERR_ARG);
   }
 
-  /* EnrichedPeerList with two peers. */
+  /* PeerList with two peers. */
   {
     CborEncoder e, m, arr;
     cbor_encoder_init(&e, buf, sizeof(buf), 0);
@@ -269,7 +268,7 @@ int main(void) {
     CHECK(cbor_encoder_close_container(&e, &m) == CborNoError);
     size_t n = cbor_encoder_get_buffer_size(&e, buf);
 
-    c2_enriched_peer peers[4];
+    c2_peer peers[4];
     c2_str ips[4][2], files[4][2];
     memset(peers, 0, sizeof(peers));
     for (int i = 0; i < 4; i++) {
@@ -278,7 +277,7 @@ int main(void) {
       peers[i].files.items = files[i];
       peers[i].files.cap = 2;
     }
-    c2_enriched_peer_list l = {0};
+    c2_peer_list l = {0};
     l.peers = peers;
     l.cap = 4;
     CHECK(dec_peers(buf, n, &l) == C2_OK);
@@ -297,7 +296,7 @@ int main(void) {
     CHECK(cbor_encode_null(&m) == CborNoError);
     CHECK(cbor_encoder_close_container(&e, &m) == CborNoError);
     size_t n = cbor_encoder_get_buffer_size(&e, buf);
-    c2_enriched_peer_list l = {0};
+    c2_peer_list l = {0};
     l.peers = NULL;
     l.cap = 0;
     CHECK(dec_peers(buf, n, &l) == C2_OK);
@@ -321,13 +320,13 @@ int main(void) {
     CHECK(cbor_encoder_close_container(&m, &arr) == CborNoError);
     CHECK(cbor_encoder_close_container(&e, &m) == CborNoError);
     size_t n = cbor_encoder_get_buffer_size(&e, buf);
-    c2_enriched_peer one[1];
+    c2_peer one[1];
     memset(one, 0, sizeof(one));
-    c2_enriched_peer_list l = {0};
+    c2_peer_list l = {0};
     l.peers = one;
     l.cap = 1;
     CHECK(dec_peers(buf, n, &l) == C2_ERR_NOMEM);
-    CHECK(c2_enriched_peer_list_decode(NULL, &l) == C2_ERR_ARG);
+    CHECK(c2_peer_list_decode(NULL, &l) == C2_ERR_ARG);
   }
 
   TEST_DONE();

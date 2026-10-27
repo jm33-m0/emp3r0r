@@ -154,7 +154,7 @@ func TestOperatorConnection(t *testing.T) {
 	defer msgCancel()
 	defer msgConn.Close()
 
-	if err := cbor.NewEncoder(msgConn).Encode(&def.MsgTunData{Tag: "ping"}); err != nil {
+	if err := cbor.NewEncoder(msgConn).Encode(&def.OperatorMsg{Tag: "ping"}); err != nil {
 		t.Fatalf("Failed to send CBOR frame over websocket tunnel: %v", err)
 	}
 	_ = msgCtx

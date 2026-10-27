@@ -97,7 +97,7 @@ func (op *operator_t) hasActiveTunnel() bool {
 // relay would silently poison every later broadcast (the "only the first agent
 // reports knock knock" bug). Setting and immediately clearing a per-write
 // deadline keeps each write bounded without corrupting the shared tunnel.
-func writeOperatorMsg(op *operator_t, msg def.MsgTunData) error {
+func writeOperatorMsg(op *operator_t, msg def.OperatorMsg) error {
 	op.mu.Lock()
 	defer op.mu.Unlock()
 	if op.conn == nil {
@@ -113,17 +113,26 @@ func writeOperatorMsg(op *operator_t, msg def.MsgTunData) error {
 // operatorBroadcastPrintf broadcasts a message to all connected operators.
 func operatorBroadcastPrintf(msg_type, format string, a ...any) (err error) {
 	msg := sanitize.SanitizeText(fmt.Sprintf(format, a...))
-	msgTunData := def.MsgTunData{
+	msgTunData := def.OperatorMsg{
 		Tag:      msg_type,    // tell operator about the message type: INFO, WARN, ERROR, SUCCESS
 		Response: []byte(msg), // message content
-		JobID:    "",
-		CmdSlice: []string{},
 	}
 	return fwdMsg2Operators(msgTunData)
 }
 
+// operatorMsgFromAgent converts an agent frame into the operator envelope.
+// Only the fields the operator tunnel actually uses are copied.
+func operatorMsgFromAgent(msg *def.MsgTunData) def.OperatorMsg {
+	return def.OperatorMsg{
+		JobID:    msg.JobID,
+		CmdSlice: msg.CmdSlice,
+		Response: msg.Response,
+		Tag:      msg.Tag,
+	}
+}
+
 // fwdMsg2Operators forwards a message to all connected operator sessions.
-func fwdMsg2Operators(msg def.MsgTunData) (err error) {
+func fwdMsg2Operators(msg def.OperatorMsg) (err error) {
 	OPERATORS.Range(func(id, value any) bool {
 		op, ok := value.(*operator_t)
 		if !ok || op == nil || !op.hasActiveTunnel() {
@@ -140,7 +149,7 @@ func fwdMsg2Operators(msg def.MsgTunData) (err error) {
 }
 
 // fwdMsgToOperator forwards a message to one operator session.
-func fwdMsgToOperator(operatorSession string, msg def.MsgTunData) error {
+func fwdMsgToOperator(operatorSession string, msg def.OperatorMsg) error {
 	if operatorSession == "" {
 		return fmt.Errorf("empty operator session")
 	}
@@ -158,11 +167,11 @@ func fwdMsgToOperator(operatorSession string, msg def.MsgTunData) error {
 	return nil
 }
 
-// collectEnrichedPeerList gathers active agent peer info for mesh discovery.
+// collectPeerList gathers active agent peer info for mesh discovery.
 // The result is sent only over an established PFS tunnel, which authenticates
 // the payload; no separate CA signature is needed.
-func collectEnrichedPeerList() (*def.EnrichedPeerList, error) {
-	peers := make([]def.EnrichedPeer, 0)
+func collectPeerList() (*def.PeerList, error) {
+	peers := make([]def.Peer, 0)
 
 	live.RangeAgents(func(rec *live.AgentRecord) bool {
 		agent := rec.Agent
@@ -172,7 +181,7 @@ func collectEnrichedPeerList() (*def.EnrichedPeerList, error) {
 			lastSeen = seenAt
 		}
 
-		p := def.EnrichedPeer{
+		p := def.Peer{
 			UUID:           agent.UUID,
 			IPs:            agent.IPs,
 			From:           agent.From,
@@ -190,5 +199,5 @@ func collectEnrichedPeerList() (*def.EnrichedPeerList, error) {
 		return nil, nil
 	}
 
-	return &def.EnrichedPeerList{Peers: peers}, nil
+	return &def.PeerList{Peers: peers}, nil
 }

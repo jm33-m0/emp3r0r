@@ -298,7 +298,7 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 					Response: replyData,
 				}
 				encoder := cbor.NewEncoder(secureConn)
-				var enrichedList *def.EnrichedPeerList
+				var enrichedList *def.PeerList
 				err = encoder.Encode(replyMsg)
 				if err == nil {
 					if sessionKey != nil {
@@ -314,9 +314,9 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 					// and we are talking to a successfully authenticated agent.
 					if pfsEstablished {
 						var collectErr error
-						enrichedList, collectErr = collectEnrichedPeerList()
+						enrichedList, collectErr = collectPeerList()
 						if collectErr != nil {
-							logging.Warningf("handleMessageTunnel: collectEnrichedPeerList for %s: %v", agent.Name, collectErr)
+							logging.Warningf("handleMessageTunnel: collectPeerList for %s: %v", agent.Name, collectErr)
 						}
 					}
 				} else {
@@ -346,9 +346,9 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 				// place before discovery starts.
 				if err == nil && (enrichedList != nil || sessionToken != nil) {
 					sessionMsg := def.MsgTunData{
-						Tag:              def.TagSessionInfo,
-						EnrichedPeerList: enrichedList,
-						AgentToken:       sessionToken,
+						Tag:        def.TagSessionInfo,
+						PeerList:   enrichedList,
+						AgentToken: sessionToken,
 					}
 					if sendErr := encoder.Encode(sessionMsg); sendErr != nil {
 						logging.Errorf("handleMessageTunnel: send SessionInfo to %s: %v", agent.Name, sendErr)
@@ -374,6 +374,7 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 
 			// if not a handshake, forward message to operators
 			// also cache it for automated tests or local usage
+			opMsg := operatorMsgFromAgent(&msg)
 			if msg.JobID != "" {
 				// Job responses whose IDs belong to the CC-internal SOCKS5 pivot
 				// are consumed by the socks manager (via live.CmdResultsReady) and
@@ -399,12 +400,11 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 					// Forward asynchronously. A slow/stuck operator must not block
 					// this goroutine, otherwise keep-alive hellos stop being
 					// processed and the agent is falsely timed out after 10m.
-					msgCopy := msg
-					go func() {
-						if relayErr := fwdMsgToOperator(ownerSession, msgCopy); relayErr != nil {
-							logging.Warningf("handleMessageTunnel: targeted relay failed for job %s owner %s: %v", strconv.Quote(msgCopy.JobID), strconv.Quote(ownerSession), relayErr)
+					go func(out def.OperatorMsg) {
+						if relayErr := fwdMsgToOperator(ownerSession, out); relayErr != nil {
+							logging.Warningf("handleMessageTunnel: targeted relay failed for job %s owner %s: %v", strconv.Quote(out.JobID), strconv.Quote(ownerSession), relayErr)
 						}
-					}()
+					}(opMsg)
 					continue
 				}
 				if socksInternal {
@@ -414,7 +414,7 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 				logging.Warningf("no operator owner for job response %s from agent %s", strconv.Quote(msg.JobID), util.AgentRef(authAgentUUID))
 				continue
 			}
-			err = fwdMsg2Operators(msg)
+			err = fwdMsg2Operators(opMsg)
 			if err != nil {
 				logging.Warningf("handleMessageTunnel: %v", err)
 				return

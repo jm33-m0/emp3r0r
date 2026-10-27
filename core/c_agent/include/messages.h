@@ -78,23 +78,23 @@ c2_status c2_msgauth_decode(CborValue *r, c2_msgauth *m);
 /* ------------------------------------------------------------------------- */
 
 enum {
-  C2_KEY_TUN_JOB_ID = 1,              /* text                               */
-  C2_KEY_TUN_CMD_SLICE = 2,           /* array of text                      */
-  C2_KEY_TUN_RESPONSE = 3,            /* bytes                              */
-  C2_KEY_TUN_TAG = 4,                 /* text                               */
-  C2_KEY_TUN_TIME = 5,                /* int64 Unix milliseconds           */
-  C2_KEY_TUN_EPHEM_PUBLIC = 8,        /* bytes agent ephemeral X||Y         */
-  C2_KEY_TUN_ENRICHED_PEER_LIST = 10, /* map (EnrichedPeerList)             */
-  C2_KEY_TUN_AGENT_TOKEN = 11,        /* map (AgentToken; C agent skips it) */
+  C2_KEY_TUN_JOB_ID = 1,       /* text                               */
+  C2_KEY_TUN_CMD_SLICE = 2,    /* array of text                      */
+  C2_KEY_TUN_RESPONSE = 3,     /* bytes                              */
+  C2_KEY_TUN_TAG = 4,          /* text                               */
+  C2_KEY_TUN_TIME = 5,         /* int64 Unix milliseconds           */
+  C2_KEY_TUN_EPHEM_PUBLIC = 8, /* bytes agent ephemeral X||Y         */
+  C2_KEY_TUN_PEER_LIST = 10,   /* map (PeerList)             */
+  C2_KEY_TUN_AGENT_TOKEN = 11, /* map (AgentToken; C agent skips it) */
 };
 
-typedef struct c2_enriched_peer c2_enriched_peer;
+typedef struct c2_peer c2_peer;
 
 typedef struct {
-  c2_enriched_peer *peers;
+  c2_peer *peers;
   size_t count;
   size_t cap;
-} c2_enriched_peer_list;
+} c2_peer_list;
 
 typedef struct {
   c2_str job_id;
@@ -103,7 +103,7 @@ typedef struct {
   c2_str tag;
   int64_t time;
   c2_bytes ephem_public_key;
-  c2_enriched_peer_list *enriched_peer_list; /* NULL when absent */
+  c2_peer_list *peer_list; /* NULL when absent */
 } c2_msgtun;
 
 c2_status c2_msgtun_encode(CborEncoder *w, const c2_msgtun *m);
@@ -258,7 +258,7 @@ typedef struct {
 c2_status c2_agent_token_decode(CborValue *r, c2_agent_token *t);
 
 /* ------------------------------------------------------------------------- */
-/* EnrichedPeer / EnrichedPeerList (CBOR keys 1..8)                           */
+/* Peer / PeerList (CBOR keys 1..8)                           */
 /* ------------------------------------------------------------------------- */
 
 enum {
@@ -276,7 +276,7 @@ enum {
   C2_KEY_PEER_LIST_PEERS = 1,
 };
 
-struct c2_enriched_peer {
+struct c2_peer {
   c2_str uuid;
   c2_str_list ips;
   c2_str from;
@@ -287,6 +287,6 @@ struct c2_enriched_peer {
   c2_str p2p_transport;
 };
 
-c2_status c2_enriched_peer_list_decode(CborValue *r, c2_enriched_peer_list *l);
+c2_status c2_peer_list_decode(CborValue *r, c2_peer_list *l);
 
 #endif /* C2_MESSAGES_H */

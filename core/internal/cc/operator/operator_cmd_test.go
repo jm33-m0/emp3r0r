@@ -16,7 +16,7 @@ import (
 
 func TestMsgTunDecoding(t *testing.T) {
 	// 1. Prepare a sample message
-	originalMsg := &def.MsgTunData{
+	originalMsg := &def.OperatorMsg{
 		Tag:      "test-agent",
 		JobID:    "cmd-123",
 		CmdSlice: []string{"ls", "-la"},
@@ -33,7 +33,7 @@ func TestMsgTunDecoding(t *testing.T) {
 
 	// 3. Decode it using CBOR decoder (simulating the operator)
 	decoder := cbor.NewDecoder(&buf)
-	decodedMsg := new(def.MsgTunData)
+	decodedMsg := new(def.OperatorMsg)
 	err = decoder.Decode(decodedMsg)
 	if err != nil {
 		t.Fatalf("Failed to decode message: %v", err)

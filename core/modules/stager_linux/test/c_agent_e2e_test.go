@@ -511,7 +511,7 @@ func startCAgentOperator(t *testing.T, opPort int) {
 		Timeout:   10 * time.Second,
 		Transport: &http.Transport{DialContext: wireguard.DialContext},
 	}
-	go client.StartMessageTunnel(func(msg *def.MsgTunData) {
+	go client.StartMessageTunnel(func(msg *def.OperatorMsg) {
 		if !strings.HasPrefix(msg.Tag, def.TagWWWRelayRequestPrefix) {
 			return
 		}
@@ -520,14 +520,14 @@ func startCAgentOperator(t *testing.T, opPort int) {
 		go func() {
 			data, err := os.ReadFile(filepath.Join(paths.WWWRoot, filepath.Base(streamID)))
 			if err != nil {
-				_ = client.SendMsgTunData(&def.MsgTunData{Tag: def.TagWWWRelayErrorPrefix + streamID, Response: []byte(err.Error())})
+				_ = client.SendOperatorMsg(&def.OperatorMsg{Tag: def.TagWWWRelayErrorPrefix + streamID, Response: []byte(err.Error())})
 				return
 			}
-			if err := client.SendMsgTunData(&def.MsgTunData{Tag: def.TagWWWRelayDataPrefix + streamID, Response: data}); err != nil {
+			if err := client.SendOperatorMsg(&def.OperatorMsg{Tag: def.TagWWWRelayDataPrefix + streamID, Response: data}); err != nil {
 				t.Logf("www relay send: %v", err)
 				return
 			}
-			_ = client.SendMsgTunData(&def.MsgTunData{Tag: def.TagWWWRelayDonePrefix + streamID})
+			_ = client.SendOperatorMsg(&def.OperatorMsg{Tag: def.TagWWWRelayDonePrefix + streamID})
 		}()
 	}, func(err error) { t.Logf("operator tunnel: %v", err) })
 	// StartMessageTunnel sleeps before its first connect; give it time to attach.

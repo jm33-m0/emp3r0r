@@ -45,8 +45,8 @@ func notifyMsgTunUpdate() {
 	}
 }
 
-// SendMsgTunData sends a CBOR message through the active operator message tunnel.
-func SendMsgTunData(msg *def.MsgTunData) error {
+// SendOperatorMsg sends a CBOR message through the active operator message tunnel.
+func SendOperatorMsg(msg *def.OperatorMsg) error {
 	if msg == nil {
 		return fmt.Errorf("nil message")
 	}
@@ -223,7 +223,7 @@ func ConnectMsgTun() (conn net.Conn, ctx context.Context, cancel context.CancelF
 }
 
 // StartMessageTunnel starts the background message tunnel handler
-func StartMessageTunnel(onData func(*def.MsgTunData), onError func(error)) {
+func StartMessageTunnel(onData func(*def.OperatorMsg), onError func(error)) {
 	time.Sleep(3 * time.Second)
 	retryDelay := 5 * time.Second
 	maxRetryDelay := 5 * time.Minute
@@ -250,13 +250,13 @@ func StartMessageTunnel(onData func(*def.MsgTunData), onError func(error)) {
 		notifyMsgTunUpdate()
 
 		// Channel to receive decode results
-		msgCh := make(chan *def.MsgTunData, 10)
+		msgCh := make(chan *def.OperatorMsg, 10)
 		errCh := make(chan error, 1)
 
 		// Single goroutine to continuously read messages
 		go func() {
 			for {
-				msg := new(def.MsgTunData)
+				msg := new(def.OperatorMsg)
 				if err := decoder.Decode(msg); err != nil {
 					errCh <- err
 					return

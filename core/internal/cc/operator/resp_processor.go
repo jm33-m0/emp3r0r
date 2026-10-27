@@ -106,7 +106,7 @@ func handleListSessions(out []byte, target *def.Emp3r0rAgent) string {
 
 // processAgentData handles data from agent side
 // UI layer - calls controller for business logic, renders output
-func processAgentData(data *def.MsgTunData) {
+func processAgentData(data *def.OperatorMsg) {
 	if handleFTPRelayMessage(data) {
 		return
 	}

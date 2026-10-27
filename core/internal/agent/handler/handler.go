@@ -27,7 +27,7 @@ func HandleC2Command(cmdData *def.MsgTunData) {
 		if cmdData.AgentToken != nil {
 			handleAgentToken(cmdData.AgentToken)
 		}
-		handlePeerList(cmdData.EnrichedPeerList)
+		handlePeerList(cmdData.PeerList)
 		return
 	}
 
@@ -76,7 +76,7 @@ func handleAgentToken(tok *def.AgentToken) {
 
 // handlePeerList joins the mesh gossip addresses advertised by C2. The list is
 // authenticated by the PFS tunnel, so no additional signature check is needed.
-func handlePeerList(list *def.EnrichedPeerList) {
+func handlePeerList(list *def.PeerList) {
 	if list == nil || len(list.Peers) == 0 {
 		return
 	}

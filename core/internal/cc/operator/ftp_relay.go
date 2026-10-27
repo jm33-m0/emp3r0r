@@ -130,7 +130,7 @@ func getOrCreateFTPRelay(token string) (*relayFTPConn, error) {
 	return conn, nil
 }
 
-func handleFTPRelayMessage(data *def.MsgTunData) bool {
+func handleFTPRelayMessage(data *def.OperatorMsg) bool {
 	if data == nil {
 		return false
 	}

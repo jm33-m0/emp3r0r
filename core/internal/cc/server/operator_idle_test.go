@@ -91,11 +91,11 @@ func TestOperatorIdleNotificationAndResume(t *testing.T) {
 	OPERATORS.Store("test-operator", &operator_t{sessionID: "test-operator", conn: opServer})
 	defer OPERATORS.Delete("test-operator")
 
-	received := make(chan def.MsgTunData, 4)
+	received := make(chan def.OperatorMsg, 4)
 	go func() {
 		dec := cbor.NewDecoder(opClient)
 		for {
-			var msg def.MsgTunData
+			var msg def.OperatorMsg
 			if err := dec.Decode(&msg); err != nil {
 				return
 			}

@@ -364,12 +364,12 @@ func TestMultiOperatorMessageTunnelRouting(t *testing.T) {
 		MarkOperatorOffline("route-b")
 	})
 
-	read := func(conn net.Conn) <-chan def.MsgTunData {
-		ch := make(chan def.MsgTunData, 4)
+	read := func(conn net.Conn) <-chan def.OperatorMsg {
+		ch := make(chan def.OperatorMsg, 4)
 		go func() {
 			dec := cbor.NewDecoder(conn)
 			for {
-				var m def.MsgTunData
+				var m def.OperatorMsg
 				if err := dec.Decode(&m); err != nil {
 					return
 				}
@@ -381,10 +381,10 @@ func TestMultiOperatorMessageTunnelRouting(t *testing.T) {
 	outA, outB := read(peerA), read(peerB)
 
 	// Broadcast reaches both operators.
-	if err := fwdMsg2Operators(def.MsgTunData{Tag: "SUCCESS", Response: []byte("broadcast")}); err != nil {
+	if err := fwdMsg2Operators(def.OperatorMsg{Tag: "SUCCESS", Response: []byte("broadcast")}); err != nil {
 		t.Fatalf("broadcast: %v", err)
 	}
-	for name, ch := range map[string]<-chan def.MsgTunData{"route-a": outA, "route-b": outB} {
+	for name, ch := range map[string]<-chan def.OperatorMsg{"route-a": outA, "route-b": outB} {
 		select {
 		case m := <-ch:
 			if m.Tag != "SUCCESS" {
@@ -396,7 +396,7 @@ func TestMultiOperatorMessageTunnelRouting(t *testing.T) {
 	}
 
 	// A targeted frame reaches only its recipient.
-	if err := fwdMsgToOperator("route-a", def.MsgTunData{Tag: "INFO", Response: []byte("dm")}); err != nil {
+	if err := fwdMsgToOperator("route-a", def.OperatorMsg{Tag: "INFO", Response: []byte("dm")}); err != nil {
 		t.Fatalf("targeted send: %v", err)
 	}
 	select {

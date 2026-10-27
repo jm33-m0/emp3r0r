@@ -1,6 +1,6 @@
 /*
  * agent_info.c — Emp3r0rAgent (check-in body), AgentToken and
- * EnrichedPeerList codecs.
+ * PeerList codecs.
  *
  * These are split from messages.c because the check-in body is a wide
  * struct (43 keys) that a minimal agent fills in from host facts, while the
@@ -327,10 +327,10 @@ c2_status c2_agent_token_decode(CborValue *r, c2_agent_token *t) {
 }
 
 /* ------------------------------------------------------------------------- */
-/* EnrichedPeer / EnrichedPeerList                                            */
+/* Peer / PeerList                                            */
 /* ------------------------------------------------------------------------- */
 
-static c2_status read_enriched_peer(CborValue *it, c2_enriched_peer *p) {
+static c2_status read_peer(CborValue *it, c2_peer *p) {
   if (cbor_value_is_null(it))
     return c2_cbor_dc(cbor_value_advance(it));
   CborValue map;
@@ -361,7 +361,7 @@ static c2_status read_enriched_peer(CborValue *it, c2_enriched_peer *p) {
   return c2_cbor_dc(cbor_value_leave_container(it, &map));
 }
 
-c2_status c2_enriched_peer_list_decode(CborValue *r, c2_enriched_peer_list *l) {
+c2_status c2_peer_list_decode(CborValue *r, c2_peer_list *l) {
   if (r == NULL || l == NULL)
     return C2_ERR_ARG;
 
@@ -388,7 +388,7 @@ c2_status c2_enriched_peer_list_decode(CborValue *r, c2_enriched_peer_list *l) {
       while (!cbor_value_at_end(&arr)) {
         if (l->count >= l->cap)
           return C2_ERR_NOMEM;
-        st = read_enriched_peer(&arr, &l->peers[l->count]);
+        st = read_peer(&arr, &l->peers[l->count]);
         if (st != C2_OK)
           return st;
         l->count++;

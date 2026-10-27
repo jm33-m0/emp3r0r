@@ -501,7 +501,7 @@ func readOperatorTunnel(ctx context.Context, conn net.Conn, session string) {
 			return
 		default:
 		}
-		msg := new(def.MsgTunData)
+		msg := new(def.OperatorMsg)
 		if err := decoder.Decode(msg); err != nil {
 			return
 		}

@@ -378,7 +378,6 @@ c2_status c2_session_hello(c2_agent_session *s, c2_secureconn *msg,
   memset(&m, 0, sizeof(m));
   m.job_id = c2_str_of(job_id, strlen(job_id));
   m.cmd_slice = cmd;
-  m.tag = s->config->agent_tag;
   m.time = now_unix_ms();
   if (send_ephem)
     m.ephem_public_key = c2_bytes_of(s->pfs_pub, C2_P256_PUB_BYTES);
@@ -460,7 +459,6 @@ c2_status c2_session_send_result(c2_agent_session *s, c2_secureconn *msg,
   m.job_id = job_id;
   m.cmd_slice = *cmd_slice;
   m.response = c2_bytes_of(response, response_len);
-  m.tag = s->config->agent_tag;
   m.time = now_unix_ms();
 
   uint8_t buf[C2_SESSION_MSG_MAX];

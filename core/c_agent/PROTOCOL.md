@@ -98,16 +98,17 @@ matching on the server is trimmed + case-insensitive.
 
 `MsgTunData.Tag` carries a routing/type label. Defined values:
 
-| Tag                            | Direction     | Meaning                                            |
-| ------------------------------ | ------------- | -------------------------------------------------- |
-| `checkin-ok`                   | C2 → agent    | check-in accepted (the ACK)                        |
-| `handshake`                    | C2 → agent    | hello reply, carries server ephemeral public key   |
-| `session_info`                 | C2 → agent    | peer list + mesh router token (see §7.1/§7.3/§7.4) |
-| `ftp_relay_data:<token>` etc.  | C2 ↔ operator | operator-tunnel relay frames (not agent wire)      |
-| `proxy_relay_*`, `www_relay_*` | C2 ↔ operator | operator-tunnel relay frames (not agent wire)      |
+| Tag                            | Envelope      | Direction     | Meaning                                            |
+| ------------------------------ | ------------- | ------------- | -------------------------------------------------- |
+| `checkin-ok`                   | `MsgTunData`  | C2 → agent    | check-in accepted (the ACK)                        |
+| `handshake`                    | `MsgTunData`  | C2 → agent    | hello reply, carries server ephemeral public key   |
+| `session_info`                 | `MsgTunData`  | C2 → agent    | peer list + mesh router token (see §7.1/§7.3/§7.4) |
+| `ftp_relay_data:<token>` etc.  | `OperatorMsg` | C2 ↔ operator | operator-tunnel relay frames                       |
+| `proxy_relay_*`, `www_relay_*` | `OperatorMsg` | C2 ↔ operator | operator-tunnel relay frames                       |
 
-Any other tag on the agent tunnel is interpreted as the agent's own tag and is
-**not trusted** by the server.
+Agent-originated `MsgTunData.Tag` is ignored; the server derives the agent tag
+from the authenticated UUID. Operator relay traffic uses the separate
+`OperatorMsg` envelope and never carries agent-only fields.
 
 ### 2.4 Limits
 
@@ -367,7 +368,7 @@ The universal agent↔C2 message.
 | 4   | `Tag`              | text          | see §2.3                                                             |
 | 5   | `Time`             | int (Unix ms) | agent clock, used for RTT                                            |
 | 8   | `EphemPublicKey`   | bytes         | agent ephemeral P-256 pubkey on the first hello                      |
-| 10  | `EnrichedPeerList` | map           | C2 push: peers (see §7.4; keys 6, 7, 9 retired)                      |
+| 10  | `PeerList` | map           | C2 push: peers (see §7.4; keys 6, 7, 9 retired)                      |
 | 11  | `AgentToken`       | map           | C2 push: mesh router token (see §7.3)                                |
 
 Fields 10 and 11 are delivered together in one `session_info` tagged message
@@ -432,15 +433,15 @@ Pushed inside `session_info` (MsgTunData key 11) after PFS is established.
 | 4   | `ExpiresAt`  | int (Unix)      |
 | 5   | `Signature`  | bytes           |
 
-### 7.4 `EnrichedPeerList`
+### 7.4 `PeerList`
 
 Pushed inside `session_info` (MsgTunData key 10) after PFS is established.
 
 | Key | Name        | Type                          |
 | --- | ----------- | ----------------------------- |
-| 1   | `Peers`     | array of `EnrichedPeer`       |
+| 1   | `Peers`     | array of `Peer`       |
 
-`EnrichedPeer`:
+`Peer`:
 
 | Key | Name             | Type          |
 | --- | ---------------- | ------------- |
