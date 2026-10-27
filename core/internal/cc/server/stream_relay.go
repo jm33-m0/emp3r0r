@@ -138,7 +138,7 @@ func handleProxyRelayStream(conn io.ReadWriteCloser, agentUUID, streamID, remote
 // the surrounding bookkeeping (pending entry etc.) and calls teardown after
 // this returns.
 func relaySOCKS5Stream(sock net.Conn, stream io.ReadWriteCloser, token string) {
-	// Bulk relay: skip control-frame padding so the tunnel does not inflate
+	// Bulk relay: skip per-frame padding so the tunnel does not inflate
 	// large transfers. Reads are unchanged.
 	stream = transport.NewBulkWriter(stream)
 
@@ -197,7 +197,7 @@ func handleWWWRelayStream(conn io.ReadWriteCloser, agentUUID, streamID, remoteAd
 		conn.Close()
 		return
 	}
-	// Bulk relay: files pushed to the agent skip control-frame padding.
+	// Bulk relay: files pushed to the agent skip per-frame padding.
 	conn = transport.NewBulkWriter(conn)
 	streamID = strings.TrimSpace(streamID)
 	if streamID == "" {

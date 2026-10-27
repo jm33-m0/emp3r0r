@@ -20,12 +20,6 @@ import (
 
 const DefaultC2BlockSize = 32 * 1024
 
-// c2PaddingMaxFrame bounds which frames receive random padding. Bulk stream
-// chunks (file transfer, port forwarding) above this size already have
-// unpredictable, content-independent lengths; padding them would only add
-// bandwidth overhead. Control frames are well under this limit.
-const c2PaddingMaxFrame = 32 * 1024
-
 // Padding is a sender-side knob: each frame carries its own payload length, so
 // the receiver strips padding without knowing the configured range. Atomically
 // accessed because config load sets it while connection goroutines read it.
@@ -47,8 +41,10 @@ func SetC2Padding(min, max int) {
 	c2PaddingMax.Store(int32(max))
 }
 
+// choosePadding returns the random pad length for a normal Write. Explicit
+// bulk writers call WriteBulk, which opts out of padding for large relays.
 func (sc *SecureConn) choosePadding(payloadLen int) int {
-	if payloadLen <= 0 || payloadLen > c2PaddingMaxFrame {
+	if payloadLen <= 0 {
 		return 0
 	}
 	min := int(c2PaddingMin.Load())
@@ -217,7 +213,7 @@ func (sc *SecureConn) Read(p []byte) (n int, err error) {
 	}
 }
 
-// Write encrypts the data and writes it to the connection with framing. Control
+// Write encrypts the data and writes it to the connection with framing. Normal
 // frames carry random padding so a passive observer cannot map frame length to
 // message content; the receiver strips it via the in-frame payload length.
 func (sc *SecureConn) Write(p []byte) (n int, err error) {

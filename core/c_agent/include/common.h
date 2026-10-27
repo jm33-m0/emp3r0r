@@ -51,8 +51,6 @@ extern "C" {
 #define C2_HANDSHAKE_TIMEOUT_SECONDS 10
 /* Message-tunnel silence timeout on the server. */
 #define C2_TUNNEL_SILENCE_SECONDS 600
-/* Maximum plaintext payload that may carry stealth padding. */
-#define C2_PADDING_MAX_FRAME (32u * 1024u)
 
 /* ------------------------------------------------------------------------- */
 /* Cryptographic sizes                                                        */

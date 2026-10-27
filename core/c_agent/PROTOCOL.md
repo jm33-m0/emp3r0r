@@ -116,7 +116,7 @@ Any other tag on the agent tunnel is interpreted as the agent's own tag and is
 | ------------------------------ | ------------------------------------------------ | ---------------------------- |
 | `MsgAuth` first frame          | ≤ 8192 bytes; must fit one frame                 | server dispatch              |
 | Encrypted frame length         | 1 .. 10 MiB                                      | `SecureConn.Read`            |
-| Random control-frame padding   | only frames ≤ 32 KiB, if configured              | `SecureConn.Write`           |
+| Random frame padding           | normal `Write` frames, if configured             | `SecureConn.Write`           |
 | Replay window                  | ±60 s                                            | server                       |
 | Initial handshake timeout      | 10 s (server closes pre-auth stream)             | server dispatch              |
 | Message tunnel silence timeout | 10 min                                           | server `handleMessageTunnel` |
@@ -230,8 +230,9 @@ Receiver rules (MUST):
 Sender rules (MUST):
 
 - One CBOR message per frame: encode the whole CBOR item, then `Write` it once.
-- Control frames may be padded with random bytes up to a configured range,
-  but only when `payload_len <= 32 KiB`; bulk transfers are not padded.
+- Normal writes may be padded with random bytes up to a configured range,
+  regardless of payload size. Explicit bulk relays use a separate writer that
+  opts out of padding.
 - The 4-byte encrypted-length prefix is not encrypted but is not trusted either:
   the length it protects is authenticated. A hostile peer can only cause an
   early error, never a misparse.
@@ -646,7 +647,7 @@ missing `client-session:` prefix fails silently and is painful to debug.
 - **TOFU** pins the agent's P-256 key on first check-in; rotation is refused.
 - **Framing** authenticates the payload length; the outer encrypted-length
   prefix is untrusted and only bounds reads.
-- **Padding** obscures control-frame lengths but not bulk transfers.
+- **Padding** obscures normal frame lengths; explicit bulk relays opt out.
 - **Identity derivation** — the server derives the operator-facing tag from the
   verified UUID and overwrites any agent-supplied tag. A C agent should still
   send its tag for compatibility but must not depend on it.

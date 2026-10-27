@@ -62,7 +62,7 @@ func runProxyRelay(cmd *cobra.Command, token, target string) {
 		return
 	}
 	defer cancel()
-	// Bulk relay: skip control-frame padding on the C2 stream so the tunneled
+	// Bulk relay: skip per-frame padding on the C2 stream so the tunneled
 	// traffic is not inflated. Reads are unchanged.
 	stream = transport.NewBulkWriter(stream)
 	logging.Debugf("proxy relay %s -> %s established", token, target)

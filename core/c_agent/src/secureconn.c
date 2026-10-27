@@ -267,7 +267,7 @@ c2_status c2_secureconn_write(c2_secureconn *sc, const uint8_t *payload,
   if (sc == NULL)
     return C2_ERR_ARG;
   size_t pad = 0;
-  if (len > 0 && len <= C2_PADDING_MAX_FRAME && sc->pad_min > 0) {
+  if (len > 0 && sc->pad_min > 0) {
     uint32_t span = sc->pad_max > sc->pad_min ? sc->pad_max - sc->pad_min : 0;
     uint32_t r = 0;
     c2_status st = random_below(sc->be, span + 1, &r);

@@ -144,6 +144,22 @@ int main(void) {
     c2_secureconn_close(&dec);
   }
 
+  /* Normal writes are padded regardless of payload size; bulk writes opt out. */
+  {
+    memstream ms = {0};
+    c2_secureconn enc = {0};
+    c2_secureconn_init(&enc, &be, (c2_stream){&g_ms_ops, &ms}, key);
+    c2_secureconn_set_padding(&enc, 7, 7);
+
+    uint8_t big[40 * 1024] = {0};
+    CHECK(c2_secureconn_write(&enc, big, sizeof(big)) == C2_OK);
+    size_t padded_len = ms.len;
+    ms.len = 0;
+    ms.rpos = 0;
+    CHECK(c2_secureconn_write_bulk(&enc, big, sizeof(big)) == C2_OK);
+    CHECK_EQ_LONG(padded_len - ms.len, 7);
+  }
+
   /* Empty control frames are skipped, not returned as EOF. */
   {
     memstream ms = {0};

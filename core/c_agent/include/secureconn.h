@@ -67,8 +67,8 @@ typedef struct {
 
   uint8_t key[C2_AES_KEY_BYTES];
 
-  /* Sender-side padding range; 0,0 disables it. Only applied to control
-   * frames (payload <= C2_PADDING_MAX_FRAME). */
+  /* Sender-side padding range; 0,0 disables it. Applied to normal writes;
+   * c2_secureconn_write_bulk opts out for bulk relays. */
   uint32_t pad_min;
   uint32_t pad_max;
 
@@ -90,7 +90,7 @@ void c2_secureconn_init(c2_secureconn *sc, const c2_crypto_backend *be,
 void c2_secureconn_set_key(c2_secureconn *sc,
                            const uint8_t key[C2_AES_KEY_BYTES]);
 
-/* Configure control-frame padding. max < min is clamped to min. */
+/* Configure padding for normal writes. max < min is clamped to min. */
 void c2_secureconn_set_padding(c2_secureconn *sc, uint32_t min, uint32_t max);
 
 /* Attach a caller-owned buffer for reassembling a decrypted frame larger than

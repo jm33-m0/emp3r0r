@@ -93,14 +93,15 @@ func TestSecureConnBulkFrameUnpadded(t *testing.T) {
 	<-done
 }
 
-// TestSecureConnLargeFrameSkipsPadding verifies the bulk threshold: a frame
-// larger than c2PaddingMaxFrame must not be padded.
-func TestSecureConnLargeFrameSkipsPadding(t *testing.T) {
+// TestSecureConnLargeFramePads verifies that normal writes are padded even when
+// the payload is larger than the old 32 KiB control-frame threshold.
+func TestSecureConnLargeFramePads(t *testing.T) {
 	withTestKey(t)
-	SetC2Padding(1024, 4096)
+	const pad = 1024
+	SetC2Padding(pad, pad)
 	t.Cleanup(func() { SetC2Padding(0, 0) })
 
-	payload := bytes.Repeat([]byte{0xAB}, c2PaddingMaxFrame+1)
+	payload := bytes.Repeat([]byte{0xAB}, 128*1024)
 	client, server := net.Pipe()
 	defer client.Close()
 	defer server.Close()
@@ -112,9 +113,9 @@ func TestSecureConnLargeFrameSkipsPadding(t *testing.T) {
 		_, _ = sc.Write(payload)
 	}()
 
-	want := 12 + 4 + len(payload) + 16
+	want := 12 + 4 + len(payload) + pad + 16
 	if got := readRawFrame(t, server); got != want {
-		t.Fatalf("large frame length = %d, want %d (must skip padding)", got, want)
+		t.Fatalf("large frame length = %d, want %d (must pad)", got, want)
 	}
 	<-done
 }
