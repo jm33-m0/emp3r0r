@@ -44,7 +44,7 @@ int c2_stager_mask_bind(void) {
 
   struct c2_stager_public pub;
   memcpy(&pub, (const void *)base, sizeof(pub));
-  if (pub.abi_magic != C2_STAGER_ABI_MAGIC ||
+  if (pub.self != (void *)base || pub.abi_magic != C2_STAGER_ABI_MAGIC ||
       pub.abi_version != C2_STAGER_ABI_VERSION || pub.mask_fn == NULL)
     return -1;
   g_mask_fn = pub.mask_fn;

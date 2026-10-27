@@ -283,8 +283,12 @@ SHARED_LIB = stager.so
 # Self-unpacking (pluggable, mirrors the transport interface). Each unpacker
 # has a stub (unpack_stub_<name>.c) and a matching packer (pack_<name>.py).
 UNPACKER ?= rc4
+UNPACK_DEPS = unpack.h
 ifeq ($(UNPACKER),rc4)
   UNPACK_SRCS = unpack_stub_rc4.c $(C2_SRC)/util/rc4.c
+else ifeq ($(UNPACKER),lzss)
+  UNPACK_SRCS = unpack_stub_lzss.c
+  UNPACK_DEPS += lzss.h
 else
   UNPACK_SRCS = unpack_stub_$(UNPACKER).c
 endif
@@ -294,7 +298,7 @@ STUB_ELF = unpack_stub.elf
 STUB_BIN = unpack_stub.bin
 PACKED = stager-packed.bin
 
-.PHONY: all raw executable executable-target so packed test-mask clean FORCE
+.PHONY: all raw executable executable-target so packed test test-mask test-lzss clean FORCE
 
 # Default target generates raw shellcode (.bin)
 all: raw
@@ -364,6 +368,15 @@ $(SHARED_LIB): $(STUB_SRCS) $(STUB_DEPS)
 # restored afterwards.
 MASK_TEST_LIB = tests/libmask_test.so
 MASK_TEST_BIN = tests/test_mask
+LZSS_TEST_BIN = tests/test_lzss
+
+test: test-lzss test-mask
+
+test-lzss: $(LZSS_TEST_BIN)
+	./$(LZSS_TEST_BIN)
+
+$(LZSS_TEST_BIN): tests/test_lzss.c lzss.h ../../c_agent/tests/test.h | tests
+	$(CC) -O2 -I. -I../../c_agent/tests -o $@ tests/test_lzss.c
 
 test-mask: $(MASK_TEST_LIB) $(MASK_TEST_BIN)
 	./$(MASK_TEST_BIN)
@@ -382,7 +395,7 @@ FORCE:
 # 4. Packed self-unpacking shellcode
 packed: $(PACKED)
 
-$(STUB_ELF): $(UNPACK_SRCS) unpack_stub.ld
+$(STUB_ELF): $(UNPACK_SRCS) $(UNPACK_DEPS) unpack_stub.ld
 	$(CC) $(PIC_CFLAGS) $(LDFLAGS_COMMON) -Wl,-e,_start -Wl,-T,unpack_stub.ld -o $@ $(UNPACK_SRCS)
 
 # Extract the stub as a single flat binary, preserving the vaddr layout
@@ -402,4 +415,5 @@ $(PACKED): $(SHELLCODE) $(STUB_BIN) $(STUB_ELF)
 clean:
 	rm -f $(STAGE0_TARGET) $(SHELLCODE) $(RAW_ELF) $(SHARED_LIB) \
 		$(STUB_ELF) $(STUB_BIN) $(PACKED) $(MASK_TEST_LIB) $(MASK_TEST_BIN) \
+		$(LZSS_TEST_BIN) \
 		downloader downloader.bin downloader_blob.h local_payload.h *.o

@@ -336,8 +336,8 @@ func startRunnerAndWaitCheckin(t *testing.T, runnerBin, artifact, homeDir, agent
 // ---------------------------------------------------------------------------
 
 // TestAgentEndToEndLifecycle exercises the raw (unpacked) stager over all
-// supported C2 modes and download transports (http, libcurl, libssl), plus an
-// optional-ECH libssl variant.
+// supported C2 modes and download transports (http, tcp, udp, libcurl, libssl),
+// plus an optional-ECH libssl variant.
 func TestAgentEndToEndLifecycle(t *testing.T) {
 	if os.Getenv("CGO_ENABLED") != "1" {
 		t.Skip("Skipping test: CGO_ENABLED is not set to 1")
@@ -352,7 +352,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 	if _, err := transport.GetC2ChannelWrapper(def.C2ChannelModeH2Conn); err != nil {
 		t.Fatalf("h2conn channel is not compiled in; run with -tags 'with_h2conn ...': %v", err)
 	}
-	transports := []string{"http", "libcurl", "libssl"}
+	transports := []string{"http", "tcp", "udp", "libcurl", "libssl"}
 	for _, mode := range []string{def.C2ChannelModeH2Conn, "http_poll"} {
 		for _, tr := range transports {
 			mode, tr := mode, tr
@@ -822,8 +822,32 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	// everything else uses plain HTTP (in production TLS is usually terminated
 	// by a reverse proxy in front of the plain listener).
 	// -----------------------------------------------------------------------
-	go func() {
-		if opts.transport == "libssl" {
+	stopListener := listener.StopHTTP
+	switch opts.transport {
+	case "tcp":
+		stopListener = func() {
+			if err := listener.StopTCPListener(stagerPortStr); err != nil {
+				logging.Warningf("Stop TCP listener: %v", err)
+			}
+		}
+		go func() {
+			if err := listener.TCPListener(payloadPath, stagerPortStr, stagerKey); err != nil {
+				logging.Errorf("Stager TCP listener failed: %v", err)
+			}
+		}()
+	case "udp":
+		stopListener = func() {
+			if err := listener.StopUDPListener(stagerPortStr); err != nil {
+				logging.Warningf("Stop UDP listener: %v", err)
+			}
+		}
+		go func() {
+			if err := listener.UDPListener(payloadPath, stagerPortStr, stagerKey); err != nil {
+				logging.Errorf("Stager UDP listener failed: %v", err)
+			}
+		}()
+	case "libssl":
+		go func() {
 			cert, err := tls.LoadX509KeyPair(transport.ServerCrtFile, transport.ServerKeyFile)
 			if err != nil {
 				logging.Errorf("Stager listener: failed to load TLS keypair: %v", err)
@@ -833,26 +857,36 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 			if err := listener.HTTPListenerTLS(payloadPath, stagerPortStr, stagerKey, tlsCfg); err != nil {
 				logging.Errorf("Stager TLS listener failed: %v", err)
 			}
-			return
-		}
-		if err := listener.HTTPListener(payloadPath, stagerPortStr, stagerKey); err != nil {
-			logging.Errorf("Stager listener failed: %v", err)
-		}
-	}()
-	listenerReady := false
-	for range 100 {
-		conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%s", stagerPortStr))
-		if err == nil {
-			conn.Close()
-			listenerReady = true
-			break
-		}
-		time.Sleep(500 * time.Millisecond)
+		}()
+	default:
+		go func() {
+			if err := listener.HTTPListener(payloadPath, stagerPortStr, stagerKey); err != nil {
+				logging.Errorf("Stager listener failed: %v", err)
+			}
+		}()
 	}
-	if !listenerReady {
-		t.Fatalf("Stager listener failed to start on port %s", stagerPortStr)
+
+	if opts.transport == "udp" {
+		// A UDP dial does not prove that the listener has bound its socket;
+		// the stager retries its hello packet, but give the goroutine a moment
+		// to register first so the first attempt normally succeeds.
+		time.Sleep(300 * time.Millisecond)
+	} else {
+		listenerReady := false
+		for range 100 {
+			conn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%s", stagerPortStr))
+			if err == nil {
+				conn.Close()
+				listenerReady = true
+				break
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
+		if !listenerReady {
+			t.Fatalf("Stager listener failed to start on port %s", stagerPortStr)
+		}
 	}
-	defer listener.StopHTTP()
+	defer stopListener()
 
 	// -----------------------------------------------------------------------
 	// 9. Build a launcher for the selected format.

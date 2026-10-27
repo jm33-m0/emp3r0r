@@ -536,7 +536,7 @@ fuzz: $(BUILD)/fuzz_rc4 $(BUILD)/fuzz_packer $(BUILD)/fuzz_inet_aton \
       $(GZIP_FUZZ) $(BOF_FUZZ) $(BUILD)/fuzz_dynload $(BUILD)/fuzz_maps \
       $(BUILD)/fuzz_mask_maps $(BUILD)/fuzz_mask_ranges \
       $(BUILD)/fuzz_module $(BUILD)/fuzz_strings $(BUILD)/fuzz_elfload \
-      $(BUILD)/fuzz_doh $(BUILD)/fuzz_http_raw
+      $(BUILD)/fuzz_doh $(BUILD)/fuzz_http_raw $(BUILD)/fuzz_lzss
 	@set -e; mkdir -p $(BUILD)/crash; \
 	for t in $^; do \
 	  name=$$(basename $$t); name=$${name#fuzz_}; \
@@ -650,6 +650,10 @@ $(BUILD)/fuzz_http_raw: fuzz/fuzz_http_raw.c $(FUZZ_DRIVER) \
 	$(HOSTCC) $(FUZZ_CFLAGS) -DHTTP_RAW_FUZZ -Isrc/transport $< $(FUZZ_DRIVER) \
 		src/transport/transport_http_raw.c src/util/doh.c \
 		src/util/dynload.c src/util/dynload_hosted.c -o $@
+
+$(BUILD)/fuzz_lzss: fuzz/fuzz_lzss.c $(FUZZ_DRIVER) \
+                    ../modules/stager_linux/lzss.h fuzz/fuzz_common.h | $(BUILD)
+	$(HOSTCC) $(FUZZ_CFLAGS) -I../modules/stager_linux $< $(FUZZ_DRIVER) -o $@
 
 # The image is untrusted, so the fuzz build records (rather than runs)
 # image-supplied constructors and IFUNC/IRELATIVE resolvers.

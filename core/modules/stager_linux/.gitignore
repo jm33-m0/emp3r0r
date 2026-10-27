@@ -11,4 +11,5 @@ unpack_stub.bin
 malasada_stage0_len.mk
 *.o
 tests/test_mask
+tests/test_lzss
 local_payload.h

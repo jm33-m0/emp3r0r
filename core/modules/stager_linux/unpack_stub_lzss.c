@@ -4,39 +4,17 @@
 // flipped to RX, and jumps to it.
 // See unpack.h for the stub/packer contract.
 
+#include "lzss.h"
 #include "unpack.h"
 
 /* Header is emitted into the read-only .unpack_header section; pack_lzss.py
  * patches unpacked_size/packed_size (key unused). */
 UNPACK_HEADER();
 
-/* LZSS: 8 flag bits per byte (LSB first). 0 = literal byte, 1 = match.
- * Match = 2 bytes: offset-1 (12 bits: low 8 in b0, high 4 in b1[0..3]) and
- * length-3 (4 bits, b1[4..7]). */
-static void lzss_decompress(const uint8_t *src, size_t src_len, uint8_t *dst,
-                            size_t dst_len) {
-  size_t ip = 0, op = 0;
-  while (op < dst_len && ip < src_len) {
-    uint8_t flags = src[ip++];
-    for (int i = 0; i < 8 && op < dst_len; i++, flags >>= 1) {
-      if (flags & 1) {
-        uint8_t b0 = src[ip++];
-        uint8_t b1 = src[ip++];
-        size_t off = b0 | ((b1 & 0x0F) << 8);
-        off += 1;
-        size_t len = (b1 >> 4) + 3;
-        for (size_t j = 0; j < len && op < dst_len; j++, op++)
-          dst[op] = dst[op - off];
-      } else {
-        dst[op++] = src[ip++];
-      }
-    }
-  }
-}
-
 static void do_unpack_lzss(const uint8_t *src, const struct unpack_header *h,
                            uint8_t *dst) {
-  lzss_decompress(src, h->packed_size, dst, h->unpacked_size);
+  if (stager_lzss_decompress(src, h->packed_size, dst, h->unpacked_size) != 0)
+    __builtin_trap();
 }
 
 __attribute__((noreturn, used)) void unpack_and_run(void) {

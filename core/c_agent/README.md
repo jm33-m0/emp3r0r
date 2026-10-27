@@ -421,6 +421,7 @@ The targets and the surface each covers:
 | `fuzz_doh`            | DoH DNS wire answer parser (A/AAAA, names, compression pointers)                 |
 | `fuzz_http_raw`       | raw HTTP response/Content-Length/chunked parser and URL parser                   |
 | `fuzz_http_poll`      | shared HTTP-poll state machine (init/read/write/close, buffering, status paths)  |
+| `fuzz_lzss`           | stager LZSS self-unpacker decoder (truncated tokens, bad back-references)         |
 
 Every target is compiled with `-fsanitize=address,undefined`; the property under
 test is that no input — however malformed or hostile — can over-read, overflow,

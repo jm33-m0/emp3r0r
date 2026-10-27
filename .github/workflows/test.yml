@@ -101,7 +101,7 @@ jobs:
           # diagnostic instead of letting an unresolved-symbol dump escape.
           go test -v -tags "$BUILD_TAGS" ./lib/coffloader -count=1
 
-      - name: Run shellcode stager lifecycle test (cgo, no race)
+      - name: Run shellcode stager lifecycle and packer tests (cgo, no race)
         if: runner.os == 'Linux'
         working-directory: ./core/modules/stager_linux
         env:
@@ -109,7 +109,10 @@ jobs:
         run: |
           # The test binary runs the C2 and the agent is built by build.py
           # (default full feature set), so both must use the same feature tags.
-          cd test && go test -v -tags "$BUILD_TAGS" -count=1 -timeout 3m -run TestAgentEndToEndLifecycle
+          # TestPackerEndToEnd covers both packers (RC4/LZSS) against each
+          # download transport, including the decoder in unpack_stub_lzss.c.
+          cd test && go test -v -tags "$BUILD_TAGS" -count=1 -timeout 8m \
+            -run 'TestAgentEndToEndLifecycle|TestPackerEndToEnd'
 
       - name: Run stager payload embedding and sleep-mask e2e tests
         if: runner.os == 'Linux'
@@ -124,10 +127,10 @@ jobs:
           cd test && go test -v -tags "$BUILD_TAGS" -count=1 -timeout 6m \
             -run 'TestEmbedPayloadHeader|TestCAgentSleepMask'
 
-      - name: Run stager sleep-mask stub test
+      - name: Run stager unit tests (sleep mask and LZSS decoder)
         if: runner.os == 'Linux'
         working-directory: ./core/modules/stager_linux
-        run: make test-mask
+        run: make test
 
       - name: Run C agent end-to-end test (cgo, no race)
         if: runner.os == 'Linux'
