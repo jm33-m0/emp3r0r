@@ -334,9 +334,10 @@ can be reused, or a provider can do its own range discovery. The wrapper
 `mask.c` handles publishing, payload discard and the stack switch.
 
 The stager can also carry the agent PIC itself instead of downloading it:
-build with `--payload-source local --payload-file <prebuilt PIC>`. That path
-embeds an RC4-encrypted copy of the PIC and compiles the downloader, its
-transports and the listener configuration out of the stager.
+build with `--agent-pic <prebuilt PIC>`. A non-empty payload file selects
+local embedding: the stager stores an RC4-encrypted copy of the PIC and
+compiles the downloader, its transports and the listener configuration out.
+Leaving it empty keeps the runtime download path.
 
 The contract is deliberately small: the agent must join or stop every other
 thread before calling `c2_stager_masked_sleep`, because the stub masks the image
@@ -393,33 +394,33 @@ a failure is reproducible.
 
 The targets and the surface each covers:
 
-| target            | surface                                                                          |
-| ----------------- | -------------------------------------------------------------------------------- |
-| `fuzz_messages`   | `MsgAuth`/`MsgTunData` CBOR decode with varying list capacities                  |
-| `fuzz_agent_info` | Emp3r0rAgent / AgentToken / EnrichedPeerList decode                              |
-| `fuzz_config`     | build-config decode (routes, malleable HTTP, custom headers)                     |
-| `fuzz_config_decrypt` | PBKDF2/AES-GCM config container + decrypt → decode (stubbed KDF)             |
-| `fuzz_session`    | SecureConn → `MsgTunData` decode, hello → handshake → PFS key switch             |
-| `fuzz_command_args` | command-slice path/flag/arg parsing with arbitrary capacities                  |
-| `fuzz_gzip`       | gzip header parser + miniz DEFLATE/INFLATE round-trip                            |
-| `fuzz_memfile`    | memfs container decode + unencrypted/encrypted round-trip (stubbed KDF/AEAD)     |
-| `fuzz_bof`        | BOF loader ELF/relocation parser (real `coffloader_linux` provider)              |
-| `fuzz_elfload`    | in-memory ELF64 mapper + relocator (constructors/IFUNCs are recorded, not run)   |
-| `fuzz_encdec`     | decode → re-encode → decode round-trip for both envelopes                        |
-| `fuzz_secureconn` | frame length/padding parser, stream read, encode/decode (identity and stub AEAD) |
-| `fuzz_text`       | hex/base64url codecs, canonical auth string, signature encoding                  |
-| `fuzz_module`     | `c2_coff_invocation_parse`: base64 + nested CBOR COFF invocation                 |
-| `fuzz_strings`    | freestanding mem/str primitives vs. a byte-wise reference                        |
-| `fuzz_dynload`    | bounds-checked ELF dynamic-symbol resolver (SysV and GNU hash)                   |
-| `fuzz_maps`       | `/proc/self/maps` parser (same line machine as the file-backed finders)          |
-| `fuzz_mask_maps`  | mask map classification (`[heap]`, `[stack]`, `[anon:...]`, file-backed)         |
-| `fuzz_mask_ranges`| mask range planner: exclusions/splits, bounds, no overlap or inverted entries    |
-| `fuzz_rc4`        | RC4 keystream                                                                    |
-| `fuzz_packer`     | passphrase packing / key derivation                                              |
-| `fuzz_inet_aton`  | IP literal parser                                                                |
-| `fuzz_doh`        | DoH DNS wire answer parser (A/AAAA, names, compression pointers)                 |
-| `fuzz_http_raw`   | raw HTTP response/Content-Length/chunked parser and URL parser                   |
-| `fuzz_http_poll`  | shared HTTP-poll state machine (init/read/write/close, buffering, status paths)  |
+| target                | surface                                                                          |
+| --------------------- | -------------------------------------------------------------------------------- |
+| `fuzz_messages`       | `MsgAuth`/`MsgTunData` CBOR decode with varying list capacities                  |
+| `fuzz_agent_info`     | Emp3r0rAgent / AgentToken / EnrichedPeerList decode                              |
+| `fuzz_config`         | build-config decode (routes, malleable HTTP, custom headers)                     |
+| `fuzz_config_decrypt` | PBKDF2/AES-GCM config container + decrypt → decode (stubbed KDF)                 |
+| `fuzz_session`        | SecureConn → `MsgTunData` decode, hello → handshake → PFS key switch             |
+| `fuzz_command_args`   | command-slice path/flag/arg parsing with arbitrary capacities                    |
+| `fuzz_gzip`           | gzip header parser + miniz DEFLATE/INFLATE round-trip                            |
+| `fuzz_memfile`        | memfs container decode + unencrypted/encrypted round-trip (stubbed KDF/AEAD)     |
+| `fuzz_bof`            | BOF loader ELF/relocation parser (real `coffloader_linux` provider)              |
+| `fuzz_elfload`        | in-memory ELF64 mapper + relocator (constructors/IFUNCs are recorded, not run)   |
+| `fuzz_encdec`         | decode → re-encode → decode round-trip for both envelopes                        |
+| `fuzz_secureconn`     | frame length/padding parser, stream read, encode/decode (identity and stub AEAD) |
+| `fuzz_text`           | hex/base64url codecs, canonical auth string, signature encoding                  |
+| `fuzz_module`         | `c2_coff_invocation_parse`: base64 + nested CBOR COFF invocation                 |
+| `fuzz_strings`        | freestanding mem/str primitives vs. a byte-wise reference                        |
+| `fuzz_dynload`        | bounds-checked ELF dynamic-symbol resolver (SysV and GNU hash)                   |
+| `fuzz_maps`           | `/proc/self/maps` parser (same line machine as the file-backed finders)          |
+| `fuzz_mask_maps`      | mask map classification (`[heap]`, `[stack]`, `[anon:...]`, file-backed)         |
+| `fuzz_mask_ranges`    | mask range planner: exclusions/splits, bounds, no overlap or inverted entries    |
+| `fuzz_rc4`            | RC4 keystream                                                                    |
+| `fuzz_packer`         | passphrase packing / key derivation                                              |
+| `fuzz_inet_aton`      | IP literal parser                                                                |
+| `fuzz_doh`            | DoH DNS wire answer parser (A/AAAA, names, compression pointers)                 |
+| `fuzz_http_raw`       | raw HTTP response/Content-Length/chunked parser and URL parser                   |
+| `fuzz_http_poll`      | shared HTTP-poll state machine (init/read/write/close, buffering, status paths)  |
 
 Every target is compiled with `-fsanitize=address,undefined`; the property under
 test is that no input — however malformed or hostile — can over-read, overflow,
