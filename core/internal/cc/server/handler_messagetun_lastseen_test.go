@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -155,6 +156,92 @@ func TestMessageTunnelCommandResponseKeepsAlive(t *testing.T) {
 // TestMessageTunnelCommandResponseWithOperator verifies the full command
 // response path (JobID + operator owner + fwdMsgToOperator) does not block or
 // kill the message tunnel.
+func TestMessageTunnelReconnectDoesNotRepeatKnockKnock(t *testing.T) {
+	uuid := "test-uuid-no-repeat-knock"
+	serverSecure, clientSecure, cleanup := setupMessageTunnelTest(t, uuid)
+	defer cleanup()
+
+	// Keep the record across teardown so the second tunnel is a normal
+	// sleep-masked reconnect, exactly like production.
+	rec, ok := live.LookupAgent(uuid)
+	if !ok {
+		t.Fatal("setup did not publish the agent")
+	}
+	agent := *rec.Agent
+	agent.OfflineGrace = 60
+	live.PublishAgent(&live.AgentRecord{Agent: &agent, Control: rec.Control, Announced: rec.Announced})
+
+	opClient, opServer := net.Pipe()
+	defer opClient.Close()
+	defer opServer.Close()
+	OPERATORS.Store("test-operator", &operator_t{sessionID: "test-operator", conn: opServer})
+	defer OPERATORS.Delete("test-operator")
+
+	received := make(chan string, 16)
+	go func() {
+		dec := cbor.NewDecoder(opClient)
+		for {
+			var m def.MsgTunData
+			if err := dec.Decode(&m); err != nil {
+				return
+			}
+			if len(m.Response) > 0 {
+				received <- string(m.Response)
+			}
+		}
+	}()
+
+	startAndHello := func(server, client net.Conn) (<-chan struct{}, context.CancelFunc) {
+		t.Helper()
+		serverSecure := transport.NewSecureConn(server)
+		clientSecure := transport.NewSecureConn(client)
+		dec := cbor.NewDecoder(serverSecure)
+		ctx, cancel := context.WithCancel(context.Background())
+		done := startMessageTunnel(serverSecure, dec, "127.0.0.1:1", ctx, uuid)
+		if err := cbor.NewEncoder(clientSecure).Encode(&def.MsgTunData{Response: []byte("ok")}); err != nil {
+			cancel()
+			t.Fatalf("send hello: %v", err)
+		}
+		return done, cancel
+	}
+
+	done1, cancel1 := startAndHello(serverSecure, clientSecure)
+	select {
+	case msg := <-received:
+		if !strings.Contains(msg, "Knock knock") {
+			t.Fatalf("first connection message = %q, want knock knock", msg)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("first connection did not produce a knock knock")
+	}
+	stopMessageTunnel(t, done1, cancel1, serverSecure, clientSecure)
+
+	// Drain anything produced by teardown; it must not be another knock.
+	for {
+		select {
+		case msg := <-received:
+			if strings.Contains(msg, "Knock knock") {
+				t.Fatalf("reconnect/teardown produced a second knock knock: %q", msg)
+			}
+		default:
+			goto drained
+		}
+	}
+drained:
+
+	server2, client2 := net.Pipe()
+	done2, cancel2 := startAndHello(server2, client2)
+	time.Sleep(300 * time.Millisecond)
+	select {
+	case msg := <-received:
+		if strings.Contains(msg, "Knock knock") {
+			t.Fatalf("re-check-in produced a second knock knock: %q", msg)
+		}
+	default:
+	}
+	stopMessageTunnel(t, done2, cancel2, server2, client2)
+}
+
 func TestMessageTunnelCommandResponseWithOperator(t *testing.T) {
 	uuid := "test-uuid-cmd-owner"
 	serverSecure, clientSecure, cleanup := setupMessageTunnelTest(t, uuid)

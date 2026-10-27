@@ -64,7 +64,11 @@ func publishAgentOffline(agent *def.Emp3r0rAgent) {
 
 	gen := time.Now().UnixNano()
 	agentDisconnectGen.Store(agent.UUID, gen)
-	live.PublishAgent(&live.AgentRecord{Agent: agent, Control: nil})
+	announced := false
+	if rec, ok := live.LookupAgent(agent.UUID); ok {
+		announced = rec.Announced
+	}
+	live.PublishAgent(&live.AgentRecord{Agent: agent, Control: nil, Announced: announced})
 
 	time.AfterFunc(grace, func() {
 		cur, ok := agentDisconnectGen.Load(agent.UUID)

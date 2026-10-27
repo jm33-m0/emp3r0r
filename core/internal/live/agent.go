@@ -42,8 +42,9 @@ type AgentControl struct {
 // A published AgentRecord is never mutated in place: readers snapshot fields
 // and writers copy the record, change the copy, and publish it.
 type AgentRecord struct {
-	Agent   *def.Emp3r0rAgent
-	Control *AgentControl
+	Agent     *def.Emp3r0rAgent
+	Control   *AgentControl
+	Announced bool // the first-connection "Knock knock" was already sent
 }
 
 // AgentRegistry is the single process-local registry of agents, keyed by agent

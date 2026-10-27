@@ -224,6 +224,7 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 	rec := &live.AgentRecord{Agent: target}
 	if alreadyKnown {
 		rec.Control = existing.Control
+		rec.Announced = existing.Announced
 	}
 	if rec.Control == nil {
 		rec.Control = &live.AgentControl{Index: agents.AssignAgentIndex()}

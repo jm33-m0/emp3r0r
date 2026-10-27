@@ -233,29 +233,24 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 			// is always derived from the authenticated UUID above.
 
 			// Agent authentication is payload-authoritative via MsgAuth / signed MsgTunData.
-			// Build the detailed connect notice once; it is emitted only when this
-			// frame represents a fresh connection.
-			notice := agentConnectedNotice(agent)
-			// Publish the registry record as an immutable snapshot. AgentRecord
-			// values are shared with readers that run outside this goroutine
-			// (operator agent list, SOCKS5 pivot startup, message tunnel teardown,
-			// SendMessageToAgent, ...). Mutating a published record in place would
-			// race those readers, so copy the current record, update the copy, and
-			// publish it: sync.Map then hands every Load/Range a consistent,
-			// never-mutated value.
+			// Announce an agent only once per registry lifetime. Reconnects after
+			// a masked sleep, and re-check-ins, must stay silent.
+			existing, known := live.LookupAgent(agent.UUID)
+			announce := !known || !existing.Announced
 			rec := &live.AgentRecord{Agent: agent}
-			if existing, ok := live.LookupAgent(agent.UUID); ok {
+			if known {
+				rec.Announced = existing.Announced
 				if existing.Control != nil {
-					if existing.Control.Conn == nil {
-						_ = operatorBroadcastPrintf(logging.SUCCESS, "%s", notice)
-					}
 					cp := *existing.Control
 					rec.Control = &cp
 				}
 			}
 			if rec.Control == nil {
-				_ = operatorBroadcastPrintf(logging.SUCCESS, "%s", notice)
 				rec.Control = &live.AgentControl{Index: agents.AssignAgentIndex()}
+			}
+			if announce {
+				_ = operatorBroadcastPrintf(logging.SUCCESS, "%s", agentConnectedNotice(agent))
+				rec.Announced = true
 			}
 			now := time.Now()
 			agents.MarkAgentSeen(agent, now)
