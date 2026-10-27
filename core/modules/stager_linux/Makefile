@@ -86,8 +86,12 @@ endif
 LDFLAGS_COMMON = -static -Wl,--gc-sections $(LDFLAGS_MAGIC) -Wl,--build-id=none
 
 # Hosted SO/EXE keep the default page-aligned multi-segment layout (distinct
-# RX/RW LOADs) and link glibc.
+# RX/RW LOADs) and link glibc. The executable is position-independent so the
+# kernel applies ASLR and it looks like a normal hosted binary; the shared
+# object is already ET_DYN.
 HOSTED_LDFLAGS = -Wl,--gc-sections -Wl,--build-id=none
+HOSTED_EXE_LDFLAGS = $(HOSTED_LDFLAGS) -pie
+HOSTED_EXE_CFLAGS = $(COMMON_CFLAGS) -fPIE $(HOSTED_TARGET)
 
 # Specific linker flags
 STAGE0_LDFLAGS = $(LDFLAGS_COMMON) $(PIC_LAYOUT) $(STAGE0_BASE)
@@ -340,7 +344,7 @@ $(LOCAL_PAYLOAD_H): embed_payload.py pack_rc4.py pack_common.py FORCE
 	python3 embed_payload.py "$(PAYLOAD_FILE)" $@
 
 $(STAGE0_TARGET): $(STUB_SRCS) $(STUB_DEPS)
-	$(CC) $(HOSTED_CFLAGS) -DSTAGER_LINKED_LIBC $(HOSTED_LDFLAGS) -o $@ $(STUB_SRCS)
+	$(CC) $(HOSTED_EXE_CFLAGS) -DSTAGER_LINKED_LIBC $(HOSTED_EXE_LDFLAGS) -o $@ $(STUB_SRCS)
 	@echo "[+] Exported symbols in $(STAGE0_TARGET):"
 	@nm $@ 2>/dev/null | grep ' [T|g] ' || readelf -W -s $@ 2>/dev/null | grep ' FUNC ' || true
 

@@ -4,6 +4,7 @@ package shellcode_stager
 
 import (
 	"bytes"
+	"debug/elf"
 	"encoding/base64"
 	"fmt"
 	"net/http"
@@ -179,6 +180,23 @@ func runCAgentEndToEnd(t *testing.T, format string) {
 		}
 		res := buildCAgentResult(t, tmpDir, "shellcode", true)
 		agentArgv = buildLocalStager(t, tmpDir, res.OutputFile, stagerFormat)
+		if format == "local-exe" || format == "local-so" {
+			// Hosted stager artifacts must be ASLR-capable PIE/ET_DYN, not a
+			// fixed-address executable that stands out in /proc/self/maps.
+			stagerPath := agentArgv[0]
+			if format == "local-so" {
+				stagerPath = agentArgv[1]
+			}
+			f, err := elf.Open(stagerPath)
+			if err != nil {
+				t.Fatalf("open %s stager: %v", format, err)
+			}
+			typ := f.Type
+			_ = f.Close()
+			if typ != elf.ET_DYN {
+				t.Fatalf("%s stager ELF type = %v, want ET_DYN", format, typ)
+			}
+		}
 	} else {
 		agentArgv = buildCAgent(t, tmpDir, format)
 	}
