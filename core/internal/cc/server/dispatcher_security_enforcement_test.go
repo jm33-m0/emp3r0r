@@ -323,45 +323,43 @@ func TestCBOREnvelopeAuthenticationBoundary(t *testing.T) {
 	}
 }
 
-// TestSessionHeartbeatUpdate verifies that session activity is tracked in the database
-func TestSessionHeartbeatUpdate(t *testing.T) {
-	tmpDir, err := os.MkdirTemp("", "heartbeat_test")
+// TestSessionLifecycle verifies that session admission is tracked without a
+// heartbeat: a check-in creates the row and teardown removes it.
+func TestSessionLifecycle(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "session_lifecycle_test")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Initialize AgentDB
 	dbPath := filepath.Join(tmpDir, "agents.db")
-	err = agents.InitAgentDB(dbPath)
-	if err != nil {
+	if err := agents.InitAgentDB(dbPath); err != nil {
 		t.Fatalf("Failed to init AgentDB: %v", err)
 	}
 	defer agents.AgentDB.Close()
 
-	testUUID := "heartbeat-test-uuid"
-
-	// Create session
+	testUUID := "session-lifecycle-test-uuid"
 	sessionID := fmt.Sprintf("%d", time.Now().UnixNano())
-	startErr := agents.StartSession(testUUID, sessionID, "127.0.0.1:12345")
-	if startErr != nil {
-		t.Fatalf("Failed to start session: %v", startErr)
+	if err := agents.StartSession(testUUID, sessionID, "127.0.0.1:12345"); err != nil {
+		t.Fatalf("Failed to start session: %v", err)
 	}
-
-	// Update heartbeat and verify no error
-	hbErr := agents.UpdateSessionHeartbeat(testUUID)
-	if hbErr != nil {
-		t.Fatalf("Failed to update heartbeat: %v", hbErr)
+	active, err := agents.IsSessionActive(testUUID)
+	if err != nil {
+		t.Fatalf("query session: %v", err)
 	}
-
-	// Verify session still exists
-	sessionErr := agents.UpdateSessionHeartbeat(testUUID)
-	if sessionErr != nil {
-		t.Errorf("Session should still exist after heartbeat update: %v", sessionErr)
+	if !active {
+		t.Fatal("session should be active after StartSession")
 	}
-
-	// Cleanup
-	_ = agents.EndSession(testUUID)
+	if err := agents.EndSession(testUUID); err != nil {
+		t.Fatalf("end session: %v", err)
+	}
+	active, err = agents.IsSessionActive(testUUID)
+	if err != nil {
+		t.Fatalf("query ended session: %v", err)
+	}
+	if active {
+		t.Fatal("session should be gone after EndSession")
+	}
 }
 
 // TestEnrollmentVerificationEnforcement verifies the enrollment check logic
@@ -411,14 +409,12 @@ func TestEnrollmentVerificationEnforcement(t *testing.T) {
 				}
 			}
 
-			// Verify heartbeat operation
-			hbErr := agents.UpdateSessionHeartbeat(tc.uuid)
-
-			hasSession := hbErr == nil
-
+			hasSession, queryErr := agents.IsSessionActive(tc.uuid)
+			if queryErr != nil {
+				t.Fatalf("query session: %v", queryErr)
+			}
 			if hasSession != tc.expectFound {
-				t.Errorf("Expected found=%v, but hasSession=%v (error: %v)",
-					tc.expectFound, hasSession, hbErr)
+				t.Errorf("Expected found=%v, but hasSession=%v", tc.expectFound, hasSession)
 			}
 
 			// Cleanup
@@ -533,10 +529,12 @@ func TestSessionIsolation(t *testing.T) {
 		t.Errorf("Expected ErrSessionAlreadyActive, got: %v", err1Dup)
 	}
 
-	// Agent 2 should still have valid session
-	hbErr := agents.UpdateSessionHeartbeat(uuid2)
-	if hbErr != nil {
-		t.Errorf("Agent 2 heartbeat should succeed, got: %v", hbErr)
+	// Agent 2 should still have a valid session.
+	active, err := agents.IsSessionActive(uuid2)
+	if err != nil {
+		t.Errorf("Agent 2 session query failed: %v", err)
+	} else if !active {
+		t.Error("Agent 2 session disappeared")
 	}
 
 	// Cleanup

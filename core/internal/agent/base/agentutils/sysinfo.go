@@ -43,6 +43,7 @@ func GatherSystemDetails() *def.Emp3r0rAgent {
 	info.Tag = common.RuntimeConfig.AgentTag // use hostid
 	info.UUID = common.RuntimeConfig.AgentUUID
 	info.C2Host = common.RuntimeConfig.CCAddress
+	info.OfflineGrace = common.OfflineGraceSeconds()
 
 	// Identity (TOFU) — ensure key is generated and read safely.
 	if key, err := AgentPrivateKey(); err != nil {

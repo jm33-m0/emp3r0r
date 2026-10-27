@@ -50,14 +50,6 @@ func handleFileUploadStream(conn *transport.SecureConn, agentUUID, streamID, rem
 		return
 	}
 
-	// Update heartbeat to show activity on this auxiliary channel
-	_ = agents.UpdateSessionHeartbeat(agentUUID)
-
-	// Clean up session heartbeat on exit
-	defer func() {
-		_ = agents.UpdateSessionHeartbeat(agentUUID)
-	}()
-
 	logging.Infof("CBOR FTP routing: relaying stream %s from %s to operator", streamID, remoteAddr)
 
 	// Since we are not using an HTTP roundtripper to monitor Context cancelation for us,

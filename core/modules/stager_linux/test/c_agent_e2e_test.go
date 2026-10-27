@@ -249,13 +249,9 @@ func runCAgentEndToEnd(t *testing.T, format string) {
 	if len(agent.IPs) == 0 {
 		t.Fatalf("agent IPs missing")
 	}
-	// A masked agent reports its own removal deadline; a non-masked one
-	// reports none and is removed as soon as its tunnel closes.
-	wantGrace := 0
-	if strings.HasPrefix(format, "local-") {
-		wantGrace = 12 // interval 5 + poll window 5 + interval/2
-	}
-	if agent.OfflineGrace != wantGrace {
+	// Every agent reports its own removal deadline. The C agent derives it
+	// from its interval and poll window when no explicit override is set.
+	if wantGrace := 12; agent.OfflineGrace != wantGrace {
 		t.Fatalf("agent OfflineGrace = %d, want %d", agent.OfflineGrace, wantGrace)
 	}
 
@@ -358,6 +354,20 @@ func runCAgentEndToEnd(t *testing.T, format string) {
 		if got := runC2Command(t, agent, doneChan, &agentOut, catCmd); !strings.Contains(got, "sa-linux-cat-ok") {
 			t.Fatalf("SA cat custom_module output = %q\nAgent output:\n%s", got, agentOut.String())
 		}
+	}
+
+	// A masked agent must not check in on every wake-up. The C2 keeps it
+	// listed through its grace and the agent reuses the message tunnel, so the
+	// persisted connection count stays at the initial enrollment.
+	stored, err := agents.GetStoredAgent(agent.UUID)
+	if err != nil {
+		t.Fatalf("read stored agent: %v", err)
+	}
+	if stored == nil {
+		t.Fatal("agent was removed from the database")
+	}
+	if stored.ConnectionCount != 1 {
+		t.Fatalf("agent checked in %d times; expected one initial check-in", stored.ConnectionCount)
 	}
 }
 

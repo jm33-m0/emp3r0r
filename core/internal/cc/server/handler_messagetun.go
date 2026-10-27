@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -39,7 +38,6 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 	// already-verified MsgAuth UUID so admission/teardown decisions can use it
 	// immediately.
 	authAgentUUID := initialAgentUUID
-	sessionStarted := false
 	var (
 		lastHandshake int64
 		err           error
@@ -165,26 +163,6 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 					logging.Warningf("handleMessageTunnel: MsgAuth pinned key proof failed for %s: %v", util.AgentRef(authAgentUUID), proofErr)
 					return
 				}
-				if hbErr := agents.UpdateSessionHeartbeat(authAgentUUID); hbErr != nil {
-					logging.Errorf("handleMessageTunnel: session heartbeat failed for %s: %v", util.AgentRef(authAgentUUID), hbErr)
-					return
-				}
-
-				// SECURITY: Enforce duplicate session prevention on first authenticated MsgAuth.
-				// Each UUID is limited to exactly one live session across all routes.
-				if !sessionStarted {
-					sessionID := fmt.Sprintf("%d", time.Now().UnixNano())
-					sessionErr := agents.StartSession(authAgentUUID, sessionID, remoteAddr)
-					if sessionErr != nil {
-						if errors.Is(sessionErr, agents.ErrSessionAlreadyActive) {
-							logging.Warningf("handleMessageTunnel: duplicate live session blocked for %s from %s", util.AgentRef(authAgentUUID), remoteAddr)
-							return
-						}
-						logging.Errorf("handleMessageTunnel: session admission failed for %s: %v", util.AgentRef(authAgentUUID), sessionErr)
-						return
-					}
-					sessionStarted = true
-				}
 
 				seenAt := time.Now()
 				atomic.StoreInt64(&lastHandshake, seenAt.Unix())
@@ -214,10 +192,6 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 					return
 				}
 				authAgentUUID = resolvedUUID
-			}
-			if hbErr := agents.UpdateSessionHeartbeat(authAgentUUID); hbErr != nil {
-				logging.Errorf("handleMessageTunnel: session heartbeat failed for %s: %v", util.AgentRef(authAgentUUID), hbErr)
-				return
 			}
 			// Sanitize agent metadata at trust boundary (after CBOR decode)
 			util.SanitizeMsgTunMetadata(&msg)

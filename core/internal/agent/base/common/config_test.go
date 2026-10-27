@@ -258,3 +258,17 @@ func TestInitConfig_ExplicitTLSURL(t *testing.T) {
 		t.Errorf("explicit TLS def.CCAddress = %q, want %q", def.CCAddress, want)
 	}
 }
+
+func TestOfflineGraceSeconds(t *testing.T) {
+	old := RuntimeConfig
+	defer func() { RuntimeConfig = old }()
+
+	RuntimeConfig = &def.Config{PollInterval: 20, PollWindow: 3}
+	if got, want := OfflineGraceSeconds(), 33; got != want {
+		t.Fatalf("derived grace = %d, want %d", got, want)
+	}
+	RuntimeConfig.OfflineGrace = 120
+	if got, want := OfflineGraceSeconds(), 120; got != want {
+		t.Fatalf("explicit grace = %d, want %d", got, want)
+	}
+}

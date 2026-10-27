@@ -238,28 +238,6 @@ func StartSession(uuid, sessionID, remoteAddr string) error {
 	return nil
 }
 
-// UpdateSessionHeartbeat updates the last heartbeat timestamp for an active session
-func UpdateSessionHeartbeat(uuid string) error {
-	if AgentDB == nil {
-		return fmt.Errorf("database not initialized")
-	}
-
-	now := time.Now().Unix()
-	query := `UPDATE agent_sessions SET last_heartbeat = ? WHERE uuid = ?`
-	res, err := AgentDB.Exec(query, now, uuid)
-	if err != nil {
-		return err
-	}
-	rows, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if rows == 0 {
-		return fmt.Errorf("session not found: %s", uuid)
-	}
-	return nil
-}
-
 // UpdateAgentLastSeen updates the persisted last_seen timestamp for an agent.
 func UpdateAgentLastSeen(uuid string, seenAt time.Time) error {
 	if AgentDB == nil {

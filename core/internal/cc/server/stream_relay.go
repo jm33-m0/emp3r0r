@@ -82,7 +82,6 @@ func verifyAuxRouteAgent(agentUUID, remoteAddr, route string) bool {
 		logging.Warningf("%s relay: agent %s not enrolled or has empty pinned key from %s", route, util.AgentRef(agentUUID), remoteAddr)
 		return false
 	}
-	_ = agents.UpdateSessionHeartbeat(agentUUID)
 	return true
 }
 
