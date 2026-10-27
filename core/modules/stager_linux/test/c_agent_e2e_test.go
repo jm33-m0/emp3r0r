@@ -4,6 +4,7 @@ package shellcode_stager
 
 import (
 	"bytes"
+	"context"
 	"debug/elf"
 	"encoding/base64"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -233,7 +235,7 @@ func runCAgentEndToEnd(t *testing.T, format string) {
 		"OS": agent.OS, "Kernel": agent.Kernel, "Arch": agent.Arch,
 		"Hostname": agent.Hostname, "Name": agent.Name, "User": agent.User,
 		"Groups": agent.Groups, "Uptime": agent.Uptime,
-		"Version": agent.Version, "C2Host": agent.C2Host, "CWD": agent.CWD,
+		"Version": agent.Version, "CWD": agent.CWD,
 		"Transport": agent.Transport,
 	} {
 		if v == "" {
@@ -511,27 +513,59 @@ func startCAgentOperator(t *testing.T, opPort int) {
 		Timeout:   10 * time.Second,
 		Transport: &http.Transport{DialContext: wireguard.DialContext},
 	}
-	go client.StartMessageTunnel(func(msg *def.OperatorMsg) {
-		if !strings.HasPrefix(msg.Tag, def.TagWWWRelayRequestPrefix) {
-			return
+
+	// Use one explicit tunnel for this subtest instead of the global
+	// StartMessageTunnel loop. The loop reconnects forever to a stale operator
+	// port after the subtest, which makes a multi-format run interfere with
+	// itself.
+	conn, _, cancel, err := client.ConnectMsgTun()
+	if err != nil {
+		t.Fatalf("connect operator message tunnel: %v", err)
+	}
+	t.Cleanup(func() {
+		cancel()
+		_ = conn.Close()
+		if network.OperatorServer != nil {
+			_ = network.OperatorServer.Shutdown(context.Background())
 		}
-		streamID := strings.TrimPrefix(msg.Tag, def.TagWWWRelayRequestPrefix)
-		t.Logf("operator: www relay request %q", streamID)
-		go func() {
-			data, err := os.ReadFile(filepath.Join(paths.WWWRoot, filepath.Base(streamID)))
-			if err != nil {
-				_ = client.SendOperatorMsg(&def.OperatorMsg{Tag: def.TagWWWRelayErrorPrefix + streamID, Response: []byte(err.Error())})
+		network.OperatorServer = nil
+		network.OperatorServerCtx = nil
+		network.OperatorServerCancel = nil
+	})
+
+	var writeMu sync.Mutex
+	send := func(msg *def.OperatorMsg) error {
+		writeMu.Lock()
+		defer writeMu.Unlock()
+		return cbor.NewEncoder(conn).Encode(msg)
+	}
+
+	go func() {
+		dec := cbor.NewDecoder(conn)
+		for {
+			var msg def.OperatorMsg
+			if err := dec.Decode(&msg); err != nil {
 				return
 			}
-			if err := client.SendOperatorMsg(&def.OperatorMsg{Tag: def.TagWWWRelayDataPrefix + streamID, Response: data}); err != nil {
-				t.Logf("www relay send: %v", err)
-				return
+			if !strings.HasPrefix(msg.Tag, def.TagWWWRelayRequestPrefix) {
+				continue
 			}
-			_ = client.SendOperatorMsg(&def.OperatorMsg{Tag: def.TagWWWRelayDonePrefix + streamID})
-		}()
-	}, func(err error) { t.Logf("operator tunnel: %v", err) })
-	// StartMessageTunnel sleeps before its first connect; give it time to attach.
-	time.Sleep(4 * time.Second)
+			streamID := strings.TrimPrefix(msg.Tag, def.TagWWWRelayRequestPrefix)
+			t.Logf("operator: www relay request %q", streamID)
+			go func() {
+				data, err := os.ReadFile(filepath.Join(paths.WWWRoot, filepath.Base(streamID)))
+				if err != nil {
+					_ = send(&def.OperatorMsg{Tag: def.TagWWWRelayErrorPrefix + streamID, Response: []byte(err.Error())})
+					return
+				}
+				if err := send(&def.OperatorMsg{Tag: def.TagWWWRelayDataPrefix + streamID, Response: data}); err != nil {
+					t.Logf("www relay send: %v", err)
+					return
+				}
+				_ = send(&def.OperatorMsg{Tag: def.TagWWWRelayDonePrefix + streamID})
+			}()
+		}
+	}()
 }
 
 // buildCAgent builds core/c_agent's reference agent in the requested format
