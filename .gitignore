@@ -1,6 +1,5 @@
 # Prerequisites
 *.d
-*private*
 
 # binary release
 emp3r0r*.tar.*
@@ -23,11 +22,9 @@ vmlinu*
 
 # temp
 *.tmp
-*history
+*.history
+.bash_history
 *.orig
-
-# build
-build
 
 # GDB
 .gdb*
@@ -92,9 +89,6 @@ lkm/dkms.conf
 
 # shellcode.txt
 shellcode.txt
-
-# temp
-temp*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -281,9 +275,6 @@ core/modules/stager/stager
 core/modules/stager/loader
 core/modules/stager/loader.pre
 core/modules/stager/stage1_size.h
-
-# build
-zig*
 
 # clangd
 compile_commands.json
