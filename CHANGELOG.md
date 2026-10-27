@@ -1,5 +1,35 @@
 # Changelog
 
+## [5.5.0](https://github.com/jm33-m0/emp3r0r/compare/v5.4.1...v5.5.0) (2026-10-27)
+
+
+### Features
+
+* **agent:** let each agent choose its offline grace ([7a3b8f3](https://github.com/jm33-m0/emp3r0r/commit/7a3b8f3c5fcae597ad0d13175d0981944a20ced7))
+* **c_agent:** cooperate with stager sleep mask and preserve identity ([1615f84](https://github.com/jm33-m0/emp3r0r/commit/1615f84e91537c9c28807d3e3720f1214b2c0817))
+* **cli:** print payload size ([a5d908d](https://github.com/jm33-m0/emp3r0r/commit/a5d908daaa3023715a57d3f1341d90ed7146e335))
+* **sleep:** mask as much as possible ([a579e9a](https://github.com/jm33-m0/emp3r0r/commit/a579e9a64f0208a06cee600b1b28b8b97f301e6b))
+* **stager:** add pluggable sleep mask and local PIC payloads ([595cbe6](https://github.com/jm33-m0/emp3r0r/commit/595cbe6cbb5c8aad1bd9d5076d3e3dccb5091e0a))
+
+
+### Bug Fixes
+
+* **agent:** drop heartbeats and honour agent-reported grace ([0dae635](https://github.com/jm33-m0/emp3r0r/commit/0dae635ff11882bee7c7243b50561fdec885cbfa))
+* **agent:** only notify on first check-in ([6439210](https://github.com/jm33-m0/emp3r0r/commit/64392105b2c558bcd03daf9bf36fec4f5b18089e))
+* **c2:** packet padding ([057cb83](https://github.com/jm33-m0/emp3r0r/commit/057cb83320b0e6314034603b67a3236c12a14ce3))
+* **c2:** remove unnecessary b64 encoding ([b7230b3](https://github.com/jm33-m0/emp3r0r/commit/b7230b3749eac4d411fba41c8cd9fb7c09fe57b7))
+* **c2:** use Unix milliseconds for easy parsing in C ([eb1deeb](https://github.com/jm33-m0/emp3r0r/commit/eb1deebf2cca693fb860fbb16e7dda924857fcd9))
+* **race:** agent termination race ([43d4dc8](https://github.com/jm33-m0/emp3r0r/commit/43d4dc8b24d0be847b86c492e13a56cb3672c1d6))
+* **server:** data race ([fe0def3](https://github.com/jm33-m0/emp3r0r/commit/fe0def30e4a1e6ca80a2ecddd1f4188b0c7bc9d4))
+* **sleep:** mask every agent mapping ([d9ad0e3](https://github.com/jm33-m0/emp3r0r/commit/d9ad0e3463f7c173d79edd6508da12e154cb46d3))
+* **sleep:** sleep mask should follow existing agent sleep pattern ([b860d7c](https://github.com/jm33-m0/emp3r0r/commit/b860d7c20cfb0432f9df237c5b1487d751f30aa4))
+* **stager:** `argv` gets masked and corrupted ([db4780f](https://github.com/jm33-m0/emp3r0r/commit/db4780f58b75157bed70a0356a28ec3b84ff184e))
+* **stager:** build as PIE when format is not PIC ([3b7e416](https://github.com/jm33-m0/emp3r0r/commit/3b7e416479ad1949f4753adf13921217d1a360a3))
+* **stager:** harden LZSS and native download paths ([5b51fcf](https://github.com/jm33-m0/emp3r0r/commit/5b51fcf0fe2fe22c9be7c291cc57d6d659f6a81a))
+* **stager:** rename flags to be more intuitive ([4bdf206](https://github.com/jm33-m0/emp3r0r/commit/4bdf206362ce1608bd409d5b2f5d04c9368e727a))
+* **ux:** display module sizes in sane numbers instead of `0.00X MB` ([6bfe813](https://github.com/jm33-m0/emp3r0r/commit/6bfe81361b5c45fbe773d599811133cfc64b47f9))
+* **ux:** some commands don't show time spent ([eb0c8b8](https://github.com/jm33-m0/emp3r0r/commit/eb0c8b87c0292c525acbf30538253e0803d17ab8))
+
 ## [5.4.1](https://github.com/jm33-m0/emp3r0r/compare/v5.4.0...v5.4.1) (2026-10-26)
 
 
