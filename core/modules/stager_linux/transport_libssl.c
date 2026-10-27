@@ -37,7 +37,7 @@
  *
  * 4. MALLEABLE_HTTP_METHOD: the HTTP verb (default "GET"). Override it here
  *    only when the C2 profile expects POST; the URI is normally controlled
- *    from the build (build.sh --download-path) and is used verbatim.
+ *    from the build (build.sh --payload-path) and is used verbatim.
  *
  * 5. MALLEABLE_HOST_HEADER: leave empty to derive "host[:port]" from the
  *    download host/port. Set it to a bare domain when the real destination is
@@ -61,7 +61,7 @@
  * Notes / limitations:
  *   - HTTP/1.1 only; no ALPN is advertised, so a server that defaults to h2
  *     still answers with HTTP/1.1.
- *   - Redirects are not followed. Point --download-path at the final URL.
+ *   - Redirects are not followed. Point --payload-path at the final URL.
  *   - Chunked transfer-encoding is not decoded; the listener must send
  *     Content-Length or close the connection (the built-in listener does).
  */
@@ -139,7 +139,7 @@ static const char LIBSONAMES[][16] = {"libssl.so.4", "libssl.so.3",
  *        ./build.sh --transport libssl --ech on --ech-config '<base64>' ...
  *      or, with make directly:
  *        make ECH=1 ECH_CONFIG='<base64>' TRANSPORT=libssl
- *   3. Point --download-host (or MALLEABLE_TLS_SNI) at a real hostname, not an
+ *   3. Point --payload-host (or MALLEABLE_TLS_SNI) at a real hostname, not an
  *      IP: the inner SNI must be a DNS name for ECH to be meaningful.
  *
  * Runtime behaviour:
