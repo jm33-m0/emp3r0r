@@ -1,7 +1,7 @@
 ## Background and Environment
 
 - If you are in a Windows environment, check if there's WSL available. This project assumes its builder runs in Linux. Build and test your code in WSL in the container environment defined by `Dockerfile`. If the image is not already available, install `podman` and build `emp3r0r-builder` image from `Dockerfile`. Use it for all your work unless you have to dynamically test Windows builds. When testing, always sync the files to WSL's native FS for better performance.
-- This project is a Go codebase. Work from the module root (`core/` for the Go module). Read `README.md` and `TESTING.md` before making changes. Keep responses concise and finish tasks rather than stopping early. Do not attempt reading the whole codebase before starting your work; only focus on relevant files and start coding as early as possible; expand code scanning while you are coding and fix errors accordingly.
+- This project is a Go codebase. Work from the module root (`core/` for the Go module). Read `README.md` and `docs/TESTING.md` before making changes. Keep responses concise and finish tasks rather than stopping early. Do not attempt reading the whole codebase before starting your work; only focus on relevant files and start coding as early as possible; expand code scanning while you are coding and fix errors accordingly.
 - Try not to `grep` from `stdout` of a command. Always prefer writing logs to disk before `grep`.
 - `install.py` and `build.py` are used to build release tarballs. Do NOT use them for testing as it would take too long to finish.
 
@@ -77,7 +77,7 @@
 
 ## Operator isolation (multi-operator mode)
 
-In multi-operator mode the server is the trust root and operators are untrusted relative to the server and to each other. Enforce every boundary on the server; never rely on the operator client to police itself. See `SECURITY.md` for the threat model.
+In multi-operator mode the server is the trust root and operators are untrusted relative to the server and to each other. Enforce every boundary on the server; never rely on the operator client to police itself. See `docs/SECURITY.md` for the threat model.
 
 - Operator identity is the provisioned WireGuard IP, derived from the authenticated peer address (`operatorIDFromRemote`). Trust the `operator_session` header only from loopback (local mode, embedders, tests), never from a network peer.
 - Every operator-facing endpoint must call `requireOperatorIdentity` and reject unidentified callers with 401.
@@ -137,7 +137,7 @@ Everything that ships to a target (agent, shellcode, stagers, loaders, BOFs, DLL
 
 ## Module System
 
-- Read `module_development_guide.md`.
+- Read `docs/module_development_guide.md`.
 - Read `./core/modules/`.
 - Tools such as `./core/cmd/bofrunner/` should be used for standalone testing. Create new tools if needed.
 

@@ -13,10 +13,10 @@
 # that session attach to the terminal (Windows Terminal works):
 #
 #   docker run -it --rm -v emp3r0r-operator:/root/.emp3r0r emp3r0r-operator:latest \
-#     emp3r0r client --c2-port 13377 --c2-host 1.2.3.4 ...
+#     emp3r0r client --operator-port 13377 --c2-host 1.2.3.4 ...
 #
 # Add `--cap-add NET_ADMIN --device /dev/net/tun` for tun2socks, or `--privileged`
-# for proxy-ns. See OPERATOR.md for the full operator guide.
+# for proxy-ns. See docs/OPERATOR.md for the full operator guide.
 #
 # The C2 server is deliberately NOT containerized: it publishes random public
 # ports, which container networking makes awkward, so it stays a standalone

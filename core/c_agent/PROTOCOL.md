@@ -562,7 +562,7 @@ and `Response` = output bytes. Job ownership is immutable on the server.
 ## 10. Command and module semantics
 
 The CBOR wire protocol is generic. Command names and payload delivery follow
-[`core/modules/module_development_guide.md`](../modules/module_development_guide.md).
+[`docs/module_development_guide.md`](../../docs/module_development_guide.md).
 Summary of what a minimal agent must support:
 
 - **Built-in commands** referenced by name, e.g. `!ls_dir`, `!stat`. A C agent

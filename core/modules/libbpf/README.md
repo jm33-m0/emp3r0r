@@ -6,7 +6,7 @@ runnable module: another module declares it in `dependencies`, the C2 builds
 and hosts `libbpf.<arch>.gz`, and the agent maps it through `core/lib/memdeps`
 for the duration of each eBPF operation and unmaps it again immediately
 afterwards (see the dependency-lifetime section of
-`module_development_guide.md`).
+`docs/module_development_guide.md`).
 
 `libbpf.so` is statically linked against libelf and zlib, so it depends only on
 libc and is loaded by the **shared-object agent** (`stub-<arch>.so`).

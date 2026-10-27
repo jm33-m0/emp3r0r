@@ -34,4 +34,4 @@ https://github.com/user-attachments/assets/e735b325-d9ad-43bd-b34d-79f395cc4b8f
 
 ### C2 Transport Methods
 
-![C2 Transport Methods](./img/c2transports.png)
+![C2 Transport Methods](../img/c2transports.png)

@@ -133,10 +133,10 @@ C2 server binaries keep the full feature set, so one server can handle every age
 
 ## Documentation
 
-- [Operator guide](./OPERATOR.md): installation, quick start, operator setup, container notes, tmux keybindings, and agent generation.
-- [Module development guide](./core/modules/module_development_guide.md)
-- [Testing guide](./TESTING.md)
-- [Security policy](./SECURITY.md)
+- [Operator guide](./docs/OPERATOR.md): installation, quick start, operator setup, container notes, tmux keybindings, and agent generation.
+- [Module development guide](./docs/module_development_guide.md)
+- [Testing guide](./docs/TESTING.md)
+- [Security policy](./docs/SECURITY.md)
 - [Changelog](./CHANGELOG.md)
 
 ## Support

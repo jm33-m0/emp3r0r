@@ -735,7 +735,7 @@ def export_operator_image(
     log_info(f"Building operator container image {image}...")
     res = run_cmd([container_engine, "build", "-t", image, str(kit_dir)], check=False)
     if res.returncode != 0:
-        log_warn("Operator image build failed; see OPERATOR.md to build it manually")
+        log_warn("Operator image build failed; see docs/OPERATOR.md to build it manually")
         return
 
     out = core_dir / "emp3r0r-operator-image.tar.zst"

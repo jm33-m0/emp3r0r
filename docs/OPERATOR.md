@@ -1,105 +1,114 @@
 # Operator Guide
 
-This guide covers the full emp3r0r deployment: building and launching the C2
-server, installing and running the operator console (natively on Linux or from
-a container -- the recommended path on Windows), and generating agent payloads.
-The console is driven through a tmux session; its keybindings are documented in
-[TMUX.md](TMUX.md).
+This guide covers the full emp3r0r deployment: building and starting the C2
+server, installing the operator console on Linux or Windows, and generating
+agent payloads. The console runs in a tmux session; see [TMUX.md](TMUX.md) for
+every keybinding.
+
+In short:
+
+- [Build and start the C2 server](#1-c2-server) on a host with Docker or Podman.
+- [Set up an operator machine](#2-operator-machine-setup) with the operator kit
+  and the WireGuard credentials the server prints.
+- [Generate agent payloads](#3-generate-agent-payloads) from the console.
 
 The C2 server is a standalone deployment: it publishes random public ports, so
 it is intentionally not containerized.
 
-## Quick Start
+## 1. C2 server
 
-### 1. C2 Server Installation
+### Build
 
-Building emp3r0r requires Docker or Podman on the host -- no local Go toolchain.
+Building emp3r0r requires Docker or Podman on the host; no local Go toolchain.
 
 ```bash
 git clone --depth=1 https://github.com/jm33-m0/emp3r0r.git && cd emp3r0r
 ./install.py
 ```
 
-The installer builds everything in a throwaway container and prepares the
-operator kit. By default it builds a fast, slim kit: only linux/amd64 and
-windows/amd64 targets, with a minimal agent (plain HTTP polling over
-`crypto/tls`, no optional subsystems).
+`./install.py` builds everything in a throwaway container and prepares the
+operator kit. The default kit is small and fast: linux/amd64 and windows/amd64
+targets, with an agent that does plain HTTP polling over `crypto/tls` and no
+optional subsystems.
 
 Opt into more when you need it:
 
 - `--full` builds every target with every agent feature (slowest).
-- `--targets OS/ARCH,...` adds specific targets, e.g.
+- `--targets OS/ARCH,...` adds specific targets, for example
   `--targets linux/amd64,linux/arm64,windows/amd64`.
 - `--agent-tags 'with_quic with_utls'` compiles in exactly those optional agent
-  features; `--list-agent-tags` prints the reference (see
-  [Choosing the C2 transport and agent features](#choosing-the-c2-transport-and-agent-features)).
-- `--garble PATH` uses your own garble binary (for example a patched build with
-  a different fingerprint) instead of the builder's vanilla garble.
+  features. `--list-agent-tags` prints the reference; see
+  [Choosing the C2 transport and agent features](#choosing-the-c2-transport-and-agent-features).
+- `--garble PATH` uses your own garble binary, for example a patched build with
+  a different fingerprint, instead of the builder's vanilla garble.
 - `--debug`, `--skip-build` and `--operator-image` control the rest of the
   build.
 
-> [!NOTE]
-> You can `--disable-garble` to build faster if you prefer.
-> [Garble](https://github.com/burrowers/garble) obfuscates the (Go) agent
-> builds but also introduces its own fingerprint; give `--garble PATH` a custom
-> build to replace it.
+[Garble](https://github.com/burrowers/garble) obfuscates the Go agent builds but
+introduces its own fingerprint. Pass `--disable-garble` to build faster, or
+`--garble PATH` to substitute a custom build.
 
-Launch the server:
+### Start
 
 ```bash
 emp3r0r server --c2-hosts 1.2.3.4 --http-port 12345 --operator-port 13377 \
   --operators alice bob carl
 ```
 
-`--operators` names the operators to provision on the **first** start (they are
-persisted in `wg_config.json` and printed as a table). Names can be
+`--operators` names the operators provisioned on the first start. They are
+persisted in `wg_config.json` and printed as a table. Names can be
 comma-separated (`--operators alice,bob`), repeated
-(`--operators alice --operators bob`) or given as positional arguments after
-`server`. A single integer still works as a count (`--operators 3` creates
-`operator-1..operator-3`), and with no names one default operator is created.
+(`--operators alice --operators bob`) or positional after `server`. A single
+integer is a count (`--operators 3` creates `operator-1` to `operator-3`),
+and with no names the server creates one default operator.
 
-Each operator gets its own WireGuard key/IP and is identified by that IP:
+Each operator gets its own WireGuard key and IP and is identified by that IP:
 the operator service listens on the userspace WireGuard stack, so the peer
-address is cryptokey-routed and cannot be spoofed. There is no separate
-operator certificate or mTLS layer. On every later start the existing
-identities are kept as-is: `--operators` is refused once `wg_config.json`
-exists, so a restart can never regenerate (and invalidate) an operator's keys.
-To add more operators without touching the existing ones, use `--add-operator`
-with the same name syntax. To start over, delete `wg_config.json` and restart.
+address is cryptokey-routed and cannot be spoofed. There is no separate operator
+certificate or mTLS layer. On every later start the existing identities are kept
+as-is; `--operators` is refused once `wg_config.json` exists, so a restart can
+never regenerate (and invalidate) an operator's keys. To add operators without
+touching the existing ones, use `--add-operator` with the same name syntax. To
+start over, delete `wg_config.json` and restart.
 
 ```bash
 # add two named operators to an existing deployment
 emp3r0r server --c2-hosts 1.2.3.4 --add-operator dave erin
 ```
 
-Names must be unique and free of control characters; they are used in the
-console and the audit log.
+Names must be unique and free of control characters; they appear in the console
+and the audit log.
 
 > [!WARNING]
 > Your local services are reachable by all operators and the server over the
-> WireGuard subnet; firewall the ones you do not want exposed. The server prints
+> WireGuard subnet. Firewall the ones you do not want exposed. The server prints
 > this warning on startup.
 
-#### Multiple operators
+### Multiple operators
 
-Multiple operators can connect at the same time. Operator identity comes from
-the provisioned WireGuard IP, not from a client-supplied header, so each
-operator keeps its own jobs, pivots, file streams and agent claims.
+Multiple operators can connect at the same time. Identity comes from the
+provisioned WireGuard IP, not a client-supplied header, so each operator keeps
+its own jobs, pivots, file streams and agent claims.
 
-- **One agent, one operator.** `target <agent>` claims the agent. While claimed,
+- One agent, one operator. `target <agent>` claims the agent. While claimed,
   other operators see the owner in the agent list (`Operator` column) and are
   refused with "Agent ... is operated by ...". The claim is released when the
   operator switches target, disconnects, or stops talking to the C2 for the
   operator idle timeout.
-- **Agent list.** The `Operator` column shows who is on what agent.
-- **Pivots, streams and downloads are owner-scoped.** SOCKS5 pivots, FTP uploads and WWW download relays are bound to the operator that started them; another operator cannot stop your pivot, hijack or unregister your stream, or list your pivots. An agent that fetches a file over the WWW route is served by the operator that currently owns it.
-- **Operator idle timeout is server-managed.** In multi-operator mode the server owns the idle policy; an operator request to change it is refused and audited. Set it in the server's config, not from the console.
-- **Adding operators.** Run the server with `--add-operator <names>`; existing
-  keys and IPs are preserved and only the new named rows are appended to
+- Agent list. The `Operator` column shows who is on what agent.
+- Owner-scoped work. SOCKS5 pivots, FTP uploads and WWW download relays belong
+  to the operator that started them. Another operator cannot stop your pivot,
+  hijack or unregister your stream, or list your pivots. An agent that fetches a
+  file over the WWW route is served by the operator that currently owns it.
+- Idle timeout. In multi-operator mode the server owns the idle policy; an
+  operator request to change it is refused and audited. Set it in the server's
+  config, not from the console.
+- Adding operators. Run the server with `--add-operator <names>`; existing keys
+  and IPs are preserved and only the new named rows are appended to
   `wg_config.json` and the printed table. `--operators` is for the first run
   only.
 
-#### Operator audit log
+### Operator audit log
 
 The server appends every operator action to `~/.emp3r0r/operator_audit.log`
 (mode `0600`), one timestamped line per event, naming the operator, its
@@ -109,14 +118,13 @@ WireGuard IP and public key, the action and the target:
 2026-10-11T04:02:15Z operator="alice" wg_ip="10.123.180.207" wg_pubkey="..." action="command" target="1a2b3c4d (uuid)" detail="ls -la"
 ```
 
-Recorded actions include `connect`, `disconnect`, `claim`/`claim_denied`,
-`command`/`command_denied`, `forget_agent`/`forget_agent_denied`,
-`sign_agent`, `set_idle_timeout`/`set_idle_timeout_denied`,
-`ftp_register`/`ftp_register_denied`,
-`socks5_start`/`socks5_start_denied` and `resume`. The log is append-only;
-rotate or archive it as needed.
+Recorded actions include `connect`, `disconnect`, `claim` and `claim_denied`,
+`command` and `command_denied`, `forget_agent` and `forget_agent_denied`,
+`sign_agent`, `set_idle_timeout` and `set_idle_timeout_denied`, `ftp_register`
+and `ftp_register_denied`, `socks5_start` and `socks5_start_denied`, and
+`resume`. The log is append-only; rotate or archive it as needed.
 
-#### Upgrading without breaking existing agents
+### Upgrades and the MagicString
 
 The `MagicString` is the static pre-shared key the agent uses for check-in.
 Every build embeds the value configured by the builder, so upgrading does not
@@ -126,11 +134,10 @@ later build. `install.py` passes that value into the builder container, and
 `core/build.py` embeds it with `-ldflags`. Go code only consumes the embedded
 value; there is no runtime configuration.
 
-- **First build** generates a random value and stores it.
-- **Later builds** reuse the stored value automatically — no flag needed.
-- **`--magic-string VALUE`** (or `EMP3R0R_MAGIC_STRING`) sets the value: it is
-  persisted to the store, so later builds can omit it and still reuse the same
-  key:
+- The first build generates a random value and stores it.
+- Later builds reuse the stored value automatically, with no flag.
+- `--magic-string VALUE` (or `EMP3R0R_MAGIC_STRING`) sets the value and persists
+  it, so later builds can omit it and still reuse the same key:
 
 ```bash
 ./install.py --magic-string '<value from an existing deployment>'
@@ -139,15 +146,15 @@ python3 core/build.py --install --magic-string '<value>'
 ```
 
 `~/.emp3r0r/magic_string` is a secret: treat it like `wg_config.json`, keep it
-out of version control, and back it up — losing it means the next build mints
+out of version control, and back it up. Losing it means the next build mints
 agents that cannot talk to the running C2.
 
-### 2. Operator Machine Setup
+## 2. Operator machine setup
 
 The build produced `core/emp3r0r-operator-kit.tar.zst`. Copy that archive to the
 operator machine, then follow one of the two paths below.
 
-#### Linux (native)
+### Linux (native)
 
 ```bash
 tar --zstd -xpf emp3r0r-operator-kit.tar.zst
@@ -157,43 +164,43 @@ cd ./emp3r0r-operator-kit && ./install.py
 Connect with the WireGuard credentials the server printed:
 
 ```bash
-emp3r0r client --c2-port 13377 \
+emp3r0r client --operator-port 13377 \
   --server-wg-key '<SERVER_WG_KEY>' --server-wg-ip '<SERVER_WG_IP>' \
   --operator-wg-ip '<OPERATOR_WG_IP>' --operator-wg-key '<OPERATOR_WG_KEY>' \
   --c2-host 1.2.3.4
 ```
 
-#### Windows (container)
+### Windows (container)
 
 `install.py` is Linux-only. To use the Windows container, run
 `./install.py --operator-image` on the build host; it builds the operator image
 and exports it to `core/emp3r0r-operator-image.tar.zst`.
 
-**1. Move the image to the operator machine.** On the build host, after
-`./install.py`:
+1. Move the image to the operator machine. On the build host, after
+   `./install.py`:
 
-```bash
-ls core/emp3r0r-operator-image.tar.zst
-```
+   ```bash
+   ls core/emp3r0r-operator-image.tar.zst
+   ```
 
-Copy that `.tar.zst` over however you like (scp, USB, ...), then load it on the
-operator machine:
+   Copy that `.tar.zst` over however you like (scp, USB, ...), then load it on
+   the operator machine:
 
-```powershell
-docker load -i "emp3r0r-operator-image.tar.zst"
-```
+   ```powershell
+   docker load -i "emp3r0r-operator-image.tar.zst"
+   ```
 
-**2. Run the console.** Everything (the console, its panes and any shell you
-open) lives inside the container's tmux session. Pass the full `emp3r0r`
-command -- the image has no entrypoint, so `docker run IMAGE emp3r0r ...` works
-exactly like running it on the host:
+2. Run the console. Everything (the console, its panes and any shell you open)
+   lives inside the container's tmux session. Pass the full `emp3r0r` command:
+   the image has no entrypoint, so `docker run IMAGE emp3r0r ...` works exactly
+   like running it on the host:
 
-```powershell
-docker run -it --rm -v emp3r0r-operator:/root/.emp3r0r emp3r0r-operator:latest `
-  emp3r0r client --c2-port 13377 --server-wg-key '<SERVER_WG_KEY>' `
-  --server-wg-ip '<SERVER_WG_IP>' --operator-wg-ip '<OPERATOR_WG_IP>' `
-  --operator-wg-key '<OPERATOR_WG_KEY>' --c2-host 1.2.3.4
-```
+   ```powershell
+   docker run -it --rm -v emp3r0r-operator:/root/.emp3r0r emp3r0r-operator:latest `
+     emp3r0r client --operator-port 13377 --server-wg-key '<SERVER_WG_KEY>' `
+     --server-wg-ip '<SERVER_WG_IP>' --operator-wg-ip '<OPERATOR_WG_IP>' `
+     --operator-wg-key '<OPERATOR_WG_KEY>' --c2-host 1.2.3.4
+   ```
 
 - `-it` is required: the client always starts a tmux session and needs a TTY to
   attach. Windows Terminal renders it like any other console.
@@ -202,8 +209,8 @@ docker run -it --rm -v emp3r0r-operator:/root/.emp3r0r emp3r0r-operator:latest `
 - The container runs as root, so drop `sudo` from any hint the console prints.
 - The image is only tagged `latest`; tag the imported image however you like.
 
-If the image was not exported (for example you did not pass
-`--operator-image`), you can build it on any Docker host from the kit instead:
+If the image was not exported (for example you did not pass `--operator-image`),
+you can build it on any Docker host from the kit instead:
 
 ```bash
 tar --zstd -xpf emp3r0r-operator-kit.tar.zst
@@ -214,7 +221,51 @@ zstd -T0 -3 -f emp3r0r-operator-image.tar -o emp3r0r-operator-image.tar.zst
 rm -f emp3r0r-operator-image.tar
 ```
 
-### 3. Generate Agent Payloads
+### Container capabilities
+
+The default container run needs no extra privileges: the client's WireGuard runs
+entirely in userspace.
+
+#### tun2socks
+
+`tun2socks` creates a kernel TUN device and installs routes, so the container
+needs `CAP_NET_ADMIN` and access to `/dev/net/tun`:
+
+```powershell
+docker run -it --rm --cap-add NET_ADMIN --device /dev/net/tun `
+  -v emp3r0r-operator:/root/.emp3r0r emp3r0r-operator:latest emp3r0r client ...
+```
+
+If Docker Desktop's Linux VM does not expose `/dev/net/tun`, run the operator
+natively or start the container with `--privileged`.
+
+#### proxy-ns
+
+`proxy-ns` runs each command in its own network namespace with a TUN device and
+fake DNS, so it needs several powerful capabilities (`cap_sys_admin`,
+`cap_net_admin`, ...). It is unlikely to work in a container without being
+privileged:
+
+```powershell
+docker run -it --rm --privileged -v emp3r0r-operator:/root/.emp3r0r emp3r0r-operator:latest emp3r0r client ...
+```
+
+`--privileged` is a large grant. Prefer the native Linux install for
+`proxy-ns`, or use the built-in SOCKS5 pivot without it.
+
+### Workspace
+
+The operator workspace is `~/.emp3r0r` (override with `EMP3R0R_WORKSPACE`). It
+holds `emp3r0r.json`, the WireGuard keys, `file-get/` downloads, generated
+payloads and `emp3r0r.log`. Mount it (or use a named volume) if you want this
+state to survive container recreation.
+
+Files installed under the prefix are root-owned and writable only by root.
+Buildable modules are copied into the workspace, where they stay editable; an
+existing workspace copy takes priority over the installed copy, so delete it to
+pick up a newly installed version.
+
+## 3. Generate agent payloads
 
 Inside the operator console:
 
@@ -248,12 +299,12 @@ features such as `kcp`, `ncsi`, `stager`, `persistent-router`, `doh`, `ech`,
 `cdn`, `proxy`, poll/jitter, mesh relay/gossip ports and bootstrap peer count
 are added when enabled. The C agent uses the `c_agent_linux_...` prefix.
 
-#### Native C agent
+### Native C agent
 
-The native C agent has its own `generate_c` command, built on demand from
-`core/c_agent` with a config encrypted under the C2's `MagicString`. `--type`
-selects the libc variant rather than a Go payload type, and `--arch` selects a
-C toolchain target:
+The native C agent currently targets Linux only. It has its own `generate_c`
+command, built on demand from `core/c_agent` with a config encrypted under the
+C2's `MagicString`. `--type` selects the libc variant rather than a Go payload
+type, and `--arch` selects a C toolchain target:
 
 ```bash
 generate_c --type glibc --arch amd64 --cc your.domain.com
@@ -297,23 +348,19 @@ Output: `c_agent_linux_<arch>_<format>_<libc>_<transport>_<crypto>_<gzip>_<dynlo
 The extension is `.so` for `--format so` and `.bin` for `--format shellcode`.
 
 Mesh nodes may run different transports. Each agent advertises the transport and
-port its relay listens on, and dialers always use the _peer's_ advertised
+port its relay listens on, and dialers always use the peer's advertised
 transport, so a mixed mesh (for example Windows SMB nodes alongside Linux mTLS
 nodes) routes through a peer that shares a usable transport instead of assuming
 everyone runs the local default. `smb` is only accepted for Windows payloads;
 kcp/mtls work everywhere.
 
-> [!NOTE]
-> Only Linux is supported as of now.
+### Choosing the C2 transport and agent features
 
-#### Choosing the C2 transport and agent features
-
-Optional agent subsystems are **opt-in** with `with_*` Go build tags. By
-default the installer builds a slim agent (plain HTTP polling with
-`crypto/tls`, no optional subsystems) for linux/amd64 and windows/amd64 only.
-Select exactly what an agent needs with `--agent-tags`, or use `--full` for the
-full build (every target, every feature). `install.py --list-agent-tags` prints
-the reference.
+Optional agent subsystems are opt-in with `with_*` Go build tags. By default the
+installer builds a slim agent (plain HTTP polling with `crypto/tls`, no optional
+subsystems) for linux/amd64 and windows/amd64 only. Select exactly what an agent
+needs with `--agent-tags`, or use `--full` for the full build (every target,
+every feature). `install.py --list-agent-tags` prints the reference.
 
 | Scenario                              | Build tags                                                                                                   |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -359,7 +406,7 @@ agent negotiates TLS transparently. If the name is not covered by the C2 TLS
 certificate, generation asks the server to add it to the certificate and reload
 the certificate used by new TLS/QUIC handshakes.
 
-Port summary:
+### Port summary
 
 | Listener                            | Transport                              |
 | ----------------------------------- | -------------------------------------- |
@@ -368,7 +415,7 @@ Port summary:
 | `CCH2Port` (UDP)                    | QUIC                                   |
 | P2P relay port (UDP)                | KCP tunnel into the TLS frontend       |
 
-#### QUIC transport
+### QUIC transport
 
 The QUIC channel is a byte stream over UDP whose datagrams are obfuscated with a
 static key derived from the build's `MagicString`, so a passive observer cannot
@@ -381,21 +428,22 @@ UDP-only: it does not use `--proxy`, and it does not ride the P2P mesh.
 
 ```bash
 # Agent that speaks the custom-key QUIC C2 transport
-emp3r0r generate --type linux_executable --arch amd64 --cc c2.example.com \
+generate --type linux_executable --arch amd64 --cc c2.example.com \
   --c2-channel-mode quic
 
 # Same, but stock QUIC (HTTP/3-interoperable)
-emp3r0r generate --type linux_executable --arch amd64 --cc c2.example.com \
+generate --type linux_executable --arch amd64 --cc c2.example.com \
   --c2-channel-mode quic --quic-standard-key
 ```
 
-The C2 starts the QUIC listener automatically when it is built with
-`with_quic`; there is no need to set `"c2_channel_mode": "quic"` on the server.
-Make sure the server's `quic_standard_key` setting matches the agent build
-(custom-key by default, stock QUIC when the agent was generated with
-`--quic-standard-key`), then restart the server after changing it.
+The C2 is always built with every feature tag, so its QUIC listener is always
+available and starts automatically; there is no need to set
+`"c2_channel_mode": "quic"` on the server. Make sure the server's
+`quic_standard_key` setting matches the agent build (custom-key by default,
+stock QUIC when the agent was generated with `--quic-standard-key`), then
+restart the server after changing it.
 
-#### Hiding the C2 name behind a CDN (ECH)
+### Hiding the C2 name behind a CDN (ECH)
 
 When the C2's TLS is terminated by an ECH-capable CDN edge (for example
 Cloudflare), pass `--doh` and `--ech <c2-domain>` so the agent fetches the
@@ -418,44 +466,11 @@ C2, so no special transport is needed. The older `--cdn` WebSocket tunnel
 TLS yourself; it tunnels the C2 TLS, so ECH does not apply there and you do not
 need it for ordinary CDN fronting.
 
-## Container capabilities
-
-The default container run needs no extra privileges: the client's WireGuard runs
-entirely in userspace.
-
-### tun2socks
-
-`tun2socks` creates a kernel TUN device and installs routes, so the container
-needs `CAP_NET_ADMIN` and access to `/dev/net/tun`:
-
-```powershell
-docker run -it --rm --cap-add NET_ADMIN --device /dev/net/tun `
-  -v emp3r0r-operator:/root/.emp3r0r emp3r0r-operator:latest emp3r0r client ...
-```
-
-If Docker Desktop's Linux VM does not expose `/dev/net/tun`, run the operator
-natively or start the container with `--privileged`.
-
-### proxy-ns
-
-`proxy-ns` runs each command in its own network namespace with a TUN device and
-fake DNS, so it needs several powerful capabilities (`cap_sys_admin`,
-`cap_net_admin`, ...). It is unlikely to work in a container without being
-privileged:
-
-```powershell
-docker run -it --rm --privileged -v emp3r0r-operator:/root/.emp3r0r emp3r0r-operator:latest emp3r0r client ...
-```
-
-`--privileged` is a large grant. Prefer the native Linux install for
-`proxy-ns`, or use the built-in SOCKS5 pivot without it.
-
 ## tmux console
 
 The console, every shell it opens, and every pane run under one tmux session.
-The prefix is **<kbd>Ctrl</kbd>+<kbd>x</kbd>** (the default
-<kbd>Ctrl</kbd>+<kbd>b</kbd> is unbound). A few keys worth memorising right
-away:
+The prefix is <kbd>Ctrl</kbd>+<kbd>x</kbd> (the default <kbd>Ctrl</kbd>+<kbd>b</kbd>
+is unbound). A few keys worth memorising right away:
 
 | Keys                                                                             | Action                                                  |
 | -------------------------------------------------------------------------------- | ------------------------------------------------------- |
@@ -471,15 +486,3 @@ The full reference -- mouse and clipboard, all window/pane/session keys, copy
 mode, and everything this config changes versus stock tmux -- is in
 [TMUX.md](TMUX.md). Reload an edited config with
 `tmux source-file /usr/local/lib/emp3r0r/tmux/.tmux.conf`.
-
-## Workspace
-
-The operator workspace is `~/.emp3r0r` (override with `EMP3R0R_WORKSPACE`). It
-holds `emp3r0r.json`, the WireGuard keys, `file-get/` downloads, generated
-payloads and `emp3r0r.log`. Mount it (or use a named volume) if you want this
-state to survive container recreation.
-
-Files installed under the prefix are root-owned and writable only by root.
-Buildable modules are copied into the workspace, where they stay editable; an
-existing workspace copy takes priority over the installed copy, so delete it
-to pick up a newly installed version.

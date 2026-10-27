@@ -1712,7 +1712,7 @@ def package_operator_bundle(prefix: str, core_dir: pathlib.Path) -> None:
             "  install.py --operator-image builds and exports emp3r0r-operator-image.tar.zst"
         )
         log_success("  transfer it, then on the operator machine: docker load -i <file>")
-        log_success("  Full operator guide: OPERATOR.md")
+        log_success("  Full operator guide: docs/OPERATOR.md")
 
 
 def remove_obsolete_wireguard_config() -> None:
