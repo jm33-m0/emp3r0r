@@ -1,6 +1,6 @@
 ### emp3r0r
 
-<img align="left" width="150" height="150" alt="emp3r0r" src="img/emp3r0r.svg" />
+<img align="left" width="130" height="130" alt="emp3r0r" src="img/emp3r0r.svg" />
 
 Linux-first multi-operator C2 built to stay quiet and keep working. Self-healing mesh with assisted discovery, in-memory execution with encrypted storage, scriptable agents, cross-platform BOFs, SOCKS5 pivoting, and a modular C agent delivered by a sleep-masking stager.
 
