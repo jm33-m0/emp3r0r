@@ -207,6 +207,10 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 	}
 
 	// ── Phase 3: Session Admission (Explicit Duplicate Prohibition) ────────
+	// A pending offline-grace callback may still be running EndSession. Wait
+	// for it before admitting the new session so it cannot delete the session
+	// this check-in is about to create.
+	markAgentReconnected(target.UUID)
 	sessionID := fmt.Sprintf("%d", time.Now().UnixNano())
 	if sessionErr := agents.StartSession(target.UUID, sessionID, remoteAddr); sessionErr != nil {
 		if errors.Is(sessionErr, agents.ErrSessionAlreadyActive) {
@@ -229,7 +233,6 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 	if rec.Control == nil {
 		rec.Control = &live.AgentControl{Index: agents.AssignAgentIndex()}
 	}
-	markAgentReconnected(target.UUID)
 	live.PublishAgent(rec)
 
 	logging.Infof("Updated agent %s with full data from CBOR", util.AgentRef(target.UUID))

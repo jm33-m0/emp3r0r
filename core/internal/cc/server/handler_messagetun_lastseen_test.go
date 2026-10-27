@@ -631,6 +631,10 @@ func TestPublishAgentOfflineKeepsRecordUntilGrace(t *testing.T) {
 	}
 	live.PublishAgent(&live.AgentRecord{Agent: agent, Control: &live.AgentControl{}})
 	publishAgentOffline(agent)
+	t.Cleanup(func() {
+		markAgentReconnected(uuid)
+		live.ForgetAgent(uuid)
+	})
 
 	if _, _, found := agents.RuntimeControlByUUID(uuid); !found {
 		t.Fatal("agent was removed immediately instead of staying listed during disconnect grace")
