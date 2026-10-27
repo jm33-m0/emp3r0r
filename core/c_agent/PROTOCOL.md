@@ -368,7 +368,7 @@ The universal agent↔C2 message.
 | 2   | `CmdSlice`         | array of text | command argv; empty for non-commands                                 |
 | 3   | `Response`         | bytes         | command output / payload                                             |
 | 4   | `Tag`              | text          | see §2.3                                                             |
-| 5   | `Time`             | text          | agent clock, `2006-01-02 15:04:05.999999999 -0700 MST`; used for RTT |
+| 5   | `Time`             | int (Unix ms) | agent clock, used for RTT                                            |
 | 8   | `EphemPublicKey`   | bytes         | agent ephemeral P-256 pubkey on the first hello                      |
 | 10  | `EnrichedPeerList` | map           | C2 push: peers (see §7.4; keys 6, 7, 9 retired)                      |
 

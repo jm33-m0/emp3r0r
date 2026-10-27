@@ -116,7 +116,7 @@ func TestSanitizeMsgTunMetadataStripsHostileFields(t *testing.T) {
 	m := &def.MsgTunData{
 		Tag:      hostile,
 		JobID:    hostile,
-		Time:     hostile,
+		Time:     123,
 		CmdSlice: []string{hostile, "ls", hostile},
 	}
 
@@ -125,7 +125,6 @@ func TestSanitizeMsgTunMetadataStripsHostileFields(t *testing.T) {
 	for name, value := range map[string]string{
 		"Tag":         m.Tag,
 		"JobID":       m.JobID,
-		"Time":        m.Time,
 		"CmdSlice[0]": m.CmdSlice[0],
 		"CmdSlice[2]": m.CmdSlice[2],
 	} {

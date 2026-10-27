@@ -30,7 +30,7 @@ var SendCmd = func(cmd, job_id string, a *def.Emp3r0rAgent) error {
 	cmdData.JobID = job_id
 
 	// timestamp
-	cmdData.Time = time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST")
+	cmdData.Time = time.Now().UnixMilli()
 
 	return SendMessageToAgent(&cmdData, a)
 }

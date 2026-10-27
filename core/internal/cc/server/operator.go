@@ -250,7 +250,7 @@ func handleSendCommand(wrt http.ResponseWriter, req *http.Request) {
 			JobID:    *operation.JobID,
 			CmdSlice: util.ParseCmd(*operation.Command),
 			Tag:      agent.Tag,
-			Time:     time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST"),
+			Time:     time.Now().UnixMilli(),
 		}
 		enqueueAgentCommand(agent.UUID, msg)
 		logging.Infof("Agent %s has no live message tunnel, queued command %s", agent.Tag, *operation.JobID)

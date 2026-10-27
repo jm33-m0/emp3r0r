@@ -87,7 +87,6 @@ func SanitizeMsgTunMetadata(m *def.MsgTunData) {
 	}
 	m.Tag = SanitizeOneLine(m.Tag)
 	m.JobID = SanitizeOneLine(m.JobID)
-	m.Time = SanitizeOneLine(m.Time)
 
 	// Sanitize command arguments
 	for i := range m.CmdSlice {

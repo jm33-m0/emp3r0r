@@ -42,20 +42,11 @@ static int64_t now_unix(void) {
   return (int64_t)time(NULL);
 }
 
-/* Go's MsgTunData.Time layout: "2006-01-02 15:04:05.999999999 -0700 MST".
- * The server only uses it for RTT, so UTC with nanoseconds is enough. */
-static size_t format_time(char *out, size_t cap) {
+static int64_t now_unix_ms(void) {
   struct timespec ts;
   if (clock_gettime(CLOCK_REALTIME, &ts) != 0)
     return 0;
-  struct tm tm;
-  if (gmtime_r(&ts.tv_sec, &tm) == NULL)
-    return 0;
-  char base[32];
-  if (strftime(base, sizeof(base), "%Y-%m-%d %H:%M:%S", &tm) == 0)
-    return 0;
-  int n = snprintf(out, cap, "%s.%09ld +0000 UTC", base, ts.tv_nsec);
-  return (n > 0 && (size_t)n < cap) ? (size_t)n : 0;
+  return (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 }
 
 static void rand_hex(const c2_crypto_backend *be, char *out, size_t nbytes) {
@@ -391,15 +382,12 @@ c2_status c2_session_hello(c2_agent_session *s, c2_secureconn *msg,
   rand_uuid(s->be, job_id, sizeof(job_id));
   memcpy(s->hello_job_id, job_id, sizeof(s->hello_job_id));
 
-  char tbuf[48];
-  size_t tlen = format_time(tbuf, sizeof(tbuf));
-
   c2_msgtun m;
   memset(&m, 0, sizeof(m));
   m.job_id = c2_str_of(job_id, strlen(job_id));
   m.cmd_slice = cmd;
   m.tag = s->config->agent_tag;
-  m.time = c2_str_of(tbuf, tlen);
+  m.time = now_unix_ms();
   if (send_ephem)
     m.ephem_public_key = c2_bytes_of(s->pfs_pub, C2_P256_PUB_BYTES);
 
@@ -475,16 +463,13 @@ c2_status c2_session_send_result(c2_agent_session *s, c2_secureconn *msg,
 
   /* The C2 derives the agent tag from the authenticated MsgAuth stream and
    * overwrites this field before forwarding the reply. */
-  char tbuf[48];
-  size_t tlen = format_time(tbuf, sizeof(tbuf));
-
   c2_msgtun m;
   memset(&m, 0, sizeof(m));
   m.job_id = job_id;
   m.cmd_slice = *cmd_slice;
   m.response = c2_bytes_of(response, response_len);
   m.tag = s->config->agent_tag;
-  m.time = c2_str_of(tbuf, tlen);
+  m.time = now_unix_ms();
 
   uint8_t buf[C2_SESSION_MSG_MAX];
   CborEncoder enc;

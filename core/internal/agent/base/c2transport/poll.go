@@ -262,7 +262,7 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 			hello_msg.CmdSlice = []string{util.RandStr(util.RandInt(1, 100))}
 			hello_msg.JobID = uuid.NewString()
 			hello_msg.Tag = config.AgentTag
-			hello_msg.Time = time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST")
+			hello_msg.Time = time.Now().UnixMilli()
 			if !handshakeDone {
 				hello_msg.EphemPublicKey = pubKeyBytes // Send our ephemeral public key
 			}

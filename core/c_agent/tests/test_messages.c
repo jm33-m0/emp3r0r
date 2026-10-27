@@ -13,7 +13,7 @@ static const char kMsgauthHex[] =
     "6673747265616d1401";
 static const char kMsgtunHex[] =
     "a701656a6f622d31028267216c735f646972642f746d700344deadbeef0464616263"
-    "6405600844090807060af6";
+    "64051b0000018bcfe568000844090807060af6";
 
 static size_t unhex(const char *hex, uint8_t *out, size_t cap) {
   long n = c2_hex_decode(hex, strlen(hex), out, cap);
@@ -108,7 +108,7 @@ int main(void) {
     CHECK_EQ_LONG(m.response.len, 4);
     CHECK(m.response.ptr[0] == 0xde && m.response.ptr[3] == 0xef);
     CHECK(c2_str_equal(m.tag, "abcd"));
-    CHECK_EQ_LONG(m.time.len, 0);
+    CHECK_EQ_LONG(m.time, 1700000000000);
     CHECK_EQ_LONG(m.ephem_public_key.len, 4);
     CHECK(m.ephem_public_key.ptr[0] == 9);
     CHECK(m.enriched_peer_list == NULL);
@@ -124,6 +124,7 @@ int main(void) {
     m.cmd_slice.cap = 1;
     m.response = c2_bytes_of("ok", 2);
     m.tag = c2_str_lit("abcd");
+    m.time = 1700000000123;
     m.ephem_public_key = c2_bytes_of("\x09\x08\x07\x06", 4);
 
     CborEncoder enc;
@@ -137,6 +138,7 @@ int main(void) {
     d.cmd_slice.cap = 2;
     CHECK(decode_msgtun(buf, n, &d) == C2_OK);
     CHECK(c2_str_equal(d.job_id, "job-2"));
+    CHECK_EQ_LONG(d.time, 1700000000123);
     CHECK(d.response.len == 2 && d.response.ptr[0] == 'o');
     CHECK(!c2_msgtun_is_hello(&d));
 

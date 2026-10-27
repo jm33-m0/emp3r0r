@@ -260,10 +260,9 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 			if err := agents.UpdateAgentLastSeen(agent.UUID, now); err != nil {
 				logging.Warningf("handleMessageTunnel: persist last_seen for %s failed: %v", util.AgentRef(agent.UUID), err)
 			}
-			if msg.Time != "" {
-				startTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", msg.Time)
-				if err == nil {
-					agents.MarkAgentRTT(agent, time.Since(startTime))
+			if msg.Time > 0 {
+				if rtt := time.Since(time.UnixMilli(msg.Time)); rtt >= 0 {
+					agents.MarkAgentRTT(agent, rtt)
 				}
 			}
 			// handshake (hello) message has empty CmdSlice or just random data

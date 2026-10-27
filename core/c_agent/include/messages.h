@@ -86,7 +86,7 @@ enum {
   C2_KEY_TUN_CMD_SLICE = 2,           /* array of text                      */
   C2_KEY_TUN_RESPONSE = 3,            /* bytes                              */
   C2_KEY_TUN_TAG = 4,                 /* text                               */
-  C2_KEY_TUN_TIME = 5,                /* text                               */
+  C2_KEY_TUN_TIME = 5,                /* int64 Unix milliseconds           */
   C2_KEY_TUN_EPHEM_PUBLIC = 8,        /* bytes agent ephemeral X||Y         */
   C2_KEY_TUN_ENRICHED_PEER_LIST = 10, /* map (EnrichedPeerList)             */
 };
@@ -104,7 +104,7 @@ typedef struct {
   c2_str_list cmd_slice;
   c2_bytes response;
   c2_str tag;
-  c2_str time;
+  int64_t time;
   c2_bytes ephem_public_key;
   c2_enriched_peer_list *enriched_peer_list; /* NULL when absent */
 } c2_msgtun;

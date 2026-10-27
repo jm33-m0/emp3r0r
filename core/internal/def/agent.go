@@ -85,7 +85,7 @@ type MsgTunData struct {
 	CmdSlice         []string          `cbor:"2,keyasint"`  // command args, [0] is the command, or empty if not a command
 	Response         []byte            `cbor:"3,keyasint"`  // response from the agent, or message to operator
 	Tag              string            `cbor:"4,keyasint"`  // agent tag for agent->C2, or message type if sent to operator
-	Time             string            `cbor:"5,keyasint"`  // timestamp
+	Time             int64             `cbor:"5,keyasint"`  // Unix milliseconds, used for RTT
 	EphemPublicKey   []byte            `cbor:"8,keyasint"`  // ephemeral public key for ECDH key exchange
 	EnrichedPeerList *EnrichedPeerList `cbor:"10,keyasint"` // C2-provided peer list
 }
