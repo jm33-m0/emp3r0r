@@ -9,4 +9,8 @@ config_embedded.c
 # artifacts, not tracked files.
 vendor/mbedtls/**/*.o
 vendor/mbedtls/**/*.a
+# Bear/clangd files from `make compiledb` (see scripts/compiledb.sh).
 bear.config.json
+.bear-zig-cc
+compile_commands.json
+compile_commands.events.json

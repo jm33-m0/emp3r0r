@@ -223,7 +223,7 @@ TEST_CFLAGS = $(WARN) -O1 -g $(INCLUDES) $(SAN) $(COV)
 
 BUILD = build
 
-.PHONY: all lib agent so test test-mbedtls vendor-mbedtls fuzz coverage clean
+.PHONY: all lib agent so compiledb test test-mbedtls vendor-mbedtls fuzz coverage clean
 
 all: lib
 
@@ -317,6 +317,17 @@ so: $(BUILD)/agent.so
 $(BUILD)/agent.so: $(AGENT_SRC) $(EXTRA_LIBS) | $(BUILD)
 	$(CC) $(WARN) $(AGENT_SO_CFLAGS) $(INCLUDES) $(HOSTED_CFLAGS) \
 	  $(AGENT_SO_LDFLAGS) $(AGENT_SRC) $(EXTRA_LIBS) -o $@
+
+# ---- compilation database --------------------------------------------------
+# Bear 3 recognises compilers by executable path, so `zig cc` needs a config
+# entry. The script generates the host-specific config and shim, then records a
+# forced build in preload mode. The generated files are gitignored.
+ZIG ?= $(firstword $(CC))
+BEAR ?= bear
+COMPILEDB_TARGETS ?= lib agent
+
+compiledb:
+	ZIG="$(ZIG)" BEAR="$(BEAR)" ./scripts/compiledb.sh $(COMPILEDB_TARGETS)
 
 # ---- unit tests ------------------------------------------------------------
 # test_dynload needs the real dynamic loader and libc, so it is not linked with
