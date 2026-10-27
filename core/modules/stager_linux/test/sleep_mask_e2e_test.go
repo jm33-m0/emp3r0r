@@ -142,6 +142,12 @@ func TestCAgentSleepMask(t *testing.T) {
 	} else if len(bad) > 0 {
 		t.Fatalf("agent executable mappings still have PROT_EXEC while masked: %#x", bad)
 	}
+	wantCmdline := []byte(strings.Join(cmd.Args, "\x00") + "\x00")
+	if got, err := os.ReadFile(fmt.Sprintf("/proc/%d/cmdline", pid)); err != nil {
+		t.Fatalf("read masked process cmdline: %v", err)
+	} else if !bytes.Equal(got, wantCmdline) {
+		t.Fatalf("masked process argv is corrupted: got %q, want %q", got, wantCmdline)
+	}
 
 	// Let the masked sleep finish. Start the C2 now: the next retry must see a
 	// restored image and check in, which also proves the XOR was reversible.
