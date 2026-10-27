@@ -8,7 +8,7 @@
  * exact structs the C2 marshals, so a divergence in key order or integer width
  * fails here. */
 static const char kMsgauthHex[] =
-    "a80b67617574685f76310c69757569642d313233340d45746f6b656e0e1a6553f100"
+    "a80b67617574685f76320c69757569642d313233340d45746f6b656e0e1a6553f100"
     "0f656e6f6e6365106663322d6d7367114570726f6f66136673747265616d";
 static const char kMsgtunHex[] =
     "a701656a6f622d31028267216c735f646972642f746d700344deadbeef0464616263"
@@ -45,7 +45,7 @@ int main(void) {
     CHECK(exp_len > 0);
 
     c2_msgauth m = {0};
-    m.type = c2_str_lit("auth_v1");
+    m.type = c2_str_lit("auth_v2");
     m.agent_uuid = c2_str_lit("uuid-1234");
     m.identity_token = c2_bytes_of("token", 5);
     m.timestamp = 1700000000;
@@ -68,7 +68,7 @@ int main(void) {
     size_t enc_len = unhex(kMsgauthHex, enc, sizeof(enc));
     c2_msgauth m = {0};
     CHECK(decode_msgauth(enc, enc_len, &m) == C2_OK);
-    CHECK(c2_str_equal(m.type, "auth_v1"));
+    CHECK(c2_str_equal(m.type, "auth_v2"));
     CHECK(c2_str_equal(m.agent_uuid, "uuid-1234"));
     CHECK(m.identity_token.len == 5 &&
           memcmp(m.identity_token.ptr, "token", 5) == 0);

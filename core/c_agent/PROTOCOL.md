@@ -264,7 +264,7 @@ reads it as a single frame (≤ 8192 bytes), then routes.
 
 | Key | Name            | CBOR type | Notes                                                          |
 | --- | --------------- | --------- | -------------------------------------------------------------- |
-| 11  | `Type`          | text      | must equal `auth_v1`; carries the wire version                 |
+| 11  | `Type`          | text      | must equal `auth_v2`; carries the wire version                 |
 | 12  | `AgentUUID`     | text      | agent UUID                                                     |
 | 13  | `IdentityToken` | bytes     | CA signature over `AgentUUID`                                  |
 | 14  | `Timestamp`     | int       | Unix seconds                                                   |
@@ -304,7 +304,7 @@ build). The agent presents the same token on every `MsgAuth`.
 
 ### 5.4 Server verification order
 
-1. Structural checks: type `auth_v1`, non-empty route/UUID/token/nonce,
+1. Structural checks: type `auth_v2`, non-empty route/UUID/token/nonce,
    `Timestamp > 0`.
 2. Replay window: `|now - Timestamp| <= 60`.
 3. `IdentityToken` verifies against the CA public key over `AgentUUID`.
@@ -588,7 +588,7 @@ download, `ftp` upload, `!ls_dir`/`!stat`, and `coff` execution. SOCKS5
 
 ## 11. Versioning and routing
 
-`MsgAuth.Type` (key 11) carries the wire-format version: `auth_v1`. The server
+`MsgAuth.Type` (key 11) carries the wire-format version: `auth_v2`. The server
 rejects any other value, so a protocol bump is an all-peers rebuild. This is the
 handle for future incompatible changes.
 
@@ -671,7 +671,7 @@ missing `client-session:` prefix fails silently and is painful to debug.
 - [ ] ECDSA/DER sign + verify over SHA-256
 - [ ] base64url (padded)
 - [ ] One channel: `http_poll` and/or a duplex wrapper (TLS)
-- [ ] `MsgAuth` (`auth_v1` + `Route`) + canonical string
+- [ ] `MsgAuth` (`auth_v2` + `Route`) + canonical string
 - [ ] check-in, hello handshake, keepalive, job loop
 - [ ] `www` download, `ftp` upload (gzip stream), `!ls_dir`/`!stat`
 - [ ] optional: `coff` loader, `proxy` relay

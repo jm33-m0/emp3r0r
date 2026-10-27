@@ -2,7 +2,7 @@ package def
 
 const (
 	// MsgAuthType identifies the CBOR envelope and its wire version.
-	MsgAuthType = "auth_v1"
+	MsgAuthType = "auth_v2"
 )
 
 // MsgAuth is the first-envelope authentication record for a C2 stream.

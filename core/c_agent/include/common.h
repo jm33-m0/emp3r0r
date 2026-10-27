@@ -26,7 +26,7 @@ extern "C" {
 /* ------------------------------------------------------------------------- */
 
 /* Value of MsgAuth.Type; the type string carries the wire version. */
-#define C2_MSGAUTH_TYPE "auth_v1"
+#define C2_MSGAUTH_TYPE "auth_v2"
 
 /* ------------------------------------------------------------------------- */
 /* Hard limits (mirrors PROTOCOL.md §2.4)                                   */
