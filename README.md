@@ -40,15 +40,11 @@ Agents can discover each other and relay traffic through a gossip mesh. Peer lin
 
 Files can also move directly between peers. The agent keeps fetched files in encrypted memfs and serves them to peers on request. If no peer has a file, the agent fetches it from the C2.
 
-### Listeners, stagers, and the C agent
+### Listeners, stagers, sleep masking, and the C agent
 
-The C2 supports HTTP, TCP, and UDP listeners. The HTTP transport has configurable request profiles. The [Linux stager](./core/modules/stager_linux/) is small, talks to the kernel through direct syscalls, and needs no libc on the target. Stager transports and packers are pluggable, so initial access can use whichever channel the target allows. Packers are RC4 (encrypted) or LZSS (compressed).
+The C2 supports HTTP, TCP, and UDP listeners. The HTTP transport has configurable request profiles. The [Linux stager](./core/modules/stager_linux/) talks to the kernel through direct syscalls, needs no libc on the target, and keeps transports and packers pluggable: HTTP, TCP, UDP, libcurl, or libssl for delivery, and RC4 or LZSS for packing. It can fetch the [experimental C agent](./core/c_agent/) at runtime or embed its PIC with `--agent-pic`, leaving the downloader and listener configuration out of the artifact.
 
-The [experimental C agent](./core/c_agent/) is the usual payload for that stager, though it can also be generated as a standalone executable or shared object. The final payload is under 100KB and contains only the core C2 protocol; crypto, compression, transport, dynamic loading, and the BOF loader are modular, loaded on demand, then removed from memory. The stager can download the C agent PIC at runtime or carry an RC4-encrypted copy in its read-only data with `--agent-pic`, compiling the downloader and its listener configuration out.
-
-Together they implement the sleep cycle. The C agent checks in once, keeps its message tunnel open for `--poll-window` seconds, then closes it and sleeps. Commands issued meanwhile stay queued and arrive after the next hello. Before sleep, the stager makes every agent-owned anonymous executable mapping non-executable and XORs the agent's ELF images, heap, and stack in place. The mask stub runs from the stager's own mapping on a dedicated stack, so no agent-owned anonymous executable page remains while the agent sleeps; executable mappings exist only while the agent is awake and running. There is no heartbeat: each agent reports its own offline grace, derived from its beacon interval and poll window unless `--offline-grace` overrides it, and the operator list shows the real last-seen time until that deadline.
-
-Stages and agents avoid RWX mappings. Code is mapped with the permissions it actually needs.
+The C agent is a small modular beacon whose sleep mask lives in the stager. While it sleeps, the stager flips the agent's executable pages to non-executable and encrypts the agent images, heap, and stack. No anonymous executable mapping is left behind, and executable mappings return only when the agent wakes and runs. Everything the mask covers is encrypted, and the [provider](./core/modules/stager_linux/mask.h) is pluggable, so a custom implementation can replace the default XOR scheme.
 
 ```bash
 generate_c --type glibc --arch amd64 --cc your.domain.com
