@@ -129,11 +129,11 @@ func TestRouteValidationStrict(t *testing.T) {
 	}
 
 	// Setup route config
-	live.RuntimeConfig.C2Routes.Checkin = "c2-checkin-test"
-	live.RuntimeConfig.C2Routes.Msg = "c2-msg-test"
-	live.RuntimeConfig.C2Routes.FTP = "c2-ftp-test"
-	live.RuntimeConfig.C2Routes.WWW = "c2-www-test"
-	live.RuntimeConfig.C2Routes.Proxy = "c2-proxy-test"
+	live.GetRuntimeConfig().C2Routes.Checkin = "c2-checkin-test"
+	live.GetRuntimeConfig().C2Routes.Msg = "c2-msg-test"
+	live.GetRuntimeConfig().C2Routes.FTP = "c2-ftp-test"
+	live.GetRuntimeConfig().C2Routes.WWW = "c2-www-test"
+	live.GetRuntimeConfig().C2Routes.Proxy = "c2-proxy-test"
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -181,9 +181,9 @@ func TestUnknownAgentRouteRestriction(t *testing.T) {
 	defer agents.AgentDB.Close()
 
 	// Setup routes
-	live.RuntimeConfig.C2Routes.Checkin = "c2-checkin-test"
-	live.RuntimeConfig.C2Routes.Msg = "c2-msg-test"
-	live.RuntimeConfig.C2Routes.FTP = "c2-ftp-test"
+	live.GetRuntimeConfig().C2Routes.Checkin = "c2-checkin-test"
+	live.GetRuntimeConfig().C2Routes.Msg = "c2-msg-test"
+	live.GetRuntimeConfig().C2Routes.FTP = "c2-ftp-test"
 
 	unknownUUID := "unknown-agent-never-enrolled"
 
@@ -223,7 +223,7 @@ func TestUnknownAgentRouteRestriction(t *testing.T) {
 
 			// Check the logic: unknown agents can only use checkin
 			_, _, isKnownAgent, _ := agents.GetPinnedIdentity(unknownUUID)
-			isCheckinRoute := tc.route == live.RuntimeConfig.C2Routes.Checkin
+			isCheckinRoute := tc.route == live.GetRuntimeConfig().C2Routes.Checkin
 
 			allowed := isKnownAgent || isCheckinRoute
 
@@ -298,8 +298,8 @@ func containsSubstring(s, substr string) bool {
 // made from CBOR envelope fields only, not from transport metadata
 func TestCBOREnvelopeAuthenticationBoundary(t *testing.T) {
 	// Setup routes
-	live.RuntimeConfig.C2Routes.Checkin = "c2-checkin-real"
-	live.RuntimeConfig.C2Routes.Msg = "c2-msg-real"
+	live.GetRuntimeConfig().C2Routes.Checkin = "c2-checkin-real"
+	live.GetRuntimeConfig().C2Routes.Msg = "c2-msg-real"
 
 	// Test that normalizeRouteFromMsgAuth only looks at Capabilities field
 	msgAuth := &def.MsgAuth{
@@ -429,11 +429,11 @@ func TestEnrollmentVerificationEnforcement(t *testing.T) {
 // and no route is processed by wrong handler
 func TestStrictRouteToHandlerMapping(t *testing.T) {
 	// Setup routes
-	live.RuntimeConfig.C2Routes.Checkin = "c2-checkin-strict"
-	live.RuntimeConfig.C2Routes.Msg = "c2-msg-strict"
-	live.RuntimeConfig.C2Routes.FTP = "c2-ftp-strict"
-	live.RuntimeConfig.C2Routes.WWW = "c2-www-strict"
-	live.RuntimeConfig.C2Routes.Proxy = "c2-proxy-strict"
+	live.GetRuntimeConfig().C2Routes.Checkin = "c2-checkin-strict"
+	live.GetRuntimeConfig().C2Routes.Msg = "c2-msg-strict"
+	live.GetRuntimeConfig().C2Routes.FTP = "c2-ftp-strict"
+	live.GetRuntimeConfig().C2Routes.WWW = "c2-www-strict"
+	live.GetRuntimeConfig().C2Routes.Proxy = "c2-proxy-strict"
 
 	testCases := []struct {
 		name          string
@@ -462,23 +462,23 @@ func TestStrictRouteToHandlerMapping(t *testing.T) {
 			// Verify route is correctly identified
 			switch tc.expectedRoute {
 			case "checkin":
-				if ctx.Service != live.RuntimeConfig.C2Routes.Checkin {
+				if ctx.Service != live.GetRuntimeConfig().C2Routes.Checkin {
 					t.Errorf("Wrong route: expected checkin, got %s", ctx.Service)
 				}
 			case "msg":
-				if ctx.Service != live.RuntimeConfig.C2Routes.Msg {
+				if ctx.Service != live.GetRuntimeConfig().C2Routes.Msg {
 					t.Errorf("Wrong route: expected msg, got %s", ctx.Service)
 				}
 			case "ftp":
-				if ctx.Service != live.RuntimeConfig.C2Routes.FTP {
+				if ctx.Service != live.GetRuntimeConfig().C2Routes.FTP {
 					t.Errorf("Wrong route: expected ftp, got %s", ctx.Service)
 				}
 			case "www":
-				if ctx.Service != live.RuntimeConfig.C2Routes.WWW {
+				if ctx.Service != live.GetRuntimeConfig().C2Routes.WWW {
 					t.Errorf("Wrong route: expected www, got %s", ctx.Service)
 				}
 			case "proxy":
-				if ctx.Service != live.RuntimeConfig.C2Routes.Proxy {
+				if ctx.Service != live.GetRuntimeConfig().C2Routes.Proxy {
 					t.Errorf("Wrong route: expected proxy, got %s", ctx.Service)
 				}
 			}

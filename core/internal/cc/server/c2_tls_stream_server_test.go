@@ -63,9 +63,9 @@ func tlsTestRequest(t *testing.T, client *http.Client, method, url string, heade
 }
 
 func TestC2TLSFrontendRoutesHTTPPoll(t *testing.T) {
-	previous := live.RuntimeConfig
-	live.RuntimeConfig = tlsTestConfig()
-	t.Cleanup(func() { live.RuntimeConfig = previous })
+	previous := live.GetRuntimeConfig()
+	live.SetRuntimeConfig(tlsTestConfig())
+	t.Cleanup(func() { live.SetRuntimeConfig(previous) })
 
 	server := httptest.NewServer(newC2TLSHandler(nil, errors.New("h2 disabled")))
 	defer server.Close()
@@ -98,9 +98,9 @@ func TestC2TLSFrontendRoutesHTTPPoll(t *testing.T) {
 }
 
 func TestC2TLSFrontendRoutesH2Conn(t *testing.T) {
-	previous := live.RuntimeConfig
-	live.RuntimeConfig = tlsTestConfig()
-	t.Cleanup(func() { live.RuntimeConfig = previous })
+	previous := live.GetRuntimeConfig()
+	live.SetRuntimeConfig(tlsTestConfig())
+	t.Cleanup(func() { live.SetRuntimeConfig(previous) })
 
 	h2 := &fakeH2Wrapper{accepted: make(chan struct{}, 1)}
 	server := httptest.NewServer(newC2TLSHandler(h2, nil))
@@ -122,9 +122,9 @@ func TestC2TLSFrontendRoutesH2Conn(t *testing.T) {
 }
 
 func TestC2TLSFrontendRoutesHTTPPollBeforeH2Conn(t *testing.T) {
-	previous := live.RuntimeConfig
-	live.RuntimeConfig = tlsTestConfig()
-	t.Cleanup(func() { live.RuntimeConfig = previous })
+	previous := live.GetRuntimeConfig()
+	live.SetRuntimeConfig(tlsTestConfig())
+	t.Cleanup(func() { live.SetRuntimeConfig(previous) })
 
 	h2 := &fakeH2Wrapper{accepted: make(chan struct{}, 1)}
 	server := httptest.NewServer(newC2TLSHandler(h2, nil))

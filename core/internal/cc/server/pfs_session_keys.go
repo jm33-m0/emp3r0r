@@ -75,7 +75,7 @@ func forgetPFSSessionKey(agentUUID string, key []byte) {
 // are bootstrap routes and are never re-keyed here: they run the pre-handshake
 // protocol on the static per-build PSK.
 func maybeRekeyAuxStream(service string, secureConn *transport.SecureConn, agentUUID string) {
-	if service == live.RuntimeConfig.C2Routes.Checkin || service == live.RuntimeConfig.C2Routes.Msg {
+	if service == live.GetRuntimeConfig().C2Routes.Checkin || service == live.GetRuntimeConfig().C2Routes.Msg {
 		return
 	}
 	key, ok := lookupPFSSessionKey(agentUUID)

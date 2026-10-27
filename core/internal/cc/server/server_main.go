@@ -25,7 +25,7 @@ func ServerMain(wg_port int, hosts string, operatorNames, addOperators []string,
 	// Publish the configured idle timeout to the atomic mirror that agent
 	// tunnels and agent-lock expiry read, so config updates and readers never
 	// race on the shared RuntimeConfig field.
-	setOperatorIdleTimeout(live.RuntimeConfig.OperatorIdleTimeout)
+	setOperatorIdleTimeout(live.GetRuntimeConfig().OperatorIdleTimeout)
 
 	// Initialize agent database for persistent tracking
 	dbPath := filepath.Join(live.EmpWorkSpace, "agents.db")
@@ -60,10 +60,10 @@ func ServerMain(wg_port int, hosts string, operatorNames, addOperators []string,
 
 	// Highlight the key ports for easy identification
 	logging.Successf("\n🎯 ════════════════════ C2 SERVER PORTS ═══════════════════════════")
-	logging.Successf("   📡 C2 Agent Port (h2conn/http_poll TLS): %s", live.RuntimeConfig.CCH2Port)
-	logging.Successf("   📡 C2 Agent Port (http_poll plain):      %s", live.RuntimeConfig.CCHTTPPort)
-	logging.Successf("   📡 C2 Agent Port (QUIC UDP):             %s", live.RuntimeConfig.CCH2Port)
-	logging.Successf("   🔄 KCP C2 Port (UDP):                    %s", live.RuntimeConfig.P2PRelayPort)
+	logging.Successf("   📡 C2 Agent Port (h2conn/http_poll TLS): %s", live.GetRuntimeConfig().CCH2Port)
+	logging.Successf("   📡 C2 Agent Port (http_poll plain):      %s", live.GetRuntimeConfig().CCHTTPPort)
+	logging.Successf("   📡 C2 Agent Port (QUIC UDP):             %s", live.GetRuntimeConfig().CCH2Port)
+	logging.Successf("   🔄 KCP C2 Port (UDP):                    %s", live.GetRuntimeConfig().P2PRelayPort)
 	logging.Successf("   🌐 Operator Port (WG):   %d", wg_port+1)
 	logging.Successf("   🔧 WireGuard Port:       %d", wg_port)
 	logging.Successf("══════════════════════════════════════════════════════════════════\n")

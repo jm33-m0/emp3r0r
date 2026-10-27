@@ -452,7 +452,7 @@ func setupE2EFileTransfer(t *testing.T) *e2eFileTransferHarness {
 
 	// Snapshot and restore every global this harness mutates. Tests share
 	// process state, so leaking any of these would corrupt later tests.
-	origLiveRuntime := live.RuntimeConfig
+	origLiveRuntime := live.GetRuntimeConfig()
 	origEmpWorkSpace := live.EmpWorkSpace
 	origFileGetDir := live.FileGetDir
 	origWWWRoot := paths.WWWRoot
@@ -469,7 +469,7 @@ func setupE2EFileTransfer(t *testing.T) *e2eFileTransferHarness {
 		network.StopEmpHTTPServer()
 		network.FTPStreams.Clear()
 		_ = agents.CloseAgentDB()
-		live.RuntimeConfig = origLiveRuntime
+		live.SetRuntimeConfig(origLiveRuntime)
 		live.EmpWorkSpace = origEmpWorkSpace
 		live.FileGetDir = origFileGetDir
 		paths.WWWRoot = origWWWRoot
@@ -552,14 +552,14 @@ func setupE2EFileTransfer(t *testing.T) *e2eFileTransferHarness {
 	}
 
 	httpPort := e2eFreePort(t)
-	live.RuntimeConfig = &def.Config{
+	live.SetRuntimeConfig(&def.Config{
 		CCHTTPPort:          fmt.Sprintf("%d", httpPort),
 		CAPEM:               string(caCertData),
 		C2ChannelMode:       def.C2ChannelModePlainHTTP,
 		C2Routes:            routes,
 		MalleableC2:         malleable,
 		OperatorIdleTimeout: 0,
-	}
+	})
 
 	// Trust DB: pin the agent public key so the dispatcher admits the FTP/WWW
 	// routes without a prior check-in round trip.

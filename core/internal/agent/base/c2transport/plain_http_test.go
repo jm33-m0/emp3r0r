@@ -88,7 +88,7 @@ func runCheckinACK(t *testing.T, mode string, quicStandardKey, httpPollOverTLS b
 	// The package shares process-wide agent/C2 state. Snapshot every global this
 	// test mutates and restore it only after the server goroutine has stopped;
 	// otherwise a slow handler from this test can race the next test's setup.
-	origLiveRuntime := live.RuntimeConfig
+	origLiveRuntime := live.GetRuntimeConfig()
 	origEmpWorkSpace := live.EmpWorkSpace
 	origWWWRoot := paths.WWWRoot
 	origCCAddr := def.CCAddress
@@ -102,7 +102,7 @@ func runCheckinACK(t *testing.T, mode string, quicStandardKey, httpPollOverTLS b
 	origServerKeyFile := transport.ServerKeyFile
 	origTransportWorkSpace := transport.EmpWorkSpace
 	t.Cleanup(func() {
-		live.RuntimeConfig = origLiveRuntime
+		live.SetRuntimeConfig(origLiveRuntime)
 		live.EmpWorkSpace = origEmpWorkSpace
 		paths.WWWRoot = origWWWRoot
 		def.CCAddress = origCCAddr
@@ -160,7 +160,7 @@ func runCheckinACK(t *testing.T, mode string, quicStandardKey, httpPollOverTLS b
 	}
 	httpPort := freeTCPPort(t)
 
-	live.RuntimeConfig = &def.Config{
+	live.SetRuntimeConfig(&def.Config{
 		CCH2Port:        fmt.Sprintf("%d", tlsPort),
 		CCHTTPPort:      fmt.Sprintf("%d", httpPort),
 		CAPEM:           string(caCertData),
@@ -182,7 +182,7 @@ func runCheckinACK(t *testing.T, mode string, quicStandardKey, httpPollOverTLS b
 			CloseHeader:   "Cookie",
 			CloseValue:    "close=1",
 		},
-	}
+	})
 	live.ClearAgents()
 
 	// Initialize the trust store before any listener accepts a request. The
@@ -274,11 +274,11 @@ func runCheckinACK(t *testing.T, mode string, quicStandardKey, httpPollOverTLS b
 		C2ChannelMode:   mode,
 		QUICStandardKey: quicStandardKey,
 		CAPEM:           string(caCertData),
-		C2Routes:        live.RuntimeConfig.C2Routes,
+		C2Routes:        live.GetRuntimeConfig().C2Routes,
 		AgentUUID:       agentUUID,
 		AgentUUIDSig:    agentSig,
 		AgentTag:        agentUUID,
-		MalleableC2:     live.RuntimeConfig.MalleableC2,
+		MalleableC2:     live.GetRuntimeConfig().MalleableC2,
 	}
 
 	certPool := x509.NewCertPool()

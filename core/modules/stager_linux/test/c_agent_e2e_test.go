@@ -100,14 +100,14 @@ func setupCAgentWorkspace(t *testing.T, tmpDir string) string {
 		CloseHeader:   "Cookie",
 		CloseValue:    "close=1",
 	}
-	live.RuntimeConfig = &def.Config{
+	live.SetRuntimeConfig(&def.Config{
 		CCH2Port:      c2PortStr,
 		CCHTTPPort:    c2HTTPPortStr,
 		C2ChannelMode: def.C2ChannelModePlainHTTP,
 		CAPEM:         string(caCertData),
 		C2Routes:      routes,
 		MalleableC2:   malleableCfg,
-	}
+	})
 	live.ClearAgents()
 	time.Sleep(100 * time.Millisecond)
 	return c2HTTPPortStr

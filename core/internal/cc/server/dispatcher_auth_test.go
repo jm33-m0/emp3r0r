@@ -68,11 +68,11 @@ func TestUnauthenticatedRequestRejection(t *testing.T) {
 	listener.Close()
 
 	// Setup C2 Config
-	live.RuntimeConfig = &def.Config{
+	live.SetRuntimeConfig(&def.Config{
 		CCH2Port:      fmt.Sprintf("%d", port),
 		CAPEM:         string(caCertData),
 		C2ChannelMode: def.C2ChannelModeH2Conn,
-	}
+	})
 
 	go StartC2AgentTLSServer()
 	time.Sleep(2 * time.Second)

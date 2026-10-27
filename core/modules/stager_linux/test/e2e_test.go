@@ -448,7 +448,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 
 	// This test mutates process-wide C2 state. Restore it after the server
 	// goroutine has stopped, or the next subtest can race the old listener.
-	origLiveRuntime := live.RuntimeConfig
+	origLiveRuntime := live.GetRuntimeConfig()
 	origEmpWorkSpace := live.EmpWorkSpace
 	origIsServer := live.IsServer
 	origEmpConfigFile := live.EmpConfigFile
@@ -460,7 +460,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	origServerKeyFile := transport.ServerKeyFile
 	origTransportWorkSpace := transport.EmpWorkSpace
 	t.Cleanup(func() {
-		live.RuntimeConfig = origLiveRuntime
+		live.SetRuntimeConfig(origLiveRuntime)
 		live.EmpWorkSpace = origEmpWorkSpace
 		live.IsServer = origIsServer
 		live.EmpConfigFile = origEmpConfigFile
@@ -567,7 +567,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 		Proxy:   "c2-proxy",
 	}
 
-	live.RuntimeConfig = &def.Config{
+	live.SetRuntimeConfig(&def.Config{
 		CCH2Port:         c2PortStr,
 		CCHTTPPort:       c2HttpPortStr,
 		C2ChannelMode:    mode,
@@ -577,7 +577,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 		PreflightURL:     preflightURL,
 		PreflightMethod:  "GET",
 		MalleableC2:      malleableCfg,
-	}
+	})
 
 	// Clear in place: reassigning `= sync.Map{}` would race any handler
 	// goroutine from an earlier test still Load/Range-ing the old instance.

@@ -68,7 +68,7 @@ func TestPFSSessionKeyRegistry(t *testing.T) {
 // bootstrap routes (check-in / message tunnel) stay on the static per-build
 // PSK until their own handshake completes.
 func TestMaybeRekeyAuxStream(t *testing.T) {
-	live.RuntimeConfig = &def.Config{
+	live.SetRuntimeConfig(&def.Config{
 		C2Routes: def.C2Routing{
 			Checkin: "c2-checkin",
 			Msg:     "c2-msg",
@@ -76,7 +76,7 @@ func TestMaybeRekeyAuxStream(t *testing.T) {
 			WWW:     "c2-www",
 			Proxy:   "c2-proxy",
 		},
-	}
+	})
 
 	const agentUUID = "rekey-test-agent"
 	sessionKey := []byte("abcdef0123456789abcdef0123456789")

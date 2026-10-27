@@ -67,11 +67,11 @@ func normalizeRouteFromMsgAuth(msg *def.MsgAuth) (c2RouteContext, error) {
 	}
 
 	allowed := map[string]struct{}{
-		live.RuntimeConfig.C2Routes.Checkin: {},
-		live.RuntimeConfig.C2Routes.Msg:     {},
-		live.RuntimeConfig.C2Routes.FTP:     {},
-		live.RuntimeConfig.C2Routes.WWW:     {},
-		live.RuntimeConfig.C2Routes.Proxy:   {},
+		live.GetRuntimeConfig().C2Routes.Checkin: {},
+		live.GetRuntimeConfig().C2Routes.Msg:     {},
+		live.GetRuntimeConfig().C2Routes.FTP:     {},
+		live.GetRuntimeConfig().C2Routes.WWW:     {},
+		live.GetRuntimeConfig().C2Routes.Proxy:   {},
 	}
 
 	seen := ""
@@ -160,7 +160,7 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 	// ── Wait for Check-in ────────────────────────────────────────────────────
 	// If the agent is unknown AND the route is NOT Checkin, someone might be
 	// enrolling right now. Wait for completion and re-check DB.
-	isCheckinRoute := routeCtx.Service == live.RuntimeConfig.C2Routes.Checkin
+	isCheckinRoute := routeCtx.Service == live.GetRuntimeConfig().C2Routes.Checkin
 	if !isKnown && !isCheckinRoute {
 		if val, exists := checkinReadyChannels.Load(msgAuth.AgentUUID); exists {
 			if ch, ok := val.(chan struct{}); ok {
@@ -262,7 +262,7 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 	}
 
 	switch routeCtx.Service {
-	case live.RuntimeConfig.C2Routes.Checkin:
+	case live.GetRuntimeConfig().C2Routes.Checkin:
 		agentUUID := msgAuth.AgentUUID
 		if agentUUID != "" {
 			defer closeCheckinReadyChannel(agentUUID)
@@ -275,20 +275,20 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 			logging.Errorf("cborProtocolDispatch: checkin error for %s: %v", util.AgentRef(agentUUID), err)
 		}
 
-	case live.RuntimeConfig.C2Routes.Msg:
+	case live.GetRuntimeConfig().C2Routes.Msg:
 		dec := cbor.NewDecoder(secureConn)
 		handleMessageTunnelStream(secureConn, dec, remoteAddr, context.Background(), msgAuth.AgentUUID)
 
-	case live.RuntimeConfig.C2Routes.FTP:
+	case live.GetRuntimeConfig().C2Routes.FTP:
 		// Provide a cancel function to terminate the connection properly
 		ctx, cancel := context.WithCancel(context.Background())
 		handleFileUploadStream(secureConn, msgAuth.AgentUUID, routeCtx.StreamID, remoteAddr, ctx, cancel)
 
-	case live.RuntimeConfig.C2Routes.Proxy:
+	case live.GetRuntimeConfig().C2Routes.Proxy:
 		_, cancel := context.WithCancel(context.Background())
 		handleProxyRelayStream(secureConn, msgAuth.AgentUUID, routeCtx.StreamID, remoteAddr, cancel)
 
-	case live.RuntimeConfig.C2Routes.WWW:
+	case live.GetRuntimeConfig().C2Routes.WWW:
 		handleWWWRelayStream(secureConn, msgAuth.AgentUUID, routeCtx.StreamID, remoteAddr)
 
 	default:

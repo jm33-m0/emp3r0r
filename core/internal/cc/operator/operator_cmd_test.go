@@ -122,13 +122,13 @@ func TestCAgentEndpointPreservesTLSURL(t *testing.T) {
 }
 
 func TestC2AddressAndPortCompletions(t *testing.T) {
-	previous := live.RuntimeConfig
-	live.RuntimeConfig = &def.Config{
+	previous := live.GetRuntimeConfig()
+	live.SetRuntimeConfig(&def.Config{
 		CCAddress:  "c2.example.com",
 		CCHTTPPort: "8080",
 		CCH2Port:   "8443",
-	}
-	t.Cleanup(func() { live.RuntimeConfig = previous })
+	})
+	t.Cleanup(func() { live.SetRuntimeConfig(previous) })
 
 	addresses := c2AddressCompletions()
 	for _, want := range []string{
@@ -150,7 +150,7 @@ func TestC2AddressAndPortCompletions(t *testing.T) {
 		}
 	}
 
-	live.RuntimeConfig.CCAddress = "https://front.example.com"
+	live.GetRuntimeConfig().CCAddress = "https://front.example.com"
 	if got := c2AddressCompletions(); !slices.Contains(got, "https://front.example.com") {
 		t.Errorf("c2AddressCompletions() did not preserve explicit URL: %v", got)
 	}

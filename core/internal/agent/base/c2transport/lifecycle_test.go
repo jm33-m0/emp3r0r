@@ -66,7 +66,7 @@ func assertInvalidCAIdentityRejected(t *testing.T, c2URL string, caCertData []by
 		IdentityToken:   base64.URLEncoding.EncodeToString(forgedIdentityRaw),
 		Timestamp:       time.Now().Unix(),
 		Nonce:           "bad-ca-nonce",
-		Capabilities:    []string{live.RuntimeConfig.C2Routes.Checkin},
+		Capabilities:    []string{live.GetRuntimeConfig().C2Routes.Checkin},
 	}
 	if err := cbor.NewEncoder(sc).Encode(msgAuth); err != nil {
 		t.Fatalf("encode MsgAuth failed: %v", err)
@@ -132,7 +132,7 @@ func TestFullAgentLifecycle(t *testing.T) {
 	listener.Close()
 
 	// Setup C2 Config
-	live.RuntimeConfig = &def.Config{
+	live.SetRuntimeConfig(&def.Config{
 		CCH2Port:  fmt.Sprintf("%d", port),
 		CCAddress: fmt.Sprintf("https://127.0.0.1:%d", port),
 		CAPEM:     string(caCertData),
@@ -143,7 +143,7 @@ func TestFullAgentLifecycle(t *testing.T) {
 			WWW:     "c2-www",
 			Proxy:   "c2-proxy",
 		},
-	}
+	})
 
 	// Reset live maps without replacing the sync.Map instance (Clear is safe
 	// with concurrent readers; `= sync.Map{}` would race them).
@@ -202,7 +202,7 @@ func TestFullAgentLifecycle(t *testing.T) {
 		AgentUUIDSig:  agentSig,
 		AgentTag:      agentTag,
 		CCTimeout:     5000,
-		C2Routes:      live.RuntimeConfig.C2Routes,
+		C2Routes:      live.GetRuntimeConfig().C2Routes,
 	}
 	def.CCAddress = c2URL
 
@@ -481,7 +481,7 @@ func TestCheckinWithRandomPaths(t *testing.T) {
 	// CUSTOM PATHS
 
 	// Setup C2 Config
-	live.RuntimeConfig = &def.Config{
+	live.SetRuntimeConfig(&def.Config{
 		CCH2Port: fmt.Sprintf("%d", port),
 		CAPEM:    string(caCertData),
 		C2Routes: def.C2Routing{
@@ -491,7 +491,7 @@ func TestCheckinWithRandomPaths(t *testing.T) {
 			WWW:     "c2-www",
 			Proxy:   "c2-proxy",
 		},
-	}
+	})
 
 	// Ensure this test uses an isolated fresh AgentDB handle.
 	if agents.AgentDB != nil {
@@ -538,7 +538,7 @@ func TestCheckinWithRandomPaths(t *testing.T) {
 		AgentUUID:     agentUUID,
 		AgentUUIDSig:  agentSig,
 		AgentTag:      agentTag,
-		C2Routes:      live.RuntimeConfig.C2Routes,
+		C2Routes:      live.GetRuntimeConfig().C2Routes,
 	}
 	def.CCAddress = c2URL
 
@@ -630,7 +630,7 @@ func TestDynamicPrefix(t *testing.T) {
 	listener.Close()
 
 	// Setup C2 Config
-	live.RuntimeConfig = &def.Config{
+	live.SetRuntimeConfig(&def.Config{
 		CCH2Port: fmt.Sprintf("%d", port),
 		CAPEM:    string(caCertData),
 		C2Routes: def.C2Routing{
@@ -640,7 +640,7 @@ func TestDynamicPrefix(t *testing.T) {
 			WWW:     "c2-www",
 			Proxy:   "c2-proxy",
 		},
-	}
+	})
 
 	// Start Real C2 Server
 	go server.StartC2AgentTLSServer()
@@ -680,7 +680,7 @@ func TestDynamicPrefix(t *testing.T) {
 		AgentUUID:     agentUUID,
 		AgentUUIDSig:  agentSig,
 		AgentTag:      agentUUID,
-		C2Routes:      live.RuntimeConfig.C2Routes,
+		C2Routes:      live.GetRuntimeConfig().C2Routes,
 	}
 	def.CCAddress = c2URL
 
@@ -771,7 +771,7 @@ func TestCheckinWithRandomPaths_Strict(t *testing.T) {
 	// CUSTOM PATHS on SERVER
 
 	// Setup C2 Config
-	live.RuntimeConfig = &def.Config{
+	live.SetRuntimeConfig(&def.Config{
 		CCH2Port: fmt.Sprintf("%d", port),
 		CAPEM:    string(caCertData),
 		C2Routes: def.C2Routing{
@@ -781,7 +781,7 @@ func TestCheckinWithRandomPaths_Strict(t *testing.T) {
 			WWW:     "c2-www",
 			Proxy:   "c2-proxy",
 		},
-	}
+	})
 
 	// Ensure this test uses an isolated fresh AgentDB handle.
 	if agents.AgentDB != nil {
@@ -828,7 +828,7 @@ func TestCheckinWithRandomPaths_Strict(t *testing.T) {
 		AgentUUID:     agentUUID,
 		AgentUUIDSig:  agentSig,
 		AgentTag:      agentTag,
-		C2Routes:      live.RuntimeConfig.C2Routes,
+		C2Routes:      live.GetRuntimeConfig().C2Routes,
 	}
 	def.CCAddress = c2URL
 

@@ -60,15 +60,15 @@ func TestRateLimiterDirect(t *testing.T) {
 func TestPreflightRateLimited(t *testing.T) {
 	origGlobal := globalLimiter
 	origIP := ipLimiter
-	origEnabled := live.RuntimeConfig.PreflightEnabled
-	origURL := live.RuntimeConfig.PreflightURL
-	origMethod := live.RuntimeConfig.PreflightMethod
+	origEnabled := live.GetRuntimeConfig().PreflightEnabled
+	origURL := live.GetRuntimeConfig().PreflightURL
+	origMethod := live.GetRuntimeConfig().PreflightMethod
 	t.Cleanup(func() {
 		globalLimiter = origGlobal
 		ipLimiter = origIP
-		live.RuntimeConfig.PreflightEnabled = origEnabled
-		live.RuntimeConfig.PreflightURL = origURL
-		live.RuntimeConfig.PreflightMethod = origMethod
+		live.GetRuntimeConfig().PreflightEnabled = origEnabled
+		live.GetRuntimeConfig().PreflightURL = origURL
+		live.GetRuntimeConfig().PreflightMethod = origMethod
 	})
 
 	// Consume the only global token so the request is rejected before any
@@ -76,9 +76,9 @@ func TestPreflightRateLimited(t *testing.T) {
 	globalLimiter = rate.NewLimiter(rate.Limit(1), 1)
 	globalLimiter.Allow()
 	ipLimiter = &ipRateLimiter{}
-	live.RuntimeConfig.PreflightEnabled = true
-	live.RuntimeConfig.PreflightURL = "http://example.com/preflight"
-	live.RuntimeConfig.PreflightMethod = http.MethodPost
+	live.GetRuntimeConfig().PreflightEnabled = true
+	live.GetRuntimeConfig().PreflightURL = "http://example.com/preflight"
+	live.GetRuntimeConfig().PreflightMethod = http.MethodPost
 
 	mux := http.NewServeMux()
 	registerPreflightFeature(mux)

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -53,6 +54,30 @@ var (
 	// emp3r0r-cat
 	CAT = ""
 )
+
+// runtimeConfigMu guards replacement of the RuntimeConfig pointer. Server
+// handlers read it concurrently while tests (and a future config reload)
+// publish a new snapshot. Field mutation remains startup-only; runtime
+// configuration changes must build a new Config and call SetRuntimeConfig.
+var runtimeConfigMu sync.RWMutex
+
+// GetRuntimeConfig returns the current configuration snapshot. The returned
+// struct must be treated as immutable.
+func GetRuntimeConfig() *def.Config {
+	runtimeConfigMu.RLock()
+	defer runtimeConfigMu.RUnlock()
+	return RuntimeConfig
+}
+
+// SetRuntimeConfig publishes a new configuration snapshot.
+func SetRuntimeConfig(c *def.Config) {
+	if c == nil {
+		c = &def.Config{}
+	}
+	runtimeConfigMu.Lock()
+	RuntimeConfig = c
+	runtimeConfigMu.Unlock()
+}
 
 func DownloadExtractConfig(url string, downloader func(string, string) error) (err error) {
 	// Use a client-only destination to avoid clobbering the server's copy when running locally

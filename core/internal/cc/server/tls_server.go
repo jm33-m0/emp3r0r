@@ -28,7 +28,7 @@ import (
 func StartC2AgentTLSServer() error {
 	prepareC2ServerPrerequisites()
 
-	mode := live.RuntimeConfig.C2ChannelMode
+	mode := live.GetRuntimeConfig().C2ChannelMode
 	if mode == "" {
 		mode = def.C2ChannelModeDefault
 	}
@@ -60,7 +60,7 @@ func prepareC2ServerPrerequisites() {
 		}
 	}
 
-	transport.SetCACrtPEM([]byte(live.RuntimeConfig.CAPEM))
+	transport.SetCACrtPEM([]byte(live.GetRuntimeConfig().CAPEM))
 }
 
 func setupC2TLSListener() net.Listener {
@@ -85,9 +85,9 @@ func setupC2TLSListener() net.Listener {
 		// hostname, and a mismatch must not abort the handshake.
 	}
 
-	listener, err := tls.Listen("tcp", fmt.Sprintf(":%s", live.RuntimeConfig.CCH2Port), tlsCfg)
+	listener, err := tls.Listen("tcp", fmt.Sprintf(":%s", live.GetRuntimeConfig().CCH2Port), tlsCfg)
 	if err != nil {
-		logging.Fatalf("Failed to start C2 TLS listener at *:%s: %v", live.RuntimeConfig.CCH2Port, err)
+		logging.Fatalf("Failed to start C2 TLS listener at *:%s: %v", live.GetRuntimeConfig().CCH2Port, err)
 	}
 	network.EmpTLSListener = listener
 
@@ -100,7 +100,7 @@ func setupC2TLSListener() net.Listener {
 func startRawC2TLSServer() error {
 	listener := setupC2TLSListener()
 
-	logging.Successf("🚀 Starting C2 agent listener service with TLS at port %s", live.RuntimeConfig.CCH2Port)
+	logging.Successf("🚀 Starting C2 agent listener service with TLS at port %s", live.GetRuntimeConfig().CCH2Port)
 	for {
 		conn, acceptErr := listener.Accept()
 		if acceptErr != nil {

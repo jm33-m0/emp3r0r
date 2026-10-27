@@ -119,14 +119,14 @@ func startPivotStack(t *testing.T) (pivotAddr string) {
 	// Clear in place: reassigning `= sync.Map{}` would race any handler
 	// goroutine from an earlier test still Load/Range-ing the old instance.
 	live.ClearAgents()
-	live.RuntimeConfig = &def.Config{
+	live.SetRuntimeConfig(&def.Config{
 		CCH2Port:      fmt.Sprintf("%d", tlsPort),
 		CCHTTPPort:    fmt.Sprintf("%d", httpPort),
 		CAPEM:         string(caCertData),
 		C2ChannelMode: mode,
 		C2Routes:      routes,
 		MalleableC2:   malleable,
-	}
+	})
 
 	go server.StartC2AgentTLSServer()
 	server.MarkOperatorOnline("test-operator")

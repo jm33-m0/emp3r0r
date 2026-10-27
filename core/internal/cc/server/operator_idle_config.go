@@ -146,7 +146,9 @@ func handleUpdateOperatorIdleConfig(wrt http.ResponseWriter, req *http.Request) 
 		return
 	}
 
-	live.RuntimeConfig.OperatorIdleTimeout = cfg.OperatorIdleTimeout
+	updated := *live.GetRuntimeConfig()
+	updated.OperatorIdleTimeout = cfg.OperatorIdleTimeout
+	live.SetRuntimeConfig(&updated)
 	setOperatorIdleTimeout(cfg.OperatorIdleTimeout)
 	if err := config.SaveConfigJSON(); err != nil {
 		http.Error(wrt, err.Error(), http.StatusInternalServerError)

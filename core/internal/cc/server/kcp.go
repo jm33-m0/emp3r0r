@@ -15,7 +15,7 @@ import (
 // context is cancelled and returns the server error, so the caller can report
 // it without tearing down the C2.
 func KCPC2ListenAndServe(ctx context.Context, cancel context.CancelFunc) error {
-	logging.Successf("🚀 Starting KCP C2 server at port %s", live.RuntimeConfig.P2PRelayPort)
-	return transport.KCPTunServer("127.0.0.1:"+live.RuntimeConfig.CCH2Port,
-		live.RuntimeConfig.P2PRelayPort, live.RuntimeConfig.Password, def.MagicString, ctx, cancel)
+	logging.Successf("🚀 Starting KCP C2 server at port %s", live.GetRuntimeConfig().P2PRelayPort)
+	return transport.KCPTunServer("127.0.0.1:"+live.GetRuntimeConfig().CCH2Port,
+		live.GetRuntimeConfig().P2PRelayPort, live.GetRuntimeConfig().Password, def.MagicString, ctx, cancel)
 }

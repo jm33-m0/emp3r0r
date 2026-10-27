@@ -80,7 +80,7 @@ func startTestC2Server(t *testing.T) {
 	// Wait until the listener actually accepts connections. A fixed sleep is
 	// racy on slow/loaded CI runners (notably Windows), where the bind can
 	// take longer than the sleep and the first dial is refused.
-	addr := fmt.Sprintf("127.0.0.1:%s", live.RuntimeConfig.CCH2Port)
+	addr := fmt.Sprintf("127.0.0.1:%s", live.GetRuntimeConfig().CCH2Port)
 	if err := waitForPort(addr, time.Now().Add(15*time.Second)); err != nil {
 		t.Fatalf("C2 TLS server did not start on %s: %v", addr, err)
 	}
@@ -137,7 +137,7 @@ func TestEstablishC2Connection(t *testing.T) {
 	listener.Close()
 
 	// Setup C2 Config
-	live.RuntimeConfig = &def.Config{
+	live.SetRuntimeConfig(&def.Config{
 		CCH2Port: fmt.Sprintf("%d", port),
 		CAPEM:    string(caCertData),
 		C2Routes: def.C2Routing{
@@ -147,7 +147,7 @@ func TestEstablishC2Connection(t *testing.T) {
 			WWW:     "c2-www",
 			Proxy:   "c2-proxy",
 		},
-	}
+	})
 
 	// Start Real C2 Server
 	startTestC2Server(t)
@@ -184,7 +184,7 @@ func TestEstablishC2Connection(t *testing.T) {
 		AgentUUIDSig:  agentSig,
 		AgentTag:      agentUUID, // Set AgentTag to match UUID for test
 		CCTimeout:     10000,     // Set timeout to 10 seconds
-		C2Routes:      live.RuntimeConfig.C2Routes,
+		C2Routes:      live.GetRuntimeConfig().C2Routes,
 	}
 	def.CCAddress = c2URL // Set global CCAddress for ReportStatus
 
@@ -369,7 +369,7 @@ func TestDuplicatedCheckin(t *testing.T) {
 	listener.Close()
 
 	// Setup C2 Config
-	live.RuntimeConfig = &def.Config{
+	live.SetRuntimeConfig(&def.Config{
 		CCH2Port: fmt.Sprintf("%d", port),
 		CAPEM:    string(caCertData),
 		C2Routes: def.C2Routing{
@@ -379,7 +379,7 @@ func TestDuplicatedCheckin(t *testing.T) {
 			WWW:     "c2-www",
 			Proxy:   "c2-proxy",
 		},
-	}
+	})
 
 	// Reset the live registry in place (avoids races with goroutines from an
 	// earlier test that still Load/Range the old instance).
@@ -417,7 +417,7 @@ func TestDuplicatedCheckin(t *testing.T) {
 		AgentUUIDSig:  agentSig,
 		AgentTag:      agentUUID,
 		CCTimeout:     3000,
-		C2Routes:      live.RuntimeConfig.C2Routes,
+		C2Routes:      live.GetRuntimeConfig().C2Routes,
 	}
 	def.CCAddress = c2URL
 
@@ -545,7 +545,7 @@ func TestBackslashTag(t *testing.T) {
 	listener.Close()
 
 	// Setup C2 Config
-	live.RuntimeConfig = &def.Config{
+	live.SetRuntimeConfig(&def.Config{
 		CCH2Port: fmt.Sprintf("%d", port),
 		CAPEM:    string(caCertData),
 		C2Routes: def.C2Routing{
@@ -555,7 +555,7 @@ func TestBackslashTag(t *testing.T) {
 			WWW:     "c2-www",
 			Proxy:   "c2-proxy",
 		},
-	}
+	})
 
 	// Start Real C2 Server
 	startTestC2Server(t)
@@ -589,7 +589,7 @@ func TestBackslashTag(t *testing.T) {
 		AgentUUID:     agentUUID,
 		AgentUUIDSig:  agentSig,
 		AgentTag:      agentTag,
-		C2Routes:      live.RuntimeConfig.C2Routes,
+		C2Routes:      live.GetRuntimeConfig().C2Routes,
 	}
 	def.CCAddress = c2URL
 
@@ -672,7 +672,7 @@ func TestEmptyUUID(t *testing.T) {
 	listener.Close()
 
 	// Setup C2 Config
-	live.RuntimeConfig = &def.Config{
+	live.SetRuntimeConfig(&def.Config{
 		CCH2Port: fmt.Sprintf("%d", port),
 		CAPEM:    string(caCertData),
 		C2Routes: def.C2Routing{
@@ -682,7 +682,7 @@ func TestEmptyUUID(t *testing.T) {
 			WWW:     "c2-www",
 			Proxy:   "c2-proxy",
 		},
-	}
+	})
 
 	// Start Real C2 Server
 	startTestC2Server(t)
@@ -716,7 +716,7 @@ func TestEmptyUUID(t *testing.T) {
 		AgentUUID:     agentUUID,
 		AgentUUIDSig:  agentSig,
 		AgentTag:      agentTag,
-		C2Routes:      live.RuntimeConfig.C2Routes,
+		C2Routes:      live.GetRuntimeConfig().C2Routes,
 	}
 	def.CCAddress = c2URL
 
@@ -798,7 +798,7 @@ func TestNewAgentCheckin(t *testing.T) {
 	listener.Close()
 
 	// Setup C2 Config
-	live.RuntimeConfig = &def.Config{
+	live.SetRuntimeConfig(&def.Config{
 		CCH2Port: fmt.Sprintf("%d", port),
 		CAPEM:    string(caCertData),
 		C2Routes: def.C2Routing{
@@ -808,7 +808,7 @@ func TestNewAgentCheckin(t *testing.T) {
 			WWW:     "c2-www",
 			Proxy:   "c2-proxy",
 		},
-	}
+	})
 
 	// Start Real C2 Server
 	startTestC2Server(t)
@@ -841,7 +841,7 @@ func TestNewAgentCheckin(t *testing.T) {
 		AgentUUID:     agentUUID,
 		AgentUUIDSig:  agentSig,
 		AgentTag:      agentTag,
-		C2Routes:      live.RuntimeConfig.C2Routes,
+		C2Routes:      live.GetRuntimeConfig().C2Routes,
 	}
 	def.CCAddress = c2URL
 

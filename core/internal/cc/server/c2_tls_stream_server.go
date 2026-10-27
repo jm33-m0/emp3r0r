@@ -24,7 +24,7 @@ func newC2TLSHandler(h2Wrapper transport.C2ChannelWrapper, h2Err error) http.Han
 		// http_poll carriers are the malleable session header/cookie. Route
 		// them first so an HTTPS http_poll client is not mistaken for h2conn
 		// when Go negotiates HTTP/2 on the TLS connection.
-		if transport.HTTPServerSessionID(req, &live.RuntimeConfig.MalleableC2) != "" {
+		if transport.HTTPServerSessionID(req, &live.GetRuntimeConfig().MalleableC2) != "" {
 			if req.URL.Path != c2Path {
 				transport.WriteBareStatus(w, http.StatusNotFound)
 				return
@@ -78,7 +78,7 @@ func StartC2TLSStreamServer() error {
 
 	listener := setupC2TLSListener()
 	network.EmpTLSServer = &http.Server{
-		Addr:    fmt.Sprintf(":%s", live.RuntimeConfig.CCH2Port),
+		Addr:    fmt.Sprintf(":%s", live.GetRuntimeConfig().CCH2Port),
 		Handler: mux,
 		// Bound slow-header (slowloris) and idle keep-alive connections. Do
 		// not set ReadTimeout/WriteTimeout: h2conn and long-polling http_poll
@@ -87,13 +87,13 @@ func StartC2TLSStreamServer() error {
 		IdleTimeout:       120 * time.Second,
 	}
 
-	logging.Successf("🚀 Starting C2 TLS frontend at port %s (h2conn + http_poll)", live.RuntimeConfig.CCH2Port)
+	logging.Successf("🚀 Starting C2 TLS frontend at port %s (h2conn + http_poll)", live.GetRuntimeConfig().CCH2Port)
 	if err := network.EmpTLSServer.Serve(listener); err != nil {
 		if err == http.ErrServerClosed {
 			logging.Warningf("C2 TLS frontend is shutdown")
 			return nil
 		}
-		return fmt.Errorf("start C2 TLS frontend at *:%s: %w", live.RuntimeConfig.CCH2Port, err)
+		return fmt.Errorf("start C2 TLS frontend at *:%s: %w", live.GetRuntimeConfig().CCH2Port, err)
 	}
 	return nil
 }

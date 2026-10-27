@@ -46,7 +46,7 @@ func setupServerWorkspace(t *testing.T, dir string) {
 	origConfigFile := live.EmpConfigFile
 	origConfigTar := live.EmpConfigTar
 	origIsServer := live.IsServer
-	origRuntime := live.RuntimeConfig
+	origRuntime := live.GetRuntimeConfig()
 	origTransportWorkSpace := transport.EmpWorkSpace
 	origCerts := [4]string{
 		transport.CaCrtFile, transport.CaKeyFile,
@@ -58,7 +58,7 @@ func setupServerWorkspace(t *testing.T, dir string) {
 		live.EmpConfigFile = origConfigFile
 		live.EmpConfigTar = origConfigTar
 		live.IsServer = origIsServer
-		live.RuntimeConfig = origRuntime
+		live.SetRuntimeConfig(origRuntime)
 		transport.EmpWorkSpace = origTransportWorkSpace
 		transport.CaCrtFile, transport.CaKeyFile = origCerts[0], origCerts[1]
 		transport.ServerCrtFile, transport.ServerKeyFile = origCerts[2], origCerts[3]
@@ -72,7 +72,7 @@ func setupServerWorkspace(t *testing.T, dir string) {
 	live.IsServer = true
 	wireguard.WgServerIP = "127.0.0.1"
 	wireguard.WgOperatorIP = "127.0.0.1"
-	live.RuntimeConfig = &def.Config{
+	live.SetRuntimeConfig(&def.Config{
 		CCAddress:     "127.0.0.1",
 		C2ChannelMode: def.C2ChannelModeDefault,
 		C2Routes: def.C2Routing{
@@ -82,7 +82,7 @@ func setupServerWorkspace(t *testing.T, dir string) {
 			WWW:     "c2-www",
 			Proxy:   "c2-proxy",
 		},
-	}
+	})
 	if err := config.InitCertsAndConfig(); err != nil {
 		t.Fatalf("InitCertsAndConfig: %v", err)
 	}

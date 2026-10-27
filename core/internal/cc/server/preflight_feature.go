@@ -15,13 +15,13 @@ import (
 // It returns the path it registered, or "" if preflight is disabled or its URL
 // is unusable, so callers can avoid registering a conflicting catch-all.
 func registerPreflightFeature(mux *http.ServeMux) string {
-	if !live.RuntimeConfig.PreflightEnabled || live.RuntimeConfig.PreflightURL == "" {
+	if !live.GetRuntimeConfig().PreflightEnabled || live.GetRuntimeConfig().PreflightURL == "" {
 		return ""
 	}
 
-	u, err := url.Parse(live.RuntimeConfig.PreflightURL)
+	u, err := url.Parse(live.GetRuntimeConfig().PreflightURL)
 	if err != nil {
-		logging.Warningf("registerPreflightFeature: invalid preflight URL %q: %v", live.RuntimeConfig.PreflightURL, err)
+		logging.Warningf("registerPreflightFeature: invalid preflight URL %q: %v", live.GetRuntimeConfig().PreflightURL, err)
 		return ""
 	}
 	if u.Path == "" || u.Path == "/" {
@@ -39,7 +39,7 @@ func registerPreflightFeature(mux *http.ServeMux) string {
 			return
 		}
 
-		if req.Method != live.RuntimeConfig.PreflightMethod {
+		if req.Method != live.GetRuntimeConfig().PreflightMethod {
 			transport.WriteBareStatus(w, http.StatusMethodNotAllowed)
 			return
 		}

@@ -416,7 +416,7 @@ func RecordAgentCheckin(agent *def.Emp3r0rAgent) error {
 		}
 
 		// Record history
-		if err := recordHistory(agent.UUID, live.RuntimeConfig.C2Routes.Checkin, "", "First connection", now); err != nil {
+		if err := recordHistory(agent.UUID, live.GetRuntimeConfig().C2Routes.Checkin, "", "First connection", now); err != nil {
 			logging.Warningf("Failed to record history: %v", err)
 		}
 

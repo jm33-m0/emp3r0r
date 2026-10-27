@@ -33,10 +33,10 @@ func StartC2QUICServer() error {
 		CurvePreferences: []tls.CurveID{tls.CurveP256, tls.X25519},
 	}
 
-	transport.SetQUICStandardKey(live.RuntimeConfig.QUICStandardKey)
+	transport.SetQUICStandardKey(live.GetRuntimeConfig().QUICStandardKey)
 	key := transport.QUICStaticKey()
 	ctx, cancel := context.WithCancel(context.Background())
-	listener, err := transport.ListenQUIC(fmt.Sprintf(":%s", live.RuntimeConfig.CCH2Port), tlsCfg, key)
+	listener, err := transport.ListenQUIC(fmt.Sprintf(":%s", live.GetRuntimeConfig().CCH2Port), tlsCfg, key)
 	if err != nil {
 		cancel()
 		return fmt.Errorf("StartC2QUICServer: %w", err)
@@ -47,7 +47,7 @@ func StartC2QUICServer() error {
 	if len(key) == 0 {
 		obfs = "standard QUIC (no obfuscation)"
 	}
-	logging.Successf("🚀 Starting C2 QUIC listener at *:%s (%s)", live.RuntimeConfig.CCH2Port, obfs)
+	logging.Successf("🚀 Starting C2 QUIC listener at *:%s (%s)", live.GetRuntimeConfig().CCH2Port, obfs)
 
 	// Run the accept loop in the background so the caller returns promptly like
 	// the other transport starters. Each connection is handled in its own

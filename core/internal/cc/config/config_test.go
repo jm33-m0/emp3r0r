@@ -13,8 +13,8 @@ import (
 
 func TestInitConfigFile(t *testing.T) {
 	// Initialize RuntimeConfig if it's nil
-	if live.RuntimeConfig == nil {
-		live.RuntimeConfig = &def.Config{}
+	if live.GetRuntimeConfig() == nil {
+		live.SetRuntimeConfig(&def.Config{})
 	}
 
 	// Setup temp file for config
@@ -63,16 +63,16 @@ func TestInitConfigFile(t *testing.T) {
 	transport.CaCrtFile = tmpCrtFile.Name()
 
 	ccHost := "127.0.0.1"
-	live.RuntimeConfig.CCHTTPPort = "12345"
-	live.RuntimeConfig.CCH2Port = "12346"
+	live.GetRuntimeConfig().CCHTTPPort = "12345"
+	live.GetRuntimeConfig().CCH2Port = "12346"
 	err = InitConfigFile(ccHost)
 	if err != nil {
 		t.Fatalf("InitConfigFile failed: %v", err)
 	}
 
 	// Verify fields
-	if live.RuntimeConfig.CCAddress != ccHost {
-		t.Errorf("Expected CCAddress %s, got %s", ccHost, live.RuntimeConfig.CCAddress)
+	if live.GetRuntimeConfig().CCAddress != ccHost {
+		t.Errorf("Expected CCAddress %s, got %s", ccHost, live.GetRuntimeConfig().CCAddress)
 	}
 
 	// Check if ports are valid integers
@@ -87,29 +87,29 @@ func TestInitConfigFile(t *testing.T) {
 		}
 	}
 
-	checkPort("CCPort", live.RuntimeConfig.CCH2Port)
-	checkPort("AgentSocksServerPort", live.RuntimeConfig.AgentSocksServerPort)
+	checkPort("CCPort", live.GetRuntimeConfig().CCH2Port)
+	checkPort("AgentSocksServerPort", live.GetRuntimeConfig().AgentSocksServerPort)
 
 	// Check if UUID is set
-	if live.RuntimeConfig.AgentUUID == "" {
+	if live.GetRuntimeConfig().AgentUUID == "" {
 		t.Error("AgentUUID is empty")
 	}
 
 	// Check if AgentUUIDSig is set
-	if live.RuntimeConfig.AgentUUIDSig == "" {
+	if live.GetRuntimeConfig().AgentUUIDSig == "" {
 		t.Error("AgentUUIDSig is empty")
 	}
 
 	// The HTTP profile must be generated, not the old static default that
 	// every deployment shared (a fixed path/cookie/UA is a network signature).
-	if live.RuntimeConfig.MalleableC2.C2Path == "" {
+	if live.GetRuntimeConfig().MalleableC2.C2Path == "" {
 		t.Error("MalleableC2.C2Path is empty")
 	}
-	if live.RuntimeConfig.MalleableC2.C2Path == "/api/v1/telemetry" {
+	if live.GetRuntimeConfig().MalleableC2.C2Path == "/api/v1/telemetry" {
 		t.Error("MalleableC2 still uses the static default path")
 	}
-	if live.RuntimeConfig.MalleableC2.SessionValue == "" ||
-		live.RuntimeConfig.MalleableC2.CustomHeaders["User-Agent"] == "" {
+	if live.GetRuntimeConfig().MalleableC2.SessionValue == "" ||
+		live.GetRuntimeConfig().MalleableC2.CustomHeaders["User-Agent"] == "" {
 		t.Error("MalleableC2 profile is incomplete")
 	}
 
@@ -123,10 +123,10 @@ func TestInitConfigFile(t *testing.T) {
 	if err := readJSONConfig(data, reloaded); err != nil {
 		t.Fatalf("reload saved config: %v", err)
 	}
-	if reloaded.MalleableC2.C2Path != live.RuntimeConfig.MalleableC2.C2Path ||
-		reloaded.MalleableC2.SessionValue != live.RuntimeConfig.MalleableC2.SessionValue ||
-		reloaded.MalleableC2.InitValue != live.RuntimeConfig.MalleableC2.InitValue {
-		t.Errorf("MalleableC2 did not round-trip: saved=%+v loaded=%+v", live.RuntimeConfig.MalleableC2, reloaded.MalleableC2)
+	if reloaded.MalleableC2.C2Path != live.GetRuntimeConfig().MalleableC2.C2Path ||
+		reloaded.MalleableC2.SessionValue != live.GetRuntimeConfig().MalleableC2.SessionValue ||
+		reloaded.MalleableC2.InitValue != live.GetRuntimeConfig().MalleableC2.InitValue {
+		t.Errorf("MalleableC2 did not round-trip: saved=%+v loaded=%+v", live.GetRuntimeConfig().MalleableC2, reloaded.MalleableC2)
 	}
 }
 
@@ -146,7 +146,7 @@ func TestSaveConfigJSON(t *testing.T) {
 	live.EmpConfigFile = tmpFile.Name()
 
 	// Setup a dummy RuntimeConfig
-	live.RuntimeConfig = &def.Config{
+	live.SetRuntimeConfig(&def.Config{
 		CCAddress:            "test.example.com",
 		CCH2Port:             "9999",
 		AgentSocksServerPort: "1080",
@@ -154,7 +154,7 @@ func TestSaveConfigJSON(t *testing.T) {
 		PaddingMax:           4096,
 		Jitter:               10,
 		C2ChannelMode:        def.C2ChannelModeH2Conn,
-	}
+	})
 
 	// Test SaveConfigJSON
 	err = SaveConfigJSON()
@@ -193,13 +193,13 @@ func TestSaveConfigJSON(t *testing.T) {
 
 func TestSaveAndLoadConfigJSON(t *testing.T) {
 	// Initialize RuntimeConfig
-	live.RuntimeConfig = &def.Config{
+	live.SetRuntimeConfig(&def.Config{
 		CCAddress:            "5.6.7.8",
 		CCH2Port:             "5678",
 		AgentSocksServerPort: "9090",
 		Password:             "another_secret",
 		C2ChannelMode:        def.C2ChannelModeH2Conn,
-	}
+	})
 
 	// Mock EmpConfigFile
 	tmpFile, err := os.CreateTemp("", "emp3r0r_save_test_*.json")
