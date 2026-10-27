@@ -84,20 +84,16 @@ static size_t build_full_config(uint8_t *buf, size_t cap, int pairs) {
   enc_text(&m, C2_KEY_CFG_CC_H2_PORT, "8443");
   enc_text(&m, C2_KEY_CFG_PASSWORD, "sekret");
   enc_text(&m, C2_KEY_CFG_CAPEM, "-----BEGIN CERTIFICATE-----");
-  enc_text(&m, C2_KEY_CFG_CA_FINGERPRINT, "ab:cd");
-  enc_text(&m, C2_KEY_CFG_C2_TRANSPORT_PROXY, "socks5://127.0.0.1:9050");
   enc_text(&m, C2_KEY_CFG_DOH_SERVER, "https://1.1.1.1/dns-query");
   enc_text(&m, C2_KEY_CFG_AGENT_UUID, "uuid-1");
   enc_text(&m, C2_KEY_CFG_AGENT_UUID_SIG, "sig");
   enc_text(&m, C2_KEY_CFG_AGENT_TAG, "abcd1234");
-  enc_int(&m, C2_KEY_CFG_CC_TIMEOUT, 30000);
   enc_int(&m, C2_KEY_CFG_PADDING_MIN, 16);
   enc_int(&m, C2_KEY_CFG_PADDING_MAX, 64);
   enc_int(&m, C2_KEY_CFG_JITTER, 20);
   enc_int(&m, C2_KEY_CFG_POLL_INTERVAL, 10);
   enc_bool(&m, C2_KEY_CFG_IS_RUN_BY_STAGER, 1);
   enc_text(&m, C2_KEY_CFG_C2_CHANNEL_MODE, "h2conn");
-  enc_text(&m, C2_KEY_CFG_SNI, "example.com");
   enc_routes(&m);
   enc_profile(&m, 2);
   enc_text(&m, 999, "future key"); /* unknown keys must be skipped */
@@ -111,7 +107,7 @@ int main(void) {
 
   /* Full config: every communication key is decoded, nested maps included. */
   {
-    size_t n = build_full_config(buf, sizeof(buf), 22);
+    size_t n = build_full_config(buf, sizeof(buf), 18);
     memset(&cfg, 0, sizeof(cfg));
     c2_str hk[4], hv[4];
     cfg.http.header_keys = hk;
@@ -122,14 +118,10 @@ int main(void) {
     CHECK(c2_str_equal(cfg.cc_http_port, "8080"));
     CHECK(c2_str_equal(cfg.cc_h2_port, "8443"));
     CHECK(c2_str_equal(cfg.password, "sekret"));
-    CHECK(c2_str_equal(cfg.ca_fingerprint, "ab:cd"));
-    CHECK(c2_str_equal(cfg.c2_transport_proxy, "socks5://127.0.0.1:9050"));
     CHECK(c2_str_equal(cfg.doh_server, "https://1.1.1.1/dns-query"));
     CHECK(c2_str_equal(cfg.agent_uuid, "uuid-1"));
     CHECK(c2_str_equal(cfg.agent_tag, "abcd1234"));
     CHECK(c2_str_equal(cfg.c2_channel_mode, "h2conn"));
-    CHECK(c2_str_equal(cfg.sni, "example.com"));
-    CHECK_EQ_LONG(cfg.cc_timeout_ms, 30000);
     CHECK_EQ_LONG(cfg.padding_min, 16);
     CHECK_EQ_LONG(cfg.padding_max, 64);
     CHECK_EQ_LONG(cfg.jitter, 20);
@@ -210,7 +202,7 @@ int main(void) {
     c2_crypto_backend *be = c2_crypto_open();
     CHECK(be != NULL);
     if (be != NULL) {
-      size_t n = build_full_config(buf, sizeof(buf), 22);
+      size_t n = build_full_config(buf, sizeof(buf), 18);
       uint8_t enc[4096];
       size_t enc_len = 0;
       c2_str magic = c2_str_lit("test-magic");

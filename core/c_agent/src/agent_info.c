@@ -159,6 +159,8 @@ c2_status c2_agent_info_encode(CborEncoder *w, const c2_agent_info *a) {
   COUNT_STR(goarch);
   COUNT_STR(p2p_transport);
   COUNT_STR(owner);
+  if (a->has_offline_grace)
+    pairs++;
 #undef COUNT_STR
 #undef COUNT_LIST
 
@@ -232,6 +234,10 @@ c2_status c2_agent_info_encode(CborEncoder *w, const c2_agent_info *a) {
   PUT_STR(C2_KEY_AGENT_GOARCH, goarch);
   PUT_STR(C2_KEY_AGENT_P2P_TRANSPORT, p2p_transport);
   PUT_STR(C2_KEY_AGENT_OWNER, owner);
+  if (a->has_offline_grace &&
+      (st = c2_cbor_write_int(&map, C2_KEY_AGENT_OFFLINE_GRACE,
+                              a->offline_grace)) != C2_OK)
+    return st;
 #undef PUT_STR
 #undef PUT_LIST
 
@@ -289,6 +295,8 @@ c2_status c2_agent_info_decode(CborValue *r, c2_agent_info *a) {
       C2_CASE_TEXT(C2_KEY_AGENT_GOARCH, a, goarch);
       C2_CASE_TEXT(C2_KEY_AGENT_P2P_TRANSPORT, a, p2p_transport);
       C2_CASE_TEXT(C2_KEY_AGENT_OWNER, a, owner);
+      C2_CASE_INT_HAS(C2_KEY_AGENT_OFFLINE_GRACE, a, offline_grace,
+                      has_offline_grace);
     case C2_KEY_AGENT_PROCESS:
       st = read_agent_process(&map, &a->process);
       break;

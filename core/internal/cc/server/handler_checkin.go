@@ -228,6 +228,7 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 	if rec.Control == nil {
 		rec.Control = &live.AgentControl{Index: agents.AssignAgentIndex()}
 	}
+	markAgentReconnected(target.UUID)
 	live.PublishAgent(rec)
 
 	logging.Infof("Updated agent %s with full data from CBOR", util.AgentRef(target.UUID))

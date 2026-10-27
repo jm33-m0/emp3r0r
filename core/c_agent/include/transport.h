@@ -93,23 +93,21 @@ enum {
   C2_KEY_CFG_CC_H2_PORT = 3,
   C2_KEY_CFG_PASSWORD = 7,
   C2_KEY_CFG_CAPEM = 24,
-  C2_KEY_CFG_CA_FINGERPRINT = 25,
-  C2_KEY_CFG_C2_TRANSPORT_PROXY = 26,
   C2_KEY_CFG_DOH_SERVER = 28,
   C2_KEY_CFG_AGENT_UUID = 32,
   C2_KEY_CFG_AGENT_UUID_SIG = 33,
   C2_KEY_CFG_AGENT_TAG = 34,
-  C2_KEY_CFG_CC_TIMEOUT = 35,
   C2_KEY_CFG_PADDING_MIN = 55,
   C2_KEY_CFG_PADDING_MAX = 56,
   C2_KEY_CFG_JITTER = 57,
   C2_KEY_CFG_IS_RUN_BY_STAGER = 59,
   C2_KEY_CFG_POLL_INTERVAL = 61,
+  C2_KEY_CFG_POLL_WINDOW = 62,
+  C2_KEY_CFG_OFFLINE_GRACE = 63,
   C2_KEY_CFG_C2_ROUTES = 75,
   C2_KEY_CFG_C2_CHANNEL_MODE = 76,
   C2_KEY_CFG_CC_HTTP_PORT = 77,
   C2_KEY_CFG_MALLEABLE_C2 = 78,
-  C2_KEY_CFG_SNI = 81,
 };
 
 typedef struct {
@@ -118,19 +116,17 @@ typedef struct {
   c2_str cc_h2_port;
   c2_str password;
   c2_str ca_pem;
-  c2_str ca_fingerprint;
-  c2_str c2_transport_proxy;
   c2_str doh_server;
   c2_str agent_uuid;
   c2_str agent_uuid_sig; /* base64url CA token over the UUID */
   c2_str agent_tag;
   c2_str c2_channel_mode; /* "http_poll" (default), "h2conn", "quic", ... */
-  c2_str sni;
 
-  int32_t cc_timeout_ms;
   int32_t padding_min;
   int32_t padding_max;
   int32_t poll_interval;
+  int32_t poll_window;
+  int32_t offline_grace;
   int32_t jitter;
   int is_run_by_stager;
 

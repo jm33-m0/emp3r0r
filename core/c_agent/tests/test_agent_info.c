@@ -105,6 +105,8 @@ static void fill_info(c2_agent_info *a) {
   a->goarch = c2_str_lit("amd64");
   a->p2p_transport = c2_str_lit("direct");
   a->owner = c2_str_lit("");
+  a->has_offline_grace = 1;
+  a->offline_grace = 90;
 }
 
 int main(void) {
@@ -162,6 +164,7 @@ int main(void) {
     CHECK(c2_str_equal(out.goarch, "amd64"));
     /* A set-but-empty string is decoded as present and empty, not absent. */
     CHECK(out.owner.ptr != NULL && out.owner.len == 0);
+    CHECK(out.has_offline_grace && out.offline_grace == 90);
   }
 
   /* A minimal agent: only the required identity fields, no lists/bools. */

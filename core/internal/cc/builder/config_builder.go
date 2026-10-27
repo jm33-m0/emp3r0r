@@ -58,6 +58,8 @@ type AgentConfig struct {
 	InitialPeers        *[]string
 	CCHTTPPort          *string
 	PollInterval        *int
+	PollWindow          *int
+	OfflineGrace        *int
 	Jitter              *int
 	OperatorIdleTimeout *int
 }
@@ -182,6 +184,15 @@ func MakeConfig(opts AgentConfig) error {
 	}
 	if live.RuntimeConfig.PollInterval == 0 {
 		live.RuntimeConfig.PollInterval = 60
+	}
+	if opts.PollWindow != nil {
+		live.RuntimeConfig.PollWindow = *opts.PollWindow
+	}
+	if live.RuntimeConfig.PollWindow == 0 {
+		live.RuntimeConfig.PollWindow = 5
+	}
+	if opts.OfflineGrace != nil {
+		live.RuntimeConfig.OfflineGrace = *opts.OfflineGrace
 	}
 
 	if opts.Jitter != nil {

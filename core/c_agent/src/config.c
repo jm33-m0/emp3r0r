@@ -144,19 +144,17 @@ c2_status c2_agent_config_decode(CborValue *r, c2_agent_config *cfg) {
       C2_CASE_TEXT(C2_KEY_CFG_CC_H2_PORT, cfg, cc_h2_port);
       C2_CASE_TEXT(C2_KEY_CFG_PASSWORD, cfg, password);
       C2_CASE_TEXT(C2_KEY_CFG_CAPEM, cfg, ca_pem);
-      C2_CASE_TEXT(C2_KEY_CFG_CA_FINGERPRINT, cfg, ca_fingerprint);
-      C2_CASE_TEXT(C2_KEY_CFG_C2_TRANSPORT_PROXY, cfg, c2_transport_proxy);
       C2_CASE_TEXT(C2_KEY_CFG_DOH_SERVER, cfg, doh_server);
       C2_CASE_TEXT(C2_KEY_CFG_AGENT_UUID, cfg, agent_uuid);
       C2_CASE_TEXT(C2_KEY_CFG_AGENT_UUID_SIG, cfg, agent_uuid_sig);
       C2_CASE_TEXT(C2_KEY_CFG_AGENT_TAG, cfg, agent_tag);
-      C2_CASE_INT32(C2_KEY_CFG_CC_TIMEOUT, cfg, cc_timeout_ms);
       C2_CASE_INT32(C2_KEY_CFG_PADDING_MIN, cfg, padding_min);
       C2_CASE_INT32(C2_KEY_CFG_PADDING_MAX, cfg, padding_max);
       C2_CASE_INT32(C2_KEY_CFG_JITTER, cfg, jitter);
       C2_CASE_INT32(C2_KEY_CFG_POLL_INTERVAL, cfg, poll_interval);
+      C2_CASE_INT32(C2_KEY_CFG_POLL_WINDOW, cfg, poll_window);
+      C2_CASE_INT32(C2_KEY_CFG_OFFLINE_GRACE, cfg, offline_grace);
       C2_CASE_TEXT(C2_KEY_CFG_C2_CHANNEL_MODE, cfg, c2_channel_mode);
-      C2_CASE_TEXT(C2_KEY_CFG_SNI, cfg, sni);
     case C2_KEY_CFG_IS_RUN_BY_STAGER: {
       int v = 0;
       if ((st = c2_cbor_read_bool(&map, &v)) == C2_OK)

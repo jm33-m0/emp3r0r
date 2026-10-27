@@ -235,6 +235,18 @@ func TestMessageTunnelSurvivesSetActiveAgent(t *testing.T) {
 	}
 }
 
+func waitForAgentGone(t *testing.T, uuid string, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if _, _, found := agents.RuntimeControlByUUID(uuid); !found {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("agent %s still in runtime map after %v", uuid, timeout)
+}
+
 // TestMessageTunnelSilenceTimesOut verifies the negative case: with no agent
 // frames at all, the tunnel is torn down and the connection is closed.
 func TestMessageTunnelSilenceTimesOut(t *testing.T) {
@@ -264,9 +276,7 @@ func TestMessageTunnelSilenceTimesOut(t *testing.T) {
 	// A silent tunnel never sets ctrl.Conn, so the handler must still remove
 	// the agent from the runtime map. Otherwise the operator list keeps showing
 	// it with an ever-growing LastSeen.
-	if _, _, found := agents.RuntimeControlByUUID(uuid); found {
-		t.Fatal("silent agent was not removed from runtime map after silence timeout")
-	}
+	waitForAgentGone(t, uuid, 2*time.Second)
 	if connected := agents.GetConnectedAgents(); len(connected) != 0 {
 		t.Fatalf("operator list still reports connected agents after silence timeout: %v", connected)
 	}
@@ -524,6 +534,23 @@ func TestMessageTunnelHandshakeTimerResetOnKeepalive(t *testing.T) {
 	}
 }
 
+func TestPublishAgentOfflineKeepsRecordUntilGrace(t *testing.T) {
+	uuid := "test-uuid-disconnect-grace"
+	agent := &def.Emp3r0rAgent{
+		UUID:         uuid,
+		Tag:          "test-agent-" + uuid,
+		LastSeen:     time.Now(),
+		OfflineGrace: 1,
+	}
+	live.PublishAgent(&live.AgentRecord{Agent: agent, Control: &live.AgentControl{}})
+	publishAgentOffline(agent)
+
+	if _, _, found := agents.RuntimeControlByUUID(uuid); !found {
+		t.Fatal("agent was removed immediately instead of staying listed during disconnect grace")
+	}
+	waitForAgentGone(t, uuid, 2*time.Second)
+}
+
 // TestMessageTunnelSelectedAgentWithActiveOperatorSurvivesWithoutCommands verifies that
 // an operator selecting an agent and performing operator activity (like polling / set active)
 // without sending explicit agent payload commands keeps the operator active and the agent tunnel
@@ -556,9 +583,7 @@ func TestMessageTunnelOperatorIdleRemovesAgent(t *testing.T) {
 		t.Fatal("tunnel did not close after operator idle timeout")
 	}
 
-	if _, _, found := agents.RuntimeControlByUUID(uuid); found {
-		t.Fatal("agent still in runtime map after operator idle teardown")
-	}
+	waitForAgentGone(t, uuid, 2*time.Second)
 	if connected := agents.GetConnectedAgents(); len(connected) != 0 {
 		t.Fatalf("operator list still reports connected agents after idle teardown: %v", connected)
 	}
@@ -588,9 +613,7 @@ func TestMessageTunnelOperatorIdleRemovesSilentAgent(t *testing.T) {
 		t.Fatal("tunnel did not close after operator idle timeout")
 	}
 
-	if _, _, found := agents.RuntimeControlByUUID(uuid); found {
-		t.Fatal("silent agent still in runtime map after operator idle teardown")
-	}
+	waitForAgentGone(t, uuid, 2*time.Second)
 	if connected := agents.GetConnectedAgents(); len(connected) != 0 {
 		t.Fatalf("operator list still reports connected agents after idle teardown: %v", connected)
 	}

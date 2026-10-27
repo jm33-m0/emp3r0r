@@ -88,15 +88,12 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 			logging.Debugf("handleMessageTunnel: teardown uuid=%s found=%v ctrlConnNil=%v", util.AgentRef(authAgentUUID), found, ctrlConnNil)
 		}
 		if found {
-			live.ForgetAgent(agent.UUID)
 			if endErr := agents.EndSession(agent.UUID); endErr != nil {
 				logging.Debugf("handleMessageTunnel: end session for %s failed: %v", util.AgentRef(agent.UUID), endErr)
 			}
-			name := agent.Name
-			if name == "" {
-				name = agent.Tag
-			}
-			operatorBroadcastPrintf(logging.ERROR, "Agent dies... %s is disconnected", util.AgentRef(agent.UUID))
+			// Keep the agent visible while it is in a masked sleep. The
+			// delayed expiry removes it only if it does not reconnect.
+			publishAgentOffline(agent)
 		}
 		logging.Debugf("handleMessageTunnel exited")
 	}()
@@ -295,6 +292,7 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 			rec.Control.Conn = secureConn
 			rec.Control.Ctx = ctx
 			rec.Control.Cancel = cancel
+			markAgentReconnected(agent.UUID)
 			live.PublishAgent(rec)
 
 			// Any authenticated frame (keep-alive hello OR command response)

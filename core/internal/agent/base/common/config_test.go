@@ -125,9 +125,6 @@ func TestInitConfig_Comprehensive(t *testing.T) {
 	if RuntimeConfig.CAPEM != originalCfg.CAPEM {
 		t.Errorf("CAPEM mismatch: got %s, want %s", RuntimeConfig.CAPEM, originalCfg.CAPEM)
 	}
-	if RuntimeConfig.CAFingerprint != originalCfg.CAFingerprint {
-		t.Errorf("CAFingerprint mismatch: got %s, want %s", RuntimeConfig.CAFingerprint, originalCfg.CAFingerprint)
-	}
 	if RuntimeConfig.C2TransportProxy != originalCfg.C2TransportProxy {
 		t.Errorf("C2TransportProxy mismatch: got %s, want %s", RuntimeConfig.C2TransportProxy, originalCfg.C2TransportProxy)
 	}

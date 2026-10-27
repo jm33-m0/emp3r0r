@@ -58,6 +58,8 @@ Examples:
 	cmd.Flags().String("bof", "1", "Include COFF/BOF support (1) or compile it out (0)")
 	cmd.Flags().Int("interval", 60, "C2 beacon interval in seconds")
 	cmd.Flags().Int("jitter", 50, "Beacon jitter percentage (0-100); sleeps in [interval*(1-jitter%), interval]")
+	cmd.Flags().Int("poll-window", 5, "Seconds to wait for commands after hello before entering masked sleep")
+	cmd.Flags().Int("offline-grace", 0, "Seconds a sleeping agent stays listed before removal (0 derives from interval and poll window)")
 
 	cmd.MarkFlagRequired("cc")
 
@@ -76,6 +78,8 @@ Examples:
 		"bof":           carapace.ActionValues("1", "0"),
 		"interval":      carapace.ActionValues("30", "60", "120", "300"),
 		"jitter":        carapace.ActionValues("0", "20", "50"),
+		"poll-window":   carapace.ActionValues("1", "5", "10", "30"),
+		"offline-grace": carapace.ActionValues("0", "120", "300", "600"),
 	})
 	return cmd
 }
@@ -90,6 +94,16 @@ func CmdGenerateCAgent(cmd *cobra.Command, _ []string) {
 	// rather than exposed as a flag that would produce a non-working agent.
 	interval, _ := cmd.Flags().GetInt("interval")
 	jitter, _ := cmd.Flags().GetInt("jitter")
+	pollWindow, _ := cmd.Flags().GetInt("poll-window")
+	offlineGrace, _ := cmd.Flags().GetInt("offline-grace")
+	if pollWindow < 1 {
+		logging.Errorf("Invalid poll window: must be >= 1 second")
+		return
+	}
+	if offlineGrace < 0 {
+		logging.Errorf("Invalid offline grace: must be >= 0 seconds")
+		return
+	}
 	if err := validateCAgentPollTiming(interval, jitter); err != nil {
 		logging.Errorf("Invalid beacon timing: %v", err)
 		return
@@ -112,6 +126,8 @@ func CmdGenerateCAgent(cmd *cobra.Command, _ []string) {
 		DoHServer:     getStringOptPtr(cmd, "doh"),
 		C2ChannelMode: &channelMode,
 		PollInterval:  &interval,
+		PollWindow:    &pollWindow,
+		OfflineGrace:  &offlineGrace,
 		Jitter:        &jitter,
 		// shellcode is the artifact stager_linux embeds for a local payload.
 		// Mark it so the agent binds the stager mask and identity FDs.

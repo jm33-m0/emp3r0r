@@ -174,6 +174,7 @@ enum {
   C2_KEY_AGENT_GOARCH = 41,
   C2_KEY_AGENT_P2P_TRANSPORT = 42,
   C2_KEY_AGENT_OWNER = 43,
+  C2_KEY_AGENT_OFFLINE_GRACE = 44,
 };
 
 /* AgentProcess (nested map under C2_KEY_AGENT_PROCESS). */
@@ -251,6 +252,9 @@ typedef struct {
   c2_str goarch;
   c2_str p2p_transport;
   c2_str owner;
+
+  int has_offline_grace;
+  int64_t offline_grace;
 } c2_agent_info;
 
 c2_status c2_agent_info_encode(CborEncoder *w, const c2_agent_info *a);

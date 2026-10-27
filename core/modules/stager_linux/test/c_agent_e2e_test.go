@@ -249,6 +249,15 @@ func runCAgentEndToEnd(t *testing.T, format string) {
 	if len(agent.IPs) == 0 {
 		t.Fatalf("agent IPs missing")
 	}
+	// A masked agent reports its own removal deadline; a non-masked one
+	// reports none and is removed as soon as its tunnel closes.
+	wantGrace := 0
+	if strings.HasPrefix(format, "local-") {
+		wantGrace = 12 // interval 5 + poll window 5 + interval/2
+	}
+	if agent.OfflineGrace != wantGrace {
+		t.Fatalf("agent OfflineGrace = %d, want %d", agent.OfflineGrace, wantGrace)
+	}
 
 	// --- Command round-trip: "ls" returns CBOR []util.Dentry like the Go agent ---
 	if got := runC2Command(t, agent, doneChan, &agentOut, "ls"); !strings.Contains(got, "c_agent_e2e_test.go") {
@@ -382,14 +391,36 @@ func waitForCAgentCheckin(t *testing.T, doneChan <-chan error, agentOut *bytes.B
 	return agent
 }
 
+// cAgentConnected reports whether the C2 has a live message tunnel for agent.
+func cAgentConnected(agent *def.Emp3r0rAgent) bool {
+	rec, ok := live.LookupAgent(agent.UUID)
+	return ok && rec.Control != nil && rec.Control.Conn != nil
+}
+
 // runC2Command sends one command to the C agent and waits for its response.
+// The agent closes its tunnel while sleeping, so wait for the next masked
+// wake-up/reconnect instead of requiring a tunnel at the instant of the call.
 func runC2Command(t *testing.T, agent *def.Emp3r0rAgent, doneChan <-chan error, agentOut *bytes.Buffer, cmd string) string {
 	t.Helper()
 	job := jobs.CreateJob(cmd, "command", agent.Tag)
 	cmdID := job.ID
 	live.CmdTime.Store(cmdID, time.Now().Format("2006-01-02 15:04:05.999999999 -0700 MST"))
-	if err := agents.SendCmd(cmd, cmdID, agent); err != nil {
-		t.Fatalf("send %q to C agent: %v", cmd, err)
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		if cAgentConnected(agent) {
+			if err := agents.SendCmd(cmd, cmdID, agent); err == nil {
+				break
+			}
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("send %q to C agent: no live tunnel", cmd)
+		}
+		select {
+		case werr := <-doneChan:
+			t.Fatalf("C agent exited while sending %q: %v.\nOutput:\n%s", cmd, werr, agentOut.String())
+		default:
+			time.Sleep(100 * time.Millisecond)
+		}
 	}
 	for i := 0; i < 30; i++ {
 		if res, ok := live.CmdResults.Load(cmdID); ok {

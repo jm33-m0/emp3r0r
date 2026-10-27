@@ -41,7 +41,6 @@ func SaveConfigJSON() (err error) {
 		PreflightIntervalMin:   live.RuntimeConfig.PreflightIntervalMin,
 		PreflightIntervalMax:   live.RuntimeConfig.PreflightIntervalMax,
 		CAPEM:                  live.RuntimeConfig.CAPEM,
-		CAFingerprint:          live.RuntimeConfig.CAFingerprint,
 		C2TransportProxy:       live.RuntimeConfig.C2TransportProxy,
 		CDNProxy:               live.RuntimeConfig.CDNProxy,
 		DoHServer:              live.RuntimeConfig.DoHServer,
@@ -54,6 +53,8 @@ func SaveConfigJSON() (err error) {
 		PaddingMax:             live.RuntimeConfig.PaddingMax,
 		Jitter:                 live.RuntimeConfig.Jitter,
 		PollInterval:           live.RuntimeConfig.PollInterval,
+		PollWindow:             live.RuntimeConfig.PollWindow,
+		OfflineGrace:           live.RuntimeConfig.OfflineGrace,
 		ModulePath:             live.RuntimeConfig.ModulePath,
 		IsRunByStager:          live.RuntimeConfig.IsRunByStager,
 		MachineID:              live.RuntimeConfig.MachineID,
@@ -144,7 +145,6 @@ func InitConfigFile(cc_host string) (err error) {
 		return fmt.Errorf("failed to load CA: %v", err)
 	}
 	live.RuntimeConfig.CAPEM = string(transport.GetCACrtPEM())
-	live.RuntimeConfig.CAFingerprint = transport.GetFingerprint(transport.CaCrtFile)
 	// sign
 	sig, err := transport.SignWithCAKey([]byte(live.RuntimeConfig.AgentUUID))
 	if err != nil {
@@ -168,6 +168,9 @@ func InitConfigFile(cc_host string) (err error) {
 	if live.RuntimeConfig.PollInterval == 0 {
 		live.RuntimeConfig.PollInterval = 60
 	}
+	if live.RuntimeConfig.PollWindow == 0 {
+		live.RuntimeConfig.PollWindow = 5
+	}
 
 	// Malleable C2 defaults: a fixed profile is a network signature, so draw a
 	// fresh one for this install. It is persisted below and embedded in every
@@ -185,7 +188,6 @@ func LoadCACrt2RuntimeConfig() error {
 		return err
 	}
 	live.RuntimeConfig.CAPEM = string(transport.GetCACrtPEM())
-	live.RuntimeConfig.CAFingerprint = transport.GetFingerprint(transport.CaCrtFile)
 	return nil
 }
 
