@@ -61,16 +61,11 @@ int main(void) {
   }
   CHECK(info.uptime.ptr != NULL && info.uptime.len > 0);
   CHECK(info.cwd.ptr != NULL && info.cwd.len > 0);
-  CHECK(str_eq(info.c2host, "127.0.0.1:8080"));
   CHECK(str_eq(info.version, "9.9.9"));
   CHECK(str_eq(info.mesh_route, "direct"));
   CHECK(str_has(info.transport, "HTTP (127.0.0.1:8080)"));
   CHECK(info.hardware.ptr != NULL && str_eq(info.hardware, "N/A"));
   CHECK(info.cpu.ptr != NULL && str_eq(info.cpu, "N/A"));
-
-  /* Identity comes straight from the build config. */
-  CHECK(str_eq(info.uuid, "11111111-1111-1111-1111-111111111111"));
-  CHECK(str_eq(info.uuid_sig, "sig"));
 
   CHECK(info.has_root == 1);
   CHECK(info.process.has_pid && info.process.pid > 0);

@@ -9,8 +9,8 @@
  * label. The agent calls c2_gather_agent_info once before check-in.
  *
  * Everything is best-effort: an unavailable fact is reported as "N/A" (or left
- * unset) rather than failing the check-in. Only UUID/UUIDSig are required by
- * the server, and c2_session_checkin fills PublicKey from the session identity.
+ * unset) rather than failing the check-in. Only PublicKey is required by the
+ * server, and c2_session_checkin fills it from the session identity.
  */
 
 #include "common.h"

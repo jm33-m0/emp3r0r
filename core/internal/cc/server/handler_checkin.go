@@ -90,14 +90,19 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 	// SECURITY: Treat agent-supplied metadata as hostile.
 	util.SanitizeAgentMetadata(target)
 
-	if target.UUID == "" {
-		logging.Warningf("handleAgentCheckIn: empty UUID in payload")
-		return fmt.Errorf("forbidden: empty uuid")
+	// Identity comes from the authenticated MsgAuth envelope, never from the
+	// check-in body. This keeps UUID/UUIDSig out of the payload and prevents a
+	// hostile body from claiming another agent's identity.
+	if auth == nil || auth.AgentUUID == "" {
+		logging.Warningf("handleAgentCheckIn: missing authenticated MsgAuth context")
+		return fmt.Errorf("forbidden: missing auth envelope context")
 	}
-	if agentUUID != "" && target.UUID != agentUUID {
-		logging.Warningf("handleAgentCheckIn: route/body UUID mismatch: body=%s route=%s", util.AgentRef(target.UUID), util.AgentRef(agentUUID))
+	if agentUUID != "" && auth.AgentUUID != agentUUID {
+		logging.Warningf("handleAgentCheckIn: route/auth UUID mismatch: auth=%s route=%s", util.AgentRef(auth.AgentUUID), util.AgentRef(agentUUID))
 		return fmt.Errorf("forbidden: uuid mismatch")
 	}
+	target.UUID = auth.AgentUUID
+	target.UUIDSig = auth.IdentityToken
 
 	// The operator-facing identifier is derived exclusively from the verified
 	// UUID. Overwrite whatever the agent reported so a hostile agent can never
@@ -121,8 +126,8 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 		return fmt.Errorf("unauthorized: missing public key")
 	}
 	if target.UUIDSig == "" {
-		logging.Warningf("handleAgentCheckIn: Agent %s provided no UUID signature, rejecting", util.AgentRef(target.UUID))
-		return fmt.Errorf("unauthorized: missing uuid signature")
+		logging.Warningf("handleAgentCheckIn: Agent %s has no CA identity token, rejecting", util.AgentRef(target.UUID))
+		return fmt.Errorf("unauthorized: missing identity token")
 	}
 	if agents.AgentDB == nil {
 		logging.Errorf("handleAgentCheckIn: AgentDB unavailable for trust decision")
@@ -165,12 +170,6 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 	}
 
 	if !isKnown {
-		if auth == nil {
-			return fmt.Errorf("forbidden: missing auth envelope context")
-		}
-		if auth.AgentUUID != target.UUID {
-			return fmt.Errorf("forbidden: auth/payload UUID mismatch")
-		}
 		if auth.AgentProof == "" {
 			return fmt.Errorf("forbidden: missing agent proof for first enrollment")
 		}

@@ -6,7 +6,7 @@ import (
 
 // Emp3r0rAgent agent properties
 type Emp3r0rAgent struct {
-	Tag            string        `cbor:"1,keyasint"`  // operator-facing agent identifier, derived from the verified UUID
+	Tag            string        `cbor:"1,keyasint"`  // operator-facing identifier, derived from the verified UUID
 	Name           string        `cbor:"2,keyasint"`  // human-readable name (hostname\username)
 	Version        string        `cbor:"3,keyasint"`  // agent version
 	Transport      string        `cbor:"4,keyasint"`  // transport the agent uses (HTTP / HTTP2 / QUIC / KCP / CDN / TOR)
@@ -22,7 +22,7 @@ type Emp3r0rAgent struct {
 	GOOS           string        `cbor:"12,keyasint"` // runtime.GOOS
 	Kernel         string        `cbor:"13,keyasint"` // kernel release
 	Arch           string        `cbor:"14,keyasint"` // kernel architecture
-	From           string        `cbor:"15,keyasint"` // where the agent is coming from, usually a public IP, or 127.0.0.1
+	From           string        `cbor:"15,keyasint"` // connection source, set by the server
 	IPs            []string      `cbor:"16,keyasint"` // IPs that are found on target's NICs
 	ARP            []string      `cbor:"17,keyasint"` // ARP table
 	User           string        `cbor:"18,keyasint"` // user account info
@@ -34,20 +34,20 @@ type Emp3r0rAgent struct {
 	Exes           []string      `cbor:"24,keyasint"` // executables found in agent's $PATH
 	CWD            string        `cbor:"25,keyasint"` // current working directory
 	Product        any           `cbor:"26,keyasint"` // product info
-	UUID           string        `cbor:"27,keyasint"` // agent UUID, specific to the agent binary
-	UUIDSig        string        `cbor:"28,keyasint"` // signature of UUID, signed by CA
+	UUID           string        `cbor:"27,keyasint"` // from the authenticated MsgAuth
+	UUIDSig        string        `cbor:"28,keyasint"` // from MsgAuth.IdentityToken
 	PublicKey      string        `cbor:"29,keyasint"` // agent's public key (PEM encoded) for TOFU
-	C2Host         string        `cbor:"30,keyasint"` // C2 server's IP or domain name that the agent is connected to
-	LastSeen       time.Time     `cbor:"31,keyasint"` // last time the agent was seen
-	LastSeenRTT    time.Duration `cbor:"32,keyasint"` // last RTT of the agent
-	AgentToken     *AgentToken   `cbor:"36,keyasint"` // current token issued by C2
+	C2Host         string        `cbor:"30,keyasint"` // local display only; not part of check-in
+	LastSeen       time.Time     `cbor:"31,keyasint"` // server-side liveness state
+	LastSeenRTT    time.Duration `cbor:"32,keyasint"` // server-side liveness state
+	AgentToken     *AgentToken   `cbor:"36,keyasint"` // pushed separately in session_info
 	MeshRoute      string        `cbor:"37,keyasint"` // p2p routing role or gateway used by this agent
 	P2PRelayPort   string        `cbor:"38,keyasint"` // dynamic P2P relay port assigned to this agent
 	MeshGossipPort string        `cbor:"39,keyasint"` // dynamic mesh gossip port assigned to this agent
 	Files          []string      `cbor:"40,keyasint"` // list of available files/modules in agent storage/MemFS
 	GOArch         string        `cbor:"41,keyasint"` // runtime.GOARCH of the agent binary (not the OS kernel arch)
 	P2PTransport   string        `cbor:"42,keyasint"` // transport the agent's P2P relay listens on (kcp/mtls/smb)
-	Owner          string        `cbor:"43,keyasint"` // operator currently holding this agent, empty when free
+	Owner          string        `cbor:"43,keyasint"` // server-side operator lock
 	OfflineGrace   int           `cbor:"44,keyasint"` // agent-chosen removal grace in seconds; 0 means remove immediately
 }
 
@@ -107,4 +107,68 @@ type SessionEntry struct {
 	Domain    string `cbor:"3,keyasint"` // domain ("." for local accounts)
 	LogonID   uint64 `cbor:"4,keyasint"` // logon session AuthenticationId (LUID)
 	CreatedAt string `cbor:"5,keyasint"` // RFC3339 timestamp
+}
+
+// CheckinFields returns the agent-owned subset sent in the check-in body.
+// Identity, tag, connection source, liveness, token and operator state are
+// derived by the server and deliberately absent from this map.
+func (a *Emp3r0rAgent) CheckinFields() map[uint64]any {
+	if a == nil {
+		return nil
+	}
+	fields := make(map[uint64]any, 24)
+	putStr := func(key uint64, value string) {
+		if value != "" {
+			fields[key] = value
+		}
+	}
+	putStr(2, a.Name)
+	putStr(3, a.Version)
+	putStr(4, a.Transport)
+	putStr(5, a.Hostname)
+	putStr(6, a.Hardware)
+	putStr(7, a.Container)
+	putStr(8, a.CPU)
+	putStr(9, a.GPU)
+	putStr(10, a.Mem)
+	putStr(11, a.OS)
+	putStr(12, a.GOOS)
+	putStr(13, a.Kernel)
+	putStr(14, a.Arch)
+	if len(a.IPs) > 0 {
+		fields[16] = a.IPs
+	}
+	if len(a.ARP) > 0 {
+		fields[17] = a.ARP
+	}
+	putStr(18, a.User)
+	fields[19] = a.HasRoot
+	fields[20] = a.HasTor
+	fields[21] = a.HasInternet
+	fields[22] = a.NCSIEnabled
+	if a.Process != nil {
+		fields[23] = a.Process
+	}
+	if len(a.Exes) > 0 {
+		fields[24] = a.Exes
+	}
+	putStr(25, a.CWD)
+	if a.Product != nil {
+		fields[26] = a.Product
+	}
+	putStr(29, a.PublicKey)
+	putStr(33, a.Uptime)
+	putStr(34, a.Groups)
+	putStr(37, a.MeshRoute)
+	putStr(38, a.P2PRelayPort)
+	putStr(39, a.MeshGossipPort)
+	if len(a.Files) > 0 {
+		fields[40] = a.Files
+	}
+	putStr(41, a.GOArch)
+	putStr(42, a.P2PTransport)
+	if a.OfflineGrace != 0 {
+		fields[44] = a.OfflineGrace
+	}
+	return fields
 }

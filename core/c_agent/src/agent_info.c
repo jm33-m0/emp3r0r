@@ -115,7 +115,6 @@ c2_status c2_agent_info_encode(CborEncoder *w, const c2_agent_info *a) {
     if (AGENT_LIST_SET(a->f))                                                  \
       pairs++;                                                                 \
   } while (0)
-  COUNT_STR(tag);
   COUNT_STR(name);
   COUNT_STR(version);
   COUNT_STR(transport);
@@ -129,7 +128,6 @@ c2_status c2_agent_info_encode(CborEncoder *w, const c2_agent_info *a) {
   COUNT_STR(goos);
   COUNT_STR(kernel);
   COUNT_STR(arch);
-  COUNT_STR(from);
   COUNT_LIST(ips);
   COUNT_LIST(arp);
   COUNT_STR(user);
@@ -146,10 +144,7 @@ c2_status c2_agent_info_encode(CborEncoder *w, const c2_agent_info *a) {
   COUNT_LIST(exes);
   COUNT_STR(cwd);
   COUNT_STR(product);
-  COUNT_STR(uuid);
-  COUNT_STR(uuid_sig);
   COUNT_STR(public_key);
-  COUNT_STR(c2host);
   COUNT_STR(uptime);
   COUNT_STR(groups);
   COUNT_STR(mesh_route);
@@ -158,7 +153,6 @@ c2_status c2_agent_info_encode(CborEncoder *w, const c2_agent_info *a) {
   COUNT_LIST(files);
   COUNT_STR(goarch);
   COUNT_STR(p2p_transport);
-  COUNT_STR(owner);
   if (a->has_offline_grace)
     pairs++;
 #undef COUNT_STR
@@ -182,7 +176,6 @@ c2_status c2_agent_info_encode(CborEncoder *w, const c2_agent_info *a) {
       return st;                                                               \
   } while (0)
 
-  PUT_STR(C2_KEY_AGENT_TAG, tag);
   PUT_STR(C2_KEY_AGENT_NAME, name);
   PUT_STR(C2_KEY_AGENT_VERSION, version);
   PUT_STR(C2_KEY_AGENT_TRANSPORT, transport);
@@ -196,7 +189,6 @@ c2_status c2_agent_info_encode(CborEncoder *w, const c2_agent_info *a) {
   PUT_STR(C2_KEY_AGENT_GOOS, goos);
   PUT_STR(C2_KEY_AGENT_KERNEL, kernel);
   PUT_STR(C2_KEY_AGENT_ARCH, arch);
-  PUT_STR(C2_KEY_AGENT_FROM, from);
   PUT_LIST(C2_KEY_AGENT_IPS, ips);
   PUT_LIST(C2_KEY_AGENT_ARP, arp);
   PUT_STR(C2_KEY_AGENT_USER, user);
@@ -220,10 +212,7 @@ c2_status c2_agent_info_encode(CborEncoder *w, const c2_agent_info *a) {
   PUT_LIST(C2_KEY_AGENT_EXES, exes);
   PUT_STR(C2_KEY_AGENT_CWD, cwd);
   PUT_STR(C2_KEY_AGENT_PRODUCT, product);
-  PUT_STR(C2_KEY_AGENT_UUID, uuid);
-  PUT_STR(C2_KEY_AGENT_UUID_SIG, uuid_sig);
   PUT_STR(C2_KEY_AGENT_PUBLIC_KEY, public_key);
-  PUT_STR(C2_KEY_AGENT_C2HOST, c2host);
   PUT_STR(C2_KEY_AGENT_UPTIME, uptime);
   PUT_STR(C2_KEY_AGENT_GROUPS, groups);
   PUT_STR(C2_KEY_AGENT_MESH_ROUTE, mesh_route);
@@ -232,7 +221,6 @@ c2_status c2_agent_info_encode(CborEncoder *w, const c2_agent_info *a) {
   PUT_LIST(C2_KEY_AGENT_FILES, files);
   PUT_STR(C2_KEY_AGENT_GOARCH, goarch);
   PUT_STR(C2_KEY_AGENT_P2P_TRANSPORT, p2p_transport);
-  PUT_STR(C2_KEY_AGENT_OWNER, owner);
   if (a->has_offline_grace &&
       (st = c2_cbor_write_int(&map, C2_KEY_AGENT_OFFLINE_GRACE,
                               a->offline_grace)) != C2_OK)
@@ -256,7 +244,6 @@ c2_status c2_agent_info_decode(CborValue *r, c2_agent_info *a) {
   uint64_t key;
   while ((st = c2_cbor_map_key(&map, &key, &done)) == C2_OK && !done) {
     switch (key) {
-      C2_CASE_TEXT(C2_KEY_AGENT_TAG, a, tag);
       C2_CASE_TEXT(C2_KEY_AGENT_NAME, a, name);
       C2_CASE_TEXT(C2_KEY_AGENT_VERSION, a, version);
       C2_CASE_TEXT(C2_KEY_AGENT_TRANSPORT, a, transport);
@@ -270,7 +257,6 @@ c2_status c2_agent_info_decode(CborValue *r, c2_agent_info *a) {
       C2_CASE_TEXT(C2_KEY_AGENT_GOOS, a, goos);
       C2_CASE_TEXT(C2_KEY_AGENT_KERNEL, a, kernel);
       C2_CASE_TEXT(C2_KEY_AGENT_ARCH, a, arch);
-      C2_CASE_TEXT(C2_KEY_AGENT_FROM, a, from);
       C2_CASE_STR_LIST(C2_KEY_AGENT_IPS, a, ips);
       C2_CASE_STR_LIST(C2_KEY_AGENT_ARP, a, arp);
       C2_CASE_TEXT(C2_KEY_AGENT_USER, a, user);
@@ -281,10 +267,7 @@ c2_status c2_agent_info_decode(CborValue *r, c2_agent_info *a) {
       C2_CASE_STR_LIST(C2_KEY_AGENT_EXES, a, exes);
       C2_CASE_TEXT(C2_KEY_AGENT_CWD, a, cwd);
       C2_CASE_TEXT(C2_KEY_AGENT_PRODUCT, a, product);
-      C2_CASE_TEXT(C2_KEY_AGENT_UUID, a, uuid);
-      C2_CASE_TEXT(C2_KEY_AGENT_UUID_SIG, a, uuid_sig);
       C2_CASE_TEXT(C2_KEY_AGENT_PUBLIC_KEY, a, public_key);
-      C2_CASE_TEXT(C2_KEY_AGENT_C2HOST, a, c2host);
       C2_CASE_TEXT(C2_KEY_AGENT_UPTIME, a, uptime);
       C2_CASE_TEXT(C2_KEY_AGENT_GROUPS, a, groups);
       C2_CASE_TEXT(C2_KEY_AGENT_MESH_ROUTE, a, mesh_route);
@@ -293,7 +276,6 @@ c2_status c2_agent_info_decode(CborValue *r, c2_agent_info *a) {
       C2_CASE_STR_LIST(C2_KEY_AGENT_FILES, a, files);
       C2_CASE_TEXT(C2_KEY_AGENT_GOARCH, a, goarch);
       C2_CASE_TEXT(C2_KEY_AGENT_P2P_TRANSPORT, a, p2p_transport);
-      C2_CASE_TEXT(C2_KEY_AGENT_OWNER, a, owner);
       C2_CASE_INT_HAS(C2_KEY_AGENT_OFFLINE_GRACE, a, offline_grace,
                       has_offline_grace);
     case C2_KEY_AGENT_PROCESS:

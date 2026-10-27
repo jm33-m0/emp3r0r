@@ -322,12 +322,6 @@ c2_status c2_gather_agent_info(c2_agent_info *info, const c2_agent_config *cfg,
   char cc[256];
   str_to_c(cfg->cc_address, cc, sizeof(cc));
 
-  /* Identity (the server re-derives Tag from the verified UUID). */
-  info->uuid = cfg->agent_uuid;
-  info->uuid_sig = cfg->agent_uuid_sig;
-  info->tag = cfg->agent_tag;
-  info->c2host = cfg->cc_address;
-
   /* OS name/arch/kernel, mirroring sysinfo.GetOSInfo. */
   char pretty[128] = {0}, os_id[64] = {0}, os_ver[64] = {0};
   read_os_release(pretty, sizeof(pretty), os_id, sizeof(os_id), os_ver,

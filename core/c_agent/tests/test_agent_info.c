@@ -5,7 +5,7 @@
 #include "test.h"
 
 /*
- * Emp3r0rAgent is the widest message (43 keys); a divergence in any key breaks
+ * Emp3r0rAgent is the widest check-in message; a divergence in any key breaks
  * registration. These tests round-trip a fully populated struct through
  * c2_agent_info_encode / c2_agent_info_decode and assert every field survives,
  * then cover the optional-field, capacity and malformed-input paths plus the
@@ -50,7 +50,6 @@ static void fill_info(c2_agent_info *a) {
   static c2_str exes_items[] = {STR("/bin/ls")};
   static c2_str files_items[] = {STR("memfs:///a.so")};
   memset(a, 0, sizeof(*a));
-  a->tag = c2_str_lit("abcd1234");
   a->name = c2_str_lit("host/root");
   a->version = c2_str_lit("v9");
   a->transport = c2_str_lit("HTTP (10.0.0.1:8080)");
@@ -64,7 +63,6 @@ static void fill_info(c2_agent_info *a) {
   a->goos = c2_str_lit("linux");
   a->kernel = c2_str_lit("6.1.0");
   a->arch = c2_str_lit("x86_64");
-  a->from = c2_str_lit("10.0.0.1");
   a->ips.items = ips_items;
   a->ips.count = 2;
   a->ips.cap = 2;
@@ -91,10 +89,7 @@ static void fill_info(c2_agent_info *a) {
   a->exes.cap = 1;
   a->cwd = c2_str_lit("/root");
   a->product = c2_str_lit("{}");
-  a->uuid = c2_str_lit("uuid-1");
-  a->uuid_sig = c2_str_lit("sig");
   a->public_key = c2_str_lit("-----BEGIN PUBLIC KEY-----");
-  a->c2host = c2_str_lit("10.0.0.1:8080");
   a->uptime = c2_str_lit("1d 2h 3m 4s");
   a->groups = c2_str_lit("0,27");
   a->mesh_route = c2_str_lit("direct");
@@ -105,7 +100,6 @@ static void fill_info(c2_agent_info *a) {
   a->files.cap = 1;
   a->goarch = c2_str_lit("amd64");
   a->p2p_transport = c2_str_lit("direct");
-  a->owner = c2_str_lit("");
   a->has_offline_grace = 1;
   a->offline_grace = 90;
 }
@@ -135,7 +129,6 @@ int main(void) {
     out.files.cap = 4;
     CHECK(dec_info(buf, n, &out) == C2_OK);
 
-    CHECK(c2_str_equal(out.tag, "abcd1234"));
     CHECK(c2_str_equal(out.name, "host/root"));
     CHECK(c2_str_equal(out.os, "Debian 12 (amd64)"));
     CHECK(c2_str_equal(out.goos, "linux"));
@@ -156,24 +149,19 @@ int main(void) {
     CHECK_EQ_LONG(out.arp.count, 1);
     CHECK_EQ_LONG(out.exes.count, 1);
     CHECK(c2_str_equal(out.cwd, "/root"));
-    CHECK(c2_str_equal(out.uuid, "uuid-1"));
     CHECK(c2_str_equal(out.public_key, "-----BEGIN PUBLIC KEY-----"));
     CHECK(c2_str_equal(out.uptime, "1d 2h 3m 4s"));
     CHECK(c2_str_equal(out.mesh_route, "direct"));
     CHECK_EQ_LONG(out.files.count, 1);
     CHECK(c2_str_equal(out.files.items[0], "memfs:///a.so"));
     CHECK(c2_str_equal(out.goarch, "amd64"));
-    /* A set-but-empty string is decoded as present and empty, not absent. */
-    CHECK(out.owner.ptr != NULL && out.owner.len == 0);
     CHECK(out.has_offline_grace && out.offline_grace == 90);
   }
 
-  /* A minimal agent: only the required identity fields, no lists/bools. */
+  /* A minimal agent: only the required public key, no lists/bools. */
   {
     c2_agent_info min;
     memset(&min, 0, sizeof(min));
-    min.uuid = c2_str_lit("u");
-    min.uuid_sig = c2_str_lit("s");
     min.public_key = c2_str_lit("p");
     CborEncoder e;
     cbor_encoder_init(&e, buf, sizeof(buf), 0);
@@ -182,8 +170,7 @@ int main(void) {
     c2_agent_info out;
     memset(&out, 0, sizeof(out));
     CHECK(dec_info(buf, n, &out) == C2_OK);
-    CHECK(c2_str_equal(out.uuid, "u"));
-    CHECK(out.tag.ptr == NULL);
+    CHECK(c2_str_equal(out.public_key, "p"));
     CHECK_EQ_LONG(out.ips.count, 0);
     CHECK_EQ_LONG(out.has_root, 0);
     CHECK(out.process.cmdline.ptr == NULL);

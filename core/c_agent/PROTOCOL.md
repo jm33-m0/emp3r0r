@@ -377,36 +377,35 @@ separate signature. Either field may be absent.
 ### 7.2 `Emp3r0rAgent` (check-in body)
 
 Sent as the single payload after the `checkin` `MsgAuth`. The server treats
-every field as hostile, sanitizes strings, derives `Tag` from the verified UUID,
-and ignores/overwrites fields it computes itself. Minimum required by the server:
-`UUID` (27), `PublicKey` (29), `UUIDSig` (28), and enough to display. `PublicKey`
-is a PEM-encoded PKIX P-256 public key; `UUIDSig` is the base64url CA
-`IdentityToken`.
+every field as hostile and sanitizes strings. Identity comes from the
+authenticated `MsgAuth` envelope; the server derives `Tag` from the verified
+UUID, takes `From`/`LastSeen` from the connection, and takes `Owner` from the
+operator lock. Minimum required in the body: `PublicKey` (29), a PEM-encoded
+PKIX P-256 public key.
 
-| Key | Name                       | Key | Name                                    |
-| --- | -------------------------- | --- | --------------------------------------- |
-| 1   | `Tag`                      | 23  | `Process` (`AgentProcess`)              |
-| 2   | `Name`                     | 24  | `Exes` (array)                          |
-| 3   | `Version`                  | 25  | `CWD`                                   |
-| 4   | `Transport`                | 26  | `Product` (any)                         |
-| 5   | `Hostname`                 | 27  | `UUID`                                  |
-| 6   | `Hardware`                 | 28  | `UUIDSig`                               |
-| 7   | `Container`                | 29  | `PublicKey` (PEM)                       |
-| 8   | `CPU`                      | 30  | `C2Host`                                |
-| 9   | `GPU`                      | 31  | `LastSeen` (time; server overwrites)    |
-| 10  | `Mem`                      | 32  | `LastSeenRTT` (duration; omit)          |
-| 11  | `OS`                       | 33  | `Uptime`                                |
-| 12  | `GOOS`                     | 34  | `Groups`                                |
-| 13  | `Kernel`                   | 36  | `AgentToken`                            |
-| 14  | `Arch`                     | 37  | `MeshRoute`                             |
-| 15  | `From` (server overwrites) | 38  | `P2PRelayPort`                          |
-| 16  | `IPs` (array)              | 39  | `MeshGossipPort`                        |
-| 17  | `ARP` (array)              | 40  | `Files` (array)                         |
-| 18  | `User`                     | 41  | `GOArch`                                |
-| 19  | `HasRoot`                  | 42  | `P2PTransport`                          |
-| 20  | `HasTor`                   | 43  | `Owner`                                 |
-| 21  | `HasInternet`              | 44  | `OfflineGrace` (seconds; 0 = immediate) |
-| 22  | `NCSIEnabled`              |     |                                         |
+Keys 1 (`Tag`), 15 (`From`), 27 (`UUID`), 28 (`UUIDSig`), 30 (`C2Host`),
+31 (`LastSeen`), 32 (`LastSeenRTT`), 36 (`AgentToken`) and 43 (`Owner`) are
+retired from the check-in body.
+
+| Key | Name           | Key | Name                                    |
+| --- | -------------- | --- | --------------------------------------- |
+| 2   | `Name`         | 20  | `HasTor`                                |
+| 3   | `Version`      | 21  | `HasInternet`                           |
+| 4   | `Transport`    | 22  | `NCSIEnabled`                           |
+| 5   | `Hostname`     | 23  | `Process` (`AgentProcess`)              |
+| 6   | `Hardware`     | 24  | `Exes` (array)                          |
+| 7   | `Container`    | 25  | `CWD`                                   |
+| 8   | `CPU`          | 26  | `Product` (any)                         |
+| 9   | `GPU`          | 29  | `PublicKey` (PEM)                       |
+| 10  | `Mem`          | 33  | `Uptime`                                |
+| 11  | `OS`           | 34  | `Groups`                                |
+| 12  | `GOOS`         | 37  | `MeshRoute`                             |
+| 13  | `Kernel`       | 38  | `P2PRelayPort`                          |
+| 14  | `Arch`         | 39  | `MeshGossipPort`                        |
+| 16  | `IPs` (array)  | 40  | `Files` (array)                         |
+| 17  | `ARP` (array)  | 41  | `GOArch`                                |
+| 18  | `User`         | 42  | `P2PTransport`                          |
+| 19  | `HasRoot`      | 44  | `OfflineGrace` (seconds; 0 = immediate) |
 
 `AgentProcess`:
 
@@ -417,8 +416,6 @@ is a PEM-encoded PKIX P-256 public key; `UUIDSig` is the base64url CA
 | 3   | `Cmdline` |
 | 4   | `Parent`  |
 
-Omit `LastSeen` (31) and `LastSeenRTT` (32) to avoid Go `time.Time`/`Duration`
-CBOR tag subtleties; the server sets `LastSeen` from the connection anyway.
 `OfflineGrace` (44) is the agent-chosen removal deadline in seconds; zero means
 remove on disconnect. The Go C2 also has a C2-derived `Sleeping` snapshot flag
 (key 45), but that is not part of the check-in body.
@@ -466,7 +463,7 @@ agent                                              C2
   |-- frame: MsgAuth(caps=[c2-checkin]) ------------>|  PSK-encrypted
   |                                                  |  verify CA + TOFU + replay
   |                                                  |  rate-limit per UUID
-  |-- frame: CBOR Emp3r0rAgent --------------------->|  sanitize, pin key, persist
+  |-- frame: CBOR Emp3r0rAgent body ---------------->|  sanitize, pin key, persist
   |                                                  |  session admission
   |<-- frame: CBOR MsgTunData{Tag:"checkin-ok"} -----|
   |-- close ---------------------------------------->|
@@ -639,8 +636,7 @@ missing `client-session:` prefix fails silently and is painful to debug.
   prefix is untrusted and only bounds reads.
 - **Padding** obscures normal frame lengths; explicit bulk relays opt out.
 - **Identity derivation** — the server derives the operator-facing tag from the
-  verified UUID and overwrites any agent-supplied tag. A C agent should still
-  send its tag for compatibility but must not depend on it.
+  verified UUID. The check-in body carries no tag or identity fields.
 - **Input is hostile** — a C agent must validate every length and index from the
   stream and must not panic on malformed CBOR or frames.
 

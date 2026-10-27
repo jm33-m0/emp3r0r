@@ -118,11 +118,10 @@ static inline int c2_msgtun_is_hello(const c2_msgtun *m) {
 }
 
 /* ------------------------------------------------------------------------- */
-/* Emp3r0rAgent check-in body (CBOR keys 1..43)                               */
+/* Emp3r0rAgent check-in body (keys 2..44; retired keys omitted)             */
 /* ------------------------------------------------------------------------- */
 
 enum {
-  C2_KEY_AGENT_TAG = 1,
   C2_KEY_AGENT_NAME = 2,
   C2_KEY_AGENT_VERSION = 3,
   C2_KEY_AGENT_TRANSPORT = 4,
@@ -136,7 +135,6 @@ enum {
   C2_KEY_AGENT_GOOS = 12,
   C2_KEY_AGENT_KERNEL = 13,
   C2_KEY_AGENT_ARCH = 14,
-  C2_KEY_AGENT_FROM = 15,
   C2_KEY_AGENT_IPS = 16,
   C2_KEY_AGENT_ARP = 17,
   C2_KEY_AGENT_USER = 18,
@@ -148,22 +146,15 @@ enum {
   C2_KEY_AGENT_EXES = 24,
   C2_KEY_AGENT_CWD = 25,
   C2_KEY_AGENT_PRODUCT = 26,
-  C2_KEY_AGENT_UUID = 27,
-  C2_KEY_AGENT_UUID_SIG = 28,
   C2_KEY_AGENT_PUBLIC_KEY = 29,
-  C2_KEY_AGENT_C2HOST = 30,
-  C2_KEY_AGENT_LAST_SEEN = 31,     /* omit: server sets it          */
-  C2_KEY_AGENT_LAST_SEEN_RTT = 32, /* omit: Go time.Duration tag    */
   C2_KEY_AGENT_UPTIME = 33,
   C2_KEY_AGENT_GROUPS = 34,
-  C2_KEY_AGENT_TOKEN = 36,
   C2_KEY_AGENT_MESH_ROUTE = 37,
   C2_KEY_AGENT_P2P_RELAY_PORT = 38,
   C2_KEY_AGENT_MESH_GOSSIP_PORT = 39,
   C2_KEY_AGENT_FILES = 40,
   C2_KEY_AGENT_GOARCH = 41,
   C2_KEY_AGENT_P2P_TRANSPORT = 42,
-  C2_KEY_AGENT_OWNER = 43,
   C2_KEY_AGENT_OFFLINE_GRACE = 44,
 };
 
@@ -185,16 +176,15 @@ typedef struct {
 } c2_agent_process;
 
 /*
- * Emp3r0rAgent, flattened. Every field is optional except the ones the server
- * requires: UUID, UUIDSig and PublicKey. Unset strings are encoded as absent
- * when .ptr is NULL; set strings may be empty. Integer/boolean fields are
- * emitted only when their present flag is set.
+ * Emp3r0rAgent, flattened. Every field is optional except PublicKey. Unset
+ * strings are encoded as absent when .ptr is NULL; set strings may be empty.
+ * Integer/boolean fields are emitted only when their present flag is set.
  *
- * The server derives Tag from the verified UUID and overwrites From/LastSeen,
- * so a C agent may omit Tag/From entirely.
+ * Identity (UUID/UUIDSig), Tag, From, LastSeen, Owner, C2Host and AgentToken
+ * are not part of the check-in body: the server takes identity from MsgAuth and
+ * derives the rest from the connection/session.
  */
 typedef struct {
-  c2_str tag;
   c2_str name;
   c2_str version;
   c2_str transport;
@@ -208,7 +198,6 @@ typedef struct {
   c2_str goos;
   c2_str kernel;
   c2_str arch;
-  c2_str from;
   c2_str_list ips;
   c2_str_list arp;
   c2_str user;
@@ -227,10 +216,7 @@ typedef struct {
   c2_str cwd;
   c2_str product; /* JSON/text; leave unset for a minimal agent */
 
-  c2_str uuid;
-  c2_str uuid_sig;
   c2_str public_key; /* PEM-encoded PKIX P-256 public key */
-  c2_str c2host;
 
   c2_str uptime;
   c2_str groups;
@@ -241,7 +227,6 @@ typedef struct {
   c2_str_list files;
   c2_str goarch;
   c2_str p2p_transport;
-  c2_str owner;
 
   int has_offline_grace;
   int64_t offline_grace;
