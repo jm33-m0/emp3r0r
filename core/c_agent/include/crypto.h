@@ -110,7 +110,7 @@ typedef struct c2_crypto_backend {
  *   psk    = first 32 ASCII bytes of hexMD5
  *
  * The PSK is the AES-256 key every stream starts on. It is weak bootstrap
- * secrecy by design (see README.md, protocol §13); never carry sensitive data
+ * secrecy by design (see PROTOCOL.md §13); never carry sensitive data
  * before the PFS handshake completes.
  */
 c2_status c2_psk_from_magic(const c2_crypto_backend *be, const char *magic,

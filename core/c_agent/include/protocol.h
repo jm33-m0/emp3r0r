@@ -13,9 +13,8 @@
  *   secureconn.h SecureConn framing and key lifecycle
  *   transport.h  build config, channel contract, agent session flow
  *
- * Normative protocol text lives in README.md's "C2 protocol specification"
- * section. When the Go implementation changes, that section and these headers
- * must change in the same commit.
+ * Normative protocol text lives in PROTOCOL.md. When the Go implementation
+ * changes, that document and these headers must change in the same commit.
  *
  * Build notes:
  *   - C99, freestanding-friendly (only <stdint.h>/<stddef.h>).

@@ -1,7 +1,7 @@
 /*
  * session.c — the agent half of the C2 flow.
  *
- * Implements the sequence documented in README §"Minimal C agent flow":
+ * Implements the sequence documented in README.md under Design/Lifecycle:
  * check-in, msg-tunnel hello + ECDH handshake, job read/reply, and the
  * one-shot www/ftp file streams. It is transport-agnostic: everything goes
  * through c2_transport (c2_http_poll.c, a duplex stream, or the in-memory

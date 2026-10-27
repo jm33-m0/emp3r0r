@@ -7,7 +7,7 @@ const (
 	// ProtocolVersion is the wire-format version every MsgAuth must carry. The
 	// server rejects any other version, so all peers must be built together.
 	// A non-Go agent (e.g. the C agent) declares this value in its MsgAuth
-	// envelope; see core/c_agent/README.md.
+	// envelope; see core/c_agent/PROTOCOL.md.
 	ProtocolVersion = 1
 )
 

@@ -19,7 +19,7 @@
  * tampered length fails the GCM tag. The outer enc_len is untrusted and only
  * bounds the read.
  *
- * Key lifecycle (README.md §4.2):
+ * Key lifecycle (PROTOCOL.md §4.2):
  *   1. every stream starts on the per-build PSK;
  *   2. checkin/msg exchange the ECDH handshake on the PSK;
  *   3. after the handshake reply is read, switch the msg stream to the session
