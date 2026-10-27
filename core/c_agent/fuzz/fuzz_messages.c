@@ -24,8 +24,6 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   if (cbor_parser_init(data, size, 0, &parser, &it) == CborNoError) {
     c2_msgauth a = {0};
-    a.capabilities.items = items;
-    a.capabilities.cap = c1;
     (void)c2_msgauth_decode(&it, &a);
   }
 

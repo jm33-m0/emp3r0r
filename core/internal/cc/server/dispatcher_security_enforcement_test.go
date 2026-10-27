@@ -98,33 +98,27 @@ func TestDuplicateSessionPrevention(t *testing.T) {
 // TestRouteValidationStrict verifies that invalid routes are rejected with no fallback
 func TestRouteValidationStrict(t *testing.T) {
 	testCases := []struct {
-		name         string
-		capabilities []string
-		shouldPass   bool
-		expectedErr  string
+		name        string
+		route       string
+		shouldPass  bool
+		expectedErr string
 	}{
 		{
-			name:         "Valid single route",
-			capabilities: []string{"c2-checkin-test"},
-			shouldPass:   true,
+			name:       "Valid single route",
+			route:      "c2-checkin-test",
+			shouldPass: true,
 		},
 		{
-			name:         "Empty capabilities",
-			capabilities: []string{},
-			shouldPass:   false,
-			expectedErr:  "missing route capability",
+			name:        "Empty route",
+			route:       "",
+			shouldPass:  false,
+			expectedErr: "missing route",
 		},
 		{
-			name:         "Invalid route name",
-			capabilities: []string{"c2-invalid-route"},
-			shouldPass:   false,
-			expectedErr:  "no configured route capability provided",
-		},
-		{
-			name:         "Multiple capabilities",
-			capabilities: []string{"c2-checkin-test", "c2-msg-test"},
-			shouldPass:   false,
-			expectedErr:  "multiple route capabilities are not allowed",
+			name:        "Invalid route name",
+			route:       "c2-invalid-route",
+			shouldPass:  false,
+			expectedErr: "unknown route",
 		},
 	}
 
@@ -138,8 +132,8 @@ func TestRouteValidationStrict(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			msgAuth := &def.MsgAuth{
-				AgentUUID:    "test-agent",
-				Capabilities: tc.capabilities,
+				AgentUUID: "test-agent",
+				Route:     tc.route,
 			}
 
 			ctx, err := normalizeRouteFromMsgAuth(msgAuth)
@@ -301,10 +295,10 @@ func TestCBOREnvelopeAuthenticationBoundary(t *testing.T) {
 	live.GetRuntimeConfig().C2Routes.Checkin = "c2-checkin-real"
 	live.GetRuntimeConfig().C2Routes.Msg = "c2-msg-real"
 
-	// Test that normalizeRouteFromMsgAuth only looks at Capabilities field
+	// Test that normalizeRouteFromMsgAuth only looks at the Route field.
 	msgAuth := &def.MsgAuth{
-		AgentUUID:    "test-agent",
-		Capabilities: []string{"c2-checkin-real"},
+		AgentUUID: "test-agent",
+		Route:     "c2-checkin-real",
 	}
 
 	ctx, err := normalizeRouteFromMsgAuth(msgAuth)
@@ -450,8 +444,8 @@ func TestStrictRouteToHandlerMapping(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			msgAuth := &def.MsgAuth{
-				AgentUUID:    "test",
-				Capabilities: []string{tc.capability},
+				AgentUUID: "test",
+				Route:     tc.capability,
 			}
 
 			ctx, err := normalizeRouteFromMsgAuth(msgAuth)

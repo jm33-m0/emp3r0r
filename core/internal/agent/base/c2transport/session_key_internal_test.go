@@ -104,19 +104,18 @@ func TestIsBootstrapRoute(t *testing.T) {
 	}
 
 	for _, c := range []struct {
-		caps []string
-		want bool
+		route string
+		want  bool
 	}{
-		{caps: []string{"c2-checkin"}, want: true},
-		{caps: []string{"c2-msg"}, want: true},
-		{caps: []string{"c2-checkin", "c2-msg"}, want: true},
-		{caps: []string{"c2-ftp"}, want: false},
-		{caps: []string{"c2-www"}, want: false},
-		{caps: []string{"c2-proxy"}, want: false},
-		{caps: []string{"c2-www", "c2-checkin"}, want: true},
+		{route: "c2-checkin", want: true},
+		{route: "c2-msg", want: true},
+		{route: "c2-ftp", want: false},
+		{route: "c2-www", want: false},
+		{route: "c2-proxy", want: false},
+		{route: "unknown", want: false},
 	} {
-		if got := isBootstrapRoute(c.caps); got != c.want {
-			t.Errorf("isBootstrapRoute(%v) = %v, want %v", c.caps, got, c.want)
+		if got := isBootstrapRoute(c.route); got != c.want {
+			t.Errorf("isBootstrapRoute(%q) = %v, want %v", c.route, got, c.want)
 		}
 	}
 }

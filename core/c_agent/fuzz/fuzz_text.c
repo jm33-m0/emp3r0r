@@ -59,31 +59,12 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     c2_hex_encode(data, hn, hex);
   }
 
-  /* canonical auth string with newline-separated capabilities. */
-  c2_str caps[C2_MAX_CAPABILITIES];
-  size_t count = 0;
-  const char *p = (const char *)data;
-  size_t remaining = size;
-  while (remaining > 0 && count < C2_MAX_CAPABILITIES) {
-    const char *nl = (const char *)memchr(p, '\n', remaining);
-    size_t len = nl ? (size_t)(nl - p) : remaining;
-    caps[count++] = c2_str_of(p, len);
-    if (!nl)
-      break;
-    remaining -= len + 1;
-    p = nl + 1;
-  }
-  c2_str_list list = {caps, count, C2_MAX_CAPABILITIES};
-  char canon[1024];
-  (void)c2_auth_canonical(c2_str_of("uuid", 4), (int64_t)size, c2_str_lit("n"),
-                          &list, canon, sizeof(canon), NULL);
-
-  /* Over the capability bound the function must reject before touching the
-   * array (items only has C2_MAX_CAPABILITIES entries). */
+  /* canonical auth string; the route is a single text field. */
   {
-    c2_str_list over = {caps, C2_MAX_CAPABILITIES + 1, C2_MAX_CAPABILITIES};
-    (void)c2_auth_canonical(c2_str_of("uuid", 4), 0, c2_str_lit("n"), &over,
-                            canon, sizeof(canon), NULL);
+    char canon[1024];
+    (void)c2_auth_canonical(
+        c2_str_of("uuid", 4), (int64_t)size, c2_str_lit("n"),
+        c2_str_of((const char *)data, size), canon, sizeof(canon), NULL);
   }
 
   /* Identity-signature helper with a fake signer, exercising the base64url

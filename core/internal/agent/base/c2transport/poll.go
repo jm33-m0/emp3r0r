@@ -24,7 +24,7 @@ import (
 
 // ReportStatus poll CC server and report its system info
 func ReportStatus(config *def.Config, info *def.Emp3r0rAgent) (err error) {
-	// The C2 protocol is transport-agnostic: routing is done by MsgAuth.Capabilities
+	// The C2 protocol is transport-agnostic: routing is done by MsgAuth.Route
 	// inside the CBOR frame — not by URL path. We dial the single C2 endpoint.
 	reportStatusURL := def.CCAddress
 	logging.Infof("Collected system info, now reporting status to %s", reportStatusURL)

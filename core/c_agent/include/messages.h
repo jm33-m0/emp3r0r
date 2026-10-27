@@ -30,20 +30,18 @@ typedef struct {
 } c2_str_list;
 
 /* ------------------------------------------------------------------------- */
-/* MsgAuth (CBOR keys 11..20)                                                 */
+/* MsgAuth (CBOR keys 11..19; keys 18, 20 retired)                           */
 /* ------------------------------------------------------------------------- */
 
 enum {
-  C2_KEY_AUTH_TYPE = 11,             /* text  must be C2_MSGAUTH_TYPE      */
-  C2_KEY_AUTH_AGENT_UUID = 12,       /* text                               */
-  C2_KEY_AUTH_IDENTITY_TOKEN = 13,   /* text  base64url(CA sig over UUID)  */
-  C2_KEY_AUTH_TIMESTAMP = 14,        /* int   unix seconds                 */
-  C2_KEY_AUTH_NONCE = 15,            /* text  fresh, anti-replay           */
-  C2_KEY_AUTH_CAPABILITIES = 16,     /* array of text (1 route + features) */
-  C2_KEY_AUTH_AGENT_PROOF = 17,      /* text  base64url(ECDSA DER sig)     */
-  C2_KEY_AUTH_EPHEM_PUBLIC = 18,     /* bytes optional                     */
-  C2_KEY_AUTH_STREAM_ID = 19,        /* text  optional                     */
-  C2_KEY_AUTH_PROTOCOL_VERSION = 20, /* int must be C2_PROTOCOL_VERSION  */
+  C2_KEY_AUTH_TYPE = 11,           /* text  must be C2_MSGAUTH_TYPE      */
+  C2_KEY_AUTH_AGENT_UUID = 12,     /* text                               */
+  C2_KEY_AUTH_IDENTITY_TOKEN = 13, /* text  base64url(CA sig over UUID)  */
+  C2_KEY_AUTH_TIMESTAMP = 14,      /* int   unix seconds                 */
+  C2_KEY_AUTH_NONCE = 15,          /* text  fresh, anti-replay           */
+  C2_KEY_AUTH_ROUTE = 16,          /* text  exactly one route name       */
+  C2_KEY_AUTH_AGENT_PROOF = 17,    /* text  base64url(ECDSA DER sig)     */
+  C2_KEY_AUTH_STREAM_ID = 19,      /* text  optional                     */
 };
 
 typedef struct {
@@ -52,23 +50,21 @@ typedef struct {
   c2_str identity_token;
   int64_t timestamp;
   c2_str nonce;
-  c2_str_list capabilities;
+  c2_str route;
   c2_str agent_proof;
-  c2_bytes ephem_public_key;
   c2_str stream_id;
-  int64_t protocol_version;
 } c2_msgauth;
 
 /*
  * Build the canonical auth string that AgentProof signs:
  *
- *   AgentUUID "\n" decimal(Timestamp) "\n" Nonce "\n" join(sorted(caps), ",")
+ *   AgentUUID "\n" decimal(Timestamp) "\n" Nonce "\n" Route
  *
- * Capabilities are sorted bytewise; duplicates are kept. Writes a NUL byte
- * after the string when there is room. Returns C2_ERR_NOMEM if it does not fit.
+ * Writes a NUL byte after the string when there is room. Returns C2_ERR_NOMEM
+ * if it does not fit.
  */
 c2_status c2_auth_canonical(c2_str agent_uuid, int64_t timestamp, c2_str nonce,
-                            const c2_str_list *caps, char *out, size_t out_cap,
+                            c2_str route, char *out, size_t out_cap,
                             size_t *out_len);
 
 /* Encode a MsgAuth map. `m->type` is emitted as-is; the caller sets it. */

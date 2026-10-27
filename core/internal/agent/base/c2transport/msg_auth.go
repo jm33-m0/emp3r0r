@@ -17,7 +17,7 @@ import (
 // sendMsgAuthEnvelope sends a CBOR-encoded MsgAuth envelope over the given writer.
 // This is the FIRST thing sent over every new connection, before any other CBOR frames.
 // The server reads this first frame to route the connection and verify identity.
-func sendMsgAuthEnvelope(w io.Writer, capabilities []string, streamID string) error {
+func sendMsgAuthEnvelope(w io.Writer, route, streamID string) error {
 	cfg := common.RuntimeConfig
 	if cfg == nil {
 		return fmt.Errorf("runtime config not initialized")
@@ -28,22 +28,21 @@ func sendMsgAuthEnvelope(w io.Writer, capabilities []string, streamID string) er
 
 	nonce := util.RandStr(16)
 	now := time.Now().Unix()
-	canonical := transport.CanonicalAuthString(cfg.AgentUUID, now, nonce, capabilities)
+	canonical := transport.CanonicalAuthString(cfg.AgentUUID, now, nonce, route)
 	sig, err := agentutils.SignWithAgentKey([]byte(canonical))
 	if err != nil {
 		return fmt.Errorf("sign MsgAuth: %w", err)
 	}
 
 	msg := def.MsgAuth{
-		Type:            def.MsgAuthType,
-		AgentUUID:       cfg.AgentUUID,
-		IdentityToken:   cfg.AgentUUIDSig,
-		Nonce:           nonce,
-		Timestamp:       now,
-		AgentProof:      base64.URLEncoding.EncodeToString(sig),
-		Capabilities:    capabilities,
-		StreamID:        streamID,
-		ProtocolVersion: def.ProtocolVersion,
+		Type:          def.MsgAuthType,
+		AgentUUID:     cfg.AgentUUID,
+		IdentityToken: cfg.AgentUUIDSig,
+		Nonce:         nonce,
+		Timestamp:     now,
+		AgentProof:    base64.URLEncoding.EncodeToString(sig),
+		Route:         route,
+		StreamID:      streamID,
 	}
 	return cbor.NewEncoder(w).Encode(msg)
 }

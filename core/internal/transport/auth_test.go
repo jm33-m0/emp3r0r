@@ -39,32 +39,17 @@ func genCA(t *testing.T) (*ecdsa.PrivateKey, []byte) {
 	return caKey, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
 }
 
-// TestCanonicalAuthStringDeterministicAndSorted verifies the canonical auth
-// string is stable: capabilities sorted, fields joined in a fixed order, and
-// independent of map/argument ordering.
-func TestCanonicalAuthStringDeterministicAndSorted(t *testing.T) {
-	a := CanonicalAuthString("agent-uuid", 1234567890, "nonce-x", []string{"exec", "shell", "get"})
-	b := CanonicalAuthString("agent-uuid", 1234567890, "nonce-x", []string{"shell", "get", "exec"})
-	if a != b {
-		t.Fatalf("canonical string not order-independent:\n%q\n%q", a, b)
-	}
-	want := "agent-uuid\n1234567890\nnonce-x\nexec,get,shell"
-	if a != want {
-		t.Fatalf("canonical string = %q, want %q", a, want)
+// TestCanonicalAuthString pins the canonical auth string for a single route.
+func TestCanonicalAuthString(t *testing.T) {
+	got := CanonicalAuthString("agent-uuid", 1234567890, "nonce-x", "c2-msg")
+	want := "agent-uuid\n1234567890\nnonce-x\nc2-msg"
+	if got != want {
+		t.Fatalf("canonical string = %q, want %q", got, want)
 	}
 
-	// Input slice must not be mutated by canonicalization.
-	caps := []string{"z", "a"}
-	_ = CanonicalAuthString("u", 1, "n", caps)
-	if caps[0] != "z" || caps[1] != "a" {
-		t.Fatalf("CanonicalAuthString mutated caller slice: %v", caps)
-	}
-
-	// Nil / empty capabilities must canonicalize the same as no caps.
-	empty := CanonicalAuthString("u", 1, "n", nil)
-	alsoEmpty := CanonicalAuthString("u", 1, "n", []string{})
-	if empty != alsoEmpty {
-		t.Fatalf("nil vs empty capabilities differ: %q vs %q", empty, alsoEmpty)
+	empty := CanonicalAuthString("u", 1, "n", "")
+	if empty != "u\n1\nn\n" {
+		t.Fatalf("empty route canonical string = %q", empty)
 	}
 }
 
@@ -83,12 +68,12 @@ func TestVerifyMsgAuthRejectsMalformed(t *testing.T) {
 			t.Fatalf("sign: %v", err)
 		}
 		a := &def.MsgAuth{
-			Type:            def.MsgAuthType,
-			ProtocolVersion: def.ProtocolVersion,
-			AgentUUID:       "agent-1",
-			IdentityToken:   base64.URLEncoding.EncodeToString(sig),
-			Nonce:           "nonce",
-			Timestamp:       time.Now().Unix(),
+			Type:          def.MsgAuthType,
+			AgentUUID:     "agent-1",
+			IdentityToken: base64.URLEncoding.EncodeToString(sig),
+			Nonce:         "nonce",
+			Timestamp:     time.Now().Unix(),
+			Route:         "c2-msg",
 		}
 		mut(a)
 		return a
@@ -105,16 +90,10 @@ func TestVerifyMsgAuthRejectsMalformed(t *testing.T) {
 			t.Fatal("expected error for wrong type")
 		}
 	})
-	t.Run("wrong protocol version", func(t *testing.T) {
-		a := mk(func(m *def.MsgAuth) { m.ProtocolVersion = def.ProtocolVersion + 1 })
+	t.Run("missing route", func(t *testing.T) {
+		a := mk(func(m *def.MsgAuth) { m.Route = "" })
 		if err := VerifyMsgAuth(a); err == nil {
-			t.Fatal("expected error for wrong protocol version")
-		}
-	})
-	t.Run("missing protocol version", func(t *testing.T) {
-		a := mk(func(m *def.MsgAuth) { m.ProtocolVersion = 0 })
-		if err := VerifyMsgAuth(a); err == nil {
-			t.Fatal("expected error for missing protocol version")
+			t.Fatal("expected error for missing route")
 		}
 	})
 	t.Run("empty agent uuid", func(t *testing.T) {
@@ -181,12 +160,12 @@ func TestVerifyMsgAuthAcceptsValidToken(t *testing.T) {
 		t.Fatalf("sign: %v", err)
 	}
 	auth := &def.MsgAuth{
-		Type:            def.MsgAuthType,
-		ProtocolVersion: def.ProtocolVersion,
-		AgentUUID:       "agent-1",
-		IdentityToken:   base64.URLEncoding.EncodeToString(sig),
-		Nonce:           "nonce",
-		Timestamp:       time.Now().Unix(),
+		Type:          def.MsgAuthType,
+		AgentUUID:     "agent-1",
+		IdentityToken: base64.URLEncoding.EncodeToString(sig),
+		Nonce:         "nonce",
+		Timestamp:     time.Now().Unix(),
+		Route:         "c2-msg",
 	}
 	if err := VerifyMsgAuth(auth); err != nil {
 		t.Fatalf("valid MsgAuth rejected: %v", err)

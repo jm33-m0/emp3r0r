@@ -8,9 +8,8 @@
  * exact structs the C2 marshals, so a divergence in key order or integer width
  * fails here. */
 static const char kMsgauthHex[] =
-    "aa0b67617574685f76310c69757569642d313233340d67644739725a57340e1a6553f100"
-    "0f656e6f6e636510826663322d6d736763626f66116763484a7662325912440102030413"
-    "6673747265616d1401";
+    "a80b67617574685f76310c69757569642d313233340d67644739725a57340e1a6553f100"
+    "0f656e6f6e6365106663322d6d7367116763484a76623259136673747265616d";
 static const char kMsgtunHex[] =
     "a701656a6f622d31028267216c735f646972642f746d700344deadbeef0464616263"
     "64051b0000018bcfe568000844090807060af6";
@@ -45,20 +44,15 @@ int main(void) {
     size_t exp_len = unhex(kMsgauthHex, exp, sizeof(exp));
     CHECK(exp_len > 0);
 
-    c2_str caps[2] = {c2_str_lit("c2-msg"), c2_str_lit("bof")};
     c2_msgauth m = {0};
     m.type = c2_str_lit("auth_v1");
     m.agent_uuid = c2_str_lit("uuid-1234");
     m.identity_token = c2_str_lit("dG9rZW4");
     m.timestamp = 1700000000;
     m.nonce = c2_str_lit("nonce");
-    m.capabilities.items = caps;
-    m.capabilities.count = 2;
-    m.capabilities.cap = 2;
+    m.route = c2_str_lit("c2-msg");
     m.agent_proof = c2_str_lit("cHJvb2Y");
-    m.ephem_public_key = c2_bytes_of("\x01\x02\x03\x04", 4);
     m.stream_id = c2_str_lit("stream");
-    m.protocol_version = 1;
 
     CborEncoder enc;
     cbor_encoder_init(&enc, buf, sizeof(buf), 0);
@@ -72,24 +66,16 @@ int main(void) {
   {
     uint8_t enc[256];
     size_t enc_len = unhex(kMsgauthHex, enc, sizeof(enc));
-    c2_str caps[4];
     c2_msgauth m = {0};
-    m.capabilities.items = caps;
-    m.capabilities.cap = 4;
     CHECK(decode_msgauth(enc, enc_len, &m) == C2_OK);
     CHECK(c2_str_equal(m.type, "auth_v1"));
     CHECK(c2_str_equal(m.agent_uuid, "uuid-1234"));
     CHECK(c2_str_equal(m.identity_token, "dG9rZW4"));
     CHECK_EQ_LONG(m.timestamp, 1700000000);
     CHECK(c2_str_equal(m.nonce, "nonce"));
-    CHECK_EQ_LONG(m.capabilities.count, 2);
-    CHECK(c2_str_equal(m.capabilities.items[0], "c2-msg"));
-    CHECK(c2_str_equal(m.capabilities.items[1], "bof"));
+    CHECK(c2_str_equal(m.route, "c2-msg"));
     CHECK(c2_str_equal(m.agent_proof, "cHJvb2Y"));
-    CHECK_EQ_LONG(m.ephem_public_key.len, 4);
-    CHECK(m.ephem_public_key.ptr[3] == 4);
     CHECK(c2_str_equal(m.stream_id, "stream"));
-    CHECK_EQ_LONG(m.protocol_version, 1);
   }
 
   /* MsgTunData: decode the Go vector (which includes a null field 10). */
@@ -231,10 +217,7 @@ int main(void) {
     static const uint8_t tagged[] = {0xbf, 0x01, 0xd5, 0x03, 0xff};
     c2_msgtun t = {0};
     CHECK(decode_msgtun(tagged, sizeof(tagged), &t) == C2_ERR_PROTO);
-    c2_str caps[1];
     c2_msgauth a = {0};
-    a.capabilities.items = caps;
-    a.capabilities.cap = 1;
     CHECK(decode_msgauth(tagged, sizeof(tagged), &a) == C2_OK);
 
     /* A key with no value ends the map: malformed, never a crash. */

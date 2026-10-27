@@ -25,14 +25,7 @@ extern "C" {
 /* Protocol identity                                                          */
 /* ------------------------------------------------------------------------- */
 
-/*
- * ProtocolVersion is carried in every MsgAuth (CBOR key 20). The C2 rejects any
- * other value, so all peers must be built from the same batch. Bump it for any
- * incompatible wire change and update def.ProtocolVersion in the Go source.
- */
-#define C2_PROTOCOL_VERSION 1
-
-/* Value of MsgAuth.Type. */
+/* Value of MsgAuth.Type; the type string carries the wire version. */
 #define C2_MSGAUTH_TYPE "auth_v1"
 
 /* ------------------------------------------------------------------------- */
@@ -94,28 +87,11 @@ extern "C" {
 #define C2_CHANNEL_DEFAULT "http_poll"
 
 /* ------------------------------------------------------------------------- */
-/* MsgAuth.Capabilities tokens                                                */
+/* AgentToken capabilities                                                    */
 /* ------------------------------------------------------------------------- */
-
-/*
- * Exactly one route token must be present; the C2 ranks the others as feature
- * advertisement. Unknown tokens are ignored by the server (so feature
- * advertising is forward compatible) but are part of the signed canonical
- * string, so they must be sent exactly as advertised.
- */
-#define C2_CAP_FILE_MGMT "file-mgmt"
-#define C2_CAP_BOF "bof"
-#define C2_CAP_MEMMOD "memmod"
-#define C2_CAP_SOCKS5 "socks5"
-#define C2_CAP_MESH "mesh"
 
 /* AgentToken.Capability value that authorises mesh routing. */
 #define C2_CAP_ROUTER "router"
-
-/* Maximum capability tokens c2_auth_canonical will sort. A route plus a handful
- * of feature tokens is the realistic maximum; the bound keeps sorting off the
- * heap in freestanding builds. */
-#define C2_MAX_CAPABILITIES 32
 
 /* ------------------------------------------------------------------------- */
 /* MsgTunData.Tag values                                                      */
@@ -262,21 +238,6 @@ static inline int c2_str_equal(c2_str a, const char *b) {
 
 static inline int c2_str_equal_str(c2_str a, c2_str b) {
   return a.len == b.len && (a.len == 0 || c2_ct_equal(a.ptr, b.ptr, a.len));
-}
-
-/* Bytewise lexicographic order, matching Go's strings.Compare / sort.Strings.
- * Returns -1, 0 or 1. NULL pointers are legal only for zero-length slices. */
-static inline int c2_str_cmp(c2_str a, c2_str b) {
-  size_t n = a.len < b.len ? a.len : b.len;
-  for (size_t i = 0; i < n; i++) {
-    unsigned char x = (unsigned char)a.ptr[i];
-    unsigned char y = (unsigned char)b.ptr[i];
-    if (x != y)
-      return x < y ? -1 : 1;
-  }
-  if (a.len == b.len)
-    return 0;
-  return a.len < b.len ? -1 : 1;
 }
 
 /* ------------------------------------------------------------------------- */

@@ -217,8 +217,7 @@ void c2_session_set_identity_pub(c2_agent_session *s,
 }
 
 c2_status c2_session_open_route(c2_agent_session *s, c2_str route,
-                                c2_str stream_id, const c2_str_list *caps,
-                                c2_secureconn *sc) {
+                                c2_str stream_id, c2_secureconn *sc) {
   if (s == NULL || sc == NULL || s->transport.ops == NULL ||
       s->transport.ops->open == NULL)
     return C2_ERR_ARG;
@@ -247,7 +246,7 @@ c2_status c2_session_open_route(c2_agent_session *s, c2_str route,
   int64_t ts = now_unix();
   char canonical[512];
   size_t canon_len = 0;
-  st = c2_auth_canonical(s->config->agent_uuid, ts, c2_str_of(nonce, 32), caps,
+  st = c2_auth_canonical(s->config->agent_uuid, ts, c2_str_of(nonce, 32), route,
                          canonical, sizeof(canonical), &canon_len);
   if (st != C2_OK) {
     c2_secureconn_close(sc);
@@ -269,10 +268,9 @@ c2_status c2_session_open_route(c2_agent_session *s, c2_str route,
   m.identity_token = s->config->agent_uuid_sig;
   m.timestamp = ts;
   m.nonce = c2_str_of(nonce, 32);
-  m.capabilities = *caps;
+  m.route = route;
   m.agent_proof = c2_str_of(proof, proof_len);
   m.stream_id = stream_id;
-  m.protocol_version = C2_PROTOCOL_VERSION;
 
   uint8_t buf[C2_SESSION_AUTH_MAX];
   CborEncoder enc;
@@ -303,12 +301,9 @@ c2_status c2_session_checkin(c2_agent_session *s, const c2_agent_info *info) {
   if (s == NULL || info == NULL)
     return C2_ERR_ARG;
 
-  c2_str caps_items[1] = {s->config->routes.checkin};
-  c2_str_list caps = {caps_items, 1, 1};
-
   c2_secureconn sc;
-  c2_status st = c2_session_open_route(s, s->config->routes.checkin,
-                                       c2_str_lit(""), &caps, &sc);
+  c2_status st =
+      c2_session_open_route(s, s->config->routes.checkin, c2_str_lit(""), &sc);
   if (st != C2_OK)
     return st;
 
@@ -490,11 +485,8 @@ c2_status c2_session_upload(c2_agent_session *s, c2_str token,
   if (s == NULL || (len > 0 && data == NULL))
     return C2_ERR_ARG;
 
-  c2_str caps_items[1] = {s->config->routes.ftp};
-  c2_str_list caps = {caps_items, 1, 1};
   c2_secureconn sc;
-  c2_status st =
-      c2_session_open_route(s, s->config->routes.ftp, token, &caps, &sc);
+  c2_status st = c2_session_open_route(s, s->config->routes.ftp, token, &sc);
   if (st != C2_OK)
     return st;
 
@@ -522,11 +514,8 @@ c2_status c2_session_download(c2_agent_session *s, c2_str name, uint8_t *out,
   if (s == NULL || out == NULL || out_len == NULL)
     return C2_ERR_ARG;
 
-  c2_str caps_items[1] = {s->config->routes.www};
-  c2_str_list caps = {caps_items, 1, 1};
   c2_secureconn sc;
-  c2_status st =
-      c2_session_open_route(s, s->config->routes.www, name, &caps, &sc);
+  c2_status st = c2_session_open_route(s, s->config->routes.www, name, &sc);
   if (st != C2_OK)
     return st;
 

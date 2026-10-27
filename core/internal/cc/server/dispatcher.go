@@ -52,8 +52,8 @@ func closeCheckinReadyChannel(agentUUID string) {
 	}
 }
 
-// normalizeRouteFromMsgAuth interprets MsgAuth capabilities as routing information.
-// Exactly one configured route capability must be provided; no default/fallback route is allowed.
+// normalizeRouteFromMsgAuth validates the single MsgAuth route. Exactly one
+// configured route must be provided; there is no default/fallback route.
 func normalizeRouteFromMsgAuth(msg *def.MsgAuth) (c2RouteContext, error) {
 	if msg == nil {
 		return c2RouteContext{}, fmt.Errorf("msg is nil")
@@ -62,8 +62,9 @@ func normalizeRouteFromMsgAuth(msg *def.MsgAuth) (c2RouteContext, error) {
 		AgentUUID: msg.AgentUUID,
 		StreamID:  msg.StreamID,
 	}
-	if len(msg.Capabilities) == 0 {
-		return ctx, fmt.Errorf("missing route capability")
+	route := strings.ToLower(strings.TrimSpace(msg.Route))
+	if route == "" {
+		return ctx, fmt.Errorf("missing route")
 	}
 
 	allowed := map[string]struct{}{
@@ -73,22 +74,10 @@ func normalizeRouteFromMsgAuth(msg *def.MsgAuth) (c2RouteContext, error) {
 		live.GetRuntimeConfig().C2Routes.WWW:     {},
 		live.GetRuntimeConfig().C2Routes.Proxy:   {},
 	}
-
-	seen := ""
-	for _, cap := range msg.Capabilities {
-		c := strings.ToLower(strings.TrimSpace(cap))
-		if _, ok := allowed[c]; !ok {
-			continue
-		}
-		if seen != "" && seen != c {
-			return ctx, fmt.Errorf("multiple route capabilities are not allowed")
-		}
-		seen = c
+	if _, ok := allowed[route]; !ok {
+		return ctx, fmt.Errorf("unknown route %q", route)
 	}
-	if seen == "" {
-		return ctx, fmt.Errorf("no configured route capability provided")
-	}
-	ctx.Service = seen
+	ctx.Service = route
 	return ctx, nil
 }
 
@@ -137,10 +126,10 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 	}
 	logging.Debugf("cborProtocolDispatch: MsgAuth CA verified from %s", remoteAddr)
 
-	// ── Dispatch by Capabilities ──────────────────────────────────────────────
+	// ── Dispatch by Route ────────────────────────────────────────────────────
 	routeCtx, routeErr := normalizeRouteFromMsgAuth(&msgAuth)
 	if routeErr != nil {
-		logging.Warningf("cborProtocolDispatch: invalid route capabilities for agent %s from %s: %v", util.AgentRef(msgAuth.AgentUUID), remoteAddr, routeErr)
+		logging.Warningf("cborProtocolDispatch: invalid route for agent %s from %s: %v", util.AgentRef(msgAuth.AgentUUID), remoteAddr, routeErr)
 		return
 	}
 	logging.Debugf("cborProtocolDispatch: normalized route: service=%s agent=%s", routeCtx.Service, util.AgentRef(msgAuth.AgentUUID))
@@ -194,7 +183,7 @@ func cborProtocolDispatch(t transport.StreamTransport) {
 			logging.Warningf("cborProtocolDispatch: decode agent proof failed for %s from %s: %v", util.AgentRef(msgAuth.AgentUUID), remoteAddr, err)
 			return
 		}
-		canonical := transport.CanonicalAuthString(msgAuth.AgentUUID, msgAuth.Timestamp, msgAuth.Nonce, msgAuth.Capabilities)
+		canonical := transport.CanonicalAuthString(msgAuth.AgentUUID, msgAuth.Timestamp, msgAuth.Nonce, msgAuth.Route)
 		ok, err := transport.VerifySignatureWithPEM([]byte(pinnedKey), []byte(canonical), proof)
 		if err != nil || !ok {
 			msg := fmt.Sprintf("cborProtocolDispatch: pinned key verification failed for agent %s from %s (sig_ok=%v, err=%v)", util.AgentRef(msgAuth.AgentUUID), remoteAddr, ok, err)

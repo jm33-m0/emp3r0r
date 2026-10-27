@@ -73,36 +73,14 @@ static c2_status sb_put_i64(c2_sb *s, int64_t v) {
 }
 
 c2_status c2_auth_canonical(c2_str agent_uuid, int64_t timestamp, c2_str nonce,
-                            const c2_str_list *caps, char *out, size_t out_cap,
+                            c2_str route, char *out, size_t out_cap,
                             size_t *out_len) {
   if (out == NULL || out_cap == 0)
     return C2_ERR_ARG;
-  if (agent_uuid.len > 0 && agent_uuid.ptr == NULL)
+  if ((agent_uuid.len > 0 && agent_uuid.ptr == NULL) ||
+      (nonce.len > 0 && nonce.ptr == NULL) ||
+      (route.len > 0 && route.ptr == NULL))
     return C2_ERR_ARG;
-  if (nonce.len > 0 && nonce.ptr == NULL)
-    return C2_ERR_ARG;
-
-  size_t count = caps ? caps->count : 0;
-  if (count > C2_MAX_CAPABILITIES)
-    return C2_ERR_OVERFLOW;
-
-  /* Copy and insertion-sort the capability views; caller storage is untouched.
-   */
-  c2_str sorted[C2_MAX_CAPABILITIES];
-  for (size_t i = 0; i < count; i++) {
-    if (caps->items[i].len > 0 && caps->items[i].ptr == NULL)
-      return C2_ERR_ARG;
-    sorted[i] = caps->items[i];
-  }
-  for (size_t i = 1; i < count; i++) {
-    c2_str key = sorted[i];
-    size_t j = i;
-    while (j > 0 && c2_str_cmp(sorted[j - 1], key) > 0) {
-      sorted[j] = sorted[j - 1];
-      j--;
-    }
-    sorted[j] = key;
-  }
 
   /* Reserve one byte for the trailing NUL. */
   c2_sb sb = {out, out_cap - 1, 0};
@@ -119,20 +97,13 @@ c2_status c2_auth_canonical(c2_str agent_uuid, int64_t timestamp, c2_str nonce,
     return st;
   if ((st = sb_putc(&sb, '\n')) != C2_OK)
     return st;
-  for (size_t i = 0; i < count; i++) {
-    if (i) {
-      if ((st = sb_putc(&sb, ',')) != C2_OK)
-        return st;
-    }
-    if ((st = sb_puts(&sb, sorted[i])) != C2_OK)
-      return st;
-  }
+  if ((st = sb_puts(&sb, route)) != C2_OK)
+    return st;
   out[sb.len] = '\0';
   if (out_len)
     *out_len = sb.len;
   return C2_OK;
 }
-
 /* ------------------------------------------------------------------------- */
 /* MsgAuth                                                                    */
 /* ------------------------------------------------------------------------- */
@@ -141,9 +112,7 @@ c2_status c2_msgauth_encode(CborEncoder *w, const c2_msgauth *m) {
   if (w == NULL || m == NULL)
     return C2_ERR_ARG;
 
-  size_t pairs = 8;
-  if (m->ephem_public_key.len)
-    pairs++;
+  size_t pairs = 7;
   if (m->stream_id.len)
     pairs++;
 
@@ -164,21 +133,13 @@ c2_status c2_msgauth_encode(CborEncoder *w, const c2_msgauth *m) {
     return st;
   if ((st = c2_cbor_write_text(&map, C2_KEY_AUTH_NONCE, m->nonce)) != C2_OK)
     return st;
-  if ((st = c2_cbor_write_str_list(&map, C2_KEY_AUTH_CAPABILITIES,
-                                   &m->capabilities)) != C2_OK)
+  if ((st = c2_cbor_write_text(&map, C2_KEY_AUTH_ROUTE, m->route)) != C2_OK)
     return st;
   if ((st = c2_cbor_write_text(&map, C2_KEY_AUTH_AGENT_PROOF,
                                m->agent_proof)) != C2_OK)
     return st;
-  if (m->ephem_public_key.len &&
-      (st = c2_cbor_write_bytes(&map, C2_KEY_AUTH_EPHEM_PUBLIC,
-                                m->ephem_public_key)) != C2_OK)
-    return st;
   if (m->stream_id.len && (st = c2_cbor_write_text(&map, C2_KEY_AUTH_STREAM_ID,
                                                    m->stream_id)) != C2_OK)
-    return st;
-  if ((st = c2_cbor_write_int(&map, C2_KEY_AUTH_PROTOCOL_VERSION,
-                              m->protocol_version)) != C2_OK)
     return st;
   return c2_cbor_ec(cbor_encoder_close_container(w, &map));
 }
@@ -201,11 +162,9 @@ c2_status c2_msgauth_decode(CborValue *r, c2_msgauth *m) {
       C2_CASE_TEXT(C2_KEY_AUTH_IDENTITY_TOKEN, m, identity_token);
       C2_CASE_INT(C2_KEY_AUTH_TIMESTAMP, m, timestamp);
       C2_CASE_TEXT(C2_KEY_AUTH_NONCE, m, nonce);
-      C2_CASE_STR_LIST(C2_KEY_AUTH_CAPABILITIES, m, capabilities);
+      C2_CASE_TEXT(C2_KEY_AUTH_ROUTE, m, route);
       C2_CASE_TEXT(C2_KEY_AUTH_AGENT_PROOF, m, agent_proof);
-      C2_CASE_BYTES(C2_KEY_AUTH_EPHEM_PUBLIC, m, ephem_public_key);
       C2_CASE_TEXT(C2_KEY_AUTH_STREAM_ID, m, stream_id);
-      C2_CASE_INT(C2_KEY_AUTH_PROTOCOL_VERSION, m, protocol_version);
     default:
       st = c2_cbor_map_skip(&map);
       break;

@@ -156,7 +156,7 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 					logging.Warningf("handleMessageTunnel: MsgAuth bad proof encoding for %s: %v", util.AgentRef(authAgentUUID), decodeErr)
 					return
 				}
-				canonical := transport.CanonicalAuthString(msgAuth.AgentUUID, msgAuth.Timestamp, msgAuth.Nonce, msgAuth.Capabilities)
+				canonical := transport.CanonicalAuthString(msgAuth.AgentUUID, msgAuth.Timestamp, msgAuth.Nonce, msgAuth.Route)
 				proofOK, proofErr := transport.VerifySignatureWithPEM([]byte(pinnedKey), []byte(canonical), proof)
 				if proofErr != nil || !proofOK {
 					logging.Warningf("handleMessageTunnel: MsgAuth pinned key proof failed for %s: %v", util.AgentRef(authAgentUUID), proofErr)

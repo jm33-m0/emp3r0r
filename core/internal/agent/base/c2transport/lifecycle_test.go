@@ -60,13 +60,12 @@ func assertInvalidCAIdentityRejected(t *testing.T, c2URL string, caCertData []by
 
 	sc := transport.NewSecureConn(c2Conn)
 	msgAuth := def.MsgAuth{
-		Type:            def.MsgAuthType,
-		ProtocolVersion: def.ProtocolVersion,
-		AgentUUID:       agentUUID,
-		IdentityToken:   base64.URLEncoding.EncodeToString(forgedIdentityRaw),
-		Timestamp:       time.Now().Unix(),
-		Nonce:           "bad-ca-nonce",
-		Capabilities:    []string{live.GetRuntimeConfig().C2Routes.Checkin},
+		Type:          def.MsgAuthType,
+		AgentUUID:     agentUUID,
+		IdentityToken: base64.URLEncoding.EncodeToString(forgedIdentityRaw),
+		Timestamp:     time.Now().Unix(),
+		Nonce:         "bad-ca-nonce",
+		Route:         live.GetRuntimeConfig().C2Routes.Checkin,
 	}
 	if err := cbor.NewEncoder(sc).Encode(msgAuth); err != nil {
 		t.Fatalf("encode MsgAuth failed: %v", err)

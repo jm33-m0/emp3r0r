@@ -3,7 +3,6 @@ package transport
 import (
 	"encoding/base64"
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -18,16 +17,13 @@ const (
 
 // CanonicalAuthString builds the payload-auth canonical string.
 // It is independent from wrapper details like method/path/header.
-func CanonicalAuthString(agentUUID string, timestamp int64, nonce string, capabilities []string) string {
-	caps := append([]string(nil), capabilities...)
-	sort.Strings(caps)
-	parts := []string{
+func CanonicalAuthString(agentUUID string, timestamp int64, nonce, route string) string {
+	return strings.Join([]string{
 		agentUUID,
 		strconv.FormatInt(timestamp, 10),
 		nonce,
-		strings.Join(caps, ","),
-	}
-	return strings.Join(parts, "\n")
+		route,
+	}, "\n")
 }
 
 // VerifyMsgAuth validates payload-carried auth claims against CA trust and local policy.
@@ -38,8 +34,8 @@ func VerifyMsgAuth(auth *def.MsgAuth) error {
 	if auth.Type != def.MsgAuthType {
 		return fmt.Errorf("unexpected MsgAuth type %q", auth.Type)
 	}
-	if auth.ProtocolVersion != def.ProtocolVersion {
-		return fmt.Errorf("unsupported protocol version %d (want %d)", auth.ProtocolVersion, def.ProtocolVersion)
+	if auth.Route == "" {
+		return fmt.Errorf("missing route")
 	}
 	if auth.AgentUUID == "" {
 		return fmt.Errorf("empty AgentUUID")

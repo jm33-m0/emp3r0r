@@ -80,7 +80,7 @@ The C2 patches `MagicString` (and optionally `QUICKey`) at build time with
 
 ### 2.2 Route names
 
-Routing is carried in `MsgAuth.Capabilities` (§5), not in the URL path. The five
+Routing is carried in `MsgAuth.Route` (§5), not in the URL path. The five
 route names are configuration values with these defaults:
 
 | Config field       | Default      | Purpose                              |
@@ -262,36 +262,33 @@ reads it as a single frame (≤ 8192 bytes), then routes.
 
 ### 5.1 Schema
 
-| Key | Name              | CBOR type     | Notes                                                          |
-| --- | ----------------- | ------------- | -------------------------------------------------------------- |
-| 11  | `Type`            | text          | must equal `auth_v1`                                           |
-| 12  | `AgentUUID`       | text          | agent UUID                                                     |
-| 13  | `IdentityToken`   | text          | base64url(CA signature over `AgentUUID`)                       |
-| 14  | `Timestamp`       | int           | Unix seconds                                                   |
-| 15  | `Nonce`           | text          | fresh random, anti-replay                                      |
-| 16  | `Capabilities`    | array of text | must contain exactly one route name                            |
-| 17  | `AgentProof`      | text          | base64url(ECDSA agent-key signature over the canonical string) |
-| 18  | `EphemPublicKey`  | bytes         | optional; unused by current flows                              |
-| 19  | `StreamID`        | text          | optional; FTP token / WWW filename / proxy token               |
-| 20  | `ProtocolVersion` | int           | must equal `1` (current version)                               |
+| Key | Name            | CBOR type | Notes                                                          |
+| --- | --------------- | --------- | -------------------------------------------------------------- |
+| 11  | `Type`          | text      | must equal `auth_v1`; carries the wire version                 |
+| 12  | `AgentUUID`     | text      | agent UUID                                                     |
+| 13  | `IdentityToken` | text      | base64url(CA signature over `AgentUUID`)                       |
+| 14  | `Timestamp`     | int       | Unix seconds                                                   |
+| 15  | `Nonce`         | text      | fresh random, anti-replay                                      |
+| 16  | `Route`         | text      | exactly one configured route name                              |
+| 17  | `AgentProof`    | text      | base64url(ECDSA agent-key signature over the canonical string) |
+| 19  | `StreamID`      | text      | optional; FTP token / WWW filename / proxy token               |
+
+Keys 18 (`EphemPublicKey`) and 20 (`ProtocolVersion`) are retired.
 
 ### 5.2 Canonical auth string
 
 ```text
-caps      = copy of Capabilities, sorted lexicographically (duplicates kept)
-canonical = AgentUUID || "\n" || decimal(Timestamp) || "\n" || Nonce || "\n" || join(caps, ",")
+canonical = AgentUUID || "\n" || decimal(Timestamp) || "\n" || Nonce || "\n" || Route
 ```
 
 Exact Go definition (`core/internal/transport/auth.go`):
 
 ```go
-caps := append([]string(nil), capabilities...)
-sort.Strings(caps)
 strings.Join([]string{
     agentUUID,
     strconv.FormatInt(timestamp, 10),
     nonce,
-    strings.Join(caps, ","),
+    route,
 }, "\n")
 ```
 
@@ -307,12 +304,12 @@ the agent build). The agent presents the same token on every `MsgAuth`.
 
 ### 5.4 Server verification order
 
-1. Structural checks: type, `ProtocolVersion == 1`, non-empty
-   UUID/token/nonce, `Timestamp > 0`.
+1. Structural checks: type `auth_v1`, non-empty route/UUID/token/nonce,
+   `Timestamp > 0`.
 2. Replay window: `|now - Timestamp| <= 60`.
 3. `IdentityToken` verifies against the CA public key over `AgentUUID`.
-4. Routing: exactly one recognized route capability. Missing or multiple known
-   routes are rejected.
+4. Routing: exactly one recognized `Route`. Missing or unknown routes are
+   rejected.
 5. TOFU lookup by `AgentUUID`:
    - **known**: `AgentProof` must verify against the pinned agent public key.
    - **unknown**: only the `checkin` route is allowed, and `AgentProof` must
@@ -327,7 +324,7 @@ check-in and **rejects key rotation** (an operator must `forget_agent` to reset)
 
 ## 6. Routes
 
-The single recognized route capability selects the handler:
+The single recognized `MsgAuth.Route` selects the handler:
 
 | Route     | Handler         | Direction / lifetime                                                   |
 | --------- | --------------- | ---------------------------------------------------------------------- |
@@ -592,22 +589,16 @@ download, `ftp` upload, `!ls_dir`/`!stat`, and `coff` execution. SOCKS5
 
 ---
 
-## 11. Versioning and capabilities
+## 11. Versioning and routing
 
-`MsgAuth.ProtocolVersion` (key 20) carries the wire-format version. The server
-rejects any value other than `1` (`def.ProtocolVersion`), so a protocol bump is
-an all-peers rebuild. This is the handle for future incompatible changes.
+`MsgAuth.Type` (key 11) carries the wire-format version: `auth_v1`. The server
+rejects any other value, so a protocol bump is an all-peers rebuild. This is the
+handle for future incompatible changes.
 
-`Capabilities` doubles as the route selector and the feature advertisement.
-Exactly one configured **route** token selects the handler; any number of
-**feature** tokens (`file-mgmt`, `bof`, `memmod`, `socks5`, `mesh`, ...) may
-follow. Unknown tokens are ignored by the server but are part of the signed
-canonical string, so they must be sent exactly as advertised. An interoperating
-agent MUST send exactly one route token.
-
-Still _PROPOSED_, not implemented: the operator UI does not yet consume the
-advertised feature tokens, so it may still offer a Go-only builtin to a minimal
-C agent. That is a server/operator change, not a wire change.
+`MsgAuth.Route` (key 16) selects the handler: exactly one configured route name.
+There is no fallback route and no separate feature-token list. If a capability
+advertisement is needed later, it must be added as a new field rather than
+overloading the route.
 
 ---
 
@@ -622,7 +613,7 @@ the C side consumes them):
    round-trip; reject zero/oversize length and truncated payload.
 3. **ECDH/HKDF** — fixed private keys ⇒ shared secret and 32-byte session key.
 4. **Public key serialization** — `X||Y` round-trip and point-on-curve rejection.
-5. **Canonical auth string** — fixed inputs, including capability sorting.
+5. **Canonical auth string** — fixed inputs, including the route.
 6. **ECDSA** — fixed key + message ⇒ verify DER signature; reject a mutated
    canonical string.
 7. **CBOR** — exact bytes for `MsgAuth`, `MsgTunData`, and `Emp3r0rAgent` minimal
@@ -684,7 +675,7 @@ missing `client-session:` prefix fails silently and is painful to debug.
 - [ ] ECDSA/DER sign + verify over SHA-256
 - [ ] base64url (padded)
 - [ ] One channel: `http_poll` and/or a duplex wrapper (TLS)
-- [ ] `MsgAuth` (with `ProtocolVersion = 1`) + canonical string
+- [ ] `MsgAuth` (`auth_v1` + `Route`) + canonical string
 - [ ] check-in, hello handshake, keepalive, job loop
 - [ ] `www` download, `ftp` upload (gzip stream), `!ls_dir`/`!stat`
 - [ ] optional: `coff` loader, `proxy` relay

@@ -178,7 +178,7 @@ func handleAgentCheckInStream(dec *cbor.Decoder, out *cbor.Encoder, auth *def.Ms
 		if decodeErr != nil {
 			return fmt.Errorf("forbidden: bad agent proof encoding: %w", decodeErr)
 		}
-		canonical := transport.CanonicalAuthString(auth.AgentUUID, auth.Timestamp, auth.Nonce, auth.Capabilities)
+		canonical := transport.CanonicalAuthString(auth.AgentUUID, auth.Timestamp, auth.Nonce, auth.Route)
 		ok, verifyErr := transport.VerifySignatureWithPEM([]byte(target.PublicKey), []byte(canonical), proof)
 		if verifyErr != nil || !ok {
 			return fmt.Errorf("forbidden: first enrollment proof invalid")
