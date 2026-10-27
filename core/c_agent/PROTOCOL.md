@@ -102,8 +102,7 @@ matching on the server is trimmed + case-insensitive.
 | ------------------------------ | ------------- | -------------------------------------------------- |
 | `checkin-ok`                   | C2 → agent    | check-in accepted (the ACK)                        |
 | `handshake`                    | C2 → agent    | hello reply, carries server ephemeral public key   |
-| `peer_list`                    | C2 → agent    | `MsgTunData.EnrichedPeerList` push                 |
-| `agent_token`                  | C2 → agent    | CBOR `AgentToken` push (mesh router authorization) |
+| `session_info`                 | C2 → agent    | peer list + mesh router token (see §7.1/§7.3/§7.4) |
 | `ftp_relay_data:<token>` etc.  | C2 ↔ operator | operator-tunnel relay frames (not agent wire)      |
 | `proxy_relay_*`, `www_relay_*` | C2 ↔ operator | operator-tunnel relay frames (not agent wire)      |
 
@@ -369,10 +368,11 @@ The universal agent↔C2 message.
 | 5   | `Time`             | int (Unix ms) | agent clock, used for RTT                                            |
 | 8   | `EphemPublicKey`   | bytes         | agent ephemeral P-256 pubkey on the first hello                      |
 | 10  | `EnrichedPeerList` | map           | C2 push: peers (see §7.4; keys 6, 7, 9 retired)                      |
+| 11  | `AgentToken`       | map           | C2 push: mesh router token (see §7.3)                                |
 
-Field 10 is delivered inside a `peer_list` tagged message and is the
-`EnrichedPeerList` structure in §7.4. It is authenticated by the PFS tunnel and
-carries no separate signature.
+Fields 10 and 11 are delivered together in one `session_info` tagged message
+after PFS is established. They are authenticated by the PFS tunnel and carry no
+separate signature. Either field may be absent.
 
 ### 7.2 `Emp3r0rAgent` (check-in body)
 
@@ -425,7 +425,7 @@ remove on disconnect. The Go C2 also has a C2-derived `Sleeping` snapshot flag
 
 ### 7.3 `AgentToken`
 
-Pushed as `agent_token` after PFS is established.
+Pushed inside `session_info` (MsgTunData key 11) after PFS is established.
 
 | Key | Name         | Type            |
 | --- | ------------ | --------------- |
@@ -437,7 +437,7 @@ Pushed as `agent_token` after PFS is established.
 
 ### 7.4 `EnrichedPeerList`
 
-Pushed as `peer_list` after PFS is established.
+Pushed inside `session_info` (MsgTunData key 10) after PFS is established.
 
 | Key | Name        | Type                          |
 | --- | ----------- | ----------------------------- |
@@ -499,8 +499,7 @@ agent                                              C2
   |<-- frame: MsgTunData{Tag:"handshake", -----------|  Response = server_pub (64 bytes)
   |           JobID=<hello JobID>, Response=pub}     |
   |                                                  |  (both sides now on session key)
-  |<-- frame: MsgTunData{Tag:"peer_list", ...} ------|
-  |<-- frame: MsgTunData{Tag:"agent_token", ...} ----|
+  |<-- frame: MsgTunData{Tag:"session_info", ...} ---|  peer list + router token
   |-- frame: MsgTunData (keepalive hello / commands)->|
   |<-- frame: MsgTunData (jobs / handshake keepalive)-|
 ```
@@ -535,7 +534,7 @@ flip the label for its own role.
 The server writes the `handshake` reply **still under the PSK**, then switches
 its `SecureConn` to the session key. The agent must therefore read the
 `handshake` reply under the PSK, then switch to the session key before reading
-the subsequent `peer_list` / `agent_token` frames. Any frame after `handshake`
+the subsequent `session_info` frame. Any frame after `handshake`
 is session-key encrypted.
 
 ### 9.5 Keepalive

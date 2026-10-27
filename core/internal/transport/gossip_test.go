@@ -108,8 +108,8 @@ func signTokenDirect(t *testing.T, tok *def.AgentToken, key *ecdsa.PrivateKey) {
 // ─── AgentToken struct ───────────────────────────────────────────────────────
 
 func TestAgentTokenConstants(t *testing.T) {
-	if def.TagAgentToken == "" {
-		t.Error("TagAgentToken must not be empty")
+	if def.TagSessionInfo == "" {
+		t.Error("TagSessionInfo must not be empty")
 	}
 	if def.CapabilityRouter == "" {
 		t.Error("CapabilityRouter must not be empty")

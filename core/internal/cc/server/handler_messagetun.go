@@ -303,6 +303,7 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 					Response: replyData,
 				}
 				encoder := cbor.NewEncoder(secureConn)
+				var enrichedList *def.EnrichedPeerList
 				err = encoder.Encode(replyMsg)
 				if err == nil {
 					if sessionKey != nil {
@@ -313,22 +314,14 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 						pfsEstablished = true
 					}
 
-					// Only push PeerList to TRUSTED agents (must have established PFS)
-					// This ensures the layout is encrypted with the ephemeral session key and
-					// we are talking to a successfully authenticated agent.
+					// Only advertise peers to TRUSTED agents (must have established PFS).
+					// This ensures the layout is encrypted with the ephemeral session key
+					// and we are talking to a successfully authenticated agent.
 					if pfsEstablished {
-						enrichedList, collectErr := collectEnrichedPeerList()
+						var collectErr error
+						enrichedList, collectErr = collectEnrichedPeerList()
 						if collectErr != nil {
 							logging.Warningf("handleMessageTunnel: collectEnrichedPeerList for %s: %v", agent.Name, collectErr)
-						}
-						if enrichedList != nil {
-							peerMsg := def.MsgTunData{
-								Tag:              def.TagPeerList,
-								EnrichedPeerList: enrichedList,
-							}
-							if err := encoder.Encode(peerMsg); err != nil {
-								logging.Errorf("handleMessageTunnel: send PeerList to %s: %v", agent.Name, err)
-							}
 						}
 					}
 				} else {
@@ -340,25 +333,39 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 				// The issued token is cached by UUID (agents.AgentTokenFor) instead of
 				// being stored on the shared agent object: this goroutine must not
 				// mutate a live.AgentRegistry record that other goroutines snapshot.
+				var sessionToken *def.AgentToken
 				curToken := agents.AgentTokenFor(authAgentUUID)
 				needsToken := curToken == nil ||
 					time.Until(time.Unix(curToken.ExpiresAt, 0)) < 6*time.Hour
 				if needsToken {
-					tok, err := SignAgentToken(agent.UUID, agent.From, def.CapabilityRouter, 24*time.Hour)
-					if err != nil {
-						logging.Errorf("handleMessageTunnel: SignAgentToken for %s: %v", agent.Name, err)
+					tok, signErr := SignAgentToken(agent.UUID, agent.From, def.CapabilityRouter, 24*time.Hour)
+					if signErr != nil {
+						logging.Errorf("handleMessageTunnel: SignAgentToken for %s: %v", agent.Name, signErr)
 					} else {
-						tokData, _ := cbor.Marshal(tok)
-						tokMsg := def.MsgTunData{
-							Tag:      def.TagAgentToken,
-							Response: tokData,
+						sessionToken = tok
+					}
+				}
+
+				// One post-handshake frame carries both pieces of session state. The
+				// token is processed before the peer list so mesh authorization is in
+				// place before discovery starts.
+				if err == nil && (enrichedList != nil || sessionToken != nil) {
+					sessionMsg := def.MsgTunData{
+						Tag:              def.TagSessionInfo,
+						EnrichedPeerList: enrichedList,
+						AgentToken:       sessionToken,
+					}
+					if sendErr := encoder.Encode(sessionMsg); sendErr != nil {
+						logging.Errorf("handleMessageTunnel: send SessionInfo to %s: %v", agent.Name, sendErr)
+					} else {
+						if sessionToken != nil {
+							agents.StoreAgentToken(authAgentUUID, sessionToken)
 						}
-						if err := encoder.Encode(tokMsg); err != nil {
-							logging.Errorf("handleMessageTunnel: send AgentToken to %s: %v", agent.Name, err)
-						} else {
-							logging.Infof("Sent AgentToken(cap=proxy) to %s", agent.Name)
-							agents.StoreAgentToken(authAgentUUID, tok)
+						peerCount := 0
+						if enrichedList != nil {
+							peerCount = len(enrichedList.Peers)
 						}
+						logging.Infof("Sent SessionInfo to %s (token=%v, peers=%d)", agent.Name, sessionToken != nil, peerCount)
 					}
 				}
 

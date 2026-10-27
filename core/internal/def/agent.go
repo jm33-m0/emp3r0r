@@ -88,6 +88,7 @@ type MsgTunData struct {
 	Time             int64             `cbor:"5,keyasint"`  // Unix milliseconds, used for RTT
 	EphemPublicKey   []byte            `cbor:"8,keyasint"`  // ephemeral public key for ECDH key exchange
 	EnrichedPeerList *EnrichedPeerList `cbor:"10,keyasint"` // C2-provided peer list
+	AgentToken       *AgentToken       `cbor:"11,keyasint"` // mesh router authorization token
 }
 
 // TokenEntry is one entry of a !list_tokens response, marshaled as CBOR by

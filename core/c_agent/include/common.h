@@ -97,10 +97,9 @@ extern "C" {
 /* MsgTunData.Tag values                                                      */
 /* ------------------------------------------------------------------------- */
 
-#define C2_TAG_CHECKIN_OK "checkin-ok"   /* C2 -> agent check-in ACK        */
-#define C2_TAG_HANDSHAKE "handshake"     /* C2 -> agent ECDH / keep-alive   */
-#define C2_TAG_PEER_LIST "peer_list"     /* C2 -> agent gossip peers        */
-#define C2_TAG_AGENT_TOKEN "agent_token" /* C2 -> agent mesh token        */
+#define C2_TAG_CHECKIN_OK "checkin-ok"     /* C2 -> agent check-in ACK        */
+#define C2_TAG_HANDSHAKE "handshake"       /* C2 -> agent ECDH / keep-alive */
+#define C2_TAG_SESSION_INFO "session_info" /* C2 -> agent peers + mesh token */
 
 /* ------------------------------------------------------------------------- */
 /* Status codes                                                               */

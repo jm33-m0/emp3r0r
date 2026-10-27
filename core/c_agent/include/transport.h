@@ -273,7 +273,7 @@ c2_status c2_session_hello(c2_agent_session *s, c2_secureconn *msg,
 /*
  * Decode one frame from the message tunnel into either a job or a control
  * message. Returns C2_OK and sets *is_job to 1 for a command, 0 for a control
- * message (handshake/peer_list/agent_token); the caller handles control tags.
+ * message (handshake/session_info); the caller handles control tags.
  * `out` must have its list arrays pre-set (items/cap) like every decoder.
  */
 c2_status c2_session_read(c2_agent_session *s, c2_secureconn *msg,
