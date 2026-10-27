@@ -43,8 +43,13 @@ Some packages compile C or load real object files and need extra tooling:
 - `lib/coffloader` builds a BOF at test time. `TestZigCompiledBOF` uses
   [zig](https://ziglang.org/download) as `zig cc` and skips when zig is not on
   `PATH`.
-- `modules/stager_linux/test` builds and runs the Linux shellcode stager. It
-  requires Linux and `CGO_ENABLED=1`.
+- `c_agent` builds its unit tests and fallback fuzzers with `zig cc` and
+  ASan/UBSan. `make coverage` is the exception: it uses GCC and `gcov`.
+- `modules/stager_linux/test` builds and runs the Linux shellcode stager over
+  raw and packed formats, all built-in download transports (including TCP and
+  UDP), and the C agent delivery modes. It requires Linux and `CGO_ENABLED=1`.
+  `make -C core/modules/stager_linux test` also runs the mask and LZSS decoder
+  unit tests.
 - `lib/memmod` and `lib/syscall/smw` need cgo on Windows, plus MSYS2 mingw and
   `nasm` to assemble the SilentMoonwalk stub.
 - The `lib/driver` load/unload round trip only runs when
@@ -63,7 +68,7 @@ Some packages compile C or load real object files and need extra tooling:
 - **Linux** runs `go test -v -race -coverprofile=coverage.txt -covermode=atomic
   ./...` with `EMP3R0R_RACE_ON=1`, installs zig 0.16.0, then runs the cgo BOF
   loader tests, the `internal/cc/modules` integration tests, and the stager
-  lifecycle test.
+  lifecycle, packer, TCP/UDP, and C agent end-to-end tests.
 - **Windows** sets up MSYS2 with mingw-w64 and `nasm`, assembles the
   SilentMoonwalk object, runs `go test -v -race ./...` with cgo, then runs the
   BOF/module integration tests with `-gcflags=all=-d=checkptr=0` and

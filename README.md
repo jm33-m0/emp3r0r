@@ -40,11 +40,21 @@ Agents can discover each other and relay traffic through a gossip mesh. Peer lin
 
 Files can also move directly between peers. The agent keeps fetched files in encrypted memfs and serves them to peers on request. If no peer has a file, the agent fetches it from the C2.
 
-### Listeners and stagers
+### Listeners, stagers, and the C agent
 
-The C2 supports HTTP, TCP, and UDP listeners. The HTTP transport has configurable request profiles. The Linux stager is small, talks to the kernel through direct syscalls, and needs no libc on the target. Stager transports and packers are pluggable, so initial access can use whichever channel the target allows.
+The C2 supports HTTP, TCP, and UDP listeners. The HTTP transport has configurable request profiles. The [Linux stager](./core/modules/stager_linux/) is small, talks to the kernel through direct syscalls, and needs no libc on the target. Stager transports and packers are pluggable, so initial access can use whichever channel the target allows. Packers are RC4 (encrypted) or LZSS (compressed).
+
+The [experimental C agent](./core/c_agent/) is the usual payload for that stager, though it can also be generated as a standalone executable or shared object. The final payload is under 100KB and contains only the core C2 protocol; crypto, compression, transport, dynamic loading, and the BOF loader are modular, loaded on demand, then removed from memory. The stager can download the C agent PIC at runtime or carry an RC4-encrypted copy in its read-only data with `--agent-pic`, compiling the downloader and its listener configuration out.
+
+Together they implement the sleep cycle. The C agent checks in once, keeps its message tunnel open for `--poll-window` seconds, then closes it and sleeps. Commands issued meanwhile stay queued and arrive after the next hello. Before sleep, the stager makes every agent-owned anonymous executable mapping non-executable and XORs the agent's ELF images, heap, and stack in place. The mask stub runs from the stager's own mapping on a dedicated stack, so no agent-owned anonymous executable page remains while the agent sleeps; executable mappings exist only while the agent is awake and running. There is no heartbeat: each agent reports its own offline grace, derived from its beacon interval and poll window unless `--offline-grace` overrides it, and the operator list shows the real last-seen time until that deadline.
 
 Stages and agents avoid RWX mappings. Code is mapped with the permissions it actually needs.
+
+```bash
+generate_c --type glibc --arch amd64 --cc your.domain.com
+generate_c --type glibc --arch amd64 --cc your.domain.com \
+  --interval 60 --jitter 50 --poll-window 5 --offline-grace 0
+```
 
 ### BOF, ELF, and PICO modules
 
@@ -100,14 +110,6 @@ HTTP polling uses a malleable request profile from the C2 config. TLS fingerprin
 Agent features are selected at build time with `with_*` tags. The installer builds a slim kit by default: Linux and Windows amd64 agents with plain HTTP polling and no optional subsystems. `--full` builds every target and every feature. `--agent-tags` selects an exact feature set, and `--list-agent-tags` prints the available tags.
 
 C2 server binaries keep the full feature set, so one server can handle every agent variant.
-
-### Experimental C agent
-
-There is an experimental C agent for Linux. Its executable is around 100 KB. The beacon contains only the core C2 protocol. Everything else, including crypto, compression, transport, dynamic loading, and the BOF loader, is modular. Runtime libraries and the BOF loader are loaded on demand, used, then removed from memory, just as the Go agent handles its dependencies.
-
-```bash
-generate_c --type glibc --arch amd64 --cc your.domain.com
-```
 
 ### Encrypted memory storage
 

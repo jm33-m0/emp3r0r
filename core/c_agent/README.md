@@ -50,7 +50,7 @@ make -C core/c_agent lib             # hosted static library (libagent.a)
 make -C core/c_agent agent           # hosted reference agent executable
 make -C core/c_agent so              # hosted shared object (agent.so, PIC)
 make -C core/c_agent agent ARCH=arm64 LIBC=musl  # cross-build
-make -C core/c_agent test            # unit tests (gcc + ASan/UBSan)
+make -C core/c_agent test            # unit tests (zig cc + ASan/UBSan)
 make -C core/c_agent coverage        # gcov line coverage per source
 make -C core/c_agent test-mbedtls    # self-contained mbedTLS backend tests
 make -C core/c_agent vendor-mbedtls  # build the vendored mbedTLS static libs
@@ -63,10 +63,11 @@ make -C core/c_agent agent BOF=0    # compile out the COFF/BOF runner
 the Makefile maps it to the corresponding zig target. `riscv64` requires
 `LIBC=musl` because zig has no riscv64 glibc 2.17 target.
 
-`zig` (the project's pinned compiler, shipped with emp3r0r) builds the library
-and the agent. The unit tests and fuzzers run under ASan/UBSan, which zig cannot
-link, so they use a host compiler (`gcc`/`clang`); `make test HOSTCC="zig cc"
-SAN=` builds them with zig without sanitizers.
+`zig` (the project's pinned compiler, shipped with emp3r0r) builds the library,
+the agent, the unit tests, and the fallback fuzz runner. Tests and fuzzing use
+`zig cc` with ASan/UBSan. `make coverage` is the exception: it uses GCC and
+`gcov` for line coverage, and `make fuzz FUZZER=libfuzzer` uses clang for
+libFuzzer. Override `HOSTCC` to select a different test toolchain.
 
 ### libc and runtime symbol resolution
 
@@ -188,12 +189,19 @@ under the C2's own `MagicString`:
 ```text
 generate_c --type glibc|musl --arch amd64|386|arm|arm64|riscv64 --cc your.domain.com
   --crypto openssl|mbedtls --gzip miniz|none --transport libcurl|http_raw|libssl
-  --interval 60 --jitter 50
+  --interval 60 --jitter 50 --poll-window 5 --offline-grace 0
 ```
 
 The beacon profile defaults to a 60s interval with 50% jitter, so the agent
 sleeps for a randomized 30–60s. Both values are embedded in the agent config
 and can be changed per build.
+
+`--poll-window` is how long the agent waits for queued work after its hello
+before closing the tunnel and entering masked sleep. The agent reports its own
+offline grace in the check-in body: `--offline-grace` sets it explicitly, and
+zero derives `interval + poll_window + interval/2`. The C2 keeps the last-seen
+record until that per-agent deadline; it does not poll or heartbeat a sleeping
+agent.
 
 `riscv64` requires `--type musl`; `--format shellcode` is `amd64` + `glibc`
 only.
@@ -290,8 +298,10 @@ key = PBKDF2-HMAC-SHA256(password = MagicString, salt, 100000, 32)
      `EphemPublicKey` = X||Y, `JobID` = fresh UUID, `AgentUUIDSig` set).
    - Read the `Tag="handshake"` reply under the PSK, run ECDH/HKDF, switch the
      SecureConn to the session key.
-   - Keep-alive with periodic hellos that omit `EphemPublicKey`; the C2 replies
-     with random bytes.
+   - Read for the configured poll window. If no job arrives, close the tunnel
+     and enter the masked sleep. Commands issued meanwhile stay queued and are
+     delivered after the next hello. Reopen the tunnel after waking; check in
+     again only when opening or using the tunnel failed.
 4. **Jobs.** A command is a `MsgTunData` with a non-empty `CmdSlice`. Reply with
    the same `JobID`, the command name in `CmdSlice`, and output in `Response`.
    A BOF runs like it does on Windows: the `coffloader_linux` module is pulled
@@ -321,9 +331,11 @@ them, and returns to the agent.
 The provider allocates its own scratch mapping with `mmap` instead of carrying
 large arrays on the stub stack. Runtime mappings that the running thread needs
 — libc/libld data, `[anon:...]` areas such as rseq/shadow stack, the stager's
-own code/GOT and the stub's state/stack/scratch — are excluded. The message
-tunnel stays open across the sleep and is kept alive with a hello after the
-stub wakes.
+own code/GOT and the stub's state/stack/scratch — are excluded. The agent
+closes the message tunnel before masking, so it makes no network requests while
+masked. After the stub restores memory and returns, the agent opens a new
+message tunnel and sends a hello; it checks in again only after a tunnel
+failure.
 
 Mask providers live in `core/modules/stager_linux/mask_<name>.c` and are
 selected with `MASK=<name>` (`--mask` from the module build). The default
@@ -470,9 +482,10 @@ Implemented and tested in `src/`:
   filesystem/navigation commands the operator expects (`ls`/`ls_dir` return
   CBOR `[]util.Dentry`, `stat` returns CBOR `util.FileStat`, `pwd`, `cd`,
   `cat`); `mem_write`/`mem_read`/`mem_ls`; `download`; `custom_module` (the C2's
-  BOF module dispatch); `bof`. It keeps the message tunnel open, masks its
-  configured idle sleep, sends a keepalive after waking, reconnects on tunnel
-  loss, and reports output like the Go agent's `NotifyC2`.
+  BOF module dispatch); `bof`. It opens a short message window after hello,
+  closes the tunnel, masks its configured idle sleep, opens a fresh tunnel
+  after waking, reconnects or checks in on tunnel loss, and reports output like
+  the Go agent's `NotifyC2`.
 - `src/agent_args.c` — command-slice path/flag/argument parsing, kept separate
   from the handlers so `fuzz_command_args` can exercise it without side effects.
 - `module.c` — `c2_coff_invocation_parse` decodes the base64 CBOR
@@ -912,7 +925,7 @@ is a PEM-encoded PKIX P-256 public key; `UUIDSig` is the base64url CA
 | 18  | `User`                     | 41  | `GOArch`                             |
 | 19  | `HasRoot`                  | 42  | `P2PTransport`                       |
 | 20  | `HasTor`                   | 43  | `Owner`                              |
-| 21  | `HasInternet`              |     |                                      |
+| 21  | `HasInternet`              | 44  | `OfflineGrace` (seconds; 0 = immediate) |
 | 22  | `NCSIEnabled`              |     |                                      |
 
 `AgentProcess`:
@@ -926,6 +939,9 @@ is a PEM-encoded PKIX P-256 public key; `UUIDSig` is the base64url CA
 
 Omit `LastSeen` (31) and `LastSeenRTT` (32) to avoid Go `time.Time`/`Duration`
 CBOR tag subtleties; the server sets `LastSeen` from the connection anyway.
+`OfflineGrace` (44) is the agent-chosen removal deadline in seconds; zero means
+remove on disconnect. The Go C2 also has a C2-derived `Sleeping` snapshot flag
+(key 45), but that is not part of the check-in body.
 
 #### 7.3 `AgentToken`
 
@@ -1045,14 +1061,19 @@ is session-key encrypted.
 
 #### 9.5 Keepalive
 
-The agent re-sends a hello periodically (random 5–60 s sleep, with a bounded
-number of retries per cycle) and waits for a `handshake`-tagged reply under
-`CCTimeout`. The reply carries random bytes rather than a public key once PFS is
-established. A hello whose `EphemPublicKey` is omitted once PFS is active is a
-pure keepalive; the server answers it with a random-bytes `handshake` reply. The
-server additionally accepts a fresh `MsgAuth` frame on the tunnel as a
-keepalive (it updates presence but sends no reply). Any authenticated frame
-resets the 10-minute silence timer.
+An interoperating agent may re-send a hello periodically and wait for a
+`handshake`-tagged reply under `CCTimeout`. The reply carries random bytes
+rather than a public key once PFS is established. A hello whose
+`EphemPublicKey` is omitted once PFS is active is a pure keepalive; the server
+answers it with a random-bytes `handshake` reply. The server additionally
+accepts a fresh `MsgAuth` frame on the tunnel as a keepalive (it updates
+presence but sends no reply). Any authenticated frame resets the 10-minute
+silence timer.
+
+The reference C agent does not keep a tunnel alive across sleep: it reads for
+the configured poll window, closes the tunnel, masks itself for the beacon
+interval, then opens a fresh tunnel and sends a hello. Commands queued during
+sleep are delivered after that hello.
 
 #### 9.6 Jobs
 
