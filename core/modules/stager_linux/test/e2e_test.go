@@ -254,7 +254,7 @@ func waitForC2Listener(t *testing.T, addr string) {
 // no supervisor, so a runner that exits before check-in is relaunched a bounded
 // number of times, mirroring the stager's recycle behavior. The returned
 // command is the runner still alive after a successful check-in.
-func startRunnerAndWaitCheckin(t *testing.T, runnerBin, artifact, homeDir, agentUUID string) (*exec.Cmd, *def.Emp3r0rAgent, *bytes.Buffer, *bytes.Buffer, <-chan error) {
+func startRunnerAndWaitCheckin(t *testing.T, runnerBin, artifact, homeDir, agentUUID string, rebuild func() (string, error)) (*exec.Cmd, *def.Emp3r0rAgent, *bytes.Buffer, *bytes.Buffer, <-chan error) {
 	t.Helper()
 	const (
 		maxAttempts    = 3
@@ -327,6 +327,16 @@ func startRunnerAndWaitCheckin(t *testing.T, runnerBin, artifact, homeDir, agent
 		_ = agents.EndSession(agentUUID)
 		_ = agents.RemoveAgent(agentUUID)
 		live.ForgetAgent(agentUUID)
+
+		if rebuild != nil {
+			next, buildErr := rebuild()
+			if buildErr != nil {
+				t.Fatalf("rebuild stager for retry: %v", buildErr)
+			}
+			artifact = next
+			logging.Warningf("Rebuilt stager artifact for retry: %s", artifact)
+		}
+		time.Sleep(500 * time.Millisecond)
 	}
 	return nil, nil, nil, nil, nil
 }
@@ -816,6 +826,33 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	// starts from a clean state.
 	os.Remove(srcArtifact)
 
+	// Flat shellcode uploads are the only variants where the runner takes the
+	// artifact path as an argument; rebuilding one is therefore enough to
+	// retry with a fresh malasada payload if the packaged handoff fails.
+	var rebuildStager func() (string, error)
+	if opts.format == "shellcode" || opts.format == "packed" {
+		rebuildStager = func() (string, error) {
+			buildCmd := exec.Command("./build.sh", buildArgs...)
+			buildCmd.Dir = ".."
+			buildCmd.Env = append(os.Environ(), "CGO_ENABLED=0")
+			buildOut, err := buildCmd.CombinedOutput()
+			if err != nil {
+				return "", fmt.Errorf("rebuild build.sh: %w\nOutput: %s", err, buildOut)
+			}
+			src := filepath.Join("..", opts.artifactName())
+			data, err := os.ReadFile(src)
+			if err != nil {
+				return "", fmt.Errorf("rebuild read %s: %w", opts.artifactName(), err)
+			}
+			_ = os.Remove(src)
+			dst := filepath.Join(tmpDir, fmt.Sprintf("stager_artifact_retry_%d.bin", time.Now().UnixNano()))
+			if err := os.WriteFile(dst, data, 0o755); err != nil {
+				return "", fmt.Errorf("rebuild write %s: %w", dst, err)
+			}
+			return dst, nil
+		}
+	}
+
 	// -----------------------------------------------------------------------
 	// 8. Start payload listener.
 	//
@@ -958,7 +995,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	// -----------------------------------------------------------------------
 	// 10. Launch the runner and wait for agent check-in.
 	// -----------------------------------------------------------------------
-	cmdRunner, agent, stdout, stderr, doneChan := startRunnerAndWaitCheckin(t, runnerBin, stagerArtifact, tmpDir, agentUUID)
+	cmdRunner, agent, stdout, stderr, doneChan := startRunnerAndWaitCheckin(t, runnerBin, stagerArtifact, tmpDir, agentUUID, rebuildStager)
 	defer func() { _ = cmdRunner.Process.Kill() }()
 
 	// -----------------------------------------------------------------------
