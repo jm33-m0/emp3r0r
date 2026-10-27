@@ -9,7 +9,7 @@
   "path": "",
   "parameters": [
     {
-      "name": "stager-format",
+      "name": "format",
       "description": "Stager can be generated as shared library (.so), ELF executable, raw shellcode (.bin), or self-unpacking packed shellcode (.bin)",
       "default": "shellcode",
       "choices": ["so", "executable", "raw", "packed"],
@@ -23,39 +23,32 @@
       "type": "cstr"
     },
     {
-      "name": "download-host",
+      "name": "payload-host",
       "description": "The host to download the payload from, eg. 192.168.0.1",
       "default": "",
       "type": "cstr"
     },
     {
-      "name": "download-port",
+      "name": "payload-port",
       "description": "The port to download the payload from, eg. 8000",
       "default": "8000",
       "type": "int"
     },
     {
-      "name": "download-path",
+      "name": "payload-path",
       "description": "The path to download the payload from (http transports only), eg. /payload",
       "default": "/",
       "type": "cstr"
     },
     {
-      "name": "download-key",
+      "name": "payload-key",
       "description": "The key to decrypt the payload",
       "default": "",
       "type": "cstr"
     },
     {
-      "name": "payload-source",
-      "description": "Where the stager gets the agent PIC: 'download' (default, downloads it through the selected transport) or 'local' (embed a prebuilt C agent PIC at build time and compile out the downloader/transport)",
-      "default": "download",
-      "choices": ["download", "local"],
-      "type": "cstr"
-    },
-    {
-      "name": "payload-file",
-      "description": "Path to the prebuilt C agent PIC when payload-source=local, eg. the output of generate_c --format shellcode",
+      "name": "agent-pic",
+      "description": "Optional prebuilt C agent PIC to embed, eg. the output of generate_c --format shellcode. Leave empty to download the payload at runtime",
       "default": "",
       "type": "cstr"
     },

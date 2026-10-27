@@ -556,9 +556,8 @@ func buildLocalStager(t *testing.T, tmpDir, picPath, stagerFormat string) []stri
 		t.Fatalf("resolve stager dir: %v", err)
 	}
 	build := exec.Command("./build.sh",
-		"--stager-format", stagerFormat,
-		"--payload-source", "local",
-		"--payload-file", picPath)
+		"--format", stagerFormat,
+		"--agent-pic", picPath)
 	build.Dir = stagerDir
 	build.Env = append(os.Environ(), "CGO_ENABLED=0")
 	if out, buildErr := build.CombinedOutput(); buildErr != nil {

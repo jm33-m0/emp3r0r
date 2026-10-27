@@ -2,14 +2,13 @@
 set -e
 
 # Default configuration values
-STAGER_FORMAT="shellcode"
+FORMAT="shellcode"
 TRANSPORT="http"
-DOWNLOAD_HOST="127.0.0.1"
-DOWNLOAD_PORT="8000"
-DOWNLOAD_PATH="/"
-DOWNLOAD_KEY=""
-PAYLOAD="download"
-PAYLOAD_FILE=""
+PAYLOAD_HOST="127.0.0.1"
+PAYLOAD_PORT="8000"
+PAYLOAD_PATH="/"
+PAYLOAD_KEY=""
+AGENT_PIC=""
 UNPACKER="rc4"
 MASK="xor"
 DYNLOAD_MODE="public"
@@ -22,43 +21,39 @@ SUPERVISE_SLEEP_MAX="30"
 
 DEBUG_FLAG=""
 
-# Parse command line flags passed by modcustom.go (e.g. --download-host 192.168.1.10)
+# Parse command line flags passed by modcustom.go (e.g. --payload-host 192.168.1.10)
 while [[ $# -gt 0 ]]; do
   case "$1" in
   --debug)
     DEBUG_FLAG="DEBUG=1"
     shift 1
     ;;
-  --stager-format | --stager_format)
-    STAGER_FORMAT="$2"
+  --format)
+    FORMAT="$2"
     shift 2
     ;;
   --transport)
     TRANSPORT="$2"
     shift 2
     ;;
-  --download-host | --download_host)
-    DOWNLOAD_HOST="$2"
+  --payload-host)
+    PAYLOAD_HOST="$2"
     shift 2
     ;;
-  --download-port | --download_port)
-    DOWNLOAD_PORT="$2"
+  --payload-port)
+    PAYLOAD_PORT="$2"
     shift 2
     ;;
-  --download-path | --download_path)
-    DOWNLOAD_PATH="$2"
+  --payload-path)
+    PAYLOAD_PATH="$2"
     shift 2
     ;;
-  --download-key | --download_key)
-    DOWNLOAD_KEY="$2"
+  --payload-key)
+    PAYLOAD_KEY="$2"
     shift 2
     ;;
-  --payload-source | --payload_source)
-    PAYLOAD="$2"
-    shift 2
-    ;;
-  --payload-file | --payload_file)
-    PAYLOAD_FILE="$2"
+  --agent-pic)
+    AGENT_PIC="$2"
     shift 2
     ;;
   --unpacker)
@@ -104,14 +99,13 @@ while [[ $# -gt 0 ]]; do
       val="${1#*=}"
       case "$opt" in
       --debug) DEBUG_FLAG="DEBUG=1" ;;
-      --stager-format | --stager_format) STAGER_FORMAT="$val" ;;
+      --format) FORMAT="$val" ;;
       --transport) TRANSPORT="$val" ;;
-      --download-host | --download_host) DOWNLOAD_HOST="$val" ;;
-      --download-port | --download_port) DOWNLOAD_PORT="$val" ;;
-      --download-path | --download_path) DOWNLOAD_PATH="$val" ;;
-      --download-key | --download_key) DOWNLOAD_KEY="$val" ;;
-      --payload-source | --payload_source) PAYLOAD="$val" ;;
-      --payload-file | --payload_file) PAYLOAD_FILE="$val" ;;
+      --payload-host) PAYLOAD_HOST="$val" ;;
+      --payload-port) PAYLOAD_PORT="$val" ;;
+      --payload-path) PAYLOAD_PATH="$val" ;;
+      --payload-key) PAYLOAD_KEY="$val" ;;
+      --agent-pic) AGENT_PIC="$val" ;;
       --unpacker) UNPACKER="$val" ;;
       --mask) MASK="$val" ;;
       --dynload-mode | --dynload_mode) DYNLOAD_MODE="$val" ;;
@@ -130,20 +124,26 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ -n "$AGENT_PIC" ]]; then
+  PAYLOAD="local"
+else
+  PAYLOAD="download"
+fi
+
 echo "[+] Building shellcode stager with options:"
-echo "    Format:        $STAGER_FORMAT"
+echo "    Format:        $FORMAT"
 echo "    Transport:     $TRANSPORT"
 echo "    Unpacker:      $UNPACKER"
 echo "    Sleep Mask:    $MASK"
 echo "    Dynload Mode:  $DYNLOAD_MODE"
 echo "    Hash Style:    $HASH_STYLE"
-echo "    Download Host: $DOWNLOAD_HOST"
-echo "    Download Port: $DOWNLOAD_PORT"
-echo "    Download Path: $DOWNLOAD_PATH"
-echo "    Download Key:  [SET]"
+echo "    Payload Host:  $PAYLOAD_HOST"
+echo "    Payload Port:  $PAYLOAD_PORT"
+echo "    Payload Path:  $PAYLOAD_PATH"
+echo "    Payload Key:   [SET]"
 echo "    Payload:       $PAYLOAD"
 if [[ "$PAYLOAD" == "local" ]]; then
-  echo "    Payload File:  ${PAYLOAD_FILE:-[MISSING]}"
+  echo "    Agent PIC:     $AGENT_PIC"
 fi
 # ECH only affects the libssl transport; ignored by the raw-socket transports.
 case "$ECH" in 1|on|true|yes) ECH_ENABLE=1 ;; *) ECH_ENABLE=0 ;; esac
@@ -154,15 +154,8 @@ echo "    ECH:           $ECH (libssl transport only)"
 case "$SUPERVISE" in 1|on|true|yes) SUPERVISE_ENABLE=1 ;; *) SUPERVISE_ENABLE=0 ;; esac
 echo "    Supervise:     $SUPERVISE"
 
-case "$PAYLOAD" in
-download | local) ;;
-*)
-  echo "[-] Unsupported payload source: $PAYLOAD (use download or local)" >&2
-  exit 1
-  ;;
-esac
-if [[ "$PAYLOAD" == "local" && ! -f "$PAYLOAD_FILE" ]]; then
-  echo "[-] payload-source=local requires --payload-file <prebuilt C agent PIC>" >&2
+if [[ "$PAYLOAD" == "local" && ! -f "$AGENT_PIC" ]]; then
+  echo "[-] --agent-pic does not exist: $AGENT_PIC" >&2
   exit 1
 fi
 
@@ -171,7 +164,7 @@ make clean
 
 # Determine build target based on requested stager format from config.json choices
 MAKE_TARGET="raw"
-case "$STAGER_FORMAT" in
+case "$FORMAT" in
   so|shared)
     MAKE_TARGET="so"
     ;;
@@ -191,12 +184,11 @@ esac
 
 # Build using Makefile
 make "$MAKE_TARGET" $DEBUG_FLAG \
-  DOWNLOAD_HOST="$DOWNLOAD_HOST" \
-  DOWNLOAD_PORT="$DOWNLOAD_PORT" \
-  DOWNLOAD_PATH="$DOWNLOAD_PATH" \
-  DOWNLOAD_KEY="$DOWNLOAD_KEY" \
-  PAYLOAD="$PAYLOAD" \
-  PAYLOAD_FILE="$PAYLOAD_FILE" \
+  DOWNLOAD_HOST="$PAYLOAD_HOST" \
+  DOWNLOAD_PORT="$PAYLOAD_PORT" \
+  DOWNLOAD_PATH="$PAYLOAD_PATH" \
+  DOWNLOAD_KEY="$PAYLOAD_KEY" \
+  PAYLOAD_FILE="$AGENT_PIC" \
   TRANSPORT="$TRANSPORT" \
   UNPACKER="$UNPACKER" \
   MASK="$MASK" \

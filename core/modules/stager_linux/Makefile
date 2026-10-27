@@ -105,7 +105,8 @@ DOWNLOAD_HOST ?= 127.0.0.1
 DOWNLOAD_PORT ?= 8080
 DOWNLOAD_PATH ?= /payload
 DOWNLOAD_KEY ?= secret
-PAYLOAD ?= download
+# A non-empty PAYLOAD_FILE selects embedded local loading; empty downloads.
+PAYLOAD ?= $(if $(strip $(PAYLOAD_FILE)),local,download)
 PAYLOAD_FILE ?=
 MODULE_PATH ?= 
 # Generate random XOR key per build
@@ -224,9 +225,9 @@ DL_TARGET = downloader
 DL_BIN = downloader.bin
 DL_BLOB_H = downloader_blob.h
 
-# Payload acquisition provider:
-#   download (default) builds the downloader stage and its transport
-#   local              embeds a prebuilt C agent PIC from PAYLOAD_FILE
+# Payload acquisition provider. PAYLOAD is derived from PAYLOAD_FILE:
+#   empty     -> download: build the downloader stage and its transport
+#   non-empty -> local:    embed the prebuilt C agent PIC from PAYLOAD_FILE
 ifeq ($(PAYLOAD),local)
   ifeq ($(filter clean,$(MAKECMDGOALS)),)
     ifeq ($(strip $(PAYLOAD_FILE)),)

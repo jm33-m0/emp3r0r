@@ -45,7 +45,7 @@ import (
 
 // stagerOpts controls which stager variant build.sh produces.
 type stagerOpts struct {
-	// format is the --stager-format argument: "shellcode" (raw) or "packed".
+	// format is the --format argument: "shellcode" (raw) or "packed".
 	format string
 	// unpacker selects the self-unpacking algorithm when format == "packed":
 	// "rc4" (encrypted) or "lzss" (compressed).  Ignored for raw format.
@@ -733,11 +733,11 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	stagerKey := "password123"
 
 	buildArgs := []string{
-		"--download-host", "127.0.0.1",
-		"--download-port", stagerPortStr,
-		"--download-path", "/",
-		"--download-key", stagerKey,
-		"--stager-format", opts.format,
+		"--payload-host", "127.0.0.1",
+		"--payload-port", stagerPortStr,
+		"--payload-path", "/",
+		"--payload-key", stagerKey,
+		"--format", opts.format,
 		"--transport", opts.transport,
 		"--dynload-mode", hostDynloadMode(t),
 		"--debug",
