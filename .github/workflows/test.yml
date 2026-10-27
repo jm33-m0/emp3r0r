@@ -5,10 +5,12 @@ on:
     branches: [v5]
     paths:
       - "core/**"
+      - "!core/internal/def/version.go"
   pull_request:
     branches: [v5]
     paths:
       - "core/**"
+      - "!core/internal/def/version.go"
   schedule:
     # Weekly, not daily: the corpus cache means each run continues where the
     # previous one stopped, so a weekly campaign still accumulates coverage.
