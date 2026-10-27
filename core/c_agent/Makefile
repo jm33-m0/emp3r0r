@@ -17,8 +17,11 @@
 # zig is the project's compiler (shipped with emp3r0r, pinned in core/build.py),
 # so it builds the library and agent. `CC = zig cc` (not `?=`) forces it even
 # when the environment exports CC; `make CC=gcc` still overrides.
+#
+# Tests and the fallback fuzz runner also use zig cc, with ASan/UBSan. Use
+# HOSTCC=clang for libFuzzer, or override HOSTCC for a custom test toolchain.
 CC = zig cc
-HOSTCC ?= gcc
+HOSTCC ?= zig cc
 AR ?= ar
 WARN = -Wall -Wextra -Werror -std=c99
 

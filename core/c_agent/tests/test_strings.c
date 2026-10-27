@@ -3,7 +3,15 @@
 #include "test.h"
 
 /* The point of strings.c is that it must behave exactly like libc for the
- * subset the payloads use, including overlapping copies. */
+ * subset the payloads use, including overlapping copies. Call through a
+ * pointer so the compiler cannot replace the test with an optimized libc
+ * builtin whose overlap semantics differ between toolchains. */
+typedef void *(*copy_fn)(void *dest, const void *src, size_t n);
+
+static void test_copy(void *dest, const void *src, size_t n) {
+  volatile copy_fn copy = memcpy;
+  copy(dest, src, n);
+}
 
 int main(void) {
   char buf[32];
@@ -28,27 +36,19 @@ int main(void) {
 
   /* Forward and backward overlap. This is a deliberate extension over the C
    * standard (memcpy overlap is UB); the freestanding stager relies on it as a
-   * general-purpose copy. The diagnostic is disabled because we are testing
-   * exactly that extension, not calling memcpy by accident. */
-#if defined(__GNUC__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wrestrict"
-#endif
-  memcpy(overlap, "abcdefgh", 8);
-  memcpy(overlap + 2, overlap, 6);
+   * general-purpose copy. */
+  test_copy(overlap, "abcdefgh", 8);
+  test_copy(overlap + 2, overlap, 6);
   CHECK(memcmp(overlap, "ababcdef", 8) == 0);
 
-  memcpy(overlap, "abcdefgh", 8);
-  memcpy(overlap, overlap + 2, 6);
+  test_copy(overlap, "abcdefgh", 8);
+  test_copy(overlap, overlap + 2, 6);
   CHECK(memcmp(overlap, "cdefghgh", 8) == 0);
-#if defined(__GNUC__)
-#pragma GCC diagnostic pop
-#endif
 
   /* No-op and zero-length copies must not touch the destination. */
-  memcpy(buf, buf, 6);
+  test_copy(buf, buf, 6);
   CHECK(strcmp(buf, "hello") == 0);
-  memcpy(buf, "zzz", 0);
+  test_copy(buf, "zzz", 0);
   CHECK(strcmp(buf, "hello") == 0);
 
   CHECK(strstr("hello world", "world") != NULL);

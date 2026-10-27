@@ -12,7 +12,8 @@ set -e
 cd "$(dirname "$0")/.."
 
 make clean
-make test COV=--coverage SAN=
+# gcov is a GCC runtime; the normal test/fuzz builds use zig cc.
+make test COV=--coverage SAN= HOSTCC=gcc
 
 rm -f ./*.gcov
 srcs=$(ls build/*.gcno | sed 's#.*-##; s#\.gcno$##' | sort -u)
