@@ -27,20 +27,17 @@ static inline void mask_push_range(uintptr_t start, uintptr_t end, int prot,
   (*n)++;
 }
 
-/* Append `start..end` minus the two exclusion ranges. */
-static inline size_t mask_add_map(uintptr_t start, uintptr_t end, int prot,
-                                  uintptr_t keep_start, uintptr_t keep_end,
-                                  uintptr_t scratch_start,
-                                  uintptr_t scratch_end,
-                                  struct c2_map *ranges, size_t cap,
-                                  size_t n) {
+/* Append `start..end` minus a list of exclusion ranges. Ranges are split into
+ * at most 8 segments in total; callers that need more must increase the cap. */
+static inline size_t mask_add_map_ex(uintptr_t start, uintptr_t end, int prot,
+                                     const uintptr_t ex[][2], size_t nex,
+                                     struct c2_map *ranges, size_t cap,
+                                     size_t n) {
   uintptr_t segs[8][2];
   size_t ns = 1;
   segs[0][0] = start;
   segs[0][1] = end;
-  const uintptr_t ex[2][2] = {{keep_start, keep_end},
-                              {scratch_start, scratch_end}};
-  for (size_t x = 0; x < 2; x++) {
+  for (size_t x = 0; x < nex; x++) {
     uintptr_t xs = ex[x][0];
     uintptr_t xe = ex[x][1];
     if (xe <= xs)
@@ -78,6 +75,18 @@ static inline size_t mask_add_map(uintptr_t start, uintptr_t end, int prot,
   for (size_t i = 0; i < ns; i++)
     mask_push_range(segs[i][0], segs[i][1], prot, ranges, cap, &n);
   return n;
+}
+
+/* Append `start..end` minus the state/stack and scratch mappings. */
+static inline size_t mask_add_map(uintptr_t start, uintptr_t end, int prot,
+                                  uintptr_t keep_start, uintptr_t keep_end,
+                                  uintptr_t scratch_start,
+                                  uintptr_t scratch_end,
+                                  struct c2_map *ranges, size_t cap,
+                                  size_t n) {
+  const uintptr_t ex[2][2] = {{keep_start, keep_end},
+                              {scratch_start, scratch_end}};
+  return mask_add_map_ex(start, end, prot, ex, 2, ranges, cap, n);
 }
 
 #endif /* STAGER_MASK_RANGES_H */

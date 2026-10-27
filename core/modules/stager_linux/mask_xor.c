@@ -72,6 +72,55 @@ static int read_full(int fd, void *buf, size_t len) {
   return (int)off;
 }
 
+/* Read argv/env bounds from /proc/self/stat (fields 48..51). They are the
+ * kernel-visible strings behind /proc/<pid>/cmdline and environ. */
+static int read_proc_stat_ranges(uintptr_t *arg_start, uintptr_t *arg_end,
+                                 uintptr_t *env_start, uintptr_t *env_end) {
+  char buf[512];
+  int fd = open("/proc/self/stat", O_RDONLY, 0);
+  if (fd < 0)
+    return 0;
+  int n = read_full(fd, buf, sizeof(buf) - 1);
+  close(fd);
+  if (n <= 0)
+    return 0;
+  int end = n;
+  while (end > 0 && buf[end - 1] != ')')
+    end--;
+  if (end == 0)
+    return 0;
+
+  uintptr_t v[4] = {0, 0, 0, 0};
+  int field = 3;
+  char *p = buf + end;
+  char *limit = buf + n;
+  while (field <= 51 && p < limit) {
+    while (p < limit && *p == ' ')
+      p++;
+    if (p >= limit || *p < '0' || *p > '9') {
+      while (p < limit && *p != ' ')
+        p++;
+      field++;
+      continue;
+    }
+    uintptr_t x = 0;
+    while (p < limit && *p >= '0' && *p <= '9') {
+      x = x * 10 + (uintptr_t)(*p - '0');
+      p++;
+    }
+    if (field >= 48)
+      v[field - 48] = x;
+    field++;
+  }
+  if (v[0] == 0 || v[1] <= v[0] || v[2] == 0 || v[3] <= v[2])
+    return 0;
+  *arg_start = v[0];
+  *arg_end = v[1];
+  *env_start = v[2];
+  *env_end = v[3];
+  return 1;
+}
+
 static uint16_t rd16(const uint8_t *p) {
   return (uint16_t)(p[0] | ((uint16_t)p[1] << 8));
 }
@@ -243,9 +292,15 @@ static size_t find_ranges(struct mask_scratch *sc, uintptr_t keep_start,
   }
   uintptr_t scratch_start = (uintptr_t)sc;
   uintptr_t scratch_end = scratch_start + sizeof(*sc);
+  uintptr_t arg_start = 0, arg_end = 0, env_start = 0, env_end = 0;
+  int have_argv_env =
+      read_proc_stat_ranges(&arg_start, &arg_end, &env_start, &env_end);
   size_t n = 0;
 
-  /* Heap and stack are named agent-owned data mappings. */
+  /* Heap and stack are named agent-owned data mappings. The stack carries
+   * argv/env; leave those exact ranges readable so process inspection stays
+   * coherent. If the bounds cannot be read, skip the stack rather than corrupt
+   * the process command line. */
   for (size_t i = 0; i < nmaps; i++) {
     if (!maps[i].anonymous || !(maps[i].prot & PROT_READ))
       continue;
@@ -254,8 +309,26 @@ static size_t find_ranges(struct mask_scratch *sc, uintptr_t keep_start,
       continue;
     if (map_excluded(&maps[i], fs_base, gs_base, code_probe, code_end))
       continue;
-    n = mask_add_map(maps[i].start, maps[i].end, maps[i].prot, keep_start,
-                     keep_end, scratch_start, scratch_end, ranges, cap, n);
+    if (maps[i].special == C2_MAP_SPECIAL_STACK) {
+      if (!have_argv_env)
+        continue;
+      /* mprotect works on whole pages: round the argv/env exclusions
+       * outward so we never split a page. */
+      const uintptr_t pm = (uintptr_t)(PAGE_SIZE - 1);
+      const uintptr_t argv_s = arg_start & ~pm;
+      const uintptr_t argv_e = (arg_end + pm) & ~pm;
+      const uintptr_t env_s = env_start & ~pm;
+      const uintptr_t env_e = (env_end + pm) & ~pm;
+      const uintptr_t ex[4][2] = {{keep_start, keep_end},
+                                  {scratch_start, scratch_end},
+                                  {argv_s, argv_e},
+                                  {env_s, env_e}};
+      n = mask_add_map_ex(maps[i].start, maps[i].end, maps[i].prot, ex, 4,
+                          ranges, cap, n);
+    } else {
+      n = mask_add_map(maps[i].start, maps[i].end, maps[i].prot, keep_start,
+                       keep_end, scratch_start, scratch_end, ranges, cap, n);
+    }
   }
 
   /* Every anonymous ELF image: the live agent and any decompressed copy
