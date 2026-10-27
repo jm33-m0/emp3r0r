@@ -30,6 +30,11 @@
 #define MASK_MAX_MAPS 2048
 #define MASK_MAX_RANGES (MASK_MAX_MAPS * 2)
 #define MASK_MAP_BUF (512u * 1024u)
+#define MASK_MAX_PHNUM 1024
+#define MASK_MAX_SEGS 32
+#define MASK_ET_DYN 3
+#define MASK_ET_EXEC 2
+#define MASK_PT_LOAD 1
 
 /* The provider allocates its own scratch area instead of carrying large local
  * arrays: users can replace this file without sizing the stub stack for it.
@@ -67,6 +72,150 @@ static int read_full(int fd, void *buf, size_t len) {
   return (int)off;
 }
 
+static uint16_t rd16(const uint8_t *p) {
+  return (uint16_t)(p[0] | ((uint16_t)p[1] << 8));
+}
+
+static uint32_t rd32(const uint8_t *p) {
+  return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) |
+         ((uint32_t)p[3] << 24);
+}
+
+static uint64_t rd64(const uint8_t *p) {
+  return (uint64_t)rd32(p) | ((uint64_t)rd32(p + 4) << 32);
+}
+
+struct mask_elf {
+  uintptr_t base;
+  uintptr_t span;
+  uintptr_t bias;
+  uint64_t phoff;
+  uint16_t phentsize;
+  uint16_t phnum;
+  int elf64;
+  struct {
+    uintptr_t start;
+    size_t len;
+  } segs[MASK_MAX_SEGS];
+  size_t nsegs;
+};
+
+/* Parse the anonymous ELF at `base` and collect its PT_LOAD segments. */
+static int elf_open(uintptr_t base, uintptr_t map_end, struct mask_elf *e) {
+  const uint8_t *eh = (const uint8_t *)base;
+  if (eh[0] != 0x7f || eh[1] != 'E' || eh[2] != 'L' || eh[3] != 'F')
+    return 0;
+  if (eh[4] != 1 && eh[4] != 2)
+    return 0;
+  if (eh[5] != 1) /* little-endian targets only */
+    return 0;
+
+  e->base = base;
+  e->elf64 = eh[4] == 2;
+  uint16_t type = rd16(eh + 16);
+  if (type != MASK_ET_DYN && type != MASK_ET_EXEC)
+    return 0;
+  e->phoff = e->elf64 ? rd64(eh + 32) : rd32(eh + 28);
+  e->phentsize = e->elf64 ? rd16(eh + 54) : rd16(eh + 42);
+  e->phnum = e->elf64 ? rd16(eh + 56) : rd16(eh + 44);
+  size_t min_ph = e->elf64 ? 56u : 32u;
+  if (e->phentsize < min_ph || e->phnum == 0 || e->phnum > MASK_MAX_PHNUM)
+    return 0;
+
+  uint64_t phbytes = (uint64_t)e->phnum * e->phentsize;
+  if (e->phoff > (uint64_t)UINTPTR_MAX || phbytes > (uint64_t)UINTPTR_MAX)
+    return 0;
+  uintptr_t phstart = base + (uintptr_t)e->phoff;
+  if (phstart < base || phstart + (uintptr_t)phbytes < phstart ||
+      phstart + (uintptr_t)phbytes > map_end)
+    return 0;
+
+  e->bias = type == MASK_ET_DYN ? base : 0;
+  uintptr_t max_end = 0;
+  e->nsegs = 0;
+  for (uint16_t i = 0; i < e->phnum; i++) {
+    const uint8_t *ph =
+        (const uint8_t *)(phstart + (uintptr_t)i * e->phentsize);
+    if (rd32(ph) != MASK_PT_LOAD)
+      continue;
+    uint64_t vaddr = e->elf64 ? rd64(ph + 16) : rd32(ph + 8);
+    uint64_t memsz = e->elf64 ? rd64(ph + 40) : rd32(ph + 20);
+    if (memsz == 0)
+      continue;
+    uintptr_t seg_start = (uintptr_t)(e->bias + vaddr);
+    uintptr_t seg_end = seg_start + (uintptr_t)memsz;
+    if (seg_end <= seg_start)
+      return 0;
+    if (seg_end > max_end)
+      max_end = seg_end;
+    if (e->nsegs < MASK_MAX_SEGS) {
+      e->segs[e->nsegs].start = seg_start & ~(uintptr_t)(PAGE_SIZE - 1);
+      e->segs[e->nsegs].len =
+          ((seg_end + PAGE_SIZE - 1) & ~(uintptr_t)(PAGE_SIZE - 1)) -
+          e->segs[e->nsegs].start;
+      e->nsegs++;
+    }
+  }
+  if (e->nsegs == 0 || max_end <= base)
+    return 0;
+  e->span = max_end - base;
+  return 1;
+}
+
+static int range_present(const struct c2_map *ranges, size_t n,
+                         uintptr_t start, uintptr_t end) {
+  for (size_t i = 0; i < n; i++)
+    if (ranges[i].start == start && ranges[i].end == end)
+      return 1;
+  return 0;
+}
+
+static int map_excluded(const struct c2_map *m, uintptr_t fs_base,
+                        uintptr_t gs_base, uintptr_t code_probe,
+                        uintptr_t code_end) {
+  if (fs_base != 0 && m->start <= fs_base && fs_base < m->end)
+    return 1;
+  if (gs_base != 0 && m->start <= gs_base && gs_base < m->end)
+    return 1;
+  if (m->start <= code_probe && code_probe < m->end)
+    return 1;
+  if (code_end != 0 && m->start == code_end)
+    return 1;
+  return 0;
+}
+
+/* Add every mapping that overlaps one of an image's PT_LOAD segments. */
+static size_t add_image_ranges(struct mask_scratch *sc, const struct mask_elf *e,
+                               size_t nmaps, uintptr_t keep_start,
+                               uintptr_t keep_end, uintptr_t scratch_start,
+                               uintptr_t scratch_end, uintptr_t fs_base,
+                               uintptr_t gs_base, uintptr_t code_probe,
+                               uintptr_t code_end, size_t n) {
+  struct c2_map *maps = sc->maps;
+  struct c2_map *ranges = sc->ranges;
+  for (size_t i = 0; i < nmaps; i++) {
+    if (maps[i].start < e->base || maps[i].start >= e->base + e->span)
+      continue;
+    int belongs = 0;
+    for (size_t j = 0; j < e->nsegs; j++) {
+      if (maps[i].start < e->segs[j].start + e->segs[j].len &&
+          e->segs[j].start < maps[i].end) {
+        belongs = 1;
+        break;
+      }
+    }
+    if (!belongs || map_excluded(&maps[i], fs_base, gs_base, code_probe,
+                                 code_end))
+      continue;
+    if (range_present(ranges, n, maps[i].start, maps[i].end))
+      continue;
+    n = mask_add_map(maps[i].start, maps[i].end, maps[i].prot, keep_start,
+                     keep_end, scratch_start, scratch_end, ranges,
+                     MASK_MAX_RANGES, n);
+  }
+  return n;
+}
+
 static size_t find_ranges(struct mask_scratch *sc, uintptr_t keep_start,
                           uintptr_t keep_end, uintptr_t fs_base,
                           uintptr_t gs_base, uintptr_t code_probe) {
@@ -92,37 +241,41 @@ static size_t find_ranges(struct mask_scratch *sc, uintptr_t keep_start,
       break;
     }
   }
+  uintptr_t scratch_start = (uintptr_t)sc;
+  uintptr_t scratch_end = scratch_start + sizeof(*sc);
   size_t n = 0;
+
+  /* Heap and stack are named agent-owned data mappings. */
   for (size_t i = 0; i < nmaps; i++) {
-    /* Anonymous [heap], [stack], [anon:...] and path-less mappings are the
-     * agent's private memory. File-backed code/data (libc, the stager image)
-     * and kernel mappings ([vdso], [vvar]) are not agent state. */
     if (!maps[i].anonymous || !(maps[i].prot & PROT_READ))
       continue;
-    int take = maps[i].special == C2_MAP_SPECIAL_HEAP ||
-               maps[i].special == C2_MAP_SPECIAL_STACK;
-    if (!take && maps[i].anonymous && maps[i].end - maps[i].start >= 4) {
-      const uint8_t *m = (const uint8_t *)maps[i].start;
-      take = m[0] == 0x7f && m[1] == 'E' && m[2] == 'L' && m[3] == 'F';
-    }
-    if (!take)
+    if (maps[i].special != C2_MAP_SPECIAL_HEAP &&
+        maps[i].special != C2_MAP_SPECIAL_STACK)
       continue;
-    /* The running stub needs the thread's TLS mapping (errno, stack cookie,
-     * rseq). The stager's own GS state is already in the keep range. The
-     * stager code may itself be an anonymous PIC mapping; never encrypt it. */
-    if (fs_base != 0 && maps[i].start <= fs_base && fs_base < maps[i].end)
-      continue;
-    if (gs_base != 0 && maps[i].start <= gs_base && gs_base < maps[i].end)
-      continue;
-    if (maps[i].start <= code_probe && code_probe < maps[i].end)
-      continue;
-    /* A raw PIC stager's writable data immediately follows its anonymous RX
-     * image; it belongs to the stub, not the agent. */
-    if (code_end != 0 && maps[i].start == code_end)
+    if (map_excluded(&maps[i], fs_base, gs_base, code_probe, code_end))
       continue;
     n = mask_add_map(maps[i].start, maps[i].end, maps[i].prot, keep_start,
-                     keep_end, (uintptr_t)sc, (uintptr_t)sc + sizeof(*sc),
-                     ranges, cap, n);
+                     keep_end, scratch_start, scratch_end, ranges, cap, n);
+  }
+
+  /* Every anonymous ELF image: the live agent and any decompressed copy
+   * malasada left behind. Adding all PT_LOAD mappings, not just the header
+   * mapping, is what makes the r-xp code segment actually masked. */
+  for (size_t i = 0; i < nmaps; i++) {
+    if (!maps[i].anonymous || !(maps[i].prot & PROT_READ) ||
+        maps[i].end - maps[i].start < 4)
+      continue;
+    const uint8_t *m = (const uint8_t *)maps[i].start;
+    if (m[0] != 0x7f || m[1] != 'E' || m[2] != 'L' || m[3] != 'F')
+      continue;
+    if (map_excluded(&maps[i], fs_base, gs_base, code_probe, code_end))
+      continue;
+    struct mask_elf image;
+    if (!elf_open(maps[i].start, maps[i].end, &image))
+      continue;
+    n = add_image_ranges(sc, &image, nmaps, keep_start, keep_end,
+                         scratch_start, scratch_end, fs_base, gs_base,
+                         code_probe, code_end, n);
   }
   return n;
 }

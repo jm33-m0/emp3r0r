@@ -13,6 +13,29 @@ import (
 	"time"
 )
 
+// unmaskedExecMappings returns anonymous executable mappings that are not the
+// stager stub itself. While the agent sleeps, every such mapping must have lost
+// PROT_EXEC (the provider rewrites it to RW before XORing).
+func unmaskedExecMappings(pid int, stagerImage []byte) ([]procMap, error) {
+	maps, err := readProcMaps(pid)
+	if err != nil {
+		return nil, err
+	}
+	var bad []procMap
+	for _, m := range maps {
+		if m.path != "" || !strings.Contains(m.perms, "x") {
+			continue
+		}
+		page := make([]byte, len(stagerImage))
+		if readProcMem(pid, m.start, page) == nil &&
+			bytes.Equal(page, stagerImage) {
+			continue // the resident mask stub
+		}
+		bad = append(bad, m)
+	}
+	return bad, nil
+}
+
 // TestCAgentSleepMask runs a locally embedded C agent through stager_linux,
 // lets its first check-in fail so it enters the sleep mask, and inspects the
 // stopped-looking process from the test: the agent ELF must be gone from
@@ -28,8 +51,17 @@ func TestCAgentSleepMask(t *testing.T) {
 
 	// Set up C2 config/certs but deliberately do not start the servers yet.
 	httpPort := setupCAgentWorkspace(t, tmpDir)
-	res := buildCAgentResult(t, tmpDir, "shellcode", true)
+	// Deliberately embed an agent whose config is NOT marked stager-run. The
+	// stager-published mask must still be used.
+	res := buildCAgentResult(t, tmpDir, "shellcode", false)
 	agentArgv := buildLocalStager(t, tmpDir, res.OutputFile, "raw")
+	stagerImage, err := os.ReadFile(agentArgv[len(agentArgv)-1])
+	if err != nil {
+		t.Fatalf("read stager image: %v", err)
+	}
+	if len(stagerImage) > 4096 {
+		stagerImage = stagerImage[:4096]
+	}
 
 	var out bytes.Buffer
 	cmd := exec.Command(agentArgv[0], agentArgv[1:]...)
@@ -105,6 +137,11 @@ func TestCAgentSleepMask(t *testing.T) {
 	if bases := findAnonymousELFs(pid); len(bases) > 0 {
 		t.Fatalf("anonymous ELFs are still visible while masked: %#x", bases)
 	}
+	if bad, err := unmaskedExecMappings(pid, stagerImage); err != nil {
+		t.Fatalf("inspect executable mappings: %v", err)
+	} else if len(bad) > 0 {
+		t.Fatalf("agent executable mappings still have PROT_EXEC while masked: %#x", bad)
+	}
 
 	// Let the masked sleep finish. Start the C2 now: the next retry must see a
 	// restored image and check in, which also proves the XOR was reversible.
@@ -147,6 +184,11 @@ func TestCAgentSleepMask(t *testing.T) {
 	}
 	if !reMasked {
 		t.Fatalf("agent did not return to masked sleep after the command.\nOutput:\n%s", out.String())
+	}
+	if bad, err := unmaskedExecMappings(pid, stagerImage); err != nil {
+		t.Fatalf("inspect executable mappings after re-mask: %v", err)
+	} else if len(bad) > 0 {
+		t.Fatalf("agent executable mappings still have PROT_EXEC after re-mask: %#x", bad)
 	}
 }
 
