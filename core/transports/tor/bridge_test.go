@@ -1,3 +1,5 @@
+//go:build linux
+
 package tor_test
 
 import (
