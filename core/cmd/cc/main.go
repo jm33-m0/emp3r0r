@@ -18,7 +18,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
-	cdn2proxy "github.com/jm33-m0/go-cdn2proxy"
 	"github.com/spf13/cobra"
 )
 
@@ -33,7 +32,6 @@ type Options struct {
 	wg_operator_ip          string   // Operator's WireGuard IP
 	wg_operator_key         string   // Operator's WireGuard private key
 	c2_hosts                string   // C2 hosts to generate cert for
-	cdnProxy                string   // Start cdn2proxy server on this port
 	debug                   bool     // Do not kill tmux session when crashing
 	server_debug            bool     // Enable verbose server logging (level 4)
 	operator_names          []string // Operator names to create on the first run
@@ -79,9 +77,6 @@ func main() {
 		Short: "emp3r0r C2 framework",
 		Long:  "A Linux C2 made by a Linux user",
 	}
-
-	// Global flags
-	rootCmd.PersistentFlags().StringVar(&opts.cdnProxy, "cdn2proxy", "", "Start cdn2proxy server on this port")
 
 	// Client subcommand
 	clientCmd := &cobra.Command{
@@ -192,11 +187,6 @@ func runClientMode(opts *Options) {
 		logging.Fatalf("CC is already running")
 	}
 
-	// Start cdn2proxy server if specified
-	if opts.cdnProxy != "" {
-		startCDN2Proxy(opts)
-	}
-
 	// Allow local connections with 127.0.0.1 when all WireGuard parameters are provided
 	// For remote connections, all WireGuard parameters are required
 	if opts.c2_server_ip != "127.0.0.1" && (opts.wg_server_key == "" || opts.wg_server_ip == "" || opts.wg_operator_ip == "") {
@@ -239,11 +229,6 @@ func runServerMode(opts *Options) {
 	// abort if CC is already running
 	if tools.IsCCRunning() {
 		logging.Fatalf("CC is already running")
-	}
-
-	// Start cdn2proxy server if specified
-	if opts.cdnProxy != "" {
-		startCDN2Proxy(opts)
 	}
 
 	// Set up C2 service ports
@@ -314,18 +299,4 @@ func connectWg(opts *Options) {
 	wireguard.WgOperator = wgDev
 	go wgDev.Wait()
 	logging.Infof("WireGuard userspace tunnel established")
-}
-
-// helper function to start the cdn2proxy server
-func startCDN2Proxy(opts *Options) {
-	go func() {
-		logFile, openErr := os.OpenFile("/tmp/ws.log", os.O_CREATE|os.O_RDWR, 0o600)
-		if openErr != nil {
-			logging.Fatalf("OpenFile: %v", openErr)
-		}
-		openErr = cdn2proxy.StartServer(opts.cdnProxy, "127.0.0.1:"+live.RuntimeConfig.CCH2Port, "ws", logFile)
-		if openErr != nil {
-			logging.Fatalf("CDN StartServer: %v", openErr)
-		}
-	}()
 }
