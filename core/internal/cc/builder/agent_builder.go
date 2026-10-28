@@ -151,17 +151,17 @@ func PatchAgentBinary(stubFile, outFile string, configPayload []byte) error {
 		return fmt.Errorf("read stub: %w", err)
 	}
 
-	// Pad config payload to 4096 bytes
-	if len(configPayload) < len(def.AgentConfig) {
-		configPayload = append(configPayload, bytes.Repeat([]byte{0x00}, len(def.AgentConfig)-len(configPayload))...)
-	} else if len(configPayload) > len(def.AgentConfig) {
-		return fmt.Errorf("config payload too large: %d bytes (max %d)", len(configPayload), len(def.AgentConfig))
+	// Store the ciphertext in the length-prefixed slot. Padding with zeros
+	// alone is ambiguous because the ciphertext may end in zero bytes.
+	configSlot, err := def.PackAgentConfig(configPayload)
+	if err != nil {
+		return fmt.Errorf("pack agent config: %w", err)
 	}
 
 	// Replace placeholder with config
 	toWrite = bytes.Replace(toWrite,
-		bytes.Repeat([]byte{0xff}, len(configPayload)),
-		configPayload,
+		bytes.Repeat([]byte{0xff}, len(configSlot)),
+		configSlot,
 		1)
 
 	// Write output

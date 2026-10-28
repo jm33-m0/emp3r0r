@@ -53,7 +53,7 @@ func TestInitConfig_Comprehensive(t *testing.T) {
 	}
 
 	// 4. Inject into def.AgentConfig
-	def.AgentConfig = encryptedData
+	setAgentConfig(t, encryptedData)
 
 	// 5. Run InitConfig
 	err = InitConfig()
@@ -179,7 +179,7 @@ func TestInitConfig_Tor(t *testing.T) {
 	// Marshal & Encrypt
 	cborData, _ := cbor.Marshal(cfg)
 	encryptedData, _ := crypto.AES_GCM_Encrypt([]byte(def.MagicString), cborData)
-	def.AgentConfig = encryptedData
+	setAgentConfig(t, encryptedData)
 
 	// Run
 	err := InitConfig()
@@ -216,7 +216,7 @@ func TestInitConfig_KCP(t *testing.T) {
 	// Marshal & Encrypt
 	cborData, _ := cbor.Marshal(cfg)
 	encryptedData, _ := crypto.AES_GCM_Encrypt([]byte(def.MagicString), cborData)
-	def.AgentConfig = encryptedData
+	setAgentConfig(t, encryptedData)
 
 	// Run
 	err := InitConfig()
@@ -249,7 +249,7 @@ func TestInitConfig_ExplicitTLSURL(t *testing.T) {
 
 	cborData, _ := cbor.Marshal(cfg)
 	encryptedData, _ := crypto.AES_GCM_Encrypt([]byte(def.MagicString), cborData)
-	def.AgentConfig = encryptedData
+	setAgentConfig(t, encryptedData)
 
 	if err := InitConfig(); err != nil {
 		t.Fatalf("InitConfig failed: %v", err)
@@ -271,4 +271,13 @@ func TestOfflineGraceSeconds(t *testing.T) {
 	if got, want := OfflineGraceSeconds(), 120; got != want {
 		t.Fatalf("explicit grace = %d, want %d", got, want)
 	}
+}
+
+func setAgentConfig(t *testing.T, ciphertext []byte) {
+	t.Helper()
+	slot, err := def.PackAgentConfig(ciphertext)
+	if err != nil {
+		t.Fatalf("PackAgentConfig failed: %v", err)
+	}
+	def.AgentConfig = slot
 }

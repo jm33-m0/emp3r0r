@@ -431,6 +431,12 @@ func TestPackerEndToEnd(t *testing.T) {
 	if os.Getenv("EMP3R0R_RACE_ON") == "1" {
 		t.Skip("Skipping test: race detector is enabled")
 	}
+	// The C2 half is this test binary; h2conn must be compiled in or every
+	// subtest waits out its check-in timeout against a listener that cannot
+	// accept the channel.
+	if _, err := transport.GetC2ChannelWrapper(def.C2ChannelModeH2Conn); err != nil {
+		t.Fatalf("h2conn channel is not compiled in; run with -tags 'with_h2conn ...': %v", err)
+	}
 	for _, unpacker := range []string{"rc4", "lzss"} {
 		for _, tr := range []string{"http", "libcurl"} {
 			unpacker, tr := unpacker, tr
@@ -644,10 +650,9 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	if err != nil {
 		t.Fatalf("Failed to encrypt config: %v", err)
 	}
-	if len(encConfig) < len(def.AgentConfig) {
-		encConfig = append(encConfig, bytes.Repeat([]byte{0x00}, len(def.AgentConfig)-len(encConfig))...)
-	} else if len(encConfig) > len(def.AgentConfig) {
-		t.Fatalf("Config payload too large: %d > %d", len(encConfig), len(def.AgentConfig))
+	configSlot, err := def.PackAgentConfig(encConfig)
+	if err != nil {
+		t.Fatalf("Failed to pack config slot: %v", err)
 	}
 
 	// Patch placeholder in the raw .so bytes.
@@ -661,7 +666,7 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 			"Verify the agent is built with the correct tags so def.AgentConfig is embedded.",
 			len(def.AgentConfig))
 	}
-	patchedSOBytes := bytes.Replace(soBytes, placeholder, encConfig, 1)
+	patchedSOBytes := bytes.Replace(soBytes, placeholder, configSlot, 1)
 	patchedSOPath := filepath.Join(tmpDir, "agent_patched.so")
 	if err := os.WriteFile(patchedSOPath, patchedSOBytes, 0o755); err != nil {
 		t.Fatalf("Failed to write patched agent.so: %v", err)
@@ -827,8 +832,9 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	os.Remove(srcArtifact)
 
 	// Flat shellcode uploads are the only variants where the runner takes the
-	// artifact path as an argument; rebuilding one is therefore enough to
-	// retry with a fresh malasada payload if the packaged handoff fails.
+	// artifact path as an argument. Rebuilding the stager gives the retry a
+	// fresh stub and packer key; the malasada payload is generated once per
+	// subtest and is not regenerated here.
 	var rebuildStager func() (string, error)
 	if opts.format == "shellcode" || opts.format == "packed" {
 		rebuildStager = func() (string, error) {

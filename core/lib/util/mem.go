@@ -1,7 +1,6 @@
 package util
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -24,13 +23,10 @@ func ExtractData() (data []byte, err error) {
 }
 
 func extractFromAgentConfig() ([]byte, error) {
-	// Try raw bytes first; some payloads legitimately end with 0x00.
-	if data, err := VerifyConfigData(def.AgentConfig); err == nil {
-		return data, nil
+	encConfig, err := def.UnpackAgentConfig(def.AgentConfig)
+	if err != nil {
+		return nil, err
 	}
-
-	// Fallback: trim trailing zeros for legacy padded blobs.
-	encConfig := bytes.TrimRight(def.AgentConfig, "\x00")
 	return VerifyConfigData(encConfig)
 }
 

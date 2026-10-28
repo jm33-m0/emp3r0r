@@ -310,8 +310,9 @@ func TestPatchAgentBinary(t *testing.T) {
 	}
 	os.WriteFile(stubFile, stubContent, 0o644)
 
-	// Create config payload
-	configPayload := []byte("test config data")
+	// Create config payload that ends in zero bytes: zero padding must not
+	// be confused with the end of the ciphertext.
+	configPayload := []byte("test config data\x00\x00")
 
 	// Patch
 	outFile := tmpDir + "/agent"
@@ -325,19 +326,15 @@ func TestPatchAgentBinary(t *testing.T) {
 		t.Error("Output file was not created")
 	}
 
-	// Read and verify
+	// Read and verify the length-prefixed slot.
 	patchedContent, _ := os.ReadFile(outFile)
-
-	// Verify config was patched in (first 16 bytes should match)
-	found := false
-	for i := 0; i < len(patchedContent)-len(configPayload); i++ {
-		if string(patchedContent[i:i+len(configPayload)]) == string(configPayload) {
-			found = true
-			break
-		}
+	slot := patchedContent[1024 : 1024+len(def.AgentConfig)]
+	got, err := def.UnpackAgentConfig(slot)
+	if err != nil {
+		t.Fatalf("UnpackAgentConfig failed: %v", err)
 	}
-	if !found {
-		t.Error("Config payload not found in patched binary")
+	if string(got) != string(configPayload) {
+		t.Fatalf("unpacked config = %q, want %q", got, configPayload)
 	}
 }
 
