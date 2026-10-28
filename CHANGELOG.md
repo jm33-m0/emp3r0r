@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.5.1](https://github.com/jm33-m0/emp3r0r/compare/v5.5.0...v5.5.1) (2026-10-28)
+
+
+### Bug Fixes
+
+* **agent:** length-prefix the agent build config blob ([a2839fb](https://github.com/jm33-m0/emp3r0r/commit/a2839fbac05857945cd74e6dc0a0be0c79360288))
+
 ## [5.5.0](https://github.com/jm33-m0/emp3r0r/compare/v5.4.1...v5.5.0) (2026-10-27)
 
 
