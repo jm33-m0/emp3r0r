@@ -91,7 +91,7 @@ static c2_status sign_der(const c2_crypto_backend *be,
 /* URL from the build config, mirroring the Go agent's framing:
  *   http_poll  -> http://<host>:<CCHTTPPort><C2Path>
  *   otherwise  -> https://<host>:<CCH2Port><C2Path>
- * A cc_address that already carries a scheme (Tor/full URL) is used as-is. */
+ * A cc_address that already carries a scheme (full URL) is used as-is. */
 static c2_status build_url(const c2_agent_config *cfg, char *out, size_t cap) {
   c2_str base = cfg->cc_address;
   c2_str path = cfg->http.c2_path;

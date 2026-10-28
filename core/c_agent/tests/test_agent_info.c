@@ -71,8 +71,6 @@ static void fill_info(c2_agent_info *a) {
   a->user = c2_str_lit("root (/root), uid=0, gid=0");
   a->has_root = 1;
   a->root = 1;
-  a->has_tor = 1;
-  a->tor = 0;
   a->has_internet = 1;
   a->internet = 1;
   a->has_ncsi = 1;
@@ -135,8 +133,6 @@ int main(void) {
     CHECK(c2_str_equal(out.user, "root (/root), uid=0, gid=0"));
     CHECK_EQ_LONG(out.has_root, 1);
     CHECK_EQ_LONG(out.root, 1);
-    CHECK_EQ_LONG(out.has_tor, 1);
-    CHECK_EQ_LONG(out.tor, 0);
     CHECK_EQ_LONG(out.has_ncsi, 1);
     CHECK_EQ_LONG(out.ncsi, 0);
     CHECK(out.process.has_pid && out.process.pid == 4242);

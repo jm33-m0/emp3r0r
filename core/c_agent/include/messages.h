@@ -139,7 +139,6 @@ enum {
   C2_KEY_AGENT_ARP = 17,
   C2_KEY_AGENT_USER = 18,
   C2_KEY_AGENT_HAS_ROOT = 19,
-  C2_KEY_AGENT_HAS_TOR = 20,
   C2_KEY_AGENT_HAS_INTERNET = 21,
   C2_KEY_AGENT_NCSI_ENABLED = 22,
   C2_KEY_AGENT_PROCESS = 23,
@@ -204,8 +203,6 @@ typedef struct {
 
   int has_root;
   int root;
-  int has_tor;
-  int tor;
   int has_internet;
   int internet;
   int has_ncsi;

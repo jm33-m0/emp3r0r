@@ -133,8 +133,6 @@ c2_status c2_agent_info_encode(CborEncoder *w, const c2_agent_info *a) {
   COUNT_STR(user);
   if (a->has_root)
     pairs++;
-  if (a->has_tor)
-    pairs++;
   if (a->has_internet)
     pairs++;
   if (a->has_ncsi)
@@ -194,9 +192,6 @@ c2_status c2_agent_info_encode(CborEncoder *w, const c2_agent_info *a) {
   PUT_STR(C2_KEY_AGENT_USER, user);
   if (a->has_root &&
       (st = c2_cbor_write_bool(&map, C2_KEY_AGENT_HAS_ROOT, a->root)) != C2_OK)
-    return st;
-  if (a->has_tor &&
-      (st = c2_cbor_write_bool(&map, C2_KEY_AGENT_HAS_TOR, a->tor)) != C2_OK)
     return st;
   if (a->has_internet &&
       (st = c2_cbor_write_bool(&map, C2_KEY_AGENT_HAS_INTERNET, a->internet)) !=
@@ -261,7 +256,6 @@ c2_status c2_agent_info_decode(CborValue *r, c2_agent_info *a) {
       C2_CASE_STR_LIST(C2_KEY_AGENT_ARP, a, arp);
       C2_CASE_TEXT(C2_KEY_AGENT_USER, a, user);
       C2_CASE_BOOL(C2_KEY_AGENT_HAS_ROOT, a, root, has_root);
-      C2_CASE_BOOL(C2_KEY_AGENT_HAS_TOR, a, tor, has_tor);
       C2_CASE_BOOL(C2_KEY_AGENT_HAS_INTERNET, a, internet, has_internet);
       C2_CASE_BOOL(C2_KEY_AGENT_NCSI_ENABLED, a, ncsi, has_ncsi);
       C2_CASE_STR_LIST(C2_KEY_AGENT_EXES, a, exes);

@@ -33,7 +33,7 @@ jobs:
     env:
       # Agent features are opt-in Go build tags. CI exercises the full set so
       # every feature and its tests are compiled.
-      BUILD_TAGS: "with_mesh with_kcp with_h2conn with_quic with_utls with_doh with_ech with_cdnproxy with_netlink with_uring"
+      BUILD_TAGS: "with_mesh with_kcp with_h2conn with_quic with_utls with_doh with_ech with_netlink with_uring"
 
     steps:
       - name: Checkout code

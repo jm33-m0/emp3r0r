@@ -31,7 +31,7 @@ back-compatibility shim.
 | --------------- | ---------------------------------------------------------------- |
 | **C2 / server** | The operator-side server (`core/internal/cc`). Trust root.       |
 | **agent**       | The remote payload talking to the C2.                            |
-| **channel**     | The outer transport wrapper (HTTP-poll, HTTP/2, QUIC, KCP, ...). |
+| **channel**     | The outer transport wrapper (HTTP-poll, HTTP/2, QUIC, SMB, ...). |
 | **stream**      | A bidirectional byte stream produced by a channel.               |
 | **frame**       | One length-prefixed, encrypted unit inside a stream (see §4).    |
 | **envelope**    | One CBOR message, carried inside exactly one frame.              |
@@ -138,7 +138,7 @@ trusted.
 Two transport classes exist:
 
 1. **Duplex** — one long-lived connection carries the stream. Examples:
-   `h2conn` (HTTP/2), `quic`, `kcp`, `smb`. Every route works naturally.
+   `h2conn` (HTTP/2), `quic`, `smb`. Every route works naturally.
 2. **Virtual stream over request/response** — `http_poll` (default). A stream is
    simulated with an init POST, GET long-polls for reads, POSTs for writes, and
    a closing POST. Covered in §3.2.
@@ -190,7 +190,7 @@ Notes:
 
 `h2conn` uses an HTTP/2 duplex POST stream. `quic` is stock QUIC/HTTP-3 (ALPN
 `h3`) optionally with a keyed datagram obfuscation seeded from `QUICKey`/PSK.
-`kcp` is a KCP-over-UDP wrapper. `smb` is a named-pipe transport. All of them
+`smb` is a named-pipe transport. All of them
 expose a byte stream identical to §3.1, so §4–§10 apply unchanged.
 
 A new C agent SHOULD implement `http_poll` first (works through CDNs/proxies),
@@ -384,29 +384,29 @@ UUID, takes `From`/`LastSeen` from the connection, and takes `Owner` from the
 operator lock. Minimum required in the body: `PublicKey` (29), a PEM-encoded
 PKIX P-256 public key.
 
-Keys 1 (`Tag`), 15 (`From`), 27 (`UUID`), 28 (`UUIDSig`), 30 (`C2Host`),
-31 (`LastSeen`), 32 (`LastSeenRTT`), 36 (`AgentToken`) and 43 (`Owner`) are
-retired from the check-in body.
+Keys 1 (`Tag`), 15 (`From`), 20 (`HasTor`), 27 (`UUID`), 28 (`UUIDSig`),
+30 (`C2Host`), 31 (`LastSeen`), 32 (`LastSeenRTT`), 36 (`AgentToken`) and
+43 (`Owner`) are retired from the check-in body.
 
 | Key | Name           | Key | Name                                    |
 | --- | -------------- | --- | --------------------------------------- |
-| 2   | `Name`         | 20  | `HasTor`                                |
-| 3   | `Version`      | 21  | `HasInternet`                           |
-| 4   | `Transport`    | 22  | `NCSIEnabled`                           |
-| 5   | `Hostname`     | 23  | `Process` (`AgentProcess`)              |
-| 6   | `Hardware`     | 24  | `Exes` (array)                          |
-| 7   | `Container`    | 25  | `CWD`                                   |
-| 8   | `CPU`          | 26  | `Product` (any)                         |
-| 9   | `GPU`          | 29  | `PublicKey` (PEM)                       |
-| 10  | `Mem`          | 33  | `Uptime`                                |
-| 11  | `OS`           | 34  | `Groups`                                |
-| 12  | `GOOS`         | 37  | `MeshRoute`                             |
-| 13  | `Kernel`       | 38  | `P2PRelayPort`                          |
-| 14  | `Arch`         | 39  | `MeshGossipPort`                        |
-| 16  | `IPs` (array)  | 40  | `Files` (array)                         |
-| 17  | `ARP` (array)  | 41  | `GOArch`                                |
-| 18  | `User`         | 42  | `P2PTransport`                          |
-| 19  | `HasRoot`      | 44  | `OfflineGrace` (seconds; 0 = immediate) |
+| 2   | `Name`         | 21  | `HasInternet`                           |
+| 3   | `Version`      | 22  | `NCSIEnabled`                           |
+| 4   | `Transport`    | 23  | `Process` (`AgentProcess`)              |
+| 5   | `Hostname`     | 24  | `Exes` (array)                          |
+| 6   | `Hardware`     | 25  | `CWD`                                   |
+| 7   | `Container`    | 26  | `Product` (any)                         |
+| 8   | `CPU`          | 29  | `PublicKey` (PEM)                       |
+| 9   | `GPU`          | 33  | `Uptime`                                |
+| 10  | `Mem`          | 34  | `Groups`                                |
+| 11  | `OS`           | 37  | `MeshRoute`                             |
+| 12  | `GOOS`         | 38  | `P2PRelayPort`                          |
+| 13  | `Kernel`       | 39  | `MeshGossipPort`                        |
+| 14  | `Arch`         | 40  | `Files` (array)                         |
+| 16  | `IPs` (array)  | 41  | `GOArch`                                |
+| 17  | `ARP` (array)  | 42  | `P2PTransport`                          |
+| 18  | `User`         | 44  | `OfflineGrace` (seconds; 0 = immediate) |
+| 19  | `HasRoot`      |     |                                         |
 
 `AgentProcess`:
 
