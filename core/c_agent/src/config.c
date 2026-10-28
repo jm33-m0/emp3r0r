@@ -95,11 +95,13 @@ static c2_status decode_custom_headers(CborValue *it, c2_http_profile *p) {
 /* TransportOptions is map[string]string (CBOR key 83). Keep the pairs as
  * borrowed slices into the decrypted config buffer. */
 static c2_status decode_transport_options(CborValue *it, c2_agent_config *cfg) {
+  cfg->transport_option_count = 0;
+  if (cbor_value_is_null(it))
+    return c2_cbor_dc(cbor_value_advance(it)); /* Go encodes a nil map as null */
   CborValue map;
   c2_status st = c2_cbor_map_enter(it, &map);
   if (st != C2_OK)
     return st;
-  cfg->transport_option_count = 0;
   while (!cbor_value_at_end(&map)) {
     if (!cbor_value_is_text_string(&map))
       return C2_ERR_PROTO;

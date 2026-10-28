@@ -164,6 +164,21 @@ int main(void) {
     CHECK(c2_agent_config_option(&cfg, "missing").len == 0);
   }
 
+  /* Go encodes a nil TransportOptions map as CBOR null. */
+  {
+    CborEncoder e, m;
+    cbor_encoder_init(&e, buf, sizeof(buf), 0);
+    CHECK(cbor_encoder_create_map(&e, &m, 1) == CborNoError);
+    CHECK(cbor_encode_uint(&m, C2_KEY_CFG_TRANSPORT_OPTIONS) == CborNoError);
+    CHECK(cbor_encode_null(&m) == CborNoError);
+    CHECK(cbor_encoder_close_container(&e, &m) == CborNoError);
+    size_t n = cbor_encoder_get_buffer_size(&e, buf);
+    memset(&cfg, 0, sizeof(cfg));
+    CHECK(decode_cfg(buf, n, &cfg) == C2_OK);
+    CHECK_EQ_LONG(cfg.transport_option_count, 0);
+    CHECK(c2_agent_config_option(&cfg, "socks5").len == 0);
+  }
+
   /* Empty config: the decoder fills the Go defaults (NormalizeC2Routes). */
   {
     CborEncoder e, m;
