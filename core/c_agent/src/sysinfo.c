@@ -244,16 +244,28 @@ static void gather_ips(c2_sysinfo_store *st) {
   freeifaddrs(ifaddr);
 }
 
-static const char *transport_label(const c2_agent_config *cfg) {
-  if (cfg->c2_channel_mode.ptr == NULL)
-    return "HTTP";
+static void transport_label(const c2_agent_config *cfg, char *out,
+                            size_t cap) {
   c2_str mode = cfg->c2_channel_mode;
-  if (mode.len == strlen("http_poll") &&
-      memcmp(mode.ptr, "http_poll", mode.len) == 0)
-    return "HTTP";
-  if (mode.len == strlen("quic") && memcmp(mode.ptr, "quic", mode.len) == 0)
-    return "QUIC";
-  return "HTTP2";
+  const char *label = NULL;
+  if (mode.ptr == NULL || mode.len == 0)
+    label = "HTTP";
+  else if (mode.len == strlen("http_poll") &&
+           memcmp(mode.ptr, "http_poll", mode.len) == 0)
+    label = "HTTP";
+  else if (mode.len == strlen("h2conn") &&
+           memcmp(mode.ptr, "h2conn", mode.len) == 0)
+    label = "HTTP2";
+  else if (mode.len == strlen("quic") &&
+           memcmp(mode.ptr, "quic", mode.len) == 0)
+    label = "QUIC";
+  if (label != NULL) {
+    snprintf(out, cap, "%s", label);
+    return;
+  }
+  size_t n = mode.len < cap - 1 ? mode.len : cap - 1;
+  memcpy(out, mode.ptr, n);
+  out[n] = '\0';
 }
 
 /* Copy a possibly-unterminated c2_str into a NUL-terminated buffer. */
@@ -377,7 +389,9 @@ c2_status c2_gather_agent_info(c2_agent_info *info, const c2_agent_config *cfg,
   info->gpu = c2_str_lit("N/A");
   info->mem = c2_str_lit("N/A");
 
-  info->transport = store_fmt(st, "%s (%s)", transport_label(cfg), cc);
+  char label[64];
+  transport_label(cfg, label, sizeof(label));
+  info->transport = store_fmt(st, "%s (%s)", label, cc);
 
   info->user = store_fmt(st, "%s (%s), uid=%u, gid=%u", username, home,
                          (unsigned)getuid(), (unsigned)getgid());

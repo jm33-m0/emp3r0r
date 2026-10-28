@@ -295,8 +295,8 @@ short random ID so even two builds with identical configuration stay distinct.
 
 The Go agent name follows
 `agent_<os>_<arch>_<kind>_<channel>_<mesh>_<features>_<host>_<port>_<id>`;
-features such as `kcp`, `ncsi`, `stager`, `persistent-router`, `doh`, `ech`,
-`cdn`, `proxy`, poll/jitter, mesh relay/gossip ports and bootstrap peer count
+features such as `ncsi`, `stager`, `persistent-router`, `doh`, `ech`,
+`proxy`, poll/jitter, mesh relay/gossip ports and bootstrap peer count
 are added when enabled. The C agent uses the `c_agent_linux_...` prefix.
 
 ### Native C agent
@@ -310,9 +310,12 @@ type, and `--arch` selects a C toolchain target:
 generate_c --type glibc --arch amd64 --cc your.domain.com
 generate_c --cc your.domain.com --crypto mbedtls --gzip none
 # transports: libcurl (default), http_raw (self-contained plain HTTP),
-# libssl (raw TCP + TLS)
+# libssl (raw TCP + TLS), tor (custom SOCKS5 transport)
 generate_c --cc your.domain.com --transport http_raw
 generate_c --cc your.domain.com --transport libssl
+generate_c --cc abcdefghijklmnop.onion:80 \
+  --c2-channel-mode tor --allow-custom-transport \
+  --transport tor --transport-option socks5=127.0.0.1:9050
 # resolve the C2 host over DNS-over-HTTPS
 generate_c --cc your.domain.com --doh https://1.1.1.1/dns-query
 # musl target (Alpine and other musl hosts); dynload follows the library
@@ -337,12 +340,13 @@ Available `--type`: `glibc`, `musl`. Available `--arch`: `amd64`, `386`, `arm`,
 `arm64`, `riscv64`. `riscv64` requires `--type musl`; `--format shellcode`
 requires `amd64` + `glibc`. Available `--transport`: `libcurl` (default,
 HTTP/HTTPS), `http_raw` (plain HTTP, no external libraries), `libssl` (plain
-HTTP plus HTTPS via libssl). `--doh` resolves the C2 host over DNS-over-HTTPS
-(libcurl transport uses its native DoH; `http_raw`/`libssl` use a runtime-loaded
-libcurl DoH client). The malleable HTTP profile is configured in `emp3r0r.json`
-under `malleable_c2`; an incomplete profile is replaced with a complete random
-one when an agent is generated. The same profile applies to every HTTP
-transport.
+HTTP plus HTTPS via libssl), `tor` (custom SOCKS5 transport), or a custom
+`transport_<name>.c` with `--allow-custom-transport`. `--doh` resolves the C2
+host over DNS-over-HTTPS (libcurl transport uses its native DoH;
+`http_raw`/`libssl` use a runtime-loaded libcurl DoH client). The malleable HTTP
+profile is configured in `emp3r0r.json` under `malleable_c2`; an incomplete
+profile is replaced with a complete random one when an agent is generated. The
+same profile applies to every HTTP transport.
 
 Output: `c_agent_linux_<arch>_<format>_<libc>_<transport>_<crypto>_<gzip>_<dynload>_..._<host>_<port>_<id>`.
 The extension is `.so` for `--format so` and `.bin` for `--format shellcode`.
@@ -352,7 +356,7 @@ port its relay listens on, and dialers always use the peer's advertised
 transport, so a mixed mesh (for example Windows SMB nodes alongside Linux mTLS
 nodes) routes through a peer that shares a usable transport instead of assuming
 everyone runs the local default. `smb` is only accepted for Windows payloads;
-kcp/mtls work everywhere.
+kcp/mtls work everywhere. KCP is mesh-only; it is not a C2 channel.
 
 ### Choosing the C2 transport and agent features
 
@@ -370,12 +374,16 @@ every feature). `install.py --list-agent-tags` prints the reference.
 | QUIC C2 with the per-build static key | `with_quic`                                                                                                  |
 | ECH behind an ECH-capable CDN         | `with_doh with_ech with_utls`                                                                                |
 | P2P mesh (relay + gossip)             | `with_mesh with_kcp`                                                                                         |
-| Everything (full build)               | `with_mesh with_kcp with_h2conn with_quic with_utls with_doh with_ech with_cdnproxy with_netlink with_uring` |
+| Tor custom transport (reference)      | `with_transport_tor`                                                                                         |
+| Everything (built-in features)        | `with_mesh with_kcp with_h2conn with_quic with_utls with_doh with_ech with_netlink with_uring` |
+
+Custom transports are not part of the full build. Add their tag explicitly, for
+example `--agent-tags 'with_transport_tor'`.
 
 CDN fronting is not a build-time choice: every CDN fronts plain HTTP(S), so set
 `--cc` to the CDN hostname and use the default `http_poll` transport (`with_h2conn`
-for HTTP/2). `with_cdnproxy` only compiles the older WebSocket `--cdn` tunnel and
-is unnecessary when the CDN terminates HTTPS directly.
+for HTTP/2). A custom wire is a build-time agent transport plus a local bridge
+process; see [Custom transports](./CUSTOM_C2.md).
 
 Examples:
 
@@ -391,10 +399,21 @@ Each C2 transport is selected per agent with `generate --c2-channel-mode`:
 `http_poll` (plain HTTP polling, always available), `h2conn` (HTTP/2 duplex, needs
 `with_h2conn`), or `quic` (needs `with_quic`). The runtime HTTP transport uses
 `crypto/tls` unless the agent was built with `with_utls`. C2 server binaries are
-always built with every tag and start every compiled listener (`http_poll`,
-`h2conn`, `quic` and `kcp`) automatically, so a single server can serve every
-agent flavour. `c2_channel_mode` only selects the default used for generated
-agents; it does not disable the other listeners.
+always built with every built-in tag and start every compiled listener
+(`http_poll`, `h2conn`, `quic`, and external bridges) automatically, so a single
+server can serve every agent flavour. `c2_channel_mode` only selects the default
+used for generated agents; it does not disable the other listeners.
+
+### Custom transports
+
+Any wire outside the built-in HTTP, HTTP/2, and QUIC channels uses an agent
+dialer plus a local bridge process on the C2 host. The bridge can be written in
+any language and connects to the running C2 over `bridge_socket`, so adding or
+changing a transport does not restart the C2.
+
+Tor is the reference custom transport. See
+[Custom transports](./CUSTOM_C2.md) for the Tor quick start, the agent dialer
+API, the bridge contract, and the configuration reference.
 
 The TLS listener on the C2 port is a frontend: it terminates TLS once and routes
 requests by the malleable http_poll session header to the polling backend, and
@@ -413,7 +432,7 @@ the certificate used by new TLS/QUIC handshakes.
 | `cc_http_port` / `CCHTTPPort` (TCP) | plain HTTP `http_poll`                 |
 | `CCH2Port` (TCP)                    | TLS frontend: `h2conn` and `http_poll` |
 | `CCH2Port` (UDP)                    | QUIC                                   |
-| P2P relay port (UDP)                | KCP tunnel into the TLS frontend       |
+| `bridge_socket` (Unix)              | external custom transports             |
 
 ### QUIC transport
 
@@ -461,10 +480,8 @@ endpoint that does not support it rejects the handshake, so omit `--ech` unless
 the C2 really is behind an ECH-capable CDN.
 
 This is the normal CDN path: the CDN terminates HTTPS and forwards HTTP to the
-C2, so no special transport is needed. The older `--cdn` WebSocket tunnel
-(compiled in with `with_cdnproxy`) is only for CDNs where you cannot terminate
-TLS yourself; it tunnels the C2 TLS, so ECH does not apply there and you do not
-need it for ordinary CDN fronting.
+C2, so no special transport is needed. For a transport that is not HTTP, see
+[Custom transports](./CUSTOM_C2.md).
 
 ## tmux console
 

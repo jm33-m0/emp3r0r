@@ -128,6 +128,7 @@ AGENT_TAG_DOCS: dict[str, str] = {
     "with_ech": "ECH (Encrypted Client Hello) for C2 TLS; requires with_doh",
     "with_netlink": "netlink route/neighbour enumeration (procfs fallback)",
     "with_uring": "io_uring file-transfer acceleration (sync fallback)",
+    "with_transport_tor": "Tor custom transport (agent dialer; needs a bridge)",
 }
 
 

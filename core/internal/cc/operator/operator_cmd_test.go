@@ -105,7 +105,7 @@ func TestGenerateCommandsDocumentTransportPorts(t *testing.T) {
 	}
 
 	generateC := gen_c_cmd()
-	for _, want := range []string{"http_poll", "--cc-http-port", "https://", "libssl", "libcurl"} {
+	for _, want := range []string{"http_poll", "--cc-http-port", "https://", "libssl", "libcurl", "tor", "--c2-channel-mode", "--allow-custom-transport"} {
 		if !strings.Contains(generateC.Long, want) {
 			t.Errorf("generate_c help does not mention %q", want)
 		}
@@ -113,11 +113,14 @@ func TestGenerateCommandsDocumentTransportPorts(t *testing.T) {
 }
 
 func TestCAgentEndpointPreservesTLSURL(t *testing.T) {
-	if got := cAgentEndpoint("https://front.example.com:8443/", "8080"); got != "https://front.example.com:8443" {
+	if got := cAgentEndpoint("https://front.example.com:8443/", "8080", def.C2ChannelModePlainHTTP); got != "https://front.example.com:8443" {
 		t.Fatalf("cAgentEndpoint(TLS URL) = %q", got)
 	}
-	if got := cAgentEndpoint("c2.example.com", "8080"); got != "http://c2.example.com:8080" {
+	if got := cAgentEndpoint("c2.example.com", "8080", def.C2ChannelModePlainHTTP); got != "http://c2.example.com:8080" {
 		t.Fatalf("cAgentEndpoint(host) = %q", got)
+	}
+	if got := cAgentEndpoint("example.onion:80", "8080", "tor"); got != "example.onion:80" {
+		t.Fatalf("cAgentEndpoint(custom) = %q", got)
 	}
 }
 

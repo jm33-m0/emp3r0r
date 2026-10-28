@@ -136,7 +136,7 @@ C2 server binaries keep the full feature set, so one server can handle every age
 ## Documentation
 
 - [Operator guide](./docs/OPERATOR.md): installation, quick start, operator setup, container notes, tmux keybindings, and agent generation.
-- [Custom transport guide](./docs/CUSTOM_C2.md): write an agent dialer and a C2 bridge, with a worked Tor example.
+- [Custom transport guide](./docs/CUSTOM_C2.md): write an agent dialer and a C2 bridge, with a reference Tor transport.
 - [Module development guide](./docs/module_development_guide.md)
 - [Testing guide](./docs/TESTING.md)
 - [Security policy](./docs/SECURITY.md)

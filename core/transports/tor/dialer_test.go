@@ -10,7 +10,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/pkg/agenttransport"
 )
 
-// TestDialThroughSOCKS5 exercises the example with a local SOCKS5 server. The
+// TestDialThroughSOCKS5 exercises the reference dialer with a local SOCKS5 server. The
 // server ignores the requested .onion target and relays to a local echo
 // listener, so the test needs no Tor daemon.
 func TestDialThroughSOCKS5(t *testing.T) {
@@ -126,7 +126,7 @@ func socksHandshake(conn net.Conn) bool {
 	return true
 }
 
-// ensure the example registers under the expected name and can be looked up.
+// ensure the reference dialer registers under the expected name and can be looked up.
 func TestRegistered(t *testing.T) {
 	d, err := agenttransport.Get(Name)
 	if err != nil {

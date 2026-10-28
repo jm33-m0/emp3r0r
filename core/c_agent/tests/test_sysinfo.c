@@ -67,6 +67,18 @@ int main(void) {
   CHECK(info.hardware.ptr != NULL && str_eq(info.hardware, "N/A"));
   CHECK(info.cpu.ptr != NULL && str_eq(info.cpu, "N/A"));
 
+  /* A custom transport reports its configured name, not an HTTP label. */
+  {
+    c2_agent_config custom = cfg;
+    custom.c2_channel_mode = c2_str_lit("tor");
+    c2_agent_info custom_info;
+    c2_sysinfo_store custom_store;
+    CHECK_EQ_LONG(c2_gather_agent_info(&custom_info, &custom, NULL, "9.9.9",
+                                       &custom_store),
+                  C2_OK);
+    CHECK(str_has(custom_info.transport, "tor (127.0.0.1:8080)"));
+  }
+
   CHECK(info.has_root == 1);
   CHECK(info.process.has_pid && info.process.pid > 0);
   CHECK(info.process.cmdline.ptr != NULL && info.process.cmdline.len > 0);

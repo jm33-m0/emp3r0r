@@ -81,6 +81,17 @@ static void enc_profile(CborEncoder *m, int headers) {
   CHECK(cbor_encoder_close_container(m, &p) == CborNoError);
 }
 
+static void enc_transport_options(CborEncoder *m) {
+  CHECK(cbor_encode_uint(m, C2_KEY_CFG_TRANSPORT_OPTIONS) == CborNoError);
+  CborEncoder opts;
+  CHECK(cbor_encoder_create_map(m, &opts, 2) == CborNoError);
+  CHECK(cbor_encode_text_stringz(&opts, "socks5") == CborNoError);
+  CHECK(cbor_encode_text_stringz(&opts, "127.0.0.1:9050") == CborNoError);
+  CHECK(cbor_encode_text_stringz(&opts, "zone") == CborNoError);
+  CHECK(cbor_encode_text_stringz(&opts, "example.onion") == CborNoError);
+  CHECK(cbor_encoder_close_container(m, &opts) == CborNoError);
+}
+
 static size_t build_full_config(uint8_t *buf, size_t cap, int pairs) {
   CborEncoder e, m;
   cbor_encoder_init(&e, buf, cap, 0);
@@ -102,6 +113,7 @@ static size_t build_full_config(uint8_t *buf, size_t cap, int pairs) {
   enc_text(&m, C2_KEY_CFG_C2_CHANNEL_MODE, "h2conn");
   enc_routes(&m);
   enc_profile(&m, 2);
+  enc_transport_options(&m);
   enc_text(&m, 999, "future key"); /* unknown keys must be skipped */
   CHECK(cbor_encoder_close_container(&e, &m) == CborNoError);
   return cbor_encoder_get_buffer_size(&e, buf);
@@ -113,7 +125,7 @@ int main(void) {
 
   /* Full config: every communication key is decoded, nested maps included. */
   {
-    size_t n = build_full_config(buf, sizeof(buf), 18);
+    size_t n = build_full_config(buf, sizeof(buf), 19);
     memset(&cfg, 0, sizeof(cfg));
     c2_str hk[4], hv[4];
     cfg.http.header_keys = hk;
@@ -144,6 +156,12 @@ int main(void) {
     CHECK_EQ_LONG(cfg.http.header_count, 2);
     CHECK(c2_str_equal(cfg.http.header_keys[0], "X-H0"));
     CHECK(c2_str_equal(cfg.http.header_values[1], "v"));
+    CHECK_EQ_LONG(cfg.transport_option_count, 2);
+    CHECK(c2_str_equal(c2_agent_config_option(&cfg, "socks5"),
+                       "127.0.0.1:9050"));
+    CHECK(c2_str_equal(c2_agent_config_option(&cfg, "zone"),
+                       "example.onion"));
+    CHECK(c2_agent_config_option(&cfg, "missing").len == 0);
   }
 
   /* Empty config: the decoder fills the Go defaults (NormalizeC2Routes). */
@@ -210,7 +228,7 @@ int main(void) {
     c2_crypto_backend *be = c2_crypto_open();
     CHECK(be != NULL);
     if (be != NULL) {
-      size_t n = build_full_config(buf, sizeof(buf), 18);
+      size_t n = build_full_config(buf, sizeof(buf), 19);
       uint8_t enc[4096];
       size_t enc_len = 0;
       c2_str magic = c2_str_lit("test-magic");

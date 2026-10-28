@@ -59,6 +59,18 @@ Some packages compile C or load real object files and need extra tooling:
   (`crypto.cloudflare.com`, `tls-ech.dev`) through a public DoH resolver and
   perform a real ECH handshake with both the uTLS and crypto/tls clients. They
   need network egress; use `go test -short` to skip them offline.
+- The Tor end-to-end tests in `modules/stager_linux/test` start a Tor hidden
+  service and check in through the custom bridge with both a Go agent built
+  with `with_transport_tor` and a C agent built with `TRANSPORT=tor`. They are
+  opt-in because they need a Tor binary and Tor network access:
+
+  ```bash
+  EMP3R0R_TOR_INTEGRATION=1 TOR_BIN=/path/to/tor \
+    go test -v -timeout 8m -run TestTorCustomC2EndToEnd ./transports/tor
+  ```
+
+  Set `TOR_LIBDIR` if Tor's libraries are not on the loader path, and
+  `EMP3R0R_TOR_KEEP=1` to keep the temporary workspace.
 
 ## How CI runs it
 

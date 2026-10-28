@@ -21,7 +21,7 @@ func TestGenerateCmdDoesNotOfferCAgent(t *testing.T) {
 
 func TestGenerateCAgentCmdHasFlags(t *testing.T) {
 	cmd := gen_c_cmd()
-	for _, name := range []string{"type", "arch", "cc", "cc-http-port", "doh", "crypto", "format", "gzip", "transport", "dynload", "glibc-version", "bof", "interval", "jitter", "poll-window", "offline-grace"} {
+	for _, name := range []string{"type", "arch", "cc", "cc-http-port", "doh", "c2-channel-mode", "allow-custom-transport", "transport-option", "crypto", "format", "gzip", "transport", "dynload", "glibc-version", "bof", "interval", "jitter", "poll-window", "offline-grace"} {
 		if cmd.Flags().Lookup(name) == nil {
 			t.Errorf("generate_c: missing flag --%s", name)
 		}
@@ -38,8 +38,8 @@ func TestGenerateCAgentCmdHasFlags(t *testing.T) {
 	if got := cmd.Flags().Lookup("jitter").DefValue; got != "50" {
 		t.Errorf("--jitter default = %q, want 50", got)
 	}
-	if cmd.Flags().Lookup("c2-channel-mode") != nil {
-		t.Error("C agent only implements http_poll; it must not expose --c2-channel-mode")
+	if got := cmd.Flags().Lookup("c2-channel-mode").DefValue; got != "http_poll" {
+		t.Errorf("--c2-channel-mode default = %q, want http_poll", got)
 	}
 }
 

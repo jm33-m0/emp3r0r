@@ -21,7 +21,7 @@ import (
 var (
 	CAgentCryptoProviders    = []string{"openssl", "mbedtls"}
 	CAgentGzipProviders      = []string{"miniz", "none"}
-	CAgentTransportProviders = []string{"libcurl", "http_raw", "libssl"}
+	CAgentTransportProviders = []string{"libcurl", "http_raw", "libssl", "tor"}
 	// DYNLOAD_MODE picks the libc symbols dynload resolves: libc_dl
 	// (__libc_dlopen_mode, glibc < 2.34), public (dlopen, glibc >= 2.34) or
 	// auto (libc_dl with a runtime fallback to the public names).
@@ -55,6 +55,10 @@ type CAgentProviders struct {
 	Arch      string // ARCH=
 	Format    string // exe|so|shellcode (post-build artifact)
 	Bof       string // BOF=0|1 (1 keeps the COFF/BOF command surface)
+
+	// AllowCustomTransport lets Transport name a provider the operator added
+	// under src/transport/ instead of one of the built-in providers.
+	AllowCustomTransport bool
 }
 
 // cAgentProviderSpec maps one operator choice to its Makefile variable. A
@@ -135,9 +139,31 @@ func copyStageSource(src, dst string) error {
 	return nil
 }
 
+// validCustomTransportName keeps a custom provider name safe to paste into a
+// Makefile source path.
+func validCustomTransportName(name string) bool {
+	if name == "" || len(name) > 64 {
+		return false
+	}
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '-', r == '_':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 func validateCAgentProviders(p CAgentProviders) error {
 	for _, spec := range cAgentProviderSpecs(p) {
 		if spec.value == "" {
+			continue
+		}
+		if spec.group == "transport" && p.AllowCustomTransport {
+			if !validCustomTransportName(spec.value) {
+				return fmt.Errorf("invalid custom transport provider %q (use lower-case letters, digits, '-' or '_')", spec.value)
+			}
 			continue
 		}
 		valid := false
@@ -221,6 +247,12 @@ func GenerateCAgentWorkflow(opts AgentConfig, providers CAgentProviders, signAge
 	srcDir := cAgentSourceDir()
 	if !util.IsFileExist(filepath.Join(srcDir, "Makefile")) {
 		return nil, fmt.Errorf("C agent source not found at %s (rebuild the operator kit)", srcDir)
+	}
+	if providers.Transport != "" && !slices.Contains(CAgentTransportProviders, providers.Transport) {
+		provider := filepath.Join(srcDir, "src", "transport", "transport_"+providers.Transport+".c")
+		if !util.IsFileExist(provider) {
+			return nil, fmt.Errorf("C transport provider %q not found at %s", providers.Transport, provider)
+		}
 	}
 
 	agentUUID := uuid.NewString()

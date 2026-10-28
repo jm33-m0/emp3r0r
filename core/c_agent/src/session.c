@@ -88,15 +88,28 @@ static c2_status sign_der(const c2_crypto_backend *be,
     return C2_ERR_CRYPTO;
   return C2_OK;
 }
-/* URL from the build config, mirroring the Go agent's framing:
+/* Target passed to the transport, mirroring the Go agent's framing:
  *   http_poll  -> http://<host>:<CCHTTPPort><C2Path>
- *   otherwise  -> https://<host>:<CCH2Port><C2Path>
+ *   h2conn/quic-> https://<host>:<CCH2Port><C2Path>
+ *   custom     -> cc_address untouched; the provider owns the address format
  * A cc_address that already carries a scheme (full URL) is used as-is. */
 static c2_status build_url(const c2_agent_config *cfg, char *out, size_t cap) {
   c2_str base = cfg->cc_address;
   c2_str path = cfg->http.c2_path;
   if (base.len > 0 && base.ptr == NULL)
     return C2_ERR_ARG;
+  int is_http = c2_str_equal(cfg->c2_channel_mode, C2_CHANNEL_DEFAULT);
+  int is_duplex_http = c2_str_equal(cfg->c2_channel_mode, "h2conn") ||
+                       c2_str_equal(cfg->c2_channel_mode, "quic");
+  if (!is_http && !is_duplex_http) {
+    if (base.len + 1 > cap)
+      return C2_ERR_NOMEM;
+    if (base.len > 0)
+      memcpy(out, base.ptr, base.len);
+    out[base.len] = '\0';
+    return C2_OK;
+  }
+
   int has_scheme = 0;
   for (size_t i = 0; i + 2 < base.len; i++) {
     if (base.ptr[i] == ':' && base.ptr[i + 1] == '/' &&
@@ -105,7 +118,6 @@ static c2_status build_url(const c2_agent_config *cfg, char *out, size_t cap) {
       break;
     }
   }
-  int is_http = c2_str_equal(cfg->c2_channel_mode, C2_CHANNEL_DEFAULT);
 
   size_t o = 0;
   if (!has_scheme) {

@@ -124,7 +124,8 @@ HOSTED_CFLAGS = $(HOSTED_TARGET) $(DYNLOAD_MODE_CFLAG)
 # CRYPTO:    openssl (default, system libcrypto via dynload) | mbedtls (vendored)
 # GZIP:      miniz (default, vendored) | none
 # TRANSPORT: libcurl (default, HTTP poll via dynload) | http_raw (raw TCP) |
-#            libssl (raw TCP + TLS via dynload) | transport_<name>.c you add
+#            libssl (raw TCP + TLS via dynload) | tor (SOCKS5 duplex stream) |
+#            transport_<name>.c you add
 CRYPTO ?= openssl
 GZIP ?= miniz
 TRANSPORT ?= libcurl
@@ -142,6 +143,11 @@ ifneq ($(filter $(TRANSPORT),$(HTTP_POLL_TRANSPORTS)),)
   TRANSPORT_SUPPORT_SRC = src/transport/http_poll.c
 endif
 ifeq ($(TRANSPORT),libssl)
+  TRANSPORT_SUPPORT_SRC += src/transport/transport_http_raw.c
+  TRANSPORT_CFLAG = -DHP_HTTP_RAW_AS_HELPER=1
+else ifeq ($(TRANSPORT),tor)
+  # Reuse the raw TCP connector for the SOCKS5 proxy; the helper flag omits the
+  # HTTP transport's exported entry points.
   TRANSPORT_SUPPORT_SRC += src/transport/transport_http_raw.c
   TRANSPORT_CFLAG = -DHP_HTTP_RAW_AS_HELPER=1
 endif

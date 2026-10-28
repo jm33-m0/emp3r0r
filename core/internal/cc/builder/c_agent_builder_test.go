@@ -55,6 +55,16 @@ func TestCAgentBuildArgsOmitsEmptyProviders(t *testing.T) {
 	}
 }
 
+func TestCAgentBuildArgsCustomTransport(t *testing.T) {
+	args := cAgentBuildArgs("/src", "/cfg", CAgentProviders{
+		Transport:            "mydns",
+		AllowCustomTransport: true,
+	})
+	if !strings.Contains(strings.Join(args, " "), "TRANSPORT=mydns") {
+		t.Fatalf("custom transport missing from build args: %v", args)
+	}
+}
+
 func TestCAgentBuildTarget(t *testing.T) {
 	for format, want := range map[string]string{
 		"":          "agent",
@@ -81,10 +91,19 @@ func TestValidateCAgentProviders(t *testing.T) {
 	if err := validateCAgentProviders(validMusl); err != nil {
 		t.Fatalf("valid musl providers rejected: %v", err)
 	}
+	if err := validateCAgentProviders(CAgentProviders{Transport: "tor"}); err != nil {
+		t.Fatalf("Tor provider rejected: %v", err)
+	}
+	if err := validateCAgentProviders(CAgentProviders{Transport: "mydns", AllowCustomTransport: true}); err != nil {
+		t.Fatalf("custom transport provider rejected: %v", err)
+	}
 	for _, bad := range []CAgentProviders{
 		{Crypto: "bogus"},
 		{Gzip: "zlib"},
 		{Transport: "quic"},
+		{Transport: "mydns"},
+		{Transport: "../mydns", AllowCustomTransport: true},
+		{Transport: "MyDNS", AllowCustomTransport: true},
 		{Dynload: "magic"},
 		{Glibc: "1.0"},
 		{Libc: "uclibc"},
@@ -180,6 +199,31 @@ func TestGenerateCAgentWorkflow(t *testing.T) {
 	}
 	if res.AgentUUID == "" || res.ConfigSize == 0 {
 		t.Fatalf("incomplete result: %+v", res)
+	}
+}
+
+func TestGenerateCAgentCustomTransport(t *testing.T) {
+	setupCAgentBuildEnv(t)
+
+	mode := "tor"
+	address := "abcdefghijklmnop.onion:80"
+	res, err := GenerateCAgentWorkflow(AgentConfig{
+		CCAddress:            &address,
+		C2ChannelMode:        &mode,
+		AllowCustomTransport: true,
+		TransportOptions:     map[string]string{"socks5": "127.0.0.1:9050"},
+	}, CAgentProviders{Transport: "tor", AllowCustomTransport: true}, nil)
+	if err != nil {
+		t.Fatalf("GenerateCAgentWorkflow(tor): %v", err)
+	}
+	if !util.IsFileExist(res.OutputFile) {
+		t.Fatalf("output not produced: %s", res.OutputFile)
+	}
+	if live.RuntimeConfig.C2ChannelMode != mode {
+		t.Fatalf("channel mode = %q, want %q", live.RuntimeConfig.C2ChannelMode, mode)
+	}
+	if got := live.RuntimeConfig.TransportOptions["socks5"]; got != "127.0.0.1:9050" {
+		t.Fatalf("transport option = %q", got)
 	}
 }
 

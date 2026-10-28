@@ -34,11 +34,16 @@ The wire format is normative in [PROTOCOL.md](./PROTOCOL.md); the C headers in
 | Libc      | `LIBC`      | `glibc` (default), `musl`                           |
 | Crypto    | `CRYPTO`    | `openssl` (runtime libcrypto), `mbedtls` (vendored) |
 | Gzip      | `GZIP`      | `miniz` (vendored), `none`                          |
-| Transport | `TRANSPORT` | `libcurl`, `http_raw`, `libssl`                     |
+| Transport | `TRANSPORT` | `libcurl`, `http_raw`, `libssl`, `tor`, or `transport_<name>.c` |
 
 Crypto, gzip, and transport providers are one file each in the matching `src/`
-directory. The hosted agent links libc dynamically; static libc is not supported
-because `dynload` needs a dynamic loader and `/proc/self/maps`.
+directory. A custom transport implements `c2_transport_create()` and
+`c2_transport_name()`, reads `cfg->cc_address` and
+`c2_agent_config_option(cfg, "key")`, and returns a raw `c2_stream`. The Tor
+SOCKS5 provider in `src/transport/transport_tor.c` is the reference.
+
+The hosted agent links libc dynamically; static libc is not supported because
+`dynload` needs a dynamic loader and `/proc/self/maps`.
 
 ### Lifecycle
 
@@ -107,6 +112,11 @@ From the operator console, `generate_c` does this automatically:
 generate_c --type glibc --arch amd64 --cc your.domain.com
 generate_c --type musl --arch arm64 --cc your.domain.com \
   --crypto mbedtls --gzip miniz --transport http_raw
+
+# Custom Tor transport (bridge on the C2 host)
+generate_c --cc abcdefghijklmnop.onion:80 \
+  --c2-channel-mode tor --allow-custom-transport \
+  --transport tor --transport-option socks5=127.0.0.1:9050
 ```
 
 ### clangd

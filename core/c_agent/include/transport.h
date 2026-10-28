@@ -108,7 +108,16 @@ enum {
   C2_KEY_CFG_C2_CHANNEL_MODE = 76,
   C2_KEY_CFG_CC_HTTP_PORT = 77,
   C2_KEY_CFG_MALLEABLE_C2 = 78,
+  C2_KEY_CFG_TRANSPORT_OPTIONS = 83,
 };
+
+/* Bound the custom transport option map; the Go builder writes string pairs. */
+#define C2_TRANSPORT_OPTIONS_MAX 16u
+
+typedef struct {
+  c2_str key;
+  c2_str value;
+} c2_kv;
 
 typedef struct {
   c2_str cc_address; /* host:port, or full URL depending on mode */
@@ -136,6 +145,11 @@ typedef struct {
 
   c2_routes routes;
   c2_http_profile http;
+
+  /* transport_options from the Go builder (CBOR key 83). Custom transports
+   * read their own keys; built-in HTTP transports ignore them. */
+  c2_kv transport_options[C2_TRANSPORT_OPTIONS_MAX];
+  size_t transport_option_count;
 } c2_agent_config;
 
 /*
@@ -143,6 +157,9 @@ typedef struct {
  * Only the communication keys above are read; unknown keys are skipped.
  */
 c2_status c2_agent_config_decode(CborValue *r, c2_agent_config *cfg);
+
+/* Look up a custom transport option. Returns an empty slice when absent. */
+c2_str c2_agent_config_option(const c2_agent_config *cfg, const char *key);
 
 /*
  * Decrypt def.AgentConfig:
@@ -162,10 +179,10 @@ c2_status c2_config_decrypt(const c2_crypto_backend *be, c2_str magic,
 /* ------------------------------------------------------------------------- */
 
 /*
- * A transport opens a fresh virtual stream to a URL using the malleable HTTP
- * profile (ignored by duplex transports). The returned c2_stream is the raw
- * byte pipe that SecureConn wraps. `url` is fully resolved by the caller:
- * scheme + host + port + profile path.
+ * A transport opens a fresh virtual stream. The returned c2_stream is the raw
+ * byte pipe that SecureConn wraps. `url` is resolved for the built-in HTTP
+ * transports; a custom provider may ignore it and read cfg->cc_address and
+ * cfg->transport_options through its ctx instead.
  */
 typedef struct c2_transport_ops {
   c2_status (*open)(void *ctx, const char *url, const c2_http_profile *profile,
@@ -180,16 +197,18 @@ typedef struct {
 /*
  * Transport provider contract. Exactly one provider is compiled in, selected
  * with `TRANSPORT=<name>`: src/transport/transport_<name>.c. The provider owns
- * its context
- * and its complete wire implementation; the session passes the profile and a
- * resolved URL to c2_transport_ops.open for every stream.
+ * its context and its complete wire implementation. The session passes the
+ * HTTP profile and a target string to c2_transport_ops.open for every stream;
+ * a custom provider may ignore both and use its ctx instead.
  *
  * Built-ins: libcurl (HTTP/HTTPS via dynload), http_raw (plain HTTP over libc
- * sockets), and libssl (plain HTTP plus HTTPS via libssl/libcrypto). Each owns
- * its complete wire implementation, so there is no separate HTTP selector.
+ * sockets), libssl (plain HTTP plus HTTPS via libssl/libcrypto), and tor (a
+ * Tor SOCKS5 stream to a hidden service). The built-in HTTP providers supply
+ * hp_http_perform() to the shared state machine.
  *
  * Add a provider by dropping src/transport/transport_<name>.c into the tree
- * and building with TRANSPORT=<name>.
+ * and building with TRANSPORT=<name>. A provider may read cfg->transport_options
+ * (CBOR key 83) for its own settings.
  */
 c2_transport c2_transport_create(const c2_agent_config *cfg);
 const char *c2_transport_name(void);

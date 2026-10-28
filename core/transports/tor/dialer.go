@@ -1,4 +1,4 @@
-// Package tor is a worked example of a custom agent transport.
+// Package tor is a reference custom agent transport.
 //
 // The agent dials the C2's onion service through a local Tor SOCKS5 proxy. The
 // transport sees only SecureConn ciphertext, so the bridge and the Tor network
@@ -23,8 +23,9 @@ const Name = "tor"
 
 type dialer struct{}
 
-// Dial connects to target.Address through a SOCKS5 proxy. The proxy defaults to
-// target.Proxy, then to 127.0.0.1:9050 when the tor.socks5 option is absent.
+// Dial connects to target.Address through a SOCKS5 proxy. The proxy is taken
+// from the socks5 transport option, then target.Proxy, and finally defaults to
+// 127.0.0.1:9050.
 func (dialer) Dial(ctx context.Context, target agenttransport.Target) (io.ReadWriteCloser, error) {
 	address := strings.TrimSpace(target.Address)
 	if address == "" {
@@ -34,9 +35,9 @@ func (dialer) Dial(ctx context.Context, target agenttransport.Target) (io.ReadWr
 		address += ":80"
 	}
 
-	socks := strings.TrimSpace(target.Options["socks5"])
+	socks := strings.TrimPrefix(strings.TrimSpace(target.Options["socks5"]), "socks5://")
 	if socks == "" {
-		socks = strings.TrimPrefix(target.Proxy, "socks5://")
+		socks = strings.TrimPrefix(strings.TrimSpace(target.Proxy), "socks5://")
 	}
 	if socks == "" {
 		socks = "127.0.0.1:9050"
