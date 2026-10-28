@@ -55,7 +55,7 @@ func ServerMain(wg_port int, hosts string, operatorNames, addOperators []string,
 
 	// Start every compiled agent transport, not only the one selected for the
 	// agent build: http_poll, the TLS frontend (h2conn + http_poll), QUIC and
-	// KCP may all be compiled in.
+	// external bridges may all be available.
 	go startAllC2Transports()
 
 	// Highlight the key ports for easy identification
@@ -63,7 +63,6 @@ func ServerMain(wg_port int, hosts string, operatorNames, addOperators []string,
 	logging.Successf("   📡 C2 Agent Port (h2conn/http_poll TLS): %s", live.GetRuntimeConfig().CCH2Port)
 	logging.Successf("   📡 C2 Agent Port (http_poll plain):      %s", live.GetRuntimeConfig().CCHTTPPort)
 	logging.Successf("   📡 C2 Agent Port (QUIC UDP):             %s", live.GetRuntimeConfig().CCH2Port)
-	logging.Successf("   🔄 KCP C2 Port (UDP):                    %s", live.GetRuntimeConfig().P2PRelayPort)
 	logging.Successf("   🌐 Operator Port (WG):   %d", wg_port+1)
 	logging.Successf("   🔧 WireGuard Port:       %d", wg_port)
 	logging.Successf("══════════════════════════════════════════════════════════════════\n")

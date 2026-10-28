@@ -199,6 +199,8 @@ func TestSaveAndLoadConfigJSON(t *testing.T) {
 		AgentSocksServerPort: "9090",
 		Password:             "another_secret",
 		C2ChannelMode:        def.C2ChannelModeH2Conn,
+		BridgeSocket:         "/run/c2-bridge.sock",
+		TransportOptions:     map[string]string{"socks5": "127.0.0.1:9050"},
 	})
 
 	// Mock EmpConfigFile
@@ -233,6 +235,13 @@ func TestSaveAndLoadConfigJSON(t *testing.T) {
 	}
 	if _, ok := raw["CCAddress"]; ok {
 		t.Errorf("Saved JSON contains 'CCAddress' key (should be snake_case). Content: %s", string(content))
+	}
+	if raw["bridge_socket"] != "/run/c2-bridge.sock" {
+		t.Errorf("bridge_socket = %v", raw["bridge_socket"])
+	}
+	opts, ok := raw["transport_options"].(map[string]any)
+	if !ok || opts["socks5"] != "127.0.0.1:9050" {
+		t.Errorf("transport_options = %v", raw["transport_options"])
 	}
 }
 

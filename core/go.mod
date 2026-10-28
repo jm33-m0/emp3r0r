@@ -14,11 +14,9 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/hashicorp/memberlist v0.6.0
-	github.com/jm33-m0/go-cdn2proxy v1.1.2
 	github.com/lithammer/fuzzysearch v1.1.8
 	github.com/miekg/dns v1.1.72
 	github.com/ncruces/go-dns v1.3.3
-	github.com/pkg/errors v0.9.1
 	github.com/posener/h2conn v0.0.0-20231204025407-3997deeca0f0
 	github.com/quic-go/quic-go v0.63.0
 	github.com/reeflective/console v0.5.0
@@ -31,10 +29,6 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/vishvananda/netlink v1.3.1
 	github.com/xtaci/kcp-go/v5 v5.6.72
-	github.com/xtaci/kcptun v0.0.0-20260131123647-8a81b86f1994
-	github.com/xtaci/qpp v1.1.25
-	github.com/xtaci/smux v1.5.57
-	github.com/xtaci/tcpraw v1.2.32
 	go.starlark.net v0.0.0-20260708150628-5395d018f003
 	golang.org/x/crypto v0.54.0
 	golang.org/x/net v0.57.0
@@ -59,15 +53,11 @@ require (
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/carapace-sh/carapace-shlex v1.1.1 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
-	github.com/coreos/go-iptables v0.8.0 // indirect
 	github.com/dlclark/regexp2 v1.12.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
-	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/gopacket v1.1.19 // indirect
-	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
 	github.com/hashicorp/go-metrics v0.6.0 // indirect
@@ -88,6 +78,7 @@ require (
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/moloch--/go-keystone v0.0.2 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/reeflective/readline v1.3.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect

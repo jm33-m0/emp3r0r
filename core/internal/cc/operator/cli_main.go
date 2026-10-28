@@ -307,12 +307,6 @@ func getTransport(transportStr string) string {
 		return color.New(color.FgHiBlue).Sprint("http2")
 	case strings.Contains(transportStr, "http"):
 		return color.New(color.FgHiCyan).Sprint("http")
-	case strings.Contains(transportStr, "kcp"):
-		return color.New(color.FgHiMagenta).Sprint("kcp")
-	case strings.Contains(transportStr, "tor"):
-		return color.New(color.FgHiGreen).Sprint("tor")
-	case strings.Contains(transportStr, "cdn"):
-		return color.New(color.FgGreen).Sprint("cdn")
 	case strings.Contains(transportStr, "reverse proxy"):
 		return color.New(color.FgHiCyan).Sprint("rproxy")
 	case strings.Contains(transportStr, "auto proxy"):
@@ -345,7 +339,7 @@ func formatRouteSummary() string {
 
 func formatBannerSummary() string {
 	return fmt.Sprintf(
-		"Config: mode=%s http=%s c2=%s kcp=%s\n"+
+		"Config: mode=%s http=%s c2=%s relay=%s\n"+
 			"Routes: %s\n"+
 			"Paths: prefix=%s data=%s workspace=%s log=%s\n"+
 			"Server: %s\n"+

@@ -104,17 +104,6 @@ func ValidateDomain(domain string) bool {
 	return re.MatchString(domain)
 }
 
-// IsTor is the C2 on Tor?
-func IsTor(addr string) bool {
-	if !strings.HasPrefix(addr, "http://") &&
-		!strings.HasPrefix(addr, "https://") {
-		return false
-	}
-	nopath := strings.Split(addr, "/")[2]
-	fields := strings.Split(nopath, ".")
-	return fields[len(fields)-1] == "onion"
-}
-
 // IPWithMask net.IP and net.IPMask
 type IPWithMask struct {
 	IP   net.IP

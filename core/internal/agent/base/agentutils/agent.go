@@ -9,19 +9,11 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/common"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
-	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 )
 
 // set C2Transport string
 func genC2TransportString() (transport_str string) {
-	if netutil.IsTor(def.CCAddress) {
-		return fmt.Sprintf("TOR (%s)", def.CCAddress)
-	} else if common.RuntimeConfig.CDNProxy != "" {
-		return fmt.Sprintf("CDN (%s)", common.RuntimeConfig.CDNProxy)
-	} else if common.RuntimeConfig.UseKCP {
-		return fmt.Sprintf("KCP (%s)",
-			def.CCAddress)
-	} else if common.RuntimeConfig.C2TransportProxy != "" {
+	if common.RuntimeConfig.C2TransportProxy != "" {
 		// parse proxy url
 		proxyURL, err := url.Parse(common.RuntimeConfig.C2TransportProxy)
 		if err != nil {
@@ -39,6 +31,9 @@ func genC2TransportString() (transport_str string) {
 		return fmt.Sprintf("Proxy %s", common.RuntimeConfig.C2TransportProxy)
 	} else {
 		mode := strings.ToLower(common.RuntimeConfig.C2ChannelMode)
+		if !def.IsBuiltinC2ChannelMode(mode) {
+			return fmt.Sprintf("%s (%s)", mode, def.CCAddress)
+		}
 		if mode == def.C2ChannelModePlainHTTP {
 			return fmt.Sprintf("HTTP (%s)", def.CCAddress)
 		}

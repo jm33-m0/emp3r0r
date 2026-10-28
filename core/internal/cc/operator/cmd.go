@@ -606,10 +606,9 @@ Choose how the agent reaches the C2:
   h2conn     HTTP/2 duplex over TLS. The agent dials CCH2Port, the TLS frontend.
              That frontend also accepts http_poll over TLS.
   quic       QUIC over UDP. The agent dials CCH2Port on UDP.
-  --kcp      Carry the selected TLS transport through the KCP relay port.
 
 The C2 starts every compiled listener automatically: http_poll, the TLS
-frontend (h2conn + http_poll), QUIC, and KCP. Use --cc with a bare hostname to
+frontend (h2conn + http_poll), QUIC, and any external bridge. Use --cc with a bare hostname to
 use CCHTTPPort for http_poll and CCH2Port for h2conn/quic. To use a TLS
 front proxy (nginx, CDN, or the C2 TLS frontend directly), pass an explicit URL
 such as --cc https://front.example.com; the scheme and port are preserved and
@@ -639,14 +638,14 @@ Examples:
 	// Group 2: C2 Connectivity & Transport
 	genAgentCmd.Flags().StringP("cc", "", defaultC2Address(), "C2 hostname, or an explicit http(s) URL for a TLS front proxy (Required)")
 	genAgentCmd.Flags().StringP("c2-channel-mode", "", def.C2ChannelModeDefault, fmt.Sprintf("Agent C2 channel wrapper mode; the server listens on every compiled transport. Available: %s", strings.Join(transport.AllC2ChannelModesDetailed(), ";")))
+	genAgentCmd.Flags().Bool("allow-custom-transport", false, "Allow --c2-channel-mode to name a custom agent transport that is not built into this C2 (the agent build must include the matching dialer)")
+	genAgentCmd.Flags().StringSlice("transport-option", nil, "Custom agent transport option as key=value (repeatable)")
 	genAgentCmd.Flags().BoolP("quic-standard-key", "", false, "QUIC mode only: disable the custom static-key datagram obfuscation and speak stock QUIC (interoperable with HTTP/3 endpoints, but exposes the Initial/ClientHello to observers)")
 	genAgentCmd.Flags().StringP("cc-http-port", "", live.RuntimeConfig.CCHTTPPort, "Port for HTTP Polling/Beaconing C2 transport")
 	genAgentCmd.Flags().StringP("proxy", "", "", "Hard coded proxy URL for agent's C2 transport. Example: socks5://127.0.0.1:9050")
-	genAgentCmd.Flags().StringP("cdn", "", "", "WebSocket CDN tunnel to reach C2 (only needed when the CDN does not front plain HTTPS). Example: wss://cdn.example.com/ws")
 	genAgentCmd.Flags().StringP("doh", "", "", "DNS over HTTPS server to use for DNS resolution. Example: https://1.1.1.1/dns-query")
 	genAgentCmd.Flags().StringP("ech", "", "", "Enable ECH for C2 TLS: DNS name whose HTTPS RR carries the ECHConfigList, fetched over --doh. Example: c2.example.com. Use it when C2 TLS terminates at an ECH-capable CDN edge")
-	genAgentCmd.Flags().BoolP("kcp", "", false, "Use KCP (secure UDP multiplexed tunnel)")
-	addFlagToGroup("C2 Transport Options", "cc", "c2-channel-mode", "quic-standard-key", "cc-http-port", "proxy", "cdn", "doh", "ech", "kcp")
+	addFlagToGroup("C2 Transport Options", "cc", "c2-channel-mode", "allow-custom-transport", "transport-option", "quic-standard-key", "cc-http-port", "proxy", "doh", "ech")
 
 	// Group 3: Beaconing (Polling/Beaconing Mode Only)
 	genAgentCmd.Flags().IntP("interval", "i", 60, "C2 beacon interval in seconds")

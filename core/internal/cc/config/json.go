@@ -40,9 +40,7 @@ type jsonConfig struct {
 	StagerHTTPListenerPort string                  `json:"stager_http_listener_port"`
 	Password               string                  `json:"password"`
 	Socks5LocalPort        string                  `json:"socks5_local_port"`
-	KCPServerPort          string                  `json:"kcp_server_port"`
-	KCPClientPort          string                  `json:"kcp_client_port"`
-	UseKCP                 bool                    `json:"use_kcp"`
+	P2PRelayPort           string                  `json:"p2p_relay_port"`
 	EnableNCSI             bool                    `json:"enable_ncsi"`
 	MeshGossipPort         string                  `json:"mesh_gossip_port"`
 	PreflightEnabled       bool                    `json:"preflight_enabled"`
@@ -53,7 +51,6 @@ type jsonConfig struct {
 	PreflightIntervalMax   int                     `json:"preflight_interval_max"`
 	CAPEM                  string                  `json:"ca_pem"`
 	C2TransportProxy       string                  `json:"c2_transport_proxy"`
-	CDNProxy               string                  `json:"cdn_proxy"`
 	DoHServer              string                  `json:"doh_server"`
 	ECHServerName          string                  `json:"ech_server_name"`
 	AgentUUID              string                  `json:"agent_uuid"`
@@ -79,8 +76,10 @@ type jsonConfig struct {
 	CamouflageCertCN       string                  `json:"camouflage_cert_cn"`
 	C2Routes               jsonC2Routing           `json:"c2_routes"`
 	C2ChannelMode          string                  `json:"c2_channel_mode"`
+	TransportOptions       map[string]string       `json:"transport_options"`
 	QUICStandardKey        bool                    `json:"quic_standard_key"`
 	CCHTTPPort             string                  `json:"cc_http_port"`
+	BridgeSocket           string                  `json:"bridge_socket"`
 	MalleableC2            jsonMalleableHTTPConfig `json:"malleable_c2"`
 	SNI                    string                  `json:"sni"`
 }
@@ -124,9 +123,7 @@ func readJSONConfig(jsonData []byte, cfg *def.Config) error {
 	applyIfSet(&cfg.StagerHTTPListenerPort, jCfg.StagerHTTPListenerPort)
 	applyIfSet(&cfg.Password, jCfg.Password)
 	applyIfSet(&cfg.Socks5LocalPort, jCfg.Socks5LocalPort)
-	applyIfSet(&cfg.P2PRelayPort, jCfg.KCPServerPort)
-	applyIfSet(&cfg.KCPClientPort, jCfg.KCPClientPort)
-	applyIfSet(&cfg.UseKCP, jCfg.UseKCP)
+	applyIfSet(&cfg.P2PRelayPort, jCfg.P2PRelayPort)
 	applyIfSet(&cfg.EnableNCSI, jCfg.EnableNCSI)
 	applyIfSet(&cfg.MeshGossipPort, jCfg.MeshGossipPort)
 	applyIfSet(&cfg.PreflightEnabled, jCfg.PreflightEnabled)
@@ -139,7 +136,6 @@ func readJSONConfig(jsonData []byte, cfg *def.Config) error {
 	applyIfSet(&cfg.PreflightIntervalMax, jCfg.PreflightIntervalMax)
 	applyIfSet(&cfg.CAPEM, jCfg.CAPEM)
 	applyIfSet(&cfg.C2TransportProxy, jCfg.C2TransportProxy)
-	applyIfSet(&cfg.CDNProxy, jCfg.CDNProxy)
 	applyIfSet(&cfg.DoHServer, jCfg.DoHServer)
 	applyIfSet(&cfg.ECHServerName, jCfg.ECHServerName)
 	applyIfSet(&cfg.AgentUUID, jCfg.AgentUUID)
@@ -171,7 +167,11 @@ func readJSONConfig(jsonData []byte, cfg *def.Config) error {
 	applyIfSet(&cfg.CamouflageCertOrg, jCfg.CamouflageCertOrg)
 	applyIfSet(&cfg.CamouflageCertCN, jCfg.CamouflageCertCN)
 	applyIfSet(&cfg.C2ChannelMode, jCfg.C2ChannelMode)
+	if jCfg.TransportOptions != nil {
+		cfg.TransportOptions = jCfg.TransportOptions
+	}
 	applyIfSet(&cfg.CCHTTPPort, jCfg.CCHTTPPort)
+	applyIfSet(&cfg.BridgeSocket, jCfg.BridgeSocket)
 
 	// Bool policy: presence, not value, because an explicit false must be able
 	// to turn obfuscation back off after it was once enabled.

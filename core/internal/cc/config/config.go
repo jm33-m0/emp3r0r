@@ -31,9 +31,7 @@ func SaveConfigJSON() (err error) {
 		StagerHTTPListenerPort: cfg.StagerHTTPListenerPort,
 		Password:               cfg.Password,
 		Socks5LocalPort:        cfg.Socks5LocalPort,
-		KCPServerPort:          cfg.P2PRelayPort,
-		KCPClientPort:          cfg.KCPClientPort,
-		UseKCP:                 cfg.UseKCP,
+		P2PRelayPort:           cfg.P2PRelayPort,
 		EnableNCSI:             cfg.EnableNCSI,
 		MeshGossipPort:         cfg.MeshGossipPort,
 		PreflightEnabled:       cfg.PreflightEnabled,
@@ -44,7 +42,6 @@ func SaveConfigJSON() (err error) {
 		PreflightIntervalMax:   cfg.PreflightIntervalMax,
 		CAPEM:                  cfg.CAPEM,
 		C2TransportProxy:       cfg.C2TransportProxy,
-		CDNProxy:               cfg.CDNProxy,
 		DoHServer:              cfg.DoHServer,
 		ECHServerName:          cfg.ECHServerName,
 		AgentUUID:              cfg.AgentUUID,
@@ -69,8 +66,10 @@ func SaveConfigJSON() (err error) {
 		CamouflageCertOrg:      cfg.CamouflageCertOrg,
 		CamouflageCertCN:       cfg.CamouflageCertCN,
 		C2ChannelMode:          cfg.C2ChannelMode,
+		TransportOptions:       cfg.TransportOptions,
 		QUICStandardKey:        cfg.QUICStandardKey,
 		CCHTTPPort:             cfg.CCHTTPPort,
+		BridgeSocket:           cfg.BridgeSocket,
 		C2Routes: jsonC2Routing{
 			Checkin: cfg.C2Routes.Checkin,
 			Msg:     cfg.C2Routes.Msg,
@@ -116,7 +115,6 @@ func InitConfigFile(cc_host string) (err error) {
 	live.RuntimeConfig.MeshGossipPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	live.RuntimeConfig.Socks5LocalPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	live.RuntimeConfig.P2PRelayPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
-	live.RuntimeConfig.KCPClientPort = fmt.Sprintf("%v", util.RandInt(1025, 65534))
 	live.RuntimeConfig.StagerHTTPListenerPort = fmt.Sprintf("%v", util.RandInt(1026, 65534))
 	live.RuntimeConfig.CCTimeout = util.RandInt(10000, 20000)
 	live.RuntimeConfig.OperatorIdleTimeout = 1800

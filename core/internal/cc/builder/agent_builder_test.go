@@ -252,13 +252,11 @@ func TestGenerateFilePathsFeatureRich(t *testing.T) {
 		P2PRelayPort:      "50000",
 		MeshGossipPort:    "50001",
 		InitialPeers:      []string{"1.2.3.4:7946"},
-		UseKCP:            true,
 		EnableNCSI:        true,
 		IsRunByStager:     true,
 		PersistentRouter:  true,
 		DoHServer:         "https://1.1.1.1/dns-query",
 		ECHServerName:     "c2.example.com",
-		CDNProxy:          "wss://cdn.example.com/ws",
 		C2TransportProxy:  "socks5://127.0.0.1:9050",
 	}
 	cfg := AgentBuildConfig{
@@ -267,8 +265,8 @@ func TestGenerateFilePathsFeatureRich(t *testing.T) {
 		WorkSpace:   t.TempDir(),
 		AgentUUID:   agentUUID,
 	}
-	want := "agent_windows_amd64_dll_h2conn_gateway-mtls_kcp_ncsi_stager_persistent-router_" +
-		"doh-1.1.1.1_ech-c2.example.com_cdn-cdn.example.com_proxy-socks5_" +
+	want := "agent_windows_amd64_dll_h2conn_gateway-mtls_ncsi_stager_persistent-router_" +
+		"doh-1.1.1.1_ech-c2.example.com_proxy-socks5_" +
 		"relay-50000_gossip-50001_peers-1_c2.example.com-8443_aaaaaaaa.dll"
 	_, outFile := GenerateFilePaths(cfg, runtimeConfig)
 	if got := filepath.Base(outFile); got != want {

@@ -76,6 +76,8 @@ The C2 supports HTTP, TCP, and UDP listeners. Agents can use beacon-style HTTP p
 
 HTTP polling uses a malleable request profile from the C2 config. TLS fingerprints can be randomized with uTLS. Behind an ECH-capable CDN, `--doh` and `--ech` hide the inner SNI from the ClientHello. Control messages use CBOR rather than JSON.
 
+New transports can be added without rebuilding the C2: the agent gets a custom dialer and a local bridge process carries the stream to the running server. See the [custom transport guide](./docs/CUSTOM_C2.md).
+
 ### Delivery
 
 #### Stager and sleep masking
@@ -134,6 +136,7 @@ C2 server binaries keep the full feature set, so one server can handle every age
 ## Documentation
 
 - [Operator guide](./docs/OPERATOR.md): installation, quick start, operator setup, container notes, tmux keybindings, and agent generation.
+- [Custom transport guide](./docs/CUSTOM_C2.md): write an agent dialer and a C2 bridge, with a worked Tor example.
 - [Module development guide](./docs/module_development_guide.md)
 - [Testing guide](./docs/TESTING.md)
 - [Security policy](./docs/SECURITY.md)

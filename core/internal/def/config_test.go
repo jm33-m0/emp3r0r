@@ -49,8 +49,6 @@ func TestReadCBORConfigFull(t *testing.T) {
 		Password:               "password",
 		Socks5LocalPort:        "1081",
 		P2PRelayPort:           "4000",
-		KCPClientPort:          "4001",
-		UseKCP:                 true,
 		EnableNCSI:             false,
 		MeshGossipPort:         "9000",
 		AgentUUID:              "uuid",

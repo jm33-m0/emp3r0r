@@ -148,9 +148,6 @@ func agentFeatureTokens(cfg *def.Config) []string {
 		return nil
 	}
 	tokens := make([]string, 0, 16)
-	if cfg.UseKCP {
-		tokens = append(tokens, "kcp")
-	}
 	if cfg.EnableNCSI {
 		tokens = append(tokens, "ncsi")
 	}
@@ -169,7 +166,6 @@ func agentFeatureTokens(cfg *def.Config) []string {
 	}{
 		{"doh", cfg.DoHServer},
 		{"ech", cfg.ECHServerName},
-		{"cdn", cfg.CDNProxy},
 	} {
 		if token := artifactValue(feature.name, feature.value); token != "" {
 			tokens = append(tokens, token)

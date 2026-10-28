@@ -116,9 +116,6 @@ func GatherSystemDetails() *def.Emp3r0rAgent {
 	// Uptime
 	info.Uptime = GetUptime()
 
-	// is cc on tor?
-	info.HasTor = netutil.IsTor(def.CCAddress)
-
 	// has internet?
 	// Minimal: skip connectivity test
 	info.HasInternet = false

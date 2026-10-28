@@ -7,7 +7,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
-	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -57,46 +56,25 @@ func InitConfig() (err error) {
 	// HTTPS RR over DoH. Disabled when ECHServerName is empty.
 	transport.SetECHConfig(RuntimeConfig.ECHServerName, RuntimeConfig.DoHServer)
 
-	// CC Address. An explicit http:// or https:// URL is authoritative: it lets
-	// http_poll use TLS (directly or through a TLS-terminating front proxy)
-	// without changing the channel wrapper.
+	// CC Address. For built-in HTTP-derived transports an explicit
+	// http:// or https:// URL is authoritative: it lets http_poll use TLS
+	// (directly or through a TLS-terminating front proxy) without changing the
+	// channel wrapper. A custom transport owns its address format, so leave it
+	// opaque and let the dialer interpret it.
 	def.CCAddress = strings.TrimSuffix(RuntimeConfig.CCAddress, "/")
-	explicitURL := strings.HasPrefix(def.CCAddress, "http://") ||
-		strings.HasPrefix(def.CCAddress, "https://")
-	isTor := netutil.IsTor(def.CCAddress)
-	if !isTor {
-		// check if it is an onion address without scheme
-		host := def.CCAddress
-		if strings.Contains(host, ":") {
-			host = strings.Split(host, ":")[0]
-		}
-		if strings.HasSuffix(host, ".onion") {
-			isTor = true
-		}
-	}
-
-	if isTor {
-		// if scheme is missing, add http
-		if !strings.HasPrefix(def.CCAddress, "http") {
-			def.CCAddress = fmt.Sprintf("http://%s", def.CCAddress)
-		}
-		// if port is missing, add 80? No, Tor handles it.
-		// ensure no trailing slash
-		def.CCAddress = strings.TrimSuffix(def.CCAddress, "/")
-
-		if RuntimeConfig.C2TransportProxy == "" {
-			RuntimeConfig.C2TransportProxy = "socks5://127.0.0.1:9050"
-		}
-	} else if RuntimeConfig.UseKCP {
-		RuntimeConfig.CCH2Port = RuntimeConfig.KCPClientPort
-		def.CCAddress = fmt.Sprintf("https://127.0.0.1:%s", RuntimeConfig.CCH2Port)
-	} else if explicitURL {
-		// Keep the configured scheme, host and port. This is how an operator
-		// reaches http_poll through an HTTPS front proxy.
-	} else if RuntimeConfig.C2ChannelMode == def.C2ChannelModePlainHTTP {
-		def.CCAddress = fmt.Sprintf("http://%s:%s", def.CCAddress, RuntimeConfig.CCHTTPPort)
+	if !def.IsBuiltinC2ChannelMode(RuntimeConfig.C2ChannelMode) {
+		// Custom transport: no HTTP scheme or port rewriting.
 	} else {
-		def.CCAddress = fmt.Sprintf("https://%s:%s", def.CCAddress, RuntimeConfig.CCH2Port)
+		explicitURL := strings.HasPrefix(def.CCAddress, "http://") ||
+			strings.HasPrefix(def.CCAddress, "https://")
+		if explicitURL {
+			// Keep the configured scheme, host and port. This is how an operator
+			// reaches http_poll through an HTTPS front proxy.
+		} else if RuntimeConfig.C2ChannelMode == def.C2ChannelModePlainHTTP {
+			def.CCAddress = fmt.Sprintf("http://%s:%s", def.CCAddress, RuntimeConfig.CCHTTPPort)
+		} else {
+			def.CCAddress = fmt.Sprintf("https://%s:%s", def.CCAddress, RuntimeConfig.CCH2Port)
+		}
 	}
 
 	// CA

@@ -129,9 +129,6 @@ func startCAgentC2(t *testing.T, c2HTTPPortStr string) func() {
 	waitForC2Listener(t, fmt.Sprintf("127.0.0.1:%s", c2HTTPPortStr))
 	return func() {
 		network.StopEmpServers()
-		if network.EmpKCPCancel != nil {
-			network.EmpKCPCancel()
-		}
 	}
 }
 

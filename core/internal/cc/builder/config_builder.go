@@ -39,29 +39,29 @@ func c2BaseURL(addr, scheme, port string) string {
 // AgentConfig represents the options provided by a user (via CLI, Web UI, API)
 // to generate a new agent configuration payload.
 type AgentConfig struct {
-	CCAddress           *string
-	CDNProxy            *string
-	C2TransportProxy    *string
-	DoHServer           *string
-	ECHServerName       *string
-	C2ChannelMode       *string
-	QUICStandardKey     bool
-	IsP2PEnabled        bool
-	IsDirectC2          bool
-	PersistentRouter    bool
-	IsNCSIEnabled       bool
-	UseKCP              bool
-	IsStager            bool
-	P2PTransport        *string
-	P2PRelayPort        *string
-	MeshGossipPort      *string
-	InitialPeers        *[]string
-	CCHTTPPort          *string
-	PollInterval        *int
-	PollWindow          *int
-	OfflineGrace        *int
-	Jitter              *int
-	OperatorIdleTimeout *int
+	CCAddress            *string
+	C2TransportProxy     *string
+	DoHServer            *string
+	ECHServerName        *string
+	C2ChannelMode        *string
+	AllowCustomTransport bool
+	TransportOptions     map[string]string
+	QUICStandardKey      bool
+	IsP2PEnabled         bool
+	IsDirectC2           bool
+	PersistentRouter     bool
+	IsNCSIEnabled        bool
+	IsStager             bool
+	P2PTransport         *string
+	P2PRelayPort         *string
+	MeshGossipPort       *string
+	InitialPeers         *[]string
+	CCHTTPPort           *string
+	PollInterval         *int
+	PollWindow           *int
+	OfflineGrace         *int
+	Jitter               *int
+	OperatorIdleTimeout  *int
 }
 
 // MakeConfig takes the generalized AgentConfig options and orchestrates the
@@ -82,29 +82,55 @@ func MakeConfig(opts AgentConfig) error {
 		}
 	}
 
+	// Resolve the transport early: certificate automation, address handling,
+	// and preflight are HTTP/TLS-specific and must not run for a custom mode.
+	if opts.C2ChannelMode != nil {
+		live.RuntimeConfig.C2ChannelMode = *opts.C2ChannelMode
+	}
+	if live.RuntimeConfig.C2ChannelMode == "" {
+		live.RuntimeConfig.C2ChannelMode = def.C2ChannelModeDefault
+	}
+	customTransport := !def.IsBuiltinC2ChannelMode(live.RuntimeConfig.C2ChannelMode)
+	if _, err := transport.GetC2ChannelWrapper(live.RuntimeConfig.C2ChannelMode); err != nil {
+		if !opts.AllowCustomTransport {
+			return fmt.Errorf("invalid c2-channel-mode: %s (available: %s; use --allow-custom-transport for a custom agent transport)", live.RuntimeConfig.C2ChannelMode, strings.Join(transport.AllC2ChannelModes(), ","))
+		}
+		logging.Warningf("C2 channel mode %q is not built into this C2; treating it as a custom agent transport", live.RuntimeConfig.C2ChannelMode)
+	}
+	if opts.TransportOptions != nil {
+		live.RuntimeConfig.TransportOptions = opts.TransportOptions
+	}
+	if customTransport {
+		// HTTP preflight and certificate automation are meaningless for a
+		// custom transport; the dialer owns its connection health checks.
+		live.RuntimeConfig.PreflightEnabled = false
+	}
+
 	// CC names and certs
 	if opts.CCAddress != nil {
 		live.RuntimeConfig.CCAddress = *opts.CCAddress
 	}
 	live.RuntimeConfig.CCAddress = strings.TrimSuffix(live.RuntimeConfig.CCAddress, "/")
-	ccHost := c2AddressHost(live.RuntimeConfig.CCAddress)
 	logging.Infof("C2 server name: %s", live.RuntimeConfig.CCAddress)
-	existingNames := transport.NamesInCert(transport.ServerCrtFile)
+	if !customTransport {
+		ccHost := c2AddressHost(live.RuntimeConfig.CCAddress)
+		existingNames := transport.NamesInCert(transport.ServerCrtFile)
 
-	if !slices.Contains(existingNames, ccHost) && ccHost != "" {
-		logging.Warningf("Name '%s' is not covered by our server cert, updating it on the C2", ccHost)
+		if !slices.Contains(existingNames, ccHost) && ccHost != "" {
+			logging.Warningf("Name '%s' is not covered by our server cert, updating it on the C2", ccHost)
 
-		certs, err := client.EnsureCerts([]string{ccHost})
-		if err != nil {
-			return fmt.Errorf("failed to update C2 certificate for %s: %w", ccHost, err)
-		}
+			certs, err := client.EnsureCerts([]string{ccHost})
+			if err != nil {
+				return fmt.Errorf("failed to update C2 certificate for %s: %w", ccHost, err)
+			}
 
-		// Save the updated CA/server certificate bundle locally.
-		if err := os.WriteFile(transport.CaCrtFile, certs["ca_crt"], 0o644); err != nil {
-			return fmt.Errorf("failed to save CA cert: %w", err)
-		}
-		if err := os.WriteFile(transport.ServerCrtFile, certs["server_crt"], 0o644); err != nil {
-			return fmt.Errorf("failed to save Server cert: %w", err)
+			// Save the updated CA/server certificate bundle locally.
+			if err := os.WriteFile(transport.CaCrtFile, certs["ca_crt"], 0o644); err != nil {
+				return fmt.Errorf("failed to save CA cert: %w", err)
+			}
+			if err := os.WriteFile(transport.ServerCrtFile, certs["server_crt"], 0o644); err != nil {
+				return fmt.Errorf("failed to save Server cert: %w", err)
+			}
 		}
 	}
 
@@ -115,18 +141,6 @@ func MakeConfig(opts AgentConfig) error {
 	}
 
 	// Proxies & Transports
-	if opts.CDNProxy != nil {
-		live.RuntimeConfig.CDNProxy = *opts.CDNProxy
-	}
-	if live.RuntimeConfig.CDNProxy != "" {
-		logging.Infof("Using CDN proxy %s", live.RuntimeConfig.CDNProxy)
-	}
-
-	live.RuntimeConfig.UseKCP = opts.UseKCP
-	if live.RuntimeConfig.UseKCP {
-		logging.Infof("Using KCP")
-	}
-
 	if opts.C2TransportProxy != nil {
 		live.RuntimeConfig.C2TransportProxy = *opts.C2TransportProxy
 	}
@@ -158,15 +172,6 @@ func MakeConfig(opts AgentConfig) error {
 	}
 	logging.Infof("C2 HTTP port: %s", live.RuntimeConfig.CCHTTPPort)
 
-	if opts.C2ChannelMode != nil {
-		live.RuntimeConfig.C2ChannelMode = *opts.C2ChannelMode
-	}
-	if live.RuntimeConfig.C2ChannelMode == "" {
-		live.RuntimeConfig.C2ChannelMode = def.C2ChannelModeDefault
-	}
-	if _, err := transport.GetC2ChannelWrapper(live.RuntimeConfig.C2ChannelMode); err != nil {
-		return fmt.Errorf("invalid c2-channel-mode: %s (available: %s)", live.RuntimeConfig.C2ChannelMode, strings.Join(transport.AllC2ChannelModes(), ","))
-	}
 	// QUIC datagram obfuscation is on by default; the operator can opt out so
 	// the agent speaks stock QUIC (interoperable with HTTP/3 endpoints).
 	live.RuntimeConfig.QUICStandardKey = opts.QUICStandardKey

@@ -30,33 +30,38 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 	directC2, _ := cmd.Flags().GetBool("direct-c2")
 	persistentRouter, _ := cmd.Flags().GetBool("persistent-router")
 	ncsi, _ := cmd.Flags().GetBool("NCSI")
-	kcp, _ := cmd.Flags().GetBool("kcp")
 	quicStandardKey, _ := cmd.Flags().GetBool("quic-standard-key")
 	isStager, _ := cmd.Flags().GetBool("stager")
 	operatorIdleTimeout, _ := cmd.Flags().GetInt("operator-idle-timeout")
+	allowCustomTransport, _ := cmd.Flags().GetBool("allow-custom-transport")
+	transportOptions, err := parseTransportOptions(cmd)
+	if err != nil {
+		logging.Errorf("Invalid transport option: %v", err)
+		return
+	}
 
 	opts := builder.AgentConfig{
-		CCAddress:           getStringOptPtr(cmd, "cc"),
-		CDNProxy:            getStringOptPtr(cmd, "cdn"),
-		C2TransportProxy:    getStringOptPtr(cmd, "proxy"),
-		DoHServer:           getStringOptPtr(cmd, "doh"),
-		ECHServerName:       getStringOptPtr(cmd, "ech"),
-		C2ChannelMode:       getStringOptPtr(cmd, "c2-channel-mode"),
-		QUICStandardKey:     quicStandardKey,
-		InitialPeers:        getStringSliceOptPtr(cmd, "peers"),
-		P2PTransport:        getStringOptPtr(cmd, "p2p-transport"),
-		P2PRelayPort:        getStringOptPtr(cmd, "p2p-relay-port"),
-		MeshGossipPort:      getStringOptPtr(cmd, "mesh-gossip-port"),
-		CCHTTPPort:          getStringOptPtr(cmd, "cc-http-port"),
-		PollInterval:        getIntOptPtr(cmd, "interval"),
-		Jitter:              getIntOptPtr(cmd, "jitter"),
-		OperatorIdleTimeout: &operatorIdleTimeout,
-		IsP2PEnabled:        p2p,
-		IsDirectC2:          directC2,
-		PersistentRouter:    persistentRouter,
-		IsNCSIEnabled:       ncsi,
-		UseKCP:              kcp,
-		IsStager:            isStager,
+		CCAddress:            getStringOptPtr(cmd, "cc"),
+		C2TransportProxy:     getStringOptPtr(cmd, "proxy"),
+		DoHServer:            getStringOptPtr(cmd, "doh"),
+		ECHServerName:        getStringOptPtr(cmd, "ech"),
+		C2ChannelMode:        getStringOptPtr(cmd, "c2-channel-mode"),
+		AllowCustomTransport: allowCustomTransport,
+		TransportOptions:     transportOptions,
+		QUICStandardKey:      quicStandardKey,
+		InitialPeers:         getStringSliceOptPtr(cmd, "peers"),
+		P2PTransport:         getStringOptPtr(cmd, "p2p-transport"),
+		P2PRelayPort:         getStringOptPtr(cmd, "p2p-relay-port"),
+		MeshGossipPort:       getStringOptPtr(cmd, "mesh-gossip-port"),
+		CCHTTPPort:           getStringOptPtr(cmd, "cc-http-port"),
+		PollInterval:         getIntOptPtr(cmd, "interval"),
+		Jitter:               getIntOptPtr(cmd, "jitter"),
+		OperatorIdleTimeout:  &operatorIdleTimeout,
+		IsP2PEnabled:         p2p,
+		IsDirectC2:           directC2,
+		PersistentRouter:     persistentRouter,
+		IsNCSIEnabled:        ncsi,
+		IsStager:             isStager,
 	}
 
 	// Push operator-idle policy to the C2 server (remote or local).
@@ -103,6 +108,28 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 	}
 }
 
+// parseTransportOptions converts repeated --transport-option key=value flags
+// into the map embedded in the agent configuration. Values may contain '='.
+func parseTransportOptions(cmd *cobra.Command) (map[string]string, error) {
+	raw, _ := cmd.Flags().GetStringSlice("transport-option")
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	options := make(map[string]string, len(raw))
+	for _, item := range raw {
+		key, value, ok := strings.Cut(item, "=")
+		key = strings.TrimSpace(key)
+		if !ok || key == "" {
+			return nil, fmt.Errorf("expected key=value, got %q", item)
+		}
+		if _, exists := options[key]; exists {
+			return nil, fmt.Errorf("duplicate option %q", key)
+		}
+		options[key] = value
+	}
+	return options, nil
+}
+
 func getStringOptPtr(cmd *cobra.Command, name string) *string {
 	if cmd.Flags().Changed(name) {
 		val, _ := cmd.Flags().GetString(name)
@@ -139,8 +166,6 @@ func generatedAgentTransport() string {
 
 	var endpoint string
 	switch {
-	case live.RuntimeConfig.UseKCP:
-		endpoint = fmt.Sprintf("KCP relay %s:%s", addr, live.RuntimeConfig.P2PRelayPort)
 	case explicitURL:
 		endpoint = addr
 	case mode == def.C2ChannelModePlainHTTP:

@@ -27,8 +27,6 @@ func TestInitConfig_Comprehensive(t *testing.T) {
 		Password:               "secret_password",
 		Socks5LocalPort:        "1080",
 		P2PRelayPort:           "4000",
-		KCPClientPort:          "4001",
-		UseKCP:                 false,
 		EnableNCSI:             true,
 		MeshGossipPort:         "9000",
 		CCTimeout:              5000,
@@ -92,12 +90,6 @@ func TestInitConfig_Comprehensive(t *testing.T) {
 	if RuntimeConfig.P2PRelayPort != originalCfg.P2PRelayPort {
 		t.Errorf("KCPServerPort mismatch: got %s, want %s", RuntimeConfig.P2PRelayPort, originalCfg.P2PRelayPort)
 	}
-	if RuntimeConfig.KCPClientPort != originalCfg.KCPClientPort {
-		t.Errorf("KCPClientPort mismatch: got %s, want %s", RuntimeConfig.KCPClientPort, originalCfg.KCPClientPort)
-	}
-	if RuntimeConfig.UseKCP != originalCfg.UseKCP {
-		t.Errorf("UseKCP mismatch: got %v, want %v", RuntimeConfig.UseKCP, originalCfg.UseKCP)
-	}
 	if RuntimeConfig.EnableNCSI != originalCfg.EnableNCSI {
 		t.Errorf("EnableNCSI mismatch: got %v, want %v", RuntimeConfig.EnableNCSI, originalCfg.EnableNCSI)
 	}
@@ -127,9 +119,6 @@ func TestInitConfig_Comprehensive(t *testing.T) {
 	}
 	if RuntimeConfig.C2TransportProxy != originalCfg.C2TransportProxy {
 		t.Errorf("C2TransportProxy mismatch: got %s, want %s", RuntimeConfig.C2TransportProxy, originalCfg.C2TransportProxy)
-	}
-	if RuntimeConfig.CDNProxy != originalCfg.CDNProxy {
-		t.Errorf("CDNProxy mismatch: got %s, want %s", RuntimeConfig.CDNProxy, originalCfg.CDNProxy)
 	}
 	if RuntimeConfig.DoHServer != originalCfg.DoHServer {
 		t.Errorf("DoHServer mismatch: got %s, want %s", RuntimeConfig.DoHServer, originalCfg.DoHServer)
@@ -161,78 +150,6 @@ func TestInitConfig_Comprehensive(t *testing.T) {
 	// 2. transport.CACrtPEM
 	if string(transport.GetCACrtPEM()) != originalCfg.CAPEM {
 		t.Errorf("transport.CACrtPEM mismatch")
-	}
-}
-
-func TestInitConfig_Tor(t *testing.T) {
-	// Reset global state
-	RuntimeConfig = &def.Config{}
-	def.CCAddress = ""
-
-	// Prepare Tor config
-	cfg := &def.Config{
-		CCAddress:        "abcdefghijklmnop.onion", // Tor address
-		CCH2Port:         "80",
-		C2TransportProxy: "", // Should default to socks5://127.0.0.1:9050
-	}
-
-	// Marshal & Encrypt
-	cborData, _ := cbor.Marshal(cfg)
-	encryptedData, _ := crypto.AES_GCM_Encrypt([]byte(def.MagicString), cborData)
-	setAgentConfig(t, encryptedData)
-
-	// Run
-	err := InitConfig()
-	if err != nil {
-		t.Fatalf("InitConfig failed: %v", err)
-	}
-
-	// Verify Tor logic
-	// def.CCAddress should be http://<onion>
-	expectedCCAddr := "http://abcdefghijklmnop.onion"
-	if def.CCAddress != expectedCCAddr {
-		t.Errorf("Tor def.CCAddress mismatch: got %s, want %s", def.CCAddress, expectedCCAddr)
-	}
-
-	// Check Proxy default
-	expectedProxy := "socks5://127.0.0.1:9050"
-	if RuntimeConfig.C2TransportProxy != expectedProxy {
-		t.Errorf("Tor Proxy default mismatch: got %s, want %s", RuntimeConfig.C2TransportProxy, expectedProxy)
-	}
-}
-
-func TestInitConfig_KCP(t *testing.T) {
-	// Reset global state
-	RuntimeConfig = &def.Config{}
-	def.CCAddress = ""
-
-	// Prepare KCP config
-	cfg := &def.Config{
-		CCAddress:     "1.2.3.4",
-		UseKCP:        true,
-		KCPClientPort: "9999",
-	}
-
-	// Marshal & Encrypt
-	cborData, _ := cbor.Marshal(cfg)
-	encryptedData, _ := crypto.AES_GCM_Encrypt([]byte(def.MagicString), cborData)
-	setAgentConfig(t, encryptedData)
-
-	// Run
-	err := InitConfig()
-	if err != nil {
-		t.Fatalf("InitConfig failed: %v", err)
-	}
-
-	// Verify KCP logic
-	// RuntimeConfig.CCPort should become KCPClientPort
-	if RuntimeConfig.CCH2Port != "9999" {
-		t.Errorf("KCP CCPort mismatch: got %s, want 9999", RuntimeConfig.CCH2Port)
-	}
-	// def.CCAddress should be https://127.0.0.1:<KCPClientPort>
-	expectedCCAddr := "https://127.0.0.1:9999"
-	if def.CCAddress != expectedCCAddr {
-		t.Errorf("KCP def.CCAddress mismatch: got %s, want %s", def.CCAddress, expectedCCAddr)
 	}
 }
 
@@ -270,6 +187,44 @@ func TestOfflineGraceSeconds(t *testing.T) {
 	RuntimeConfig.OfflineGrace = 120
 	if got, want := OfflineGraceSeconds(), 120; got != want {
 		t.Fatalf("explicit grace = %d, want %d", got, want)
+	}
+}
+
+func TestInitConfig_CustomTransportKeepsAddress(t *testing.T) {
+	oldConfig := RuntimeConfig
+	oldAddress := def.CCAddress
+	oldAgentConfig := def.AgentConfig
+	defer func() {
+		RuntimeConfig = oldConfig
+		def.CCAddress = oldAddress
+		def.AgentConfig = oldAgentConfig
+	}()
+
+	RuntimeConfig = &def.Config{}
+	cfg := &def.Config{
+		CCAddress:        "telemetry.example.com",
+		C2ChannelMode:    "dns",
+		TransportOptions: map[string]string{"zone": "telemetry.example.com"},
+	}
+
+	cborData, err := cbor.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("marshal config: %v", err)
+	}
+	encryptedData, err := crypto.AES_GCM_Encrypt([]byte(def.MagicString), cborData)
+	if err != nil {
+		t.Fatalf("encrypt config: %v", err)
+	}
+	setAgentConfig(t, encryptedData)
+
+	if err := InitConfig(); err != nil {
+		t.Fatalf("InitConfig failed: %v", err)
+	}
+	if def.CCAddress != "telemetry.example.com" {
+		t.Fatalf("custom transport address = %q, want opaque address", def.CCAddress)
+	}
+	if got := RuntimeConfig.TransportOptions["zone"]; got != "telemetry.example.com" {
+		t.Fatalf("transport option zone = %q", got)
 	}
 }
 

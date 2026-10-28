@@ -2,7 +2,7 @@ package transport
 
 // mesh_transport.go — thin helpers for the mesh bridge (mesh/bridge.go).
 // These are intentionally minimal: they create a single KCP stream without
-// the full smux session machinery used by KCPTunClient/KCPTunServer.
+// the full smux session machinery used by the C2 tunnel.
 
 import (
 	"context"

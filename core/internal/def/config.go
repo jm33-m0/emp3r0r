@@ -63,6 +63,18 @@ const (
 	C2ChannelModeDefault   = C2ChannelModePlainHTTP
 )
 
+// IsBuiltinC2ChannelMode reports whether mode names a transport implemented by
+// the emp3r0r Go agent itself. Any other name belongs to a custom agent
+// dialer.
+func IsBuiltinC2ChannelMode(mode string) bool {
+	switch mode {
+	case C2ChannelModePlainHTTP, C2ChannelModeH2Conn, C2ChannelModeQUIC:
+		return true
+	default:
+		return false
+	}
+}
+
 // C2Routing randomized names for each service
 type C2Routing struct {
 	Checkin string `cbor:"1,keyasint"`
@@ -92,11 +104,9 @@ type Config struct {
 	AgentSocksServerPort   string `cbor:"4,keyasint"`  // agent side socks5 proxy server port
 	AgentSocksTimeout      int    `cbor:"5,keyasint"`  // timeout (in seconds) for agent side Socks5 server, 0 to disable
 	StagerHTTPListenerPort string `cbor:"6,keyasint"`  // For stager HTTP server
-	Password               string `cbor:"7,keyasint"`  // pre-shared key for P2P/KCP transport encryption and agent file crypto
+	Password               string `cbor:"7,keyasint"`  // pre-shared key for P2P mesh transport encryption and agent file crypto
 	Socks5LocalPort        string `cbor:"8,keyasint"`  // local SOCKS5 port of the operator auto-proxy
-	P2PRelayPort           string `cbor:"10,keyasint"` // port of p2p relay transport, also used as KCP server port
-	KCPClientPort          string `cbor:"11,keyasint"` // client port of kcp
-	UseKCP                 bool   `cbor:"12,keyasint"` // enable KCP for the C2 transport
+	P2PRelayPort           string `cbor:"10,keyasint"` // port of the p2p relay transport
 	EnableNCSI             bool   `cbor:"13,keyasint"` // NCSI connectivity checking, disable when C2 is reachable but NCSI is not
 	MeshGossipPort         string `cbor:"17,keyasint"` // UDP/TCP port for gossip (memberlist)
 	// Preflight Config
@@ -110,7 +120,6 @@ type Config struct {
 
 	CAPEM            string `cbor:"24,keyasint"` // CA cert from server side
 	C2TransportProxy string `cbor:"26,keyasint"` // proxy for C2 transport
-	CDNProxy         string `cbor:"27,keyasint"` // websocket proxy, see go-cdn2proxy
 	DoHServer        string `cbor:"28,keyasint"` // DNS over HTTPS server, for name resolving
 	ECHServerName    string `cbor:"36,keyasint"` // DNS name whose HTTPS RR carries the ECH config (empty disables ECH)
 
@@ -151,6 +160,10 @@ type Config struct {
 	// C2 channel wrapper mode: h2conn.
 	C2ChannelMode string `cbor:"76,keyasint"`
 
+	// TransportOptions carries settings for a custom agent transport. Built-in
+	// HTTP/QUIC transports ignore it. Keys are transport-defined.
+	TransportOptions map[string]string `cbor:"83,keyasint"`
+
 	// Port for plain HTTP C2 Server
 	CCHTTPPort string `cbor:"77,keyasint"`
 
@@ -168,6 +181,10 @@ type Config struct {
 	// with arbitrary QUIC/HTTP3 peers, at the cost of exposing the Initial
 	// payload to any observer that knows the standard salt.
 	QUICStandardKey bool `cbor:"82,keyasint"`
+
+	// BridgeSocket is the local IPC socket where custom transport bridges
+	// connect agent streams. Server-only; never embedded in an agent config.
+	BridgeSocket string `cbor:"-"`
 
 	// Runtime state (not persisted in config file)
 	MyAgentToken *AgentToken `cbor:"-"` // Current AgentToken issued by C2

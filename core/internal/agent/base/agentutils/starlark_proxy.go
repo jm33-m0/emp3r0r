@@ -41,7 +41,6 @@ func (p *AgentProxyImpl) GatherSystemDetails() (map[string]any, error) {
 		"arp":              agent.ARP,
 		"user":             agent.User,
 		"has_root":         agent.HasRoot,
-		"has_tor":          agent.HasTor,
 		"has_internet":     agent.HasInternet,
 		"ncsi_enabled":     agent.NCSIEnabled,
 		"exes":             agent.Exes,

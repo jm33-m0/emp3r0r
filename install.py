@@ -48,13 +48,12 @@ CUSTOM_GARBLE_CONTAINER_PATH = "/usr/local/bin/garble-custom"
 # and the //go:build constraints across core/.
 AGENT_TAG_DOCS: dict[str, str] = {
     "with_mesh": "P2P mesh and memberlist gossip (peer discovery/routing)",
-    "with_kcp": "KCP C2 transport and the xtaci kcp-go/kcptun/smux stack",
+    "with_kcp": "KCP P2P mesh transport and the xtaci kcp-go stack",
     "with_h2conn": "HTTP/2 duplex (h2conn) C2 channel",
     "with_quic": "QUIC C2 transport and the quic-go stack",
     "with_utls": "uTLS TLS fingerprinting (otherwise crypto/tls)",
     "with_doh": "DNS-over-HTTPS resolver (otherwise the OS resolver)",
     "with_ech": "ECH (Encrypted Client Hello) for C2 TLS; requires with_doh",
-    "with_cdnproxy": "WebSocket CDN tunnel (go-cdn2proxy; unneeded for HTTP CDN fronting)",
     "with_netlink": "netlink route/neighbour enumeration (procfs fallback)",
     "with_uring": "io_uring file-transfer acceleration (sync fallback)",
 }
@@ -63,7 +62,7 @@ AGENT_TAG_DOCS: dict[str, str] = {
 # selects an exact feature set and --full enables every feature.
 ALL_AGENT_TAGS = (
     "with_mesh with_kcp with_h2conn with_quic with_utls "
-    "with_doh with_ech with_cdnproxy with_netlink with_uring"
+    "with_doh with_ech with_netlink with_uring"
 )
 SLIM_AGENT_TAGS = ""
 

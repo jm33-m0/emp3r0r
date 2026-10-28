@@ -711,9 +711,6 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	}()
 	t.Cleanup(func() {
 		network.StopEmpServers()
-		if network.EmpKCPCancel != nil {
-			network.EmpKCPCancel()
-		}
 		select {
 		case <-serverDone:
 		case <-time.After(5 * time.Second):

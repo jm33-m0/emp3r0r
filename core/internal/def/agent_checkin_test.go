@@ -22,7 +22,7 @@ func TestCheckinFieldsOmitServerState(t *testing.T) {
 	}
 	fields := agent.CheckinFields()
 
-	for _, retired := range []uint64{1, 15, 27, 28, 30, 31, 32, 36, 43} {
+	for _, retired := range []uint64{1, 15, 20, 27, 28, 30, 31, 32, 36, 43} {
 		if _, ok := fields[retired]; ok {
 			t.Errorf("check-in body still carries retired key %d", retired)
 		}
@@ -33,7 +33,7 @@ func TestCheckinFieldsOmitServerState(t *testing.T) {
 		}
 	}
 	// Booleans are meaningful even when false, so they are always sent.
-	for _, wanted := range []uint64{19, 20, 21, 22} {
+	for _, wanted := range []uint64{19, 21, 22} {
 		if _, ok := fields[wanted]; !ok {
 			t.Errorf("check-in body is missing boolean key %d", wanted)
 		}

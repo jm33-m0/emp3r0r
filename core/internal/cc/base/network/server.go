@@ -31,9 +31,6 @@ var (
 	quicServer       io.Closer
 	quicServerCancel context.CancelFunc
 
-	EmpKCPCtx    context.Context
-	EmpKCPCancel context.CancelFunc
-
 	// Shared stream handlers and maps
 	FTPStreams sync.Map
 )

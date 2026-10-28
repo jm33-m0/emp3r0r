@@ -9,7 +9,7 @@ type Emp3r0rAgent struct {
 	Tag            string        `cbor:"1,keyasint"`  // operator-facing identifier, derived from the verified UUID
 	Name           string        `cbor:"2,keyasint"`  // human-readable name (hostname\username)
 	Version        string        `cbor:"3,keyasint"`  // agent version
-	Transport      string        `cbor:"4,keyasint"`  // transport the agent uses (HTTP / HTTP2 / QUIC / KCP / CDN / TOR)
+	Transport      string        `cbor:"4,keyasint"`  // transport the agent uses
 	Hostname       string        `cbor:"5,keyasint"`  // Hostname and machine ID
 	Hardware       string        `cbor:"6,keyasint"`  // machine details and hypervisor
 	Container      string        `cbor:"7,keyasint"`  // container tech (if any)
@@ -27,7 +27,6 @@ type Emp3r0rAgent struct {
 	ARP            []string      `cbor:"17,keyasint"` // ARP table
 	User           string        `cbor:"18,keyasint"` // user account info
 	HasRoot        bool          `cbor:"19,keyasint"` // is agent run as root?
-	HasTor         bool          `cbor:"20,keyasint"` // is agent from Tor?
 	HasInternet    bool          `cbor:"21,keyasint"` // has internet access?
 	NCSIEnabled    bool          `cbor:"22,keyasint"` // NCSI (or similar services) enabled
 	Process        *AgentProcess `cbor:"23,keyasint"` // agent's process
@@ -143,7 +142,6 @@ func (a *Emp3r0rAgent) CheckinFields() map[uint64]any {
 	}
 	putStr(18, a.User)
 	fields[19] = a.HasRoot
-	fields[20] = a.HasTor
 	fields[21] = a.HasInternet
 	fields[22] = a.NCSIEnabled
 	if a.Process != nil {

@@ -4,7 +4,7 @@ package transport
 
 // mesh_transport_kcp.go — the KCP-backed mesh transport. It is split out of
 // mesh_transport.go so a build that keeps the mTLS mesh can still drop the
-// xtaci KCP stack (kcptun, smux, qpp, tcpraw, gopacket).
+// xtaci kcp-go stack.
 
 import (
 	"context"
@@ -28,7 +28,7 @@ func DialKCP(addr, password, salt string) (net.Conn, error) {
 	if err != nil {
 		return nil, fmt.Errorf("DialKCP: dial %s: %v", addr, err)
 	}
-	// Mirror fast-mode settings from KCPTunClient defaults.
+	// Mirror the fast-mode settings used by the mesh KCP client.
 	sess.SetNoDelay(1, 10, 2, 1)
 	sess.SetWindowSize(128, 1024)
 	sess.SetMtu(1350)

@@ -22,7 +22,7 @@ func TestC2TransportStartersCoverAllModes(t *testing.T) {
 		got[starter.name] = true
 	}
 
-	for _, want := range []string{"http_poll", "tls", "quic", "kcp"} {
+	for _, want := range []string{"http_poll", "bridge", "tls", "quic"} {
 		if !got[want] {
 			t.Errorf("C2 transport %q is not started automatically", want)
 		}

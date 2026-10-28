@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
@@ -29,18 +28,19 @@ func c2TransportStarters() []c2TransportStarter {
 			},
 		},
 		{
+			// Local IPC ingress for custom transport bridges. It is always
+			// started so a bridge can be launched later without restarting the
+			// C2.
+			name:  "bridge",
+			start: StartC2BridgeListener,
+		},
+		{
 			name:  "tls",
 			start: func(context.Context) error { return StartC2TLSStreamServer() },
 		},
 		{
 			name:  "quic",
 			start: func(context.Context) error { return StartC2QUICServer() },
-		},
-		{
-			name: "kcp",
-			start: func(ctx context.Context) error {
-				return KCPC2ListenAndServe(ctx, network.EmpKCPCancel)
-			},
 		},
 	}
 }
@@ -51,10 +51,7 @@ func c2TransportStarters() []c2TransportStarter {
 func startAllC2Transports() {
 	prepareC2ServerPrerequisites()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	network.EmpKCPCtx, network.EmpKCPCancel = ctx, cancel
-
-	launchC2Transports(ctx, c2TransportStarters())
+	launchC2Transports(context.Background(), c2TransportStarters())
 }
 
 // launchC2Transports starts every starter in its own goroutine. It is separate
