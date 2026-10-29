@@ -73,6 +73,16 @@ func TestParseCmd(t *testing.T) {
 			input:    `echo 'single quotes' and "double quotes"`,
 			expected: []string{"echo", "single quotes", "and", "double quotes"},
 		},
+		{
+			name:     "single quote inside double quotes",
+			input:    `stat --path "/tmp/it's a 'quoted' file --extra"`,
+			expected: []string{"stat", "--path", "/tmp/it's a 'quoted' file --extra"},
+		},
+		{
+			name:     "escaped double quote and backslash in double quotes",
+			input:    `put --file "C:\\Users\\admin\\my \"secret\" file.txt" --path "/tmp/a'b"`,
+			expected: []string{"put", "--file", `C:\Users\admin\my "secret" file.txt`, "--path", "/tmp/a'b"},
+		},
 	}
 
 	for _, tt := range tests {

@@ -290,3 +290,27 @@ func udpReachable(addr string) bool {
 	_ = conn.Close()
 	return true
 }
+
+func TestSocks5DomainValidationRejectsInjection(t *testing.T) {
+	badDomains := []string{
+		"evil.com --token injected",
+		"evil'quote.com",
+		"evil\"quote.com",
+		"evil\\slash.com",
+		"evil\nnewline.com",
+	}
+	for _, dom := range badDomains {
+		if isValidSocks5Domain([]byte(dom)) {
+			t.Errorf("expected isValidSocks5Domain(%q) to be false", dom)
+		}
+		pkt := []byte{0x00, 0x00, 0x00, socks5AtypDomain, byte(len(dom))}
+		pkt = append(pkt, dom...)
+		pkt = append(pkt, 0x00, 0x35, 0xaa, 0xbb)
+		if _, _, _, ok := parseSocks5UDPAddr(pkt); ok {
+			t.Errorf("expected parseSocks5UDPAddr to reject injected domain %q", dom)
+		}
+	}
+	if !isValidSocks5Domain([]byte("corp.internal")) {
+		t.Errorf("expected corp.internal to be valid")
+	}
+}

@@ -2,14 +2,12 @@ package util
 
 import (
 	crand "crypto/rand"
-	"encoding/csv"
 	"encoding/hex"
 	"fmt"
 	"math/big"
 	"runtime"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/sanitize"
 )
@@ -40,58 +38,102 @@ func SanitizeOneLine(str string) string {
 // double quotes and backslash escapes. The returned slice never contains
 // empty tokens.
 func ParseCmd(cmd string) (parsedCmd []string) {
-	isQuoted := strings.Contains(cmd, "'") && strings.Count(cmd, "'")%2 == 0 && !strings.Contains(cmd, "\\")
-	isEscaped := strings.Contains(cmd, "\\")
-	isDoubleQuoted := strings.Contains(cmd, "\"") && strings.Count(cmd, "\"")%2 == 0
+	parsedCmd = []string{}
+	var current strings.Builder
+	inSingle := false
+	inDouble := false
+	inToken := false
 
-	// UUIDs act as collision-free placeholders while we protect escaped
-	// spaces/tabs from the quote-aware parser below.
-	space := uuid.NewString()
-	tab := uuid.NewString()
-
-	if isEscaped && (isQuoted || isDoubleQuoted) {
-		cmd = strings.ReplaceAll(cmd, "\\ ", space)
-		cmd = strings.ReplaceAll(cmd, "\\t", tab)
-		parsedCmd = parseQuotedCmd(cmd)
-		for n, arg := range parsedCmd {
-			parsedCmd[n] = strings.ReplaceAll(strings.ReplaceAll(arg, space, " "), tab, "\t")
+	for i := 0; i < len(cmd); i++ {
+		c := cmd[i]
+		switch {
+		case inSingle:
+			if c == '\'' {
+				inSingle = false
+				continue
+			}
+			if c == '\\' && i+1 < len(cmd) {
+				next := cmd[i+1]
+				if next == ' ' || next == '\'' {
+					current.WriteByte(next)
+					i++
+					continue
+				}
+			}
+			current.WriteByte(c)
+		case inDouble:
+			if c == '"' {
+				inDouble = false
+				continue
+			}
+			if c == '\\' && i+1 < len(cmd) {
+				next := cmd[i+1]
+				switch next {
+				case '"', '\\', '\'', ' ':
+					current.WriteByte(next)
+					i++
+					continue
+				case 't':
+					current.WriteByte('\t')
+					i++
+					continue
+				case 'n':
+					current.WriteByte('\n')
+					i++
+					continue
+				case 'r':
+					current.WriteByte('\r')
+					i++
+					continue
+				}
+			}
+			current.WriteByte(c)
+		default:
+			if c == ' ' || c == '\t' || c == '\n' || c == '\r' {
+				if inToken {
+					if current.Len() > 0 {
+						parsedCmd = append(parsedCmd, current.String())
+					}
+					current.Reset()
+					inToken = false
+				}
+				continue
+			}
+			inToken = true
+			if c == '\'' {
+				inSingle = true
+				continue
+			}
+			if c == '"' {
+				inDouble = true
+				continue
+			}
+			if c == '\\' && i+1 < len(cmd) {
+				next := cmd[i+1]
+				switch next {
+				case ' ', '\'', '"', '\\':
+					current.WriteByte(next)
+					i++
+					continue
+				case 't':
+					current.WriteByte('\t')
+					i++
+					continue
+				case 'n':
+					current.WriteByte('\n')
+					i++
+					continue
+				case 'r':
+					current.WriteByte('\r')
+					i++
+					continue
+				}
+			}
+			current.WriteByte(c)
 		}
-		return parsedCmd
 	}
-
-	if isEscaped {
-		return parseEscapedCmd(cmd, space, tab)
-	}
-
-	if isQuoted || isDoubleQuoted {
-		return parseQuotedCmd(cmd)
-	}
-
-	return strings.Fields(cmd)
-}
-
-func parseEscapedCmd(cmd, space, tab string) (parsedCmd []string) {
-	temp := strings.ReplaceAll(cmd, "\\ ", space)
-	temp = strings.ReplaceAll(temp, "\\t", tab)
-	parsedCmd = strings.Fields(temp)
-	for n, arg := range parsedCmd {
-		parsedCmd[n] = strings.ReplaceAll(strings.ReplaceAll(arg, space, " "), tab, "\t")
-	}
-	return parsedCmd
-}
-
-func parseQuotedCmd(cmd string) (parsedCmd []string) {
-	cmd = strings.ReplaceAll(cmd, "'", `"`) // use double quotes
-	r := csv.NewReader(strings.NewReader(cmd))
-	r.Comma = ' ' // space
-	r.LazyQuotes = true
-	fields, err := r.Read()
-	if err != nil {
-		logging.Debugf("ParseCmd: %v", err)
-		return parsedCmd
-	}
-	for _, f := range fields {
-		parsedCmd = append(parsedCmd, strings.TrimSpace(f))
+	if inToken && current.Len() > 0 {
+		parsedCmd = append(parsedCmd, current.String())
 	}
 	return parsedCmd
 }

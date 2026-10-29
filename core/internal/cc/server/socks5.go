@@ -590,6 +590,9 @@ func readSocks5Request(conn net.Conn) (cmd byte, host string, port uint16, atyp 
 		if _, err = io.ReadFull(conn, name); err != nil {
 			return 0, "", 0, 0, err
 		}
+		if !isValidSocks5Domain(name) {
+			return 0, "", 0, 0, fmt.Errorf("invalid domain characters in SOCKS5 request")
+		}
 		host = string(name)
 	default:
 		return 0, "", 0, 0, fmt.Errorf("unsupported address type 0x%02x", atyp)
@@ -601,6 +604,21 @@ func readSocks5Request(conn net.Conn) (cmd byte, host string, port uint16, atyp 
 	}
 	port = binary.BigEndian.Uint16(portBuf)
 	return cmd, host, port, atyp, nil
+}
+
+// isValidSocks5Domain checks that a SOCKS5 domain contains only printable ASCII
+// hostname characters and no whitespace, quotes, or escapes that could split
+// agent command lines.
+func isValidSocks5Domain(name []byte) bool {
+	if len(name) == 0 || len(name) > 255 {
+		return false
+	}
+	for _, b := range name {
+		if b <= 0x20 || b >= 0x7f || b == '\'' || b == '"' || b == '\\' {
+			return false
+		}
+	}
+	return true
 }
 
 // socks5Addr encodes host/port/atyp into a SOCKS5 address (no leading ATYP

@@ -329,9 +329,9 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Run: func(cmd *cobra.Command, args []string) {
 				path, _ := cmd.Flags().GetString("path")
 				out, _ := cmd.Flags().GetString("out")
-				cmdStr := fmt.Sprintf("decrypt --path '%s'", path)
+				cmdStr := fmt.Sprintf("decrypt --path %s", strconv.Quote(path))
 				if out != "" {
-					cmdStr += fmt.Sprintf(" --out '%s'", out)
+					cmdStr += fmt.Sprintf(" --out %s", strconv.Quote(out))
 				}
 				logging.Warningf("OPSEC: decrypt writes plaintext files to agent's disk")
 				executeCmd(cmdStr) // Helper to send command

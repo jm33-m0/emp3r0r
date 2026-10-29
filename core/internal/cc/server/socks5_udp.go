@@ -313,6 +313,9 @@ func parseSocks5UDPAddr(b []byte) (host string, port uint16, bodyStart int, ok b
 		if l == 0 || pos+l+2 > len(b) {
 			return "", 0, 0, false
 		}
+		if !isValidSocks5Domain(b[pos : pos+l]) {
+			return "", 0, 0, false
+		}
 		host = string(b[pos : pos+l])
 		pos += l
 	default:
