@@ -65,8 +65,7 @@ Some packages compile C or load real object files and need extra tooling:
   opt-in because they need a Tor binary and Tor network access:
 
   ```bash
-  EMP3R0R_TOR_INTEGRATION=1 TOR_BIN=/path/to/tor \
-    go test -v -timeout 8m -run TestTorCustomC2EndToEnd ./transports/tor
+  EMP3R0R_TOR_INTEGRATION=1 TOR_BIN=/path/to/tor go test -v -timeout 8m -run TestTorCustomC2EndToEnd ./transports/tor
   ```
 
   Set `TOR_LIBDIR` if Tor's libraries are not on the loader path, and

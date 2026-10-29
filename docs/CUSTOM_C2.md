@@ -52,9 +52,7 @@ port, and the bridge forwards each connection to the C2 socket:
 
 ```bash
 cd core
-go run ./transports/tor/bridge \
-  --listen 127.0.0.1:8080 \
-  --c2-socket "$HOME/.emp3r0r/bridge.sock"
+go run ./transports/tor/bridge --listen 127.0.0.1:8080 --c2-socket "$HOME/.emp3r0r/bridge.sock"
 ```
 
 The bridge and the C2 must run as the same user.
@@ -92,11 +90,7 @@ Only the agent needs this tag. The C2 binary does not.
 Select `tor` as the channel mode and pass the agent's SOCKS5 proxy:
 
 ```text
-generate --type linux_executable --arch amd64 \
-  --cc abcdefghijklmnop.onion:80 \
-  --c2-channel-mode tor \
-  --allow-custom-transport \
-  --transport-option socks5=127.0.0.1:9050
+generate --type linux_executable --arch amd64 --cc abcdefghijklmnop.onion:80 --c2-channel-mode tor --allow-custom-transport --transport-option socks5=127.0.0.1:9050
 ```
 
 `--allow-custom-transport` is required because `tor` is not built into the C2.
@@ -290,9 +284,7 @@ Tor provider is the reference.
 Generate a Tor C agent with the normal C generator:
 
 ```text
-generate_c --cc abcdefghijklmnop.onion:80 \
-  --c2-channel-mode tor --allow-custom-transport \
-  --transport tor --transport-option socks5=127.0.0.1:9050
+generate_c --cc abcdefghijklmnop.onion:80 --c2-channel-mode tor --allow-custom-transport --transport tor --transport-option socks5=127.0.0.1:9050
 ```
 
 For a manual build, select the provider and supply the generated config source:
@@ -337,8 +329,7 @@ The bridge listener always starts with the C2.
 Generated with the console:
 
 ```text
-generate ... --c2-channel-mode <name> --allow-custom-transport \
-  --transport-option key=value [--transport-option key=value ...]
+generate ... --c2-channel-mode <name> --allow-custom-transport --transport-option key=value [--transport-option key=value ...]
 ```
 
 `--allow-custom-transport` is required for any mode that is not `http_poll`,
@@ -348,9 +339,9 @@ generate ... --c2-channel-mode <name> --allow-custom-transport \
 
 These do not use a bridge:
 
-- `http_poll` — HTTP polling, including HTTPS and the malleable profile;
-- `h2conn` — HTTP/2 duplex;
-- `quic` — QUIC with the per-build static key.
+- `http_poll`: HTTP polling, including HTTPS and the malleable profile;
+- `h2conn`: HTTP/2 duplex;
+- `quic`: QUIC with the per-build static key.
 
 KCP is a P2P mesh transport only. It cannot be selected as a C2 channel.
 
@@ -366,19 +357,16 @@ config carries one `c2_channel_mode`, so an agent picks exactly one wire:
 
 ```text
 # Agent A: Tor
-generate ... --cc abcdef.onion:80 --c2-channel-mode tor \
-  --allow-custom-transport --transport-option socks5=127.0.0.1:9050
+generate ... --cc abcdef.onion:80 --c2-channel-mode tor --allow-custom-transport --transport-option socks5=127.0.0.1:9050
 
 # Agent B: another custom wire
-generate ... --cc my-zone --c2-channel-mode mydns \
-  --allow-custom-transport --transport-option key=value
+generate ... --cc my-zone --c2-channel-mode mydns --allow-custom-transport --transport-option key=value
 ```
 
 A Go agent may carry several dialers in one binary by combining build tags:
 
 ```bash
-python3 core/build.py --build \
-  --agent-tags 'with_transport_tor with_transport_mydns'
+python3 core/build.py --build --agent-tags 'with_transport_tor with_transport_mydns'
 ```
 
 The dialer is selected per generated agent with `--c2-channel-mode`.

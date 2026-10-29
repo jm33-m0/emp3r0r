@@ -78,7 +78,7 @@ HTTP polling uses a malleable request profile from the C2 config. TLS fingerprin
 
 #### Custom transports
 
-Agent-to-C2 traffic can run over any reliable byte stream—Tor, DNS, SMB, a cloud API, or a custom protocol—without changing authentication, encryption, modules, or file transfers.
+Agent-to-C2 traffic can run over any reliable byte stream, such as Tor, DNS, SMB, a cloud API, or a custom protocol, without changing authentication, encryption, modules, or file transfers.
 
 A custom transport has two parts: a small dialer compiled into the Go or [C agent](#c-agent), and an external bridge process on the C2 host. The bridge can be written in any language and forwards streams to the running server over a local Unix socket (`bridge.sock`), so adding or switching transports does not require rebuilding or restarting the C2. Multiple bridges can run at the same time for different agents.
 
@@ -100,8 +100,7 @@ Operators generate it with `generate_c`:
 
 ```bash
 generate_c --type glibc --arch amd64 --cc your.domain.com
-generate_c --type glibc --arch amd64 --cc your.domain.com \
-  --interval 60 --jitter 50 --poll-window 5 --offline-grace 0
+generate_c --type glibc --arch amd64 --cc your.domain.com --interval 60 --jitter 50 --poll-window 5 --offline-grace 0
 ```
 
 ### Network movement

