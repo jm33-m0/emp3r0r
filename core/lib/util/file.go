@@ -350,7 +350,7 @@ func FileBaseName(path string) string {
 		return filepath.Base(norm)
 	}
 	sanitized, err := SecureLocalPath(path)
-	if err != nil {
+	if err != nil || sanitized == "." {
 		logging.Debugf("FileBaseName: %v", err)
 		return ""
 	}

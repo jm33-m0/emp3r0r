@@ -121,17 +121,14 @@ func GenerateGetFilePaths(file_path string) (write_dir, save_to_file, tempname, 
 	localized, err := util.SecureLocalPath(relPath)
 	if err != nil {
 		logging.Debugf("GenerateGetFilePaths: unsafe path %q: %v. Using basename only.", file_path, err)
-		localized = filepath.Base(cleanPath) // fallback to just filename
+		localized = util.FileBaseName(filepath.Base(cleanPath)) // fallback to sanitized filename
 	}
-	baseName := filepath.Base(localized)
-	if localized == "" || localized == "." || localized == ".." || localized == "/" || localized == "\\" ||
-		baseName == "" || baseName == "." || baseName == ".." || baseName == "/" || baseName == "\\" {
+	if localized == "" || localized == "." {
 		localized = "downloaded_file"
-		baseName = "downloaded_file"
 	}
 
 	write_dir = filepath.Join(live.FileGetDir, filepath.Dir(localized))
-	save_to_file = filepath.Join(write_dir, baseName)
+	save_to_file = filepath.Join(write_dir, filepath.Base(localized))
 	tempname = save_to_file + ".tmp"
 	lock = save_to_file + ".lock"
 	return write_dir, save_to_file, tempname, lock
@@ -139,8 +136,7 @@ func GenerateGetFilePaths(file_path string) (write_dir, save_to_file, tempname, 
 
 // GetFile get file from agent
 func GetFile(file_path string, agent *def.Emp3r0rAgent) (ftpSh *network.StreamHandler, err error) {
-	trimmed := strings.TrimSpace(file_path)
-	if trimmed == "" || trimmed == "." || trimmed == ".." {
+	if util.FileBaseName(filepath.Base(filepath.Clean(file_path))) == "" {
 		return nil, fmt.Errorf("invalid remote file path: %q", file_path)
 	}
 	logging.Notify(logging.INFO, "Getting file '%s' from agent %s", file_path, agent.Tag)
