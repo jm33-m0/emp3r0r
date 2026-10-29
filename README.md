@@ -76,7 +76,13 @@ The C2 supports HTTP, TCP, and UDP listeners. Agents can use beacon-style HTTP p
 
 HTTP polling uses a malleable request profile from the C2 config. TLS fingerprints can be randomized with uTLS. Behind an ECH-capable CDN, `--doh` and `--ech` hide the inner SNI from the ClientHello. Control messages use CBOR rather than JSON.
 
-New transports can be added without rebuilding the C2: the agent gets a custom dialer and a local bridge process carries the stream to the running server. See the [custom transport guide](./docs/CUSTOM_C2.md).
+#### Custom transports
+
+Agent-to-C2 traffic can run over any reliable byte stream—Tor, DNS, SMB, a cloud API, or a custom protocol—without changing authentication, encryption, modules, or file transfers.
+
+A custom transport has two parts: a small dialer compiled into the Go or [C agent](#c-agent), and an external bridge process on the C2 host. The bridge can be written in any language and forwards streams to the running server over a local Unix socket (`bridge.sock`), so adding or switching transports does not require rebuilding or restarting the C2. Multiple bridges can run at the same time for different agents.
+
+A reference Tor hidden-service transport (`with_transport_tor` for Go agents, `TRANSPORT=tor` for C agents) and bridge are included. See the [custom transport guide](./docs/CUSTOM_C2.md).
 
 ### Delivery
 
@@ -136,7 +142,7 @@ C2 server binaries keep the full feature set, so one server can handle every age
 ## Documentation
 
 - [Operator guide](./docs/OPERATOR.md): installation, quick start, operator setup, container notes, tmux keybindings, and agent generation.
-- [Custom transport guide](./docs/CUSTOM_C2.md): write an agent dialer and a C2 bridge, with a reference Tor transport.
+- [Custom transport guide](./docs/CUSTOM_C2.md): Tor hidden-service quick start, Go and C agent dialers, C2 bridge socket protocol, and running multiple custom transports.
 - [Module development guide](./docs/module_development_guide.md)
 - [Testing guide](./docs/TESTING.md)
 - [Security policy](./docs/SECURITY.md)
