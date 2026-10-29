@@ -55,6 +55,7 @@ static size_t udp_download(const char *host, const char *port, const char *path,
         return 0;
       }
     }
+    src_len = sizeof(src_addr);
     long n = recvfrom(sockfd, temp_buffer, BUFFER_SIZE, 0,
                       (struct sockaddr *)&src_addr, &src_len);
     if (n <= 0) {
@@ -65,6 +66,11 @@ static size_t udp_download(const char *host, const char *port, const char *path,
         continue;
       }
       break;
+    }
+    if (src_addr.sin_family != AF_INET ||
+        src_addr.sin_addr.s_addr != serv_addr.sin_addr.s_addr ||
+        src_addr.sin_port != serv_addr.sin_port) {
+      continue;
     }
     if (n >= UDP_HEADER_SIZE && temp_buffer[0] == UDP_TYPE_DATA) {
       uint32_t seq = 0;

@@ -50,8 +50,10 @@ static size_t http_download(const char *host, const char *port,
     return 0;
   }
 
-  /* Read the response body, skipping the headers. */
+  /* Read the response body, skipping the headers and verifying a 2xx status. */
   char temp_buffer[BUFFER_SIZE];
+  char status[12];
+  size_t status_len = 0;
   size_t data_size = 0;
   unsigned int http_marker = 0;
   int header_end = 0;
@@ -61,6 +63,13 @@ static size_t http_download(const char *host, const char *port,
     if (n <= 0)
       break;
 
+    if (status_len < sizeof(status)) {
+      size_t want = sizeof(status) - status_len;
+      size_t take = (size_t)n < want ? (size_t)n : want;
+      memcpy(status + status_len, temp_buffer, take);
+      status_len += take;
+    }
+
     if (!header_end) {
       for (long i = 0; i < n; i++) {
         if ((unsigned char)temp_buffer[i] ==
@@ -68,10 +77,20 @@ static size_t http_download(const char *host, const char *port,
           http_marker++;
           if (http_marker == 4) {
             header_end = 1;
+            if (status_len < 12 || status[0] != 'H' || status[1] != 'T' ||
+                status[2] != 'T' || status[3] != 'P' || status[4] != '/' ||
+                status[5] != '1' || status[6] != '.' ||
+                (status[7] != '0' && status[7] != '1') || status[8] != ' ' ||
+                status[9] != '2') {
+              data_size = 0;
+              goto done;
+            }
             if (i + 1 < n) {
               size_t body = (size_t)(n - (i + 1));
-              if (data_size + body > capacity)
+              if (data_size + body > capacity) {
+                data_size = 0;
                 goto done;
+              }
               memcpy((char *)buffer + data_size, temp_buffer + i + 1, body);
               data_size += body;
             }
@@ -84,12 +103,17 @@ static size_t http_download(const char *host, const char *port,
         }
       }
     } else {
-      if (data_size + (size_t)n > capacity)
-        break;
+      if (data_size + (size_t)n > capacity) {
+        data_size = 0;
+        goto done;
+      }
       memcpy((char *)buffer + data_size, temp_buffer, (size_t)n);
       data_size += (size_t)n;
     }
   }
+
+  if (!header_end)
+    data_size = 0;
 
 done:
   close(sockfd);
