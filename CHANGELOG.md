@@ -1,5 +1,26 @@
 # Changelog
 
+## [5.6.0](https://github.com/jm33-m0/emp3r0r/compare/v5.5.1...v5.6.0) (2026-10-29)
+
+
+### Features
+
+* **c2:** complete user-defined transports and add C Tor provider ([6f68866](https://github.com/jm33-m0/emp3r0r/commit/6f6886602f38fcbf1f228f8a8e172a750267be2d))
+* **c2:** remove legacy tor/cdnproxy/kcp C2 transports ([f061823](https://github.com/jm33-m0/emp3r0r/commit/f0618233b662988a350da84163b7fcd9274b2d76))
+* **transport:** add pluggable agent dialers and external C2 bridges ([058e6db](https://github.com/jm33-m0/emp3r0r/commit/058e6dbfd40bbaee7417400f0bb8792c547a8efe))
+
+
+### Bug Fixes
+
+* **c_agent:** reserve gzip trailer space in miniz and harden packer helpers ([278655d](https://github.com/jm33-m0/emp3r0r/commit/278655daa1af6f5c80a07fbab7b5554464f2294a))
+* **c2transport:** cap P2P file response allocation in FetchFilePeerWithEndpoint ([a334d0b](https://github.com/jm33-m0/emp3r0r/commit/a334d0bdfc76fd1cf8180721a151ea0fd8b20550))
+* **c2:** treat nil C transport options as empty ([757a79c](https://github.com/jm33-m0/emp3r0r/commit/757a79c5d24f725230117942f0bad13f36a6db08))
+* **cc:** harden ParseCmd quote/escape parsing and reject invalid SOCKS5 domains ([78c10fd](https://github.com/jm33-m0/emp3r0r/commit/78c10fdf8fbd0622d3bf07f947e6f1697c408049))
+* **ftp:** prevent traversal/dir clobber in GenerateGetFilePaths and bound FileAllocate ([c18f76e](https://github.com/jm33-m0/emp3r0r/commit/c18f76e3334a0853fbf294454660723ebc17458a))
+* **smw:** `UWOP_SAVE_NONVOL` unwind code misparse ([e99a841](https://github.com/jm33-m0/emp3r0r/commit/e99a8415a9823144918e52bad2dc4f4e5d10ba95))
+* **stager_linux:** validate HTTP 2xx status and UDP sender address ([206276c](https://github.com/jm33-m0/emp3r0r/commit/206276c08bff59e41d52a925589906a3a69cbaed))
+* **test:** tor transport doesn't build in Windows ([bd635c2](https://github.com/jm33-m0/emp3r0r/commit/bd635c2811f3459a17a837cd92414394dd59acd1))
+
 ## [5.5.1](https://github.com/jm33-m0/emp3r0r/compare/v5.5.0...v5.5.1) (2026-10-28)
 
 
