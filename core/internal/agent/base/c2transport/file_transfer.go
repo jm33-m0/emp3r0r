@@ -327,7 +327,11 @@ func FetchFilePeerWithEndpoint(ep transport.PeerEndpoint, file_to_download, path
 	if _, err = io.ReadFull(conn, dataLenBuf); err != nil {
 		return nil, fmt.Errorf("FetchFilePeer read data len: %v", err)
 	}
+	const maxPeerFileBytes = 256 * 1024 * 1024 // 256 MiB bound to prevent peer OOM DoS
 	dataLen := binary.LittleEndian.Uint32(dataLenBuf)
+	if dataLen > maxPeerFileBytes {
+		return nil, fmt.Errorf("FetchFilePeer data length %d exceeds maximum %d", dataLen, maxPeerFileBytes)
+	}
 	conn.SetDeadline(time.Now().Add(5 * time.Minute)) // generous for large files
 
 	// Read all data

@@ -766,3 +766,64 @@ func TestFileTransfer_OperatorSendsToAgent(t *testing.T) {
 		t.Fatalf("downloaded content mismatch: got %d bytes want %d", len(got), len(content))
 	}
 }
+
+func TestFetchFilePeer_RejectsOversizedDataLen(t *testing.T) {
+	common.RuntimeConfig = &def.Config{
+		Password:          "oversized_test_password",
+		P2PTransport:      "mtls",
+		CamouflageCertOrg: "emp3r0r test org",
+		CamouflageCertCN:  "emp3r0r test cn",
+	}
+
+	tr, err := transport.GetTransportImplementationStrict("mtls")
+	if err != nil {
+		t.Fatalf("resolve mtls transport: %v", err)
+	}
+	if camo, ok := tr.(*transport.CamouflageMTLS); ok {
+		camo.CertOrg = common.RuntimeConfig.CamouflageCertOrg
+		camo.CertCN = common.RuntimeConfig.CamouflageCertCN
+	}
+
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("find free port: %v", err)
+	}
+	port := fmt.Sprintf("%d", l.Addr().(*net.TCPAddr).Port)
+	l.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	listener, err := tr.Listen(port, common.RuntimeConfig.Password, def.MagicString)
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	defer listener.Close()
+
+	go func() {
+		conn, acceptErr := tr.Accept(ctx, listener)
+		if acceptErr != nil {
+			return
+		}
+		defer conn.Close()
+		var hdr [5]byte
+		if _, err := io.ReadFull(conn, hdr[:]); err != nil {
+			return
+		}
+		nameLen := binary.LittleEndian.Uint32(hdr[1:5])
+		if _, err := io.CopyN(io.Discard, conn, int64(nameLen)); err != nil {
+			return
+		}
+		// Advertise 0xFFFFFFFF bytes (~4 GiB) after OpcodeOK (0x00)
+		var resp [5]byte
+		resp[0] = 0x00
+		binary.LittleEndian.PutUint32(resp[1:5], 0xFFFFFFFF)
+		_, _ = conn.Write(resp[:])
+	}()
+
+	common.RuntimeConfig.P2PRelayPort = port
+	_, err = FetchFilePeer("127.0.0.1", "oversized.bin", "", "")
+	if err == nil || !strings.Contains(err.Error(), "exceeds maximum") {
+		t.Fatalf("expected oversized dataLen error, got: %v", err)
+	}
+}
