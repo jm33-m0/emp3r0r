@@ -24,6 +24,9 @@
 /* Worst case for tdefl on incompressible data: DEFLATE adds at most ~5 bytes
  * per 16 KiB block plus a small fixed overhead. */
 size_t c2_gzip_bound(size_t in_len) {
+  const size_t overhead = GZIP_HEADER_BYTES + GZIP_TRAILER_BYTES + 64u;
+  if (in_len > (SIZE_MAX - overhead) / 9u * 8u)
+    return SIZE_MAX;
   return GZIP_HEADER_BYTES + in_len + in_len / 8 + 64 + GZIP_TRAILER_BYTES;
 }
 
@@ -65,7 +68,9 @@ c2_status c2_gzip_compress(const uint8_t *in, size_t in_len, uint8_t *out,
     return C2_ERR_ARG;
   if (in_len > 0 && in == NULL)
     return C2_ERR_ARG;
-  if (c2_gzip_bound(in_len) > out_cap)
+  size_t bound = c2_gzip_bound(in_len);
+  if (bound == SIZE_MAX || out_cap < GZIP_HEADER_BYTES + GZIP_TRAILER_BYTES ||
+      bound > out_cap)
     return C2_ERR_NOMEM;
 
   /* Fixed 10-byte header: no name/comment, mtime 0, OS = Unix. */
@@ -73,9 +78,10 @@ c2_status c2_gzip_compress(const uint8_t *in, size_t in_len, uint8_t *out,
       0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03};
   memcpy(out, header, sizeof(header));
 
+  size_t deflate_cap = out_cap - GZIP_HEADER_BYTES - GZIP_TRAILER_BYTES;
   size_t csize = tdefl_compress_mem_to_mem(
-      out + GZIP_HEADER_BYTES, out_cap - GZIP_HEADER_BYTES, in, in_len, 0);
-  if (csize == 0)
+      out + GZIP_HEADER_BYTES, deflate_cap, in, in_len, 0);
+  if (csize == 0 || csize > deflate_cap)
     return C2_ERR_CRYPTO; /* tdefl returns 0 only on failure */
 
   size_t o = GZIP_HEADER_BYTES + csize;

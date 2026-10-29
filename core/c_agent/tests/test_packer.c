@@ -48,6 +48,22 @@ int main(void) {
     memset(d2, 0x55, sizeof(d2));
     decode_config_string(d2, e2, sizeof(d2));
     CHECK(d2[0] == 'A' && d2[1] == '\0');
+
+    /* max_len == 0 must be a no-op and never underflow or write to dest. */
+    memset(d2, 0x55, sizeof(d2));
+    decode_config_string(d2, e2, 0);
+    CHECK((unsigned char)d2[0] == 0x55);
+  }
+
+  /* High-bit (>= 0x80) bytes must zero-extend, matching Go's uint32(str[i]). */
+  {
+    const char high_pass[] = "\x80\x81\x82\x83";
+    uint8_t high_key[DERIVED_KEY_LEN];
+    const uint8_t expected[DERIVED_KEY_LEN] = {
+        0x80, 0x00, 0x00, 0x00, 0x81, 0x00, 0x00, 0x00,
+        0x82, 0x00, 0x00, 0x00, 0x83, 0x00, 0x00, 0x00};
+    derive_key_from_string(high_pass, high_key);
+    CHECK_BYTES(high_key, expected, DERIVED_KEY_LEN);
   }
 
   TEST_DONE();
