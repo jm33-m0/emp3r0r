@@ -40,7 +40,8 @@ func DownloadFromAgent(target *def.Emp3r0rAgent, filePath string, isRecursive bo
 
 	if isRecursive {
 		job_id := uuid.NewString()
-		cmd_str := fmt.Sprintf("get --file_path %s --filter %s --offset 0 --token %s", filePath, strconv.Quote(filter), uuid.NewString())
+		cmd_str := fmt.Sprintf("get --file_path %s --filter %s --offset 0 --token %s",
+			strconv.Quote(filePath), strconv.Quote(filter), strconv.Quote(uuid.NewString()))
 		err := ExecCmd(cmd_str, job_id, target.Tag)
 		if err != nil {
 			return fmt.Errorf("cannot get file list: %v", err)

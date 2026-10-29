@@ -30,7 +30,7 @@ var ExecCmd ExecCmdFunc
 // StatFile Get stat info of a file on agent
 func StatFile(filepath string, a *def.Emp3r0rAgent) (fi *util.FileStat, err error) {
 	job_id := uuid.NewString()
-	cmd := fmt.Sprintf("%s --path '%s'", def.C2CmdStat, filepath)
+	cmd := fmt.Sprintf("%s --path %s", def.C2CmdStat, strconv.Quote(filepath))
 	// send command
 	err = ExecCmd(cmd, job_id, a.Tag)
 	if err != nil {
@@ -88,7 +88,8 @@ func PutFile(lpath, rpath string, a *def.Emp3r0rAgent) error {
 	}
 
 	// send cmd
-	cmd := fmt.Sprintf("put --file '%s' --path '%s' --checksum %s --size %d", lpath, rpath, sum, size)
+	cmd := fmt.Sprintf("put --file %s --path %s --checksum %s --size %d",
+		strconv.Quote(lpath), strconv.Quote(rpath), strconv.Quote(sum), size)
 	err = ExecCmd(cmd, "", a.Tag)
 	if err != nil {
 		return fmt.Errorf("PutFile send command: %v", err)
@@ -122,9 +123,15 @@ func GenerateGetFilePaths(file_path string) (write_dir, save_to_file, tempname, 
 		logging.Debugf("GenerateGetFilePaths: unsafe path %q: %v. Using basename only.", file_path, err)
 		localized = filepath.Base(cleanPath) // fallback to just filename
 	}
+	baseName := filepath.Base(localized)
+	if localized == "" || localized == "." || localized == ".." || localized == "/" || localized == "\\" ||
+		baseName == "" || baseName == "." || baseName == ".." || baseName == "/" || baseName == "\\" {
+		localized = "downloaded_file"
+		baseName = "downloaded_file"
+	}
 
 	write_dir = filepath.Join(live.FileGetDir, filepath.Dir(localized))
-	save_to_file = filepath.Join(write_dir, filepath.Base(localized))
+	save_to_file = filepath.Join(write_dir, baseName)
 	tempname = save_to_file + ".tmp"
 	lock = save_to_file + ".lock"
 	return write_dir, save_to_file, tempname, lock
@@ -132,6 +139,10 @@ func GenerateGetFilePaths(file_path string) (write_dir, save_to_file, tempname, 
 
 // GetFile get file from agent
 func GetFile(file_path string, agent *def.Emp3r0rAgent) (ftpSh *network.StreamHandler, err error) {
+	trimmed := strings.TrimSpace(file_path)
+	if trimmed == "" || trimmed == "." || trimmed == ".." {
+		return nil, fmt.Errorf("invalid remote file path: %q", file_path)
+	}
 	logging.Notify(logging.INFO, "Getting file '%s' from agent %s", file_path, agent.Tag)
 
 	write_dir, save_to_file, tempname, lock := GenerateGetFilePaths(file_path)
@@ -161,6 +172,9 @@ func GetFile(file_path string, agent *def.Emp3r0rAgent) (ftpSh *network.StreamHa
 	}
 	fileinfo := *fi
 	filesize := fileinfo.Size
+	if filesize < 0 {
+		return ftpSh, fmt.Errorf("GetFile: negative remote file size (%d) for %s", filesize, file_path)
+	}
 	// check if file exists
 	if util.IsExist(save_to_file) {
 		checksum := crypto.SHA256SumFile(save_to_file)
@@ -204,7 +218,8 @@ func GetFile(file_path string, agent *def.Emp3r0rAgent) (ftpSh *network.StreamHa
 	}
 
 	// cmd
-	cmd := fmt.Sprintf("get --file_path '%s' --offset %d --token '%s'", file_path, offset, ftpSh.Token)
+	cmd := fmt.Sprintf("get --file_path %s --offset %d --token %s",
+		strconv.Quote(file_path), offset, strconv.Quote(ftpSh.Token))
 	err = ExecCmd(cmd, "", agent.Tag)
 	if err != nil {
 		logging.Errorf("GetFile send command: %v", err)

@@ -9,6 +9,7 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 func TestCopyWithDecompressedLimit_AllowsExpectedSize(t *testing.T) {
@@ -182,6 +183,12 @@ func TestHandleFTPTransfer_TraversalPrevention(t *testing.T) {
 		"../../../etc/shadow",
 		"../../.ssh/id_rsa",
 		"./../../secrets.txt",
+		"..",
+		"../..",
+		".",
+		"/",
+		"",
+		"\\",
 	}
 
 	for _, malPath := range maliciousPaths {
@@ -192,8 +199,8 @@ func TestHandleFTPTransfer_TraversalPrevention(t *testing.T) {
 			if !strings.HasPrefix(writeDir, live.FileGetDir) {
 				t.Errorf("Path traversal detected in writeDir: %s escapes %s", writeDir, live.FileGetDir)
 			}
-			if !strings.HasPrefix(targetFile, live.FileGetDir) {
-				t.Errorf("Path traversal detected in targetFile: %s escapes %s", targetFile, live.FileGetDir)
+			if !strings.HasPrefix(targetFile, live.FileGetDir+string(filepath.Separator)) {
+				t.Errorf("Path traversal or directory clobber detected in targetFile: %s is not strictly inside %s", targetFile, live.FileGetDir)
 			}
 
 			// Verify no ".." in final path
@@ -203,5 +210,20 @@ func TestHandleFTPTransfer_TraversalPrevention(t *testing.T) {
 
 			t.Logf("✓ Malicious path safely handled: %s -> %s", malPath, targetFile)
 		})
+	}
+}
+
+func TestFileAllocate_BoundsAndDirGuard(t *testing.T) {
+	tmpDir := t.TempDir()
+	target := filepath.Join(tmpDir, "alloc.bin")
+
+	if err := util.FileAllocate(target, -1); err == nil {
+		t.Fatal("expected error for negative FileAllocate size")
+	}
+	if err := util.FileAllocate(target, util.MaxFileAllocateBytes+1); err == nil {
+		t.Fatal("expected error for oversized FileAllocate size")
+	}
+	if err := util.FileAllocate(tmpDir, 64); err == nil {
+		t.Fatal("expected error when FileAllocate targets an existing directory")
 	}
 }

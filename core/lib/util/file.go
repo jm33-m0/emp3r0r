@@ -357,12 +357,23 @@ func FileBaseName(path string) string {
 	return filepath.Base(sanitized)
 }
 
+// MaxFileAllocateBytes bounds the maximum sparse/preallocated file size accepted from remote metadata (10 GiB).
+const MaxFileAllocateBytes int64 = 10 << 30
+
 // FileAllocate allocate n bytes for a file, will delete the target file if already exists
 func FileAllocate(filepath string, n int64) (err error) {
-	if IsExist(filepath) {
-		err = os.Remove(filepath)
-		if err != nil {
-			return err
+	if n < 0 {
+		return fmt.Errorf("negative file allocation size: %d", n)
+	}
+	if n > MaxFileAllocateBytes {
+		return fmt.Errorf("file allocation size %d exceeds limit %d", n, MaxFileAllocateBytes)
+	}
+	if fi, statErr := os.Stat(filepath); statErr == nil {
+		if fi.IsDir() {
+			return fmt.Errorf("refusing to overwrite directory %s", filepath)
+		}
+		if err = os.Remove(filepath); err != nil {
+			return fmt.Errorf("remove existing file: %w", err)
 		}
 	}
 	f, err := os.Create(filepath)
@@ -370,9 +381,12 @@ func FileAllocate(filepath string, n int64) (err error) {
 		return err
 	}
 	defer f.Close()
-	_ = f.Truncate(n)
+	if err = f.Truncate(n); err != nil {
+		_ = os.Remove(filepath)
+		return fmt.Errorf("truncate file to %d bytes: %w", n, err)
+	}
 
-	return err
+	return nil
 }
 
 // FileSize calc file size
