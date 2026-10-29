@@ -337,14 +337,15 @@ DWORD GetStackFrameSizeWhereRbpIsPushedOnStack(HMODULE moduleBase,
       if (unwindCode->OpInfo == RSP) {
         return 0;
       } else {
-        savedRegs[unwindCode->OpInfo] =
+        BYTE regInfo = unwindCode->OpInfo;
+        savedRegs[regInfo] =
             *targetStackOffset +
             (DWORD)((PUNWIND_CODE)((PWORD)unwindCode + 1))->FrameOffset * 8;
 
         unwindCode = (PUNWIND_CODE)((PWORD)unwindCode + 1);
         nodeIndex++;
 
-        if (unwindCode->OpInfo != RBP) {
+        if (regInfo != RBP) {
           *targetStackOffset = backupStackOffset;
           break;
         }
@@ -353,7 +354,7 @@ DWORD GetStackFrameSizeWhereRbpIsPushedOnStack(HMODULE moduleBase,
         }
 
         rbpPushed = TRUE;
-        saveStackOffset = savedRegs[unwindCode->OpInfo];
+        saveStackOffset = savedRegs[regInfo];
         *targetStackOffset = backupStackOffset;
       }
       break;
@@ -361,27 +362,29 @@ DWORD GetStackFrameSizeWhereRbpIsPushedOnStack(HMODULE moduleBase,
     case UWOP_SAVE_NONVOL_BIG:
       if (unwindCode->OpInfo == RSP) {
         return 0;
-      }
+      } else {
+        BYTE regInfo = unwindCode->OpInfo;
+        savedRegs[regInfo] =
+            *targetStackOffset +
+            (DWORD)((PUNWIND_CODE)((PWORD)unwindCode + 1))->FrameOffset;
+        savedRegs[regInfo] +=
+            (DWORD)((PUNWIND_CODE)((PWORD)unwindCode + 2))->FrameOffset << 16;
 
-      savedRegs[unwindCode->OpInfo] =
-          *targetStackOffset +
-          (DWORD)((PUNWIND_CODE)((PWORD)unwindCode + 1))->FrameOffset;
-      savedRegs[unwindCode->OpInfo] +=
-          (DWORD)((PUNWIND_CODE)((PWORD)unwindCode + 2))->FrameOffset << 16;
+        unwindCode = (PUNWIND_CODE)((PWORD)unwindCode + 2);
+        nodeIndex += 2;
 
-      if (unwindCode->OpInfo != RBP) {
+        if (regInfo != RBP) {
+          *targetStackOffset = backupStackOffset;
+          break;
+        }
+        if (rbpPushed) {
+          return 0;
+        }
+
+        rbpPushed = TRUE;
+        saveStackOffset = savedRegs[regInfo];
         *targetStackOffset = backupStackOffset;
-        break;
       }
-      if (rbpPushed) {
-        return 0;
-      }
-
-      saveStackOffset = savedRegs[unwindCode->OpInfo];
-      *targetStackOffset = backupStackOffset;
-
-      unwindCode = (PUNWIND_CODE)((PWORD)unwindCode + 2);
-      nodeIndex += 2;
       break;
 
     case UWOP_EPILOG:
