@@ -45,6 +45,11 @@ Some packages compile C or load real object files and need extra tooling:
   `PATH`.
 - `c_agent` builds its unit tests and fallback fuzzers with `zig cc` and
   ASan/UBSan. `make coverage` is the exception: it uses GCC and `gcov`.
+- `lib/rvvm` and `c_agent`'s `test_rvvm` build the RV32 interpreter module and
+  portable BOF fixtures (`riscv32-linux-musl` ET_REL) with zig, then run them
+  through the real module ABI. They skip when zig is not on `PATH`; `lib/rvvm`
+  also needs a dynamically linked test process because the interpreter links
+  libc.
 - `modules/stager_linux/test` builds and runs the Linux shellcode stager over
   raw and packed formats, all built-in download transports (including TCP and
   UDP), and the C agent delivery modes. It requires Linux and `CGO_ENABLED=1`.

@@ -11,8 +11,12 @@ There are two kinds of modules:
 - **Agent modules** run on the target. `agent_config.type` is one of:
   - `coff`: a Windows COFF/BOF or Linux relocatable object,
   - `starlark`: a script for the embedded Starlark engine,
-  - `dll`: a Windows DLL mapped into the agent process, or
+  - `dll`: a Windows DLL mapped into the agent process,
   - `so`: a Linux shared-library dependency used by other modules.
+
+  A `coff` module can also run in the RISC-V interpreter with `--riscv`; it
+  is still declared as `coff` (see [`rvvm.md`](rvvm.md)). `rv` is an internal
+  dispatch type, not a manifest type.
 
   DLL/SO modules can also be declared as `dependencies`
   of another module; see §8.
@@ -199,8 +203,8 @@ A manifest is a single module object or an array of module objects.
 
 | Field   | Meaning                                                                                                                                                                                                                                                   |
 | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `type`  | `coff`, `starlark`, `dll`, or `so`. A manifest with any other type (or an empty type on a non-local module) is rejected at load time.                                                                                                                     |
-| `files` | Payload files, relative to the module directory. For `starlark`, `files[0]` is the entry script. For `coff`/`dll`/`so`, list per-architecture variants (`.x64.o`/`.x86.o`, `x64.dll`/`x86.dll`, `libbpf.so`); the C2 selects by the agent's architecture. |
+| `type`  | `coff`, `starlark`, `dll`, `rv`, or `so`. A manifest with any other type (or an empty type on a non-local module) is rejected at load time.                                                                                                                |
+| `files` | Payload files, relative to the module directory. For `starlark`, `files[0]` is the entry script. For `coff`/`dll`/`so`, list per-architecture variants (`.x64.o`/`.x86.o`, `x64.dll`/`x86.dll`, `libbpf.so`); the C2 selects by the agent's architecture. A BOF recompiled with `--riscv` is architecture-independent; the module build emits `.rv.o` next to the native object, and `riscv_libraries` lists delivered RV32 libraries. |
 | `exec`  | Only meaningful for built-in Go modules, which use `"built-in"`. Custom modules may omit it; the entry is `files[0]`.                                                                                                                                     |
 
 ### `parameters`
@@ -334,6 +338,10 @@ On the agent (`ModuleHandler`):
    - `starlark`: `script.Run(payload, argv, {module_files}, token)`.
    - `coff`: run the BOF through the in-memory `coffloader` dependency
      (Windows) or the native ELF loader (Linux).
+   - `rv` (internal, produced by `--riscv`): the C2 recompiles the BOF for
+     RV32 and the interpreter relocates it against its embedded Beacon/libc
+     runtime, then calls `invocation.coff_export` (usually `go`) with the
+     packed COFF arguments.
    - `dll`: map the DLL and call its `LoadAndRun` export for the BOF named by
      `dll_entry`.
    - `so`: a shared-library dependency (e.g. `libbpf`). It is fetched on
@@ -348,8 +356,13 @@ Dependency mapping and teardown are covered in §8.
 
 A module may declare `dependencies`: other modules whose payload is a DLL
 (`.dll`) or shared object (`.so`) rather than something that runs on its own.
-Windows `coff` modules always depend on `coffloader`; Linux eBPF modules depend
-on `libbpf`.
+Windows `coff` modules always depend on `coffloader`; Linux `coff` modules on
+`coffloader_linux`; Linux eBPF modules depend on `libbpf`. A `coff` module run
+with `--riscv` makes the C2 host the matching interpreter dependency
+(`rvvm_linux` or `rvvm_windows`) on demand; the manifest does not declare it.
+`rvvm_linux` links libc dynamically (it serves the guest's file/process host
+calls), so a statically linked agent cannot map it; `rvvm_windows` imports only
+`kernel32`.
 
 The C2 only builds and hosts each dependency as `<name>.<arch>.gz`; the agent
 decides when to map it. That decision lives in one place (`core/lib/memdeps`)
@@ -394,6 +407,7 @@ Every dependency consumer goes through this layer:
 | Windows `coff` modules             | `coffloader.RunCOFFDependency` → `memdeps.Use("coffloader", …)` |
 | `dll` modules / explicit DLL bytes | `coffloader.RunWindowsCOFFViaDLL` → `memdeps.Run(dllData, …)`   |
 | Linux eBPF builtins                | `libbpf.WithLibrary` → `memdeps.Use("libbpf", …)`               |
+| `--riscv` BOFs (Linux/Windows)     | `rvvm.RunRiscvBof` → `memdeps.Use("rvvm_linux"/"rvvm_windows", …)` |
 
 Scripts that map a library themselves with `mem_load_library` are covered too:
 their handles live in a per-run registry (`runModules` in
@@ -404,13 +418,13 @@ before returning, freeing anything the script did not `mem_free`. See
 The point of the indirection is that no caller can hold a mapping it might
 cache; a dependency image exists only while its user is executing.
 
-The C agent has no `memdeps` layer: its BOF runner
-(`core/c_agent/src/bof.c`) resolves the `coffloader_linux` dependency
-itself, pulling `coffloader_linux.<arch>.gz` into memfs on first use and
-mapping it in memory with `src/util/elfload.c` (anonymous mmap + dynamic
-relocations, the C counterpart of the Go agent's `memmod`) for the duration of
-a single BOF run. The loader is built by `core/modules/coffloader_linux` as a
-position-independent `.so` with a single exported entry point (`bof_run`).
+The C agent has no `memdeps` layer: its in-memory module runners resolve
+their dependency themselves (`src/agent.c`'s `ensure_dependency`), pulling
+`<module>.<arch>.gz` into memfs on first use and mapping it in memory with
+`src/util/elfload.c` (anonymous mmap + dynamic relocations, the C counterpart
+of the Go agent's `memmod`) for the duration of a single run. The BOF loader
+(`core/modules/coffloader_linux`) exports `bof_run`; the RISC-V interpreter
+(`core/modules/rvvm`) exports `rv_run`.
 
 ---
 

@@ -153,5 +153,40 @@ int main(void) {
     }
   }
 
+  /* rv module companion files (ModuleFiles, key 10), followed by a later key
+   * that must still be consumed. */
+  {
+    uint8_t cbor[256];
+    CborEncoder e, m, arr, item;
+    cbor_encoder_init(&e, cbor, sizeof(cbor), 0);
+    cbor_encoder_create_map(&e, &m, 2);
+    cbor_encode_uint(&m, 10);
+    cbor_encoder_create_array(&m, &arr, 1);
+    cbor_encoder_create_map(&arr, &item, 3);
+    cbor_encode_uint(&item, 1);
+    cbor_encode_text_stringz(&item, "mod.lib.rv.o.gz");
+    cbor_encode_uint(&item, 2);
+    cbor_encode_text_stringz(&item, "memfs:///mod/lib.rv.o");
+    cbor_encode_uint(&item, 3);
+    cbor_encode_text_stringz(&item, "deadbeef");
+    cbor_encoder_close_container(&arr, &item);
+    cbor_encoder_close_container(&m, &arr);
+    cbor_encode_uint(&m, 11);
+    cbor_encode_text_stringz(&m, "user");
+    cbor_encoder_close_container(&e, &m);
+    size_t n = cbor_encoder_get_buffer_size(&e, cbor);
+    char b64[512];
+    size_t b64n = c2_base64url_encode(cbor, n, b64, sizeof(b64));
+    CHECK(b64n > 0);
+
+    c2_module_file files[C2_MODULE_FILE_MAX];
+    size_t nf = 0;
+    CHECK_EQ_LONG(c2_module_files_parse(b64, b64n, files, &nf), C2_OK);
+    CHECK_EQ_LONG(nf, 1);
+    CHECK(strcmp(files[0].name, "mod.lib.rv.o.gz") == 0);
+    CHECK(strcmp(files[0].mem_path, "memfs:///mod/lib.rv.o") == 0);
+    CHECK(strcmp(files[0].checksum, "deadbeef") == 0);
+  }
+
   TEST_DONE();
 }

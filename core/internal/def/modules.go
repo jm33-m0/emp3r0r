@@ -197,6 +197,10 @@ type ModuleConfig struct {
 	// memfs (memfs:///) so multi-file starlark modules can read their companion
 	// files transparently via read_file().
 	ModuleFilesMemFS bool `cbor:"14,keyasint"`
+	// RiscvLibraries are companion RISC-V objects loaded into guest RAM by
+	// the interpreter when the module runs with --riscv. They are hosted and
+	// delivered through the normal module-files path (memfs only).
+	RiscvLibraries []string `cbor:"15,keyasint"`
 }
 
 // Module help info and options
@@ -480,6 +484,28 @@ func tokenContextType(t string) bool {
 	default:
 		return false
 	}
+}
+
+// InjectRiscvOption adds the universal "riscv" option to COFF modules. When
+// set, the C2 recompiles the BOF for RV32 and runs it in the interpreter
+// dependency instead of the native loader. Module-declared options always win.
+func InjectRiscvOption(mod *ModuleConfig) {
+	if mod == nil || mod.IsLocal || !strings.EqualFold(mod.AgentConfig.Type, "coff") {
+		return
+	}
+	if mod.Options == nil {
+		mod.Options = make(ModOptions)
+	}
+	if _, exists := mod.Options["riscv"]; exists {
+		return
+	}
+	mod.Options["riscv"] = &ModOption{
+		Name: "riscv",
+		Desc: "Recompile this BOF for RISC-V and run it in the in-memory interpreter",
+		Val:  "0",
+		Type: "bool",
+	}
+	markOptionInjected(mod.Name, "riscv")
 }
 
 // injectedOptions tracks which options InjectTokenOption added per module, so

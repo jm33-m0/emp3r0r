@@ -15,7 +15,7 @@ SOURCES = loader_linux.c beacon_compat.c
 all: $(TARGET)
 
 $(TARGET): $(SOURCES)
-	$(CC) -target $(ZIG_TARGET) -shared $(CFLAGS) -o $@ $(SOURCES) -ldl
+	$(CC) -target $(ZIG_TARGET) -shared $(CFLAGS) -o $@ $(SOURCES)
 	@command -v strip >/dev/null 2>&1 && \
 	  strip --remove-section=.comment $@ || true
 

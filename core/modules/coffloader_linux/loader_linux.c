@@ -1,7 +1,5 @@
 #define _GNU_SOURCE
-#include <dlfcn.h>
 #include <elf.h>
-#include <pthread.h>
 #include <setjmp.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -72,8 +70,21 @@ static int cstr_ok(const char *base, size_t total, uint64_t off) {
   return memchr(base + off, 0, total - (size_t)off) != NULL;
 }
 
-// Global mutex to serialize BOF execution and protect signal handler state
-static pthread_mutex_t bof_lock = PTHREAD_MUTEX_INITIALIZER;
+// Serialize BOF execution and protect signal handler state. A byte-sized
+// atomic keeps the image free of a libpthread dependency, which the in-memory
+// loader does not provide on glibc < 2.34.
+static volatile int bof_lock;
+
+static void bof_lock_acquire(void) {
+  while (__atomic_exchange_n(&bof_lock, 1, __ATOMIC_ACQUIRE)) {
+    while (__atomic_load_n(&bof_lock, __ATOMIC_RELAXED)) {
+    }
+  }
+}
+
+static void bof_lock_release(void) {
+  __atomic_store_n(&bof_lock, 0, __ATOMIC_RELEASE);
+}
 
 // Saved signal handlers
 static struct sigaction old_sa[32];
@@ -122,10 +133,10 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
                         int args_len, char **out_buf, char **err_buf) {
 
   // Serialize access
-  pthread_mutex_lock(&bof_lock);
+  bof_lock_acquire();
 
   if (!obj_buf || object_size < sizeof(Elf64_Ehdr)) {
-    pthread_mutex_unlock(&bof_lock);
+    bof_lock_release();
     return set_err(err_buf, "invalid object buffer");
   }
 
@@ -141,7 +152,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
   if (memcmp(ehdr->e_ident, ELFMAG, SELFMAG) != 0 ||
       ehdr->e_ident[EI_CLASS] != ELFCLASS64 || ehdr->e_machine != EM_X86_64 ||
       ehdr->e_type != ET_REL) {
-    pthread_mutex_unlock(&bof_lock);
+    bof_lock_release();
     return set_err(err_buf, "object is not x86_64 ET_REL");
   }
 
@@ -150,7 +161,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
   if (ehdr->e_shentsize != sizeof(Elf64_Shdr) || ehdr->e_shnum == 0 ||
       !range_ok(ehdr->e_shoff, (uint64_t)ehdr->e_shnum * sizeof(Elf64_Shdr),
                 object_size)) {
-    pthread_mutex_unlock(&bof_lock);
+    bof_lock_release();
     return set_err(err_buf, "invalid section header table");
   }
 
@@ -159,7 +170,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
   uintptr_t *sec_offsets =
       (uintptr_t *)calloc(ehdr->e_shnum, sizeof(uintptr_t));
   if (!sec_offsets) {
-    pthread_mutex_unlock(&bof_lock);
+    bof_lock_release();
     return set_err(err_buf, "calloc sec_offsets failed");
   }
 
@@ -174,7 +185,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
     sec_offsets[i] = total_size;
     if (total_size > UINT64_MAX - shdrs[i].sh_size) {
       free(sec_offsets);
-      pthread_mutex_unlock(&bof_lock);
+      bof_lock_release();
       return set_err(err_buf, "section size overflow");
     }
     total_size += shdrs[i].sh_size;
@@ -186,7 +197,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
 
   if (total_size == 0) {
     free(sec_offsets);
-    pthread_mutex_unlock(&bof_lock);
+    bof_lock_release();
     return set_err(err_buf, "no alloc sections");
   }
 
@@ -195,7 +206,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
                            MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (mem_base == MAP_FAILED) {
     free(sec_offsets);
-    pthread_mutex_unlock(&bof_lock);
+    bof_lock_release();
     return set_err(err_buf, "mmap failed");
   }
 
@@ -207,7 +218,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
       if (!range_ok(shdrs[i].sh_offset, shdrs[i].sh_size, object_size)) {
         munmap(mem_base, total_size);
         free(sec_offsets);
-        pthread_mutex_unlock(&bof_lock);
+        bof_lock_release();
         return set_err(err_buf, "section out of bounds");
       }
       memcpy(mem_base + sec_offsets[i], obj_buf + shdrs[i].sh_offset,
@@ -226,7 +237,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
           !range_ok(shdrs[i].sh_offset, shdrs[i].sh_size, object_size)) {
         munmap(mem_base, total_size);
         free(sec_offsets);
-        pthread_mutex_unlock(&bof_lock);
+        bof_lock_release();
         return set_err(err_buf, "invalid symtab");
       }
       Elf64_Shdr *str_sh = &shdrs[shdrs[i].sh_link];
@@ -234,7 +245,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
           !range_ok(str_sh->sh_offset, str_sh->sh_size, object_size)) {
         munmap(mem_base, total_size);
         free(sec_offsets);
-        pthread_mutex_unlock(&bof_lock);
+        bof_lock_release();
         return set_err(err_buf, "invalid strtab");
       }
       symtab = (Elf64_Sym *)(obj_buf + shdrs[i].sh_offset);
@@ -248,7 +259,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
   if (!symtab || !strtab) {
     munmap(mem_base, total_size);
     free(sec_offsets);
-    pthread_mutex_unlock(&bof_lock);
+    bof_lock_release();
     return set_err(err_buf, "missing symtab");
   }
 
@@ -262,7 +273,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
     if (target_sec_idx >= (uint32_t)ehdr->e_shnum) {
       munmap(mem_base, total_size);
       free(sec_offsets);
-      pthread_mutex_unlock(&bof_lock);
+      bof_lock_release();
       return set_err(err_buf, "invalid relocation target");
     }
 
@@ -275,7 +286,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
         !range_ok(shdrs[i].sh_offset, shdrs[i].sh_size, object_size)) {
       munmap(mem_base, total_size);
       free(sec_offsets);
-      pthread_mutex_unlock(&bof_lock);
+      bof_lock_release();
       return set_err(err_buf, "invalid rela section");
     }
 
@@ -294,7 +305,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
           patch_size > shdrs[target_sec_idx].sh_size - rel.r_offset) {
         munmap(mem_base, total_size);
         free(sec_offsets);
-        pthread_mutex_unlock(&bof_lock);
+        bof_lock_release();
         return set_err(err_buf, "relocation out of bounds");
       }
 
@@ -304,7 +315,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
       if (sym_idx >= (uint32_t)num_syms) {
         munmap(mem_base, total_size);
         free(sec_offsets);
-        pthread_mutex_unlock(&bof_lock);
+        bof_lock_release();
         return set_err(err_buf, "rel sym out of range");
       }
 
@@ -313,7 +324,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
       if (!cstr_ok(strtab, strtab_size, sym.st_name)) {
         munmap(mem_base, total_size);
         free(sec_offsets);
-        pthread_mutex_unlock(&bof_lock);
+        bof_lock_release();
         return set_err(err_buf, "invalid symbol name");
       }
       const char *sym_name = strtab + sym.st_name;
@@ -321,19 +332,19 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
       if (sym.st_shndx == SHN_UNDEF) {
         void *handle = beacon_api_lookup(sym_name);
         if (!handle) {
-          handle = dlsym(RTLD_DEFAULT, sym_name);
+          handle = beacon_host_dlsym(sym_name);
         }
         if (!handle) {
           munmap(mem_base, total_size);
           free(sec_offsets);
-          pthread_mutex_unlock(&bof_lock);
+          bof_lock_release();
           return set_errf(err_buf, "unresolved symbol: %s", sym_name);
         }
 
         if (next_trampoline >= 256) {
           munmap(mem_base, total_size);
           free(sec_offsets);
-          pthread_mutex_unlock(&bof_lock);
+          bof_lock_release();
           return set_err(err_buf,
                          "too many undefined symbols for trampoline limit");
         }
@@ -355,7 +366,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
             sym.st_value > shdrs[sym.st_shndx].sh_size) {
           munmap(mem_base, total_size);
           free(sec_offsets);
-          pthread_mutex_unlock(&bof_lock);
+          bof_lock_release();
           return set_err(err_buf, "invalid symbol section");
         }
         sym_addr =
@@ -378,7 +389,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
         if (val > 2147483647L || val < -2147483648L) {
           munmap(mem_base, total_size);
           free(sec_offsets);
-          pthread_mutex_unlock(&bof_lock);
+          bof_lock_release();
           return set_errf(err_buf,
                           "relocation overflow for symbol %s (type %u): "
                           "distance %ld exceeds 32 bits",
@@ -390,7 +401,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
       default:
         munmap(mem_base, total_size);
         free(sec_offsets);
-        pthread_mutex_unlock(&bof_lock);
+        bof_lock_release();
         return set_errf(err_buf, "unsupported relocation %u for symbol %s",
                         type, sym_name);
       }
@@ -421,7 +432,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
     if (mprotect((void *)start, prot_len, prot) < 0) {
       munmap(mem_base, total_size);
       free(sec_offsets);
-      pthread_mutex_unlock(&bof_lock);
+      bof_lock_release();
       return set_err(err_buf, "mprotect failed");
     }
   }
@@ -444,7 +455,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
           symtab[i].st_value > shdrs[symtab[i].st_shndx].sh_size) {
         munmap(mem_base, total_size);
         free(sec_offsets);
-        pthread_mutex_unlock(&bof_lock);
+        bof_lock_release();
         return set_err(err_buf, "invalid entry symbol");
       }
       entry_addr = (uintptr_t)mem_base + sec_offsets[symtab[i].st_shndx] +
@@ -456,7 +467,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
   if (!entry_addr) {
     munmap(mem_base, total_size);
     free(sec_offsets);
-    pthread_mutex_unlock(&bof_lock);
+    bof_lock_release();
     return set_errf(err_buf, "function %s not found", entry_name);
   }
 
@@ -506,7 +517,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
 
   munmap(mem_base, total_size);
   free(sec_offsets);
-  pthread_mutex_unlock(&bof_lock);
+  bof_lock_release();
   return status;
 }
 

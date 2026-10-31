@@ -21,6 +21,9 @@ typedef struct {
 /* Resolve a Beacon API name to the loader's implementation. */
 void *beacon_api_lookup(const char *name);
 
+/* Resolve a host symbol from libc. */
+void *beacon_host_dlsym(const char *name);
+
 /* Captured BeaconPrintf/BeaconOutput data. take transfers ownership. */
 void beacon_output_reset(void);
 char *beacon_output_take(void);

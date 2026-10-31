@@ -30,6 +30,22 @@ c2_status c2_coff_invocation_parse(const char *b64, size_t b64len,
                                    size_t tokens_cap, char *buf, size_t buf_cap,
                                    size_t *buf_used);
 
+/* One companion file of a multi-file module (ResolvedInvocation.ModuleFiles,
+ * key 10). Files are downloaded to encrypted memfs. */
+#define C2_MODULE_FILE_MAX 8
+typedef struct {
+  char name[256];
+  char mem_path[512];
+  char checksum[128];
+} c2_module_file;
+
+/*
+ * Decode `b64` and extract ResolvedInvocation.ModuleFiles (key 10). Returns
+ * C2_OK with *count entries, or a protocol error on malformed input.
+ */
+c2_status c2_module_files_parse(const char *b64, size_t b64len,
+                                c2_module_file *files, size_t *count);
+
 #ifdef __cplusplus
 }
 #endif

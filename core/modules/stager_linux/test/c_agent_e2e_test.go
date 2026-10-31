@@ -315,6 +315,22 @@ func runCAgentEndToEnd(t *testing.T, format string) {
 		t.Fatalf("custom_module output = %q\nAgent output:\n%s", got, agentOut.String())
 	}
 
+	// A portable BOF: the same SA_linux pwd source compiled as an RV32 ET_REL
+	// object, relocated by the interpreter against its embedded runtime.
+	rvBofInv := def.ResolvedInvocation{Coff: &def.ResolvedCoffInvocation{Export: "go"}}
+	rvBofBytes, err := cbor.Marshal(rvBofInv)
+	if err != nil {
+		t.Fatalf("marshal rv BOF invocation: %v", err)
+	}
+	rvBofB64 := base64.StdEncoding.EncodeToString(rvBofBytes)
+	rvBofChecksum := crypto.SHA256SumFile(filepath.Join(paths.WWWRoot, "sa_linux_pwd_rv.gz"))
+	rvBofCmd := fmt.Sprintf(
+		"!custom_module --mod_name sa_linux_pwd_rv --type rv --file_to_download sa_linux_pwd_rv.gz --checksum %s --invocation %s",
+		rvBofChecksum, strconv.Quote(rvBofB64))
+	if got := runC2Command(t, agent, doneChan, &agentOut, rvBofCmd); !strings.Contains(got, "/tmp") {
+		t.Fatalf("rv BOF custom_module output = %q\nAgent output:\n%s", got, agentOut.String())
+	}
+
 	// Regression: SA_linux BOFs with no parameters marshal a nil Args slice as
 	// CBOR null, and their BeaconDataParse callers expect the packed buffer to
 	// start with a body-length prefix. Both used to break C-agent execution.
@@ -493,6 +509,15 @@ func hostBOFModules(t *testing.T) {
 	}
 	host("modules/coffloader_linux", "coffloader_linux.so", "coffloader_linux.amd64.gz", coffArgs...)
 	host("modules/hello_linux", "hello_linux.o", "hello_linux.amd64.gz", helloArgs...)
+	// The RV32 interpreter serves host calls from libc, so it follows the
+	// agent's libc like coffloader_linux. The guest payloads are
+	// architecture-independent.
+	rvvmArgs := []string{}
+	if cAgentTestLibc() == "musl" {
+		rvvmArgs = append(rvvmArgs, "ZIG_TARGET=x86_64-linux-musl")
+	}
+	host("modules/rvvm", "rvvm_linux.so", "rvvm_linux.amd64.gz", rvvmArgs...)
+	host("modules/SA_linux", "SA/src/pwd.rv.o", "sa_linux_pwd_rv.gz", rvvmArgs...)
 	if cAgentTestLibc() != "musl" {
 		host("modules/SA_linux", "SA/src/pwd.o", "sa_linux_pwd.amd64.gz")
 		host("modules/SA_linux", "SA/src/cat.o", "sa_linux_cat.amd64.gz")

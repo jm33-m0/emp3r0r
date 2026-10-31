@@ -3,12 +3,8 @@
 package coffloader
 
 import (
-	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"runtime"
-	"strconv"
-	"unicode/utf16"
 	"unsafe"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/memdeps"
@@ -41,7 +37,7 @@ func RunLinuxCOFF(payload []byte, export string, args []CoffArg, _ uintptr) (str
 		return "", err
 	}
 
-	wire, err := packLinuxArgs(packedArgs)
+	wire, err := PackLinuxArgs(packedArgs)
 	if err != nil {
 		return "", err
 	}
@@ -116,73 +112,4 @@ func readCString(ptr uintptr) string {
 		buf = append(buf, b)
 	}
 	return string(buf)
-}
-
-// packLinuxArgs mirrors lighthouse.PackArgs for the subset used by PackCoffArgs.
-func packLinuxArgs(args []string) ([]byte, error) {
-	if len(args) == 0 {
-		return nil, nil
-	}
-
-	var body []byte
-	for _, arg := range args {
-		if arg == "" {
-			return nil, fmt.Errorf("empty arg")
-		}
-
-		switch arg[0] {
-		case 'b':
-			data, err := hex.DecodeString(arg[1:])
-			if err != nil {
-				return nil, fmt.Errorf("pack binary: %w", err)
-			}
-			body = appendU32(body, uint32(len(data)))
-			body = append(body, data...)
-		case 'i':
-			v, err := strconv.ParseInt(arg[1:], 10, 32)
-			if err != nil {
-				return nil, fmt.Errorf("pack int: %w", err)
-			}
-			body = appendU32(body, uint32(v))
-		case 's':
-			v, err := strconv.ParseInt(arg[1:], 10, 16)
-			if err != nil {
-				return nil, fmt.Errorf("pack short: %w", err)
-			}
-			body = appendU16(body, uint16(v))
-		case 'z':
-			// Narrow string. Match the Windows COFFLoader ABI: length-prefixed
-			// AND NUL-terminated, so BOFs that pass the extracted pointer to
-			// BeaconPrintf("%s") do not read past the argument.
-			b := append([]byte(arg[1:]), 0)
-			body = appendU32(body, uint32(len(b)))
-			body = append(body, b...)
-		case 'Z':
-			// Wide string: UTF-16LE plus a 2-byte terminator, matching the
-			// Windows packCString/utf16Bytes convention.
-			u := utf16.Encode([]rune(arg[1:]))
-			buf := make([]byte, len(u)*2+2)
-			for i, r := range u {
-				buf[i*2] = byte(r)
-				buf[i*2+1] = byte(r >> 8)
-			}
-			body = appendU32(body, uint32(len(buf)))
-			body = append(body, buf...)
-		default:
-			return nil, fmt.Errorf("unknown arg prefix %q", arg[0])
-		}
-	}
-
-	out := make([]byte, 4, 4+len(body))
-	binary.LittleEndian.PutUint32(out, uint32(len(body)))
-	out = append(out, body...)
-	return out, nil
-}
-
-func appendU32(b []byte, v uint32) []byte {
-	return append(b, byte(v), byte(v>>8), byte(v>>16), byte(v>>24))
-}
-
-func appendU16(b []byte, v uint16) []byte {
-	return append(b, byte(v), byte(v>>8))
 }

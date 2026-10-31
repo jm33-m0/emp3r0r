@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -71,6 +72,57 @@ func moduleCustom(ctx *c2context.C2Context) {
 		return
 	}
 
+	// --riscv: recompile the BOF for RV32 and dispatch it to the interpreter
+	// dependency. The manifest stays a normal COFF module; no separate
+	// portable module entry is needed.
+	if flagEnabled(ctx.Flags["riscv"]) {
+		if !strings.EqualFold(payload_type, "coff") {
+			logging.Errorf("--riscv is only supported for coff modules")
+			return
+		}
+		if ctx.Target == nil {
+			logging.Errorf("--riscv requires an active agent")
+			return
+		}
+		dep := rvvmDependency(config.Platform)
+		if dep == "" {
+			logging.Errorf("--riscv requires a Linux or Windows module")
+			return
+		}
+		if err := ensureModuleDependencyHosted(ctx, dep); err != nil {
+			logging.Errorf("Running %s as RISC-V on %s: %v", config.Name, ctx.Target.Tag, err)
+			return
+		}
+		if err := buildRiscvPayload(config, ctx.Flags); err != nil {
+			logging.Errorf("Running %s as RISC-V: %v", config.Name, err)
+			return
+		}
+		native := config.AgentConfig.Files[0]
+		archVariants := false
+		for _, f := range config.AgentConfig.Files {
+			if payloadArch(f) != "" {
+				archVariants = true
+				break
+			}
+		}
+		if archVariants {
+			native = selectArchPayload(config.AgentConfig.Files, agentArch(ctx))
+		}
+		rvFile := riscvPayloadPath(native)
+		if !util.IsFileExist(filepath.Join(config.Path, rvFile)) {
+			logging.Errorf("Running %s as RISC-V: %s was not produced by the build (add rv_build.sh or make the Makefile emit it)", config.Name, rvFile)
+			return
+		}
+		logging.Infof("Running %s as a RISC-V BOF (%s)", config.Name, rvFile)
+		handleInMemoryModule(ctx, *config, "rv", invocation, peerIP, &payloadOverride{
+			file:      rvFile,
+			hosted:    strings.ToLower(config.Name) + ".rv",
+			typ:       "rv",
+			libraries: config.RiscvLibraries,
+		})
+		return
+	}
+
 	// Pre-flight every dependency this module declares before building or
 	// dispatching it: each dependency is built (when it has a build step) and
 	// hosted for the target agent's arch first, so a dependency failure is
@@ -111,7 +163,7 @@ func moduleCustom(ctx *c2context.C2Context) {
 
 	// Every agent module runs in memory; there is no on-disk/fork-and-run
 	// path. handleInMemoryModule re-encodes the invocation for the agent.
-	handleInMemoryModule(ctx, *config, payload_type, invocation, peerIP)
+	handleInMemoryModule(ctx, *config, payload_type, invocation, peerIP, nil)
 }
 
 // moduleFilesMissing reports whether any payload the module declares is not
@@ -247,7 +299,92 @@ func getPeerIP(flags map[string]string) string {
 	return ""
 }
 
-func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, payload_type string, invocation def.ResolvedInvocation, peerIP string) {
+// payloadOverride replaces the payload selected from the manifest. It is used
+// by the --riscv path, where the C2 hosts a recompiled RV32 object instead of
+// the native BOF.
+type payloadOverride struct {
+	file      string
+	hosted    string
+	typ       string
+	libraries []string
+}
+
+// flagEnabled reports whether an injected boolean option is on.
+func flagEnabled(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
+}
+
+// rvvmDependency returns the interpreter dependency for a module platform.
+func rvvmDependency(platform string) string {
+	switch {
+	case def.IsLinuxPlatform(platform):
+		return "rvvm_linux"
+	case def.IsWindowsPlatform(platform):
+		return "rvvm_windows"
+	}
+	return ""
+}
+
+var bofArchObject = regexp.MustCompile(`(?i)\.(x64|x86|x86_64|amd64|386|aarch64|arm64)\.o$`)
+
+// riscvPayloadPath derives the RV32 object path from a native BOF path:
+// pwd.o -> pwd.rv.o, whoami.x64.o -> whoami.rv.o.
+func riscvPayloadPath(native string) string {
+	if bofArchObject.MatchString(native) {
+		return bofArchObject.ReplaceAllString(native, ".rv.o")
+	}
+	if strings.HasSuffix(strings.ToLower(native), ".o") {
+		return native[:len(native)-2] + ".rv.o"
+	}
+	return native + ".rv.o"
+}
+
+// buildRiscvPayload runs the module's RISC-V build. Modules can provide an
+// rv_build.sh; otherwise the normal build/make_all.sh runs with
+// EMP3R0R_BOF_ARCH=riscv32 so existing Makefiles can branch on it.
+func buildRiscvPayload(config *def.ModuleConfig, flags map[string]string) error {
+	env, err := moduleBuildEnv()
+	if err != nil {
+		return err
+	}
+	env = append(env, "EMP3R0R_BOF_ARCH=riscv32")
+
+	var command string
+	switch {
+	case util.IsFileExist(filepath.Join(config.Path, "rv_build.sh")):
+		command = "sh rv_build.sh"
+	case config.Build != "":
+		keys := make([]string, 0, len(flags))
+		for name := range flags {
+			keys = append(keys, name)
+		}
+		sort.Strings(keys)
+		for _, name := range keys {
+			command += " --" + name + " " + shellQuote(flags[name])
+		}
+		command = config.Build + command
+	case util.IsFileExist(filepath.Join(config.Path, "make_all.sh")):
+		command = "bash ./make_all.sh"
+	default:
+		return fmt.Errorf("module has no RISC-V build (add rv_build.sh)")
+	}
+
+	cmd := exec.Command("sh", "-c", command)
+	cmd.Dir = config.Path
+	cmd.Env = env
+	out, err := cmd.CombinedOutput()
+	logging.Infof("RISC-V build of %s:\n%s", config.Name, out)
+	if err != nil {
+		return fmt.Errorf("RISC-V build: %w", err)
+	}
+	return nil
+}
+
+func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, payload_type string, invocation def.ResolvedInvocation, peerIP string, override *payloadOverride) {
 	if len(config.AgentConfig.Files) == 0 {
 		logging.Errorf("No files found for module %s in %s", config.Name, config.Path)
 		return
@@ -260,18 +397,24 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 	// running under WoW64 on x64 Windows reports Arch "x64".
 	payloadFile := config.AgentConfig.Files[0]
 	hostedName := strings.ToLower(live.ActiveModule.Name)
-	archVariants := false
-	for _, f := range config.AgentConfig.Files {
-		if payloadArch(f) != "" {
-			archVariants = true
-			break
+	if override != nil {
+		payloadFile = override.file
+		hostedName = override.hosted
+		payload_type = override.typ
+	} else {
+		archVariants := false
+		for _, f := range config.AgentConfig.Files {
+			if payloadArch(f) != "" {
+				archVariants = true
+				break
+			}
 		}
-	}
-	if ctx.Target != nil && archVariants &&
-		(strings.EqualFold(payload_type, "dll") || strings.EqualFold(payload_type, "coff") || strings.EqualFold(payload_type, "so")) {
-		arch := agentArch(ctx)
-		payloadFile = selectArchPayload(config.AgentConfig.Files, arch)
-		hostedName = fmt.Sprintf("%s.%s", strings.ToLower(live.ActiveModule.Name), arch)
+		if ctx.Target != nil && archVariants &&
+			(strings.EqualFold(payload_type, "dll") || strings.EqualFold(payload_type, "coff") || strings.EqualFold(payload_type, "so")) {
+			arch := agentArch(ctx)
+			payloadFile = selectArchPayload(config.AgentConfig.Files, arch)
+			hostedName = fmt.Sprintf("%s.%s", strings.ToLower(live.ActiveModule.Name), arch)
+		}
 	}
 
 	// Multi-file modules: host every companion file (all entries except the
@@ -287,6 +430,17 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 			companion, err := hostModuleFile(live.ActiveModule.Name, file, filepath.Join(config.Path, file))
 			if err != nil {
 				logging.Errorf("Hosting companion file %s: %v", file, err)
+				return
+			}
+			invocation.ModuleFiles = append(invocation.ModuleFiles, companion)
+		}
+	}
+
+	if override != nil {
+		for _, lib := range override.libraries {
+			companion, err := hostModuleFile(config.Name, lib, filepath.Join(config.Path, lib))
+			if err != nil {
+				logging.Errorf("Hosting RISC-V library %s: %v", lib, err)
 				return
 			}
 			invocation.ModuleFiles = append(invocation.ModuleFiles, companion)
@@ -752,6 +906,7 @@ func registerModuleConfig(moduleDir string, config *def.ModuleConfig, copiedPath
 	// Without this, the Load inside updateModuleHelp always misses and the
 	// validated options are silently discarded.
 	def.InjectTokenOption(config)
+	def.InjectRiscvOption(config)
 	def.Modules.Store(config.Name, config)
 	if helpErr := updateModuleHelp(config); helpErr != nil {
 		def.Modules.Delete(config.Name) // rollback — don't expose a broken entry

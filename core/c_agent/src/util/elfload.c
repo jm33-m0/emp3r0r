@@ -126,13 +126,22 @@ struct elfload_module {
 };
 
 /* Host libraries searched for an undefined (imported) symbol. libc covers
- * glibc >= 2.34 and musl; libdl/libpthread cover older glibc. Both the soname
- * and the dashed real filename are listed because /proc/self/maps shows the
- * latter on RHEL/CentOS (libpthread-2.17.so, not libpthread.so.0). */
+ * glibc and musl; the soname and the dashed real filename are both listed
+ * because /proc/self/maps shows the latter on RHEL/CentOS. */
 static const char *const host_libs[] = {
-    "libc.so", "libc-",         "libc.musl",   "ld-musl",   "libdl.so",
-    "libdl-",  "libpthread.so", "libpthread-", "librt.so",  "librt-",
-    "libm.so", "libm-",         "libgcc_s.so", "libgcc_s-",
+    "libc.so", "libc-", "libc.musl",   "ld-musl",
+    "libm.so", "libm-", "libgcc_s.so", "libgcc_s-",
+};
+
+/* glibc before 2.34 keeps the dl* entry points in a separate library; libc
+ * exports the internal __libc_* equivalents. Resolve those instead. */
+static const struct {
+  const char *name;
+  const char *alias;
+} host_aliases[] = {
+    {"dlsym", "__libc_dlsym"},        {"__libc_dlsym", "dlsym"},
+    {"dlopen", "__libc_dlopen_mode"}, {"__libc_dlopen_mode", "dlopen"},
+    {"dlclose", "__libc_dlclose"},    {"__libc_dlclose", "dlclose"},
 };
 
 static void set_err(char *err, size_t cap, const char *msg) {
@@ -242,7 +251,7 @@ static void *ifunc_resolve(void *resolver) {
 #endif
 }
 
-static void *host_symbol(const char *name) {
+static void *lookup_host_libs(const char *name) {
   for (size_t i = 0; i < sizeof(host_libs) / sizeof(host_libs[0]); i++) {
     unsigned long end = 0;
     unsigned long base = dynload_find_module(host_libs[i], &end);
@@ -254,6 +263,17 @@ static void *host_symbol(const char *name) {
     if (addr == NULL)
       continue;
     return ((info & 0xf) == STT_GNU_IFUNC) ? ifunc_resolve(addr) : addr;
+  }
+  return NULL;
+}
+
+static void *host_symbol(const char *name) {
+  void *addr = lookup_host_libs(name);
+  if (addr != NULL)
+    return addr;
+  for (size_t i = 0; i < sizeof(host_aliases) / sizeof(host_aliases[0]); i++) {
+    if (strcmp(name, host_aliases[i].name) == 0)
+      return lookup_host_libs(host_aliases[i].alias);
   }
   return NULL;
 }

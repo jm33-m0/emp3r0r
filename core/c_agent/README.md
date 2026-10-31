@@ -62,6 +62,24 @@ agent calls it from its sleep cycle. The stub encrypts the agent's images,
 heap, and stack with a fresh key and restores them on wake. The agent closes
 the message tunnel before masking, so no network traffic happens while masked.
 
+### In-memory module runners
+
+Two dependency-backed runners execute module payloads in memory:
+
+- **BOF** (`BOF=1`, default): a Linux relocatable object is mapped and run by
+  the `coffloader_linux` dependency (`bof_run`), cached in memfs as
+  `memfs:///coffloader_linux.so`. Console command: `bof`.
+- **RV32IMA BOFs** (`RVVM=1`, default): an RV32 `ET_REL` BOF is interpreted
+  by the `rvvm_linux` dependency (`rv_run`), cached in memfs as
+  `memfs:///rvvm_linux.so`. The interpreter links libc dynamically for its
+  host-call services; the BOF runtime is freestanding. There is no standalone
+  `rv` command: an `rv` payload is always a BOF dispatched through
+  `!custom_module`. See [`docs/rvvm.md`](../../docs/rvvm.md).
+
+Both are reached by the C2's `!custom_module --type <coff|rv> ...` dispatch
+and share `src/module.c` (invocation decoding) and `src/util/elfload.c`. Set
+`BOF=0`/`RVVM=0` to compile either out.
+
 ### Output formats
 
 `agent` is a hosted executable, `so` is a PIC `ET_DYN` shared object exporting
@@ -92,7 +110,7 @@ requires `LIBC=musl`. `GLIBC_VERSION` and `DYNLOAD_MODE` tune the glibc build.
 ```sh
 make -C core/c_agent agent ARCH=arm64 LIBC=musl
 make -C core/c_agent agent CRYPTO=mbedtls GZIP=none TRANSPORT=http_raw
-make -C core/c_agent agent BOF=0
+make -C core/c_agent agent BOF=0 RVVM=0
 ```
 
 ### Config embedding

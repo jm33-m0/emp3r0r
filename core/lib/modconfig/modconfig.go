@@ -83,7 +83,8 @@ func ReadConfigs(file string) (configs []*def.ModuleConfig, err error) {
 		// ModuleFilesMemFS uploads and caches all companion files in
 		// encrypted memfs so multi-file starlark modules can read them via
 		// read_file("memfs:///...").
-		ModuleFilesMemFS bool `json:"module_files_memfs"`
+		ModuleFilesMemFS bool     `json:"module_files_memfs"`
+		RiscvLibraries   []string `json:"riscv_libraries"`
 	}
 
 	jsonData, err := os.ReadFile(file)
@@ -123,6 +124,7 @@ func ReadConfigs(file string) (configs []*def.ModuleConfig, err error) {
 		config.Invocation.DllEntry = raw.Invocation.DllEntry
 		config.Invocation.DllFileParam = raw.Invocation.DllFileParam
 		config.Dependencies = raw.Dependencies
+		config.RiscvLibraries = raw.RiscvLibraries
 
 		// Reject payload kinds the agent cannot run in-process. Only coff,
 		// starlark and dll are loadable from config.json; built-in Go modules
@@ -370,12 +372,11 @@ func ResolveInvocation(config *def.ModuleConfig, flags map[string]string) (def.R
 		return renderOptionValue(opt, val)
 	}
 
-	// Starlark is dynamically typed: its main(*args) receives positional
-	// strings and scripts coerce values themselves (int(), bool(), ...). BOF
-	// arg packing (type validation, zero-filling, dropping empty args) must
-	// not apply here, because dropping an empty optional arg would shift every
-	// subsequent positional argument.
-	isStarlark := strings.EqualFold(config.AgentConfig.Type, "starlark")
+	// Starlark modules receive a positional argument list: scripts coerce
+	// values themselves. BOF arg packing (type validation, zero-filling,
+	// dropping empty args) must not apply here, because dropping an empty
+	// optional arg would shift every subsequent positional argument.
+	isPositional := strings.EqualFold(config.AgentConfig.Type, "starlark")
 	rawVal := func(name string) (string, error) {
 		opt, val, err := lookupOpt(name)
 		if err != nil {
@@ -395,7 +396,7 @@ func ResolveInvocation(config *def.ModuleConfig, flags map[string]string) (def.R
 		case arg.Flag != "" && arg.Param != "":
 			var strVal string
 			var err error
-			if isStarlark {
+			if isPositional {
 				strVal, err = rawVal(arg.Param)
 			} else {
 				strVal, _, err = coerceVal(arg.Param)
@@ -403,14 +404,14 @@ func ResolveInvocation(config *def.ModuleConfig, flags map[string]string) (def.R
 			if err != nil {
 				return resolved, err
 			}
-			if !isStarlark && strVal == "" {
+			if !isPositional && strVal == "" {
 				continue
 			}
 			resolved.Argv = append(resolved.Argv, arg.Flag, strVal)
 		case arg.Param != "":
 			var strVal string
 			var err error
-			if isStarlark {
+			if isPositional {
 				strVal, err = rawVal(arg.Param)
 			} else {
 				strVal, _, err = coerceVal(arg.Param)
@@ -418,7 +419,7 @@ func ResolveInvocation(config *def.ModuleConfig, flags map[string]string) (def.R
 			if err != nil {
 				return resolved, err
 			}
-			if !isStarlark && strVal == "" {
+			if !isPositional && strVal == "" {
 				continue
 			}
 			resolved.Argv = append(resolved.Argv, strVal)

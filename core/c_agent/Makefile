@@ -64,8 +64,8 @@ endif
 #   libc_dl : __libc_dlopen_mode/__libc_dlsym/__libc_dlclose (glibc < 2.34)
 #   public  : dlopen/dlsym/dlclose (moved into libc.so.6 in glibc 2.34)
 #   auto    : resolve libc_dl, then fall back to the public names
-# musl only exports the public names (from the loader itself, no libdl), so
-# LIBC=musl defaults DYNLOAD_MODE to public.
+# musl only exports the public names, so LIBC=musl defaults DYNLOAD_MODE to
+# public.
 LIBC ?= glibc
 ifeq ($(LIBC),musl)
   DYNLOAD_MODE ?= public
@@ -90,9 +90,9 @@ endif
 # systems; use DYNLOAD_MODE=auto to build one binary that loads on both old and
 # new glibc.
 
-# musl has no libdl and no __libc_dlopen_mode/__libc_dlsym/__libc_dlclose: the
-# public dlopen/dlsym/dlclose are exported by the loader/libc segment itself
-# (see dynload_find_libc), so public is the only mode that can work.
+# musl has no __libc_dlopen_mode/__libc_dlsym/__libc_dlclose: the public
+# dlopen/dlsym/dlclose are exported by the loader/libc segment itself (see
+# dynload_find_libc), so public is the only mode that can work.
 ifeq ($(LIBC),musl)
   ifneq ($(DYNLOAD_MODE),public)
     $(error LIBC=musl only supports DYNLOAD_MODE=public, got '$(DYNLOAD_MODE)')
@@ -166,14 +166,27 @@ MINIZ_DEFS = -DMINIZ_NO_ARCHIVE_APIS -DMINIZ_NO_ARCHIVE_WRITING_APIS \
              -DMINIZ_NO_STDIO -DMINIZ_NO_ZLIB_APIS \
              -DMINIZ_NO_ZLIB_COMPATIBLE_NAMES
 
-# Optional BOF support. BOF=0 compiles out the COFF runner, its ELF loader and
-# the module-invocation parser; the corresponding command names then fall
-# through to the normal "unsupported command" reply.
+# In-memory module runners. BOF runs Linux relocatable objects through the
+# coffloader_linux dependency; RVVM runs RV32IMA guests through the rvvm_linux
+# dependency. Either can be compiled out; both share the invocation decoder
+# (src/module.c) and the in-memory ELF loader (src/util/elfload.c).
+#
+# BOF=0/RVVM=0 also drops the `bof`/`rv` console commands and the matching
+# `!custom_module` type; unsupported requests fall through to the normal
+# "unsupported command" reply.
 BOF ?= 1
+RVVM ?= 1
+BOF_SRC =
+RVVM_SRC =
+MODULE_SUPPORT_SRC =
 ifeq ($(BOF),1)
-  BOF_SRC = src/bof.c src/module.c src/util/elfload.c
-else
-  BOF_SRC =
+  BOF_SRC = src/bof.c
+endif
+ifeq ($(RVVM),1)
+  RVVM_SRC = src/rvvm.c
+endif
+ifneq ($(filter 1,$(BOF) $(RVVM)),)
+  MODULE_SUPPORT_SRC = src/module.c src/util/elfload.c src/bof_args.c
 endif
 
 # DoH is implemented by the raw-socket transports and by libssl (which reuses
@@ -217,7 +230,7 @@ PORTABLE_SRC = src/util/rc4.c src/util/packer.c src/util/dynload.c src/util/dynl
                src/messages.c src/agent_info.c src/config.c \
                src/secureconn.c src/session.c src/memfile.c \
                src/sysinfo.c src/agent_identity.c src/stager_iface.c \
-               $(BOF_SRC) $(DOH_SRC) \
+               $(BOF_SRC) $(RVVM_SRC) $(MODULE_SUPPORT_SRC) $(DOH_SRC) \
                $(GZIP_SRC) $(CRYPTO_SRC) $(TRANSPORT_SRC) $(TRANSPORT_SUPPORT_SRC) \
                $(EXTRA_SRC)
 
@@ -280,7 +293,7 @@ AGENT_CONFIG_SRC =
 ifneq ($(strip $(CONFIG_SRC)),)
   AGENT_CONFIG_SRC = $(CONFIG_SRC)
 endif
-AGENT_SRC = $(AGENT_COMMON_SRC) $(BOF_SRC) $(DOH_SRC) \
+AGENT_SRC = $(AGENT_COMMON_SRC) $(BOF_SRC) $(RVVM_SRC) $(MODULE_SUPPORT_SRC) $(DOH_SRC) \
             $(GZIP_SRC) $(CRYPTO_SRC) $(TRANSPORT_SRC) $(TRANSPORT_SUPPORT_SRC) \
             $(EXTRA_SRC) $(TINYCBOR_MIN_SRC) src/agent.c \
             $(AGENT_CONFIG_SRC)
@@ -290,6 +303,7 @@ AGENT_SRC = $(AGENT_COMMON_SRC) $(BOF_SRC) $(DOH_SRC) \
 # symbols, no build-id. -DNDEBUG drops assert machinery (and its __FILE__ and
 # message strings); the fuzzers keep asserts so an invariant violation is loud.
 AGENT_CFLAGS = -Os -DNDEBUG -DC2_AGENT_ENABLE_BOF=$(BOF) \
+               -DC2_AGENT_ENABLE_RVVM=$(RVVM) \
                -ffunction-sections -fdata-sections -fno-ident \
                -fno-asynchronous-unwind-tables -fno-unwind-tables \
                -fno-stack-protector -fvisibility=hidden
@@ -343,6 +357,25 @@ ifneq ($(wildcard $(BOF_MODULE_DIR)/loader_linux.c),)
   BOF_FUZZ = $(BUILD)/fuzz_bof
 endif
 
+# RV32 interpreter test: build the real rvvm_linux module and the guest
+# fixtures with the shipped zig, then run the guests through the module ABI.
+# Skipped when the module sources are absent (standalone checkout).
+RVVM_MODULE_DIR = ../modules/rvvm
+ZIG ?= zig
+# Portable BOF fixtures: RV32 ET_REL objects that the module relocates against
+# its embedded guest runtime.
+RVVM_BOF_CFLAGS = -target riscv32-linux-musl -mcpu=generic_rv32 -O2 -g0 \
+                  -fno-pic -mno-relax -msmall-data-limit=0 \
+                  -fno-asynchronous-unwind-tables -fno-unwind-tables \
+                  -fno-builtin -fno-stack-protector -fno-sanitize=all \
+                  -fvisibility=hidden
+RVVM_BOF_GUESTS = $(BUILD)/rv_bof.o $(BUILD)/rv_bof_bad.o $(BUILD)/rv_bof_win.o \
+                  $(BUILD)/rv_bof_lib.o $(BUILD)/rv_libanswer.o
+ifneq ($(wildcard $(RVVM_MODULE_DIR)/rvvm.c),)
+  RVVM_TEST = $(BUILD)/test_rvvm
+  RVVM_FUZZ = $(BUILD)/fuzz_rvvm
+endif
+
 test: $(BUILD)/test_strings $(BUILD)/test_rc4 $(BUILD)/test_packer \
       $(BUILD)/test_net_parse $(BUILD)/test_dynload $(BUILD)/test_maps \
       $(BUILD)/test_auth $(BUILD)/test_messages \
@@ -350,7 +383,7 @@ test: $(BUILD)/test_strings $(BUILD)/test_rc4 $(BUILD)/test_packer \
       $(BUILD)/test_sysinfo $(BUILD)/test_module \
       $(BUILD)/test_secureconn $(BUILD)/test_identity \
       $(BUILD)/test_stager_iface \
-      $(GZIP_TEST) $(BOF_TEST) \
+      $(GZIP_TEST) $(BOF_TEST) $(RVVM_TEST) \
       $(BUILD)/test_crypto_openssl
 	@set -e; for t in $^; do echo "--- $$t"; ./$$t; done
 
@@ -431,7 +464,9 @@ $(BUILD)/test_gzip: tests/test_gzip.c $(GZIP_SRC) $(EXTRA_SRC) \
                        src/common.c tests/test.h | $(BUILD)
 	$(HOSTCC) $(TEST_CFLAGS) $< $(GZIP_SRC) $(EXTRA_SRC) src/common.c -o $@
 
-$(BUILD)/coffloader_linux.so: $(BOF_MODULE_DIR)/loader_linux.c | $(BUILD)
+$(BUILD)/coffloader_linux.so: $(BOF_MODULE_DIR)/loader_linux.c \
+                                   $(BOF_MODULE_DIR)/beacon_compat.c \
+                                   $(BOF_MODULE_DIR)/Makefile | $(BUILD)
 	$(MAKE) -C $(BOF_MODULE_DIR) >/dev/null
 	cp $(BOF_MODULE_DIR)/coffloader_linux.so $@
 	$(MAKE) -C $(BOF_MODULE_DIR) clean >/dev/null
@@ -441,13 +476,13 @@ $(BUILD)/hello_linux.o: $(BOF_HELLO_DIR)/hello_linux.c | $(BUILD)
 	cp $(BOF_HELLO_DIR)/hello_linux.o $@
 	$(MAKE) -C $(BOF_HELLO_DIR) clean >/dev/null
 
-$(BUILD)/test_bof: tests/test_bof.c src/bof.c src/util/dynload.c \
+$(BUILD)/test_bof: tests/test_bof.c src/bof.c src/bof_args.c src/util/dynload.c \
                       src/util/elfload.c $(BUILD)/coffloader_linux.so \
                       $(BUILD)/hello_linux.o tests/test.h | $(BUILD)
 	$(HOSTCC) $(TEST_CFLAGS) \
 	  -DBOF_LOADER_PATH='"$(BUILD)/coffloader_linux.so"' \
 	  -DBOF_OBJ_PATH='"$(BUILD)/hello_linux.o"' \
-	  tests/test_bof.c src/bof.c src/util/dynload.c \
+	  tests/test_bof.c src/bof.c src/bof_args.c src/util/dynload.c \
 	  src/util/elfload.c -o $@
 
 $(BUILD)/test_elfload: tests/test_elfload.c src/util/elfload.c \
@@ -463,6 +498,38 @@ $(BUILD)/test_elfload: tests/test_elfload.c src/util/elfload.c \
 # to resolve before it can reach the constructor.
 $(BUILD)/faulty_ctor.so: tests/faulty_ctor.c | $(BUILD)
 	$(HOSTCC) -shared -fPIC -O0 -nostdlib -o $@ $<
+
+$(BUILD)/rvvm_linux.so: $(RVVM_MODULE_DIR)/rvvm.c | $(BUILD)
+	$(MAKE) -C $(RVVM_MODULE_DIR) >/dev/null
+	cp $(RVVM_MODULE_DIR)/rvvm_linux.so $@
+	$(MAKE) -C $(RVVM_MODULE_DIR) clean >/dev/null
+
+$(BUILD)/rv_bof.o: $(RVVM_MODULE_DIR)/tests/guests/bof.c | $(BUILD)
+	$(ZIG) cc $(RVVM_BOF_CFLAGS) -c -o $@ $<
+
+$(BUILD)/rv_bof_bad.o: $(RVVM_MODULE_DIR)/tests/guests/bof_bad.c | $(BUILD)
+	$(ZIG) cc $(RVVM_BOF_CFLAGS) -c -o $@ $<
+
+$(BUILD)/rv_bof_win.o: $(RVVM_MODULE_DIR)/tests/guests/bof_win.c | $(BUILD)
+	$(ZIG) cc $(RVVM_BOF_CFLAGS) -c -o $@ $<
+
+$(BUILD)/rv_bof_lib.o: $(RVVM_MODULE_DIR)/tests/guests/bof_lib.c | $(BUILD)
+	$(ZIG) cc $(RVVM_BOF_CFLAGS) -c -o $@ $<
+
+$(BUILD)/rv_libanswer.o: $(RVVM_MODULE_DIR)/tests/guests/libanswer.c | $(BUILD)
+	$(ZIG) cc $(RVVM_BOF_CFLAGS) -c -o $@ $<
+
+$(BUILD)/test_rvvm: tests/test_rvvm.c $(BUILD)/rvvm_linux.so \
+                      $(RVVM_BOF_GUESTS) tests/test.h | $(BUILD)
+	$(HOSTCC) $(TEST_CFLAGS) \
+	  -DRVVM_MODULE_PATH='"$(BUILD)/rvvm_linux.so"' \
+	  -DRVVM_BOF_PATH='"$(BUILD)/rv_bof.o"' \
+	  -DRVVM_BOF_BAD_PATH='"$(BUILD)/rv_bof_bad.o"' \
+	  -DRVVM_BOF_WIN_PATH='"$(BUILD)/rv_bof_win.o"' \
+	  -DRVVM_BOF_LIB_PATH='"$(BUILD)/rv_bof_lib.o"' \
+	  -DRVVM_LIBANSWER_PATH='"$(BUILD)/rv_libanswer.o"' \
+	  tests/test_rvvm.c src/util/elfload.c src/util/dynload.c \
+	  src/util/dynload_hosted.c -o $@
 
 $(BUILD)/test_module: tests/test_module.c tests/test.h \
                        src/module.c src/common.c \
@@ -542,7 +609,7 @@ fuzz: $(BUILD)/fuzz_rc4 $(BUILD)/fuzz_packer $(BUILD)/fuzz_inet_aton \
       $(BUILD)/fuzz_config_decrypt $(BUILD)/fuzz_session \
       $(BUILD)/fuzz_command_args $(BUILD)/fuzz_http_poll \
       $(BUILD)/fuzz_secureconn $(BUILD)/fuzz_text $(BUILD)/fuzz_encdec \
-      $(GZIP_FUZZ) $(BOF_FUZZ) $(BUILD)/fuzz_dynload $(BUILD)/fuzz_maps \
+      $(GZIP_FUZZ) $(BOF_FUZZ) $(RVVM_FUZZ) $(BUILD)/fuzz_dynload $(BUILD)/fuzz_maps \
       $(BUILD)/fuzz_mask_maps $(BUILD)/fuzz_mask_ranges \
       $(BUILD)/fuzz_module $(BUILD)/fuzz_strings $(BUILD)/fuzz_elfload \
       $(BUILD)/fuzz_doh $(BUILD)/fuzz_http_raw $(BUILD)/fuzz_lzss
@@ -624,6 +691,20 @@ $(BUILD)/fuzz_bof: fuzz/fuzz_bof.c $(FUZZ_DRIVER) src/bof.c \
 	$(HOSTCC) $(FUZZ_CFLAGS) -DELFLOAD_NO_EXEC \
 		-DFUZZ_BOF_LOADER='"$(BUILD)/coffloader_linux.so"' \
 		$< $(FUZZ_DRIVER) src/bof.c src/util/dynload.c src/util/elfload.c -o $@
+
+$(RVVM_MODULE_DIR)/runtime/rv_bof_runtime_blob.c: $(RVVM_MODULE_DIR)/runtime/rv_bof_runtime.c
+	$(MAKE) -C $(RVVM_MODULE_DIR) runtime/rv_bof_runtime_blob.c
+
+$(BUILD)/fuzz_rvvm: fuzz/fuzz_rvvm.c $(FUZZ_DRIVER) $(RVVM_MODULE_DIR)/rvvm.c \
+                    $(RVVM_MODULE_DIR)/rv_host_posix.c \
+                    $(RVVM_MODULE_DIR)/runtime/rv_bof_runtime_blob.c \
+                    $(BUILD)/rv_bof.o fuzz/fuzz_common.h | $(BUILD)
+	$(HOSTCC) $(FUZZ_CFLAGS) -I$(RVVM_MODULE_DIR)/include \
+	  -DRV_RAM_SIZE=2097152 -DRV_MAX_INSNS=20000 \
+	  -DRVVM_SEED='"$(BUILD)/rv_bof.o"' \
+	  $< $(FUZZ_DRIVER) $(RVVM_MODULE_DIR)/rvvm.c \
+	  $(RVVM_MODULE_DIR)/rv_host_posix.c \
+	  $(RVVM_MODULE_DIR)/runtime/rv_bof_runtime_blob.c -o $@
 
 $(BUILD)/fuzz_dynload: fuzz/fuzz_dynload.c $(FUZZ_DRIVER) src/util/dynload.c fuzz/fuzz_common.h | $(BUILD)
 	$(HOSTCC) $(FUZZ_CFLAGS) $< $(FUZZ_DRIVER) src/util/dynload.c -o $@

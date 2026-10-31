@@ -3,6 +3,7 @@ package operator
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/carapace-sh/carapace"
@@ -80,15 +81,12 @@ func addModuleCommands(rootCmd *cobra.Command) {
 				if opt.Required {
 					help = strings.TrimSpace(help + " [required]")
 				}
-				cmd.Flags().String(opt.Name, opt.Val, help)
-				// Boolean options are documented and used as bare switches
-				// (e.g. `--disable`). A string flag otherwise demands a value,
-				// so give it a NoOptDefVal; `--flag=false` still works for an
-				// explicit value.
+				// Boolean options are real switches (`--riscv`), not
+				// `--riscv 1`; `--riscv=false` remains available.
 				if strings.EqualFold(opt.Type, "bool") {
-					if flag := cmd.Flags().Lookup(opt.Name); flag != nil {
-						flag.NoOptDefVal = "true"
-					}
+					cmd.Flags().Bool(opt.Name, moduleBoolDefault(opt.Val), help)
+				} else {
+					cmd.Flags().String(opt.Name, opt.Val, help)
 				}
 				if len(opt.Vals) > 0 {
 					vals := append([]string(nil), opt.Vals...)
@@ -131,6 +129,15 @@ func runModuleByName(cmd *cobra.Command, modName string) {
 		// regenerated before each invocation, so an omitted flag already holds
 		// its JSON default; we read it and never write it back into the shared
 		// module config (Options.Val stays pristine).
+		if flag.Value.Type() == "bool" {
+			b, err := cmd.Flags().GetBool(optName)
+			if err != nil {
+				logging.Errorf("module %s: read flag %s: %v", mod.Name, optName, err)
+				continue
+			}
+			runtimeFlags[optName] = strconv.FormatBool(b)
+			continue
+		}
 		val, err := cmd.Flags().GetString(optName)
 		if err != nil {
 			logging.Errorf("module %s: read flag %s: %v", mod.Name, optName, err)
@@ -170,4 +177,13 @@ func cmdSearchModule(cmd *cobra.Command, args []string) {
 	tableStr := cli.BuildTable([]string{"Module", "Description"}, row)
 	cli.AdaptiveTable(tableStr)
 	logging.Infof("\n%s", tableStr)
+}
+
+// moduleBoolDefault turns a manifest's boolean default string into a bool.
+func moduleBoolDefault(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
 }

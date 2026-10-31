@@ -3,13 +3,15 @@
  * Adapted from TrustedSec ELFLoader's beacon_compatibility.c (BSD; see
  * core/modules/SA_linux/LICENSE.txt), with bounds checks and a working reset.
  */
-#include <dlfcn.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#if !defined(__GLIBC__)
+#include <dlfcn.h>
+#endif
 
 #include "beacon_compat.h"
 
@@ -241,11 +243,31 @@ char *BeaconDataExtract(datap *parser, int *size) {
   return out;
 }
 
+#if defined(__GLIBC__)
+extern void *__libc_dlopen_mode(const char *name, int mode);
+extern void *__libc_dlsym(void *handle, const char *name);
+#define C2_DLOPEN(name, mode) __libc_dlopen_mode(name, mode)
+#define C2_DLSYM(handle, name) __libc_dlsym(handle, name)
+#else
+#define C2_DLOPEN(name, mode) dlopen(name, mode)
+#define C2_DLSYM(handle, name) dlsym(handle, name)
+#endif
+
+void *beacon_host_dlsym(const char *name) {
+  static void *libc;
+  if (libc == NULL) {
+#if defined(__GLIBC__)
+    /* __libc_dlopen_mode has no NULL/global handle; open libc itself. */
+    libc = C2_DLOPEN("libc.so.6", 1);
+#else
+    libc = C2_DLOPEN(NULL, 1);
+#endif
+  }
+  return libc != NULL ? C2_DLSYM(libc, name) : NULL;
+}
+
 static char **get_environ(void) {
-  /* Resolve the data symbol through dlsym instead of taking a direct
-   * relocation on `environ`: the C agent's in-memory ELF loader resolves
-   * function imports from host libc but not weak data symbols. */
-  char ***envp = (char ***)dlsym(RTLD_DEFAULT, "environ");
+  char ***envp = (char ***)beacon_host_dlsym("environ");
   return envp != NULL ? *envp : NULL;
 }
 static const char *get_os_name(void) {

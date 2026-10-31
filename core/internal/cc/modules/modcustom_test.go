@@ -1450,3 +1450,31 @@ func TestHostDeclaredDependencies(t *testing.T) {
 		t.Fatalf("hosted loader mismatch: got %q", got)
 	}
 }
+
+func TestRiscvPayloadPath(t *testing.T) {
+	cases := map[string]string{
+		"SA/src/pwd.o":           "SA/src/pwd.rv.o",
+		"SA/whoami/whoami.x64.o": "SA/whoami/whoami.rv.o",
+		"SA/whoami/whoami.x86.o": "SA/whoami/whoami.rv.o",
+		"SA/foo/foo.aarch64.o":   "SA/foo/foo.rv.o",
+		"SA/foo/bar.o":           "SA/foo/bar.rv.o",
+	}
+	for in, want := range cases {
+		if got := riscvPayloadPath(in); got != want {
+			t.Errorf("riscvPayloadPath(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestFlagEnabled(t *testing.T) {
+	for _, on := range []string{"1", "true", "TRUE", "yes", "on"} {
+		if !flagEnabled(on) {
+			t.Errorf("flagEnabled(%q) = false, want true", on)
+		}
+	}
+	for _, off := range []string{"", "0", "false", "no", "off", "2"} {
+		if flagEnabled(off) {
+			t.Errorf("flagEnabled(%q) = true, want false", off)
+		}
+	}
+}

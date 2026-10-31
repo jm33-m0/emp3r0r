@@ -65,7 +65,8 @@ Examples:
 	cmd.Flags().String("transport", builder.CAgentTransportProviders[0], fmt.Sprintf("Transport provider. Available: %v", builder.CAgentTransportProviders))
 	cmd.Flags().String("dynload", builder.CAgentDynloadModes[0], fmt.Sprintf("libc dynamic-loader symbols. Available: %v", builder.CAgentDynloadModes))
 	cmd.Flags().String("glibc-version", builder.CAgentGlibcVersions[0], fmt.Sprintf("Oldest glibc ABI to link against. Available: %v", builder.CAgentGlibcVersions))
-	cmd.Flags().String("bof", "1", "Include COFF/BOF support (1) or compile it out (0)")
+	cmd.Flags().Bool("bof", true, "Include COFF/BOF support (--bof=false compiles it out)")
+	cmd.Flags().Bool("rvvm", true, "Include RISC-V BOF support (--rvvm=false compiles it out)")
 	cmd.Flags().Int("interval", 60, "C2 beacon interval in seconds")
 	cmd.Flags().Int("jitter", 50, "Beacon jitter percentage (0-100); sleeps in [interval*(1-jitter%), interval]")
 	cmd.Flags().Int("poll-window", 5, "Seconds to wait for commands after hello before entering masked sleep")
@@ -86,7 +87,6 @@ Examples:
 		"transport":       carapace.ActionValues(builder.CAgentTransportProviders...),
 		"dynload":         carapace.ActionValues(builder.CAgentDynloadModes...),
 		"glibc-version":   carapace.ActionValues(builder.CAgentGlibcVersions...),
-		"bof":             carapace.ActionValues("1", "0"),
 		"interval":        carapace.ActionValues("30", "60", "120", "300"),
 		"jitter":          carapace.ActionValues("0", "20", "50"),
 		"poll-window":     carapace.ActionValues("1", "5", "10", "30"),
@@ -153,7 +153,8 @@ func CmdGenerateCAgent(cmd *cobra.Command, _ []string) {
 		Libc:                 libc,
 		Arch:                 flagString(cmd, "arch"),
 		Format:               flagString(cmd, "format"),
-		Bof:                  flagString(cmd, "bof"),
+		Bof:                  boolProvider(flagBool(cmd, "bof")),
+		Rvvm:                 boolProvider(flagBool(cmd, "rvvm")),
 		AllowCustomTransport: allowCustom,
 	}
 	opts := builder.AgentConfig{
@@ -211,6 +212,19 @@ func cAgentStagerMode(format string) bool {
 func flagString(cmd *cobra.Command, name string) string {
 	v, _ := cmd.Flags().GetString(name)
 	return v
+}
+
+func flagBool(cmd *cobra.Command, name string) bool {
+	v, _ := cmd.Flags().GetBool(name)
+	return v
+}
+
+// boolProvider renders a boolean CLI switch as the Makefile's 0/1 provider.
+func boolProvider(b bool) string {
+	if b {
+		return "1"
+	}
+	return "0"
 }
 
 // cAgentDynloadForLibc follows the selected libc when the operator did not pick

@@ -31,6 +31,7 @@ only inside the callback and must not escape.
 | Windows COFF/BOF loader | `coffloader.RunCOFFDependency` → `Use("coffloader", …)` |
 | `dll` module payloads | `coffloader.RunWindowsCOFFViaDLL` → `Run(dllData, …)` |
 | Linux eBPF builtins | `libbpf.WithLibrary` → `Use("libbpf", …)` |
+| `rv` BOF modules | `rvvm.RunRiscvBof` → `Use("rvvm_linux"/"rvvm_windows", …)` |
 
 Scripts that call `mem_load_library` directly are covered separately: their
 handles live in a per-run registry and `script.Run` calls `releaseRunModules`

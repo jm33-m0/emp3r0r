@@ -129,6 +129,29 @@ static c2_status coff_arg_token(CborValue *v, char wire, char *buf, size_t cap,
   return C2_OK;
 }
 
+/* Decode the base64 CBOR ResolvedInvocation (standard or URL-safe alphabet)
+ * into a root iterator. On success *rawp is malloc'd and the caller frees it;
+ * the iterator borrows that buffer. */
+static c2_status invocation_open(const char *b64, size_t b64len, uint8_t **rawp,
+                                 CborParser *p, CborValue *it) {
+  size_t raw_cap = b64len / 4 * 3 + 4;
+  uint8_t *raw = (uint8_t *)malloc(raw_cap);
+  if (raw == NULL)
+    return C2_ERR_NOMEM;
+  size_t raw_len = 0;
+  c2_status st = c2_base64url_decode(b64, b64len, raw, raw_cap, &raw_len);
+  if (st != C2_OK) {
+    free(raw);
+    return st;
+  }
+  if (cbor_parser_init(raw, raw_len, 0, p, it) != CborNoError) {
+    free(raw);
+    return C2_ERR_PROTO;
+  }
+  *rawp = raw;
+  return C2_OK;
+}
+
 c2_status c2_coff_invocation_parse(const char *b64, size_t b64len,
                                    char *export_name, size_t export_cap,
                                    c2_str *tokens, size_t *tokenc,
@@ -142,23 +165,12 @@ c2_status c2_coff_invocation_parse(const char *b64, size_t b64len,
   if (export_cap > 0)
     export_name[0] = '\0';
 
-  size_t raw_cap = b64len / 4 * 3 + 4;
-  uint8_t *raw = (uint8_t *)malloc(raw_cap);
-  if (raw == NULL)
-    return C2_ERR_NOMEM;
-  size_t raw_len = 0;
-  c2_status st = c2_base64url_decode(b64, b64len, raw, raw_cap, &raw_len);
-  if (st != C2_OK) {
-    free(raw);
-    return st;
-  }
-
+  uint8_t *raw = NULL;
   CborParser p;
   CborValue it;
-  if (cbor_parser_init(raw, raw_len, 0, &p, &it) != CborNoError) {
-    free(raw);
-    return C2_ERR_PROTO;
-  }
+  c2_status st = invocation_open(b64, b64len, &raw, &p, &it);
+  if (st != C2_OK)
+    return st;
 
   CborValue map;
   st = c2_cbor_map_enter(&it, &map);
@@ -274,6 +286,115 @@ c2_status c2_coff_invocation_parse(const char *b64, size_t b64len,
       st = c2_cbor_dc(cbor_value_leave_container(&map, &coff));
     if (st != C2_OK)
       break;
+  }
+  if (st == C2_OK)
+    st = c2_cbor_dc(cbor_value_leave_container(&it, &map));
+  free(raw);
+  return st;
+}
+
+/*
+ * ResolvedInvocation.ModuleFiles (key 10) lists companion files hosted for a
+ * multi-file module. Each entry is { Name(1), MemPath(2), Checksum(3) }.
+ */
+c2_status c2_module_files_parse(const char *b64, size_t b64len,
+                                c2_module_file *files, size_t *count) {
+  if (b64 == NULL || files == NULL || count == NULL)
+    return C2_ERR_ARG;
+  *count = 0;
+
+  uint8_t *raw = NULL;
+  CborParser p;
+  CborValue it;
+  c2_status st = invocation_open(b64, b64len, &raw, &p, &it);
+  if (st != C2_OK)
+    return st;
+
+  CborValue map;
+  st = c2_cbor_map_enter(&it, &map);
+  if (st != C2_OK) {
+    free(raw);
+    return st;
+  }
+
+  int done = 0;
+  uint64_t key = 0;
+  while ((st = c2_cbor_map_key(&map, &key, &done)) == C2_OK && !done) {
+    if (key != 10) {
+      st = c2_cbor_map_skip(&map);
+      if (st != C2_OK)
+        break;
+      continue;
+    }
+    if (cbor_value_is_null(&map)) {
+      st = c2_cbor_map_skip(&map);
+      if (st != C2_OK)
+        break;
+      continue;
+    }
+    if (!cbor_value_is_array(&map)) {
+      st = C2_ERR_PROTO;
+      break;
+    }
+    CborValue arr;
+    st = c2_cbor_dc(cbor_value_enter_container(&map, &arr));
+    if (st != C2_OK)
+      break;
+    while (!cbor_value_at_end(&arr)) {
+      if (*count >= C2_MODULE_FILE_MAX || !cbor_value_is_map(&arr)) {
+        st = (*count >= C2_MODULE_FILE_MAX) ? C2_ERR_NOMEM : C2_ERR_PROTO;
+        break;
+      }
+      c2_module_file *f = &files[*count];
+      memset(f, 0, sizeof(*f));
+      CborValue m;
+      st = c2_cbor_map_enter(&arr, &m);
+      if (st != C2_OK)
+        break;
+      int mdone = 0;
+      uint64_t mkey = 0;
+      while ((st = c2_cbor_map_key(&m, &mkey, &mdone)) == C2_OK && !mdone) {
+        c2_str v;
+        char *dst = NULL;
+        size_t cap = 0;
+        switch (mkey) {
+        case 1:
+          dst = f->name;
+          cap = sizeof(f->name);
+          break;
+        case 2:
+          dst = f->mem_path;
+          cap = sizeof(f->mem_path);
+          break;
+        case 3:
+          dst = f->checksum;
+          cap = sizeof(f->checksum);
+          break;
+        default:
+          st = c2_cbor_map_skip(&m);
+          if (st != C2_OK)
+            break;
+          continue;
+        }
+        st = c2_cbor_read_text(&m, &v);
+        if (st != C2_OK)
+          break;
+        if (v.len >= cap)
+          v.len = cap - 1;
+        memcpy(dst, v.ptr, v.len);
+        dst[v.len] = '\0';
+      }
+      if (st == C2_OK)
+        st = c2_cbor_dc(cbor_value_leave_container(&arr, &m));
+      if (st != C2_OK)
+        break;
+      (*count)++;
+    }
+    if (st == C2_OK)
+      st = c2_cbor_dc(cbor_value_leave_container(&map, &arr));
+    if (st != C2_OK)
+      break;
+    /* Keep consuming later keys (SessionUser, Ticket, ...). */
   }
   if (st == C2_OK)
     st = c2_cbor_dc(cbor_value_leave_container(&it, &map));

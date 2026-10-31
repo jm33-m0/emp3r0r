@@ -55,6 +55,7 @@ type CAgentProviders struct {
 	Arch      string // ARCH=
 	Format    string // exe|so|shellcode (post-build artifact)
 	Bof       string // BOF=0|1 (1 keeps the COFF/BOF command surface)
+	Rvvm      string // RVVM=0|1 (1 keeps the RISC-V guest command surface)
 
 	// AllowCustomTransport lets Transport name a provider the operator added
 	// under src/transport/ instead of one of the built-in providers.
@@ -81,6 +82,7 @@ func cAgentProviderSpecs(p CAgentProviders) []cAgentProviderSpec {
 		{group: "glibc", varname: "GLIBC_VERSION", value: p.Glibc, allowed: CAgentGlibcVersions},
 		{group: "libc", varname: "LIBC", value: p.Libc, allowed: CAgentLibcs},
 		{group: "bof", varname: "BOF", value: p.Bof, allowed: []string{"0", "1"}},
+		{group: "rvvm", varname: "RVVM", value: p.Rvvm, allowed: []string{"0", "1"}},
 	}
 }
 

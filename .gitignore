@@ -260,6 +260,7 @@ downloader_blob.h
 
 # AI agent
 project_knowledge.md
+*.diff
 
 # Sqlite
 *.sqlite
