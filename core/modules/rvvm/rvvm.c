@@ -442,7 +442,8 @@ static size_t rv_name_len(const char *s, size_t avail) {
   return n;
 }
 
-/* Strip the Windows BOF module prefix (KERNEL32$VirtualAlloc -> VirtualAlloc). */
+/* Strip the Windows BOF module prefix (KERNEL32$VirtualAlloc -> VirtualAlloc).
+ */
 static const char *rv_strip_module(const char *name, size_t avail,
                                    size_t *out) {
   for (size_t i = 0; i < avail; i++) {
@@ -976,13 +977,9 @@ RV_EXPORT char *rv_run(const uint8_t *image, size_t len, const char *entry,
   return rv_out;
 }
 
-RV_EXPORT const char *rv_last_error(void) {
-  return rv_err;
-}
+RV_EXPORT const char *rv_last_error(void) { return rv_err; }
 
-RV_EXPORT int rv_exit_code(void) {
-  return rv_guest_status;
-}
+RV_EXPORT int rv_exit_code(void) { return rv_guest_status; }
 
 RV_EXPORT void rv_free(char *out) {
   (void)out; /* the output buffer is static */

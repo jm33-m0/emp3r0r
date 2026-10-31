@@ -231,12 +231,8 @@ unsigned long strtoul(const char *s, char **end, int base) {
   return (unsigned long)strtol(s, end, base);
 }
 
-int atoi(const char *s) {
-  return (int)strtol(s, NULL, 10);
-}
-long atol(const char *s) {
-  return strtol(s, NULL, 10);
-}
+int atoi(const char *s) { return (int)strtol(s, NULL, 10); }
+long atol(const char *s) { return strtol(s, NULL, 10); }
 
 /* ------------------------------------------------------------------------- */
 /* errno / process                                                           */
@@ -247,16 +243,10 @@ int *__errno_location(void) {
   return &host_errno;
 }
 
-void exit(int code) {
-  rv_guest_exit(code);
-}
-void _Exit(int code) {
-  rv_guest_exit(code);
-}
+void exit(int code) { rv_guest_exit(code); }
+void _Exit(int code) { rv_guest_exit(code); }
 
-void abort(void) {
-  rv_guest_exit(134);
-}
+void abort(void) { rv_guest_exit(134); }
 
 /* ------------------------------------------------------------------------- */
 /* Memory / strings                                                          */
@@ -300,9 +290,7 @@ int memcmp(const void *a, const void *b, size_t n) {
   return 0;
 }
 
-int bcmp(const void *a, const void *b, size_t n) {
-  return memcmp(a, b, n);
-}
+int bcmp(const void *a, const void *b, size_t n) { return memcmp(a, b, n); }
 
 size_t strlen(const char *s) {
   size_t n = 0;
@@ -464,9 +452,7 @@ void *calloc(size_t n, size_t size) {
   return p;
 }
 
-void free(void *p) {
-  (void)p;
-}
+void free(void *p) { (void)p; }
 
 void *realloc(void *p, size_t n) {
   if (p == NULL)
@@ -659,12 +645,8 @@ int fflush(FILE *f) {
   return 0;
 }
 
-int feof(FILE *f) {
-  return f != NULL ? f->eof : 0;
-}
-int ferror(FILE *f) {
-  return f != NULL ? f->err : 0;
-}
+int feof(FILE *f) { return f != NULL ? f->eof : 0; }
+int ferror(FILE *f) { return f != NULL ? f->err : 0; }
 void clearerr(FILE *f) {
   if (f != NULL) {
     f->eof = 0;
@@ -691,9 +673,7 @@ long ftell(FILE *f) {
   return r < 0 ? -1 : (long)r;
 }
 
-void rewind(FILE *f) {
-  (void)fseek(f, 0, RV_SEEK_SET);
-}
+void rewind(FILE *f) { (void)fseek(f, 0, RV_SEEK_SET); }
 
 char *fgets(char *s, int n, FILE *f) {
   if (s == NULL || n <= 0)
@@ -719,21 +699,15 @@ int fgetc(FILE *f) {
   return f->rbuf[f->rpos++];
 }
 
-int getc(FILE *f) {
-  return fgetc(f);
-}
+int getc(FILE *f) { return fgetc(f); }
 
 int fputc(int c, FILE *f) {
   unsigned char b = (unsigned char)c;
   return rv_write_all(f->fd, &b, 1) < 0 ? -1 : b;
 }
 
-int putchar(int c) {
-  return fputc(c, stdout);
-}
-int putc(int c, FILE *f) {
-  return fputc(c, f);
-}
+int putchar(int c) { return fputc(c, stdout); }
+int putc(int c, FILE *f) { return fputc(c, f); }
 
 int fputs(const char *s, FILE *f) {
   size_t n = strlen(s);
@@ -1220,21 +1194,11 @@ int usleep(unsigned int usec) {
   return 0;
 }
 
-uid_t getuid(void) {
-  return (uid_t)rv_hostcall(RV_HC_GETUID, 0, 0, 0, 0);
-}
-uid_t geteuid(void) {
-  return (uid_t)rv_hostcall(RV_HC_GETEUID, 0, 0, 0, 0);
-}
-gid_t getgid(void) {
-  return (gid_t)rv_hostcall(RV_HC_GETGID, 0, 0, 0, 0);
-}
-gid_t getegid(void) {
-  return (gid_t)rv_hostcall(RV_HC_GETEGID, 0, 0, 0, 0);
-}
-pid_t getpid(void) {
-  return (pid_t)rv_hostcall(RV_HC_GETPID, 0, 0, 0, 0);
-}
+uid_t getuid(void) { return (uid_t)rv_hostcall(RV_HC_GETUID, 0, 0, 0, 0); }
+uid_t geteuid(void) { return (uid_t)rv_hostcall(RV_HC_GETEUID, 0, 0, 0, 0); }
+gid_t getgid(void) { return (gid_t)rv_hostcall(RV_HC_GETGID, 0, 0, 0, 0); }
+gid_t getegid(void) { return (gid_t)rv_hostcall(RV_HC_GETEGID, 0, 0, 0, 0); }
+pid_t getpid(void) { return (pid_t)rv_hostcall(RV_HC_GETPID, 0, 0, 0, 0); }
 
 int getgroups(int size, gid_t list[]) {
   int n = rv_hostcall(RV_HC_GETGROUPS, (uint32_t)(size_t)list, (uint32_t)size,
@@ -1280,12 +1244,8 @@ static int rv_do_stat(const char *path, struct stat *st, int follow) {
   return 0;
 }
 
-int stat(const char *path, struct stat *st) {
-  return rv_do_stat(path, st, 1);
-}
-int lstat(const char *path, struct stat *st) {
-  return rv_do_stat(path, st, 0);
-}
+int stat(const char *path, struct stat *st) { return rv_do_stat(path, st, 1); }
+int lstat(const char *path, struct stat *st) { return rv_do_stat(path, st, 0); }
 
 /* glibc's old interface, declared by find/grep/walk. */
 int __xstat(int ver, const char *path, struct stat *st) {
@@ -1426,9 +1386,7 @@ int VirtualFree(void *addr, unsigned size, unsigned type) {
   return 1;
 }
 
-void *GetProcessHeap(void) {
-  return (void *)1;
-}
+void *GetProcessHeap(void) { return (void *)1; }
 
 void *HeapAlloc(void *heap, unsigned flags, unsigned size) {
   (void)heap;
@@ -1459,41 +1417,27 @@ void *LocalFree(void *p) {
   return NULL;
 }
 
-unsigned GetLastError(void) {
-  return 0;
-}
-void SetLastError(unsigned err) {
-  (void)err;
-}
+unsigned GetLastError(void) { return 0; }
+void SetLastError(unsigned err) { (void)err; }
 
 int CloseHandle(void *h) {
   (void)h;
   return 1;
 }
 
-void Sleep(unsigned ms) {
-  rv_hostcall(RV_HC_USLEEP, ms * 1000u, 0, 0, 0);
-}
+void Sleep(unsigned ms) { rv_hostcall(RV_HC_USLEEP, ms * 1000u, 0, 0, 0); }
 
-void *GetCurrentProcess(void) {
-  return (void *)0xffffffffu;
-}
+void *GetCurrentProcess(void) { return (void *)0xffffffffu; }
 
 unsigned GetCurrentProcessId(void) {
   return (unsigned)rv_hostcall(RV_HC_GETPID, 0, 0, 0, 0);
 }
 
-int lstrlenA(const char *s) {
-  return (int)strlen(s);
-}
+int lstrlenA(const char *s) { return (int)strlen(s); }
 
-char *lstrcpyA(char *dst, const char *src) {
-  return strcpy(dst, src);
-}
+char *lstrcpyA(char *dst, const char *src) { return strcpy(dst, src); }
 
-char *lstrcatA(char *dst, const char *src) {
-  return strcat(dst, src);
-}
+char *lstrcatA(char *dst, const char *src) { return strcat(dst, src); }
 
 int _stricmp(const char *a, const char *b) {
   while (*a != '\0' && *b != '\0') {
@@ -1681,18 +1625,14 @@ void BeaconPrintf(int type, const char *fmt, ...) {
   free(buf);
 }
 
-int BeaconIsAdmin(void) {
-  return getuid() == 0;
-}
+int BeaconIsAdmin(void) { return getuid() == 0; }
 
 uint32_t swap_endianess(uint32_t indata) {
   return ((indata & 0x000000ffu) << 24) | ((indata & 0x0000ff00u) << 8) |
          ((indata & 0x00ff0000u) >> 8) | ((indata & 0xff000000u) >> 24);
 }
 
-const char *getOSName(void) {
-  return "lin";
-}
+const char *getOSName(void) { return "lin"; }
 
 char *BeaconGetOutputData(int *outsize) {
   if (outsize != NULL)

@@ -97,7 +97,8 @@ static c2_status decode_custom_headers(CborValue *it, c2_http_profile *p) {
 static c2_status decode_transport_options(CborValue *it, c2_agent_config *cfg) {
   cfg->transport_option_count = 0;
   if (cbor_value_is_null(it))
-    return c2_cbor_dc(cbor_value_advance(it)); /* Go encodes a nil map as null */
+    return c2_cbor_dc(
+        cbor_value_advance(it)); /* Go encodes a nil map as null */
   CborValue map;
   c2_status st = c2_cbor_map_enter(it, &map);
   if (st != C2_OK)

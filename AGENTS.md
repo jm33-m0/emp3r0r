@@ -42,6 +42,7 @@
 ## Code Style
 
 - Run `gofumpt -w` and `goimports -w` on every changed `.go` file.
+- Run `clang-format -i` on every changed C source and header file.
 - Build the module and run the affected packages' tests after formatting.
 - Reuse code. Do not hardcode values or duplicate logic.
 - Wrap errors with context: `fmt.Errorf("do x: %w", err)`.

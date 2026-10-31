@@ -62,9 +62,9 @@ int main(void) {
   CHECK_EQ_LONG(c2_gzip_bound(SIZE_MAX), SIZE_MAX);
   uint8_t tiny[16];
   size_t tiny_len = 0;
-  CHECK_EQ_LONG(
-      c2_gzip_compress((const uint8_t *)"hello", 5, tiny, sizeof(tiny), &tiny_len),
-      C2_ERR_NOMEM);
+  CHECK_EQ_LONG(c2_gzip_compress((const uint8_t *)"hello", 5, tiny,
+                                 sizeof(tiny), &tiny_len),
+                C2_ERR_NOMEM);
 
   TEST_DONE();
 }

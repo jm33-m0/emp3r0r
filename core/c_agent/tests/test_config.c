@@ -157,10 +157,9 @@ int main(void) {
     CHECK(c2_str_equal(cfg.http.header_keys[0], "X-H0"));
     CHECK(c2_str_equal(cfg.http.header_values[1], "v"));
     CHECK_EQ_LONG(cfg.transport_option_count, 2);
-    CHECK(c2_str_equal(c2_agent_config_option(&cfg, "socks5"),
-                       "127.0.0.1:9050"));
-    CHECK(c2_str_equal(c2_agent_config_option(&cfg, "zone"),
-                       "example.onion"));
+    CHECK(
+        c2_str_equal(c2_agent_config_option(&cfg, "socks5"), "127.0.0.1:9050"));
+    CHECK(c2_str_equal(c2_agent_config_option(&cfg, "zone"), "example.onion"));
     CHECK(c2_agent_config_option(&cfg, "missing").len == 0);
   }
 

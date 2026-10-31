@@ -244,8 +244,7 @@ static void gather_ips(c2_sysinfo_store *st) {
   freeifaddrs(ifaddr);
 }
 
-static void transport_label(const c2_agent_config *cfg, char *out,
-                            size_t cap) {
+static void transport_label(const c2_agent_config *cfg, char *out, size_t cap) {
   c2_str mode = cfg->c2_channel_mode;
   const char *label = NULL;
   if (mode.ptr == NULL || mode.len == 0)
