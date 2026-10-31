@@ -1348,33 +1348,20 @@ func (resolver *symbolResolver) Resolve(name string) (uintptr, error) {
 		return 0, err
 	}
 
-	if resolver.api != nil {
-		// Prefer the native loader once dlsym has been bootstrapped. In addition
-		// to honoring loader scope and interposition, the public dlsym evaluates
-		// GNU IFUNC resolvers. The glibc-internal __libc_dlsym does not, so
-		// resolveWithLoader finishes that resolution when needed.
-		if addr, err := resolver.resolveWithLoader(name); err == nil && addr != 0 {
-			resolver.resolved[name] = addr
-			return addr, nil
-		}
-	}
-
-	if addr, err := resolveFromRuntimeModules(resolver.modules, name); err == nil && addr != 0 {
+	addr, err := resolver.resolveDirect(name)
+	if err == nil && addr != 0 {
 		resolver.resolved[name] = addr
 		return addr, nil
 	}
 
-	if resolver.api != nil && resolver.api.dlopen != 0 {
-		for _, dep := range commonLinuxDependencies() {
-			_ = resolver.ensureLibraryLoaded(dep)
-		}
-		if addr, err := resolver.resolveWithLoader(name); err == nil && addr != 0 {
-			resolver.resolved[name] = addr
-			return addr, nil
-		}
-		if addr, err := resolveFromRuntimeModules(resolver.modules, name); err == nil && addr != 0 {
-			resolver.resolved[name] = addr
-			return addr, nil
+	// A module built against one glibc era can import the other era's
+	// dynamic-loader names. glibc hid __libc_* in 2.34, when the public dl*
+	// names moved from libdl.so.2 into libc.so.6. Bind the equivalent name
+	// that this host actually exports.
+	if alias, ok := linuxDynSymbolAlias(name); ok {
+		if aliasAddr, aliasErr := resolver.resolveDirect(alias); aliasErr == nil && aliasAddr != 0 {
+			resolver.resolved[name] = aliasAddr
+			return aliasAddr, nil
 		}
 	}
 
@@ -1388,9 +1375,63 @@ func (resolver *symbolResolver) Resolve(name string) (uintptr, error) {
 		}
 	}
 
-	err := fmt.Errorf("unresolved external symbol %q", name)
+	err = fmt.Errorf("unresolved external symbol %q", name)
 	resolver.misses[name] = err
 	return 0, err
+}
+
+// resolveDirect looks a name up in the loaded modules and through the native
+// loader without applying the glibc symbol aliases.
+func (resolver *symbolResolver) resolveDirect(name string) (uintptr, error) {
+	if resolver.api != nil {
+		// Prefer the native loader once dlsym has been bootstrapped. In addition
+		// to honoring loader scope and interposition, the public dlsym evaluates
+		// GNU IFUNC resolvers. The glibc-internal __libc_dlsym does not, so
+		// resolveWithLoader finishes that resolution when needed.
+		if addr, err := resolver.resolveWithLoader(name); err == nil && addr != 0 {
+			return addr, nil
+		}
+	}
+
+	if addr, err := resolveFromRuntimeModules(resolver.modules, name); err == nil && addr != 0 {
+		return addr, nil
+	}
+
+	if resolver.api != nil && resolver.api.dlopen != 0 {
+		for _, dep := range commonLinuxDependencies() {
+			_ = resolver.ensureLibraryLoaded(dep)
+		}
+		if addr, err := resolver.resolveWithLoader(name); err == nil && addr != 0 {
+			return addr, nil
+		}
+		if addr, err := resolveFromRuntimeModules(resolver.modules, name); err == nil && addr != 0 {
+			return addr, nil
+		}
+	}
+
+	return 0, fmt.Errorf("unresolved external symbol %q", name)
+}
+
+// linuxDynSymbolAlias returns the equivalent dynamic-loader symbol from the
+// other glibc era. Both sets take the same arguments, so an import of one can
+// bind to the other when that is what the host exports.
+func linuxDynSymbolAlias(name string) (string, bool) {
+	switch name {
+	case "dlopen":
+		return "__libc_dlopen_mode", true
+	case "__libc_dlopen_mode":
+		return "dlopen", true
+	case "dlsym":
+		return "__libc_dlsym", true
+	case "__libc_dlsym":
+		return "dlsym", true
+	case "dlclose":
+		return "__libc_dlclose", true
+	case "__libc_dlclose":
+		return "dlclose", true
+	default:
+		return "", false
+	}
 }
 
 func (resolver *symbolResolver) ResolveSymbol(sym elf.Symbol) (uintptr, error) {
@@ -1865,22 +1906,29 @@ func findELFSymbolOffset(path string, symbol string) (uintptr, error) {
 	}
 	defer f.Close()
 
-	if syms, err := f.DynamicSymbols(); err == nil {
-		if off, ok := matchSymbolOffset(syms, symbol); ok {
-			return off, nil
-		}
+	// Only the dynamic symbol table participates in runtime symbol lookup. The
+	// full symbol table can contain local and hidden definitions (glibc's own
+	// __libc_dl* helpers among them) that the dynamic linker never exports.
+	syms, err := f.DynamicSymbols()
+	if err != nil {
+		return 0, fmt.Errorf("read dynamic symbols from %s: %w", path, err)
 	}
-	if syms, err := f.Symbols(); err == nil {
-		if off, ok := matchSymbolOffset(syms, symbol); ok {
-			return off, nil
-		}
+	if off, ok := matchSymbolOffset(syms, symbol); ok {
+		return off, nil
 	}
 	return 0, fmt.Errorf("symbol %s not found in %s", symbol, path)
 }
 
 func matchSymbolOffset(symbols []elf.Symbol, want string) (uintptr, bool) {
 	for _, s := range symbols {
-		if s.Value == 0 {
+		if s.Value == 0 || s.Section == elf.SHN_UNDEF {
+			continue
+		}
+		bind := elf.ST_BIND(s.Info)
+		if bind != elf.STB_GLOBAL && bind != elf.STB_WEAK {
+			continue
+		}
+		if vis := elf.ST_VISIBILITY(s.Other); vis != elf.STV_DEFAULT && vis != elf.STV_PROTECTED {
 			continue
 		}
 		// An IFUNC's st_value addresses its resolver, not the callable function.

@@ -3,6 +3,7 @@
 package memmod
 
 import (
+	"debug/elf"
 	"errors"
 	"testing"
 )
@@ -117,5 +118,61 @@ func TestChooseLinuxDynAPIUnavailable(t *testing.T) {
 	lookup := fakeSymbolLookup(map[string]uintptr{"__libc_dlopen_mode": 0x1000})
 	if _, err := chooseLinuxDynAPI(lookup); err == nil {
 		t.Fatal("chooseLinuxDynAPI succeeded with only __libc_dlopen_mode")
+	}
+}
+
+// TestResolveLinuxDynSymbolAliases pins that an import from either glibc era
+// binds on a host that exports the other set. Modern glibc hides __libc_* and
+// keeps the public dl* names in libc.so.6, while older glibc exports the
+// internal names and leaves the public names in libdl.so.2, which memmod never
+// loads.
+func TestResolveLinuxDynSymbolAliases(t *testing.T) {
+	if !LinuxLibcMapped() {
+		t.Skip("no dynamically linked libc in this process")
+	}
+	resolver := newSymbolResolver(nil)
+	if resolver.api == nil {
+		t.Skip("dynamic loader API is unavailable")
+	}
+	for _, name := range []string{
+		"dlopen", "__libc_dlopen_mode",
+		"dlsym", "__libc_dlsym",
+		"dlclose", "__libc_dlclose",
+	} {
+		addr, err := resolver.Resolve(name)
+		if err != nil {
+			t.Errorf("Resolve(%q): %v", name, err)
+			continue
+		}
+		if addr == 0 {
+			t.Errorf("Resolve(%q) returned a nil address", name)
+		}
+	}
+}
+
+// TestMatchSymbolOffsetSkipsNonExported pins that runtime lookup only matches
+// definitions the dynamic linker can actually export. glibc keeps local,
+// hidden __libc_dl* helpers in its full symbol table, and binding those
+// bypasses the public API and returns IFUNC resolvers instead of callable
+// implementations.
+func TestMatchSymbolOffsetSkipsNonExported(t *testing.T) {
+	info := func(bind elf.SymBind, typ elf.SymType) uint8 {
+		return uint8(bind)<<4 | uint8(typ)
+	}
+	symbols := []elf.Symbol{
+		{Name: "local", Value: 0x1000, Section: 1, Info: info(elf.STB_LOCAL, elf.STT_FUNC)},
+		{Name: "hidden", Value: 0x2000, Section: 1, Info: info(elf.STB_GLOBAL, elf.STT_FUNC), Other: uint8(elf.STV_HIDDEN)},
+		{Name: "ifunc", Value: 0x3000, Section: 1, Info: info(elf.STB_GLOBAL, elf.STT_GNU_IFUNC)},
+		{Name: "undefined", Value: 0x4000, Section: elf.SHN_UNDEF, Info: info(elf.STB_GLOBAL, elf.STT_FUNC)},
+		{Name: "exported", Value: 0x5000, Section: 1, Info: info(elf.STB_GLOBAL, elf.STT_FUNC)},
+	}
+	for _, name := range []string{"local", "hidden", "ifunc", "undefined"} {
+		if off, ok := matchSymbolOffset(symbols, name); ok {
+			t.Errorf("matchSymbolOffset(%q) = %#x, want no match", name, off)
+		}
+	}
+	off, ok := matchSymbolOffset(symbols, "exported")
+	if !ok || off != 0x5000 {
+		t.Fatalf("matchSymbolOffset(exported) = %#x, %v; want 0x5000, true", off, ok)
 	}
 }
