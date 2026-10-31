@@ -14,8 +14,7 @@ There are two kinds of modules:
   - `dll`: a Windows DLL mapped into the agent process, or
   - `so`: a Linux shared-library dependency used by other modules.
 
-  The payload is never written to disk and no interpreter or child process is
-  spawned on the target. DLL/SO modules can also be declared as `dependencies`
+  DLL/SO modules can also be declared as `dependencies`
   of another module; see §8.
 
 - **C2 modules** (`"is_local": true`) run on the operator host. They execute
@@ -79,7 +78,6 @@ What happens:
 - The agent runs it with the embedded Starlark engine. `main(*args)` is
   called with the resolved arguments; a non-`None` return value is appended
   to the output. `print()` output is returned to the operator.
-- No interpreter is needed on the target.
 
 ---
 
@@ -342,7 +340,6 @@ On the agent (`ModuleHandler`):
      demand by the `ebpf_*` builtins; invoking it directly reports that it is a
      dependency.
 
-The agent never extracts a module to disk and never spawns a child process.
 Dependency mapping and teardown are covered in §8.
 
 ---
@@ -419,9 +416,8 @@ position-independent `.so` with a single exported entry point (`bof_run`).
 
 ## 9. Starlark API
 
-Starlark is a small deterministic Python dialect. The agent embeds the engine,
-so no interpreter is installed on the target. There is no standard library and
-`load()` is not wired up.
+Starlark is a small deterministic Python dialect embedded in the agent. There is
+no standard library and `load()` is not wired up.
 
 ### Strings
 

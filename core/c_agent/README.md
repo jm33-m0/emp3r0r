@@ -70,8 +70,7 @@ PIC. The shared object keeps a `PT_NOTE` for malasada's stage0 segment.
 
 ### Hardening
 
-ELF images are mapped with `mmap` and relocated in memory; no code is loaded
-through an fd or disk. The loader guards constructors and IFUNC/IRELATIVE
+ELF images are mapped with `mmap` and relocated in memory. The loader guards constructors and IFUNC/IRELATIVE
 resolvers with signal handlers, so a faulty image is rejected instead of taking
 the agent down. Remote input is length-checked before use, and decoders never
 panic on malformed CBOR or frames.

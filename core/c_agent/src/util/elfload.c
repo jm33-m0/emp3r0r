@@ -1,7 +1,6 @@
 /*
  * elfload.c — in-memory ELF64 shared-object loader.
- * See elfload.h. The C counterpart of the Go agent's memmod: an image is
- * mapped, relocated and executed without ever creating an fd or touching disk.
+ * See elfload.h. The C counterpart of the Go agent's memmod.
  *
  * Linux-only (anonymous mmap + /proc/self/maps-backed host symbol lookup).
  */
@@ -658,8 +657,7 @@ elfload_module *elfload_map(const uint8_t *image, size_t len, char *err,
     return NULL;
   }
 
-  /* Copy the file-backed bytes of every segment and zero its BSS tail. The
-   * whole mapping is RW here, so no fd or mprotect dance is needed. */
+  /* Copy the file-backed bytes of every segment and zero its BSS tail. */
   for (size_t i = 0; i < nsegs; i++) {
     memcpy(map + segs[i].vaddr, image + segs[i].offset, (size_t)segs[i].filesz);
     if (segs[i].memsz > segs[i].filesz)

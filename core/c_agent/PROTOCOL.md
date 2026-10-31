@@ -22,8 +22,7 @@ CBOR is provided by vendored [Intel tinycbor](https://github.com/intel/tinycbor)
 (MIT, version 7.0) under `vendor/tinycbor/`; there is no hand-rolled codec.
 
 When the Go side changes, this document and the headers change in the same
-commit. All peers are built from the same batch, so there is no
-back-compatibility shim.
+commit.
 
 ## 1. Conventions
 

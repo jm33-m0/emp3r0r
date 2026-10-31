@@ -4,9 +4,8 @@
 # dynload, the Go agent through memmod (core/lib/coffloader). Keep this the
 # single source of the loader.
 #
-# Hosted artifact: glibc is linked dynamically and pinned to the oldest
-# supported ABI (2.17). Never link glibc statically. The C2 runs this on every
-# module invocation; the build is idempotent.
+# Hosted artifact: glibc is linked dynamically and pinned to ABI 2.17.
+# The C2 runs this on every module invocation; the build is idempotent.
 CC = zig cc
 ZIG_TARGET ?= x86_64-linux-gnu.2.17
 CFLAGS = -O2 -fPIC -Wall -fvisibility=hidden

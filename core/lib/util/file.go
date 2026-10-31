@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	// Added sync import
 	"github.com/fxamacker/cbor/v2"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -250,13 +249,6 @@ func RemoveDupsFromArray[T string | int](sliceList []T) []T {
 func Copy(src, dst string) error {
 	srcInfo, err := os.Stat(src)
 	if err != nil {
-		// if not on disk, check memory?
-		// "Copy" function is genericutil, but we are upgrading agent.
-		// If src is in memory, Copy should work.
-		// But Copy uses os.Stat which doesn't know about memory.
-		// Since we have parallel agent utils (CopyAgent), maybe we should leave this?
-		// But IsStrInFile is common util.
-		// Let's assume generic utils might stay disk-based for non-agent stuff.
 		return err
 	}
 
@@ -484,12 +476,7 @@ func GetWritablePaths(root_path string, depth, max int) ([]string, error) {
 }
 
 // ApplyFilePattern applies a naming pattern to files created/accessed by the agent.
-// Modify this function to implement your specific pattern (e.g., appending a suffix).
-// This is the hook for "every file to have a certain pattern in its name".
 func ApplyFilePattern(path string) string {
-	// Placeholder: currently returns the path as is.
-	// To implement a pattern, e.g., appending ".agent":
-	// return path + ".agent"
 	return path
 }
 
@@ -535,7 +522,7 @@ func RemoveFileAgent(path string) error {
 			return fmt.Errorf("rm %s: no such memfs file", path)
 		}
 		// Drop namespace entries and spill metadata under the lock; delete the
-		// backing files after unlock (no disk I/O while holding the lock).
+		// backing files after unlock.
 		var stalePaths []string
 		for _, k := range toRemove {
 			if old := MemFileMap[k]; old != nil {
@@ -645,13 +632,8 @@ var (
 	memTotalBytes  int64                       // current in-RAM memfs bytes (encrypted)
 	OnMemFSChanged func()
 
-	// memfsBudgetCache caches the most recently computed RAM budget so a
-	// write burst does not re-probe /proc/meminfo (or equivalent) on every
-	// call. The budget is deliberately computed lazily on the first write and
-	// refreshed at most every memfsBudgetCacheInterval — never at process
-	// init, which would add startup noise and pin a stale snapshot. The
-	// value is derived from currently AVAILABLE memory at write time, so a
-	// busy target spills earlier and an idle one can keep more in RAM.
+	// memfsBudgetCache caches the most recently computed RAM budget, refreshed
+	// lazily on writes at most every memfsBudgetCacheIntv.
 	memfsBudgetCache     int64
 	memfsBudgetCachedAt  time.Time
 	memfsBudgetCacheMu   sync.Mutex
@@ -663,12 +645,7 @@ var (
 	memfsLowMemWarnedAt time.Time
 )
 
-// memSpillNewFile creates a fresh unmarked backing file for spilled memfs
-// content. os.CreateTemp with an empty pattern yields a name like
-// "1234567890" in the system temp dir — no product branding, nothing for a
-// quick grep/forensic sweep to key on. The file is created 0600 and the path
-// is tracked in-process (memSpillPaths) so a crash leaves at most one
-// anonymous temp file behind, exactly like any other process's temp litter.
+// memSpillNewFile creates a temporary backing file for spilled memfs content.
 func memSpillNewFile() (string, error) {
 	d := os.TempDir()
 	if d == "" {
@@ -706,18 +683,9 @@ func memSpillPath(key string) string {
 // memfsBudgetBytes returns the maximum bytes memfs may keep in RAM at the time
 // of a write.
 //
-// It is intentionally NOT computed at process init: that would add startup
-// noise and pin a stale snapshot for the whole agent lifetime. Instead the
-// budget is derived lazily on the first write (and refreshed every few
-// seconds) from the amount of memory currently AVAILABLE, so a busy target
-// with shrinking free RAM naturally spills earlier, while an idle one can use
-// more. An explicit EMP3R0R_MEMFS_LIMIT (bytes) overrides the heuristic
-// entirely.
-//
-// A hard absolute ceiling is still enforced so even a host with huge free RAM
-// can never let a single write balloon the process past memfsBudgetHardMax —
-// that bound is what keeps us confident the agent cannot overflow memory by
-// accident.
+// The budget is derived lazily on the first write (and refreshed every few
+// seconds) from currently available memory. An explicit EMP3R0R_MEMFS_LIMIT
+// (bytes) overrides the heuristic, and memfsBudgetHardMax caps the result.
 func memfsBudgetBytes() int64 {
 	if v := os.Getenv("EMP3R0R_MEMFS_LIMIT"); v != "" {
 		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n > 0 {
@@ -725,8 +693,6 @@ func memfsBudgetBytes() int64 {
 		}
 	}
 
-	// Serve from cache when fresh: probing available memory on every write
-	// would add syscall noise to a hot path (module caching etc.).
 	memfsBudgetCacheMu.Lock()
 	now := time.Now()
 	if memfsBudgetCachedAt.IsZero() || now.Sub(memfsBudgetCachedAt) > memfsBudgetCacheIntv {
@@ -738,9 +704,7 @@ func memfsBudgetBytes() int64 {
 	return budget
 }
 
-// memfsBudgetHardMax is the absolute ceiling for in-RAM memfs bytes. It is the
-// "sane upper limit" that guarantees a single write (or a rapid burst) can
-// never exhaust the process even when free RAM is plentiful.
+// memfsBudgetHardMax is the ceiling for in-RAM memfs bytes.
 const memfsBudgetHardMax = 512 * 1024 * 1024 // 512 MiB
 
 // memfsBudgetMin is the floor: even a nearly-OOM target keeps enough headroom
@@ -938,10 +902,8 @@ func SaveFileAgent(filename string, data []byte, perm os.FileMode, strategy Stor
 
 		var staleSpillPath string
 		MemFileLock.Lock()
-		// Remove any previous spill marker/path for this key first: the new
-		// content is authoritative. Maps are only touched under the lock; the
-		// backing file itself is removed after unlock (no disk I/O under the
-		// lock).
+		// Remove any previous spill marker/path for this key first; the
+		// backing file is removed after unlock.
 		staleSpillPath = memSpillPaths[filename]
 		delete(memSpilled, filename)
 		delete(memSpillPaths, filename)

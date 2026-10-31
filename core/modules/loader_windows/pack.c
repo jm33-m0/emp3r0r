@@ -1,10 +1,6 @@
 /*
  * pack - C2-side helper that RC4-encrypts a shellcode blob for embedding.
  *
- * The generated loader decrypts at runtime, so "encryption" here means
- * obfuscation at rest; the point is that the shellcode bytes never appear in
- * plaintext in the shipped host executable/DLL.
- *
  * Usage:
  *   pack <in.bin> <payload.bin> <key.bin> [key-hex]
  *

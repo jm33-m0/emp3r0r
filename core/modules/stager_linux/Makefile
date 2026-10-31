@@ -11,7 +11,7 @@
 # and dynload.c can resolve dlopen/dlsym/dlclose. They target the oldest glibc
 # that provides the symbols selected by DYNLOAD_MODE: 2.34 for the public
 # dlopen (merged into libc in 2.34) and 2.17 for glibc-internal
-# __libc_dlopen_mode. Never statically link glibc.
+# __libc_dlopen_mode.
 CC = zig cc
 
 # -fno-toplevel-reorder is a GCC-only flag that clang/zig cc reject, so only

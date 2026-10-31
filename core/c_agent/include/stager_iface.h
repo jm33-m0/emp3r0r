@@ -4,10 +4,9 @@
 /*
  * stager_iface.h — same-process cooperation ABI between the stager and agent.
  *
- * The agent runs in the stager's process, so no descriptor or helper process is
- * needed: the stager publishes its mask entry point in the state block it
- * already installs as the x86_64 GS base (see stager state.h). The agent reads
- * that block once and calls the mask function directly during its existing
+ * The stager publishes its mask entry point in the state block it
+ * installs as the x86_64 GS base (see stager state.h). The agent reads
+ * that block once and calls the mask function directly during its
  * sleep cycle.
  *
  * The mask function makes the agent ELF writable, XORs it in place with a fresh

@@ -1,8 +1,8 @@
 /*
  * transport_http_raw.c — self-contained HTTP-poll transport over TCP.
  *
- * This transport implements the HTTP/1.1 request/response exchange itself on
- * top of libc TCP sockets: no libcurl, no OpenSSL, no external process. It is
+ * This transport implements the HTTP/1.1 request/response exchange on top of
+ * libc TCP sockets. It is
  * selected with TRANSPORT=http_raw and supplies hp_http_perform() to the shared
  * http_poll state machine. HTTPS is intentionally unsupported; use the libcurl
  * transport (or a CDN that terminates TLS in front of a plain HTTP listener).

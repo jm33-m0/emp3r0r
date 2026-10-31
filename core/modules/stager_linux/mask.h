@@ -10,10 +10,9 @@
  * Sleep-mask stub for the stager.
  *
  * The mask code lives in the stager mapping, not in the agent image, so it can
- * keep running while the agent image is XORed. The stager and agent share one
- * process, so no descriptor is needed: stager_mask_publish() places the entry
- * point in the GS state block the stager already installs, and the agent reads
- * it directly at startup. The agent must have stopped or joined every other
+ * keep running while the agent image is XORed. stager_mask_publish() places
+ * the entry point in the GS state block installed by the stager, and the agent
+ * reads it at startup. The agent must have stopped or joined every other
  * thread first: this function masks in place and does not suspend the caller.
  *
  * The agent passes an address inside its own mapping (a probe, currently

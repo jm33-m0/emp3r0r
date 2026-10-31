@@ -240,8 +240,7 @@ c2_status c2_bof_run(const uint8_t *loader_so, size_t loader_len,
   /* The loader imports dlsym and pthread_mutex_* which live outside libc on
    * older glibc (libdl.so.2 / libpthread.so.0). Pre-load those host
    * dependencies so the in-memory relocation pass can bind them; on glibc >=
-   * 2.34 they are in libc and this is a harmless no-op. The loader image
-   * itself is never written to an fd. */
+   * 2.34 they are in libc and this is a harmless no-op. */
   static const char *const host_deps[] = {"libdl.so.2", "libpthread.so.0"};
   dynload dl;
   dynload_reset(&dl);

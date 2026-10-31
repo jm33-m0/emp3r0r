@@ -107,4 +107,3 @@ Some packages compile C or load real object files and need extra tooling:
 - Security-sensitive code (crypto, parsers, memfs) should have known-answer
   vectors and boundary cases.
 - Add a regression test that fails on the old behavior before fixing a bug.
-- Do not add a test that can only pass. If it cannot fail, it is not a test.

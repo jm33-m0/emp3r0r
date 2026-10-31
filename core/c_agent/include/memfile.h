@@ -10,8 +10,7 @@
  * or a downloaded payload. Read/write are transparent: callers hand over and
  * receive plaintext; the container is an implementation detail.
  *
- * There is no disk: everything stays in RAM, bounded by `max_bytes` so a
- * hostile or careless upload cannot grow the agent without limit. The store is
+ * Entries are held in RAM and bounded by `max_bytes`. The store is
  * not thread-safe; the agent's single job loop owns it.
  */
 

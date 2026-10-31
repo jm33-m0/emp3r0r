@@ -2,9 +2,7 @@
  * test_elfload.c — in-memory ELF loader.
  *
  * The Makefile builds the real coffloader_linux.so and passes its path in, so
- * the loader maps and relocates the actual dependency. The point of the test is
- * twofold: the exports resolve, and mapping the image creates no file
- * descriptor (the loader must never touch an fd or disk).
+ * the loader maps and relocates the actual dependency and resolves its exports.
  */
 
 #include "util/elfload.h"

@@ -311,7 +311,6 @@ c2_crypto_backend *c2_crypto_open(void) {
     return NULL;
   mbedtls_entropy_init(&c->entropy);
   mbedtls_ctr_drbg_init(&c->drbg);
-  /* No project-identifying personalization string ships in the agent. */
   if (mbedtls_ctr_drbg_seed(&c->drbg, mbedtls_entropy_func, &c->entropy, NULL,
                             0) != 0) {
     mbedtls_ctr_drbg_free(&c->drbg);

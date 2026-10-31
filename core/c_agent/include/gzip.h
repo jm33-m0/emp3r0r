@@ -15,7 +15,7 @@
  * the vendored miniz (DEFLATE/INFLATE), so gzip is self-contained; `none`
  * stubs it out for builds that do not need it, and a provider can be added by
  * dropping src/gzip/c2_gzip_<name>.c into the tree. All providers are pure
- * byte transforms: no disk, no global state.
+ * in-memory byte transforms.
  */
 
 #include "common.h"

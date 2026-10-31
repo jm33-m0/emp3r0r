@@ -3,9 +3,6 @@
 
 /*
  * debug.h — the DEBUG compile-time logging switch.
- *
- * In a release build every debug call compiles to nothing, so no format
- * strings from the debugging layer survive into a shipped artifact.
  */
 
 #ifdef DEBUG

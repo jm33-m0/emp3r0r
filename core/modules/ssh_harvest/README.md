@@ -1,11 +1,8 @@
 # ssh_harvest
 
-Capture clear-text SSH credentials from `sshd` with an eBPF uprobe. This
-replaces the old ptrace-based `ssh_harvester` Go module: instead of attaching
-ptrace, scanning the text segment for a byte pattern, and patching an `INT3`,
-the module locates the pattern in the on-disk `sshd` image and attaches an
-in-memory eBPF uprobe at that file offset. The target process is not stopped,
-modified, or traced.
+Capture clear-text SSH credentials from `sshd` with an eBPF uprobe. The module
+locates a code pattern in the on-disk `sshd` image and attaches an in-memory
+eBPF uprobe at that file offset.
 
 ## How it works
 
@@ -85,8 +82,8 @@ The default invocation returns at once with the memfs path where credentials
 accumulate (and streams each one live). Use `--disable` when you are done to
 stop the capture, print the full credential list, and delete the output file.
 
-Defaults mirror the old module: register `RSI`, the classic code pattern
-`4883c4080fb6c021`, and `/usr/sbin/sshd`.
+Defaults: register `RSI`, code pattern `4883c4080fb6c021`, and
+`/usr/sbin/sshd`.
 
 Requires a Linux agent with `CAP_BPF` or `CAP_SYS_ADMIN` (running as root
 implies both) and a kernel with `bpf_probe_read_user_str` (5.5+). The module

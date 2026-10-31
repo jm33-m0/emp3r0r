@@ -147,8 +147,7 @@ static const char LIBSONAMES[][16] = {"libssl.so.4", "libssl.so.3",
  *     form so no decoder is needed.
  *   - The symbol is resolved from libssl at runtime. If the library has no ECH
  *     (OpenSSL < 4.0), or the config list is empty/rejected, we log and carry
- *     on with a normal TLS handshake instead of aborting the download. This is
- *     what "support ECH if libssl allows" means in practice.
+ *     on with a normal TLS handshake instead of aborting the download.
  *   - The inner SNI is whatever host was dialed (or MALLEABLE_TLS_SNI); ECH
  *     substitutes the configured public_name as the outer SNI automatically.
  * ------------------------------------------------------------------------ */

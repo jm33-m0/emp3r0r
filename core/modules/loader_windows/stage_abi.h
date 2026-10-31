@@ -8,9 +8,7 @@
  * dispatcher and the injection logic; the stager only bootstraps.
  *
  * Keep the entry name and the function signature here so the two sides
- * cannot drift apart unnoticed. The name is deliberately generic: it lands in
- * the shipped host's string table as the lookup key, so it must not describe
- * the project or the technique.
+ * cannot drift apart unnoticed.
  */
 #ifndef STAGED_LOADER_STAGE_ABI_H
 #define STAGED_LOADER_STAGE_ABI_H

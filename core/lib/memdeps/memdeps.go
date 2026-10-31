@@ -42,8 +42,6 @@ func Use(name string, fn func(*memmod.Module) error) error {
 	if name == "" {
 		return errors.New("memdeps: empty dependency name")
 	}
-	// Copy the resolver out before releasing the lock: fetching touches
-	// memfs/C2 and must not hold a lock.
 	resolverMu.RLock()
 	fetch := resolver
 	resolverMu.RUnlock()

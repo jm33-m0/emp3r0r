@@ -5,7 +5,7 @@
  *
  * The stager installs its state block as the x86_64 GS base before the agent
  * starts. The block's first field is a self pointer, followed by the ABI
- * magic/version and the mask function. Nothing is passed through a descriptor.
+ * magic/version and the mask function.
  */
 
 #include "stager_iface.h"

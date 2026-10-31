@@ -53,8 +53,6 @@
 #include <time.h>
 #include <unistd.h>
 
-/* Debug tracing is compiled out unless C2_AGENT_TRACE is defined, so no
- * diagnostic strings ship in the release agent. */
 #ifdef C2_AGENT_TRACE
 #define TRACE(...)                                                             \
   do {                                                                         \

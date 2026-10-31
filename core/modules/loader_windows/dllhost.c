@@ -44,8 +44,6 @@ static int run_stage(int argc, wchar_t **argv) {
 }
 
 __declspec(dllexport) int __cdecl Run(void) {
-  /* argv[0] is never inspected by the stage; keep it empty so the shipped
-   * DLL carries no project-identifying string. */
   wchar_t *argv[] = {L""};
   return run_stage(1, argv);
 }

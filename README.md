@@ -28,7 +28,7 @@ emp3r0r started as a Linux post-exploitation framework with interactive remote s
 
 Every agent has an embedded Starlark engine. A module can add post-exploitation logic without rebuilding the agent or uploading an interpreter. Scripts run inside the agent process and use built-in APIs for file I/O, HTTP, process execution, and other common work. They can also call Win32 functions and Linux syscalls through the agent's API proxy. When a script needs an API that is not already present, it can load a DLL or SO from encrypted memfs or the C2 with [`mem_load_library`](#in-memory-library-loader), call its exports, and unload it when done. [Linux eBPF modules](#linux-modules-and-ebpf) use the same path to load `libbpf`.
 
-Modules are a Starlark file and a small JSON manifest. The agent loads them in memory and does not spawn Python, Bash, PowerShell, or another command interpreter. [Compiled modules](#compiled-modules) use the same in-memory delivery path but run native code.
+Modules are a Starlark file and a small JSON manifest loaded in memory by the agent. [Compiled modules](#compiled-modules) use the same in-memory delivery path to run native code.
 
 #### Compiled modules
 
@@ -38,13 +38,13 @@ BOF, ELF, and PICO modules run in the agent process on both platforms:
 - Linux ELF relocatable objects loaded from memory by the [in-memory loader](#in-memory-library-loader).
 - Crystal-Kit PICO modules with SilentMoonwalk call stack spoofing.
 
-The repository ships Kerbeus-BOF, Remote-OPs, and a Situational Awareness suite. Running a BOF does not start another process or write the object to disk. On Windows, modules can run under a borrowed [access token](#windows-tokens-and-kerberos).
+The repository ships Kerbeus-BOF, Remote-OPs, and a Situational Awareness suite. On Windows, modules can run under a borrowed [access token](#windows-tokens-and-kerberos).
 
 #### Linux modules and eBPF
 
 Linux modules are Starlark scripts with access to the kernel through libbpf. The agent maps `libbpf` when a module needs it and exposes its API as Go-backed builtins. This uses the same on-demand loader that [`mem_load_library`](#in-memory-library-loader) exposes; libbpf is just another shared object the module asks for. A script can enumerate BPF objects, attach programs, manage maps and links, and start or stop uprobes.
 
-[`ssh_harvest`](./core/modules/ssh_harvest/) is the worked example. It finds a pattern in `sshd`, attaches a long-lived uprobe, streams captured credentials, and keeps the probe running until `--disable`. It uses no ptrace, breakpoints, or temporary files.
+[`ssh_harvest`](./core/modules/ssh_harvest/) is the worked example. It finds a pattern in `sshd`, attaches a long-lived uprobe, streams captured credentials, and keeps the probe running until `--disable`.
 
 The loader can map any `.so` a module declares or supplies, including raw bytes provided by the script.
 

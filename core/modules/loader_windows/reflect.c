@@ -2,8 +2,7 @@
  * reflect - minimal reflective PE (DLL) loader for the staged_loader stager.
  *
  * The stager executable carries the real loader as an RC4-encrypted DLL
- * resource. This file maps that DLL into memory without touching disk and
- * without registering it with the Windows loader, then exposes its exports:
+ * resource. This file maps that DLL into memory and exposes its exports:
  *
  *   reflect_load   parse headers, map sections, apply relocations, resolve
  *                  the import table via the real LoadLibraryA/GetProcAddress,
@@ -417,9 +416,7 @@ static int protect_sections(unsigned char *mapped, SIZE_T image_size,
 
 static int force_any_base(void) {
 #ifdef DEBUG
-  /* Lab-only test hook: force the relocation path even when the linked base
-   * is free. Compiled out of release images so neither the code nor its
-   * environment-variable name ships. */
+  /* Test hook: force the relocation path even when the linked base is free. */
   char buf[8];
   DWORD n = GetEnvironmentVariableA("DLL_FORCE_RELOC", buf, sizeof(buf));
   return n == 1 && buf[0] == '1';

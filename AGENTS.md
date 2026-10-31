@@ -46,6 +46,10 @@
 - Reuse code. Do not hardcode values or duplicate logic.
 - Wrap errors with context: `fmt.Errorf("do x: %w", err)`.
 - Write comments that explain why, not what.
+- Never address the user, answer the prompt, or justify rule compliance in
+  code, comments, or documentation. Do not mention rejected alternatives or
+  absent mechanisms just because a prompt or rule forbade them; describe only
+  what the code actually does.
 - Do not add empty tests. Tests must assert real behavior.
 - Keep code building on Linux and Windows; operator and C2 code is Linux-only.
   Put platform code behind `//go:build` tags and provide stubs.
@@ -133,6 +137,11 @@
   does in `lib/memmod` and `lib/memdeps`. In C, use `src/util/elfload.c`.
 - Use `dlopen` and `dlsym` only for libraries already present on the host, not
   for an image held in memory.
+- Do not link or load `libdl.so.2` just to use `dlopen`/`dlsym`/`dlclose`. On
+  glibc < 2.34, `libc.so.6` already exports the internal helpers
+  `__libc_dlopen_mode`, `__libc_dlsym`, and `__libc_dlclose`; on glibc >= 2.34,
+  `dlopen`, `dlsym`, and `dlclose` are in `libc.so.6` directly. Resolve them
+  from `libc.so.6` (as `dynload` does) without loading `libdl`.
 
 ## Artifact Strings
 
@@ -174,6 +183,9 @@
 
 ## Documentation
 
+- Write only user-facing or developer-facing technical reference. Never put
+  conversational notes, prompt responses, or rule-compliance disclaimers into
+  documentation.
 - Put project guides in `docs/`. Keep the root `README.md`, `AGENTS.md`,
   `CHANGELOG.md`, and `LICENSE` at the repository root.
 - Keep each component's or module's `README.md` in its directory. If it has a
