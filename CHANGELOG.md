@@ -1,5 +1,17 @@
 # Changelog
 
+## [5.7.0](https://github.com/jm33-m0/emp3r0r/compare/v5.6.0...v5.7.0) (2026-10-31)
+
+
+### Features
+
+* **agent:** add portable RISC-V BOF execution module and agent support ([e19afd5](https://github.com/jm33-m0/emp3r0r/commit/e19afd5b968258ee2e99a02f053217b8f0335501))
+
+
+### Bug Fixes
+
+* **memmod:** be smarter with `dl*` in glibc ([342eecd](https://github.com/jm33-m0/emp3r0r/commit/342eecdf9fc14b5a7194efe9738f4de973db185d))
+
 ## [5.6.0](https://github.com/jm33-m0/emp3r0r/compare/v5.5.1...v5.6.0) (2026-10-29)
 
 
