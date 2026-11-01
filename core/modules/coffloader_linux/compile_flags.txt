@@ -1,5 +1,7 @@
+-std=c99
 -O2
 -fPIC
 -Wall
+-Wextra
 -I.
 -fvisibility=hidden

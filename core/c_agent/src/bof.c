@@ -50,9 +50,9 @@ c2_status c2_bof_run(const uint8_t *loader_so, size_t loader_len,
     return C2_ERR_IO;
   }
 
-  c2_bof_run_fn run = (c2_bof_run_fn)elfload_sym(mod, "bof_run");
-  c2_bof_err_fn last_err = (c2_bof_err_fn)elfload_sym(mod, "bof_last_error");
-  c2_bof_free_fn release = (c2_bof_free_fn)elfload_sym(mod, "bof_free");
+  c2_bof_run_fn run = (c2_bof_run_fn)elfload_sym(mod, "Run");
+  c2_bof_err_fn last_err = (c2_bof_err_fn)elfload_sym(mod, "LastError");
+  c2_bof_free_fn release = (c2_bof_free_fn)elfload_sym(mod, "Free");
   if (run == NULL || last_err == NULL || release == NULL) {
     elfload_free(mod);
     return C2_ERR_UNSUPPORTED;

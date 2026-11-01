@@ -8,14 +8,18 @@
 # The C2 runs this on every module invocation; the build is idempotent.
 CC = zig cc
 ZIG_TARGET ?= x86_64-linux-gnu.2.17
-CFLAGS = -O2 -fPIC -Wall -fvisibility=hidden
+CFLAGS = -O2 -fPIC -std=c99 -Wall -Wextra -Werror -fvisibility=hidden \
+         -fno-builtin -fno-stack-protector -fno-sanitize=all -fno-ident \
+         -ffunction-sections -fdata-sections
+LDFLAGS = -shared -Wl,--gc-sections -Wl,--build-id=none -Wl,-z,noexecstack \
+          -Wl,--hash-style=both
 TARGET = coffloader_linux.so
 SOURCES = loader_linux.c beacon_compat.c
 
 all: $(TARGET)
 
 $(TARGET): $(SOURCES)
-	$(CC) -target $(ZIG_TARGET) -shared $(CFLAGS) -o $@ $(SOURCES)
+	$(CC) -target $(ZIG_TARGET) $(CFLAGS) $(LDFLAGS) -o $@ $(SOURCES)
 	@command -v strip >/dev/null 2>&1 && \
 	  strip --remove-section=.comment $@ || true
 

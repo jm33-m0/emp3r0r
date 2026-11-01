@@ -7,7 +7,7 @@
  * The loader itself is not linked into the agent: it is the `coffloader_linux`
  * dependency module (coffloader_linux.so), the Linux counterpart of the Windows
  * COFFLoader DLL. c2_bof_run maps the loader image from memory with elfload,
- * calls its `bof_run` export with the object and packed arguments, and unmaps
+ * calls its `Run` export with the object and packed arguments, and unmaps
  * it again.
  *
  * The Go agent maps the same dependency with memmod (core/lib/coffloader), so
@@ -25,7 +25,8 @@ extern "C" {
  *
  *   uint32(body_len) || value...
  *
- * Each `args[i]` is a prefixed token, mirroring Go's PackCoffArgs/packLinuxArgs:
+ * Each `args[i]` is a prefixed token, mirroring Go's
+ *PackCoffArgs/packLinuxArgs:
  *   i<int32>   s<int16>   z<string>   Z<wide string>   b<hex bytes>
  *
  * Returns C2_OK and sets *out_len, or C2_ERR_ARG/C2_ERR_NOMEM.

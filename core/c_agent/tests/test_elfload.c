@@ -169,9 +169,9 @@ int main(void) {
   elfload_module *m = elfload_map(image, len, err, sizeof(err));
   CHECK(m != NULL);
   if (m != NULL) {
-    CHECK(elfload_sym(m, "bof_run") != NULL);
-    CHECK(elfload_sym(m, "bof_last_error") != NULL);
-    CHECK(elfload_sym(m, "bof_free") != NULL);
+    CHECK(elfload_sym(m, "Run") != NULL);
+    CHECK(elfload_sym(m, "LastError") != NULL);
+    CHECK(elfload_sym(m, "Free") != NULL);
     CHECK(elfload_sym(m, "definitely_not_exported") == NULL);
     CHECK(elfload_sym(m, NULL) == NULL);
   }

@@ -21,11 +21,14 @@ typedef struct {
 /* Resolve a Beacon API name to the loader's implementation. */
 void *beacon_api_lookup(const char *name);
 
-/* Resolve a host symbol from libc. */
+/* Resolve a host symbol from the process global symbol scope. */
 void *beacon_host_dlsym(const char *name);
 
 /* Captured BeaconPrintf/BeaconOutput data. take transfers ownership. */
 void beacon_output_reset(void);
 char *beacon_output_take(void);
+
+/* Release the environment snapshot taken by getEnviron. */
+void beacon_env_reset(void);
 
 #endif /* BOF_BEACON_COMPAT_H */

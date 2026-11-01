@@ -24,8 +24,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 
   /* Exercise the exported-symbol lookup over the module's own dynamic symbol
    * table, including a name taken from the input. */
-  static const char *const names[] = {"go", "bof_run", "bof_free", "dlsym",
-                                      "x"};
+  static const char *const names[] = { "go", "Run", "Free", "LastError", "x" };
   (void)elfload_sym(m, names[size % (sizeof(names) / sizeof(names[0]))]);
 
   char name[32];

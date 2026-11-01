@@ -8,7 +8,7 @@ nothing invokes it directly, it is hosted by the C2 as
 ## Source layout
 
 - `loader_linux.c` — ELF object mapping, relocations, signal handling and the
-  exported `bof_run`/`bof_free`/`bof_last_error` ABI.
+  exported `Run`/`Free`/`LastError` ABI.
 - `beacon_compat.c` / `beacon_compat.h` — the Beacon API shims BOFs resolve
   against, plus the captured output buffer.
 
@@ -32,17 +32,22 @@ Linux agent with libc mapped. A statically linked agent returns a clear
 and `memmod`, the C agent through `core/c_agent/src/util/elfload.c`):
 
 - Parses an x86_64 `ET_REL` object.
-- Maps `SHF_ALLOC` sections into one anonymous, page-aligned region and applies
-  the `R_X86_64_64/32/32S/PC32/PLT32` relocations.
-- Resolves undefined symbols to the mocked Beacon API first, then to the host
-  process (`dlsym(RTLD_DEFAULT, …)`), building a 16-byte `movabs/jmp` trampoline
-  for each. `getEnviron` and `getOSName` from the TrustedSec compatibility layer
-  are mocked too.
-- Applies `W^X` per section and executes the requested entry point.
+- Packs `SHF_ALLOC` sections into one anonymous mapping with three page-aligned
+  segments by protection (RX, R, RW), keeping the trampoline page inside the
+  executable segment. Sections that are both writable and executable are
+  rejected, so the image never contains an RWX mapping.
+- Applies the `R_X86_64_64/32/32S/PC32/PLT32` relocations.
+- Resolves undefined symbols to the mocked Beacon API first, then to the host's
+  global symbol scope (`__libc_dlsym(NULL, …)` on glibc, `dlsym(RTLD_DEFAULT,
+  …)` elsewhere), building a 16-byte `movabs/jmp` trampoline for each.
+  `getEnviron` and `getOSName` from the TrustedSec compatibility layer are
+  mocked too.
+- Applies `W^X` per segment and executes the requested entry point.
 - Catches `SIGSEGV`/`SIGBUS`/`SIGILL`/`SIGFPE` during execution and returns an
   error instead of killing the agent.
+- Rejects images larger than 64 MiB and truncates captured output at 8 MiB.
 
-`bof_run` is the only exported symbol. Everything else is built with
+`Run` is the only entry point; every other symbol is built with
 `-fvisibility=hidden`.
 
 The parser validates every offset and length against the object size before it
@@ -61,7 +66,7 @@ The loader implements the Beacon compatibility API that BOFs commonly use:
 ## Arguments
 
 `core/c_agent/src/bof.c` packs arguments in the Windows COFFLoader wire
-format before calling `bof_run`: a leading `uint32` body length, then per
+format before calling `Run`: a leading `uint32` body length, then per
 argument `int32`, `int16`, a length-prefixed **NUL-terminated** `char *`
 (`z`/`cstr`/`S`), a length-prefixed NUL-terminated UTF-16LE `wchar_t *`
 (`Z`/`wstr`), or a length-prefixed binary blob (`b`).
@@ -72,8 +77,9 @@ argument `int32`, `int16`, a length-prefixed **NUL-terminated** `char *`
 make -C core/modules/coffloader_linux
 ```
 
-Built with `zig cc -target x86_64-linux-gnu.2.17 -shared -fPIC -O2 -ldl`; the
-`.comment` section is stripped. The output is `coffloader_linux.so`.
+Built with `zig cc -target x86_64-linux-gnu.2.17 -shared -fPIC -O2` with
+`-fvisibility=hidden`; the linker drops unused sections, emits no build ID, and
+the `.comment` section is stripped. The output is `coffloader_linux.so`.
 
 ## Use
 

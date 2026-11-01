@@ -62,6 +62,10 @@ static int range_ok(uint64_t off, uint64_t len, size_t total) {
   return off <= (uint64_t)total && len <= (uint64_t)total - off;
 }
 
+/* Upper bound for the mapped image. BOFs are small; a crafted object with a
+ * huge NOBITS section must not be able to reserve an arbitrary mapping. */
+#define BOF_IMAGE_MAX (64u << 20)
+
 /* True when a NUL-terminated string at `off` terminates within the table. */
 static int cstr_ok(const char *base, size_t total, uint64_t off) {
   if (base == NULL || off >= (uint64_t)total) {
@@ -88,7 +92,7 @@ static void bof_lock_release(void) {
 
 // Saved signal handlers
 static struct sigaction old_sa[32];
-static int handled_sigs[] = {SIGSEGV, SIGBUS, SIGILL, SIGFPE};
+static int handled_sigs[] = { SIGSEGV, SIGBUS, SIGILL, SIGFPE };
 #define NUM_HANDLED_SIGS (sizeof(handled_sigs) / sizeof(handled_sigs[0]))
 
 // Crash-recovery state. bof_run serializes every execution with bof_lock, so
@@ -125,24 +129,48 @@ static void bof_signal_handler(int sig, siginfo_t *info, void *ctx) {
   }
 }
 
+enum {
+  BOF_SEG_RX = 0, /* executable */
+  BOF_SEG_RO,     /* read-only data */
+  BOF_SEG_RW,     /* writable data */
+  BOF_SEG_COUNT
+};
+
+static int bof_seg_for(const Elf64_Shdr *sh) {
+  if (sh->sh_flags & SHF_EXECINSTR)
+    return BOF_SEG_RX;
+  if (sh->sh_flags & SHF_WRITE)
+    return BOF_SEG_RW;
+  return BOF_SEG_RO;
+}
+
 // bof_run_impl loads an x86_64 ELF ET_REL object and executes the requested
-// symbol. It is internal; the exported bof_run() wraps it with a stable,
+// symbol. It is internal; the exported Run() wraps it with a stable,
 // machine-callable ABI (see below).
+//
+// Sections are packed into three page-aligned segments by protection (RX, R,
+// RW), like a normal shared object, instead of one page per section. That keeps
+// the mapping compact, gives it ordinary segment boundaries, and guarantees
+// there is never a writable and executable mapping.
 static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
                         const char *func_name, const uint8_t *args_buf,
                         int args_len, char **out_buf, char **err_buf) {
+
+  uint8_t *mem_base = NULL;
+  uintptr_t *sec_offsets = NULL;
+  uint64_t total_size = 0;
 
   // Serialize access
   bof_lock_acquire();
 
   if (!obj_buf || object_size < sizeof(Elf64_Ehdr)) {
-    bof_lock_release();
-    return set_err(err_buf, "invalid object buffer");
+    set_err(err_buf, "invalid object buffer");
+    goto fail;
   }
 
   const char *entry_name = (func_name && func_name[0]) ? func_name : "go";
 
-  uint8_t empty_args[4] = {0};
+  uint8_t empty_args[4] = { 0 };
   if (!args_buf || args_len <= 0) {
     args_buf = empty_args;
     args_len = (int)sizeof(empty_args);
@@ -152,8 +180,8 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
   if (memcmp(ehdr->e_ident, ELFMAG, SELFMAG) != 0 ||
       ehdr->e_ident[EI_CLASS] != ELFCLASS64 || ehdr->e_machine != EM_X86_64 ||
       ehdr->e_type != ET_REL) {
-    bof_lock_release();
-    return set_err(err_buf, "object is not x86_64 ET_REL");
+    set_err(err_buf, "unsupported image");
+    goto fail;
   }
 
   /* The section header table is walked by index throughout, so validate it
@@ -161,53 +189,102 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
   if (ehdr->e_shentsize != sizeof(Elf64_Shdr) || ehdr->e_shnum == 0 ||
       !range_ok(ehdr->e_shoff, (uint64_t)ehdr->e_shnum * sizeof(Elf64_Shdr),
                 object_size)) {
-    bof_lock_release();
-    return set_err(err_buf, "invalid section header table");
+    set_err(err_buf, "invalid section header table");
+    goto fail;
   }
 
   Elf64_Shdr *shdrs = (Elf64_Shdr *)(obj_buf + ehdr->e_shoff);
 
-  uintptr_t *sec_offsets =
-      (uintptr_t *)calloc(ehdr->e_shnum, sizeof(uintptr_t));
+  sec_offsets = (uintptr_t *)calloc(ehdr->e_shnum, sizeof(uintptr_t));
   if (!sec_offsets) {
-    bof_lock_release();
-    return set_err(err_buf, "calloc sec_offsets failed");
+    set_err(err_buf, "out of memory");
+    goto fail;
   }
 
-  uint64_t total_size = 0;
+  uint64_t seg_size[BOF_SEG_COUNT] = { 0 };
   for (int i = 0; i < ehdr->e_shnum; i++) {
     if (!(shdrs[i].sh_flags & SHF_ALLOC)) {
       continue;
     }
-    // Force page alignment for all sections to allow granular mprotect
-    uint64_t align = 4096;
-    total_size = align_up(total_size, align);
-    sec_offsets[i] = total_size;
-    if (total_size > UINT64_MAX - shdrs[i].sh_size) {
-      free(sec_offsets);
-      bof_lock_release();
-      return set_err(err_buf, "section size overflow");
+    if ((shdrs[i].sh_flags & (SHF_WRITE | SHF_EXECINSTR)) ==
+        (SHF_WRITE | SHF_EXECINSTR)) {
+      set_err(err_buf, "writable executable section");
+      goto fail;
     }
-    total_size += shdrs[i].sh_size;
+    uint64_t align = shdrs[i].sh_addralign;
+    if (align == 0) {
+      align = 1;
+    }
+    if ((align & (align - 1)) != 0 || align > 65536) {
+      set_err(err_buf, "bad section alignment");
+      goto fail;
+    }
+    int seg = bof_seg_for(&shdrs[i]);
+    uint64_t off = align_up(seg_size[seg], align);
+    if (off < seg_size[seg] || off > UINT64_MAX - shdrs[i].sh_size) {
+      set_err(err_buf, "section size overflow");
+      goto fail;
+    }
+    sec_offsets[i] = (uintptr_t)off;
+    seg_size[seg] = off + shdrs[i].sh_size;
   }
 
-  total_size = align_up(total_size, 4096);
-  uintptr_t trampoline_offset = total_size;
-  total_size += 4096; // Space for up to 256 trampolines
-
-  if (total_size == 0) {
-    free(sec_offsets);
-    bof_lock_release();
-    return set_err(err_buf, "no alloc sections");
+  if (seg_size[BOF_SEG_RX] == 0 && seg_size[BOF_SEG_RO] == 0 &&
+      seg_size[BOF_SEG_RW] == 0) {
+    set_err(err_buf, "empty image");
+    goto fail;
   }
+
+  /* The trampoline page sits at the end of the executable segment, so code
+   * and trampolines share one RX mapping. 256 trampolines fit in one page. */
+  uint64_t tramp_local = align_up(seg_size[BOF_SEG_RX], 16);
+  if (tramp_local > UINT64_MAX - 4096) {
+    set_err(err_buf, "section size overflow");
+    goto fail;
+  }
+  seg_size[BOF_SEG_RX] = tramp_local + 4096;
+
+  uint64_t seg_base[BOF_SEG_COUNT];
+  seg_base[BOF_SEG_RX] = 0;
+  seg_base[BOF_SEG_RO] = align_up(seg_size[BOF_SEG_RX], 4096);
+  if (seg_base[BOF_SEG_RO] < seg_size[BOF_SEG_RX] ||
+      seg_size[BOF_SEG_RO] > UINT64_MAX - seg_base[BOF_SEG_RO]) {
+    set_err(err_buf, "section size overflow");
+    goto fail;
+  }
+  seg_base[BOF_SEG_RW] =
+      align_up(seg_base[BOF_SEG_RO] + seg_size[BOF_SEG_RO], 4096);
+  if (seg_base[BOF_SEG_RW] < seg_base[BOF_SEG_RO] ||
+      seg_size[BOF_SEG_RW] > UINT64_MAX - seg_base[BOF_SEG_RW]) {
+    set_err(err_buf, "section size overflow");
+    goto fail;
+  }
+  total_size = align_up(seg_base[BOF_SEG_RW] + seg_size[BOF_SEG_RW], 4096);
+  if (total_size == 0 || total_size < seg_base[BOF_SEG_RW] ||
+      total_size > SIZE_MAX) {
+    set_err(err_buf, "section size overflow");
+    goto fail;
+  }
+  if (total_size > BOF_IMAGE_MAX) {
+    set_err(err_buf, "image too large");
+    goto fail;
+  }
+
+  for (int i = 0; i < ehdr->e_shnum; i++) {
+    if (!(shdrs[i].sh_flags & SHF_ALLOC)) {
+      continue;
+    }
+    sec_offsets[i] += (uintptr_t)seg_base[bof_seg_for(&shdrs[i])];
+  }
+  uintptr_t trampoline_offset = (uintptr_t)(seg_base[BOF_SEG_RX] + tramp_local);
 
   // Writable initially for loading
-  uint8_t *mem_base = mmap(NULL, total_size, PROT_READ | PROT_WRITE,
-                           MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  mem_base = mmap(NULL, (size_t)total_size, PROT_READ | PROT_WRITE,
+                  MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (mem_base == MAP_FAILED) {
-    free(sec_offsets);
-    bof_lock_release();
-    return set_err(err_buf, "mmap failed");
+    mem_base = NULL;
+    set_err(err_buf, "mmap failed");
+    goto fail;
   }
 
   for (int i = 0; i < ehdr->e_shnum; i++) {
@@ -216,10 +293,8 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
     }
     if (shdrs[i].sh_type != SHT_NOBITS) {
       if (!range_ok(shdrs[i].sh_offset, shdrs[i].sh_size, object_size)) {
-        munmap(mem_base, total_size);
-        free(sec_offsets);
-        bof_lock_release();
-        return set_err(err_buf, "section out of bounds");
+        set_err(err_buf, "section out of bounds");
+        goto fail;
       }
       memcpy(mem_base + sec_offsets[i], obj_buf + shdrs[i].sh_offset,
              shdrs[i].sh_size);
@@ -235,18 +310,14 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
       if (shdrs[i].sh_link >= ehdr->e_shnum ||
           shdrs[i].sh_size % sizeof(Elf64_Sym) != 0 ||
           !range_ok(shdrs[i].sh_offset, shdrs[i].sh_size, object_size)) {
-        munmap(mem_base, total_size);
-        free(sec_offsets);
-        bof_lock_release();
-        return set_err(err_buf, "invalid symtab");
+        set_err(err_buf, "invalid symtab");
+        goto fail;
       }
       Elf64_Shdr *str_sh = &shdrs[shdrs[i].sh_link];
       if (str_sh->sh_type != SHT_STRTAB || str_sh->sh_size == 0 ||
           !range_ok(str_sh->sh_offset, str_sh->sh_size, object_size)) {
-        munmap(mem_base, total_size);
-        free(sec_offsets);
-        bof_lock_release();
-        return set_err(err_buf, "invalid strtab");
+        set_err(err_buf, "invalid strtab");
+        goto fail;
       }
       symtab = (Elf64_Sym *)(obj_buf + shdrs[i].sh_offset);
       num_syms = (int)(shdrs[i].sh_size / sizeof(Elf64_Sym));
@@ -257,10 +328,8 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
   }
 
   if (!symtab || !strtab) {
-    munmap(mem_base, total_size);
-    free(sec_offsets);
-    bof_lock_release();
-    return set_err(err_buf, "missing symtab");
+    set_err(err_buf, "missing symtab");
+    goto fail;
   }
 
   int next_trampoline = 0;
@@ -271,10 +340,8 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
 
     uint32_t target_sec_idx = shdrs[i].sh_info;
     if (target_sec_idx >= (uint32_t)ehdr->e_shnum) {
-      munmap(mem_base, total_size);
-      free(sec_offsets);
-      bof_lock_release();
-      return set_err(err_buf, "invalid relocation target");
+      set_err(err_buf, "invalid relocation target");
+      goto fail;
     }
 
     uintptr_t target_base_offset = sec_offsets[target_sec_idx];
@@ -284,10 +351,8 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
 
     if (shdrs[i].sh_size % sizeof(Elf64_Rela) != 0 ||
         !range_ok(shdrs[i].sh_offset, shdrs[i].sh_size, object_size)) {
-      munmap(mem_base, total_size);
-      free(sec_offsets);
-      bof_lock_release();
-      return set_err(err_buf, "invalid rela section");
+      set_err(err_buf, "invalid rela section");
+      goto fail;
     }
 
     int num_rels = (int)(shdrs[i].sh_size / sizeof(Elf64_Rela));
@@ -303,29 +368,23 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
       uint64_t patch_size = (type == R_X86_64_64) ? 8 : 4;
       if (rel.r_offset > shdrs[target_sec_idx].sh_size ||
           patch_size > shdrs[target_sec_idx].sh_size - rel.r_offset) {
-        munmap(mem_base, total_size);
-        free(sec_offsets);
-        bof_lock_release();
-        return set_err(err_buf, "relocation out of bounds");
+        set_err(err_buf, "relocation out of bounds");
+        goto fail;
       }
 
       uintptr_t patch_addr =
           (uintptr_t)mem_base + target_base_offset + rel.r_offset;
 
       if (sym_idx >= (uint32_t)num_syms) {
-        munmap(mem_base, total_size);
-        free(sec_offsets);
-        bof_lock_release();
-        return set_err(err_buf, "rel sym out of range");
+        set_err(err_buf, "rel sym out of range");
+        goto fail;
       }
 
       Elf64_Sym sym = symtab[sym_idx];
       uintptr_t sym_addr = 0;
       if (!cstr_ok(strtab, strtab_size, sym.st_name)) {
-        munmap(mem_base, total_size);
-        free(sec_offsets);
-        bof_lock_release();
-        return set_err(err_buf, "invalid symbol name");
+        set_err(err_buf, "invalid symbol name");
+        goto fail;
       }
       const char *sym_name = strtab + sym.st_name;
 
@@ -335,18 +394,13 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
           handle = beacon_host_dlsym(sym_name);
         }
         if (!handle) {
-          munmap(mem_base, total_size);
-          free(sec_offsets);
-          bof_lock_release();
-          return set_errf(err_buf, "unresolved symbol: %s", sym_name);
+          set_errf(err_buf, "unresolved symbol: %s", sym_name);
+          goto fail;
         }
 
         if (next_trampoline >= 256) {
-          munmap(mem_base, total_size);
-          free(sec_offsets);
-          bof_lock_release();
-          return set_err(err_buf,
-                         "too many undefined symbols for trampoline limit");
+          set_err(err_buf, "too many undefined symbols for trampoline limit");
+          goto fail;
         }
         uint8_t *tramp = mem_base + trampoline_offset + (next_trampoline * 16);
         next_trampoline++;
@@ -364,10 +418,8 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
         if (sym.st_shndx >= ehdr->e_shnum ||
             !(shdrs[sym.st_shndx].sh_flags & SHF_ALLOC) ||
             sym.st_value > shdrs[sym.st_shndx].sh_size) {
-          munmap(mem_base, total_size);
-          free(sec_offsets);
-          bof_lock_release();
-          return set_err(err_buf, "invalid symbol section");
+          set_err(err_buf, "invalid symbol section");
+          goto fail;
         }
         sym_addr =
             (uintptr_t)mem_base + sec_offsets[sym.st_shndx] + sym.st_value;
@@ -387,54 +439,41 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
       case R_X86_64_PLT32: {
         int64_t val = (int64_t)sym_addr + rel.r_addend - (int64_t)patch_addr;
         if (val > 2147483647L || val < -2147483648L) {
-          munmap(mem_base, total_size);
-          free(sec_offsets);
-          bof_lock_release();
-          return set_errf(err_buf,
-                          "relocation overflow for symbol %s (type %u): "
-                          "distance %ld exceeds 32 bits",
-                          sym_name, type, val);
+          set_errf(err_buf, "relocation overflow for symbol %s (type %u): "
+                            "distance %ld exceeds 32 bits",
+                   sym_name, type, val);
+          goto fail;
         }
         *(uint32_t *)patch_addr = (uint32_t)val;
         break;
       }
       default:
-        munmap(mem_base, total_size);
-        free(sec_offsets);
-        bof_lock_release();
-        return set_errf(err_buf, "unsupported relocation %u for symbol %s",
-                        type, sym_name);
+        set_errf(err_buf, "unsupported relocation %u for symbol %s", type,
+                 sym_name);
+        goto fail;
       }
     }
   }
 
-  mprotect(mem_base + trampoline_offset, 4096, PROT_READ | PROT_EXEC);
-
-  // Apply protection (W^X)
-  for (int i = 0; i < ehdr->e_shnum; i++) {
-    if (!(shdrs[i].sh_flags & SHF_ALLOC)) {
-      continue;
-    }
-    uintptr_t start = (uintptr_t)mem_base + sec_offsets[i];
-    uint64_t size = shdrs[i].sh_size;
-    if (size == 0)
-      continue;
-
-    uint64_t prot_len = align_up(size, 4096);
-
-    int prot = PROT_READ;
-    // Map data as RW, code as RX
-    if (shdrs[i].sh_flags & SHF_WRITE)
-      prot |= PROT_WRITE;
-    if (shdrs[i].sh_flags & SHF_EXECINSTR)
-      prot |= PROT_EXEC;
-
-    if (mprotect((void *)start, prot_len, prot) < 0) {
-      munmap(mem_base, total_size);
-      free(sec_offsets);
-      bof_lock_release();
-      return set_err(err_buf, "mprotect failed");
-    }
+  /* Apply protection (W^X): the executable segment also holds the
+   * trampolines, and no section may end up writable and executable. */
+  if (mprotect(mem_base, (size_t)align_up(seg_size[BOF_SEG_RX], 4096),
+               PROT_READ | PROT_EXEC) < 0) {
+    set_err(err_buf, "mprotect failed");
+    goto fail;
+  }
+  if (seg_size[BOF_SEG_RO] != 0 &&
+      mprotect(mem_base + seg_base[BOF_SEG_RO],
+               (size_t)align_up(seg_size[BOF_SEG_RO], 4096), PROT_READ) < 0) {
+    set_err(err_buf, "mprotect failed");
+    goto fail;
+  }
+  if (seg_size[BOF_SEG_RW] != 0 &&
+      mprotect(mem_base + seg_base[BOF_SEG_RW],
+               (size_t)align_up(seg_size[BOF_SEG_RW], 4096),
+               PROT_READ | PROT_WRITE) < 0) {
+    set_err(err_buf, "mprotect failed");
+    goto fail;
   }
 
   uintptr_t entry_addr = 0;
@@ -453,10 +492,8 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
       if (symtab[i].st_shndx >= ehdr->e_shnum ||
           !(shdrs[symtab[i].st_shndx].sh_flags & SHF_ALLOC) ||
           symtab[i].st_value > shdrs[symtab[i].st_shndx].sh_size) {
-        munmap(mem_base, total_size);
-        free(sec_offsets);
-        bof_lock_release();
-        return set_err(err_buf, "invalid entry symbol");
+        set_err(err_buf, "invalid entry symbol");
+        goto fail;
       }
       entry_addr = (uintptr_t)mem_base + sec_offsets[symtab[i].st_shndx] +
                    symtab[i].st_value;
@@ -465,10 +502,8 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
   }
 
   if (!entry_addr) {
-    munmap(mem_base, total_size);
-    free(sec_offsets);
-    bof_lock_release();
-    return set_errf(err_buf, "function %s not found", entry_name);
+    set_errf(err_buf, "function %s not found", entry_name);
+    goto fail;
   }
 
   // Install signal handlers
@@ -477,7 +512,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
   sa.sa_sigaction = bof_signal_handler;
   sa.sa_flags = SA_SIGINFO | SA_NODEFER | SA_ONSTACK;
 
-  for (int i = 0; i < NUM_HANDLED_SIGS; i++) {
+  for (size_t i = 0; i < NUM_HANDLED_SIGS; i++) {
     sigaction(handled_sigs[i], &sa, &old_sa[handled_sigs[i]]);
   }
 
@@ -493,12 +528,12 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
     is_in_bof = 0;
   } else {
     is_in_bof = 0;
-    status = -1; // Specific status for crash?
-    set_err(err_buf, "BOF Crashed (SIGSEGV/SIGBUS/etc caught)");
+    status = -1;
+    set_err(err_buf, "guest execution fault");
   }
 
   // Restore signal handlers
-  for (int i = 0; i < NUM_HANDLED_SIGS; i++) {
+  for (size_t i = 0; i < NUM_HANDLED_SIGS; i++) {
     sigaction(handled_sigs[i], &old_sa[handled_sigs[i]], NULL);
   }
 
@@ -515,27 +550,40 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
     beacon_output_reset();
   }
 
-  munmap(mem_base, total_size);
+  beacon_env_reset();
+  munmap(mem_base, (size_t)total_size);
   free(sec_offsets);
   bof_lock_release();
   return status;
+
+fail:
+  beacon_env_reset();
+  if (mem_base != NULL) {
+    munmap(mem_base, (size_t)total_size);
+  }
+  free(sec_offsets);
+  bof_lock_release();
+  return -1;
 }
 
 /* Public ABI. Kept to five machine-word arguments so it can be called by the
  * Go agent's in-memory loader (memmod supports at most five) as well as by the
  * C agent's dynload. The output is a malloc'd, NUL-terminated buffer on
- * success and NULL on failure; bof_last_error() then describes the error.
- * Free the returned buffer with bof_free(). */
+ * success and NULL on failure; LastError() then describes the error. Free the
+ * returned buffer with Free(). */
 static char bof_err_buf[512];
 
-__attribute__((visibility("default"))) char *
-bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
-        const uint8_t *args_buf, int args_len) {
+__attribute__((visibility("default"))) char *Run(const uint8_t *obj_buf,
+                                                 size_t object_size,
+                                                 const char *func_name,
+                                                 const uint8_t *args_buf,
+                                                 int args_len) {
   char *out = NULL;
   char *err = NULL;
 
-  if (bof_run_impl(obj_buf, object_size, func_name, args_buf, args_len, &out,
-                   &err) != 0) {
+  int rc = bof_run_impl(obj_buf, object_size, func_name, args_buf, args_len,
+                        &out, &err);
+  if (rc != 0) {
     if (err != NULL) {
       snprintf(bof_err_buf, sizeof(bof_err_buf), "%s", err);
       free(err);
@@ -556,10 +604,8 @@ bof_run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
   return out;
 }
 
-__attribute__((visibility("default"))) const char *bof_last_error(void) {
+__attribute__((visibility("default"))) const char *LastError(void) {
   return bof_err_buf;
 }
 
-__attribute__((visibility("default"))) void bof_free(char *p) {
-  free(p);
-}
+__attribute__((visibility("default"))) void Free(char *p) { free(p); }
