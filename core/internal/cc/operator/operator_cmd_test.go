@@ -158,3 +158,62 @@ func TestC2AddressAndPortCompletions(t *testing.T) {
 		t.Errorf("c2AddressCompletions() did not preserve explicit URL: %v", got)
 	}
 }
+
+// TestModuleCommandTreeDoesNotCacheFlags locks in that a module invocation's
+// flag values live for one command tree only. The console builds a fresh tree
+// per run; --riscv set on one tree must not leak into the next, and the
+// module's option default must stay pristine.
+func TestModuleCommandTreeDoesNotCacheFlags(t *testing.T) {
+	const name = "flag_cache_probe"
+	previous, existed := def.Modules.Load(name)
+	def.Modules.Store(name, &def.ModuleConfig{
+		Name: name,
+		Options: def.ModOptions{
+			"riscv": &def.ModOption{Name: "riscv", Desc: "probe", Val: "0", Type: "bool"},
+		},
+	})
+	t.Cleanup(func() {
+		if existed {
+			def.Modules.Store(name, previous)
+			return
+		}
+		def.Modules.Delete(name)
+	})
+
+	build := func() *cobra.Command {
+		root := &cobra.Command{}
+		addModuleCommands(root)
+		return root
+	}
+	riscvFlag := func(root *cobra.Command) bool {
+		cmd, _, err := root.Find([]string{name})
+		if err != nil {
+			t.Fatalf("find %s: %v", name, err)
+		}
+		value, err := cmd.Flags().GetBool("riscv")
+		if err != nil {
+			t.Fatalf("read riscv flag: %v", err)
+		}
+		return value
+	}
+
+	root := build()
+	cmd, _, err := root.Find([]string{name})
+	if err != nil {
+		t.Fatalf("find %s: %v", name, err)
+	}
+	if err := cmd.Flags().Set("riscv", "true"); err != nil {
+		t.Fatalf("set riscv: %v", err)
+	}
+	if !riscvFlag(root) {
+		t.Fatal("--riscv did not take effect on the first tree")
+	}
+
+	if riscvFlag(build()) {
+		t.Fatal("--riscv leaked into a fresh command tree")
+	}
+	mod, ok := def.GetModule(name)
+	if !ok || mod.Options["riscv"] == nil || mod.Options["riscv"].Val != "0" {
+		t.Fatalf("module option default was changed: %+v", mod)
+	}
+}

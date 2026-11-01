@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/uuid"
@@ -23,7 +24,10 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-// moduleCustom run a custom module
+// dependencyHostMu serializes dependency builds and hosting so concurrent
+// module runs cannot race in the shared module directory or WWWRoot.
+var dependencyHostMu sync.Mutex
+
 // moduleCustom run a custom module
 func moduleCustom(ctx *c2context.C2Context) {
 	// We might still need live.ActiveModule for metadata like Name
@@ -84,12 +88,13 @@ func moduleCustom(ctx *c2context.C2Context) {
 			logging.Errorf("--riscv requires an active agent")
 			return
 		}
-		dep := rvvmDependency(config.Platform)
-		if dep == "" {
-			logging.Errorf("--riscv requires a Linux or Windows module")
+		if agentOS := ctx.Target.GOOS; (agentOS != "" && agentOS != "linux") ||
+			(agentOS == "" && def.IsWindowsPlatform(config.Platform)) {
+			logging.Errorf("--riscv requires a Linux agent")
 			return
 		}
-		if err := ensureModuleDependencyHosted(ctx, dep); err != nil {
+		dep, err := ensureModuleDependencyHosted(ctx, "rvvm_linux")
+		if err != nil {
 			logging.Errorf("Running %s as RISC-V on %s: %v", config.Name, ctx.Target.Tag, err)
 			return
 		}
@@ -115,13 +120,17 @@ func moduleCustom(ctx *c2context.C2Context) {
 		}
 		logging.Infof("Running %s as a RISC-V BOF (%s)", config.Name, rvFile)
 		handleInMemoryModule(ctx, *config, "rv", invocation, peerIP, &payloadOverride{
-			file:      rvFile,
-			hosted:    strings.ToLower(config.Name) + ".rv",
-			typ:       "rv",
-			libraries: config.RiscvLibraries,
-		})
+			file:   rvFile,
+			hosted: strings.ToLower(config.Name) + ".rv",
+			typ:    "rv",
+		}, &dep)
 		return
 	}
+
+	// A previous --riscv run compiled this module's sources for RV32 in place.
+	// Native execution must never reuse those objects: drop them and rebuild
+	// with the host toolchain.
+	repairNativePayloads(config)
 
 	// Pre-flight every dependency this module declares before building or
 	// dispatching it: each dependency is built (when it has a build step) and
@@ -129,9 +138,23 @@ func moduleCustom(ctx *c2context.C2Context) {
 	// reported for what it is instead of surfacing later as a missing payload
 	// on the agent. Dependency modules are ordinary modules — today they are
 	// DLL loaders and shared-library backends, but nothing here assumes that.
+	var loaderDep *hostedDependency
+	loaderDepName := ""
+	if ctx.Target != nil && strings.EqualFold(payload_type, "coff") {
+		loaderDepName = coffLoaderDependency(ctx, config.Platform)
+		dep, err := ensureModuleDependencyHosted(ctx, loaderDepName)
+		if err != nil {
+			logging.Errorf("Running %s on %s: %v", config.Name, ctx.Target.Tag, err)
+			return
+		}
+		loaderDep = &dep
+	}
 	if ctx.Target != nil && len(config.Dependencies) > 0 {
 		for _, dep := range config.Dependencies {
-			if err := ensureModuleDependencyHosted(ctx, dep); err != nil {
+			if loaderDepName != "" && strings.EqualFold(dep, loaderDepName) {
+				continue
+			}
+			if _, err := ensureModuleDependencyHosted(ctx, dep); err != nil {
 				logging.Errorf("Running %s on %s: %v", config.Name, ctx.Target.Tag, err)
 				return
 			}
@@ -163,7 +186,7 @@ func moduleCustom(ctx *c2context.C2Context) {
 
 	// Every agent module runs in memory; there is no on-disk/fork-and-run
 	// path. handleInMemoryModule re-encodes the invocation for the agent.
-	handleInMemoryModule(ctx, *config, payload_type, invocation, peerIP, nil)
+	handleInMemoryModule(ctx, *config, payload_type, invocation, peerIP, nil, loaderDep)
 }
 
 // moduleFilesMissing reports whether any payload the module declares is not
@@ -191,16 +214,8 @@ func build_make_all(config *def.ModuleConfig) (out []byte, err error) {
 		return nil, fmt.Errorf("prepare module toolchain: %w", err)
 	}
 
-	if err := os.Chdir(config.Path); err != nil {
-		return nil, err
-	}
-	defer func() {
-		if chdirErr := os.Chdir(live.EmpWorkSpace); chdirErr != nil {
-			logging.Warningf("Failed changing directory to %s: %v", live.EmpWorkSpace, chdirErr)
-		}
-	}()
-
 	cmd := exec.Command("bash", "./make_all.sh")
+	cmd.Dir = config.Path
 	cmd.Env = buildEnv
 	out, err = cmd.CombinedOutput()
 	if err != nil {
@@ -211,19 +226,6 @@ func build_make_all(config *def.ModuleConfig) (out []byte, err error) {
 
 // build_module builds a local module using `build.sh`, passing flags as args to `./build.sh`
 func build_module(config *def.ModuleConfig, flags map[string]string) (out []byte, err error) {
-	err = os.Chdir(config.Path)
-	if err != nil {
-		return out, err
-	}
-	defer func() {
-		// Use a local error: assigning to the named return here would clobber
-		// the build's own error on the return path (a failed build would look
-		// like success and the caller would report a missing payload instead).
-		if chdirErr := os.Chdir(live.EmpWorkSpace); chdirErr != nil {
-			logging.Warningf("Failed changing directory to %s: %v", live.EmpWorkSpace, chdirErr)
-		}
-	}()
-
 	// Sort flag names so the generated command is deterministic, and shell-quote
 	// every value so paths with spaces/backslashes and empty defaults survive
 	// interpolation into the `sh -c` command line.
@@ -249,6 +251,7 @@ func build_module(config *def.ModuleConfig, flags map[string]string) (out []byte
 
 	// build module
 	cmd := exec.Command("sh", "-c", build_cmd)
+	cmd.Dir = config.Path
 	cmd.Env = buildEnv
 	out, err = cmd.CombinedOutput()
 	if err != nil {
@@ -303,10 +306,9 @@ func getPeerIP(flags map[string]string) string {
 // by the --riscv path, where the C2 hosts a recompiled RV32 object instead of
 // the native BOF.
 type payloadOverride struct {
-	file      string
-	hosted    string
-	typ       string
-	libraries []string
+	file   string
+	hosted string
+	typ    string
 }
 
 // flagEnabled reports whether an injected boolean option is on.
@@ -318,40 +320,28 @@ func flagEnabled(v string) bool {
 	return false
 }
 
-// rvvmDependency returns the interpreter dependency for a module platform.
-func rvvmDependency(platform string) string {
-	switch {
-	case def.IsLinuxPlatform(platform):
-		return "rvvm_linux"
-	case def.IsWindowsPlatform(platform):
-		return "rvvm_windows"
-	}
-	return ""
-}
-
 var bofArchObject = regexp.MustCompile(`(?i)\.(x64|x86|x86_64|amd64|386|aarch64|arm64)\.o$`)
 
-// riscvPayloadPath derives the RV32 object path from a native BOF path:
-// pwd.o -> pwd.rv.o, whoami.x64.o -> whoami.rv.o.
+// riscvPayloadPath derives the RV32 guest path from a native BOF path:
+// pwd.o -> pwd.rv, whoami.x64.o -> whoami.rv.
 func riscvPayloadPath(native string) string {
 	if bofArchObject.MatchString(native) {
-		return bofArchObject.ReplaceAllString(native, ".rv.o")
+		return bofArchObject.ReplaceAllString(native, ".rv")
 	}
 	if strings.HasSuffix(strings.ToLower(native), ".o") {
-		return native[:len(native)-2] + ".rv.o"
+		return native[:len(native)-2] + ".rv"
 	}
-	return native + ".rv.o"
+	return native + ".rv"
 }
 
 // buildRiscvPayload runs the module's RISC-V build. Modules can provide an
 // rv_build.sh; otherwise the normal build/make_all.sh runs with
 // EMP3R0R_BOF_ARCH=riscv32 so existing Makefiles can branch on it.
 func buildRiscvPayload(config *def.ModuleConfig, flags map[string]string) error {
-	env, err := moduleBuildEnv()
+	env, err := moduleBuildEnvRiscv()
 	if err != nil {
 		return err
 	}
-	env = append(env, "EMP3R0R_BOF_ARCH=riscv32")
 
 	var command string
 	switch {
@@ -381,10 +371,13 @@ func buildRiscvPayload(config *def.ModuleConfig, flags map[string]string) error 
 	if err != nil {
 		return fmt.Errorf("RISC-V build: %w", err)
 	}
+	if err := linkRiscvPayloads(config, env); err != nil {
+		return err
+	}
 	return nil
 }
 
-func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, payload_type string, invocation def.ResolvedInvocation, peerIP string, override *payloadOverride) {
+func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, payload_type string, invocation def.ResolvedInvocation, peerIP string, override *payloadOverride, dep *hostedDependency) {
 	if len(config.AgentConfig.Files) == 0 {
 		logging.Errorf("No files found for module %s in %s", config.Name, config.Path)
 		return
@@ -396,7 +389,12 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 	// (runtime.GOARCH). Prefer GOArch over the OS kernel Arch: a 386 agent
 	// running under WoW64 on x64 Windows reports Arch "x64".
 	payloadFile := config.AgentConfig.Files[0]
-	hostedName := strings.ToLower(live.ActiveModule.Name)
+	moduleName, err := safeComponent(strings.ToLower(live.ActiveModule.Name))
+	if err != nil {
+		logging.Errorf("Module %s: %v", live.ActiveModule.Name, err)
+		return
+	}
+	hostedName := moduleName
 	if override != nil {
 		payloadFile = override.file
 		hostedName = override.hosted
@@ -417,6 +415,12 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 		}
 	}
 
+	hostedName, err = safeComponent(hostedName)
+	if err != nil {
+		logging.Errorf("Module %s: %v", config.Name, err)
+		return
+	}
+
 	// Multi-file modules: host every companion file (all entries except the
 	// selected payload) and tell the agent where to cache them in memfs.
 	// Gated by the module's own config.json (module_files_memfs). DLL and COFF
@@ -427,20 +431,14 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 			if file == payloadFile {
 				continue
 			}
-			companion, err := hostModuleFile(live.ActiveModule.Name, file, filepath.Join(config.Path, file))
+			path, err := moduleFilePath(config.Path, file)
 			if err != nil {
-				logging.Errorf("Hosting companion file %s: %v", file, err)
+				logging.Errorf("Module %s: %v", config.Name, err)
 				return
 			}
-			invocation.ModuleFiles = append(invocation.ModuleFiles, companion)
-		}
-	}
-
-	if override != nil {
-		for _, lib := range override.libraries {
-			companion, err := hostModuleFile(config.Name, lib, filepath.Join(config.Path, lib))
+			companion, err := hostModuleFile(live.ActiveModule.Name, file, path)
 			if err != nil {
-				logging.Errorf("Hosting RISC-V library %s: %v", lib, err)
+				logging.Errorf("Hosting companion file %s: %v", file, err)
 				return
 			}
 			invocation.ModuleFiles = append(invocation.ModuleFiles, companion)
@@ -457,7 +455,11 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 	hosted_file := filepath.Join(paths.WWWRoot, hostedName+".gz")
 	logging.Infof("Compressing %s with gzip...", hostedName)
 
-	path := filepath.Join(config.Path, payloadFile)
+	path, err := moduleFilePath(config.Path, payloadFile)
+	if err != nil {
+		logging.Errorf("Module %s: %v", config.Name, err)
+		return
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		logging.Errorf("Reading %s: %v", path, err)
@@ -476,7 +478,10 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 	}
 	fileToDownload := filepath.Base(hosted_file)
 	cmd := fmt.Sprintf("%s --mod_name %s --type %s --file_to_download %s --checksum %s --invocation %s",
-		def.C2CmdCustomModule, strings.ToLower(live.ActiveModule.Name), payload_type, fileToDownload, crypto.SHA256SumFile(hosted_file), strconv.Quote(invB64))
+		def.C2CmdCustomModule, moduleName, payload_type, fileToDownload, crypto.SHA256SumFile(hosted_file), strconv.Quote(invB64))
+	if dep != nil && dep.Checksum != "" {
+		cmd += fmt.Sprintf(" --dep_checksum %s", dep.Checksum)
+	}
 	if peerIP != "" {
 		cmd += fmt.Sprintf(" --peer %s", strconv.Quote(peerIP))
 	}
@@ -488,10 +493,36 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 	}
 }
 
+// safeComponent rejects a module or payload name that could escape the
+// directory it is hosted under. Module metadata is operator-controlled, but a
+// name such as "../../etc/cron.d/x" must never become a WWWRoot path.
+func safeComponent(name string) (string, error) {
+	if name == "" || name == "." || name == ".." || strings.HasPrefix(name, "-") ||
+		filepath.Base(name) != name || strings.ContainsAny(name, "/\\") ||
+		strings.ContainsRune(name, 0) {
+		return "", fmt.Errorf("invalid module path component %q", name)
+	}
+	for _, r := range name {
+		if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') &&
+			(r < '0' || r > '9') && r != '.' && r != '_' && r != '-' {
+			return "", fmt.Errorf("invalid character in module path component %q", name)
+		}
+	}
+	return name, nil
+}
+
 // hostModuleFile compresses a companion file, hosts it in WWWRoot under a
 // module-unique name, and returns the ResolvedModuleFile the agent needs to
 // fetch and cache it in memfs.
 func hostModuleFile(moduleName, fileName, path string) (def.ResolvedModuleFile, error) {
+	moduleName, err := safeComponent(strings.ToLower(moduleName))
+	if err != nil {
+		return def.ResolvedModuleFile{}, err
+	}
+	base, err := safeComponent(filepath.Base(fileName))
+	if err != nil {
+		return def.ResolvedModuleFile{}, err
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return def.ResolvedModuleFile{}, fmt.Errorf("reading %s: %w", path, err)
@@ -501,10 +532,9 @@ func hostModuleFile(moduleName, fileName, path string) (def.ResolvedModuleFile, 
 		return def.ResolvedModuleFile{}, fmt.Errorf("compressing %s: %w", path, err)
 	}
 
-	base := filepath.Base(fileName)
 	// Unique per module so the agent's memfs cache key (derived from the
 	// basename) cannot collide across modules.
-	hostedBase := fmt.Sprintf("%s.%s.gz", strings.ToLower(moduleName), base)
+	hostedBase := fmt.Sprintf("%s.%s.gz", moduleName, base)
 	hostedPath := filepath.Join(paths.WWWRoot, hostedBase)
 	if err := os.WriteFile(hostedPath, compressed, 0o600); err != nil {
 		return def.ResolvedModuleFile{}, fmt.Errorf("writing %s: %w", hostedPath, err)
@@ -514,7 +544,7 @@ func hostModuleFile(moduleName, fileName, path string) (def.ResolvedModuleFile, 
 
 	return def.ResolvedModuleFile{
 		Name:     hostedBase,
-		MemPath:  fmt.Sprintf("memfs:///%s/%s", strings.ToLower(moduleName), base),
+		MemPath:  fmt.Sprintf("memfs:///%s/%s", moduleName, base),
 		Checksum: crypto.SHA256SumFile(hostedPath),
 	}, nil
 }
@@ -559,18 +589,27 @@ func hostDeclaredDependencies() {
 }
 
 // hostModulePayload compresses payload file of module config into
-// <module>.<arch>.gz under WWWRoot (unless already hosted) and returns the
-// hosted path. The module is not required to be a DLL module; any module with
-// payload files can be hosted this way.
+// <module>.<arch>.gz under WWWRoot and returns the hosted path. The archive is
+// rewritten on every call so a rebuilt payload never hides behind an old copy.
+// The module is not required to be a DLL module; any module with payload files
+// can be hosted this way.
 func hostModulePayload(config *def.ModuleConfig, file, arch string) (string, error) {
-	hosted := filepath.Join(paths.WWWRoot, fmt.Sprintf("%s.%s.gz", strings.ToLower(config.Name), arch))
-	if util.IsFileExist(hosted) {
-		return hosted, nil
+	name, err := safeComponent(strings.ToLower(config.Name))
+	if err != nil {
+		return "", err
 	}
+	arch, err = safeComponent(arch)
+	if err != nil {
+		return "", err
+	}
+	hosted := filepath.Join(paths.WWWRoot, fmt.Sprintf("%s.%s.gz", name, arch))
 	if err := os.MkdirAll(paths.WWWRoot, 0o700); err != nil {
 		return "", fmt.Errorf("create %s: %w", paths.WWWRoot, err)
 	}
-	path := filepath.Join(config.Path, file)
+	path, err := moduleFilePath(config.Path, file)
+	if err != nil {
+		return "", err
+	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("read %s: %w", path, err)
@@ -586,6 +625,29 @@ func hostModulePayload(config *def.ModuleConfig, file, arch string) (string, err
 	return hosted, nil
 }
 
+// hostedDependency is a dependency archive that the C2 has just built and
+// hosted, together with the identity the agent must verify before mapping it.
+type hostedDependency struct {
+	// Checksum is the SHA-256 of the uncompressed dependency image. The agent
+	// compares it against its cached copy and refetches only on a mismatch.
+	Checksum string
+}
+
+// coffLoaderDependency names the COFF loader for the target's OS: the Linux
+// shared object or the Windows COFFLoader DLL module. Older agents may not
+// report GOOS, so the module's own platform is the fallback.
+func coffLoaderDependency(ctx *c2context.C2Context, modulePlatform string) string {
+	if ctx != nil && ctx.Target != nil {
+		if strings.EqualFold(ctx.Target.GOOS, "windows") {
+			return "coffloader"
+		}
+		if ctx.Target.GOOS == "" && def.IsWindowsPlatform(modulePlatform) {
+			return "coffloader"
+		}
+	}
+	return "coffloader_linux"
+}
+
 // ensureModuleDependencyHosted makes sure the payload of dependency depName
 // is hosted and downloadable from the C2 file endpoint for the target agent's
 // arch before a module that depends on it is dispatched. hostDeclaredDependencies()
@@ -597,19 +659,15 @@ func hostModulePayload(config *def.ModuleConfig, file, arch string) (string, err
 // A dependency is an ordinary module with payload files: today BOF
 // dependencies are DLL loader modules ("coffloader"), but nothing in this
 // path assumes a particular payload type.
-func ensureModuleDependencyHosted(ctx *c2context.C2Context, depName string) error {
+func ensureModuleDependencyHosted(ctx *c2context.C2Context, depName string) (hostedDependency, error) {
 	if ctx == nil || ctx.Target == nil {
-		return fmt.Errorf("no target selected")
+		return hostedDependency{}, fmt.Errorf("no target selected")
 	}
 	arch := agentArch(ctx)
 	if arch == "" {
-		return fmt.Errorf("cannot determine target arch (GOArch=%q Arch=%q)", ctx.Target.GOArch, ctx.Target.Arch)
+		return hostedDependency{}, fmt.Errorf("cannot determine target arch (GOArch=%q Arch=%q)", ctx.Target.GOArch, ctx.Target.Arch)
 	}
 	depName = strings.ToLower(depName)
-	hosted := filepath.Join(paths.WWWRoot, fmt.Sprintf("%s.%s.gz", depName, arch))
-	if util.IsFileExist(hosted) {
-		return nil
-	}
 
 	// Locate the dependency module config (case-insensitive, module names are
 	// not guaranteed to be lowercase).
@@ -623,10 +681,10 @@ func ensureModuleDependencyHosted(ctx *c2context.C2Context, depName string) erro
 		}
 	})
 	if config == nil {
-		return fmt.Errorf("dependency module %q is not loaded; install it so dependent modules can fetch it", depName)
+		return hostedDependency{}, fmt.Errorf("dependency module %q is not loaded; install it so dependent modules can fetch it", depName)
 	}
 	if len(config.AgentConfig.Files) == 0 || config.Path == "" {
-		return fmt.Errorf("dependency module %q has no payload files", depName)
+		return hostedDependency{}, fmt.Errorf("dependency module %q has no payload files", depName)
 	}
 
 	// Pick the payload for the target arch. Modules may ship per-arch
@@ -636,26 +694,40 @@ func ensureModuleDependencyHosted(ctx *c2context.C2Context, depName string) erro
 	// silently served under the wrong arch name.
 	payloadFile := selectArchPayload(config.AgentConfig.Files, arch)
 	if fileArch := payloadArch(payloadFile); fileArch != "" && fileArch != arch {
-		return fmt.Errorf("dependency module %q ships no %s payload (found %s)", depName, arch, fileArch)
+		return hostedDependency{}, fmt.Errorf("dependency module %q ships no %s payload (found %s)", depName, arch, fileArch)
 	}
 
-	// Dependencies may not have their payload yet. Build it now: a module with
-	// a build command uses that, while a BOF suite uses make_all.sh to build
-	// both its x86 and x64 payloads.
-	if !util.IsFileExist(filepath.Join(config.Path, payloadFile)) {
-		if config.Build != "" {
-			if _, err := build_module(config, nil); err != nil {
-				return fmt.Errorf("building dependency %q: %w", depName, err)
-			}
-		} else if util.IsFileExist(filepath.Join(config.Path, "make_all.sh")) {
-			if _, err := build_make_all(config); err != nil {
-				return fmt.Errorf("building dependency %q: %w", depName, err)
-			}
+	// Build a buildable dependency on every use. Reusing a previously built
+	// interpreter/loader would keep serving an image from before a source or
+	// build change; the hosted archive is refreshed below with the new bytes.
+	// Serialize dependency builds so concurrent module runs cannot race in the
+	// shared module directory.
+	dependencyHostMu.Lock()
+	defer dependencyHostMu.Unlock()
+	if config.Build != "" {
+		if _, err := build_module(config, nil); err != nil {
+			return hostedDependency{}, fmt.Errorf("building dependency %q: %w", depName, err)
+		}
+	} else if util.IsFileExist(filepath.Join(config.Path, "make_all.sh")) &&
+		!util.IsFileExist(filepath.Join(config.Path, payloadFile)) {
+		// A precompiled suite only builds when its payload is missing.
+		if _, err := build_make_all(config); err != nil {
+			return hostedDependency{}, fmt.Errorf("building dependency %q: %w", depName, err)
 		}
 	}
 
-	_, err := hostModulePayload(config, payloadFile, arch)
-	return err
+	payloadPath, err := moduleFilePath(config.Path, payloadFile)
+	if err != nil {
+		return hostedDependency{}, fmt.Errorf("dependency module %q: %w", depName, err)
+	}
+	checksum := crypto.SHA256SumFile(payloadPath)
+	if checksum == "" {
+		return hostedDependency{}, fmt.Errorf("dependency module %q has no readable payload file", depName)
+	}
+	if _, err := hostModulePayload(config, payloadFile, arch); err != nil {
+		return hostedDependency{}, err
+	}
+	return hostedDependency{Checksum: checksum}, nil
 }
 
 // agentArch returns the canonical agent arch ("amd64"/"386") of ctx.Target,
@@ -709,6 +781,137 @@ func selectArchPayload(files []string, arch string) string {
 		}
 	}
 	return files[0]
+}
+
+// sourceManifestName records the install-tree hashes that were copied into a
+// workspace module. It lets the C2 distinguish an untouched auto-created copy
+// (safe to refresh after an install update) from an operator-edited file.
+const sourceManifestName = ".source-manifest"
+
+func readSourceManifest(dir string) (map[string]string, bool) {
+	manifest := make(map[string]string)
+	data, err := os.ReadFile(filepath.Join(dir, sourceManifestName))
+	if err != nil {
+		return manifest, false
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if line == "" {
+			continue
+		}
+		rel, hash, ok := strings.Cut(line, "\t")
+		if ok && rel != "" && hash != "" {
+			manifest[rel] = hash
+		}
+	}
+	return manifest, true
+}
+
+func writeSourceManifest(src, dst string, entries map[string]string) error {
+	var b strings.Builder
+	for rel, hash := range entries {
+		if rel == sourceManifestName {
+			continue
+		}
+		b.WriteString(rel)
+		b.WriteByte('\t')
+		b.WriteString(hash)
+		b.WriteByte('\n')
+	}
+	return os.WriteFile(filepath.Join(dst, sourceManifestName), []byte(b.String()), 0o600)
+}
+
+// recordSourceManifest snapshots the install tree after a fresh workspace copy.
+func recordSourceManifest(src, dst string) error {
+	entries := make(map[string]string)
+	err := filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		if rel == "." || info.IsDir() {
+			if info.IsDir() && info.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !info.Mode().IsRegular() || rel == sourceManifestName {
+			return nil
+		}
+		hash := crypto.SHA256SumFile(path)
+		if hash == "" {
+			return nil
+		}
+		entries[rel] = hash
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return writeSourceManifest(src, dst, entries)
+}
+
+// syncModuleSources keeps a workspace module in step with the installed tree.
+// A file is refreshed when it matches the hash recorded in the manifest; a file
+// the operator changed keeps its content and its old baseline, so later
+// installs do not overwrite it. Workspaces created before the manifest existed
+// are migrated by refreshing every differing file once.
+func syncModuleSources(src, dst string) error {
+	manifest, managed := readSourceManifest(dst)
+	err := filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		if rel == "." {
+			return nil
+		}
+		if info.IsDir() {
+			if info.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return os.MkdirAll(filepath.Join(dst, rel), 0o700)
+		}
+		if !info.Mode().IsRegular() || rel == sourceManifestName {
+			return nil
+		}
+		target := filepath.Join(dst, rel)
+		srcHash := crypto.SHA256SumFile(path)
+		if srcHash == "" {
+			return nil
+		}
+		if targetHash := crypto.SHA256SumFile(target); targetHash == srcHash {
+			manifest[rel] = srcHash
+			return nil
+		} else if managed && targetHash != "" && manifest[rel] != "" && targetHash != manifest[rel] {
+			// Operator edit: keep the file and its old baseline.
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
+			return err
+		}
+		if err := os.WriteFile(target, data, info.Mode().Perm()); err != nil {
+			return err
+		}
+		if err := os.Chtimes(target, info.ModTime(), info.ModTime()); err != nil {
+			return err
+		}
+		manifest[rel] = srcHash
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return writeSourceManifest(src, dst, manifest)
 }
 
 // scan custom modules in ModuleDir,
@@ -814,6 +1017,9 @@ func loadModuleDir(moduleDir string) ([]string, error) {
 	absDir, _ := filepath.Abs(moduleDir)
 	absWsDir, _ := filepath.Abs(wsDir)
 	if absDir != absWsDir && util.IsFileExist(filepath.Join(wsDir, "config.json")) {
+		if err := syncModuleSources(absDir, wsDir); err != nil {
+			logging.Warningf("Refreshing workspace module %s from %s: %v", wsDir, absDir, err)
+		}
 		return loadModuleDir(wsDir)
 	}
 
@@ -881,6 +1087,9 @@ func registerModuleConfig(moduleDir string, config *def.ModuleConfig, copiedPath
 			err = util.Copy(config.Path, wsDir)
 			if err != nil {
 				return fmt.Errorf("copying %s to %s: %v", config.Path, wsDir, err)
+			}
+			if err := recordSourceManifest(moduleDir, wsDir); err != nil {
+				logging.Warningf("Recording source manifest for %s: %v", wsDir, err)
 			}
 			config.Path = wsDir
 			*copiedPath = wsDir

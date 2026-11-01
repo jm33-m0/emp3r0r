@@ -1324,8 +1324,12 @@ func TestEnsureModuleDependencyHosted(t *testing.T) {
 
 	// 386 agent: coffloader.386.gz must be hosted from the x86 DLL.
 	ctx := &context.C2Context{Target: &def.Emp3r0rAgent{GOOS: "windows", GOArch: "386"}}
-	if err := ensureModuleDependencyHosted(ctx, "coffloader"); err != nil {
+	dep, err := ensureModuleDependencyHosted(ctx, "coffloader")
+	if err != nil {
 		t.Fatalf("ensureModuleDependencyHosted 386: %v", err)
+	}
+	if want := crypto.SHA256SumRaw([]byte(payloads["COFFLoader.x86.dll"])); dep.Checksum != want {
+		t.Fatalf("dependency checksum = %q, want %q", dep.Checksum, want)
 	}
 	hostedPath := filepath.Join(paths.WWWRoot, "coffloader.386.gz")
 	compressed, err := os.ReadFile(hostedPath)
@@ -1341,13 +1345,13 @@ func TestEnsureModuleDependencyHosted(t *testing.T) {
 	}
 
 	// Second call is idempotent (file already hosted).
-	if err := ensureModuleDependencyHosted(ctx, "coffloader"); err != nil {
+	if _, err := ensureModuleDependencyHosted(ctx, "coffloader"); err != nil {
 		t.Fatalf("second ensureModuleDependencyHosted: %v", err)
 	}
 
 	// amd64 agent: hosts the x64 payload as well.
 	amd64Ctx := &context.C2Context{Target: &def.Emp3r0rAgent{GOOS: "windows", GOArch: "amd64"}}
-	if err := ensureModuleDependencyHosted(amd64Ctx, "coffloader"); err != nil {
+	if _, err := ensureModuleDependencyHosted(amd64Ctx, "coffloader"); err != nil {
 		t.Fatalf("ensureModuleDependencyHosted amd64: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(paths.WWWRoot, "coffloader.amd64.gz")); err != nil {
@@ -1369,7 +1373,7 @@ func TestEnsureModuleDependencyHosted(t *testing.T) {
 		},
 	})
 	defer def.Modules.Delete("generic_dep")
-	if err := ensureModuleDependencyHosted(amd64Ctx, "generic_dep"); err != nil {
+	if _, err := ensureModuleDependencyHosted(amd64Ctx, "generic_dep"); err != nil {
 		t.Fatalf("ensureModuleDependencyHosted non-DLL dep: %v", err)
 	}
 	genericCompressed, err := os.ReadFile(filepath.Join(paths.WWWRoot, "generic_dep.amd64.gz"))
@@ -1386,13 +1390,13 @@ func TestEnsureModuleDependencyHosted(t *testing.T) {
 
 	// Agent arch with no matching payload => clear error, no dispatch.
 	armCtx := &context.C2Context{Target: &def.Emp3r0rAgent{GOOS: "windows", GOArch: "arm64"}}
-	err = ensureModuleDependencyHosted(armCtx, "coffloader")
+	_, err = ensureModuleDependencyHosted(armCtx, "coffloader")
 	if err == nil || !strings.Contains(err.Error(), "no arm64 payload") {
 		t.Fatalf("expected no-arm64-payload error, got: %v", err)
 	}
 
 	// Unknown dependency module => clear error.
-	err = ensureModuleDependencyHosted(amd64Ctx, "no_such_dep")
+	_, err = ensureModuleDependencyHosted(amd64Ctx, "no_such_dep")
 	if err == nil || !strings.Contains(err.Error(), "not loaded") {
 		t.Fatalf("expected not-loaded error, got: %v", err)
 	}
@@ -1453,11 +1457,11 @@ func TestHostDeclaredDependencies(t *testing.T) {
 
 func TestRiscvPayloadPath(t *testing.T) {
 	cases := map[string]string{
-		"SA/src/pwd.o":           "SA/src/pwd.rv.o",
-		"SA/whoami/whoami.x64.o": "SA/whoami/whoami.rv.o",
-		"SA/whoami/whoami.x86.o": "SA/whoami/whoami.rv.o",
-		"SA/foo/foo.aarch64.o":   "SA/foo/foo.rv.o",
-		"SA/foo/bar.o":           "SA/foo/bar.rv.o",
+		"SA/src/pwd.o":           "SA/src/pwd.rv",
+		"SA/whoami/whoami.x64.o": "SA/whoami/whoami.rv",
+		"SA/whoami/whoami.x86.o": "SA/whoami/whoami.rv",
+		"SA/foo/foo.aarch64.o":   "SA/foo/foo.rv",
+		"SA/foo/bar.o":           "SA/foo/bar.rv",
 	}
 	for in, want := range cases {
 		if got := riscvPayloadPath(in); got != want {
@@ -1476,5 +1480,57 @@ func TestFlagEnabled(t *testing.T) {
 		if flagEnabled(off) {
 			t.Errorf("flagEnabled(%q) = true, want false", off)
 		}
+	}
+}
+
+func TestCoffLoaderDependencyName(t *testing.T) {
+	win := &context.C2Context{Target: &def.Emp3r0rAgent{GOOS: "windows"}}
+	if got := coffLoaderDependency(win, "windows"); got != "coffloader" {
+		t.Fatalf("Windows loader = %q, want coffloader", got)
+	}
+	lin := &context.C2Context{Target: &def.Emp3r0rAgent{GOOS: "linux"}}
+	if got := coffLoaderDependency(lin, "linux"); got != "coffloader_linux" {
+		t.Fatalf("Linux loader = %q, want coffloader_linux", got)
+	}
+	oldWin := &context.C2Context{Target: &def.Emp3r0rAgent{}}
+	if got := coffLoaderDependency(oldWin, "windows"); got != "coffloader" {
+		t.Fatalf("Windows loader without GOOS = %q, want coffloader", got)
+	}
+}
+
+func TestHandleInMemoryModuleSendsDependencyChecksum(t *testing.T) {
+	origRoot, origSender, origActive := paths.WWWRoot, CmdSender, live.ActiveModule
+	t.Cleanup(func() {
+		paths.WWWRoot = origRoot
+		CmdSender = origSender
+		live.ActiveModule = origActive
+	})
+
+	paths.WWWRoot = t.TempDir()
+	live.ActiveModule = &def.ModuleConfig{Name: "probe"}
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "probe.x64.o"), []byte("payload"), 0o600); err != nil {
+		t.Fatalf("write payload: %v", err)
+	}
+
+	var sent string
+	CmdSender = func(cmd, _, _ string) error {
+		sent = cmd
+		return nil
+	}
+	config := def.ModuleConfig{
+		Name: "probe",
+		Path: dir,
+		AgentConfig: def.AgentModuleConfig{
+			Type:  "coff",
+			Files: []string{"probe.x64.o"},
+		},
+	}
+	ctx := &context.C2Context{Target: &def.Emp3r0rAgent{Tag: "target", GOOS: "linux", GOArch: "amd64"}}
+	handleInMemoryModule(ctx, config, "coff", def.ResolvedInvocation{}, "", nil,
+		&hostedDependency{Checksum: "abc123"})
+
+	if !strings.Contains(sent, "--dep_checksum abc123") {
+		t.Fatalf("command %q does not carry the dependency checksum", sent)
 	}
 }

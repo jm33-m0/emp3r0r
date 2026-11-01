@@ -216,7 +216,7 @@ func TestEnsureModuleDependencyHostedSurfacesBuildFailure(t *testing.T) {
 	defer def.Modules.Delete("broken_dep")
 
 	ctx := &context.C2Context{Target: &def.Emp3r0rAgent{GOOS: "linux", GOArch: "amd64"}}
-	err = ensureModuleDependencyHosted(ctx, "broken_dep")
+	_, err = ensureModuleDependencyHosted(ctx, "broken_dep")
 	if err == nil {
 		t.Fatal("expected an error when the dependency build fails")
 	}
