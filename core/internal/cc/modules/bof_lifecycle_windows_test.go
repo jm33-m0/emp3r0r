@@ -3,9 +3,11 @@
 package modules
 
 import (
+	"bytes"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -65,12 +67,22 @@ func hostBOFFile(t *testing.T, bof []byte) (path, checksum string) {
 	return path, crypto.SHA256SumRaw(compressed)
 }
 
-// cacheCoffLoaderDLL seeds the agent memfs with the COFFLoader DLL, matching
-// the cache key produced by ModuleHandler's dll branch / fetchDependency.
-func cacheCoffLoaderDLL(t *testing.T, dll []byte) {
+// coffLoaderArchiveKey is the checksum-verified memfs cache key that
+// fetchDependency uses for the hosted COFFLoader archive.
+func coffLoaderArchiveKey() string {
+	return "memfs:///coffloader." + runtime.GOARCH + ".gz"
+}
+
+// cacheCoffLoaderArchive seeds the agent memfs with the compressed COFFLoader
+// archive, matching the cache key produced by fetchDependency.
+func cacheCoffLoaderArchive(t *testing.T, dll []byte) {
 	t.Helper()
-	if err := util.WriteFileAgent("memfs:///coffloader.dll", dll, 0o600); err != nil {
-		t.Fatalf("cache COFFLoader DLL in memfs: %v", err)
+	compressed, err := util.Compress(dll)
+	if err != nil {
+		t.Fatalf("compress COFFLoader DLL: %v", err)
+	}
+	if err := util.WriteFileAgent(coffLoaderArchiveKey(), compressed, 0o600); err != nil {
+		t.Fatalf("cache COFFLoader archive in memfs: %v", err)
 	}
 }
 
@@ -90,12 +102,11 @@ func TestBOFFullLifecycle(t *testing.T) {
 	dllPath := filepath.Join(modulesRoot, "coffloader", "COFFLoader.x64.dll")
 	dll := readOrSkip(t, dllPath)
 
-	// Every BOF in this test runs through the cached coffloader DLL
-	// (memfs:///coffloader.dll). To prove fetchDependency really uses that
-	// cache, evict the hosted .gz and chdir into an empty scratch dir so no
-	// download fallback can satisfy the dependency.
-	cacheCoffLoaderDLL(t, dll)
-	_ = util.RemoveFileAgent("memfs:///coffloader.amd64.gz")
+	// Every BOF in this test runs through the cached coffloader archive
+	// (memfs:///coffloader.<arch>.gz). To prove fetchDependency really uses
+	// that cache, chdir into an empty scratch dir so no download fallback can
+	// satisfy the dependency.
+	cacheCoffLoaderArchive(t, dll)
 	origWD, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("getwd: %v", err)
@@ -187,9 +198,9 @@ func TestBOFFullLifecycle(t *testing.T) {
 }
 
 // TestBOFDependencyDownloadLifecycle exercises the fallback path where the
-// COFFLoader DLL is not yet cached in memfs and must be downloaded from the C2
-// file endpoint as <name>.<arch>.gz, decompressed and cached before the BOF
-// runs.
+// COFFLoader archive is not yet cached in memfs and must be downloaded from
+// the C2 file endpoint as <name>.<arch>.gz, decompressed and cached before
+// the BOF runs.
 func TestBOFDependencyDownloadLifecycle(t *testing.T) {
 	skipUnderRace(t)
 
@@ -220,10 +231,10 @@ func TestBOFDependencyDownloadLifecycle(t *testing.T) {
 		t.Fatalf("write hosted DLL: %v", err)
 	}
 
-	// Force a clean dependency state: no memfs cache for either the .dll or
-	// the .gz, then run with the scratch directory as CWD.
-	_ = util.RemoveFileAgent("memfs:///coffloader.dll")
-	_ = util.RemoveFileAgent("memfs:///coffloader.amd64.gz")
+	// Force a clean dependency state, then run with the scratch directory as
+	// CWD.
+	_ = util.RemoveFileAgent(coffLoaderArchiveKey())
+	_ = util.RemoveFileAgent("coffloader.amd64.gz")
 
 	origWD, err := os.Getwd()
 	if err != nil {
@@ -245,9 +256,17 @@ func TestBOFDependencyDownloadLifecycle(t *testing.T) {
 		t.Fatalf("BOF output missing privilege name: %q", out)
 	}
 
-	// The dependency must now be cached for future BOF runs.
-	if cached, err := util.ReadFileAgent("memfs:///coffloader.dll"); err != nil || len(cached) == 0 {
-		t.Fatalf("coffloader DLL was not cached after download: %v", err)
+	// The dependency archive must now be cached for future BOF runs.
+	cached, err := util.ReadFileAgent(coffLoaderArchiveKey())
+	if err != nil || len(cached) == 0 {
+		t.Fatalf("coffloader archive was not cached after download: %v", err)
+	}
+	decached, err := util.Decompress(cached)
+	if err != nil {
+		t.Fatalf("decompress cached coffloader archive: %v", err)
+	}
+	if !bytes.Equal(decached, dll) {
+		t.Fatal("cached coffloader archive does not contain the downloaded DLL")
 	}
 }
 
@@ -299,7 +318,7 @@ func TestBOFCrashIsContained(t *testing.T) {
 		t.Fatalf("resolveInvocation: %v", err)
 	}
 
-	cacheCoffLoaderDLL(t, dll)
+	cacheCoffLoaderArchive(t, dll)
 	compressedPath, checksum := hostBOFFile(t, crashBOF)
 	out := agentmodules.ModuleHandler("", compressedPath, "coff", "crash_bof", checksum, invocation)
 
@@ -346,7 +365,7 @@ func TestBOFLifecycleErrorResilience(t *testing.T) {
 	})
 
 	t.Run("empty BOF payload", func(t *testing.T) {
-		cacheCoffLoaderDLL(t, dll)
+		cacheCoffLoaderArchive(t, dll)
 		compressedPath, checksum := hostBOFFile(t, []byte{})
 		out := agentmodules.ModuleHandler("", compressedPath, "coff", "get_priv", checksum, invocation)
 		if out == "" {
@@ -358,7 +377,7 @@ func TestBOFLifecycleErrorResilience(t *testing.T) {
 	})
 
 	t.Run("malformed COFF object", func(t *testing.T) {
-		cacheCoffLoaderDLL(t, dll)
+		cacheCoffLoaderArchive(t, dll)
 		// Valid gzip but garbage COFF bytes: the DLL loader must reject it
 		// (or contain any native fault) without killing the test process.
 		compressedPath, checksum := hostBOFFile(t, []byte("this is definitely not a COFF object"))
@@ -369,8 +388,8 @@ func TestBOFLifecycleErrorResilience(t *testing.T) {
 	})
 
 	t.Run("missing coffloader dependency", func(t *testing.T) {
-		_ = util.RemoveFileAgent("memfs:///coffloader.dll")
-		_ = util.RemoveFileAgent("memfs:///coffloader.amd64.gz")
+		_ = util.RemoveFileAgent(coffLoaderArchiveKey())
+		_ = util.RemoveFileAgent("coffloader.amd64.gz")
 
 		// Point the process CWD at an empty directory so the dependency
 		// download has no local file to fall back to. ModuleHandler must
