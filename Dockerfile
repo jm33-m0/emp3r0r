@@ -6,7 +6,8 @@ FROM quay.io/pypa/manylinux2014_x86_64
 
 # Pinned tool versions with their SHA-256 digests. Every remote artifact is
 # verified before extraction so a compromised mirror/CDN cannot inject code
-# into the builder image.
+# into the builder image. Pins last verified 2026-11-01; update this date
+# whenever a version or digest changes.
 ARG ZIG_VERSION=0.16.0
 ARG ZIG_SHA256=70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00
 ARG GO_VERSION=1.26.2
@@ -14,7 +15,7 @@ ARG GO_SHA256=990e6b4bbba816dc3ee129eaeaf4b42f17c2800b88a2166c265ac1a200262282
 ARG GARBLE_VERSION=v0.17.0
 ARG DONUT_VERSION=1.1
 ARG DONUT_SHA256=033132caee328c6d53cf6074719bfa326d88044484cc8bcbce0eaeeb73dd6494
-ARG CRYSTALPALACE_SHA256=bfeb0d8fa01bf7f81845758a12300d19a4915540e7008e320ccb43b332ea6917
+ARG CRYSTALPALACE_SHA256=4cae345def03afbf1ef483d5f155bf7f04e611d806d347f4268e236d0bcb2105
 ARG PROXY_NS_VERSION=v2.4.5
 ARG PROXY_NS_SHA256=511b6a5bb97cf3ae06a3b30d69c3b00ac09c5a3e287c4efdd1a4a4f3042f14cd
 
@@ -45,15 +46,26 @@ RUN yum install -y epel-release \
   && yum clean all \
   && ln -sf /usr/local/bin/python3.12 /usr/local/bin/python3
 
-# Zig toolchain (static build, so it runs on the glibc 2.17 base image).
-# Fetched with aria2 over many parallel connections: the single-stream zig
-# download is slow and frequently stalls. The digest is still verified before
-# anything is extracted.
-RUN aria2c -x 16 -s 16 -k 1M \
-      --max-tries=3 --retry-wait=3 --file-allocation=none \
-      --console-log-level=warn --summary-interval=0 \
-      --dir=/tmp --out=zig.tar.xz \
+# Fetch a remote artifact into /tmp with aria2. Every download in this file
+# goes through this helper: single-stream transfers from these hosts are slow
+# and frequently stall, and parallel connections are what make the build
+# reliable. The caller verifies the SHA-256 digest before extracting.
+RUN printf '%s\n' \
+      '#!/bin/sh' \
+      'set -eu' \
+      '[ "$#" -eq 2 ] || { echo "usage: fetch-artifact <url> <file>" >&2; exit 2; }' \
+      'exec aria2c -x 16 -s 16 -k 1M --max-tries=3 --retry-wait=3 \' \
+      '  --file-allocation=none --allow-overwrite=true --auto-file-renaming=false \' \
+      '  --console-log-level=warn --summary-interval=0 \' \
+      '  --dir=/tmp --out="$2" "$1"' \
+      > /usr/local/bin/fetch-artifact \
+  && chmod 0755 /usr/local/bin/fetch-artifact
+
+# Zig toolchain (static build, so it runs on the glibc 2.17 base image). The
+# digest is verified before anything is extracted.
+RUN fetch-artifact \
       "https://ziglang.org/download/${ZIG_VERSION}/zig-x86_64-linux-${ZIG_VERSION}.tar.xz" \
+      zig.tar.xz \
   && echo "${ZIG_SHA256}  /tmp/zig.tar.xz" | sha256sum -c - \
   && mkdir -p /opt/zig \
   && tar -xJf /tmp/zig.tar.xz -C /opt/zig --strip-components=1 --no-same-owner \
@@ -67,8 +79,7 @@ RUN aria2c -x 16 -s 16 -k 1M \
 # database (sum.golang.org) before building, so garble is integrity-checked
 # as well.
 ENV PATH="/usr/local/go/bin:${PATH}"
-RUN curl -fsSL --retry 3 -o /tmp/go.tar.gz \
-      "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
+RUN fetch-artifact "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" go.tar.gz \
   && echo "${GO_SHA256}  /tmp/go.tar.gz" | sha256sum -c - \
   && tar -C /usr/local -xzf /tmp/go.tar.gz \
   && rm -f /tmp/go.tar.gz \
@@ -93,17 +104,17 @@ RUN set -eux; \
 # Windows payload tooling, cached in the image so build.py copies it instead of
 # downloading on every build/install run. The Crystal Palace URL is the moving
 # "latest" alias, so its digest is what actually pins the release; bump it here
-# when upstream cuts a new one. Digests are verified before anything is
-# extracted.
-RUN curl -fsSL --retry 3 -o /tmp/donut.tar.gz \
+# when upstream cuts a new one (pin verified 2026-11-01). Digests are verified
+# before anything is extracted.
+RUN fetch-artifact \
       "https://github.com/TheWover/donut/releases/download/v${DONUT_VERSION}/donut_v${DONUT_VERSION}.tar.gz" \
+      donut.tar.gz \
   && echo "${DONUT_SHA256}  /tmp/donut.tar.gz" | sha256sum -c - \
   && mkdir -p /opt/donut \
   && tar -xzf /tmp/donut.tar.gz -C /opt/donut --strip-components=1 --no-same-owner \
   && rm -f /tmp/donut.tar.gz \
   && ln -sf /opt/donut/donut /usr/local/bin/donut \
-  && curl -fsSL --retry 3 -o /tmp/cpdist.tgz \
-      "https://tradecraftgarden.org/download/cpdist-latest.tgz" \
+  && fetch-artifact "https://tradecraftgarden.org/download/cpdist-latest.tgz" cpdist.tgz \
   && echo "${CRYSTALPALACE_SHA256}  /tmp/cpdist.tgz" | sha256sum -c - \
   && mkdir -p /opt/crystalpalace \
   && tar -xzf /tmp/cpdist.tgz -C /opt/crystalpalace --strip-components=1 --no-same-owner \
@@ -115,8 +126,9 @@ RUN curl -fsSL --retry 3 -o /tmp/donut.tar.gz \
 # release binaries; vendored deps keep the build offline. The operator kit
 # carries the resulting static binary and its default config (proxy-ns refuses
 # to start without one; operators override socks5_address per invocation).
-RUN curl -fsSL --retry 3 -o /tmp/proxy-ns.tar.gz \
+RUN fetch-artifact \
       "https://github.com/OkamiW/proxy-ns/archive/refs/tags/${PROXY_NS_VERSION}.tar.gz" \
+      proxy-ns.tar.gz \
   && echo "${PROXY_NS_SHA256}  /tmp/proxy-ns.tar.gz" | sha256sum -c - \
   && mkdir -p /opt/proxy-ns-src /opt/proxy-ns \
   && tar -xzf /tmp/proxy-ns.tar.gz -C /opt/proxy-ns-src --strip-components=1 --no-same-owner \
