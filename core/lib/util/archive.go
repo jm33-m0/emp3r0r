@@ -24,13 +24,33 @@ func Compress(data []byte) ([]byte, error) {
 }
 
 // Decompress decompresses gzip data
-func Decompress(data []byte) ([]byte, error) {
+// MaxDecompressedBytes bounds a gzip payload from a remote agent, peer, or
+// C2. The largest module image the loaders accept is 64 MiB; allow no more.
+const MaxDecompressedBytes int64 = 64 << 20
+
+// DecompressLimit decompresses data and rejects output larger than limit
+// instead of allocating it first. A negative or zero limit is rejected.
+func DecompressLimit(data []byte, limit int64) ([]byte, error) {
+	if limit <= 0 {
+		return nil, fmt.Errorf("invalid decompression limit: %d", limit)
+	}
 	zr, err := gzip.NewReader(bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}
 	defer zr.Close()
-	return io.ReadAll(zr)
+	out, err := io.ReadAll(io.LimitReader(zr, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(out)) > limit {
+		return nil, fmt.Errorf("decompressed data exceeds %d bytes", limit)
+	}
+	return out, nil
+}
+
+func Decompress(data []byte) ([]byte, error) {
+	return DecompressLimit(data, MaxDecompressedBytes)
 }
 
 // Unarchive unarchives a tarball to a directory
