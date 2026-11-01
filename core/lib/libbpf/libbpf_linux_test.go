@@ -428,7 +428,7 @@ func TestFindMapAndAttachUprobe(t *testing.T) {
 // mock's map yields two entries, each a complete event.
 func TestCaptureUprobe(t *testing.T) {
 	data := buildMockLibbpf(t)
-	memdeps.SetResolver(func(string) ([]byte, error) { return data, nil })
+	memdeps.SetResolver(func(string, string) ([]byte, error) { return data, nil })
 	t.Cleanup(func() { memdeps.SetResolver(nil) })
 
 	events, err := CaptureUprobe([]byte("BPFfake-object"), "probe", "events", "cfg",
@@ -448,7 +448,7 @@ func TestCaptureUprobe(t *testing.T) {
 
 func TestWithLibraryReleasesMapping(t *testing.T) {
 	data := buildMockLibbpf(t)
-	memdeps.SetResolver(func(string) ([]byte, error) { return data, nil })
+	memdeps.SetResolver(func(string, string) ([]byte, error) { return data, nil })
 	t.Cleanup(func() { memdeps.SetResolver(nil) })
 
 	var captured *Library
@@ -475,13 +475,13 @@ func TestWithLibraryErrors(t *testing.T) {
 		t.Fatal("WithLibrary succeeded without a resolver")
 	}
 
-	memdeps.SetResolver(func(string) ([]byte, error) { return nil, errors.New("fetch failed") })
+	memdeps.SetResolver(func(string, string) ([]byte, error) { return nil, errors.New("fetch failed") })
 	t.Cleanup(func() { memdeps.SetResolver(nil) })
 	if err := WithLibrary(func(*Library) error { return nil }); err == nil {
 		t.Fatal("WithLibrary ignored a resolver error")
 	}
 
-	memdeps.SetResolver(func(string) ([]byte, error) { return []byte("not an ELF"), nil })
+	memdeps.SetResolver(func(string, string) ([]byte, error) { return []byte("not an ELF"), nil })
 	if err := WithLibrary(func(*Library) error { return nil }); err == nil {
 		t.Fatal("WithLibrary accepted a non-ELF image")
 	}

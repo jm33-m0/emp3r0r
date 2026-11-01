@@ -18,13 +18,13 @@ const linuxDependency = "coffloader_linux"
 
 // maxLoaderOutput bounds the C string read from the loader so a corrupted
 // return value cannot make the agent scan unmapped memory forever.
-const maxLoaderOutput = 16 << 20
+const maxLoaderOutput = (8 << 20) + 16
 
 // RunLinuxCOFF executes an x86_64 ELF BOF payload on Linux through the
 // coffloader_linux dependency. The dependency is resolved, mapped, used once,
 // and unmapped by memdeps.Use. The loader itself links libc, so a statically
 // linked agent (no libc mapped) is rejected with an explanatory error.
-func RunLinuxCOFF(payload []byte, export string, args []CoffArg, _ uintptr) (string, error) {
+func RunLinuxCOFF(payload []byte, export string, args []CoffArg, _ uintptr, opts ...memdeps.UseOption) (string, error) {
 	if len(payload) == 0 {
 		return "", fmt.Errorf("empty payload")
 	}
@@ -59,7 +59,7 @@ func RunLinuxCOFF(payload []byte, export string, args []CoffArg, _ uintptr) (str
 			argsPtr = uintptr(unsafe.Pointer(&wire[0]))
 		}
 
-		result, callErr := module.CallExportWithArgs("bof_run",
+		result, callErr := module.CallExportWithArgs("Run",
 			uintptr(unsafe.Pointer(&payload[0])),
 			uintptr(len(payload)),
 			uintptr(unsafe.Pointer(&entry[0])),
@@ -83,15 +83,15 @@ func RunLinuxCOFF(payload []byte, export string, args []CoffArg, _ uintptr) (str
 		out = readCString(result)
 		// The loader allocated the buffer; let it free it while its code is
 		// still mapped.
-		_, _ = module.CallExportWithArgs("bof_free", result)
+		_, _ = module.CallExportWithArgs("Free", result)
 		return nil
-	})
+	}, opts...)
 	return out, err
 }
 
 // loaderError fetches the loader's last error message, if any.
 func loaderError(module *memmod.Module) string {
-	ptr, err := module.CallExportWithArgs("bof_last_error")
+	ptr, err := module.CallExportWithArgs("LastError")
 	if err != nil || ptr == 0 {
 		return ""
 	}

@@ -204,7 +204,7 @@ A manifest is a single module object or an array of module objects.
 | Field   | Meaning                                                                                                                                                                                                                                                   |
 | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `type`  | `coff`, `starlark`, `dll`, `rv`, or `so`. A manifest with any other type (or an empty type on a non-local module) is rejected at load time.                                                                                                                |
-| `files` | Payload files, relative to the module directory. For `starlark`, `files[0]` is the entry script. For `coff`/`dll`/`so`, list per-architecture variants (`.x64.o`/`.x86.o`, `x64.dll`/`x86.dll`, `libbpf.so`); the C2 selects by the agent's architecture. A BOF recompiled with `--riscv` is architecture-independent; the module build emits `.rv.o` next to the native object, and `riscv_libraries` lists delivered RV32 libraries. |
+| `files` | Payload files, relative to the module directory. For `starlark`, `files[0]` is the entry script. For `coff`/`dll`/`so`, list per-architecture variants (`.x64.o`/`.x86.o`, `x64.dll`/`x86.dll`, `libbpf.so`); the C2 selects by the agent's architecture. A BOF recompiled with `--riscv` is architecture-independent; the module build emits `.rv.o`, which the C2 links with RV32 musl into `.rv`, and `riscv_libraries` lists RV32 static libraries linked into it. |
 | `exec`  | Only meaningful for built-in Go modules, which use `"built-in"`. Custom modules may omit it; the entry is `files[0]`.                                                                                                                                     |
 
 ### `parameters`
@@ -321,7 +321,7 @@ On the C2 (`moduleCustom`):
    `!custom_module` job:
 
    ```text
-   !custom_module --mod_name <name> --type <type> --file_to_download <hosted.gz> --checksum <sha256> --invocation <base64 CBOR> [--peer <ip>]
+   !custom_module --mod_name <name> --type <type> --file_to_download <hosted.gz> --checksum <sha256> --invocation <base64 CBOR> [--dep_checksum <sha256>] [--peer <ip>]
    ```
 
    For a multi-file Starlark module (`module_files_memfs`), the companion
@@ -339,9 +339,9 @@ On the agent (`ModuleHandler`):
    - `coff`: run the BOF through the in-memory `coffloader` dependency
      (Windows) or the native ELF loader (Linux).
    - `rv` (internal, produced by `--riscv`): the C2 recompiles the BOF for
-     RV32 and the interpreter relocates it against its embedded Beacon/libc
-     runtime, then calls `invocation.coff_export` (usually `go`) with the
-     packed COFF arguments.
+     RV32 and links it with musl and the guest entry shim into a static
+     executable; the interpreter starts musl, which calls `go` with the packed
+     COFF arguments.
    - `dll`: map the DLL and call its `LoadAndRun` export for the BOF named by
      `dll_entry`.
    - `so`: a shared-library dependency (e.g. `libbpf`). It is fetched on
@@ -358,11 +358,10 @@ A module may declare `dependencies`: other modules whose payload is a DLL
 (`.dll`) or shared object (`.so`) rather than something that runs on its own.
 Windows `coff` modules always depend on `coffloader`; Linux `coff` modules on
 `coffloader_linux`; Linux eBPF modules depend on `libbpf`. A `coff` module run
-with `--riscv` makes the C2 host the matching interpreter dependency
-(`rvvm_linux` or `rvvm_windows`) on demand; the manifest does not declare it.
-`rvvm_linux` links libc dynamically (it serves the guest's file/process host
-calls), so a statically linked agent cannot map it; `rvvm_windows` imports only
-`kernel32`.
+with `--riscv` makes the C2 host the `rvvm_linux` interpreter dependency on
+demand; the manifest does not declare it. `rvvm_linux` links libc dynamically
+to implement the guest syscall gate, so a statically linked agent cannot map
+it. `--riscv` requires a Linux agent.
 
 The C2 only builds and hosts each dependency as `<name>.<arch>.gz`; the agent
 decides when to map it. That decision lives in one place (`core/lib/memdeps`)
@@ -380,20 +379,23 @@ func init() {
 }
 ```
 
-`fetchDependency` checks the encrypted memfs cache first
-(`memfs:///<name>.dll` on Windows, `memfs:///<name>.so` elsewhere), then
-downloads and decompresses the C2-hosted `<name>.<arch>.gz` and writes it back
-to memfs. The extension comes from `dependencyExt()`. Bytes are never stored in
-the clear.
+The C2 sends the dependency image's SHA-256 with the module command. The Go
+agent checks the encrypted memfs archive (`memfs:///<name>.<arch>.gz`),
+decompresses it, and reuses it only when the plaintext hash matches the value
+the C2 supplied. On a mismatch it drops the stale entry, fetches the archive
+once from the C2, verifies it, and caches the fresh copy; a valid cached image
+needs no network I/O. The C agent applies the same check to its plaintext memfs
+image. Bytes are never stored in the clear.
 
 ### Mapping
 
 `memdeps` exposes two entry points:
 
-| Function                | Behavior                                                               |
-| ----------------------- | ---------------------------------------------------------------------- |
-| `memdeps.Use(name, fn)` | Resolve the named dependency, map it, run `fn(*memmod.Module)`, unmap. |
-| `memdeps.Run(data, fn)` | Map caller-supplied bytes, run `fn`, unmap.                            |
+| Function                                   | Behavior                                                               |
+| ------------------------------------------ | ---------------------------------------------------------------------- |
+| `memdeps.Use(name, fn)`                    | Resolve the named dependency, map it, run `fn(*memmod.Module)`, unmap. |
+| `memdeps.Use(name, fn, WithChecksum(sha))` | Same, but reject a cached image whose plaintext hash differs from `sha`. |
+| `memdeps.Run(data, fn)`                    | Map caller-supplied bytes, run `fn`, unmap.                            |
 
 Both map with `memmod.LoadLibrary` and **unconditionally** `defer module.Free()`
 around the callback, so the image is released on success, on error, and on
@@ -407,7 +409,7 @@ Every dependency consumer goes through this layer:
 | Windows `coff` modules             | `coffloader.RunCOFFDependency` → `memdeps.Use("coffloader", …)` |
 | `dll` modules / explicit DLL bytes | `coffloader.RunWindowsCOFFViaDLL` → `memdeps.Run(dllData, …)`   |
 | Linux eBPF builtins                | `libbpf.WithLibrary` → `memdeps.Use("libbpf", …)`               |
-| `--riscv` BOFs (Linux/Windows)     | `rvvm.RunRiscvBof` → `memdeps.Use("rvvm_linux"/"rvvm_windows", …)` |
+| `--riscv` BOFs (Linux agents)      | `rvvm.RunRiscvBof` → `memdeps.Use("rvvm_linux", …)` |
 
 Scripts that map a library themselves with `mem_load_library` are covered too:
 their handles live in a per-run registry (`runModules` in
@@ -423,8 +425,8 @@ their dependency themselves (`src/agent.c`'s `ensure_dependency`), pulling
 `<module>.<arch>.gz` into memfs on first use and mapping it in memory with
 `src/util/elfload.c` (anonymous mmap + dynamic relocations, the C counterpart
 of the Go agent's `memmod`) for the duration of a single run. The BOF loader
-(`core/modules/coffloader_linux`) exports `bof_run`; the RISC-V interpreter
-(`core/modules/rvvm`) exports `rv_run`.
+(`core/modules/coffloader_linux`) exports `Run`; the RISC-V interpreter
+(`core/modules/rvvm`) exports `Run`.
 
 ---
 

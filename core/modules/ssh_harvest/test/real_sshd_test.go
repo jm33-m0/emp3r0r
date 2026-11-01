@@ -97,7 +97,7 @@ func TestRealSSHDAuthCapture(t *testing.T) {
 
 	// The module's ebpf_* builtins resolve the libbpf dependency through
 	// memdeps; hand them the freshly built object for the duration of the run.
-	memdeps.SetResolver(func(string) ([]byte, error) { return libData, nil })
+	memdeps.SetResolver(func(string, string) ([]byte, error) { return libData, nil })
 	defer memdeps.SetResolver(nil)
 
 	// First invocation starts the background capture. ebpf_uprobe_start waits

@@ -119,10 +119,12 @@ func TestRunRejectsEmptyImage(t *testing.T) {
 
 func TestUseResolvesAndReleases(t *testing.T) {
 	data := buildMockDep(t)
-	SetResolver(func(name string) ([]byte, error) {
+	var gotChecksum string
+	SetResolver(func(name, checksum string) ([]byte, error) {
 		if name != "dep" {
 			t.Fatalf("resolver got name %q, want %q", name, "dep")
 		}
+		gotChecksum = checksum
 		return data, nil
 	})
 	t.Cleanup(func() { SetResolver(nil) })
@@ -131,11 +133,14 @@ func TestUseResolvesAndReleases(t *testing.T) {
 	if err := Use("dep", func(module *memmod.Module) error {
 		captured = module
 		return nil
-	}); err != nil {
+	}, WithChecksum("abc")); err != nil {
 		t.Fatalf("Use: %v", err)
 	}
 	if captured.BaseAddr() != 0 {
 		t.Fatalf("module still mapped after Use returned (base=%#x)", captured.BaseAddr())
+	}
+	if gotChecksum != "abc" {
+		t.Fatalf("resolver checksum = %q, want abc", gotChecksum)
 	}
 }
 
@@ -149,7 +154,7 @@ func TestUseRequiresResolver(t *testing.T) {
 	}
 
 	wantErr := errors.New("fetch failed")
-	SetResolver(func(string) ([]byte, error) { return nil, wantErr })
+	SetResolver(func(string, string) ([]byte, error) { return nil, wantErr })
 	t.Cleanup(func() { SetResolver(nil) })
 	if err := Use("dep", func(*memmod.Module) error { return nil }); !errors.Is(err, wantErr) {
 		t.Fatalf("Use error = %v, want %v", err, wantErr)

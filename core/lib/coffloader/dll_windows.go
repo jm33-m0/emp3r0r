@@ -107,7 +107,7 @@ func RunWindowsCOFFViaDLL(dllData, payload []byte, entry string, args []CoffArg,
 // RunCOFFDependency resolves the "coffloader" dependency, runs one BOF
 // through its exported LoadAndRun function, and unmaps the dependency before
 // returning. The dependency is never left resident once the BOF has run.
-func RunCOFFDependency(payload []byte, entry string, args []CoffArg, token uintptr) (out string, err error) {
+func RunCOFFDependency(payload []byte, entry string, args []CoffArg, token uintptr, opts ...memdeps.UseOption) (out string, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("RunCOFFDependency panic: %v", r)
@@ -124,7 +124,7 @@ func RunCOFFDependency(payload []byte, entry string, args []CoffArg, token uintp
 		var runErr error
 		out, runErr = runLoadAndRun(module, buf, token)
 		return runErr
-	})
+	}, opts...)
 	return out, err
 }
 

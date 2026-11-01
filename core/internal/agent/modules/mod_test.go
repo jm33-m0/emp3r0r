@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/agent/base/c2transport"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -242,5 +243,90 @@ func TestDownloadAndVerifyModuleRetryLimit(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "checksum verification failed after 3 attempts") {
 		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+func TestFetchDependencyUsesVerifiedCache(t *testing.T) {
+	origFetch, origDownload := fetchFile, downloadDependency
+	t.Cleanup(func() {
+		fetchFile = origFetch
+		downloadDependency = origDownload
+	})
+
+	hosted := "rvvm_linux." + runtime.GOARCH + ".gz"
+	cacheKey := c2transport.MemFSKey(hosted)
+	_ = util.RemoveFileAgent(cacheKey)
+	_ = util.RemoveFileAgent(hosted)
+	t.Cleanup(func() {
+		_ = util.RemoveFileAgent(cacheKey)
+		_ = util.RemoveFileAgent(hosted)
+	})
+
+	compress := func(s string) []byte {
+		t.Helper()
+		data, err := util.Compress([]byte(s))
+		if err != nil {
+			t.Fatalf("compress %q: %v", s, err)
+		}
+		return data
+	}
+	stale, current, newer := compress("stale"), compress("current"), compress("newer")
+
+	var fetches, downloads int
+	fetchFile = func(_ *def.Config, _, name, _, _ string) ([]byte, error) {
+		fetches++
+		if data, err := util.ReadFileAgent(c2transport.MemFSKey(name)); err == nil {
+			return data, nil
+		}
+		return stale, nil
+	}
+	nextDownload := current
+	downloadDependency = func(_ *def.Config, name, _, _ string) ([]byte, error) {
+		downloads++
+		if name != hosted {
+			t.Fatalf("dependency name = %q, want %q", name, hosted)
+		}
+		return nextDownload, nil
+	}
+
+	wantCurrent := crypto.SHA256SumRaw([]byte("current"))
+	got, err := fetchDependency("rvvm_linux", wantCurrent)
+	if err != nil {
+		t.Fatalf("first fetch: %v", err)
+	}
+	if string(got) != "current" {
+		t.Fatalf("first fetch = %q, want current", got)
+	}
+	if downloads != 1 {
+		t.Fatalf("downloads after stale cache = %d, want 1", downloads)
+	}
+
+	// The refreshed archive is now the cache entry, so the same checksum must
+	// be a pure cache hit.
+	got, err = fetchDependency("rvvm_linux", wantCurrent)
+	if err != nil {
+		t.Fatalf("cached fetch: %v", err)
+	}
+	if string(got) != "current" {
+		t.Fatalf("cached fetch = %q, want current", got)
+	}
+	if downloads != 1 {
+		t.Fatalf("downloads after cache hit = %d, want 1", downloads)
+	}
+	if fetches != 2 {
+		t.Fatalf("fetches = %d, want 2", fetches)
+	}
+
+	// A new C2 image invalidates the cache and is fetched exactly once.
+	nextDownload = newer
+	got, err = fetchDependency("rvvm_linux", crypto.SHA256SumRaw([]byte("newer")))
+	if err != nil {
+		t.Fatalf("updated fetch: %v", err)
+	}
+	if string(got) != "newer" {
+		t.Fatalf("updated fetch = %q, want newer", got)
+	}
+	if downloads != 2 {
+		t.Fatalf("downloads after update = %d, want 2", downloads)
 	}
 }

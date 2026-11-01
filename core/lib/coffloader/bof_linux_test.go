@@ -37,7 +37,7 @@ func wireLinuxLoader(t *testing.T) {
 	build := exec.Command("make", "-C", linuxLoaderModule)
 	build.Env = os.Environ()
 	if out, err := build.CombinedOutput(); err != nil {
-		t.Skipf("building coffloader_linux: %v\n%s", err, out)
+		t.Fatalf("building coffloader_linux: %v\n%s", err, out)
 	}
 
 	data, err := os.ReadFile(filepath.Join(linuxLoaderModule, "coffloader_linux.so"))
@@ -45,7 +45,7 @@ func wireLinuxLoader(t *testing.T) {
 		t.Fatalf("read coffloader_linux.so: %v", err)
 	}
 
-	memdeps.SetResolver(func(name string) ([]byte, error) {
+	memdeps.SetResolver(func(name, _ string) ([]byte, error) {
 		if name != "coffloader_linux" {
 			return nil, fmt.Errorf("unexpected dependency %q", name)
 		}

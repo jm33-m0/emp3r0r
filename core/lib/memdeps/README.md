@@ -6,9 +6,11 @@ Scoped lifetime management for in-memory DLL/SO **dependency** modules.
 Its single rule is: **map on use, unmap on return.** A dependency therefore
 never stays resident in cleartext once the code that needed it has finished.
 
-The raw image is never held here — it lives encrypted in memfs and is re-fetched
-on demand through the resolver the agent wires at startup
-(`memdeps.SetResolver(fetchDependency)` in `core/internal/agent/modules/mod.go`).
+The raw image is not held here. The agent's resolver receives the SHA-256 the
+C2 supplied for the current run and reuses the encrypted memfs archive only
+when it matches that image (`memdeps.SetResolver(fetchDependency)` in
+`core/internal/agent/modules/mod.go`). A stale or missing archive causes one
+fresh C2 download, so a cache entry can never shadow an updated dependency.
 
 ## API
 
@@ -31,7 +33,7 @@ only inside the callback and must not escape.
 | Windows COFF/BOF loader | `coffloader.RunCOFFDependency` → `Use("coffloader", …)` |
 | `dll` module payloads | `coffloader.RunWindowsCOFFViaDLL` → `Run(dllData, …)` |
 | Linux eBPF builtins | `libbpf.WithLibrary` → `Use("libbpf", …)` |
-| `rv` BOF modules | `rvvm.RunRiscvBof` → `Use("rvvm_linux"/"rvvm_windows", …)` |
+| `rv` BOF modules | `rvvm.RunRiscvBof` → `Use("rvvm_linux", …)` |
 
 Scripts that call `mem_load_library` directly are covered separately: their
 handles live in a per-run registry and `script.Run` calls `releaseRunModules`
