@@ -15,6 +15,7 @@
 
 #include "cbor.h"
 
+#include <stdlib.h>
 #include <string.h>
 
 /* ------------------------------------------------------------------------- */
@@ -42,9 +43,7 @@ static c2_status sb_puts(c2_sb *s, c2_str v) {
   return sb_put(s, v.ptr, v.len);
 }
 
-static c2_status sb_putc(c2_sb *s, char c) {
-  return sb_put(s, &c, 1);
-}
+static c2_status sb_putc(c2_sb *s, char c) { return sb_put(s, &c, 1); }
 
 static c2_status sb_put_i64(c2_sb *s, int64_t v) {
   char tmp[20];
@@ -83,7 +82,7 @@ c2_status c2_auth_canonical(c2_str agent_uuid, int64_t timestamp, c2_str nonce,
     return C2_ERR_ARG;
 
   /* Reserve one byte for the trailing NUL. */
-  c2_sb sb = {out, out_cap - 1, 0};
+  c2_sb sb = { out, out_cap - 1, 0 };
   c2_status st;
   if ((st = sb_puts(&sb, agent_uuid)) != C2_OK)
     return st;
@@ -226,6 +225,35 @@ c2_status c2_msgtun_encode(CborEncoder *w, const c2_msgtun *m) {
                                 m->ephem_public_key)) != C2_OK)
     return st;
   return c2_cbor_ec(cbor_encoder_close_container(w, &map));
+}
+
+/* Encode a MsgTunData into a buffer sized for its response. Command results
+ * are arbitrary BOF output and do not fit a fixed control-frame buffer. */
+#define C2_MSGTUN_RESPONSE_MAX (8u << 20)
+c2_status c2_msgtun_encode_alloc(const c2_msgtun *m, uint8_t **out,
+                                 size_t *out_len) {
+  if (m == NULL || out == NULL || out_len == NULL)
+    return C2_ERR_ARG;
+  *out = NULL;
+  *out_len = 0;
+  /* The response dominates; this leaves room for the map header, job id,
+   * command slice, tag, timestamp and ephemeral key. */
+  if (m->response.len > SIZE_MAX - 4096u)
+    return C2_ERR_OVERFLOW;
+  size_t cap = m->response.len + 4096u;
+  uint8_t *buf = (uint8_t *)malloc(cap);
+  if (buf == NULL)
+    return C2_ERR_NOMEM;
+  CborEncoder enc;
+  cbor_encoder_init(&enc, buf, cap, 0);
+  c2_status st = c2_msgtun_encode(&enc, m);
+  if (st != C2_OK) {
+    free(buf);
+    return st;
+  }
+  *out = buf;
+  *out_len = cbor_encoder_get_buffer_size(&enc, buf);
+  return C2_OK;
 }
 
 c2_status c2_msgtun_decode(CborValue *r, c2_msgtun *m) {

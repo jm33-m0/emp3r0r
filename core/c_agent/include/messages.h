@@ -107,6 +107,10 @@ typedef struct {
 } c2_msgtun;
 
 c2_status c2_msgtun_encode(CborEncoder *w, const c2_msgtun *m);
+/* Encode into a malloc'd buffer sized for the message's response. The caller
+ * frees *out on success. */
+c2_status c2_msgtun_encode_alloc(const c2_msgtun *m, uint8_t **out,
+                                 size_t *out_len);
 c2_status c2_msgtun_decode(CborValue *r, c2_msgtun *m);
 
 /*

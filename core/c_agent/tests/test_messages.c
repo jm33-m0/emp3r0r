@@ -4,6 +4,8 @@
 
 #include "test.h"
 
+#include <stdlib.h>
+
 /* Authoritative vectors produced by the Go encoder (fxamacker/cbor) for the
  * exact structs the C2 marshals, so a divergence in key order or integer width
  * fails here. */
@@ -44,7 +46,7 @@ int main(void) {
     size_t exp_len = unhex(kMsgauthHex, exp, sizeof(exp));
     CHECK(exp_len > 0);
 
-    c2_msgauth m = {0};
+    c2_msgauth m = { 0 };
     m.type = c2_str_lit("auth_v2");
     m.agent_uuid = c2_str_lit("uuid-1234");
     m.identity_token = c2_bytes_of("token", 5);
@@ -66,7 +68,7 @@ int main(void) {
   {
     uint8_t enc[256];
     size_t enc_len = unhex(kMsgauthHex, enc, sizeof(enc));
-    c2_msgauth m = {0};
+    c2_msgauth m = { 0 };
     CHECK(decode_msgauth(enc, enc_len, &m) == C2_OK);
     CHECK(c2_str_equal(m.type, "auth_v2"));
     CHECK(c2_str_equal(m.agent_uuid, "uuid-1234"));
@@ -84,7 +86,7 @@ int main(void) {
     uint8_t enc[256];
     size_t enc_len = unhex(kMsgtunHex, enc, sizeof(enc));
     c2_str cmds[4];
-    c2_msgtun m = {0};
+    c2_msgtun m = { 0 };
     m.cmd_slice.items = cmds;
     m.cmd_slice.cap = 4;
     CHECK(decode_msgtun(enc, enc_len, &m) == C2_OK);
@@ -103,8 +105,8 @@ int main(void) {
 
   /* MsgTunData: encode then decode round-trip (no null field 10). */
   {
-    c2_str cmds[1] = {c2_str_lit("!stat")};
-    c2_msgtun m = {0};
+    c2_str cmds[1] = { c2_str_lit("!stat") };
+    c2_msgtun m = { 0 };
     m.job_id = c2_str_lit("job-2");
     m.cmd_slice.items = cmds;
     m.cmd_slice.count = 1;
@@ -120,7 +122,7 @@ int main(void) {
     size_t n = cbor_encoder_get_buffer_size(&enc, buf);
 
     c2_str dcmds[2];
-    c2_msgtun d = {0};
+    c2_msgtun d = { 0 };
     d.cmd_slice.items = dcmds;
     d.cmd_slice.cap = 2;
     CHECK(decode_msgtun(buf, n, &d) == C2_OK);
@@ -130,8 +132,8 @@ int main(void) {
     CHECK(!c2_msgtun_is_hello(&d));
 
     /* A hello has an empty response and a non-empty command slice. */
-    c2_msgtun hello = {0};
-    c2_str hello_cmd[1] = {c2_str_lit("random")};
+    c2_msgtun hello = { 0 };
+    c2_str hello_cmd[1] = { c2_str_lit("random") };
     hello.cmd_slice.items = hello_cmd;
     hello.cmd_slice.count = 1;
     hello.cmd_slice.cap = 1;
@@ -156,16 +158,16 @@ int main(void) {
     CHECK(cbor_encoder_close_container(&e, &m) == CborNoError);
     size_t n = cbor_encoder_get_buffer_size(&e, buf);
 
-    c2_peer peers[1] = {0};
+    c2_peer peers[1] = { 0 };
     c2_str ips[1][2], files[1][2];
     peers[0].ips.items = ips[0];
     peers[0].ips.cap = 2;
     peers[0].files.items = files[0];
     peers[0].files.cap = 2;
-    c2_peer_list list_out = {0};
+    c2_peer_list list_out = { 0 };
     list_out.peers = peers;
     list_out.cap = 1;
-    c2_msgtun msg = {0};
+    c2_msgtun msg = { 0 };
     msg.peer_list = &list_out;
     CHECK(decode_msgtun(buf, n, &msg) == C2_OK);
     CHECK_EQ_LONG(list_out.count, 1);
@@ -187,7 +189,7 @@ int main(void) {
     CHECK(cbor_encoder_close_container(&enc, &map) == CborNoError);
     size_t n = cbor_encoder_get_buffer_size(&enc, buf);
 
-    c2_msgtun m = {0};
+    c2_msgtun m = { 0 };
     CHECK(decode_msgtun(buf, n, &m) == C2_OK);
     CHECK(c2_str_equal(m.job_id, "job-x"));
   }
@@ -206,7 +208,7 @@ int main(void) {
     size_t n = cbor_encoder_get_buffer_size(&enc, buf);
 
     c2_str one[1];
-    c2_msgtun m = {0};
+    c2_msgtun m = { 0 };
     m.cmd_slice.items = one;
     m.cmd_slice.cap = 1;
     CHECK(decode_msgtun(buf, n, &m) == C2_ERR_NOMEM);
@@ -215,16 +217,48 @@ int main(void) {
   /* Regression: a tagged value under an unknown key must be skipped whole, not
    * misread as the next map key (found by fuzz_messages). */
   {
-    static const uint8_t tagged[] = {0xbf, 0x01, 0xd5, 0x03, 0xff};
-    c2_msgtun t = {0};
+    static const uint8_t tagged[] = { 0xbf, 0x01, 0xd5, 0x03, 0xff };
+    c2_msgtun t = { 0 };
     CHECK(decode_msgtun(tagged, sizeof(tagged), &t) == C2_ERR_PROTO);
-    c2_msgauth a = {0};
+    c2_msgauth a = { 0 };
     CHECK(decode_msgauth(tagged, sizeof(tagged), &a) == C2_OK);
 
     /* A key with no value ends the map: malformed, never a crash. */
-    static const uint8_t odd[] = {0xa1, 0x01};
-    c2_msgtun t2 = {0};
+    static const uint8_t odd[] = { 0xa1, 0x01 };
+    c2_msgtun t2 = { 0 };
     CHECK(decode_msgtun(odd, sizeof(odd), &t2) == C2_ERR_PROTO);
+  }
+
+  /* A command result larger than the old 64 KiB control-frame buffer must
+   * encode and decode intact: BOF output (tasklist, walk, grep) is not a
+   * control envelope. */
+  {
+    size_t resp_len = 256 * 1024;
+    uint8_t *resp = (uint8_t *)malloc(resp_len);
+    CHECK(resp != NULL);
+    if (resp != NULL) {
+      for (size_t i = 0; i < resp_len; i++)
+        resp[i] = (uint8_t)(i * 31u);
+      c2_msgtun m = { 0 };
+      m.job_id = c2_str_lit("job-big");
+      m.response = c2_bytes_of(resp, resp_len);
+
+      uint8_t *enc = NULL;
+      size_t enc_len = 0;
+      CHECK(c2_msgtun_encode_alloc(&m, &enc, &enc_len) == C2_OK);
+      CHECK(enc != NULL);
+      CHECK(enc_len > resp_len);
+      if (enc != NULL) {
+        c2_msgtun out = { 0 };
+        CHECK(decode_msgtun(enc, enc_len, &out) == C2_OK);
+        CHECK_EQ_LONG(out.response.len, resp_len);
+        CHECK(out.response.ptr[0] == 0);
+        CHECK(out.response.ptr[resp_len - 1] ==
+              (uint8_t)((resp_len - 1) * 31u));
+        free(enc);
+      }
+      free(resp);
+    }
   }
 
   TEST_DONE();

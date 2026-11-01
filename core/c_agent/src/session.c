@@ -29,8 +29,9 @@
 #include <string.h>
 #include <time.h>
 
-/* One envelope is small; the server caps MsgAuth at 8 KiB and jobs are far
- * smaller. Anything larger is a protocol violation, not a reason to grow. */
+/* Control envelopes (check-in, hello, incoming jobs) are small; the server
+ * caps MsgAuth at 8 KiB. Command results use a buffer sized for the response
+ * instead of this control-frame bound. */
 #define C2_SESSION_MSG_MAX (64u * 1024u)
 #define C2_SESSION_AUTH_MAX C2_AUTH_FRAME_MAX
 
@@ -38,9 +39,7 @@
 /* Small helpers                                                              */
 /* ------------------------------------------------------------------------- */
 
-static int64_t now_unix(void) {
-  return (int64_t)time(NULL);
-}
+static int64_t now_unix(void) { return (int64_t)time(NULL); }
 
 static int64_t now_unix_ms(void) {
   struct timespec ts;
@@ -161,7 +160,7 @@ static int is_bootstrap_route(const c2_agent_config *cfg, c2_str route) {
 }
 
 /* ------------------------------------------------------------------------- */
-/* Session setup / route open                                                  */
+/* Session setup / route open */
 /* ------------------------------------------------------------------------- */
 
 c2_status c2_session_init(c2_agent_session *s, const c2_crypto_backend *be,
@@ -303,7 +302,7 @@ c2_status c2_session_open_route(c2_agent_session *s, c2_str route,
 }
 
 /* ------------------------------------------------------------------------- */
-/* Check-in                                                                    */
+/* Check-in */
 /* ------------------------------------------------------------------------- */
 
 c2_status c2_session_checkin(c2_agent_session *s, const c2_agent_info *info) {
@@ -361,7 +360,7 @@ c2_status c2_session_checkin(c2_agent_session *s, const c2_agent_info *info) {
 }
 
 /* ------------------------------------------------------------------------- */
-/* Message tunnel                                                              */
+/* Message tunnel */
 /* ------------------------------------------------------------------------- */
 
 c2_status c2_session_hello(c2_agent_session *s, c2_secureconn *msg,
@@ -371,8 +370,8 @@ c2_status c2_session_hello(c2_agent_session *s, c2_secureconn *msg,
 
   char rand_str[17];
   rand_hex(s->be, rand_str, 8);
-  c2_str cmd_items[1] = {c2_str_of(rand_str, 16)};
-  c2_str_list cmd = {cmd_items, 1, 1};
+  c2_str cmd_items[1] = { c2_str_of(rand_str, 16) };
+  c2_str_list cmd = { cmd_items, 1, 1 };
 
   if (send_ephem) {
     if (s->be->ec_p256_keygen == NULL)
@@ -382,7 +381,7 @@ c2_status c2_session_hello(c2_agent_session *s, c2_secureconn *msg,
     s->pfs_pending = 1;
   }
 
-  char job_id[40] = {0};
+  char job_id[40] = { 0 };
   rand_uuid(s->be, job_id, sizeof(job_id));
   memcpy(s->hello_job_id, job_id, sizeof(s->hello_job_id));
 
@@ -473,18 +472,18 @@ c2_status c2_session_send_result(c2_agent_session *s, c2_secureconn *msg,
   m.response = c2_bytes_of(response, response_len);
   m.time = now_unix_ms();
 
-  uint8_t buf[C2_SESSION_MSG_MAX];
-  CborEncoder enc;
-  cbor_encoder_init(&enc, buf, sizeof(buf), 0);
-  c2_status st = c2_msgtun_encode(&enc, &m);
+  uint8_t *buf = NULL;
+  size_t buf_len = 0;
+  c2_status st = c2_msgtun_encode_alloc(&m, &buf, &buf_len);
   if (st != C2_OK)
     return st;
-  return c2_secureconn_write_bulk(msg, buf,
-                                  cbor_encoder_get_buffer_size(&enc, buf));
+  st = c2_secureconn_write_bulk(msg, buf, buf_len);
+  free(buf);
+  return st;
 }
 
 /* ------------------------------------------------------------------------- */
-/* File streams                                                                */
+/* File streams */
 /* ------------------------------------------------------------------------- */
 
 c2_status c2_session_upload(c2_agent_session *s, c2_str token,

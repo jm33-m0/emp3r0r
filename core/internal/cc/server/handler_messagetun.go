@@ -19,7 +19,9 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-const maxCmdResultCacheBytes = 1024 * 1024 // 1 MiB
+// Keep command results below the 10 MiB tunnel frame cap (C2_FRAME_ENC_MAX)
+// so a large BOF result (tasklist, walk, grep) is cached and relayed whole.
+const maxCmdResultCacheBytes = 8 * 1024 * 1024 // 8 MiB
 
 // handshakeTimeout is the maximum silence allowed on a message tunnel before
 // it is torn down. It is a var so tests can shorten it.
