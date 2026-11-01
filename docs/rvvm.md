@@ -1,44 +1,66 @@
 # RISC-V BOF modules
 
 `rv` modules run a **BOF object** inside a tiny RV32IMA interpreter on the
-agent. The payload is architecture-independent: the same RV32 relocatable
-object runs on every Linux and Windows agent, because only the interpreter is
+agent. The payload is architecture-independent: the same RV32 executable runs
+on every supported Linux agent architecture, because only the interpreter is
 host code.
 
-`rv` is BOF-only. The payload is an `ET_REL` RISC-V object with the standard
-BOF entry point `int go(char *args, int len)`. The interpreter maps it,
-resolves its imports against the embedded guest runtime (Beacon API and a libc
-subset), and calls the export with the packed COFF argument buffer.
+`rv` is BOF-only. A module build produces an RV32 static executable containing:
+
+- musl,
+- a guest entry shim that receives the packed arguments in a reserved section,
+- the BOF entry point `int go(char *args, int len)`.
+
+The interpreter loads the executable, builds the initial Linux stack, `auxv`
+and environment, starts at musl's `_start`, and lets musl initialize TLS,
+errno, stdio, the allocator, and libc. The environment mirrors the agent's
+environment, like a native BOF sees through `getEnviron()`. `main` then calls
+`go`. The only host boundary is the Linux syscall gate.
 
 ## Prerequisites
 
-- The `rvvm_linux` (Linux) or `rvvm_windows` (Windows) dependency module. The
-  C2 selects and hosts it automatically from the `rv` module's `platform`.
+- The `rvvm_linux` dependency module. The C2 hosts it automatically for
+  `--riscv` runs. `rv` modules run on Linux agents only.
 - The agent must be able to map the interpreter: `memmod` on the Go agent
-  (386/amd64/arm/arm64 on Windows, 386/amd64/arm64 on Linux) and `elfload` on
-  the C agent (x86_64/aarch64/riscv64). The Linux interpreter links libc (like
-  `coffloader_linux`); the Windows interpreter imports only `kernel32`.
-- To build a payload: the `zig` toolchain shipped with emp3r0r (the C2
-  provides `ZIG` to module builds).
+  (386/amd64/arm/arm64 on Linux) and `elfload` on the C agent
+  (x86_64/aarch64/riscv64).
+- The `zig` toolchain shipped with emp3r0r. It compiles the BOF for
+  `riscv32-linux-musl` and links the static guest executable.
 
 ## Running a BOF in the interpreter
 
 Every `coff` module gets a `--riscv` option. With it, the C2 recompiles the
-module's BOF sources for RV32 and dispatches the result to the interpreter; the
-manifest stays a normal COFF module:
+module's BOF sources for RV32, links each payload with musl, and dispatches the
+result to the interpreter:
 
 ```text
 sa_linux_pwd --riscv
 whoami --riscv
 ```
 
-The C2 runs the module's `rv_build.sh` if present, otherwise its normal build
-(`build`/`make_all.sh`) with `EMP3R0R_BOF_ARCH=riscv32`. The build must emit
-the RV32 object next to the native one: `pwd.o` -> `pwd.rv.o`,
-`whoami.x64.o` -> `whoami.rv.o`. Modules without a source build report that no
-RISC-V object was produced.
+The `--riscv` flag selects the RISC-V build for that invocation; without it the
+same module still builds and runs as a native BOF. With the flag, the C2 puts
+the module toolchain in RV32 mode before running the build:
 
-Build an RV32 `ET_REL` object with:
+- `CC`/`CXX` shims target `riscv32-linux-musl`
+- `ZIG_TARGET=riscv32-linux-musl`
+- `RV_TARGET=riscv32-linux-musl`
+- `EMP3R0R_BOF_ARCH=riscv32`
+- `EMP3R0R_TARGET=riscv32`
+
+The C2 runs the module's `rv_build.sh` if present, otherwise its normal build
+(`build`/`make_all.sh`). The build emits an RV32 object next to the native one:
+
+```text
+pwd.o             -> pwd.rv.o  -> pwd.rv
+whoami.x64.o      -> whoami.rv.o -> whoami.rv
+```
+
+The C2 links `*.rv.o` with `core/internal/cc/modules/rvguest/main.c` and
+`guest.ld` into a static `ET_EXEC` image. Modules do not need to invoke the
+linker themselves.
+
+A module that wants to compile RV32 objects directly can use:
 
 ```sh
 zig cc -target riscv32-linux-musl -mcpu=generic_rv32 -O2 -g0 -fno-pic \
@@ -47,58 +69,56 @@ zig cc -target riscv32-linux-musl -mcpu=generic_rv32 -O2 -g0 -fno-pic \
   -I includes -c -o pwd.rv.o pwd.c
 ```
 
-- `-mcpu=generic_rv32`: the interpreter implements RV32IMA without the
-  compressed-instruction extension.
-- `-fno-pic`, `-mno-relax`, `-g0` and no unwind tables keep the object to the
-  relocation types the loader implements.
-- Do not strip: the loader needs `.symtab` for the export and imports.
-
 ### Libraries
 
-A module can ship RISC-V libraries alongside the BOF and list them in
-`riscv_libraries`. They are hosted with the multi-file module mechanism, sent
-to the agent, kept in encrypted memfs, and copied into guest RAM by the
-interpreter:
+A module can add RISC-V static libraries or object files to
+`riscv_libraries`. They are linked into each guest executable at build time:
 
 ```json
 {
   "name": "my_bof",
   "platform": "Linux",
-  "riscv_libraries": ["libkit.rv.o"],
+  "riscv_libraries": ["libkit.a"],
   "agent_config": { "files": ["my_bof.o"], "type": "coff" },
   "invocation": { "coff_export": "go" }
 }
 ```
 
-Libraries are ordinary RV32 `ET_REL` objects. The loader places the BOF, the
-interpreter runtime and up to three libraries in guest RAM, builds one symbol
-table, resolves cross-object imports, and relocates everything as a single
-image. Undefined symbols that are not in the runtime or a delivered library are
-rejected with a named `unresolved symbol`.
+Build the library for `riscv32-linux-musl` with `zig` and the same CPU flags.
+This is how a BOF gains new capabilities without adding a host proxy: link
+zlib, libbpf, OpenSSL, or another library into the guest executable.
 
-Windows BOF sources use the `MODULE$Function` import convention
-(`KERNEL32$VirtualAlloc`, `MSVCRT$memcpy`, ...). The loader strips the module
-prefix and resolves the function name against the guest runtime, exactly as the
-Windows COFF loader resolves it against the host DLL. The embedded runtime
-implements a core subset (memory, handles, strings, time, and the POSIX-layer
-services below); other imports fail at load time with a named symbol.
+`riscv_libraries` are linked on the C2; nothing is delivered to the agent at
+run time.
 
-## Host calls
+## Syscall gate
 
-The guest runtime uses a mailbox at `0x801ff000` for `open`/`read`/`write`/
-`close`/`lseek`/`getcwd`/`stat`/`readdir`/`uname`/`getuid`/`getenv`/
-`readlink`/`chmod`/`usleep`/`getpwuid`/`getgrgid` services and MMIO
-`0x10001000` for exit. The Linux backend serves them with libc; the Windows
-backend uses `kernel32`.
+Guest `ecall` instructions enter one Linux syscall gate. The gate implements
+the RV32 Linux ABI for the calls used by musl and common BOFs:
+
+- process and identity: `exit`, `exit_group`, `getpid`, `getppid`, `getuid`,
+  `geteuid`, `getgid`, `getegid`, `getgroups`, `uname`, `sched_getaffinity`
+- files and directories: `openat`, `close`, `read`, `readv`, `write`,
+  `writev`, `lseek`, `getdents64`, `readlinkat`, `fchmodat`, `statx`
+- memory and runtime: `brk`, `mmap`, `munmap`, `mprotect`, `set_tid_address`,
+  `set_robust_list`, `rseq`, `prlimit64`, `getrandom`, `clock_gettime64`
+- network: `socket`, `bind`, `sendto`, `recvfrom`, `setsockopt`, `recvmsg`
+- startup: `getcwd`, `fcntl`
+
+Unsupported calls return `-ENOSYS`. Adding a capability normally means adding
+a library or a syscall case, not a BOF-specific proxy.
 
 ## Constraints
 
 - RV32IMA only; no compressed instructions, no floating point, no MMU.
-- Single thread, no guest syscalls.
-- 8 MiB guest RAM: up to 512 KiB of BOF sections, a ~1.1 MiB runtime (with a
-  1 MiB heap), a host-call mailbox, and a 128 KiB stack.
-- A run is bounded to 512M instructions and 1 MiB of output. An illegal
-  instruction, a misaligned jump, an out-of-range load/store, an unresolved
-  symbol or a budget overrun reports an error; it never crashes the agent.
+- Single thread, no guest `fork` or `clone`.
+- 64 MiB guest address space, laid out like a normal process (image, brk heap,
+  51 MiB mmap arena, stack, argument block). The guest executable, its libc, TLS,
+  heap, stack, and program headers all live in it.
+- A run is bounded to a loose instruction budget and 8 MiB of output. The
+  budget is a runaway-guest guard, not a latency bound: scanning BOFs such as
+  `tasklist` legitimately run for hundreds of millions of guest instructions.
+  An illegal instruction, a misaligned jump, an out-of-range load/store, a bad
+  ELF image or a budget overrun reports an error; it never crashes the agent.
 - The interpreter is mapped only for the run and unmapped immediately
   afterwards. `RVVM=0` compiles the C agent support out.

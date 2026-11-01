@@ -67,12 +67,12 @@ the message tunnel before masking, so no network traffic happens while masked.
 Two dependency-backed runners execute module payloads in memory:
 
 - **BOF** (`BOF=1`, default): a Linux relocatable object is mapped and run by
-  the `coffloader_linux` dependency (`bof_run`), cached in memfs as
+  the `coffloader_linux` dependency (`Run`), cached in memfs as
   `memfs:///coffloader_linux.so`. Console command: `bof`.
-- **RV32IMA BOFs** (`RVVM=1`, default): an RV32 `ET_REL` BOF is interpreted
-  by the `rvvm_linux` dependency (`rv_run`), cached in memfs as
-  `memfs:///rvvm_linux.so`. The interpreter links libc dynamically for its
-  host-call services; the BOF runtime is freestanding. There is no standalone
+- **RV32IMA BOFs** (`RVVM=1`, default): an RV32 static musl BOF executable is
+  interpreted by the `rvvm_linux` dependency (`Run`), cached in memfs as
+  `memfs:///rvvm_linux.so`. The interpreter starts musl, runs the BOF, and
+  forwards Linux syscalls through one gate. There is no standalone
   `rv` command: an `rv` payload is always a BOF dispatched through
   `!custom_module`. See [`docs/rvvm.md`](../../docs/rvvm.md).
 

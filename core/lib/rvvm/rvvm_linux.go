@@ -9,11 +9,11 @@ import (
 func checkPlatform() error { return nil }
 
 func callRun(module *memmod.Module, args ...uintptr) (uintptr, error) {
-	return module.CallExportWithArgs("rv_run", args...)
+	return module.CallExportWithArgs("Run", args...)
 }
 
 func callLastError(module *memmod.Module) string {
-	ptr, err := module.CallExportWithArgs("rv_last_error")
+	ptr, err := module.CallExportWithArgs("LastError")
 	if err != nil || ptr == 0 {
 		return ""
 	}
@@ -21,5 +21,5 @@ func callLastError(module *memmod.Module) string {
 }
 
 func callFree(module *memmod.Module, ptr uintptr) {
-	_, _ = module.CallExportWithArgs("rv_free", ptr)
+	_, _ = module.CallExportWithArgs("Free", ptr)
 }

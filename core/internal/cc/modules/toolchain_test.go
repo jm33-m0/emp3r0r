@@ -261,3 +261,47 @@ payload.x86.o: payload.c
 		t.Fatalf("module shims escaped the workspace: %s", binDir)
 	}
 }
+
+func TestModuleBuildEnvRiscvTargetsRV32(t *testing.T) {
+	skipToolchainUnderRace(t)
+	if runtime.GOOS != "linux" {
+		t.Skip("module toolchain shims are Linux-only")
+	}
+
+	_, workspace := newInstalledTestLayout(t)
+	env, err := moduleBuildEnvRiscv()
+	if err != nil {
+		t.Fatalf("prepare RISC-V module toolchain: %v", err)
+	}
+	envMap := make(map[string]string, len(env))
+	for _, kv := range env {
+		key, value, ok := strings.Cut(kv, "=")
+		if ok {
+			envMap[key] = value
+		}
+	}
+
+	for key, want := range map[string]string{
+		"EMP3R0R_BOF_ARCH": "riscv32",
+		"EMP3R0R_TARGET":   "riscv32",
+		"ZIG_TARGET":       moduleRiscvTarget,
+		"RV_TARGET":        moduleRiscvTarget,
+	} {
+		if envMap[key] != want {
+			t.Errorf("%s = %q, want %q", key, envMap[key], want)
+		}
+	}
+
+	binDir := envMap["CC"]
+	data, err := os.ReadFile(binDir)
+	if err != nil {
+		t.Fatalf("read cc shim: %v", err)
+	}
+	if !strings.Contains(string(data), moduleRiscvTarget) {
+		t.Fatalf("cc shim does not target %s:\n%s", moduleRiscvTarget, data)
+	}
+	wantPrefix := filepath.Join(workspace, moduleToolchainSubdir) + string(os.PathSeparator)
+	if !strings.HasPrefix(binDir, wantPrefix) {
+		t.Fatalf("RISC-V shims are outside the workspace: %s", binDir)
+	}
+}

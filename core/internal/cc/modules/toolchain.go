@@ -13,7 +13,10 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 )
 
-const moduleToolchainSubdir = ".module-toolchain"
+const (
+	moduleToolchainSubdir = ".module-toolchain"
+	moduleRiscvTarget     = "riscv32-linux-musl"
+)
 
 var moduleToolchainMu sync.Mutex
 
@@ -38,6 +41,14 @@ func moduleLinuxTarget() (string, error) {
 	}
 }
 
+func mustModuleLinuxTarget() string {
+	target, err := moduleLinuxTarget()
+	if err != nil {
+		return ""
+	}
+	return target
+}
+
 // findModuleZig prefers the zig toolchain shipped in the installed tree, then
 // falls back to PATH for source-tree builds and tests.
 func findModuleZig() (string, error) {
@@ -58,15 +69,25 @@ func findModuleZig() (string, error) {
 // x86_64-w64-mingw32-gcc, so putting these shims first on PATH makes every
 // module build use the shipped zig regardless of its Makefile.
 func ensureModuleToolchain() (string, string, error) {
+	linuxTarget, err := moduleLinuxTarget()
+	if err != nil {
+		return "", "", err
+	}
+	return ensureModuleToolchainForTarget(linuxTarget)
+}
+
+// ensureModuleToolchainForTarget writes shims for one Linux target. The host
+// target keeps the historical .module-toolchain/bin path; cross-targets get
+// their own directory so a RISC-V build cannot leave host-target shims behind.
+func ensureModuleToolchainForTarget(linuxTarget string) (string, string, error) {
 	if runtime.GOOS != "linux" {
 		return "", "", fmt.Errorf("module builds require Linux")
 	}
 	if live.EmpWorkSpace == "" {
 		return "", "", fmt.Errorf("operator workspace is not initialized")
 	}
-	linuxTarget, err := moduleLinuxTarget()
-	if err != nil {
-		return "", "", err
+	if linuxTarget == "" {
+		return "", "", fmt.Errorf("module Linux target is empty")
 	}
 	zig, err := findModuleZig()
 	if err != nil {
@@ -76,7 +97,11 @@ func ensureModuleToolchain() (string, string, error) {
 	moduleToolchainMu.Lock()
 	defer moduleToolchainMu.Unlock()
 
-	binDir := filepath.Join(live.EmpWorkSpace, moduleToolchainSubdir, "bin")
+	subdir := moduleToolchainSubdir
+	if linuxTarget != mustModuleLinuxTarget() {
+		subdir = filepath.Join(subdir, strings.NewReplacer("/", "_", "\\", "_").Replace(linuxTarget))
+	}
+	binDir := filepath.Join(live.EmpWorkSpace, subdir, "bin")
 	if err := os.MkdirAll(binDir, 0o700); err != nil {
 		return "", "", fmt.Errorf("create module toolchain dir: %w", err)
 	}
@@ -133,7 +158,25 @@ func moduleBuildEnv() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	return moduleBuildEnvFrom(binDir, zig, nil)
+}
 
+// moduleBuildEnvRiscv prepares the same shims for RV32 guest builds. Every C
+// and C++ invocation, including dependency builds, targets riscv32-linux-musl.
+func moduleBuildEnvRiscv() ([]string, error) {
+	binDir, zig, err := ensureModuleToolchainForTarget(moduleRiscvTarget)
+	if err != nil {
+		return nil, err
+	}
+	return moduleBuildEnvFrom(binDir, zig, []string{
+		"EMP3R0R_BOF_ARCH=riscv32",
+		"EMP3R0R_TARGET=riscv32",
+		"ZIG_TARGET=" + moduleRiscvTarget,
+		"RV_TARGET=" + moduleRiscvTarget,
+	})
+}
+
+func moduleBuildEnvFrom(binDir, zig string, extra []string) ([]string, error) {
 	merged := make(map[string]string)
 	for _, kv := range os.Environ() {
 		key, value, ok := strings.Cut(kv, "=")
@@ -151,6 +194,12 @@ func moduleBuildEnv() ([]string, error) {
 	merged["CXX"] = filepath.Join(binDir, "c++")
 	merged["AR"] = filepath.Join(binDir, "ar")
 	merged["RANLIB"] = filepath.Join(binDir, "ranlib")
+	for _, kv := range extra {
+		key, value, ok := strings.Cut(kv, "=")
+		if ok {
+			merged[key] = value
+		}
+	}
 
 	keys := make([]string, 0, len(merged))
 	for key := range merged {

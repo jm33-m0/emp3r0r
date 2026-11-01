@@ -362,15 +362,17 @@ endif
 # Skipped when the module sources are absent (standalone checkout).
 RVVM_MODULE_DIR = ../modules/rvvm
 ZIG ?= zig
-# Portable BOF fixtures: RV32 ET_REL objects that the module relocates against
-# its embedded guest runtime.
+# Guest fixtures: RV32 objects compiled from the same sources and linked with
+# the guest entry shim into static musl executables.
 RVVM_BOF_CFLAGS = -target riscv32-linux-musl -mcpu=generic_rv32 -O2 -g0 \
                   -fno-pic -mno-relax -msmall-data-limit=0 \
                   -fno-asynchronous-unwind-tables -fno-unwind-tables \
                   -fno-builtin -fno-stack-protector -fno-sanitize=all \
                   -fvisibility=hidden
-RVVM_BOF_GUESTS = $(BUILD)/rv_bof.o $(BUILD)/rv_bof_bad.o $(BUILD)/rv_bof_win.o \
-                  $(BUILD)/rv_bof_lib.o $(BUILD)/rv_libanswer.o
+RVVM_BOF_GUESTS = $(BUILD)/rv_bof_exec $(BUILD)/rv_bof_spam_exec \
+                  $(BUILD)/rv_bof_time_exec $(BUILD)/rv_bof_net_exec \
+                  $(BUILD)/rv_bof_lock_exec
+RVVM_GUEST_DIR = ../internal/cc/modules/rvguest
 ifneq ($(wildcard $(RVVM_MODULE_DIR)/rvvm.c),)
   RVVM_TEST = $(BUILD)/test_rvvm
   RVVM_FUZZ = $(BUILD)/fuzz_rvvm
@@ -504,30 +506,27 @@ $(BUILD)/rvvm_linux.so: $(RVVM_MODULE_DIR)/rvvm.c | $(BUILD)
 	cp $(RVVM_MODULE_DIR)/rvvm_linux.so $@
 	$(MAKE) -C $(RVVM_MODULE_DIR) clean >/dev/null
 
-$(BUILD)/rv_bof.o: $(RVVM_MODULE_DIR)/tests/guests/bof.c | $(BUILD)
+# Each guest source builds to an RV32 ET_REL object, and any of those objects
+# can be linked with the guest entry shim into a static musl executable.
+$(BUILD)/rv_%.o: $(RVVM_MODULE_DIR)/tests/guests/%.c | $(BUILD)
 	$(ZIG) cc $(RVVM_BOF_CFLAGS) -c -o $@ $<
 
-$(BUILD)/rv_bof_bad.o: $(RVVM_MODULE_DIR)/tests/guests/bof_bad.c | $(BUILD)
-	$(ZIG) cc $(RVVM_BOF_CFLAGS) -c -o $@ $<
-
-$(BUILD)/rv_bof_win.o: $(RVVM_MODULE_DIR)/tests/guests/bof_win.c | $(BUILD)
-	$(ZIG) cc $(RVVM_BOF_CFLAGS) -c -o $@ $<
-
-$(BUILD)/rv_bof_lib.o: $(RVVM_MODULE_DIR)/tests/guests/bof_lib.c | $(BUILD)
-	$(ZIG) cc $(RVVM_BOF_CFLAGS) -c -o $@ $<
-
-$(BUILD)/rv_libanswer.o: $(RVVM_MODULE_DIR)/tests/guests/libanswer.c | $(BUILD)
-	$(ZIG) cc $(RVVM_BOF_CFLAGS) -c -o $@ $<
+$(BUILD)/rv_%_exec: $(BUILD)/rv_%.o $(RVVM_GUEST_DIR)/main.c \
+                    $(RVVM_GUEST_DIR)/guest.ld | $(BUILD)
+	$(ZIG) build-exe -target riscv32-linux-musl -mcpu=generic_rv32+a \
+	  -static -O ReleaseSmall -fno-entry -fstrip -lc \
+	  -T $(RVVM_GUEST_DIR)/guest.ld $(RVVM_GUEST_DIR)/main.c \
+	  $< -femit-bin=$@
 
 $(BUILD)/test_rvvm: tests/test_rvvm.c $(BUILD)/rvvm_linux.so \
                       $(RVVM_BOF_GUESTS) tests/test.h | $(BUILD)
 	$(HOSTCC) $(TEST_CFLAGS) \
 	  -DRVVM_MODULE_PATH='"$(BUILD)/rvvm_linux.so"' \
-	  -DRVVM_BOF_PATH='"$(BUILD)/rv_bof.o"' \
-	  -DRVVM_BOF_BAD_PATH='"$(BUILD)/rv_bof_bad.o"' \
-	  -DRVVM_BOF_WIN_PATH='"$(BUILD)/rv_bof_win.o"' \
-	  -DRVVM_BOF_LIB_PATH='"$(BUILD)/rv_bof_lib.o"' \
-	  -DRVVM_LIBANSWER_PATH='"$(BUILD)/rv_libanswer.o"' \
+	  -DRVVM_BOF_EXEC_PATH='"$(BUILD)/rv_bof_exec"' \
+	  -DRVVM_BOF_SPAM_EXEC_PATH='"$(BUILD)/rv_bof_spam_exec"' \
+	  -DRVVM_BOF_TIME_EXEC_PATH='"$(BUILD)/rv_bof_time_exec"' \
+	  -DRVVM_BOF_NET_EXEC_PATH='"$(BUILD)/rv_bof_net_exec"' \
+	  -DRVVM_BOF_LOCK_EXEC_PATH='"$(BUILD)/rv_bof_lock_exec"' \
 	  tests/test_rvvm.c src/util/elfload.c src/util/dynload.c \
 	  src/util/dynload_hosted.c -o $@
 
@@ -692,19 +691,12 @@ $(BUILD)/fuzz_bof: fuzz/fuzz_bof.c $(FUZZ_DRIVER) src/bof.c \
 		-DFUZZ_BOF_LOADER='"$(BUILD)/coffloader_linux.so"' \
 		$< $(FUZZ_DRIVER) src/bof.c src/util/dynload.c src/util/elfload.c -o $@
 
-$(RVVM_MODULE_DIR)/runtime/rv_bof_runtime_blob.c: $(RVVM_MODULE_DIR)/runtime/rv_bof_runtime.c
-	$(MAKE) -C $(RVVM_MODULE_DIR) runtime/rv_bof_runtime_blob.c
-
 $(BUILD)/fuzz_rvvm: fuzz/fuzz_rvvm.c $(FUZZ_DRIVER) $(RVVM_MODULE_DIR)/rvvm.c \
-                    $(RVVM_MODULE_DIR)/rv_host_posix.c \
-                    $(RVVM_MODULE_DIR)/runtime/rv_bof_runtime_blob.c \
-                    $(BUILD)/rv_bof.o fuzz/fuzz_common.h | $(BUILD)
-	$(HOSTCC) $(FUZZ_CFLAGS) -I$(RVVM_MODULE_DIR)/include \
-	  -DRV_RAM_SIZE=2097152 -DRV_MAX_INSNS=20000 \
-	  -DRVVM_SEED='"$(BUILD)/rv_bof.o"' \
-	  $< $(FUZZ_DRIVER) $(RVVM_MODULE_DIR)/rvvm.c \
-	  $(RVVM_MODULE_DIR)/rv_host_posix.c \
-	  $(RVVM_MODULE_DIR)/runtime/rv_bof_runtime_blob.c -o $@
+                    $(BUILD)/rv_bof_exec fuzz/fuzz_common.h | $(BUILD)
+	$(HOSTCC) $(FUZZ_CFLAGS) \
+	  -DRV_MAX_INSNS=100000 \
+	  -DRVVM_SEED='"$(BUILD)/rv_bof_exec"' \
+	  $< $(FUZZ_DRIVER) $(RVVM_MODULE_DIR)/rvvm.c -o $@
 
 $(BUILD)/fuzz_dynload: fuzz/fuzz_dynload.c $(FUZZ_DRIVER) src/util/dynload.c fuzz/fuzz_common.h | $(BUILD)
 	$(HOSTCC) $(FUZZ_CFLAGS) $< $(FUZZ_DRIVER) src/util/dynload.c -o $@

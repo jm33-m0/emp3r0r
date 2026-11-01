@@ -1,4 +1,5 @@
-/* Test BOF: exercises the guest runtime's Beacon data parser and formatter. */
+/* Test BOF: exercises the guest entry shim's Beacon data parser and formatter.
+ */
 #include <string.h>
 
 typedef struct {

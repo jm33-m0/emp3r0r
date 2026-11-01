@@ -16,8 +16,8 @@ The file is vendored verbatim. `../../rvvm.c` includes it once with
 | `MINI_RV32_RAM_SIZE` | guest RAM arena size |
 | `MINIRV32_RAM_IMAGE_OFFSET` | guest RAM base (`0x80000000`) |
 | `MINIRV32_CUSTOM_MEMORY_BUS` | byte-wise, bounds-checked load/store helpers (avoids host alignment/strict-aliasing UB and the 3-byte over-read on instruction fetch at the end of RAM) |
-| `MINIRV32_HANDLE_MEM_STORE_CONTROL` / `_LOAD_CONTROL` | MMIO host calls (console, block write, exit) |
-| `MINIRV32WARN` / `MINIRV32_POSTEXEC` | compile out upstream logging and per-step callbacks |
+| `MINIRV32_HANDLE_MEM_STORE_CONTROL` / `_LOAD_CONTROL` | MMIO byte console and exit register |
+| `MINIRV32WARN` / `MINIRV32_POSTEXEC` | compile out upstream logging; dispatch guest ECALL to the syscall gate |
 
 `mini-rv32ima` implements RV32IMA (no compressed or floating-point
 instructions). BOFs must therefore be built with `-mcpu=generic_rv32`

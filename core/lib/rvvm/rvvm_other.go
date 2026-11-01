@@ -1,4 +1,4 @@
-//go:build !linux && !windows
+//go:build !linux
 
 package rvvm
 
@@ -9,7 +9,7 @@ import (
 )
 
 func checkPlatform() error {
-	return errors.New("RISC-V BOFs are supported on Linux and Windows only")
+	return errors.New("rv modules run on Linux agents only")
 }
 
 func callRun(*memmod.Module, ...uintptr) (uintptr, error) {

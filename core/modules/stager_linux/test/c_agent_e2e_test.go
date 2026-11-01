@@ -315,8 +315,8 @@ func runCAgentEndToEnd(t *testing.T, format string) {
 		t.Fatalf("custom_module output = %q\nAgent output:\n%s", got, agentOut.String())
 	}
 
-	// A portable BOF: the same SA_linux pwd source compiled as an RV32 ET_REL
-	// object, relocated by the interpreter against its embedded runtime.
+	// A portable BOF: the same SA_linux pwd source compiled as an RV32 object
+	// and linked into a static guest executable.
 	rvBofInv := def.ResolvedInvocation{Coff: &def.ResolvedCoffInvocation{Export: "go"}}
 	rvBofBytes, err := cbor.Marshal(rvBofInv)
 	if err != nil {
@@ -479,7 +479,7 @@ func hostBOFModules(t *testing.T) {
 	}
 	ww := t.TempDir()
 	paths.WWWRoot = ww
-	host := func(moduleDir, src, hosted string, extraArgs ...string) {
+	buildModule := func(moduleDir string, extraArgs ...string) {
 		// -B forces a rebuild: the module Makefiles have no libc in their
 		// dependency graph, so a switch (e.g. glibc <-> musl) must not reuse a
 		// stale object from a previous run.
@@ -488,17 +488,23 @@ func hostBOFModules(t *testing.T) {
 		if out, berr := build.CombinedOutput(); berr != nil {
 			t.Skipf("build %s: %v\n%s", moduleDir, berr, out)
 		}
-		data, rerr := os.ReadFile(filepath.Join(coreDir, moduleDir, src))
+	}
+	publish := func(srcPath, hosted string) {
+		data, rerr := os.ReadFile(srcPath)
 		if rerr != nil {
-			t.Fatalf("read %s: %v", src, rerr)
+			t.Fatalf("read %s: %v", srcPath, rerr)
 		}
 		gz, cerr := util.Compress(data)
 		if cerr != nil {
-			t.Fatalf("compress %s: %v", src, cerr)
+			t.Fatalf("compress %s: %v", srcPath, cerr)
 		}
 		if werr := os.WriteFile(filepath.Join(ww, hosted), gz, 0o600); werr != nil {
 			t.Fatalf("host %s: %v", hosted, werr)
 		}
+	}
+	host := func(moduleDir, src, hosted string, extraArgs ...string) {
+		buildModule(moduleDir, extraArgs...)
+		publish(filepath.Join(coreDir, moduleDir, src), hosted)
 	}
 	// The C agent maps these modules in-process, so they must match its libc.
 	coffArgs := []string{}
@@ -517,7 +523,22 @@ func hostBOFModules(t *testing.T) {
 		rvvmArgs = append(rvvmArgs, "ZIG_TARGET=x86_64-linux-musl")
 	}
 	host("modules/rvvm", "rvvm_linux.so", "rvvm_linux.amd64.gz", rvvmArgs...)
-	host("modules/SA_linux", "SA/src/pwd.rv.o", "sa_linux_pwd_rv.gz", rvvmArgs...)
+	// The rv payload is a static guest executable: link the RV32 object with
+	// the guest entry shim exactly as the C2 does.
+	buildModule("modules/SA_linux", rvvmArgs...)
+	shimDir := filepath.Join(coreDir, "internal", "cc", "modules", "rvguest")
+	rvGuest := filepath.Join(t.TempDir(), "pwd.rv")
+	link := exec.Command("zig", "build-exe",
+		"-target", "riscv32-linux-musl", "-mcpu=generic_rv32+a",
+		"-static", "-O", "ReleaseSmall", "-fno-entry", "-fstrip", "-lc",
+		"-T", filepath.Join(shimDir, "guest.ld"),
+		filepath.Join(shimDir, "main.c"),
+		filepath.Join(coreDir, "modules", "SA_linux", "SA", "src", "pwd.rv.o"),
+		"-femit-bin="+rvGuest)
+	if out, lerr := link.CombinedOutput(); lerr != nil {
+		t.Skipf("link RV32 guest: %v\n%s", lerr, out)
+	}
+	publish(rvGuest, "sa_linux_pwd_rv.gz")
 	if cAgentTestLibc() != "musl" {
 		host("modules/SA_linux", "SA/src/pwd.o", "sa_linux_pwd.amd64.gz")
 		host("modules/SA_linux", "SA/src/cat.o", "sa_linux_cat.amd64.gz")
