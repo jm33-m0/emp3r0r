@@ -32,13 +32,14 @@ Modules are a Starlark file and a small JSON manifest loaded in memory by the ag
 
 #### Compiled modules
 
-BOF, ELF, and PICO modules run in the agent process on both platforms:
+BOF, ELF, RV32, and PICO modules run in the agent process:
 
 - Windows COFF/BOF objects with typed argument packing.
 - Linux ELF relocatable objects loaded from memory by the [in-memory loader](#in-memory-library-loader).
+- Portable [RISC-V BOFs](./docs/rvvm.md) (`--riscv`): the C2 compiles BOF sources for `riscv32-linux-musl`, links them with musl and any static `riscv_libraries` into a self-contained guest executable, and runs them inside the on-demand `rvvm_linux` RV32IMA interpreter on any Linux agent architecture.
 - Crystal-Kit PICO modules with SilentMoonwalk call stack spoofing.
 
-The repository ships Kerbeus-BOF, Remote-OPs, and a Situational Awareness suite. On Windows, modules can run under a borrowed [access token](#windows-tokens-and-kerberos).
+The repository ships Kerbeus-BOF, Remote-OPs, and a Situational Awareness suite for Windows and Linux. On Windows, modules can run under a borrowed [access token](#windows-tokens-and-kerberos).
 
 #### Linux modules and eBPF
 
@@ -54,7 +55,7 @@ The loader can map any `.so` a module declares or supplies, including raw bytes 
 
 `memmod` maps shared libraries into the agent's address space and calls their exports in place. On Windows it loads PE DLLs. On Linux it loads ELF `.so` files and applies relocations, imports, and symbol lookups without `LoadLibrary` or `dlopen`.
 
-The PE side follows WireGuard's `memmod`. The ELF side follows [Sliver](https://github.com/BishopFox/sliver) and [sliverarmory/reflektor](https://github.com/sliverarmory/reflektor). `memdeps` sits on top: a module declares a dependency, the agent gets it from [encrypted memory storage](#encrypted-memory-storage) or the C2, maps it for one operation, then unmaps it.
+The PE side follows WireGuard's `memmod`. The ELF side follows [Sliver](https://github.com/BishopFox/sliver) and [sliverarmory/reflektor](https://github.com/sliverarmory/reflektor). `memdeps` sits on top: a module declares a dependency, the agent verifies its cached copy in [encrypted memory storage](#encrypted-memory-storage) against the SHA-256 sent by the C2 (refreshing it from the C2 on a mismatch), maps it for one operation, then unmaps it.
 
 [Starlark modules](#scriptable-agents) can use the same loader directly with `mem_load_library`. They are not limited to APIs that are already loaded in the agent or target process.
 
@@ -94,7 +95,7 @@ The agent's sleep mask lives in the stager. While it sleeps, the stager flips th
 
 #### C agent
 
-The [C agent](./core/c_agent/) is deliberately thin: a C2 beacon with no built-in features. It implements only file I/O, network I/O, and `dynload` helpers that resolve code already present on the host. Everything else arrives as [BOF modules](#compiled-modules), and even the BOF loader is a dependency module mapped from memory at run time instead of being linked in.
+The [C agent](./core/c_agent/) is deliberately thin: a C2 beacon with no built-in features. It implements only file I/O, network I/O, and `dynload` helpers that resolve code already present on the host. Everything else arrives as [BOF modules](#compiled-modules), and both the native BOF loader (`coffloader_linux`) and the [RV32IMA interpreter](./docs/rvvm.md) (`rvvm_linux`) are dependency modules mapped from memory at run time instead of being linked in.
 
 Operators generate it with `generate_c`:
 
@@ -142,6 +143,7 @@ C2 server binaries keep the full feature set, so one server can handle every age
 
 - [Operator guide](./docs/OPERATOR.md): installation, quick start, operator setup, container notes, tmux keybindings, and agent generation.
 - [Custom transport guide](./docs/CUSTOM_C2.md): Tor hidden-service quick start, Go and C agent dialers, C2 bridge socket protocol, and running multiple custom transports.
+- [RISC-V BOF modules](./docs/rvvm.md): running portable BOFs with `--riscv`, linking static libraries, and the RV32IMA interpreter.
 - [Module development guide](./docs/module_development_guide.md)
 - [Testing guide](./docs/TESTING.md)
 - [Security policy](./docs/SECURITY.md)
