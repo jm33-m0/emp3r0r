@@ -32,7 +32,9 @@ func payloadIsRiscv(path string) bool {
 // paths and traversal. A module manifest must not be able to point the repair
 // step at a file outside its own directory.
 func moduleFilePath(dir, rel string) (string, error) {
-	if rel == "" || filepath.IsAbs(rel) {
+	if rel == "" || filepath.IsAbs(rel) || !filepath.IsLocal(rel) ||
+		strings.HasPrefix(rel, "/") || strings.HasPrefix(rel, `\`) ||
+		filepath.VolumeName(rel) != "" {
 		return "", fmt.Errorf("invalid module payload path %q", rel)
 	}
 	clean := filepath.Clean(rel)
