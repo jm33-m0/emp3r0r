@@ -611,9 +611,20 @@ func setupE2EFileTransfer(t *testing.T) *e2eFileTransferHarness {
 // relays it to the operator, and the operator-side ftp.HandleFTPStream
 // decompresses, checksums and commits it.
 func TestFileTransfer_AgentUploadsToOperator(t *testing.T) {
+	runAgentUploadE2E(t, bytes.Repeat([]byte("agent-upload-to-operator-e2e-"), 1024)) // ~29KB
+}
+
+// TestFileTransfer_AgentUploadsLargeFile drives the same path with a body well
+// past one 1 MiB chunk, so the file is read and compressed as a stream instead
+// of being buffered whole.
+func TestFileTransfer_AgentUploadsLargeFile(t *testing.T) {
+	runAgentUploadE2E(t, bytes.Repeat([]byte("agent-upload-large-file-e2e-"), 300_000)) // ~8MB
+}
+
+func runAgentUploadE2E(t *testing.T, content []byte) {
+	t.Helper()
 	h := setupE2EFileTransfer(t)
 
-	content := bytes.Repeat([]byte("agent-upload-to-operator-e2e-"), 1024) // ~29KB
 	checksum := crypto.SHA256SumRaw(content)
 	srcPath := filepath.Join(h.tmpDir, "agent_upload_src.bin")
 	if err := os.WriteFile(srcPath, content, 0o600); err != nil {
@@ -704,6 +715,13 @@ func TestFileTransfer_OperatorSendsToAgent(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(paths.WWWRoot, fileName), content, 0o600); err != nil {
 		t.Fatalf("write hosted file: %v", err)
 	}
+	// The C2 only serves downloads an operator registered; an empty AgentUUID
+	// accepts any agent (the agent-binding rule is covered by the C agent e2e).
+	network.WWWDownloads.Store("name:"+fileName, &network.WWWDownload{
+		Name:            fileName,
+		OperatorSession: "test-operator",
+	})
+	t.Cleanup(func() { network.WWWDownloads.Delete("name:" + fileName) })
 
 	opCC, opTest := net.Pipe()
 	server.RegisterOperatorConn("test-operator", opCC)

