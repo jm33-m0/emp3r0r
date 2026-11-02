@@ -98,7 +98,7 @@ var RegisterDownloadRemote = client.RegisterWWWDownload
 // operator serves it) and on the C2 (the C2 routes the agent's request).
 // transient marks a one-shot copy that is removed once the transfer ends.
 func RegisterWWWDownload(name, agentUUID string, size int64, checksum string, transient bool) error {
-	network.WWWDownloads.Store("name:"+name, &network.WWWDownload{
+	network.WWWDownloads.Store(network.LocalWWWDownloadKey(name), &network.WWWDownload{
 		Name:            name,
 		AgentUUID:       agentUUID,
 		ExpectedSize:    size,
@@ -106,8 +106,8 @@ func RegisterWWWDownload(name, agentUUID string, size int64, checksum string, tr
 		OperatorSession: client.SessionID,
 		Transient:       transient,
 	})
-	if err := RegisterDownloadRemote(name, agentUUID, size, checksum); err != nil {
-		network.WWWDownloads.Delete("name:" + name)
+	if err := RegisterDownloadRemote(name, agentUUID, size, checksum, transient); err != nil {
+		network.WWWDownloads.Delete(network.LocalWWWDownloadKey(name))
 		return fmt.Errorf("register download %s: %w", name, err)
 	}
 	return nil

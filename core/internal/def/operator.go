@@ -51,6 +51,10 @@ type WWWDownloadRequest struct {
 	AgentUUID    string `cbor:"2,keyasint"`
 	ExpectedSize int64  `cbor:"3,keyasint"`
 	Checksum     string `cbor:"4,keyasint"`
+	// Transient marks a one-shot copy made for a single transfer: the
+	// registration is consumed by the first fetch. A module or loader archive
+	// is registered persistently so a retry can fetch it again.
+	Transient bool `cbor:"5,keyasint,omitempty"`
 }
 
 // Socks5ProxyRequest is the payload used to start/stop a C2-resident SOCKS5

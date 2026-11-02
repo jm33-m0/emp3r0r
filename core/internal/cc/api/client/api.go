@@ -73,13 +73,15 @@ func RegisterFTPStream(token, file_path string, expectedSize int64, checksum str
 }
 
 // RegisterWWWDownload registers one hosted file that `agentUUID` may fetch over
-// the www route. Without a registration the C2 refuses the name.
-func RegisterWWWDownload(name, agentUUID string, expectedSize int64, checksum string) error {
+// the www route. Without a registration the C2 refuses the name. transient marks
+// a one-shot copy consumed by the first fetch.
+func RegisterWWWDownload(name, agentUUID string, expectedSize int64, checksum string, transient bool) error {
 	req := def.WWWDownloadRequest{
 		Name:         name,
 		AgentUUID:    agentUUID,
 		ExpectedSize: expectedSize,
 		Checksum:     checksum,
+		Transient:    transient,
 	}
 	_, err := SendCBORRequest(transport.OperatorRegisterWWWDownload, req)
 	return err

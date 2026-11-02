@@ -55,6 +55,21 @@ type WWWDownload struct {
 	Transient bool
 }
 
+// WWWDownloadKey is the registry key for a hosted file that only agentUUID may
+// fetch. Scoping by agent keeps two agents' copies of a stable name (a module
+// dependency such as coffloader_linux.amd64.gz) from overwriting each other,
+// so one operator can never replace another operator's delivery to an agent.
+func WWWDownloadKey(agentUUID, name string) string {
+	return "agent:" + agentUUID + ":name:" + name
+}
+
+// LocalWWWDownloadKey is the key under which an operator records one file it
+// can serve from its own www root. The C2 authorizes the agent's request with
+// WWWDownloadKey; this entry only tells the operator which local file to read.
+func LocalWWWDownloadKey(name string) string {
+	return "name:" + name
+}
+
 // StopEmpTLSServer stops whichever C2 TLS endpoint is currently active.
 // It supports both HTTP-fronted and raw TLS listener modes.
 func StopEmpTLSServer() {

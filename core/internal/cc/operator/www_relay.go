@@ -42,7 +42,7 @@ func serveWWWRelay(streamID string) {
 
 	// Only files this operator registered for an agent are served; the
 	// registration is one-shot and dropped when the transfer ends.
-	val, found := network.WWWDownloads.Load("name:" + name)
+	val, found := network.WWWDownloads.Load(network.LocalWWWDownloadKey(name))
 	if !found {
 		logging.Errorf("WWW relay: refusing %q: no operator-registered download for this agent")
 		_ = client.SendOperatorMsg(&def.OperatorMsg{Tag: def.TagWWWRelayErrorPrefix + streamID, Response: []byte("unregistered download")})
@@ -50,21 +50,22 @@ func serveWWWRelay(streamID string) {
 	}
 	dl, ok := val.(*network.WWWDownload)
 	if !ok || dl == nil {
-		network.WWWDownloads.Delete("name:" + name)
+		network.WWWDownloads.Delete(network.LocalWWWDownloadKey(name))
 		_ = client.SendOperatorMsg(&def.OperatorMsg{Tag: def.TagWWWRelayErrorPrefix + streamID, Response: []byte("invalid download registration")})
 		return
 	}
 	defer func() {
-		network.WWWDownloads.Delete("name:" + name)
-		if err := client.UnregisterWWWDownload(name, ""); err != nil {
+		if !dl.Transient {
+			return
+		}
+		network.WWWDownloads.Delete(network.LocalWWWDownloadKey(name))
+		if err := client.UnregisterWWWDownload(name, dl.AgentUUID); err != nil {
 			logging.Debugf("WWW relay: unregister %q: %v", name, err)
 		}
-		// A copy made for this transfer is finished either way: keeping it
-		// would leave a random-name file in the www root per transfer.
-		if dl.Transient {
-			if err := os.Remove(filepath.Join(paths.WWWRoot, dl.Name)); err != nil {
-				logging.Debugf("WWW relay: remove transient copy %q: %v", dl.Name, err)
-			}
+		// The copy was made for this one transfer; keeping it would leave a
+		// random-name file in the www root per transfer.
+		if err := os.Remove(filepath.Join(paths.WWWRoot, dl.Name)); err != nil {
+			logging.Debugf("WWW relay: remove transient copy %q: %v", dl.Name, err)
 		}
 	}()
 

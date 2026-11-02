@@ -2,11 +2,12 @@
 
 File transfer has two directions and two entry points:
 
-- `put` (operator -> agent) is a plain agent command. The C2 hosts the file,
-  registers it for the target agent, and sends
-  `put --file <hosted name> --path <dest> --checksum <sha256>`.
-  Both agents stream the body to the destination and verify the digest after the
-  transfer; the C agent writes a `.part` file and renames it only on success.
+- `put` (operator -> agent) is a plain agent command, handled by the same fetch
+  as a module payload and with no transfer code of its own. The C2 hosts the
+  file, registers it for the target agent, and sends
+  `put --file <hosted name> --path <dest> --checksum <sha256>`; the agent
+  fetches it, streams the body to the destination and verifies the digest before
+  committing, writing a `.part` file and renaming it only on success.
 - `get` (agent -> operator) is the operator command; it dispatches the
   `get_file` Linux BOF (`core/modules/file_transfer_bof`). The C2 registers an
   FTP stream, hands the BOF its token and the resume offset, and the agent
@@ -16,14 +17,16 @@ File transfer has two directions and two entry points:
 ## Downloads are operator-initiated
 
 An agent can only fetch a file the operator registered for it. The C2 keeps the
-registry (`network.WWWDownloads`), the operator stores the same entry locally and
-serves the file, and a registration is bound to one agent and consumed by one
-transfer:
+registry (`network.WWWDownloads`) keyed by agent, the operator stores the same
+entry locally and serves the file, and a registration is bound to one agent:
 
 - a name that was never registered is refused, even if the file exists in the
   operator's www root;
 - a registration made for another agent is refused for this one;
-- a registration that already served a transfer is refused on the next request.
+- a one-shot registration (a `put` copy) is consumed by the first transfer and
+  refused on the next request;
+- a module or loader archive stays registered after a transfer, so a retry is
+  served without re-registering it.
 
 The agent presents only the registered name (a random token, not the operator's
 path) on the www route; the C2 resolves it and routes the request to the operator
@@ -42,7 +45,10 @@ put --src /tmp/agent.gz --dst memfs:///agent.gz
 | `dst`  | `memfs:///key` (encrypted RAM) or a disk path.       |
 
 A disk destination is streamed, so file size is not bounded by agent memory; a
-memfs destination is buffered because memfs is memory (64 MiB cap).
+memfs destination is buffered because memfs is memory (64 MiB cap). A disk
+destination also writes to the agent's filesystem, which host tooling and
+file-integrity monitoring can observe (the console prints an OPSEC warning);
+`memfs:///` keeps the file in encrypted RAM instead.
 
 ## `get` / `get_file`
 
@@ -78,3 +84,12 @@ get_file --riscv --path /etc/hosts
 - `get` and `get_file` need a Linux agent built from `core/c_agent` with BOF
   support, and the `coffloader_linux` dependency (hosted automatically).
   `--riscv` uses `rvvm_linux`, also hosted automatically.
+
+## Sleep mask
+
+Both transfer primitives are synchronous on the agent's main thread: `get_file`'s
+upload and `put`'s download return before the agent finishes the command, so
+neither can overlap the idle sleep. A broken C2 stream aborts the transfer before
+the agent reaches its sleep cycle, and there is no background transfer thread for
+the sleep path to wait on. See [`socks5_bof.md`](socks5_bof.md) for the one agent
+feature that does keep worker threads alive across a sleep.

@@ -30,6 +30,11 @@ import (
 // transfer code used to cap a body at, so a buffered implementation cannot pass.
 const e2eTransferSize = 70 << 20
 
+// fileTransferMaskedWait exceeds the test agent's 5s poll window, so an agent
+// whose stager mask is bound completes one masked sleep before the transfer
+// subtests run.
+const fileTransferMaskedWait = 7 * time.Second
+
 // e2eTransferSizes walks the size boundary of the operator -> agent path so a
 // failure names the layer that truncates instead of only "no bytes".
 var e2eTransferSizes = []int{32 << 10, 64 << 10, 256 << 10, 1 << 20, 8 << 20, e2eTransferSize}
@@ -165,7 +170,13 @@ func getTestFTPRelayConn(token string) *testFTPRelayConn {
 // runFileTransferChecks drives the real operator command (`put`) and the
 // get_file module against the running C agent and the real C2 relays: the
 // download gate, then a size sweep up to a body above the old 64 MiB cap.
-func runFileTransferChecks(t *testing.T, agent *def.Emp3r0rAgent, doneChan <-chan error, agentOut *bytes.Buffer) {
+//
+// masked waits one sleep cycle before the transfer subtests, for an agent whose
+// stager mask is bound. The upload and download host calls are synchronous on
+// the agent's main thread, so a broken C2 stream aborts them before the agent
+// masks; a completed transfer followed by a mask proves the mask restores the
+// agent and its host bridge.
+func runFileTransferChecks(t *testing.T, agent *def.Emp3r0rAgent, doneChan <-chan error, agentOut *bytes.Buffer, masked bool) {
 	t.Helper()
 
 	coreDir, err := filepath.Abs(filepath.Join("..", "..", ".."))
@@ -190,6 +201,12 @@ func runFileTransferChecks(t *testing.T, agent *def.Emp3r0rAgent, doneChan <-cha
 		live.SetActiveAgent(prevTarget)
 	})
 
+	if masked {
+		// Longer than the test agent's poll window, so it completes a masked
+		// sleep before the first host call.
+		time.Sleep(fileTransferMaskedWait)
+	}
+
 	// --- Operator-initiated downloads only: the agent cannot decide what to
 	// fetch, and a registration is bound to one agent and used once. ---
 	t.Run("download-refuses-unregistered", func(t *testing.T) {
@@ -203,10 +220,10 @@ func runFileTransferChecks(t *testing.T, agent *def.Emp3r0rAgent, doneChan <-cha
 			t.Fatalf("unregistered file was served to the agent: %q", got)
 		}
 		// The same name is only served once the operator registers it.
-		if err := client.RegisterWWWDownload(secret, agent.UUID, 6, ""); err != nil {
+		if err := client.RegisterWWWDownload(secret, agent.UUID, 6, "", false); err != nil {
 			t.Fatalf("register %s: %v", secret, err)
 		}
-		network.WWWDownloads.Store("name:"+secret, &network.WWWDownload{
+		network.WWWDownloads.Store(network.LocalWWWDownloadKey(secret), &network.WWWDownload{
 			Name: secret, AgentUUID: agent.UUID, OperatorSession: client.SessionID,
 		})
 		got = runC2Command(t, agent, doneChan, agentOut, "download "+secret)
@@ -221,10 +238,10 @@ func runFileTransferChecks(t *testing.T, agent *def.Emp3r0rAgent, doneChan <-cha
 			t.Fatalf("write file: %v", err)
 		}
 		const otherAgent = "00000000-0000-4000-8000-000000000000"
-		if err := client.RegisterWWWDownload(other, otherAgent, 16, ""); err != nil {
+		if err := client.RegisterWWWDownload(other, otherAgent, 16, "", false); err != nil {
 			t.Fatalf("register %s: %v", other, err)
 		}
-		network.WWWDownloads.Store("name:"+other, &network.WWWDownload{
+		network.WWWDownloads.Store(network.LocalWWWDownloadKey(other), &network.WWWDownload{
 			Name: other, AgentUUID: otherAgent, OperatorSession: client.SessionID,
 		})
 		got := runC2Command(t, agent, doneChan, agentOut, "download "+other)
@@ -239,11 +256,11 @@ func runFileTransferChecks(t *testing.T, agent *def.Emp3r0rAgent, doneChan <-cha
 		if err := os.WriteFile(filepath.Join(paths.WWWRoot, name), payload, 0o600); err != nil {
 			t.Fatalf("write file: %v", err)
 		}
-		if err := client.RegisterWWWDownload(name, agent.UUID, int64(len(payload)), ""); err != nil {
+		if err := client.RegisterWWWDownload(name, agent.UUID, int64(len(payload)), "", true); err != nil {
 			t.Fatalf("register %s: %v", name, err)
 		}
-		network.WWWDownloads.Store("name:"+name, &network.WWWDownload{
-			Name: name, AgentUUID: agent.UUID, OperatorSession: client.SessionID,
+		network.WWWDownloads.Store(network.LocalWWWDownloadKey(name), &network.WWWDownload{
+			Name: name, AgentUUID: agent.UUID, OperatorSession: client.SessionID, Transient: true,
 		})
 		if got := runC2Command(t, agent, doneChan, agentOut, "download "+name); !strings.Contains(got, "downloaded") {
 			t.Fatalf("first fetch failed: %q", got)

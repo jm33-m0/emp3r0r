@@ -51,9 +51,12 @@ const (
 	// maxFTPStreamsPerOperator bounds concurrent FTP streams per operator so one
 	// operator cannot grow the server's stream registry without limit.
 	maxFTPStreamsPerOperator = 64
-	// maxWWWDownloadsPerOperator bounds queued file downloads per operator so an
-	// agent cannot make one operator hold an unbounded registry.
-	maxWWWDownloadsPerOperator = 128
+	// maxWWWDownloadsPerOperator bounds registered downloads per operator so an
+	// agent cannot make one operator hold an unbounded registry. Module and
+	// loader archives stay registered across fetches so a retry can find them,
+	// so the bound must cover every agent's hosted dependencies rather than one
+	// transfer at a time.
+	maxWWWDownloadsPerOperator = 1024
 )
 
 // DecodeCBORBody decodes CBOR HTTP request body
@@ -608,12 +611,23 @@ func handleRegisterWWWDownload(wrt http.ResponseWriter, req *http.Request) {
 		http.Error(wrt, "too many registered downloads", http.StatusTooManyRequests)
 		return
 	}
-	network.WWWDownloads.Store("name:"+dlReq.Name, &network.WWWDownload{
+	// Registering a file for an agent is an action on that agent, so the caller
+	// must own it. A live lock held by another operator is never taken: without
+	// this check any operator could register a name for an agent it does not
+	// control and serve it its own bytes.
+	if acquired, heldBy := acquireAgentLock(dlReq.AgentUUID, operatorSession, operatorDisplayName(operatorSession)); !acquired {
+		logging.Warningf("operator %s tried to register a www download for agent %s owned by %s", operatorSession, util.AgentRef(dlReq.AgentUUID), heldBy)
+		auditOperatorAction(operatorSession, "www_download_denied", dlReq.AgentUUID, "agent owned by "+heldBy)
+		http.Error(wrt, "agent is controlled by another operator", http.StatusConflict)
+		return
+	}
+	network.WWWDownloads.Store(network.WWWDownloadKey(dlReq.AgentUUID, dlReq.Name), &network.WWWDownload{
 		Name:            dlReq.Name,
 		AgentUUID:       dlReq.AgentUUID,
 		ExpectedSize:    dlReq.ExpectedSize,
 		Checksum:        dlReq.Checksum,
 		OperatorSession: operatorSession,
+		Transient:       dlReq.Transient,
 	})
 	auditOperatorAction(operatorSession, "www_download_register", dlReq.AgentUUID, dlReq.Name)
 	logging.Infof("Registered www download %q for agent %s (operator %s)", dlReq.Name, util.AgentRef(dlReq.AgentUUID), operatorSession)
@@ -629,17 +643,35 @@ func handleUnregisterWWWDownload(wrt http.ResponseWriter, req *http.Request) {
 	if !ok {
 		return
 	}
-	val, found := network.WWWDownloads.Load("name:" + dlReq.Name)
-	if !found {
-		wrt.WriteHeader(http.StatusOK)
+	if dlReq.Name == "" {
+		http.Error(wrt, "name is required", http.StatusBadRequest)
 		return
 	}
-	dl, isDL := val.(*network.WWWDownload)
-	if !isDL || dl == nil || dl.OperatorSession != operatorSession {
-		http.Error(wrt, "Forbidden", http.StatusForbidden)
-		return
+	if dlReq.AgentUUID != "" {
+		key := network.WWWDownloadKey(dlReq.AgentUUID, dlReq.Name)
+		val, found := network.WWWDownloads.Load(key)
+		if !found {
+			wrt.WriteHeader(http.StatusOK)
+			return
+		}
+		dl, isDL := val.(*network.WWWDownload)
+		if !isDL || dl == nil || dl.OperatorSession != operatorSession {
+			http.Error(wrt, "Forbidden", http.StatusForbidden)
+			return
+		}
+		network.WWWDownloads.Delete(key)
+	} else {
+		// The operator relays an agent's request by name and may not know which
+		// agent the download was registered for; remove only its own entries.
+		network.WWWDownloads.Range(func(k, v any) bool {
+			dl, isDL := v.(*network.WWWDownload)
+			if !isDL || dl == nil || dl.Name != dlReq.Name || dl.OperatorSession != operatorSession {
+				return true
+			}
+			network.WWWDownloads.Delete(k)
+			return true
+		})
 	}
-	network.WWWDownloads.Delete("name:" + dlReq.Name)
 	auditOperatorAction(operatorSession, "www_download_unregister", dlReq.AgentUUID, dlReq.Name)
 	wrt.WriteHeader(http.StatusOK)
 }
@@ -661,11 +693,7 @@ func cleanupOperatorWWWDownloads(session string) {
 // countOperatorWWWDownloads counts the download registrations of one operator.
 func countOperatorWWWDownloads(session string) int {
 	count := 0
-	network.WWWDownloads.Range(func(k, v any) bool {
-		key, ok := k.(string)
-		if !ok || !strings.HasPrefix(key, "name:") {
-			return true
-		}
+	network.WWWDownloads.Range(func(_, v any) bool {
 		if dl, ok := v.(*network.WWWDownload); ok && dl != nil && dl.OperatorSession == session {
 			count++
 		}

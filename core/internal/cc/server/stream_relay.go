@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"strings"
@@ -207,10 +208,11 @@ func handleWWWRelayStream(conn io.ReadWriteCloser, agentUUID, streamID, remoteAd
 		return
 	}
 
-	// The agent may only fetch a file an operator registered for it. Resolve the
-	// name here rather than trusting the agent, and route the request to the
-	// operator that registered it.
-	val, found := network.WWWDownloads.Load("name:" + streamID)
+	// The agent may only fetch a file an operator registered for it. The key is
+	// scoped by agent, so an entry for one agent can never satisfy another
+	// agent's request (stable module names are otherwise identical).
+	key := network.WWWDownloadKey(agentUUID, streamID)
+	val, found := network.WWWDownloads.Load(key)
 	if !found {
 		logging.Errorf("www relay: refused %q from agent %s: no operator-registered download", streamID, util.AgentRef(agentUUID))
 		conn.Close()
@@ -218,7 +220,7 @@ func handleWWWRelayStream(conn io.ReadWriteCloser, agentUUID, streamID, remoteAd
 	}
 	dl, ok := val.(*network.WWWDownload)
 	if !ok || dl == nil {
-		network.WWWDownloads.Delete("name:" + streamID)
+		network.WWWDownloads.Delete(key)
 		logging.Errorf("www relay: refused %q: invalid registration", streamID)
 		conn.Close()
 		return
@@ -229,9 +231,19 @@ func handleWWWRelayStream(conn io.ReadWriteCloser, agentUUID, streamID, remoteAd
 		conn.Close()
 		return
 	}
-	ownerSession := dl.OperatorSession
-	if ownerSession == "" {
-		logging.Errorf("www relay: refused %q: registration has no owner", streamID)
+	// An agent-initiated fetch is served by the operator that owns the agent
+	// (or the sole online operator in single-operator mode). A registration
+	// made by a different operator would let it serve bytes to an agent it
+	// does not control.
+	ownerSession, err := wwwRelayOperatorFor(agentUUID)
+	if err != nil {
+		logging.Errorf("www relay: refused %q: %v", streamID, err)
+		conn.Close()
+		return
+	}
+	if dl.OperatorSession != "" && dl.OperatorSession != ownerSession {
+		logging.Errorf("www relay: refused %q: registered by operator %s, but agent %s is served by %s",
+			streamID, dl.OperatorSession, util.AgentRef(agentUUID), ownerSession)
 		conn.Close()
 		return
 	}
@@ -252,12 +264,45 @@ func handleWWWRelayStream(conn io.ReadWriteCloser, agentUUID, streamID, remoteAd
 	// A zero-byte relay is a failure the agent can only report as "no data", so
 	// say here what the agent could not know: how much was delivered and to
 	// which operator session the request went.
-	network.WWWDownloads.Delete("name:" + streamID)
+	// A transient registration is a one-shot copy for this transfer. Module and
+	// loader archives stay registered so a retry can fetch them again.
+	if dl.Transient {
+		network.WWWDownloads.Delete(key)
+	}
 	logging.Infof("www relay %q: delivered %d bytes to the agent (operator %s)",
 		streamID, rs.bytes.Load(), ownerSession)
 	if rs.bytes.Load() == 0 {
 		logging.Errorf("www relay %q: delivered nothing; check the operator's www root and the relay errors above", streamID)
 	}
+}
+
+// wwwRelayOperatorFor resolves which operator should serve a WWW relay stream
+// opened by agentUUID. A WWW stream fetches a file hosted in an operator's WWW
+// root, so it must be served by the operator that currently owns the agent.
+// When no operator holds the agent (an agent-initiated fetch such as a module
+// download during check-in), it falls back to the sole online operator so
+// single-operator deployments keep working; when several operators are online
+// the request is ambiguous and is refused rather than letting an agent pick an
+// arbitrary operator to serve from its filesystem.
+func wwwRelayOperatorFor(agentUUID string) (string, error) {
+	if owner := agentLockOwnerSession(agentUUID); owner != "" {
+		return owner, nil
+	}
+	return getOnlyOperatorSession()
+}
+
+func getOnlyOperatorSession() (string, error) {
+	count := 0
+	session := ""
+	OPERATORS.Range(func(key, _ any) bool {
+		count++
+		session, _ = key.(string)
+		return true
+	})
+	if count != 1 || session == "" {
+		return "", fmt.Errorf("www relay requires exactly one active operator session (have %d)", count)
+	}
+	return session, nil
 }
 
 func handleOperatorRelayFrame(operatorSession string, msg *def.OperatorMsg) {

@@ -508,14 +508,16 @@ func hostBOFModules(t *testing.T, agent *def.Emp3r0rAgent) {
 		if werr := os.WriteFile(filepath.Join(ww, hosted), gz, 0o600); werr != nil {
 			t.Fatalf("host %s: %v", hosted, werr)
 		}
-		// The C2 only serves a www name an operator registered for the agent.
-		// The test runs the C2 and the operator in one process, so the local
-		// registry is the one the relay consults.
-		network.WWWDownloads.Store("name:"+hosted, &network.WWWDownload{
+		// The C2 authorizes the agent's fetch by an agent-scoped key; the
+		// operator side looks the file up by its local name. The test runs the
+		// C2 and the operator in one process, so both entries share a registry.
+		dl := &network.WWWDownload{
 			Name:            hosted,
 			AgentUUID:       agent.UUID,
 			OperatorSession: "c-agent-test-operator",
-		})
+		}
+		network.WWWDownloads.Store(network.LocalWWWDownloadKey(hosted), dl)
+		network.WWWDownloads.Store(network.WWWDownloadKey(agent.UUID, hosted), dl)
 	}
 	host := func(moduleDir, src, hosted string, extraArgs ...string) {
 		buildModule(moduleDir, extraArgs...)

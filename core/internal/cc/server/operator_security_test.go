@@ -245,3 +245,109 @@ func TestCheckinRateLimiterBounded(t *testing.T) {
 		t.Fatal("stale rate-limiter entry was not purged")
 	}
 }
+
+// TestWWWRelayRoutesToAgentOwner verifies a WWW relay opened by an agent is
+// served by the operator that owns the agent, not by whichever operator happens
+// to be online first, and that it is refused when the choice is ambiguous.
+func TestWWWRelayRoutesToAgentOwner(t *testing.T) {
+	const agentUUID = "www-agent-1"
+	publishTestAgent(t, agentUUID, "wwwtag1")
+	MarkOperatorOnline("op-a")
+	MarkOperatorOnline("op-b")
+	t.Cleanup(func() {
+		MarkOperatorOffline("op-a")
+		MarkOperatorOffline("op-b")
+		deleteAgentLock(agentUUID)
+	})
+
+	// Two operators online and no owner: the agent must not be able to pick one.
+	if _, err := wwwRelayOperatorFor(agentUUID); err == nil {
+		t.Fatal("www relay with two operators and no owner must be refused")
+	}
+
+	if acquired, _ := acquireAgentLock(agentUUID, "op-a", operatorDisplayName("op-a")); !acquired {
+		t.Fatal("op-a failed to claim the agent")
+	}
+	owner, err := wwwRelayOperatorFor(agentUUID)
+	if err != nil || owner != "op-a" {
+		t.Fatalf("www relay owner = %q (err=%v), want op-a", owner, err)
+	}
+
+	// When the owner disconnects, only one operator remains, so the
+	// single-operator fallback applies instead of breaking the transfer.
+	MarkOperatorOffline("op-a")
+	owner, err = wwwRelayOperatorFor(agentUUID)
+	if err != nil || owner != "op-b" {
+		t.Fatalf("www relay sole-operator fallback = %q (err=%v), want op-b", owner, err)
+	}
+}
+
+// TestWWWDownloadRegistrationChecksOwnerAndScopesAgents verifies that only the
+// operator holding an agent may register a file for it, and that a stable name
+// registered for two agents yields two independent entries.
+func TestWWWDownloadRegistrationChecksOwnerAndScopesAgents(t *testing.T) {
+	const (
+		agentA = "www-scope-a"
+		agentB = "www-scope-b"
+		name   = "coffloader_linux.amd64.gz"
+	)
+	publishTestAgent(t, agentA, "scopetaga")
+	publishTestAgent(t, agentB, "scopetagb")
+	MarkOperatorOnline("op-a")
+	MarkOperatorOnline("op-b")
+	keyA := network.WWWDownloadKey(agentA, name)
+	keyB := network.WWWDownloadKey(agentB, name)
+	t.Cleanup(func() {
+		MarkOperatorOffline("op-a")
+		MarkOperatorOffline("op-b")
+		deleteAgentLock(agentA)
+		deleteAgentLock(agentB)
+		network.WWWDownloads.Delete(keyA)
+		network.WWWDownloads.Delete(keyB)
+	})
+
+	// op-a owns agent A.
+	if acquired, _ := acquireAgentLock(agentA, "op-a", operatorDisplayName("op-a")); !acquired {
+		t.Fatal("op-a failed to claim agent A")
+	}
+	rec := httptest.NewRecorder()
+	handleRegisterWWWDownload(rec, operatorHTTPRequest(t, "op-b", def.WWWDownloadRequest{Name: name, AgentUUID: agentA}))
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("op-b register for op-a's agent = %d, want 409 (body %q)", rec.Code, rec.Body.String())
+	}
+	if _, ok := network.WWWDownloads.Load(keyA); ok {
+		t.Fatal("a refused registration was stored")
+	}
+
+	// op-a may, and the value is bound to agent A.
+	rec = httptest.NewRecorder()
+	handleRegisterWWWDownload(rec, operatorHTTPRequest(t, "op-a", def.WWWDownloadRequest{Name: name, AgentUUID: agentA}))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("op-a register = %d, want 200 (body %q)", rec.Code, rec.Body.String())
+	}
+	val, ok := network.WWWDownloads.Load(keyA)
+	if !ok {
+		t.Fatal("op-a's registration was not stored under the agent-scoped key")
+	}
+	if dl := val.(*network.WWWDownload); dl.AgentUUID != agentA || dl.OperatorSession != "op-a" {
+		t.Fatalf("stored registration = %+v, want agent %s / operator op-a", dl, agentA)
+	}
+
+	// The same stable name for another agent is a separate entry, so neither
+	// agent's delivery can overwrite the other's.
+	rec = httptest.NewRecorder()
+	handleRegisterWWWDownload(rec, operatorHTTPRequest(t, "op-b", def.WWWDownloadRequest{Name: name, AgentUUID: agentB}))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("op-b register for agent B = %d, want 200 (body %q)", rec.Code, rec.Body.String())
+	}
+	valB, ok := network.WWWDownloads.Load(keyB)
+	if !ok {
+		t.Fatal("op-b's registration for agent B was not stored")
+	}
+	if dl := valB.(*network.WWWDownload); dl.AgentUUID != agentB || dl.OperatorSession != "op-b" {
+		t.Fatalf("stored registration for B = %+v, want agent %s / operator op-b", dl, agentB)
+	}
+	if _, ok := network.WWWDownloads.Load(keyA); !ok {
+		t.Fatal("registering the same name for agent B removed agent A's entry")
+	}
+}

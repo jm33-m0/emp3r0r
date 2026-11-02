@@ -1204,7 +1204,7 @@ func TestReadModConfigModuleFilesMemFS(t *testing.T) {
 func stubRemoteDownloads(t *testing.T) {
 	t.Helper()
 	prev := ftp.RegisterDownloadRemote
-	ftp.RegisterDownloadRemote = func(string, string, int64, string) error { return nil }
+	ftp.RegisterDownloadRemote = func(string, string, int64, string, bool) error { return nil }
 	t.Cleanup(func() { ftp.RegisterDownloadRemote = prev })
 }
 
@@ -1545,8 +1545,8 @@ func TestHandleInMemoryModuleSendsDependencyChecksum(t *testing.T) {
 		},
 	}
 	ctx := &context.C2Context{Target: &def.Emp3r0rAgent{UUID: "77777777-7777-4777-8777-777777777777", Tag: "target", GOOS: "linux", GOArch: "amd64"}}
-	handleInMemoryModule(ctx, config, "coff", def.ResolvedInvocation{}, "", nil,
-		&hostedDependency{Checksum: "abc123"})
+	handleInMemoryModule(ctx, config, "coff", def.ResolvedInvocation{}, "", "",
+		nil, &hostedDependency{Checksum: "abc123"})
 
 	if !strings.Contains(sent, "--dep_checksum abc123") {
 		t.Fatalf("command %q does not carry the dependency checksum", sent)

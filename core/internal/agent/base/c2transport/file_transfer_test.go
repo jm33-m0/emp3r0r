@@ -362,7 +362,8 @@ func TestFetchFilePeerRejectsUnknownTransport(t *testing.T) {
 // padded SecureConn framing, the bulk padding bypass, and checksum validation.
 
 type e2eFileTransferHarness struct {
-	tmpDir string
+	tmpDir    string
+	agentUUID string
 }
 
 // e2eFreePort returns a currently free loopback TCP port.
@@ -603,7 +604,7 @@ func setupE2EFileTransfer(t *testing.T) *e2eFileTransferHarness {
 		CCTimeout:     10000,
 	}
 
-	return &e2eFileTransferHarness{tmpDir: tmpDir}
+	return &e2eFileTransferHarness{tmpDir: tmpDir, agentUUID: agentUUID}
 }
 
 // TestFileTransfer_AgentUploadsToOperator verifies agent -> CC -> operator:
@@ -707,7 +708,7 @@ func runAgentUploadE2E(t *testing.T, content []byte) {
 // operator answers a WWW relay request with the file, handleWWWRelayStream
 // pushes it over the agent's SecureConn, and DownloadViaC2 returns it.
 func TestFileTransfer_OperatorSendsToAgent(t *testing.T) {
-	setupE2EFileTransfer(t)
+	h := setupE2EFileTransfer(t)
 
 	content := bytes.Repeat([]byte("operator-sends-to-agent-e2e-"), 2048) // ~53KB
 	checksum := crypto.SHA256SumRaw(content)
@@ -715,13 +716,14 @@ func TestFileTransfer_OperatorSendsToAgent(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(paths.WWWRoot, fileName), content, 0o600); err != nil {
 		t.Fatalf("write hosted file: %v", err)
 	}
-	// The C2 only serves downloads an operator registered; an empty AgentUUID
-	// accepts any agent (the agent-binding rule is covered by the C agent e2e).
-	network.WWWDownloads.Store("name:"+fileName, &network.WWWDownload{
+	// The C2 only serves a download registered for this agent, under its
+	// agent-scoped key.
+	network.WWWDownloads.Store(network.WWWDownloadKey(h.agentUUID, fileName), &network.WWWDownload{
 		Name:            fileName,
+		AgentUUID:       h.agentUUID,
 		OperatorSession: "test-operator",
 	})
-	t.Cleanup(func() { network.WWWDownloads.Delete("name:" + fileName) })
+	t.Cleanup(func() { network.WWWDownloads.Delete(network.WWWDownloadKey(h.agentUUID, fileName)) })
 
 	opCC, opTest := net.Pipe()
 	server.RegisterOperatorConn("test-operator", opCC)
@@ -782,6 +784,16 @@ func TestFileTransfer_OperatorSendsToAgent(t *testing.T) {
 	}
 	if !bytes.Equal(got, content) {
 		t.Fatalf("downloaded content mismatch: got %d bytes want %d", len(got), len(content))
+	}
+
+	// A persistent registration (a module or loader archive) survives the
+	// first fetch: a retry must be served without re-registering.
+	got, err = DownloadViaC2(common.RuntimeConfig, fileName, "", checksum)
+	if err != nil {
+		t.Fatalf("second DownloadViaC2: %v", err)
+	}
+	if !bytes.Equal(got, content) {
+		t.Fatalf("second download content mismatch: got %d bytes want %d", len(got), len(content))
 	}
 }
 
