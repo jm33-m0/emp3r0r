@@ -50,9 +50,6 @@ const (
 	// connection while the UDP socket is idle.
 	socks5UDPIdleCheck = 30 * time.Second
 
-	// dnsQueryRelayTimeout bounds one !dns_query round trip.
-	dnsQueryRelayTimeout = 15 * time.Second
-
 	// dnsMaxQueryBytes is the largest DNS query we forward to the agent.
 	dnsMaxQueryBytes = 4096
 	// dnsMaxReplyBytes is the largest DNS reply we accept back from the agent.
@@ -128,7 +125,8 @@ func (ls *socks5Listener) handleUDPAssociate(sock net.Conn) error {
 	// (see !dns_query), so letting every datagram spawn a goroutine would just
 	// pile up waiting jobs. A small pool is enough to keep DNS snappy while
 	// bounding memory. On teardown the loop drains dnsWG so no worker outlives
-	// the association (workers block on the agent reply up to dnsQueryRelayTimeout).
+	// the association (workers block on the agent reply for up to one agent poll
+	// interval, see live.AgentReplyTimeout).
 	workerSem := make(chan struct{}, dnsMaxConcurrentQueries)
 	var dnsWG sync.WaitGroup
 	defer dnsWG.Wait()
@@ -219,6 +217,8 @@ func (ls *socks5Listener) relayDNSQuery(agent *def.Emp3r0rAgent, query []byte, d
 		return nil, fmt.Errorf("instruct agent: %w", err)
 	}
 
+	// The agent resolves on its next poll, so the wait covers one poll interval.
+	timeout := live.AgentReplyTimeout()
 	select {
 	case <-resultCh:
 		rawStr, ok := live.TakeCmdResultString(token)
@@ -240,9 +240,9 @@ func (ls *socks5Listener) relayDNSQuery(agent *def.Emp3r0rAgent, query []byte, d
 			return nil, fmt.Errorf("agent returned a non-DNS payload: %.200s", string(raw))
 		}
 		return raw, nil
-	case <-time.After(dnsQueryRelayTimeout):
+	case <-time.After(timeout):
 		clearProxyJobBookkeeping(token)
-		return nil, fmt.Errorf("agent resolution timed out")
+		return nil, fmt.Errorf("agent resolution timed out after %s", timeout)
 	case <-ls.ctx.Done():
 		clearProxyJobBookkeeping(token)
 		return nil, fmt.Errorf("listener stopped")

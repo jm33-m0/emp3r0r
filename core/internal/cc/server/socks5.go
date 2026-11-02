@@ -72,9 +72,6 @@ const (
 const socks5UDPMinHeader = 4
 
 const (
-	// socks5ProxyDialTimeout caps how long a CONNECT waits for the agent to
-	// dial the target and open its relay stream.
-	socks5ProxyDialTimeout = 30 * time.Second
 	// socks5HandshakeTimeout bounds the SOCKS5 negotiation itself.
 	socks5HandshakeTimeout = 15 * time.Second
 )
@@ -494,6 +491,9 @@ func (ls *socks5Listener) proxyToAgent(sock net.Conn, target string) error {
 		return fmt.Errorf("socks5: instruct agent %s: %w", ls.agentTag, err)
 	}
 
+	// The agent dials only after it polls for the command, so the wait covers
+	// one agent poll interval (see live.AgentReplyTimeout).
+	replyTimeout := live.AgentReplyTimeout()
 	select {
 	case <-entry.streamUp:
 		// The agent's relay stream is up (its dial succeeded). handleProxyRelayStream
@@ -509,11 +509,12 @@ func (ls *socks5Listener) proxyToAgent(sock net.Conn, target string) error {
 		errMsg, _ := errAny.(string)
 		return fmt.Errorf("socks5: agent %s could not reach %s: %s", ls.agentTag, target, errMsg)
 
-	case <-time.After(socks5ProxyDialTimeout):
+	case <-time.After(replyTimeout):
 		clearProxyJobBookkeeping(token)
 		_ = socks5Reply(sock, socks5RepHostUnreachable, "0.0.0.0", 0)
 		entry.teardown()
-		return fmt.Errorf("socks5: timed out waiting for agent %s to open relay to %s", ls.agentTag, target)
+		return fmt.Errorf("socks5: timed out after %s waiting for agent %s to open relay to %s",
+			replyTimeout, ls.agentTag, target)
 
 	case <-ls.ctx.Done():
 		clearProxyJobBookkeeping(token)
