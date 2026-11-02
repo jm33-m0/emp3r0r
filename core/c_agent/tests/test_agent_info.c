@@ -95,6 +95,7 @@ static void fill_info(c2_agent_info *a) {
   a->files.count = 1;
   a->files.cap = 1;
   a->goarch = c2_str_lit("amd64");
+  a->impl = c2_str_lit("c");
   a->p2p_transport = c2_str_lit("direct");
   a->has_offline_grace = 1;
   a->offline_grace = 90;
@@ -149,6 +150,7 @@ int main(void) {
     CHECK_EQ_LONG(out.files.count, 1);
     CHECK(c2_str_equal(out.files.items[0], "memfs:///a.so"));
     CHECK(c2_str_equal(out.goarch, "amd64"));
+    CHECK(c2_str_equal(out.impl, "c"));
     CHECK(out.has_offline_grace && out.offline_grace == 90);
   }
 

@@ -122,7 +122,7 @@ static inline int c2_msgtun_is_hello(const c2_msgtun *m) {
 }
 
 /* ------------------------------------------------------------------------- */
-/* Emp3r0rAgent check-in body (keys 2..44; retired keys omitted)             */
+/* Emp3r0rAgent check-in body (keys 2..45; retired keys omitted)             */
 /* ------------------------------------------------------------------------- */
 
 enum {
@@ -159,6 +159,7 @@ enum {
   C2_KEY_AGENT_GOARCH = 41,
   C2_KEY_AGENT_P2P_TRANSPORT = 42,
   C2_KEY_AGENT_OFFLINE_GRACE = 44,
+  C2_KEY_AGENT_IMPL = 45,
 };
 
 /* AgentProcess (nested map under C2_KEY_AGENT_PROCESS). */
@@ -227,6 +228,7 @@ typedef struct {
   c2_str mesh_gossip_port;
   c2_str_list files;
   c2_str goarch;
+  c2_str impl; /* "c": host bridge capability is built in */
   c2_str p2p_transport;
 
   int has_offline_grace;

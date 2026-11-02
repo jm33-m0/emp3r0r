@@ -48,6 +48,7 @@ type Emp3r0rAgent struct {
 	P2PTransport   string        `cbor:"42,keyasint"` // transport the agent's P2P relay listens on (kcp/mtls/smb)
 	Owner          string        `cbor:"43,keyasint"` // server-side operator lock
 	OfflineGrace   int           `cbor:"44,keyasint"` // agent-chosen removal grace in seconds; 0 means remove immediately
+	AgentImpl      string        `cbor:"45,keyasint"` // "go" or "c"; empty for older agents
 }
 
 // Peer holds detailed peer information pushed by C2.

@@ -25,6 +25,7 @@ func GatherSystemDetails() *def.Emp3r0rAgent {
 	osinfo := sysinfo.GetOSInfo()
 	info.GOOS = runtime.GOOS
 	info.GOArch = runtime.GOARCH
+	info.AgentImpl = "go"
 
 	info.OS = fmt.Sprintf("%s %s %s (%s)", osinfo.Vendor, osinfo.Name, osinfo.Version, osinfo.Architecture)
 	hostname, err := os.Hostname()

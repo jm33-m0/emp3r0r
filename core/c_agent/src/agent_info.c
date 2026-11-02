@@ -150,6 +150,7 @@ c2_status c2_agent_info_encode(CborEncoder *w, const c2_agent_info *a) {
   COUNT_STR(mesh_gossip_port);
   COUNT_LIST(files);
   COUNT_STR(goarch);
+  COUNT_STR(impl);
   COUNT_STR(p2p_transport);
   if (a->has_offline_grace)
     pairs++;
@@ -215,6 +216,7 @@ c2_status c2_agent_info_encode(CborEncoder *w, const c2_agent_info *a) {
   PUT_STR(C2_KEY_AGENT_MESH_GOSSIP_PORT, mesh_gossip_port);
   PUT_LIST(C2_KEY_AGENT_FILES, files);
   PUT_STR(C2_KEY_AGENT_GOARCH, goarch);
+  PUT_STR(C2_KEY_AGENT_IMPL, impl);
   PUT_STR(C2_KEY_AGENT_P2P_TRANSPORT, p2p_transport);
   if (a->has_offline_grace &&
       (st = c2_cbor_write_int(&map, C2_KEY_AGENT_OFFLINE_GRACE,
@@ -269,6 +271,7 @@ c2_status c2_agent_info_decode(CborValue *r, c2_agent_info *a) {
       C2_CASE_TEXT(C2_KEY_AGENT_MESH_GOSSIP_PORT, a, mesh_gossip_port);
       C2_CASE_STR_LIST(C2_KEY_AGENT_FILES, a, files);
       C2_CASE_TEXT(C2_KEY_AGENT_GOARCH, a, goarch);
+      C2_CASE_TEXT(C2_KEY_AGENT_IMPL, a, impl);
       C2_CASE_TEXT(C2_KEY_AGENT_P2P_TRANSPORT, a, p2p_transport);
       C2_CASE_INT_HAS(C2_KEY_AGENT_OFFLINE_GRACE, a, offline_grace,
                       has_offline_grace);

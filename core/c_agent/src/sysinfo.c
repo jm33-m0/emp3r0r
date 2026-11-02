@@ -361,6 +361,7 @@ c2_status c2_gather_agent_info(c2_agent_info *info, const c2_agent_config *cfg,
 
   info->goos = c2_str_lit("linux");
   info->goarch = c2_str_lit(C2_AGENT_GOARCH);
+  info->impl = c2_str_lit("c");
   info->version = store_cstr(st, version != NULL ? version : "N/A");
 
   /* Host identity. */

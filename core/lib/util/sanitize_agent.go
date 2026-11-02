@@ -31,6 +31,7 @@ func SanitizeAgentMetadata(a *def.Emp3r0rAgent) {
 	a.OS = SanitizeOneLine(a.OS)
 	a.GOOS = SanitizeOneLine(a.GOOS)
 	a.GOArch = SanitizeOneLine(a.GOArch)
+	a.AgentImpl = SanitizeOneLine(a.AgentImpl)
 	a.Kernel = SanitizeOneLine(a.Kernel)
 	a.Arch = SanitizeOneLine(a.Arch)
 	a.From = SanitizeOneLine(a.From)
