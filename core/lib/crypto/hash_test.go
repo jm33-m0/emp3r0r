@@ -312,3 +312,28 @@ func TestSHA256SumFile(t *testing.T) {
 		}
 	})
 }
+
+// TestIsSHA256Hex verifies digest validation, used to tell a real agent-side
+// checksum from the placeholder some agents report.
+func TestIsSHA256Hex(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want bool
+	}{
+		{"lowercase digest", SHA256Sum("hello"), true},
+		{"uppercase digest", "B94D27B9934D3E08A52E52D7DA7DABFAC484EFE37A5380EE9088F7ACE2EFCDE9", true},
+		{"empty", "", false},
+		{"placeholder", "N/A", false},
+		{"error text", "open /tmp/x: no such file or directory", false},
+		{"short hex", "abcd", false},
+		{"non-hex digit", "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcdeZ", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := IsSHA256Hex(tt.in); got != tt.want {
+				t.Errorf("IsSHA256Hex(%q) = %v, want %v", tt.in, got, tt.want)
+			}
+		})
+	}
+}

@@ -43,6 +43,25 @@ func SHA256SumRaw(data []byte) string {
 	return fmt.Sprintf("%x", sum)
 }
 
+// IsSHA256Hex reports whether s is a hex-encoded SHA-256 digest. Agents that
+// cannot hash a file on stat report a placeholder, so callers use this to tell
+// a real digest from a status string.
+func IsSHA256Hex(s string) bool {
+	if len(s) != sha256.Size*2 {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		switch c := s[i]; {
+		case c >= '0' && c <= '9':
+		case c >= 'a' && c <= 'f':
+		case c >= 'A' && c <= 'F':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 // Base64URLEncode encode a string with base64
 func Base64URLEncode(text string) string {
 	return base64.URLEncoding.EncodeToString([]byte(text))
