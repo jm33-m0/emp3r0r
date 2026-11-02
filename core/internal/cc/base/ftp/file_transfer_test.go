@@ -30,6 +30,7 @@ func TestStatFile(t *testing.T) {
 				return
 			}
 			live.CmdResults.Store(job_id, string(data))
+			live.SignalCmdResultReady(job_id)
 		}()
 		return nil
 	}

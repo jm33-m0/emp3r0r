@@ -264,7 +264,10 @@ func HandleFTPStream(conn io.ReadWriteCloser, token, remoteAddr string, cancel c
 				logging.Errorf("Rename file error %s: %v", targetFile, err)
 			}
 			checksum := crypto.SHA256SumFile(targetFile)
-			if checksum == mustHaveChecksum {
+			// A token whose checksum part is empty carries no expected digest:
+			// the agent could not hash the file, so the transferred size is the
+			// only integrity check.
+			if mustHaveChecksum == "" || checksum == mustHaveChecksum {
 				logging.Notify(logging.SUCCESS, "Downloaded %d bytes to %s (%s)", nowSize, targetFile, checksum)
 				return
 			}

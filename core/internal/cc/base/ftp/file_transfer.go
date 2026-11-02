@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/uuid"
@@ -29,46 +28,102 @@ var ExecCmd ExecCmdFunc
 
 // StatFile Get stat info of a file on agent
 func StatFile(filepath string, a *def.Emp3r0rAgent) (fi *util.FileStat, err error) {
-	job_id := uuid.NewString()
 	cmd := fmt.Sprintf("%s --path %s", def.C2CmdStat, strconv.Quote(filepath))
-	// send command
-	err = ExecCmd(cmd, job_id, a.Tag)
+	jobID := uuid.NewString()
+	res, err := live.AwaitCmdResult(jobID, live.AgentReplyTimeout(), func() error {
+		return ExecCmd(cmd, jobID, a.Tag)
+	})
 	if err != nil {
-		return fi, err
+		return nil, fmt.Errorf("stat %s: %w", filepath, err)
 	}
+
 	var fileinfo util.FileStat
+	if err := cbor.Unmarshal([]byte(res), &fileinfo); err != nil {
+		return nil, fmt.Errorf("stat %s: %w", filepath, err)
+	}
+	return &fileinfo, nil
+}
 
-	// wait for response
-	for range 10 {
-		time.Sleep(1 * time.Second)
-		// check if cmd results ready
-		if res, ok := live.CmdResultString(job_id); ok {
-			err = cbor.Unmarshal([]byte(res), &fileinfo)
-			if err != nil {
-				return fi, err
-			}
-			fi = &fileinfo
-			live.CmdResults.Delete(job_id)
-			break
-		}
+// HostFileForAgent publishes a local file in the C2 file directory and
+// registers it for one agent, returning the hosted name the agent fetches it by
+// plus the file's SHA-256.
+//
+// The hosted name is random and the registration is per agent: the C2 only
+// serves a www name an operator registered for that agent, so an agent cannot
+// pull arbitrary files out of the operator's www root.
+func HostFileForAgent(lpath string, agent *def.Emp3r0rAgent) (name, checksum string, err error) {
+	if agent == nil || agent.UUID == "" {
+		return "", "", fmt.Errorf("no target agent")
+	}
+	fi, err := os.Stat(lpath)
+	if err != nil {
+		return "", "", fmt.Errorf("%s: %w", lpath, err)
+	}
+	if !fi.Mode().IsRegular() {
+		return "", "", fmt.Errorf("%s: not a regular file", lpath)
 	}
 
-	if fi == nil && err == nil {
-		err = fmt.Errorf("StatFile: timed out waiting for response")
+	name = fmt.Sprintf("%s.bin", util.RandHexString())
+
+	checksum = crypto.SHA256SumFile(lpath)
+	if !crypto.IsSHA256Hex(checksum) {
+		return "", "", fmt.Errorf("hashing %s: %s", lpath, checksum)
 	}
 
-	return fi, err
+	hosted := filepath.Join(paths.WWWRoot, name)
+	if err := util.Copy(lpath, hosted); err != nil {
+		return "", "", fmt.Errorf("copy %s to %s: %w", lpath, hosted, err)
+	}
+	// The agent fetches this path over the www route, so a short copy would turn
+	// into a truncated transfer with no obvious cause.
+	copied, err := os.Stat(hosted)
+	if err != nil {
+		return "", "", fmt.Errorf("hosted copy %s: %w", hosted, err)
+	}
+	if copied.Size() != fi.Size() {
+		return "", "", fmt.Errorf("hosted copy %s is %d bytes, want %d", hosted, copied.Size(), fi.Size())
+	}
+	if err := RegisterWWWDownload(name, agent.UUID, copied.Size(), checksum, true); err != nil {
+		return "", "", err
+	}
+	logging.Infof("Hosted %s as %s for agent %s (%s)", lpath, hosted, util.AgentRef(agent.UUID), util.FormatBytes(copied.Size()))
+	return name, checksum, nil
+}
+
+// RegisterDownloadRemote registers a download on the C2. A var so tests can
+// stub the operator API.
+var RegisterDownloadRemote = client.RegisterWWWDownload
+
+// RegisterWWWDownload records one served file for one agent, locally (the
+// operator serves it) and on the C2 (the C2 routes the agent's request).
+// transient marks a one-shot copy that is removed once the transfer ends.
+func RegisterWWWDownload(name, agentUUID string, size int64, checksum string, transient bool) error {
+	network.WWWDownloads.Store("name:"+name, &network.WWWDownload{
+		Name:            name,
+		AgentUUID:       agentUUID,
+		ExpectedSize:    size,
+		Checksum:        checksum,
+		OperatorSession: client.SessionID,
+		Transient:       transient,
+	})
+	if err := RegisterDownloadRemote(name, agentUUID, size, checksum); err != nil {
+		network.WWWDownloads.Delete("name:" + name)
+		return fmt.Errorf("register download %s: %w", name, err)
+	}
+	return nil
 }
 
 // PutFile put file to agent. The destination path selects the storage: a
 // memfs:/// key is kept in encrypted RAM, any other path is written to disk.
 func PutFile(lpath, rpath string, a *def.Emp3r0rAgent) error {
-	// file sha256sum
-	logging.Infof("Calculating sha256sum of '%s'", lpath)
-	sum := crypto.SHA256SumFile(lpath)
 	// file size
 	size := util.FileSize(lpath)
 	sizemB := float32(size) / 1024 / 1024
+	// host the file and hash it in one step
+	hosted, sum, err := HostFileForAgent(lpath, a)
+	if err != nil {
+		return err
+	}
 	logging.Notify(
 		logging.INFO, "\nPutFile:\nUploading '%s' to\n'%s' "+
 			"on %s, agent [%s]\n"+
@@ -79,19 +134,14 @@ func PutFile(lpath, rpath string, a *def.Emp3r0rAgent) error {
 		size, sizemB,
 		sum,
 	)
-
-	// move file to wwwroot, then move it back when we are done with it
-	logging.Infof("Copying %s to %s", lpath, paths.WWWRoot+util.FileBaseName(lpath))
-	err := util.Copy(lpath, paths.WWWRoot+util.FileBaseName(lpath))
-	if err != nil {
-		return fmt.Errorf("copy %s to %s: %v", lpath, paths.WWWRoot+util.FileBaseName(lpath), err)
-	}
+	logging.Infof("%s is hosted as %s", lpath, filepath.Join(paths.WWWRoot, hosted))
 
 	// send cmd
+	// The agent fetches the file by the name the www route serves, not by the
+	// operator's local path.
 	cmd := fmt.Sprintf("put --file %s --path %s --checksum %s --size %d",
-		strconv.Quote(lpath), strconv.Quote(rpath), strconv.Quote(sum), size)
-	err = ExecCmd(cmd, "", a.Tag)
-	if err != nil {
+		strconv.Quote(hosted), strconv.Quote(rpath), strconv.Quote(sum), size)
+	if err := ExecCmd(cmd, "", a.Tag); err != nil {
 		return fmt.Errorf("PutFile send command: %v", err)
 	}
 	logging.Infof("Waiting for response from agent %s", a.Tag)
@@ -134,95 +184,146 @@ func GenerateGetFilePaths(file_path string) (write_dir, save_to_file, tempname, 
 	return write_dir, save_to_file, tempname, lock
 }
 
-// GetFile get file from agent
-func GetFile(file_path string, agent *def.Emp3r0rAgent) (ftpSh *network.StreamHandler, err error) {
-	if util.FileBaseName(filepath.Base(filepath.Clean(file_path))) == "" {
-		return nil, fmt.Errorf("invalid remote file path: %q", file_path)
+// GetFileTransfer describes the transfer an agent has to perform for a remote
+// path.
+type GetFileTransfer struct {
+	// Token is the FTP stream token the agent uploads to, or the token its
+	// argument list requires when Listing is set.
+	Token string
+	// Offset is the number of bytes the agent has to skip because they are
+	// already on disk.
+	Offset int64
+	// Listing means the remote path is a directory: the agent prints the
+	// matching paths instead of uploading anything.
+	Listing bool
+	// Complete means the local copy already matches the remote checksum, so no
+	// command has to be sent.
+	Complete bool
+	// Stream is the registered FTP stream that receives the upload. It is nil
+	// unless the agent will upload; the legacy agent `get` path returns it to
+	// its caller.
+	Stream *network.StreamHandler
+}
+
+// PrepareGetFileStream resolves the local destination of a remote file,
+// registers the FTP stream its upload will arrive on, and reports the token and
+// resume offset the agent needs. Callers send the token to the agent
+// themselves: GetFile sends it as a command flag, the module dispatcher packs it
+// as a BOF argument.
+func PrepareGetFileStream(filePath string, agent *def.Emp3r0rAgent) (*GetFileTransfer, error) {
+	if agent == nil {
+		return nil, fmt.Errorf("no target agent")
 	}
-	logging.Notify(logging.INFO, "Getting file '%s' from agent %s", file_path, agent.Tag)
+	if util.FileBaseName(filepath.Base(filepath.Clean(filePath))) == "" {
+		return nil, fmt.Errorf("invalid remote file path: %q", filePath)
+	}
 
-	write_dir, save_to_file, tempname, lock := GenerateGetFilePaths(file_path)
-	logging.Debugf("Get file: %s, save to: %s, tempname: %s, lock: %s", file_path, save_to_file, tempname, lock)
+	fi, err := StatFile(filePath, agent)
+	if err != nil {
+		return nil, fmt.Errorf("stat %s: %w", filePath, err)
+	}
+	// A remote directory is never transferred: the agent lists the paths that
+	// match the filter and only needs a token because its argument list
+	// requires one.
+	if strings.HasPrefix(fi.Permission, "d") {
+		return &GetFileTransfer{Token: util.RandHexString(), Listing: true}, nil
+	}
 
-	// create directories
-	if !util.IsDirExist(write_dir) {
-		logging.Infof("Creating directory: %s", strconv.Quote(write_dir))
-		err = os.MkdirAll(write_dir, 0o700)
-		if err != nil {
-			err = fmt.Errorf("GetFile mkdir %s: %v", write_dir, err)
-			return ftpSh, err
+	fileSize := fi.Size
+	if fileSize < 0 {
+		return nil, fmt.Errorf("negative remote file size (%d) for %s", fileSize, filePath)
+	}
+	// Agents that cannot hash a file on stat report a placeholder instead of a
+	// digest. The stream then carries no expected checksum and the receiving
+	// side verifies the transferred size.
+	checksum := strings.TrimSpace(fi.Checksum)
+	if !crypto.IsSHA256Hex(checksum) {
+		logging.Warningf("%s: agent reported no checksum (%q), verifying size only", filePath, checksum)
+		checksum = ""
+	}
+
+	logging.Notify(logging.INFO, "Getting file '%s' from agent %s", filePath, agent.Tag)
+	writeDir, saveToFile, tempname, lock := GenerateGetFilePaths(filePath)
+	logging.Debugf("Get file: %s, save to: %s, tempname: %s, lock: %s", filePath, saveToFile, tempname, lock)
+
+	if !util.IsDirExist(writeDir) {
+		logging.Infof("Creating directory: %s", strconv.Quote(writeDir))
+		if err := os.MkdirAll(writeDir, 0o700); err != nil {
+			return nil, fmt.Errorf("mkdir %s: %w", writeDir, err)
 		}
 	}
 
 	// is this file already being downloaded?
 	if util.IsExist(lock) {
-		err = fmt.Errorf("%s is already being downloaded", save_to_file)
-		return ftpSh, err
+		return nil, fmt.Errorf("%s is already being downloaded", saveToFile)
 	}
 
-	// stat target file, know its size, and allocate the file on disk
-	fi, err := StatFile(file_path, agent)
-	if err != nil {
-		err = fmt.Errorf("GetFile: failed to stat %s: %v", file_path, err)
-		return ftpSh, err
-	}
-	fileinfo := *fi
-	filesize := fileinfo.Size
-	if filesize < 0 {
-		return ftpSh, fmt.Errorf("GetFile: negative remote file size (%d) for %s", filesize, file_path)
-	}
-	// check if file exists
-	if util.IsExist(save_to_file) {
-		checksum := crypto.SHA256SumFile(save_to_file)
-		if checksum == fileinfo.Checksum {
-			logging.Successf("%s already exists, checksum matched", save_to_file)
-			return ftpSh, err
-		} else {
-			logging.Warningf("%s already exists, but checksum mismatched", save_to_file)
+	// check if the local copy is already complete, which needs a digest to
+	// compare against
+	if checksum != "" && util.IsExist(saveToFile) {
+		if crypto.SHA256SumFile(saveToFile) == checksum {
+			logging.Successf("%s already exists, checksum matched", saveToFile)
+			return &GetFileTransfer{Complete: true}, nil
 		}
+		logging.Warningf("%s already exists, but checksum mismatched", saveToFile)
 	}
 
-	err = util.FileAllocate(save_to_file, filesize)
-	if err != nil {
-		err = fmt.Errorf("GetFile: %s allocate file: %v", file_path, err)
-		return ftpSh, err
+	if err := util.FileAllocate(saveToFile, fileSize); err != nil {
+		return nil, fmt.Errorf("%s allocate file: %w", filePath, err)
 	}
-	logging.Infof("We will be downloading %s, %d bytes in total (%s)", file_path, filesize, fileinfo.Checksum)
+	if checksum == "" {
+		logging.Infof("We will be downloading %s, %d bytes in total (size-only verification)", filePath, fileSize)
+	} else {
+		logging.Infof("We will be downloading %s, %d bytes in total (%s)", filePath, fileSize, checksum)
+	}
 
 	// what if we have downloaded part of the file
-	var offset int64 = 0
+	var offset int64
 	if util.IsExist(tempname) {
-		fiHave := util.FileSize(tempname)
-		offset = fiHave
+		offset = util.FileSize(tempname)
 	}
 
-	// mark this file transfer stream
-	ftpSh = &network.StreamHandler{}
-	// tell agent where to seek the left bytes
-	ftpSh.Token = fmt.Sprintf("%s-%s", util.RandHexString(), fileinfo.Checksum)
-	ftpSh.OperatorSession = client.SessionID
-	ftpSh.ExpectedSize = filesize
-	ftpSh.Checksum = fileinfo.Checksum
-	// stream handler
-	network.FTPStreams.Store(file_path, ftpSh)
-	network.FTPStreams.Store("token:"+ftpSh.Token, ftpSh)
+	sh := &network.StreamHandler{
+		// The receiving side reads the expected digest from the token, so the
+		// format stays <random>-<checksum> even when the checksum is unknown.
+		Token:           fmt.Sprintf("%s-%s", util.RandHexString(), checksum),
+		OperatorSession: client.SessionID,
+		ExpectedSize:    fileSize,
+		Checksum:        checksum,
+	}
+	network.FTPStreams.Store(filePath, sh)
+	network.FTPStreams.Store("token:"+sh.Token, sh)
 
 	// Register with server if we are an operator client
-	err = client.RegisterFTPStream(ftpSh.Token, file_path, filesize, fileinfo.Checksum)
-	if err != nil {
+	if err := client.RegisterFTPStream(sh.Token, filePath, fileSize, checksum); err != nil {
 		logging.Errorf("GetFile: failed to register FTP stream on server: %v", err)
 	}
 
-	// cmd
-	cmd := fmt.Sprintf("get --file_path %s --offset %d --token %s",
-		strconv.Quote(file_path), offset, strconv.Quote(ftpSh.Token))
-	err = ExecCmd(cmd, "", agent.Tag)
+	return &GetFileTransfer{Token: sh.Token, Offset: offset, Stream: sh}, nil
+}
+
+// getFile starts the legacy agent `get` command and returns its FTP stream.
+// Agents that cannot run the get_file BOF (Windows, non-x86_64 Linux) keep
+// using this path.
+func getFile(filePath string, agent *def.Emp3r0rAgent) (*network.StreamHandler, error) {
+	transfer, err := PrepareGetFileStream(filePath, agent)
 	if err != nil {
+		return nil, err
+	}
+	if transfer.Complete {
+		return nil, nil
+	}
+
+	cmd := fmt.Sprintf("get --file_path %s --offset %d --token %s",
+		strconv.Quote(filePath), transfer.Offset, strconv.Quote(transfer.Token))
+	if err := ExecCmd(cmd, "", agent.Tag); err != nil {
 		logging.Errorf("GetFile send command: %v", err)
 		return nil, err
 	}
-
-	return ftpSh, nil
+	if transfer.Listing {
+		return nil, nil
+	}
+	return transfer.Stream, nil
 }
 
 // DownloadFile downloads a file from URL using the provided HTTP client. A
