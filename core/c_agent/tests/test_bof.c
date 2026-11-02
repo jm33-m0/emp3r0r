@@ -21,6 +21,9 @@
 #ifndef BOF_OBJ_PATH
 #define BOF_OBJ_PATH ""
 #endif
+#ifndef BOF_IFUNC_PATH
+#define BOF_IFUNC_PATH ""
+#endif
 
 static uint8_t *slurp(const char *path, size_t *len) {
   FILE *f = fopen(path, "rb");
@@ -134,7 +137,27 @@ int main(void) {
     free(out);
   }
 
-  free(loader);
   free(bof);
+
+  /* GNU IFUNC symbols (memcpy, strlen, strchr, ...) must be resolved to their
+   * implementation, not to the resolver the dynamic symbol points at. */
+  if (BOF_IFUNC_PATH[0] != '\0') {
+    size_t ifunc_len = 0;
+    uint8_t *ifunc = slurp(BOF_IFUNC_PATH, &ifunc_len);
+    CHECK(ifunc != NULL && ifunc_len > 0);
+    if (ifunc != NULL) {
+      out = NULL;
+      CHECK_EQ_LONG(c2_bof_run(loader, loader_len, ifunc, ifunc_len, "go", NULL,
+                               0, NULL, &out),
+                    C2_OK);
+      if (out != NULL && strstr(out, "ifunc broken") != NULL)
+        fprintf(stderr, "  loader resolved an IFUNC symbol to its resolver\n");
+      CHECK(out != NULL && strstr(out, "ifunc ok") != NULL);
+      free(out);
+      free(ifunc);
+    }
+  }
+
+  free(loader);
   TEST_DONE();
 }
