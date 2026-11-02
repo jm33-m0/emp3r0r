@@ -208,9 +208,9 @@ func (ls *socks5Listener) relayDNSQuery(agent *def.Emp3r0rAgent, query []byte, d
 	live.CmdResultsReady.Store(token, resultCh)
 
 	cmdLine := fmt.Sprintf("%s --token %s --query %s",
-		def.C2CmdDNSQuery, token, base64.StdEncoding.EncodeToString(query))
+		def.C2CmdDNSQuery, strconv.Quote(token), strconv.Quote(base64.StdEncoding.EncodeToString(query)))
 	if dnsServer != "" {
-		cmdLine += " --server " + dnsServer
+		cmdLine += " --server " + strconv.Quote(dnsServer)
 	}
 	if err := sendAgentCommandOrQueue(cmdLine, token, agent); err != nil {
 		clearProxyJobBookkeeping(token)

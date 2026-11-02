@@ -528,7 +528,7 @@ func (ls *socks5Listener) proxyToAgent(sock net.Conn, target string) error {
 	resultCh := make(chan struct{})
 	live.CmdResultsReady.Store(token, resultCh)
 
-	cmdLine := fmt.Sprintf("%s --token %s --target %s", def.C2CmdProxyStart, token, target)
+	cmdLine := fmt.Sprintf("%s --token %s --target %s", def.C2CmdProxyStart, strconv.Quote(token), strconv.Quote(target))
 	if err := sendAgentCommandOrQueue(cmdLine, token, agent); err != nil {
 		clearProxyJobBookkeeping(token)
 		// Fail the operator's SOCKS5 CONNECT fast (agent offline/dead) instead
