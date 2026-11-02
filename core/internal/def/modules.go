@@ -70,6 +70,10 @@ type ModOption struct {
 	// ArgvFlag, when non-empty, prefixes the value in the argv list.
 	// e.g. "-p" produces ["-p", "<value>"].
 	ArgvFlag string `cbor:"9,keyasint"`
+	// Internal marks a parameter the C2 fills in: it is still packed as a BOF
+	// argument, but it gets no console flag, so operators are never asked for a
+	// value they cannot know (upload stream tokens, hosted file names).
+	Internal bool `cbor:"10,keyasint"`
 }
 
 // ModOptions represents multiple module options

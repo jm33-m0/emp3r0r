@@ -363,3 +363,52 @@ func TestResolveInvocationStarlarkOnlyRequires(t *testing.T) {
 		t.Fatal("expected required error for empty starlark parameter")
 	}
 }
+
+// TestReadConfigsInternalParameter checks that a parameter the C2 fills in keeps
+// its place in the BOF argument list without being exposed to the operator.
+func TestReadConfigsInternalParameter(t *testing.T) {
+	const manifest = `{
+	  "name": "get_file",
+	  "platform": "Linux",
+	  "agent_config": {"type": "coff", "files": ["get_file.o"]},
+	  "parameters": [
+	    {"name": "path", "description": "remote path", "type": "cstr", "required": true},
+	    {"name": "stream", "description": "upload stream token", "type": "cstr", "internal": true}
+	  ],
+	  "invocation": {"coff_export": "go"}
+	}`
+
+	configs, err := ReadConfigs(writeConfig(t, manifest))
+	if err != nil {
+		t.Fatalf("ReadConfigs: %v", err)
+	}
+	config := configs[0]
+
+	if config.Options["stream"] == nil || !config.Options["stream"].Internal {
+		t.Fatalf("stream option = %#v, want an internal parameter", config.Options["stream"])
+	}
+	if config.Options["path"].Internal {
+		t.Error("path option is marked internal, want an operator parameter")
+	}
+
+	// The C2-supplied value is packed in declaration order with the rest.
+	args, err := ResolveCoffArgs(config, map[string]string{
+		"path":   "/etc/hosts",
+		"stream": "token-abc",
+	})
+	if err != nil {
+		t.Fatalf("ResolveCoffArgs: %v", err)
+	}
+	want := []coffloader.CoffArg{
+		{WireType: "z", Value: "/etc/hosts"},
+		{WireType: "z", Value: "token-abc"},
+	}
+	if len(args) != len(want) {
+		t.Fatalf("got %d args, want %d", len(args), len(want))
+	}
+	for i := range want {
+		if args[i].WireType != want[i].WireType || args[i].Value != want[i].Value {
+			t.Errorf("arg %d = %#v, want %#v", i, args[i], want[i])
+		}
+	}
+}

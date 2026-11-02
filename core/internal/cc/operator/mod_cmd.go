@@ -74,6 +74,11 @@ func addModuleCommands(rootCmd *cobra.Command) {
 				if opt == nil {
 					continue
 				}
+				// Internal parameters are filled in by the C2 before the
+				// invocation is packed, so they get no console flag.
+				if opt.Internal {
+					continue
+				}
 				help := strings.TrimSpace(opt.Desc)
 				if len(opt.Vals) > 0 {
 					help = fmt.Sprintf("%s (choices: %s)", help, strings.Join(opt.Vals, ", "))

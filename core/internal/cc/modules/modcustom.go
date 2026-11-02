@@ -14,6 +14,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/uuid"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/ftp"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/paths"
 	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -28,24 +29,31 @@ import (
 // module runs cannot race in the shared module directory or WWWRoot.
 var dependencyHostMu sync.Mutex
 
-// moduleCustom run a custom module
+// moduleCustom runs a custom module as a console command; the dispatched job ID
+// is not needed by the console, which tracks output through the job system.
 func moduleCustom(ctx *c2context.C2Context) {
+	_ = moduleCustomWithJob(ctx)
+}
+
+// moduleCustomWithJob dispatches a custom module and returns the job ID that
+// carries the payload command, or "" when nothing was dispatched.
+func moduleCustomWithJob(ctx *c2context.C2Context) string {
 	// We might still need live.ActiveModule for metadata like Name
 	// But Options come from ctx.Flags
 	if live.ActiveModule == nil {
 		logging.Warningf("No module selected")
-		return
+		return ""
 	}
 	config, ok := def.GetModule(live.ActiveModule.Name)
 	if !ok {
 		logging.Errorf("Config of %s does not exist", live.ActiveModule.Name)
-		return
+		return ""
 	}
 
 	// Only require target for non-local modules
 	if ctx.Target == nil && !config.IsLocal {
 		logging.Errorf("No active agent")
-		return
+		return ""
 	}
 
 	// Local C2 modules build and run on the C2; they have no agent dispatch
@@ -56,24 +64,35 @@ func moduleCustom(ctx *c2context.C2Context) {
 			out, err := build_module(config, ctx.Flags)
 			if err != nil {
 				logging.Errorf("Build module %s: %v", config.Name, err)
-				return
+				return ""
 			}
 			logging.Infof("Module output:\n%s", out)
 			logGeneratedPayloads(out)
 		}
 		logging.Infof("%s will run as a plugin on C2, no files will be executed on target", config.Name)
-		return
+		return ""
 	}
 
 	// where to download the module, can be from C2 or peer agents
 	peerIP := getPeerIP(ctx.Flags)
+
+	// Parameters the C2 owns (an upload stream token, a hosted file name) are
+	// resolved before the invocation is packed.
+	done, err := prepareModuleParameters(config, ctx.Target, ctx.Flags)
+	if err != nil {
+		logging.Errorf("Running %s on %s: %v", config.Name, ctx.Target.Tag, err)
+		return ""
+	}
+	if done {
+		return ""
+	}
 
 	// agent side configs
 	payload_type := config.AgentConfig.Type
 	invocation, err := resolveInvocation(config, ctx.Flags)
 	if err != nil {
 		logging.Errorf("Parsing module invocation: %v", err)
-		return
+		return ""
 	}
 
 	// --riscv: recompile the BOF for RV32 and dispatch it to the interpreter
@@ -82,25 +101,25 @@ func moduleCustom(ctx *c2context.C2Context) {
 	if flagEnabled(ctx.Flags["riscv"]) {
 		if !strings.EqualFold(payload_type, "coff") {
 			logging.Errorf("--riscv is only supported for coff modules")
-			return
+			return ""
 		}
 		if ctx.Target == nil {
 			logging.Errorf("--riscv requires an active agent")
-			return
+			return ""
 		}
 		if agentOS := ctx.Target.GOOS; (agentOS != "" && agentOS != "linux") ||
 			(agentOS == "" && def.IsWindowsPlatform(config.Platform)) {
 			logging.Errorf("--riscv requires a Linux agent")
-			return
+			return ""
 		}
 		dep, err := ensureModuleDependencyHosted(ctx, "rvvm_linux")
 		if err != nil {
 			logging.Errorf("Running %s as RISC-V on %s: %v", config.Name, ctx.Target.Tag, err)
-			return
+			return ""
 		}
 		if err := buildRiscvPayload(config, ctx.Flags); err != nil {
 			logging.Errorf("Running %s as RISC-V: %v", config.Name, err)
-			return
+			return ""
 		}
 		native := config.AgentConfig.Files[0]
 		archVariants := false
@@ -116,7 +135,7 @@ func moduleCustom(ctx *c2context.C2Context) {
 		rvFile := riscvPayloadPath(native)
 		if !util.IsFileExist(filepath.Join(config.Path, rvFile)) {
 			logging.Errorf("Running %s as RISC-V: %s was not produced by the build (add rv_build.sh or make the Makefile emit it)", config.Name, rvFile)
-			return
+			return ""
 		}
 		logging.Infof("Running %s as a RISC-V BOF (%s)", config.Name, rvFile)
 		handleInMemoryModule(ctx, *config, "rv", invocation, peerIP, &payloadOverride{
@@ -124,7 +143,7 @@ func moduleCustom(ctx *c2context.C2Context) {
 			hosted: strings.ToLower(config.Name) + ".rv",
 			typ:    "rv",
 		}, &dep)
-		return
+		return ""
 	}
 
 	// A previous --riscv run compiled this module's sources for RV32 in place.
@@ -145,7 +164,7 @@ func moduleCustom(ctx *c2context.C2Context) {
 		dep, err := ensureModuleDependencyHosted(ctx, loaderDepName)
 		if err != nil {
 			logging.Errorf("Running %s on %s: %v", config.Name, ctx.Target.Tag, err)
-			return
+			return ""
 		}
 		loaderDep = &dep
 	}
@@ -156,7 +175,7 @@ func moduleCustom(ctx *c2context.C2Context) {
 			}
 			if _, err := ensureModuleDependencyHosted(ctx, dep); err != nil {
 				logging.Errorf("Running %s on %s: %v", config.Name, ctx.Target.Tag, err)
-				return
+				return ""
 			}
 		}
 	}
@@ -169,7 +188,7 @@ func moduleCustom(ctx *c2context.C2Context) {
 		out, err := build_module(config, ctx.Flags)
 		if err != nil {
 			logging.Errorf("Build module %s: %v", config.Name, err)
-			return
+			return ""
 		}
 		logging.Infof("Module output:\n%s", out)
 		logGeneratedPayloads(out)
@@ -178,7 +197,7 @@ func moduleCustom(ctx *c2context.C2Context) {
 		out, err := build_make_all(config)
 		if err != nil {
 			logging.Errorf("Build module %s: %v", config.Name, err)
-			return
+			return ""
 		}
 		logging.Infof("Module output:\n%s", out)
 		logGeneratedPayloads(out)
@@ -186,7 +205,7 @@ func moduleCustom(ctx *c2context.C2Context) {
 
 	// Every agent module runs in memory; there is no on-disk/fork-and-run
 	// path. handleInMemoryModule re-encodes the invocation for the agent.
-	handleInMemoryModule(ctx, *config, payload_type, invocation, peerIP, nil, loaderDep)
+	return handleInMemoryModule(ctx, *config, payload_type, invocation, peerIP, nil, loaderDep)
 }
 
 // moduleFilesMissing reports whether any payload the module declares is not
@@ -377,10 +396,10 @@ func buildRiscvPayload(config *def.ModuleConfig, flags map[string]string) error 
 	return nil
 }
 
-func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, payload_type string, invocation def.ResolvedInvocation, peerIP string, override *payloadOverride, dep *hostedDependency) {
+func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, payload_type string, invocation def.ResolvedInvocation, peerIP string, override *payloadOverride, dep *hostedDependency) string {
 	if len(config.AgentConfig.Files) == 0 {
 		logging.Errorf("No files found for module %s in %s", config.Name, config.Path)
-		return
+		return ""
 	}
 
 	// DLL loader modules (COFFLoader.x64.dll / COFFLoader.x86.dll) and
@@ -392,7 +411,7 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 	moduleName, err := safeComponent(strings.ToLower(live.ActiveModule.Name))
 	if err != nil {
 		logging.Errorf("Module %s: %v", live.ActiveModule.Name, err)
-		return
+		return ""
 	}
 	hostedName := moduleName
 	if override != nil {
@@ -418,7 +437,7 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 	hostedName, err = safeComponent(hostedName)
 	if err != nil {
 		logging.Errorf("Module %s: %v", config.Name, err)
-		return
+		return ""
 	}
 
 	// Multi-file modules: host every companion file (all entries except the
@@ -434,12 +453,16 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 			path, err := moduleFilePath(config.Path, file)
 			if err != nil {
 				logging.Errorf("Module %s: %v", config.Name, err)
-				return
+				return ""
 			}
 			companion, err := hostModuleFile(live.ActiveModule.Name, file, path)
 			if err != nil {
 				logging.Errorf("Hosting companion file %s: %v", file, err)
-				return
+				return ""
+			}
+			if err := ftp.RegisterWWWDownload(companion.Name, ctx.Target.UUID, 0, companion.Checksum, true); err != nil {
+				logging.Errorf("Module %s: companion %s: %v", config.Name, file, err)
+				return ""
 			}
 			invocation.ModuleFiles = append(invocation.ModuleFiles, companion)
 		}
@@ -448,35 +471,41 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 	invBytes, err := cbor.Marshal(invocation)
 	if err != nil {
 		logging.Errorf("Encoding invocation: %v", err)
-		return
+		return ""
 	}
 	invB64 := base64.StdEncoding.EncodeToString(invBytes)
 
-	hosted_file := filepath.Join(paths.WWWRoot, hostedName+".gz")
-	logging.Infof("Compressing %s with gzip...", hostedName)
+	// The agent fetches the payload by a random name that is registered for this
+	// agent only, so module payloads are not addressable by name.
+	hosted_file := filepath.Join(paths.WWWRoot, fmt.Sprintf("%s.gz", util.RandHexString()))
+	logging.Infof("Compressing %s with gzip...", payloadFile)
 
 	path, err := moduleFilePath(config.Path, payloadFile)
 	if err != nil {
 		logging.Errorf("Module %s: %v", config.Name, err)
-		return
+		return ""
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		logging.Errorf("Reading %s: %v", path, err)
-		return
+		return ""
 	}
 	compressedBytes, err := util.Compress(data)
 	if err != nil {
 		logging.Errorf("Compressing %s: %v", path, err)
-		return
+		return ""
 	}
 	logging.Infof("Created %s archive (%s) for module '%s'", util.FormatBytes(int64(len(compressedBytes))), hosted_file, live.ActiveModule.Name)
 	err = os.WriteFile(hosted_file, compressedBytes, 0o600)
 	if err != nil {
 		logging.Errorf("Writing %s: %v", hosted_file, err)
-		return
+		return ""
 	}
 	fileToDownload := filepath.Base(hosted_file)
+	if err := ftp.RegisterWWWDownload(fileToDownload, ctx.Target.UUID, int64(len(compressedBytes)), crypto.SHA256SumFile(hosted_file), true); err != nil {
+		logging.Errorf("Module %s: %v", config.Name, err)
+		return ""
+	}
 	cmd := fmt.Sprintf("%s --mod_name %s --type %s --file_to_download %s --checksum %s --invocation %s",
 		def.C2CmdCustomModule, moduleName, payload_type, fileToDownload, crypto.SHA256SumFile(hosted_file), strconv.Quote(invB64))
 	if dep != nil && dep.Checksum != "" {
@@ -485,12 +514,13 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 	if peerIP != "" {
 		cmd += fmt.Sprintf(" --peer %s", strconv.Quote(peerIP))
 	}
-	job_id := uuid.NewString()
+	jobID := uuid.NewString()
 	logging.Debugf("Sending command %s to %s", cmd, ctx.Target.Tag)
-	err = CmdSender(cmd, job_id, ctx.Target.Tag)
-	if err != nil {
+	if err := CmdSender(cmd, jobID, ctx.Target.Tag); err != nil {
 		logging.Errorf("Sending command %s to %s: %v", cmd, ctx.Target.Tag, err)
+		return ""
 	}
+	return jobID
 }
 
 // safeComponent rejects a module or payload name that could escape the
@@ -532,9 +562,9 @@ func hostModuleFile(moduleName, fileName, path string) (def.ResolvedModuleFile, 
 		return def.ResolvedModuleFile{}, fmt.Errorf("compressing %s: %w", path, err)
 	}
 
-	// Unique per module so the agent's memfs cache key (derived from the
-	// basename) cannot collide across modules.
-	hostedBase := fmt.Sprintf("%s.%s.gz", moduleName, base)
+	// Random per transfer: the agent fetches the companion by this name, which is
+	// registered for that agent only.
+	hostedBase := fmt.Sprintf("%s.gz", util.RandHexString())
 	hostedPath := filepath.Join(paths.WWWRoot, hostedBase)
 	if err := os.WriteFile(hostedPath, compressed, 0o600); err != nil {
 		return def.ResolvedModuleFile{}, fmt.Errorf("writing %s: %w", hostedPath, err)
@@ -724,7 +754,13 @@ func ensureModuleDependencyHosted(ctx *c2context.C2Context, depName string) (hos
 	if checksum == "" {
 		return hostedDependency{}, fmt.Errorf("dependency module %q has no readable payload file", depName)
 	}
-	if _, err := hostModulePayload(config, payloadFile, arch); err != nil {
+	hostedPath, err := hostModulePayload(config, payloadFile, arch)
+	if err != nil {
+		return hostedDependency{}, err
+	}
+	// The agent derives this name from the dependency module, so register exactly
+	// it for the target agent.
+	if err := ftp.RegisterWWWDownload(filepath.Base(hostedPath), ctx.Target.UUID, 0, checksum, false); err != nil {
 		return hostedDependency{}, err
 	}
 	return hostedDependency{Checksum: checksum}, nil

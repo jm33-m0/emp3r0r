@@ -47,6 +47,7 @@ func ReadConfigs(file string) (configs []*def.ModuleConfig, err error) {
 		Min      *float64 `json:"min"`
 		Max      *float64 `json:"max"`
 		ArgvFlag string   `json:"argv_flag"`
+		Internal bool     `json:"internal"`
 	}
 
 	type invocationArgJSON struct {
@@ -164,6 +165,7 @@ func ReadConfigs(file string) (configs []*def.ModuleConfig, err error) {
 				Min:      p.Min,
 				Max:      p.Max,
 				ArgvFlag: p.ArgvFlag,
+				Internal: p.Internal,
 			}
 		}
 
