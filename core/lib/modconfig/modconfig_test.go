@@ -412,3 +412,39 @@ func TestReadConfigsInternalParameter(t *testing.T) {
 		}
 	}
 }
+
+// An internal parameter is filled by the C2 and gets no console flag, so a
+// manifest cannot make it required: that could only fail a run before the
+// dispatch that would have supplied the value.
+func TestReadConfigsInternalParameterIsNeverRequired(t *testing.T) {
+	const body = `[
+  {
+    "name": "relay",
+    "platform": "Linux",
+    "agent_config": {"type": "coff", "files": ["relay.o"]},
+    "parameters": [
+      {"name": "token", "description": "stream token", "type": "cstr", "internal": true, "required": true},
+      {"name": "path", "description": "file", "type": "cstr", "required": true}
+    ],
+    "invocation": {"coff_export": "go"}
+  }
+]`
+	configs, err := ReadConfigs(writeConfig(t, body))
+	if err != nil {
+		t.Fatalf("ReadConfigs: %v", err)
+	}
+	if len(configs) != 1 {
+		t.Fatalf("expected 1 module, got %d", len(configs))
+	}
+	token := configs[0].Options["token"]
+	if token == nil {
+		t.Fatal("token option missing")
+	}
+	if token.Required {
+		t.Error("internal parameter token is required; the console exposes no flag for it")
+	}
+	path := configs[0].Options["path"]
+	if path == nil || !path.Required {
+		t.Error("operator-facing parameter lost its required flag")
+	}
+}

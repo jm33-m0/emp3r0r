@@ -222,7 +222,7 @@ value in the module invocation.
 | `choices`     | Restrict the value to one of a fixed list. Enforced for `coff`/`dll`, **not** for `starlark`.                                                           |
 | `min`, `max`  | Numeric bounds, enforced for `int`/`uint`/`short` on `coff`/`dll` modules. Not enforced for `starlark`.                                                 |
 | `argv_flag`   | Prefix inserted before the value when building the argv list, e.g. `--user`. Only affects `starlark`; BOF arguments are packed from the type, not argv. |
-| `internal`    | The C2 fills the value in before the invocation is packed. The parameter is still packed as a BOF argument but gets no console flag, so operators are never asked for a value only the C2 can know. Use it for upload stream tokens and hosted file names. |
+| `internal`    | The C2 fills the value in before the invocation is packed. The parameter is still packed as a BOF argument but gets no console flag, so operators are never asked for a value only the C2 can know. An internal parameter is never required: the C2 must supply it. Use it for upload stream tokens and hosted file names. |
 
 Avoid the name `help` for a parameter: it collides with the built-in
 `--help` flag.

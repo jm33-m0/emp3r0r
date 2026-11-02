@@ -155,13 +155,17 @@ func ReadConfigs(file string) (configs []*def.ModuleConfig, err error) {
 				logging.Warningf("Module '%s' config warning: parameter '%s' conflicts with the reserved --help flag", raw.Name, p.Name)
 			}
 
+			// The C2 fills internal parameters and the console exposes no flag
+			// for them, so requiring one could only ever fail before a dispatch
+			// that would have supplied it.
+			required := p.Required && !p.Internal
 			config.Options[p.Name] = &def.ModOption{
 				Name:     p.Name,
 				Desc:     p.Desc,
 				Val:      p.Val,
 				Vals:     p.Vals,
 				Type:     p.Type,
-				Required: p.Required,
+				Required: required,
 				Min:      p.Min,
 				Max:      p.Max,
 				ArgvFlag: p.ArgvFlag,
