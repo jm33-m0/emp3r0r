@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -50,6 +51,9 @@ const (
 	// maxFTPStreamsPerOperator bounds concurrent FTP streams per operator so one
 	// operator cannot grow the server's stream registry without limit.
 	maxFTPStreamsPerOperator = 64
+	// maxWWWDownloadsPerOperator bounds queued file downloads per operator so an
+	// agent cannot make one operator hold an unbounded registry.
+	maxWWWDownloadsPerOperator = 128
 )
 
 // DecodeCBORBody decodes CBOR HTTP request body
@@ -417,12 +421,19 @@ func handleRegisterFTPStream(wrt http.ResponseWriter, req *http.Request) {
 		return
 	}
 	// An operator may not hijack a token that another operator already owns.
+	// When the same operator already registered it, keep that handler: the
+	// operator and the C2 share the registry when both run on one host, and the
+	// receiver is matched by pointer identity against the operator's entry.
 	if val, ok := network.FTPStreams.Load("token:" + ftpReq.Token); ok {
-		if existing, castOK := val.(*network.StreamHandler); castOK && existing != nil &&
-			existing.OperatorSession != "" && existing.OperatorSession != operatorSession {
-			logging.Warningf("operator %s tried to hijack ftp token %s owned by %s", operatorSession, ftpReq.Token, existing.OperatorSession)
-			auditOperatorAction(operatorSession, "ftp_register_denied", "", ftpReq.FilePath)
-			http.Error(wrt, "Forbidden", http.StatusForbidden)
+		if existing, castOK := val.(*network.StreamHandler); castOK && existing != nil {
+			if existing.OperatorSession != "" && existing.OperatorSession != operatorSession {
+				logging.Warningf("operator %s tried to hijack ftp token %s owned by %s", operatorSession, ftpReq.Token, existing.OperatorSession)
+				auditOperatorAction(operatorSession, "ftp_register_denied", "", ftpReq.FilePath)
+				http.Error(wrt, "Forbidden", http.StatusForbidden)
+				return
+			}
+			logging.Debugf("FTP stream token %s already registered by this operator, keeping it", ftpReq.Token)
+			wrt.WriteHeader(http.StatusOK)
 			return
 		}
 	}
@@ -544,8 +555,10 @@ func unregisterOperatorConn(session string, op *operator_t) bool {
 	cleanupOperatorOwnedJobs(session)
 	// SOCKS5 pivots are owned by the operator that started them.
 	StopSocks5ProxiesForOperator(session)
-	// FTP streams owned by the operator die with its session.
+	// FTP streams and www download registrations owned by the operator die with
+	// its session.
 	cleanupOperatorFTPStreams(session)
+	cleanupOperatorWWWDownloads(session)
 	// Free every agent this operator was holding.
 	releaseAgentLocksForOperator(session)
 	return true
@@ -563,6 +576,102 @@ func cleanupOperatorFTPStreams(session string) {
 		}
 		return true
 	})
+}
+
+// handleRegisterWWWDownload records one hosted file the named agent may fetch
+// from this operator's www root. The agent's request is resolved through this
+// table, so it can never name an arbitrary file.
+func handleRegisterWWWDownload(wrt http.ResponseWriter, req *http.Request) {
+	dlReq, err := DecodeCBORBody[def.WWWDownloadRequest](wrt, req)
+	if err != nil {
+		return
+	}
+	operatorSession, ok := requireOperatorIdentity(wrt, req)
+	if !ok {
+		return
+	}
+	if _, online := OPERATORS.Load(operatorSession); !online {
+		http.Error(wrt, "operator session not connected", http.StatusUnauthorized)
+		return
+	}
+	if dlReq.Name == "" || dlReq.AgentUUID == "" {
+		http.Error(wrt, "name and agent UUID are required", http.StatusBadRequest)
+		return
+	}
+	if filepath.Base(dlReq.Name) != dlReq.Name || strings.ContainsAny(dlReq.Name, "/\\") {
+		http.Error(wrt, "invalid file name", http.StatusBadRequest)
+		return
+	}
+	if countOperatorWWWDownloads(operatorSession) >= maxWWWDownloadsPerOperator {
+		logging.Warningf("operator %s exceeded the www download limit (%d)", operatorSession, maxWWWDownloadsPerOperator)
+		auditOperatorAction(operatorSession, "www_download_denied", dlReq.AgentUUID, "too many registrations")
+		http.Error(wrt, "too many registered downloads", http.StatusTooManyRequests)
+		return
+	}
+	network.WWWDownloads.Store("name:"+dlReq.Name, &network.WWWDownload{
+		Name:            dlReq.Name,
+		AgentUUID:       dlReq.AgentUUID,
+		ExpectedSize:    dlReq.ExpectedSize,
+		Checksum:        dlReq.Checksum,
+		OperatorSession: operatorSession,
+	})
+	auditOperatorAction(operatorSession, "www_download_register", dlReq.AgentUUID, dlReq.Name)
+	logging.Infof("Registered www download %q for agent %s (operator %s)", dlReq.Name, util.AgentRef(dlReq.AgentUUID), operatorSession)
+	wrt.WriteHeader(http.StatusOK)
+}
+
+func handleUnregisterWWWDownload(wrt http.ResponseWriter, req *http.Request) {
+	dlReq, err := DecodeCBORBody[def.WWWDownloadRequest](wrt, req)
+	if err != nil {
+		return
+	}
+	operatorSession, ok := requireOperatorIdentity(wrt, req)
+	if !ok {
+		return
+	}
+	val, found := network.WWWDownloads.Load("name:" + dlReq.Name)
+	if !found {
+		wrt.WriteHeader(http.StatusOK)
+		return
+	}
+	dl, isDL := val.(*network.WWWDownload)
+	if !isDL || dl == nil || dl.OperatorSession != operatorSession {
+		http.Error(wrt, "Forbidden", http.StatusForbidden)
+		return
+	}
+	network.WWWDownloads.Delete("name:" + dlReq.Name)
+	auditOperatorAction(operatorSession, "www_download_unregister", dlReq.AgentUUID, dlReq.Name)
+	wrt.WriteHeader(http.StatusOK)
+}
+
+// cleanupOperatorWWWDownloads drops the download registrations owned by a
+// disconnecting operator.
+func cleanupOperatorWWWDownloads(session string) {
+	if session == "" {
+		return
+	}
+	network.WWWDownloads.Range(func(k, v any) bool {
+		if dl, ok := v.(*network.WWWDownload); ok && dl != nil && dl.OperatorSession == session {
+			network.WWWDownloads.Delete(k)
+		}
+		return true
+	})
+}
+
+// countOperatorWWWDownloads counts the download registrations of one operator.
+func countOperatorWWWDownloads(session string) int {
+	count := 0
+	network.WWWDownloads.Range(func(k, v any) bool {
+		key, ok := k.(string)
+		if !ok || !strings.HasPrefix(key, "name:") {
+			return true
+		}
+		if dl, ok := v.(*network.WWWDownload); ok && dl != nil && dl.OperatorSession == session {
+			count++
+		}
+		return true
+	})
+	return count
 }
 
 // countOperatorFTPStreams counts the tokens currently registered by one

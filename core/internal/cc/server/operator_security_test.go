@@ -113,42 +113,6 @@ func TestStopSocks5ProxyOwnership(t *testing.T) {
 	}
 }
 
-// TestWWWRelayRoutesToAgentOwner verifies a WWW relay opened by an agent is
-// served by the operator that owns the agent, not by whichever operator happens
-// to be online first, and that it is refused when the choice is ambiguous.
-func TestWWWRelayRoutesToAgentOwner(t *testing.T) {
-	const agentUUID = "www-agent-1"
-	publishTestAgent(t, agentUUID, "wwwtag1")
-	MarkOperatorOnline("op-a")
-	MarkOperatorOnline("op-b")
-	t.Cleanup(func() {
-		MarkOperatorOffline("op-a")
-		MarkOperatorOffline("op-b")
-		deleteAgentLock(agentUUID)
-	})
-
-	// Two operators online and no owner: the agent must not be able to pick one.
-	if _, err := wwwRelayOperatorFor(agentUUID); err == nil {
-		t.Fatal("www relay with two operators and no owner must be refused")
-	}
-
-	if acquired, _ := acquireAgentLock(agentUUID, "op-a", operatorDisplayName("op-a")); !acquired {
-		t.Fatal("op-a failed to claim the agent")
-	}
-	owner, err := wwwRelayOperatorFor(agentUUID)
-	if err != nil || owner != "op-a" {
-		t.Fatalf("www relay owner = %q (err=%v), want op-a", owner, err)
-	}
-
-	// When the owner disconnects, only one operator remains, so the
-	// single-operator fallback applies instead of breaking the transfer.
-	MarkOperatorOffline("op-a")
-	owner, err = wwwRelayOperatorFor(agentUUID)
-	if err != nil || owner != "op-b" {
-		t.Fatalf("www relay sole-operator fallback = %q (err=%v), want op-b", owner, err)
-	}
-}
-
 // TestUnregisterFTPStreamOwnerChecked verifies that unregistering an FTP stream
 // requires owning its token and that an unknown token cannot be used to delete
 // an unrelated registry entry by supplying its key as a file path.

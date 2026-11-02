@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net"
 	"strings"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -23,6 +23,7 @@ type relayStream struct {
 	writeMu      sync.Mutex
 	done         chan struct{}
 	doneOnce     sync.Once
+	bytes        atomic.Int64 // bytes handed to the agent over this relay
 }
 
 func (rs *relayStream) signalDone() {
@@ -206,9 +207,31 @@ func handleWWWRelayStream(conn io.ReadWriteCloser, agentUUID, streamID, remoteAd
 		return
 	}
 
-	ownerSession, err := wwwRelayOperatorFor(agentUUID)
-	if err != nil {
-		logging.Warningf("www relay: %v", err)
+	// The agent may only fetch a file an operator registered for it. Resolve the
+	// name here rather than trusting the agent, and route the request to the
+	// operator that registered it.
+	val, found := network.WWWDownloads.Load("name:" + streamID)
+	if !found {
+		logging.Errorf("www relay: refused %q from agent %s: no operator-registered download", streamID, util.AgentRef(agentUUID))
+		conn.Close()
+		return
+	}
+	dl, ok := val.(*network.WWWDownload)
+	if !ok || dl == nil {
+		network.WWWDownloads.Delete("name:" + streamID)
+		logging.Errorf("www relay: refused %q: invalid registration", streamID)
+		conn.Close()
+		return
+	}
+	if dl.AgentUUID != "" && dl.AgentUUID != agentUUID {
+		logging.Errorf("www relay: refused %q: registered for agent %s, requested by %s",
+			streamID, util.AgentRef(dl.AgentUUID), util.AgentRef(agentUUID))
+		conn.Close()
+		return
+	}
+	ownerSession := dl.OperatorSession
+	if ownerSession == "" {
+		logging.Errorf("www relay: refused %q: registration has no owner", streamID)
 		conn.Close()
 		return
 	}
@@ -225,35 +248,16 @@ func handleWWWRelayStream(conn io.ReadWriteCloser, agentUUID, streamID, remoteAd
 
 	// Keep this stream alive until operator finishes or errors; otherwise agent receives EOF with empty body.
 	<-rs.done
-}
 
-// wwwRelayOperatorFor resolves which operator should serve a WWW relay stream
-// opened by agentUUID. A WWW stream fetches a file hosted in an operator's WWW
-// root, so it must be served by the operator that currently owns the agent.
-// When no operator holds the agent (an agent-initiated fetch such as a module
-// download during check-in), it falls back to the sole online operator so
-// single-operator deployments keep working; when several operators are online
-// the request is ambiguous and is refused rather than letting an agent pick an
-// arbitrary operator to serve from its filesystem.
-func wwwRelayOperatorFor(agentUUID string) (string, error) {
-	if owner := agentLockOwnerSession(agentUUID); owner != "" {
-		return owner, nil
+	// A zero-byte relay is a failure the agent can only report as "no data", so
+	// say here what the agent could not know: how much was delivered and to
+	// which operator session the request went.
+	network.WWWDownloads.Delete("name:" + streamID)
+	logging.Infof("www relay %q: delivered %d bytes to the agent (operator %s)",
+		streamID, rs.bytes.Load(), ownerSession)
+	if rs.bytes.Load() == 0 {
+		logging.Errorf("www relay %q: delivered nothing; check the operator's www root and the relay errors above", streamID)
 	}
-	return getOnlyOperatorSession()
-}
-
-func getOnlyOperatorSession() (string, error) {
-	count := 0
-	session := ""
-	OPERATORS.Range(func(key, _ any) bool {
-		count++
-		session, _ = key.(string)
-		return true
-	})
-	if count != 1 || session == "" {
-		return "", fmt.Errorf("www relay requires exactly one active operator session (have %d)", count)
-	}
-	return session, nil
 }
 
 func handleOperatorRelayFrame(operatorSession string, msg *def.OperatorMsg) {
@@ -288,8 +292,11 @@ func handleOperatorRelayFrame(operatorSession string, msg *def.OperatorMsg) {
 				return
 			}
 			rs.writeMu.Lock()
-			_, err := rs.conn.Write(msg.Response)
+			n, err := rs.conn.Write(msg.Response)
 			rs.writeMu.Unlock()
+			if n > 0 {
+				rs.bytes.Add(int64(n))
+			}
 			if err != nil {
 				logging.Errorf("www relay write failed for %q: %v", streamID, err)
 				wwwRelayStreams.Delete(streamID)

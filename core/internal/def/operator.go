@@ -44,6 +44,15 @@ type FTPStreamRequest struct {
 	Checksum     string `cbor:"4,keyasint"`
 }
 
+// WWWDownloadRequest registers one operator-hosted file that a specific agent
+// may fetch over the www route.
+type WWWDownloadRequest struct {
+	Name         string `cbor:"1,keyasint"`
+	AgentUUID    string `cbor:"2,keyasint"`
+	ExpectedSize int64  `cbor:"3,keyasint"`
+	Checksum     string `cbor:"4,keyasint"`
+}
+
 // Socks5ProxyRequest is the payload used to start/stop a C2-resident SOCKS5
 // pivot. The listener accepts operator (WireGuard/VPN) traffic on the C2 host
 // and relays every connection through the bound agent via a dedicated C2 stream.

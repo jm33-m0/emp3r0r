@@ -38,6 +38,10 @@ const (
 	OperatorRegisterFTPStream = OperatorRoot + "/register_ftp_stream"
 	// OperatorUnregisterFTPStream
 	OperatorUnregisterFTPStream = OperatorRoot + "/unregister_ftp_stream"
+	// OperatorRegisterWWWDownload registers a file an agent may fetch
+	OperatorRegisterWWWDownload = OperatorRoot + "/register_www_download"
+	// OperatorUnregisterWWWDownload drops that registration
+	OperatorUnregisterWWWDownload = OperatorRoot + "/unregister_www_download"
 	// OperatorUpdateConfig
 	OperatorUpdateConfig = OperatorRoot + "/update_config"
 	// OperatorResume

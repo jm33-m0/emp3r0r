@@ -33,7 +33,27 @@ var (
 
 	// Shared stream handlers and maps
 	FTPStreams sync.Map
+
+	// WWWDownloads holds the file downloads an operator has registered for a
+	// specific agent. The agent presents the hosted name on the www route; the
+	// C2 resolves it here, so a name the operator did not register for that
+	// agent is never served out of the operator's www root.
+	WWWDownloads sync.Map
 )
+
+// WWWDownload is one registered download, keyed in WWWDownloads as
+// "name:<hosted name>".
+type WWWDownload struct {
+	Name            string // file name inside the operator's www root
+	AgentUUID       string // the only agent allowed to fetch it
+	ExpectedSize    int64
+	Checksum        string
+	OperatorSession string
+	// Transient marks a copy the operator made for this one transfer: it is
+	// removed from the www root once the registration is consumed, so repeated
+	// uploads and module dispatches do not accumulate random-name copies.
+	Transient bool
+}
 
 // StopEmpTLSServer stops whichever C2 TLS endpoint is currently active.
 // It supports both HTTP-fronted and raw TLS listener modes.

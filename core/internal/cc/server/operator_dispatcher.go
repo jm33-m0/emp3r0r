@@ -50,6 +50,10 @@ func operationDispatcher(w http.ResponseWriter, r *http.Request) {
 		handleRegisterFTPStream(w, r)
 	case transport.OperatorUnregisterFTPStream:
 		handleUnregisterFTPStream(w, r)
+	case transport.OperatorRegisterWWWDownload:
+		handleRegisterWWWDownload(w, r)
+	case transport.OperatorUnregisterWWWDownload:
+		handleUnregisterWWWDownload(w, r)
 	case transport.OperatorUpdateConfig:
 		handleUpdateOperatorIdleConfig(w, r)
 	case transport.OperatorResume:

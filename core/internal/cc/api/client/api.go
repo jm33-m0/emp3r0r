@@ -72,6 +72,26 @@ func RegisterFTPStream(token, file_path string, expectedSize int64, checksum str
 	return err
 }
 
+// RegisterWWWDownload registers one hosted file that `agentUUID` may fetch over
+// the www route. Without a registration the C2 refuses the name.
+func RegisterWWWDownload(name, agentUUID string, expectedSize int64, checksum string) error {
+	req := def.WWWDownloadRequest{
+		Name:         name,
+		AgentUUID:    agentUUID,
+		ExpectedSize: expectedSize,
+		Checksum:     checksum,
+	}
+	_, err := SendCBORRequest(transport.OperatorRegisterWWWDownload, req)
+	return err
+}
+
+// UnregisterWWWDownload drops a www download registration.
+func UnregisterWWWDownload(name, agentUUID string) error {
+	req := def.WWWDownloadRequest{Name: name, AgentUUID: agentUUID}
+	_, err := SendCBORRequest(transport.OperatorUnregisterWWWDownload, req)
+	return err
+}
+
 // UnregisterFTPStream unregisters an FTP stream from the server
 func UnregisterFTPStream(token, file_path string) error {
 	req := def.FTPStreamRequest{
