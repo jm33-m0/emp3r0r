@@ -15,6 +15,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/builder"
 	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/controllers"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
@@ -273,8 +274,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 				filter, _ := cmd.Flags().GetString("regex")
 
 				go func() {
-					err := ftp.DownloadFromAgent(target, filePath, isRecursive, filter)
-					if err != nil {
+					if err := modules.DownloadGetFile(target, filePath, filter, isRecursive); err != nil {
 						logging.Errorf("Download failed: %v", err)
 					}
 				}()

@@ -1,11 +1,30 @@
 package modules
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/ftp"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 )
+
+func TestParseGetFileListing(t *testing.T) {
+	out := "get_file: 3 file(s) in /var/log\n" +
+		"/var/log/a.log\n" +
+		" /var/log/b.log \r\n" +
+		"get_file: 3 file(s) in /var/log\n" +
+		"/var/log/a.log\n" +
+		"memfs:///c.log\n"
+	got := parseGetFileListing(out)
+	want := []string{"/var/log/a.log", "/var/log/b.log", "memfs:///c.log"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("parseGetFileListing = %v, want %v", got, want)
+	}
+
+	if files := parseGetFileListing("get_file: 0 file(s) in /empty\n"); len(files) != 0 {
+		t.Fatalf("empty listing parsed as %v", files)
+	}
+}
 
 func TestPrepareModuleParametersUsesPreparedStream(t *testing.T) {
 	prev := prepareGetFileStream
@@ -50,5 +69,28 @@ func TestPrepareModuleParametersRegistersStream(t *testing.T) {
 	}
 	if flags["stream"] != "token" || flags["offset"] != "9" {
 		t.Fatalf("stream/offset = %q/%q, want token/9", flags["stream"], flags["offset"])
+	}
+}
+
+func TestCanRunGetFileModule(t *testing.T) {
+	cases := []struct {
+		name   string
+		target *def.Emp3r0rAgent
+		want   bool
+	}{
+		{"c agent amd64", &def.Emp3r0rAgent{GOOS: "linux", GOArch: "amd64", AgentImpl: "c"}, true},
+		{"c agent x86_64 kernel arch", &def.Emp3r0rAgent{GOOS: "linux", Arch: "x86_64", AgentImpl: "C"}, true},
+		{"c agent arm64", &def.Emp3r0rAgent{GOOS: "linux", GOArch: "arm64", AgentImpl: "c"}, false},
+		{"go agent amd64", &def.Emp3r0rAgent{GOOS: "linux", GOArch: "amd64", AgentImpl: "go"}, false},
+		{"old agent without impl", &def.Emp3r0rAgent{GOOS: "linux", GOArch: "amd64"}, false},
+		{"windows c agent", &def.Emp3r0rAgent{GOOS: "windows", GOArch: "amd64", AgentImpl: "c"}, false},
+		{"nil", nil, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := canRunGetFileModule(tc.target); got != tc.want {
+				t.Fatalf("canRunGetFileModule = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }

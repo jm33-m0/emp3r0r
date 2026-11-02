@@ -14,6 +14,6 @@ type FileInfo struct {
 // if needed for consistency with the controller pattern.
 //
 // Current file operations can be accessed via:
-// - ftp.CmdDownloadFromAgent
-// - ftp.CmdUploadToAgent
+// - ftp.PutFile (operator -> agent)
+// - modules.DownloadGetFile (agent -> operator)
 // These already return errors and don't have UI dependencies.
