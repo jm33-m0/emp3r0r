@@ -229,7 +229,7 @@ PORTABLE_SRC = src/util/rc4.c src/util/packer.c src/util/dynload.c src/util/dynl
                src/util/debug.c src/common.c src/crypto.c \
                src/messages.c src/agent_info.c src/config.c \
                src/secureconn.c src/session.c src/memfile.c src/bof_host.c \
-               src/file_transfer.c \
+               src/fetch.c \
                src/sysinfo.c src/agent_identity.c src/stager_iface.c \
                $(BOF_SRC) $(RVVM_SRC) $(MODULE_SUPPORT_SRC) $(DOH_SRC) \
                $(GZIP_SRC) $(CRYPTO_SRC) $(TRANSPORT_SRC) $(TRANSPORT_SUPPORT_SRC) \
@@ -286,7 +286,7 @@ CONFIG_SRC ?=
 AGENT_COMMON_SRC = src/agent_args.c src/util/dynload.c src/util/dynload_hosted.c \
                    src/crypto.c src/messages.c src/common.c \
                    src/agent_info.c src/config.c src/secureconn.c \
-                   src/session.c src/memfile.c src/bof_host.c src/file_transfer.c \
+                   src/session.c src/memfile.c src/bof_host.c src/fetch.c \
                    src/sysinfo.c \
                    src/agent_identity.c src/stager_iface.c
 TINYCBOR_MIN_SRC = vendor/tinycbor/cborencoder.c vendor/tinycbor/cborparser.c
@@ -355,12 +355,20 @@ endif
 BOF_MODULE_DIR = ../modules/coffloader_linux
 BOF_HELLO_DIR = ../modules/hello_linux
 XFER_BOF_DIR = ../modules/file_transfer_bof
+SOCKS5_BOF_DIR = ../modules/socks5
+EXEC_BOF_DIR = ../modules/exec
 ifneq ($(wildcard $(BOF_MODULE_DIR)/loader_linux.c),)
   BOF_TEST = $(BUILD)/test_bof $(BUILD)/test_elfload
   BOF_FUZZ = $(BUILD)/fuzz_bof
 endif
 ifneq ($(wildcard $(XFER_BOF_DIR)/file_transfer_bof.c),)
   XFER_BOF_TEST = $(BUILD)/test_file_transfer_bof
+endif
+ifneq ($(wildcard $(SOCKS5_BOF_DIR)/socks5.c),)
+  SOCKS5_BOF_TEST = $(BUILD)/test_socks5_bof
+endif
+ifneq ($(wildcard $(EXEC_BOF_DIR)/exec.c),)
+  EXEC_BOF_TEST = $(BUILD)/test_exec_bof
 endif
 
 # RV32 interpreter test: build the real rvvm_linux module and the guest
@@ -391,8 +399,8 @@ test: $(BUILD)/test_strings $(BUILD)/test_rc4 $(BUILD)/test_packer \
       $(BUILD)/test_sysinfo $(BUILD)/test_module \
       $(BUILD)/test_secureconn $(BUILD)/test_identity \
       $(BUILD)/test_stager_iface \
-      $(GZIP_TEST) $(BOF_TEST) $(XFER_BOF_TEST) $(RVVM_TEST) \
-      $(BUILD)/test_crypto_openssl
+      $(GZIP_TEST) $(BOF_TEST) $(XFER_BOF_TEST) $(SOCKS5_BOF_TEST) \
+      $(EXEC_BOF_TEST) $(RVVM_TEST) $(BUILD)/test_crypto_openssl
 	@set -e; for t in $^; do echo "--- $$t"; ./$$t; done
 
 # The self-contained backend is only built when mbedTLS is vendored.
@@ -479,6 +487,13 @@ $(BUILD)/coffloader_linux.so: $(BOF_MODULE_DIR)/loader_linux.c \
 	cp $(BOF_MODULE_DIR)/coffloader_linux.so $@
 	$(MAKE) -C $(BOF_MODULE_DIR) clean >/dev/null
 
+# A freestanding BOF fixture whose libc calls must reach the real symbols; see
+# tests/ifunc_bof.c. Built with the module BOF flags so it matches what the C2
+# ships.
+$(BUILD)/ifunc_bof.o: tests/ifunc_bof.c | $(BUILD)
+	$(HOSTCC) -target x86_64-linux-gnu.2.17 -O2 -fPIC -c -fno-stack-protector \
+	  -fno-sanitize=all -fvisibility=hidden -o $@ $<
+
 $(BUILD)/hello_linux.o: $(BOF_HELLO_DIR)/hello_linux.c | $(BUILD)
 	$(MAKE) -C $(BOF_HELLO_DIR) >/dev/null
 	cp $(BOF_HELLO_DIR)/hello_linux.o $@
@@ -486,10 +501,11 @@ $(BUILD)/hello_linux.o: $(BOF_HELLO_DIR)/hello_linux.c | $(BUILD)
 
 $(BUILD)/test_bof: tests/test_bof.c src/bof.c src/bof_args.c src/util/dynload.c \
                       src/util/elfload.c $(BUILD)/coffloader_linux.so \
-                      $(BUILD)/hello_linux.o tests/test.h | $(BUILD)
+                      $(BUILD)/hello_linux.o $(BUILD)/ifunc_bof.o tests/test.h | $(BUILD)
 	$(HOSTCC) $(TEST_CFLAGS) \
 	  -DBOF_LOADER_PATH='"$(BUILD)/coffloader_linux.so"' \
 	  -DBOF_OBJ_PATH='"$(BUILD)/hello_linux.o"' \
+	  -DBOF_IFUNC_PATH='"$(BUILD)/ifunc_bof.o"' \
 	  tests/test_bof.c src/bof.c src/bof_args.c src/util/dynload.c \
 	  src/util/elfload.c -o $@
 
@@ -521,6 +537,64 @@ $(BUILD)/test_file_transfer_bof: tests/test_file_transfer_bof.c src/bof.c \
 	  -DRVVM_LOADER_PATH='"$(BUILD)/rvvm_linux.so"' \
 	  -DRV_GET_PATH='"$(BUILD)/get_file.rv"' \
 	  tests/test_file_transfer_bof.c src/bof.c src/bof_args.c src/rvvm.c \
+	  src/util/dynload.c src/util/elfload.c -o $@
+
+$(BUILD)/socks5.o: $(SOCKS5_BOF_DIR)/socks5.c | $(BUILD)
+	$(MAKE) -C $(SOCKS5_BOF_DIR) socks5.o >/dev/null
+	cp $(SOCKS5_BOF_DIR)/socks5.o $@
+	$(MAKE) -C $(SOCKS5_BOF_DIR) clean >/dev/null
+
+$(BUILD)/socks5.rv.o: $(SOCKS5_BOF_DIR)/socks5.c | $(BUILD)
+	$(MAKE) -C $(SOCKS5_BOF_DIR) socks5.rv.o >/dev/null
+	cp $(SOCKS5_BOF_DIR)/socks5.rv.o $@
+	$(MAKE) -C $(SOCKS5_BOF_DIR) clean >/dev/null
+
+$(BUILD)/socks5.rv: $(BUILD)/socks5.rv.o $(RVVM_GUEST_DIR)/main.c \
+                    $(RVVM_GUEST_DIR)/guest.ld | $(BUILD)
+	$(ZIG) build-exe -target riscv32-linux-musl -mcpu=generic_rv32+a \
+	  -static -O ReleaseSmall -fno-entry -fstrip -lc \
+	  -T $(RVVM_GUEST_DIR)/guest.ld $(RVVM_GUEST_DIR)/main.c \
+	  $< -femit-bin=$@
+
+$(BUILD)/test_socks5_bof: tests/test_socks5_bof.c src/bof.c src/bof_args.c \
+                          src/rvvm.c src/util/dynload.c src/util/elfload.c \
+                          $(BUILD)/coffloader_linux.so $(BUILD)/rvvm_linux.so \
+                          $(BUILD)/socks5.o $(BUILD)/socks5.rv tests/test.h | $(BUILD)
+	$(HOSTCC) $(TEST_CFLAGS) \
+	  -DBOF_LOADER_PATH='"$(BUILD)/coffloader_linux.so"' \
+	  -DBOF_SOCKS5_PATH='"$(BUILD)/socks5.o"' \
+	  -DRVVM_LOADER_PATH='"$(BUILD)/rvvm_linux.so"' \
+	  -DRV_SOCKS5_PATH='"$(BUILD)/socks5.rv"' \
+	  tests/test_socks5_bof.c src/bof.c src/bof_args.c src/rvvm.c \
+	  src/util/dynload.c src/util/elfload.c -o $@
+
+$(BUILD)/exec.o: $(EXEC_BOF_DIR)/exec.c | $(BUILD)
+	$(MAKE) -C $(EXEC_BOF_DIR) exec.o >/dev/null
+	cp $(EXEC_BOF_DIR)/exec.o $@
+	$(MAKE) -C $(EXEC_BOF_DIR) clean >/dev/null
+
+$(BUILD)/exec.rv.o: $(EXEC_BOF_DIR)/exec.c | $(BUILD)
+	$(MAKE) -C $(EXEC_BOF_DIR) exec.rv.o >/dev/null
+	cp $(EXEC_BOF_DIR)/exec.rv.o $@
+	$(MAKE) -C $(EXEC_BOF_DIR) clean >/dev/null
+
+$(BUILD)/exec.rv: $(BUILD)/exec.rv.o $(RVVM_GUEST_DIR)/main.c \
+                  $(RVVM_GUEST_DIR)/guest.ld | $(BUILD)
+	$(ZIG) build-exe -target riscv32-linux-musl -mcpu=generic_rv32+a \
+	  -static -O ReleaseSmall -fno-entry -fstrip -lc \
+	  -T $(RVVM_GUEST_DIR)/guest.ld $(RVVM_GUEST_DIR)/main.c \
+	  $< -femit-bin=$@
+
+$(BUILD)/test_exec_bof: tests/test_exec_bof.c src/bof.c src/bof_args.c \
+                        src/rvvm.c src/util/dynload.c src/util/elfload.c \
+                        $(BUILD)/coffloader_linux.so $(BUILD)/rvvm_linux.so \
+                        $(BUILD)/exec.o $(BUILD)/exec.rv tests/test.h | $(BUILD)
+	$(HOSTCC) $(TEST_CFLAGS) \
+	  -DBOF_LOADER_PATH='"$(BUILD)/coffloader_linux.so"' \
+	  -DBOF_EXEC_PATH='"$(BUILD)/exec.o"' \
+	  -DRVVM_LOADER_PATH='"$(BUILD)/rvvm_linux.so"' \
+	  -DRV_EXEC_PATH='"$(BUILD)/exec.rv"' \
+	  tests/test_exec_bof.c src/bof.c src/bof_args.c src/rvvm.c \
 	  src/util/dynload.c src/util/elfload.c -o $@
 
 $(BUILD)/test_elfload: tests/test_elfload.c src/util/elfload.c \

@@ -37,11 +37,14 @@ and `memmod`, the C agent through `core/c_agent/src/util/elfload.c`):
   executable segment. Sections that are both writable and executable are
   rejected, so the image never contains an RWX mapping.
 - Applies the `R_X86_64_64/32/32S/PC32/PLT32` relocations.
-- Resolves undefined symbols to the mocked Beacon API first, then to the host's
-  global symbol scope (`__libc_dlsym(NULL, …)` on glibc, `dlsym(RTLD_DEFAULT,
-  …)` elsewhere), building a 16-byte `movabs/jmp` trampoline for each.
-  `getEnviron` and `getOSName` from the TrustedSec compatibility layer are
-  mocked too.
+- Resolves undefined symbols to the mocked Beacon API first, then to the loaded
+  `libc`, `libm` and `libgcc_s`, building a 16-byte `movabs/jmp` trampoline for
+  each. The lookup reads those modules' dynamic symbol tables (the same policy
+  `core/c_agent/src/util/elfload.c` applies to the loader's own imports), checks
+  the symbol type and invokes a GNU IFUNC's resolver, so `memcpy`, `memset`,
+  `strlen`, `strchr`, `strrchr` and `memcmp` resolve to the implementation
+  instead of the resolver. `libdl` is never loaded. `getEnviron` and `getOSName`
+  from the TrustedSec compatibility layer are mocked too.
 - Applies `W^X` per segment and executes the requested entry point.
 - Catches `SIGSEGV`/`SIGBUS`/`SIGILL`/`SIGFPE` during execution and returns an
   error instead of killing the agent.
@@ -65,9 +68,9 @@ The loader implements the Beacon compatibility API that BOFs commonly use:
 
 ### Host primitives
 
-An agent can install storage and session primitives with
-`SetHostBridge(ctx, read, write, upload, sha256)`. BOFs resolve the wrappers
-below through the same symbol table:
+An agent can install storage, session and relay primitives with
+`SetHostBridge(ctx, read, write, upload, sha256, relay, exec)`. BOFs resolve the
+wrappers below through the same symbol table:
 
 ```c
 int ReadFile(const char *path, unsigned char **out, unsigned long *len,
@@ -78,13 +81,21 @@ int UploadFile(const char *token, const char *path, unsigned long offset,
                char *err, int err_cap);
 int Sha256Hex(const unsigned char *data, unsigned long len, char *hex,
               unsigned long hex_cap, char *err, int err_cap);
+int RelaySocket(const char *token, int fd, int idle_seconds, char *err,
+                int err_cap);
+int ExecCmd(const char *cmd, int shell, char *out, int out_cap, char *err,
+            int err_cap);
 ```
 
 Each returns `0` on success and a negative status otherwise. Without installed
 callbacks they return `-9` (unsupported). `UploadFile` streams the named file
 through the registered FTP route from `offset`, so a BOF sends a file without
 holding it in memory; downloads are not a BOF concern, because `put` is an agent
-command.
+command. `RelaySocket` takes an already-connected socket and pumps it through the
+C2 stream named by `token`, which lets a BOF own its own address resolution and
+dialing while the transfer runs on agent threads. `ExecCmd` runs the command line in a child process and returns the byte count
+copied into `out` (combined stdout and stderr), or a negative status; `shell`
+selects `/bin/sh -c` or a direct exec of the tokenized command line.
 
 ## Arguments
 

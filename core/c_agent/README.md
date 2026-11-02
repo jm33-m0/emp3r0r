@@ -80,16 +80,41 @@ Both are reached by the C2's `!custom_module --type <coff|rv> ...` dispatch
 and share `src/module.c` (invocation decoding) and `src/util/elfload.c`. Set
 `BOF=0`/`RVVM=0` to compile either out.
 
-The BOF host bridge exposes `ReadFile`, `WriteFile`, `UploadFile`, and
-`Sha256Hex`. `UploadFile` streams the named file through the FTP route in chunks,
-so the `get_file` BOF never holds the file in memory; the same BOF runs as an
-RV32 guest, with the primitives forwarded through the `rvvm_linux` syscall gate.
+A third entry point needs no dispatch: `!proxy_start --token <t> --target
+<host:port>` is the SOCKS5 pivot command the C2 sends to every agent. The agent
+fetches the `socks5` BOF by its stable hosted name (`socks5.<arch>.gz`, which the
+operator hosted when it ran `socks_start`), caches it in memfs, and runs its `go`
+entry with the token and target. See
+[`docs/socks5_bof.md`](../../docs/socks5_bof.md).
 
-Operator uploads (`put`) need no BOF: the agent streams the www route into the
-destination and verifies the digest after the transfer, using the same download
-primitive a module payload uses. Every download is operator-registered: the C2
-refuses a name no operator registered for this agent. See
-[`docs/file_transfer_bof.md`](../../docs/file_transfer_bof.md).
+The BOF host bridge exposes `ReadFile`, `WriteFile`, `UploadFile`, `Sha256Hex`,
+`RelaySocket` and `ExecCmd`. `UploadFile` streams the named file through the FTP
+route in chunks, so the `get_file` BOF never holds the file in memory; the same
+BOF runs as an RV32 guest, with the primitives forwarded through the `rvvm_linux`
+syscall gate. `ExecCmd` runs a command line in a child process — through `/bin/sh -c`, or
+directly after word splitting — and returns its combined output; it is
+synchronous, so the message loop waits for the child. The operator's `exec` command dispatches the `exec` module
+for a C agent; see [`docs/exec_bof.md`](../../docs/exec_bof.md).
+
+`RelaySocket` is the one host primitive that outlives the BOF call: it takes an
+already-connected socket and pumps it through a C2 stream until either side ends
+or the relay goes idle. Everything up to that socket — argument handling, name
+resolution, the dial and its deadline, error reporting — belongs to the BOF, and
+the agent adds no module-specific code. A relay must run on an agent thread
+because the loader unmaps the BOF object when its entry point returns and the
+RV32 guest is single threaded. Relay managers are the agent's only worker
+threads; `agent_sleep` joins every finished one and refuses to mask while any is
+still alive, because the stager mask encrypts the heap and every thread stack.
+`pthread` is resolved from the loaded libc at run time, so neither the
+shared-object nor the raw PIC build gains a `libpthread` dependency. See
+[`docs/socks5_bof.md`](../../docs/socks5_bof.md).
+
+Operator uploads (`put`) need no BOF, and no code of their own: the agent
+handles `put` with the same fetch every module payload and dependency image
+takes (`src/fetch.c`), which streams the body to the destination, verifies the
+digest the C2 supplied and only then commits the file. Every download is
+operator-registered: the C2 refuses a name no operator registered for this
+agent. See [`docs/file_transfer_bof.md`](../../docs/file_transfer_bof.md).
 
 ### Output formats
 

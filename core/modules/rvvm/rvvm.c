@@ -38,6 +38,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <sched.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -129,15 +130,19 @@
 #define RV_SYS_WRITE 64
 #define RV_SYS_READV 65
 #define RV_SYS_WRITEV 66
+#define RV_SYS_PPOLL 73         /* 32-bit timespec */
+#define RV_SYS_PPOLL_TIME64 414 /* 64-bit timespec */
 #define RV_SYS_READLINKAT 78
 #define RV_SYS_EXIT 93
 #define RV_SYS_EXIT_GROUP 94
 #define RV_SYS_SET_TID_ADDRESS 96
 #define RV_SYS_SOCKET 198
 #define RV_SYS_BIND 200
+#define RV_SYS_CONNECT 203
 #define RV_SYS_SENDTO 206
 #define RV_SYS_RECVFROM 207
 #define RV_SYS_SETSOCKOPT 208
+#define RV_SYS_GETSOCKOPT 209
 #define RV_SYS_RECVMSG 212
 #define RV_SYS_SET_ROBUST_LIST 99
 #define RV_SYS_SCHED_GETAFFINITY 123
@@ -167,6 +172,12 @@
 #define RV_SYS_XFER_WRITE 0x40000002u
 #define RV_SYS_XFER_UPLOAD 0x40000004u
 #define RV_SYS_XFER_SHA256 0x40000005u
+#define RV_SYS_XFER_RELAY 0x40000006u
+#define RV_SYS_XFER_EXEC 0x40000007u
+
+/* Bounds for the poll array and sockaddr a guest may hand the gate. */
+#define RV_POLL_MAX_FDS 64
+#define RV_SOCKADDR_MAX 128
 
 typedef int (*rv_host_read_fn)(void *ctx, const char *path, unsigned char **out,
                                unsigned long *len, char *err, int err_cap);
@@ -178,12 +189,18 @@ typedef int (*rv_host_upload_fn)(void *ctx, const char *token, const char *path,
 typedef int (*rv_host_sha256_fn)(void *ctx, const unsigned char *data,
                                  unsigned long len, char *hex,
                                  unsigned long hex_cap, char *err, int err_cap);
+typedef int (*rv_host_relay_fn)(void *ctx, const char *token, int fd,
+                                int idle_seconds, char *err, int err_cap);
+typedef int (*rv_host_exec_fn)(void *ctx, const char *cmd, int shell, char *out,
+                               unsigned long out_cap, char *err, int err_cap);
 
 static void *rv_host_ctx;
 static rv_host_read_fn rv_host_read;
 static rv_host_write_fn rv_host_write;
 static rv_host_upload_fn rv_host_upload;
 static rv_host_sha256_fn rv_host_sha256;
+static rv_host_relay_fn rv_host_relay;
+static rv_host_exec_fn rv_host_exec;
 
 static void rv_mmio_store(uint32_t addr, uint32_t val);
 static uint32_t rv_mmio_load(uint32_t addr);
@@ -217,6 +234,76 @@ static uint32_t rv_brk_min;
  * releases sub-ranges cannot leak the whole arena. */
 #define RV_MAP_PAGES (RV_MAP_SIZE / 4096u)
 static uint8_t rv_map_used[RV_MAP_PAGES];
+
+/*
+ * Guest file descriptors. A guest never names a host descriptor: sockets and
+ * files it opens through the syscall gate are recorded here and returned as
+ * RV_GUEST_FD_BASE + slot. Every fd-taking syscall translates back, so a
+ * hostile or buggy guest cannot read, write, poll, connect or close the
+ * agent's own descriptors (the C2 transport, stdio, or any other agent fd).
+ * Guest fds 1 and 2 are not in this table: they are the captured BOF output.
+ */
+#define RV_GUEST_FD_BASE 1024
+#define RV_GUEST_FD_SLOTS 64
+
+static int rv_guest_fd_host[RV_GUEST_FD_SLOTS];
+static uint8_t rv_guest_fd_used[RV_GUEST_FD_SLOTS];
+
+static void rv_guest_fds_reset(void) {
+  for (int i = 0; i < RV_GUEST_FD_SLOTS; i++) {
+    if (!rv_guest_fd_used[i])
+      continue;
+    if (rv_guest_fd_host[i] >= 0)
+      close(rv_guest_fd_host[i]);
+    rv_guest_fd_used[i] = 0;
+    rv_guest_fd_host[i] = -1;
+  }
+}
+
+/* Record a host descriptor and return the guest-visible number, or -1 when the
+ * table is full; the caller closes the host descriptor in that case. */
+static int rv_guest_fd_alloc(int host_fd) {
+  if (host_fd < 0)
+    return -1;
+  for (int i = 0; i < RV_GUEST_FD_SLOTS; i++) {
+    if (rv_guest_fd_used[i])
+      continue;
+    rv_guest_fd_used[i] = 1;
+    rv_guest_fd_host[i] = host_fd;
+    return RV_GUEST_FD_BASE + i;
+  }
+  return -1;
+}
+
+/* Translate a guest number to its host descriptor, or -1 when the guest does
+ * not own it. */
+static int rv_guest_fd_host_of(int guest_fd) {
+  int slot = guest_fd - RV_GUEST_FD_BASE;
+  if (slot < 0 || slot >= RV_GUEST_FD_SLOTS || !rv_guest_fd_used[slot])
+    return -1;
+  return rv_guest_fd_host[slot];
+}
+
+/* Remove a guest number from the table and return its host descriptor. Used by
+ * close and by the relay, which takes ownership of the descriptor. */
+static int rv_guest_fd_take(int guest_fd) {
+  int slot = guest_fd - RV_GUEST_FD_BASE;
+  if (slot < 0 || slot >= RV_GUEST_FD_SLOTS || !rv_guest_fd_used[slot])
+    return -1;
+  rv_guest_fd_used[slot] = 0;
+  int host_fd = rv_guest_fd_host[slot];
+  rv_guest_fd_host[slot] = -1;
+  return host_fd;
+}
+
+/* Directory descriptor for the *at() syscalls: AT_FDCWD passes through, any
+ * other value must be a guest-owned descriptor (-1 when it is not). */
+static int rv_guest_dirfd(uint32_t raw) {
+  int32_t d = (int32_t)raw;
+  if (d == -100) /* AT_FDCWD */
+    return -100;
+  return rv_guest_fd_host_of(d);
+}
 
 static void rv_memzero(void *dst, size_t n);
 static void rv_memcpy(void *dst, const void *src, size_t n);
@@ -480,6 +567,10 @@ static uint8_t *rv_gptr(uint32_t addr, uint32_t len) {
  * hosts, whose layout is identical. */
 _Static_assert(sizeof(struct flock) == 32,
                "unexpected host struct flock layout");
+/* The guest pollfd array is copied in and out as a whole, so the layouts must
+ * match: int fd, short events, short revents. */
+_Static_assert(sizeof(struct pollfd) == 8,
+               "unexpected host struct pollfd layout");
 
 static int rv_guest_path(uint32_t addr, char *out, size_t cap) {
   if (cap == 0)
@@ -605,6 +696,129 @@ static int64_t rv_host_sha256_to_guest(uint32_t src_addr, uint32_t len,
                         (int)sizeof(err));
 }
 
+/* Hand a connected socket to the agent's relay; the token lives in guest RAM
+ * and the socket is the host descriptor the guest opened. */
+static int64_t rv_host_relay_from_guest(uint32_t token_addr, int fd,
+                                        uint32_t idle_seconds) {
+  char token[1024];
+  if (rv_guest_path(token_addr, token, sizeof(token)) != 0)
+    return -22;
+  if (rv_host_relay == NULL)
+    return -38;
+  char err[160] = {0};
+  return rv_host_relay(rv_host_ctx, token, fd, (int)idle_seconds, err,
+                       (int)sizeof(err));
+}
+
+/* Run a command and place its output in guest memory. The host writes through
+ * a host buffer because the guest pointer is only valid inside guest RAM. */
+static int64_t rv_host_exec_to_guest(uint32_t cmd_addr, int32_t shell,
+                                     uint32_t out_addr, uint32_t cap) {
+  char cmd[1024];
+  if (rv_guest_path(cmd_addr, cmd, sizeof(cmd)) != 0)
+    return -22;
+  if (rv_host_exec == NULL)
+    return -38;
+  if (cap == 0)
+    return -22;
+  if (cap > (64u << 10))
+    cap = 64u << 10;
+  char *buf = (char *)malloc(cap);
+  if (buf == NULL)
+    return -12;
+  char err[160] = {0};
+  int rc = rv_host_exec(rv_host_ctx, cmd, shell, buf, (unsigned long)cap, err,
+                        (int)sizeof(err));
+  if (rc > 0) {
+    void *dst = rv_gptr(out_addr, (uint32_t)rc);
+    if (dst == NULL) {
+      free(buf);
+      return -14;
+    }
+    rv_memcpy(dst, buf, (size_t)rc);
+  }
+  free(buf);
+  return rc;
+}
+
+/* ppoll, for both guest timespec layouts: the 32-bit syscall passes two words,
+ * ppoll_time64 a 64-bit timespec. A signal mask cannot cross the gate, and host
+ * poll() counts milliseconds, so any deadline is rounded up. */
+static int64_t rv_guest_ppoll(uint32_t fds_addr, uint32_t nfds,
+                              uint32_t tsp_addr, uint32_t sigmask, int time64) {
+  if (sigmask != 0)
+    return -38;
+  if (nfds > RV_POLL_MAX_FDS)
+    return -22;
+  size_t bytes = (size_t)nfds * sizeof(struct pollfd);
+  struct pollfd *fds = NULL;
+  if (bytes > 0) {
+    const void *guest = rv_gptr(fds_addr, (uint32_t)bytes);
+    if (guest == NULL)
+      return -22;
+    fds = (struct pollfd *)malloc(bytes);
+    if (fds == NULL)
+      return -12;
+    rv_memcpy(fds, guest, bytes);
+  }
+  /* Translate guest descriptors. An unowned one reports POLLNVAL, like poll()
+   * on a closed descriptor, instead of reaching an agent descriptor. */
+  uint8_t invalid[RV_POLL_MAX_FDS];
+  rv_memzero(invalid, sizeof(invalid));
+  for (uint32_t i = 0; i < nfds; i++) {
+    int host_fd = rv_guest_fd_host_of(fds[i].fd);
+    if (host_fd < 0) {
+      invalid[i] = 1;
+      fds[i].fd = -1;
+    } else {
+      fds[i].fd = host_fd;
+    }
+  }
+  int timeout_ms = -1;
+  if (tsp_addr != 0) {
+    const uint8_t *g = rv_gptr(tsp_addr, time64 ? 16u : 12u);
+    if (g == NULL) {
+      free(fds);
+      return -22;
+    }
+    int64_t sec = 0;
+    int64_t nsec = 0;
+    rv_memcpy(&sec, g, 8);
+    if (time64) {
+      rv_memcpy(&nsec, g + 8, 8);
+    } else {
+      int32_t nsec32 = 0;
+      rv_memcpy(&nsec32, g + 8, 4);
+      nsec = nsec32;
+    }
+    if (sec < 0 || nsec < 0 || nsec >= 1000000000 || sec > INT32_MAX / 1000) {
+      free(fds);
+      return -22;
+    }
+    timeout_ms = (int)(sec * 1000 + (nsec + 999999) / 1000000);
+  }
+  int r = poll(fds, (nfds_t)nfds, timeout_ms);
+  int saved = errno;
+  if (r >= 0) {
+    for (uint32_t i = 0; i < nfds; i++) {
+      if (!invalid[i])
+        continue;
+      fds[i].revents = POLLNVAL;
+      r++;
+    }
+  }
+  if (r >= 0 && bytes > 0) {
+    void *back = rv_gptr(fds_addr, (uint32_t)bytes);
+    if (back == NULL) {
+      free(fds);
+      return -22;
+    }
+    rv_memcpy(back, fds, bytes);
+  }
+  free(fds);
+  return r < 0 ? -saved : r;
+}
+
 static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
                                 uint32_t a2, uint32_t a3, uint32_t a4,
                                 uint32_t a5) {
@@ -644,6 +858,9 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
   case RV_SYS_RSEQ:
     return 0;
   case RV_SYS_FCNTL: {
+    int fd = rv_guest_fd_host_of((int)a0);
+    if (fd < 0)
+      return -9; /* EBADF: not a descriptor the guest opened */
     /* Lock commands pass a struct flock. Translate it through a local copy so
      * the raw guest address never reaches the kernel. musl numbers the
      * 64-bit-offset lock commands 12/13/14 on 32-bit guests. */
@@ -677,7 +894,7 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
     default:
       break;
     }
-    int r = fcntl((int)a0, host_cmd, arg);
+    int r = fcntl(fd, host_cmd, arg);
     if (r < 0)
       return -errno;
     if (gfl != NULL)
@@ -685,29 +902,57 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
     return r;
   }
   case RV_SYS_SOCKET: {
-    int fd = socket((int)a0, (int)a1, (int)a2);
-    return fd < 0 ? -errno : fd;
+    int host_fd = socket((int)a0, (int)a1, (int)a2);
+    if (host_fd < 0)
+      return -errno;
+    int guest_fd = rv_guest_fd_alloc(host_fd);
+    if (guest_fd < 0) {
+      close(host_fd);
+      return -24; /* EMFILE */
+    }
+    return guest_fd;
   }
   case RV_SYS_BIND: {
+    int fd = rv_guest_fd_host_of((int)a0);
+    if (fd < 0)
+      return -9;
     const void *addr = rv_gptr(a1, a2);
     return addr == NULL
                ? -22
-               : (bind((int)a0, (const struct sockaddr *)addr, a2) < 0 ? -errno
-                                                                       : 0);
+               : (bind(fd, (const struct sockaddr *)addr, a2) < 0 ? -errno : 0);
+  }
+  case RV_SYS_CONNECT: {
+    /* AF_INET, AF_INET6 and AF_UNIX socket addresses have the same layout on
+     * 32-bit and 64-bit Linux, so the guest structure crosses the gate as is.
+     */
+    int fd = rv_guest_fd_host_of((int)a0);
+    if (fd < 0)
+      return -9;
+    const void *addr = rv_gptr(a1, a2);
+    if (a2 > RV_SOCKADDR_MAX || (addr == NULL && a2 != 0))
+      return -22;
+    return connect(fd, (const struct sockaddr *)addr, (socklen_t)a2) < 0
+               ? -errno
+               : 0;
   }
   case RV_SYS_SENDTO: {
+    int fd = rv_guest_fd_host_of((int)a0);
+    if (fd < 0)
+      return -9;
     const void *buf = rv_gptr(a1, a2);
     const void *addr = rv_gptr(a4, a5);
     if (buf == NULL || (a5 > 0 && addr == NULL))
       return -22;
-    ssize_t n =
-        sendto((int)a0, buf, a2, (int)a3, (const struct sockaddr *)addr, a5);
+    ssize_t n = sendto(fd, buf, a2, (int)a3, (const struct sockaddr *)addr, a5);
     return n < 0 ? -errno : n;
   }
   case RV_SYS_RECVFROM: {
     /* The kernel cannot write the address length back through a guest address,
      * so the length word is copied in and out of the local variable. A null
      * address, as musl's recv() passes, has no length word either. */
+    int fd = rv_guest_fd_host_of((int)a0);
+    if (fd < 0)
+      return -9;
     struct sockaddr *addr = NULL;
     void *alenp = NULL;
     socklen_t alen = 0;
@@ -724,18 +969,48 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
         return -22;
     }
     ssize_t n =
-        recvfrom((int)a0, buf, a2, (int)a3, addr, alenp != NULL ? &alen : NULL);
+        recvfrom(fd, buf, a2, (int)a3, addr, alenp != NULL ? &alen : NULL);
     if (n >= 0 && alenp != NULL)
       rv_memcpy(alenp, &alen, sizeof(alen));
     return n < 0 ? -errno : n;
   }
   case RV_SYS_SETSOCKOPT: {
+    int fd = rv_guest_fd_host_of((int)a0);
+    if (fd < 0)
+      return -9;
     const void *opt = rv_gptr(a3, a4);
     if (opt == NULL && a4 != 0)
       return -22;
-    return setsockopt((int)a0, (int)a1, (int)a2, opt, a4) < 0 ? -errno : 0;
+    return setsockopt(fd, (int)a1, (int)a2, opt, a4) < 0 ? -errno : 0;
   }
+  case RV_SYS_GETSOCKOPT: {
+    /* The kernel writes the length back through a guest address, so the length
+     * word is copied in and out of the local variable. */
+    int fd = rv_guest_fd_host_of((int)a0);
+    if (fd < 0)
+      return -9;
+    socklen_t optlen = 0;
+    void *optlenp = rv_gptr(a4, sizeof(optlen));
+    if (optlenp == NULL)
+      return -22;
+    rv_memcpy(&optlen, optlenp, sizeof(optlen));
+    if (optlen > 512)
+      return -22;
+    void *optval = rv_gptr(a3, optlen);
+    if (optval == NULL && optlen != 0)
+      return -22;
+    if (getsockopt(fd, (int)a1, (int)a2, optval, &optlen) < 0)
+      return -errno;
+    rv_memcpy(optlenp, &optlen, sizeof(optlen));
+    return 0;
+  }
+  case RV_SYS_PPOLL:
+  case RV_SYS_PPOLL_TIME64:
+    return rv_guest_ppoll(a0, a1, a2, a3, nr == RV_SYS_PPOLL_TIME64);
   case RV_SYS_RECVMSG: {
+    int fd = rv_guest_fd_host_of((int)a0);
+    if (fd < 0)
+      return -9;
     uint8_t *g = rv_gptr(a1, 28);
     if (g == NULL)
       return -22;
@@ -768,7 +1043,7 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
     msg.msg_iovlen = iovcnt;
     msg.msg_control = rv_gptr(gctl, ctllen);
     msg.msg_controllen = ctllen;
-    ssize_t n = recvmsg((int)a0, &msg, (int)a2);
+    ssize_t n = recvmsg(fd, &msg, (int)a2);
     if (n < 0)
       return -errno;
     rv_wr32((uint32_t)(g - rv_ram) + 4, (uint32_t)msg.msg_namelen);
@@ -778,8 +1053,11 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
   }
   case RV_SYS_LSEEK: {
     /* riscv32 passes a 64-bit off_t in the a1/a2 register pair. */
+    int fd = rv_guest_fd_host_of((int)a0);
+    if (fd < 0)
+      return -9;
     off_t off = (off_t)(((uint64_t)a2 << 32) | a1);
-    off_t r = lseek((int)a0, off, (int)a3);
+    off_t r = lseek(fd, off, (int)a3);
     return r < 0 ? -errno : r;
   }
   case RV_SYS_SCHED_GETAFFINITY:
@@ -788,20 +1066,26 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
                ? -errno
                : 0;
   case RV_SYS_GETDENTS64: {
+    int fd = rv_guest_fd_host_of((int)a0);
+    if (fd < 0)
+      return -9;
     void *dst = rv_gptr(a1, a2);
     if (dst == NULL)
       return -22;
-    long n = syscall(SYS_getdents64, (int)a0, dst, (size_t)a2);
+    long n = syscall(SYS_getdents64, fd, dst, (size_t)a2);
     return n < 0 ? -errno : n;
   }
   case RV_SYS_STATX: {
     char path[1024];
+    int dfd = rv_guest_dirfd(a0);
+    if (dfd == -1)
+      return -9;
     void *dst = rv_gptr(a4, 256);
     if (dst == NULL)
       return -22;
     if (rv_guest_path(a1, path, sizeof(path)) != 0)
       return -22;
-    long n = syscall(SYS_statx, (int)a0, path, (int)a2, (unsigned int)a3, dst);
+    long n = syscall(SYS_statx, dfd, path, (int)a2, (unsigned int)a3, dst);
     return n < 0 ? -errno : n;
   }
   case RV_SYS_PRLIMIT64:
@@ -846,18 +1130,35 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
   }
   case RV_SYS_OPENAT: {
     char path[1024];
+    int dfd = rv_guest_dirfd(a0);
+    if (dfd == -1)
+      return -9;
     if (rv_guest_path(a1, path, sizeof(path)) != 0)
       return -22;
-    int fd = openat((int)a0, path, (int)a2, (mode_t)a3);
-    return fd < 0 ? -errno : fd;
+    int host_fd = openat(dfd, path, (int)a2, (mode_t)a3);
+    if (host_fd < 0)
+      return -errno;
+    int guest_fd = rv_guest_fd_alloc(host_fd);
+    if (guest_fd < 0) {
+      close(host_fd);
+      return -24; /* EMFILE */
+    }
+    return guest_fd;
   }
-  case RV_SYS_CLOSE:
-    return close((int)a0) < 0 ? -errno : 0;
+  case RV_SYS_CLOSE: {
+    int host_fd = rv_guest_fd_take((int)a0);
+    if (host_fd < 0)
+      return -9;
+    return close(host_fd) < 0 ? -errno : 0;
+  }
   case RV_SYS_READ: {
+    int fd = rv_guest_fd_host_of((int)a0);
+    if (fd < 0)
+      return -9;
     void *dst = rv_gptr(a1, a2);
     if (dst == NULL)
       return -22;
-    ssize_t n = read((int)a0, dst, a2);
+    ssize_t n = read(fd, dst, a2);
     return n < 0 ? -errno : n;
   }
   case RV_SYS_WRITE: {
@@ -869,12 +1170,18 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
         return -28;
       return (int64_t)a2;
     }
-    ssize_t n = write((int)a0, src, a2);
+    int fd = rv_guest_fd_host_of((int)a0);
+    if (fd < 0)
+      return -9;
+    ssize_t n = write(fd, src, a2);
     return n < 0 ? -errno : n;
   }
   case RV_SYS_READV: {
     if (a2 > 64)
       return -22;
+    int fd = rv_guest_fd_host_of((int)a0);
+    if (fd < 0)
+      return -9;
     const uint8_t *iov = rv_gptr(a1, a2 * 8u);
     if (iov == NULL && a2 != 0)
       return -22;
@@ -885,7 +1192,7 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
       void *dst = rv_gptr(base, n);
       if (dst == NULL)
         return -22;
-      ssize_t got = read((int)a0, dst, n);
+      ssize_t got = read(fd, dst, n);
       if (got < 0)
         return total > 0 ? total : -errno;
       total += got;
@@ -910,8 +1217,12 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
       if (a0 == 1 || a0 == 2) {
         if (rv_out_append(src, n) != 0)
           return -28;
-      } else if (write((int)a0, src, n) < 0) {
-        return -errno;
+      } else {
+        int fd = rv_guest_fd_host_of((int)a0);
+        if (fd < 0)
+          return -9;
+        if (write(fd, src, n) < 0)
+          return -errno;
       }
       total += n;
     }
@@ -919,17 +1230,23 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
   }
   case RV_SYS_READLINKAT: {
     char path[1024];
+    int dfd = rv_guest_dirfd(a0);
+    if (dfd == -1)
+      return -9;
     void *dst = rv_gptr(a2, a3);
     if (dst == NULL || rv_guest_path(a1, path, sizeof(path)) != 0)
       return -22;
-    ssize_t n = readlinkat((int)a0, path, (char *)dst, a3);
+    ssize_t n = readlinkat(dfd, path, (char *)dst, a3);
     return n < 0 ? -errno : n;
   }
   case RV_SYS_FCHMODAT: {
     char path[1024];
+    int dfd = rv_guest_dirfd(a0);
+    if (dfd == -1)
+      return -9;
     if (rv_guest_path(a1, path, sizeof(path)) != 0)
       return -22;
-    return fchmodat((int)a0, path, (mode_t)a2, 0) < 0 ? -errno : 0;
+    return fchmodat(dfd, path, (mode_t)a2, 0) < 0 ? -errno : 0;
   }
   case RV_SYS_GETGROUPS: {
     if (a0 > 65536u)
@@ -974,6 +1291,16 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
     return rv_host_upload_from_guest(a0, a1, a2);
   case RV_SYS_XFER_SHA256:
     return rv_host_sha256_to_guest(a0, a1, a2, a3);
+  case RV_SYS_XFER_RELAY: {
+    /* RelaySocket takes ownership of the descriptor: remove it from the guest
+     * table before the call so the guest can never touch it again. */
+    int host_fd = rv_guest_fd_take((int)a1);
+    if (host_fd < 0)
+      return -9;
+    return rv_host_relay_from_guest(a0, host_fd, a2);
+  }
+  case RV_SYS_XFER_EXEC:
+    return rv_host_exec_to_guest(a0, (int32_t)a1, a2, a3);
   default:
     return -38;
   }
@@ -1074,6 +1401,7 @@ static void rv_reset(void) {
   rv_brk_min = 0;
   rv_heap_cur = 0;
   rv_memzero(rv_map_used, sizeof(rv_map_used));
+  rv_guest_fds_reset();
 }
 
 /* The guest entry shim reserves a section for the argument handoff. Return
@@ -1320,6 +1648,7 @@ RV_EXPORT char *Run(const uint8_t *image, size_t len,
     return NULL;
   }
   if (rv_run_exec(image, len, args) != 0) {
+    rv_guest_fds_reset();
     rv_ram_unmap();
     return NULL;
   }
@@ -1333,6 +1662,7 @@ RV_EXPORT char *Run(const uint8_t *image, size_t len,
     rv_out[0] = '\0';
     rv_out_cap = 1;
   }
+  rv_guest_fds_reset();
   rv_ram_unmap();
   return rv_out;
 }
@@ -1343,12 +1673,15 @@ RV_EXPORT int ExitCode(void) { return rv_guest_status; }
 
 RV_EXPORT void SetHostBridge(void *ctx, rv_host_read_fn read,
                              rv_host_write_fn write, rv_host_upload_fn upload,
-                             rv_host_sha256_fn sha256) {
+                             rv_host_sha256_fn sha256, rv_host_relay_fn relay,
+                             rv_host_exec_fn exec) {
   rv_host_ctx = ctx;
   rv_host_read = read;
   rv_host_write = write;
   rv_host_upload = upload;
   rv_host_sha256 = sha256;
+  rv_host_relay = relay;
+  rv_host_exec = exec;
 }
 
 RV_EXPORT void Free(char *out) {

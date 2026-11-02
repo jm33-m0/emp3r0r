@@ -177,7 +177,8 @@ static char *run_entry(const uint8_t *loader, size_t loader_len,
   size_t packed_len = 0;
   CHECK_EQ_LONG(
       c2_bof_pack_args(args, argc, packed, sizeof(packed), &packed_len), C2_OK);
-  c2_bof_host host = {fake, fake_read, fake_write, fake_upload, fake_sha256};
+  c2_bof_host host = {fake,        fake_read, fake_write, fake_upload,
+                      fake_sha256, NULL,      NULL};
   char *out = NULL;
   c2_status st = c2_bof_run(loader, loader_len, bof, bof_len, entry, packed,
                             packed_len, &host, &out);
@@ -194,7 +195,8 @@ static char *run_rv_entry(const uint8_t *loader, size_t loader_len,
   size_t packed_len = 0;
   CHECK_EQ_LONG(
       c2_bof_pack_args(args, argc, packed, sizeof(packed), &packed_len), C2_OK);
-  c2_bof_host host = {fake, fake_read, fake_write, fake_upload, fake_sha256};
+  c2_bof_host host = {fake,        fake_read, fake_write, fake_upload,
+                      fake_sha256, NULL,      NULL};
   char *out = NULL;
   CHECK_EQ_LONG(c2_rv_run(loader, loader_len, image, image_len, packed,
                           packed_len, &host, &out),

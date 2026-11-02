@@ -72,7 +72,7 @@ static void rb_close(void *ctx) {
   (void)ctx;
 }
 
-static const c2_stream_ops g_rb_ops = {rb_read, rb_write, rb_close};
+static const c2_stream_ops g_rb_ops = {rb_read, rb_write, rb_close, NULL};
 
 static void drive_read(const c2_crypto_backend *be, const uint8_t *data,
                        size_t size, const uint8_t key[C2_AES_KEY_BYTES]) {

@@ -85,7 +85,7 @@ static void rb_close(void *ctx) {
   (void)ctx;
 }
 
-static const c2_stream_ops g_rb_ops = {rb_read, rb_write, rb_close};
+static const c2_stream_ops g_rb_ops = {rb_read, rb_write, rb_close, NULL};
 
 /* Encode one payload as a SecureConn frame, then run it through
  * c2_session_read. */

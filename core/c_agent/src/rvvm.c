@@ -53,13 +53,14 @@ c2_status c2_rv_run(const uint8_t *loader_so, size_t loader_len,
     return C2_ERR_IO;
   }
 
-  if (host != NULL && host->read != NULL && host->write != NULL &&
-      host->upload != NULL && host->sha256 != NULL) {
+  if (host != NULL) {
     typedef void (*set_host_fn)(void *, c2_bof_read_fn, c2_bof_write_fn,
-                                c2_bof_upload_fn, c2_bof_sha256_fn);
+                                c2_bof_upload_fn, c2_bof_sha256_fn,
+                                c2_bof_relay_fn, c2_bof_exec_fn);
     set_host_fn set_host = (set_host_fn)elfload_sym(mod, "SetHostBridge");
     if (set_host != NULL)
-      set_host(host->ctx, host->read, host->write, host->upload, host->sha256);
+      set_host(host->ctx, host->read, host->write, host->upload, host->sha256,
+               host->relay, host->exec);
   }
 
   c2_rv_run_fn run = (c2_rv_run_fn)elfload_sym(mod, "Run");

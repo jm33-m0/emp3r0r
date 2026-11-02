@@ -1,15 +1,16 @@
 /*
- * file_transfer.c — operator file upload (`put`).
+ * fetch.c — the one way a C2-hosted file reaches the agent.
  *
- * This is the module-payload download path with a destination: the body comes
- * over the www route with the same session primitive a module payload uses, the
- * name is a token the operator registered for this agent, and the digest is
- * verified before the destination is committed.
+ * Every delivery (module payload, dependency image, console `download`, operator
+ * `put`) is a www-route fetch with a digest the C2 supplied, so they share this
+ * file instead of each re-implementing the transfer, the hash and the commit.
  */
 
 #define _POSIX_C_SOURCE 200809L
 
-#include "file_transfer.h"
+#include "fetch.h"
+
+#include "gzip.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -23,11 +24,97 @@
 
 /* A memfs destination is memory by definition, so it is buffered; disk
  * destinations are streamed and unbounded. */
-#define C2_PUT_MEM_MAX (64u * 1024u * 1024u)
+#define C2_FETCH_MEM_MAX (64u * 1024u * 1024u)
 
 static void set_err(char *err, int cap, const char *msg) {
   if (err != NULL && cap > 0)
     snprintf(err, (size_t)cap, "%s", msg);
+}
+
+/* The digest the C2 compares against is the one it computed over the bytes it
+ * serves, so it is checked before anything is unwrapped or written. */
+static c2_status check_sha256(c2_agent_session *s, const uint8_t *data,
+                              size_t len, const char *checksum, char *got,
+                              size_t got_cap) {
+  if (got != NULL && got_cap > 0)
+    got[0] = '\0';
+  if (s->be == NULL || s->be->sha256 == NULL)
+    return (checksum != NULL && checksum[0] != '\0') ? C2_ERR_UNSUPPORTED
+                                                     : C2_OK;
+  uint8_t digest[C2_SHA256_BYTES];
+  if (s->be->sha256(s->be->ctx, data, len, digest) != 0)
+    return C2_ERR_CRYPTO;
+  char hex[C2_SHA256_BYTES * 2 + 1];
+  c2_hex_encode(digest, sizeof(digest), hex);
+  hex[C2_SHA256_BYTES * 2] = '\0';
+  if (got != NULL && got_cap > 0)
+    snprintf(got, got_cap, "%s", hex);
+  if (checksum != NULL && checksum[0] != '\0' && !c2_str_eq_ci(hex, checksum))
+    return C2_ERR_CRYPTO;
+  return C2_OK;
+}
+
+c2_status c2_fetch_payload(c2_agent_session *s, c2_str name,
+                           const char *checksum, int checksum_on_image,
+                           size_t gz_cap, size_t obj_cap, uint8_t **out,
+                           size_t *out_len, char *err, int err_cap) {
+  if (s == NULL || name.ptr == NULL || name.len == 0 || out == NULL ||
+      out_len == NULL || gz_cap == 0 || obj_cap == 0)
+    return C2_ERR_ARG;
+  *out = NULL;
+  *out_len = 0;
+
+  uint8_t *gz = (uint8_t *)malloc(gz_cap);
+  if (gz == NULL) {
+    set_err(err, err_cap, "out of memory");
+    return C2_ERR_NOMEM;
+  }
+  size_t gz_len = 0;
+  c2_status st = c2_session_download(s, name, gz, gz_cap, &gz_len);
+  if (st != C2_OK) {
+    set_err(err, err_cap, "download failed");
+    free(gz);
+    return st;
+  }
+
+  if (!checksum_on_image) {
+    st = check_sha256(s, gz, gz_len, checksum, NULL, 0);
+    if (st != C2_OK) {
+      set_err(err, err_cap,
+              st == C2_ERR_CRYPTO ? "checksum mismatch"
+                                  : "checksum unavailable");
+      free(gz);
+      return st;
+    }
+  }
+
+  uint8_t *obj = (uint8_t *)malloc(obj_cap);
+  if (obj == NULL) {
+    set_err(err, err_cap, "out of memory");
+    free(gz);
+    return C2_ERR_NOMEM;
+  }
+  size_t obj_len = 0;
+  st = c2_gzip_decompress(gz, gz_len, obj, obj_cap, &obj_len);
+  free(gz);
+  if (st != C2_OK) {
+    set_err(err, err_cap, "decompress failed");
+    free(obj);
+    return st;
+  }
+  if (checksum_on_image) {
+    st = check_sha256(s, obj, obj_len, checksum, NULL, 0);
+    if (st != C2_OK) {
+      set_err(err, err_cap,
+              st == C2_ERR_CRYPTO ? "checksum mismatch"
+                                  : "checksum unavailable");
+      free(obj);
+      return st;
+    }
+  }
+  *out = obj;
+  *out_len = obj_len;
+  return C2_OK;
 }
 
 static c2_status ensure_parent_dirs(const char *path) {
@@ -62,10 +149,10 @@ typedef struct {
   const c2_crypto_backend *be;
   void *be_ctx;
   void *hash;
-} put_sink;
+} fetch_sink;
 
-static c2_status put_sink_write(void *vctx, const uint8_t *data, size_t len) {
-  put_sink *d = (put_sink *)vctx;
+static c2_status fetch_sink_write(void *vctx, const uint8_t *data, size_t len) {
+  fetch_sink *d = (fetch_sink *)vctx;
   if (len == 0)
     return C2_OK;
   if (d->f != NULL) {
@@ -83,11 +170,10 @@ static c2_status put_sink_write(void *vctx, const uint8_t *data, size_t len) {
   return C2_OK;
 }
 
-c2_status c2_agent_put_file(c2_agent_session *s, c2_memfile *mem,
-                            const char *name, const char *dest,
-                            const char *checksum, char *got_hex, size_t got_cap,
-                            char *err, int err_cap) {
-  if (s == NULL || name == NULL || name[0] == '\0' || dest == NULL ||
+c2_status c2_deliver_file(c2_agent_session *s, c2_memfile *mem, c2_str name,
+                          const char *dest, const char *checksum, char *got_hex,
+                          size_t got_cap, char *err, int err_cap) {
+  if (s == NULL || name.ptr == NULL || name.len == 0 || dest == NULL ||
       dest[0] == '\0') {
     set_err(err, err_cap, "invalid argument");
     return C2_ERR_ARG;
@@ -100,7 +186,7 @@ c2_status c2_agent_put_file(c2_agent_session *s, c2_memfile *mem,
   const c2_crypto_backend *be = s->be;
   void *be_ctx = be != NULL ? be->ctx : NULL;
   int want_hash = checksum[0] != '\0' || (got_hex != NULL && got_cap > 0);
-  put_sink sink = {0};
+  fetch_sink sink = {0};
   sink.be = be;
   sink.be_ctx = be_ctx;
 
@@ -122,7 +208,7 @@ c2_status c2_agent_put_file(c2_agent_session *s, c2_memfile *mem,
   part[0] = '\0';
 
   if (mem_dest) {
-    sink.cap = C2_PUT_MEM_MAX;
+    sink.cap = C2_FETCH_MEM_MAX;
     sink.buf = (uint8_t *)malloc(sink.cap);
     if (sink.buf == NULL) {
       hash_abort(be, be_ctx, sink.hash);
@@ -149,8 +235,7 @@ c2_status c2_agent_put_file(c2_agent_session *s, c2_memfile *mem,
     }
   }
 
-  c2_status st = c2_session_download_stream(s, c2_str_of(name, strlen(name)),
-                                            put_sink_write, &sink);
+  c2_status st = c2_session_download_stream(s, name, fetch_sink_write, &sink);
 
   uint8_t digest[C2_SHA256_BYTES];
   int have_digest = 0;

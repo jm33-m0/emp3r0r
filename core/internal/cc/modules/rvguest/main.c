@@ -51,6 +51,8 @@ char **getEnviron(void) {
 #define RV_SYS_XFER_WRITE 0x40000002u
 #define RV_SYS_XFER_UPLOAD 0x40000004u
 #define RV_SYS_XFER_SHA256 0x40000005u
+#define RV_SYS_XFER_RELAY 0x40000006u
+#define RV_SYS_XFER_EXEC 0x40000007u
 
 /* 32-byte SHA-256 digest written as hex, NUL terminated (the guest has no
  * access to the agent's common.h constants). */
@@ -104,6 +106,24 @@ int Sha256Hex(const unsigned char *data, unsigned long len, char *hex,
   if (hex == NULL || hex_cap < RV_SHA256_HEX_BYTES)
     return -22;
   return (int)syscall(RV_SYS_XFER_SHA256, data, len, hex, hex_cap);
+}
+
+/* Hand a connected socket to the agent's relay. The relay owns the socket from
+ * here on and runs on the agent's threads. */
+int RelaySocket(const char *token, int fd, int idle_seconds, char *err,
+                int err_cap) {
+  guest_clear_err(err, err_cap);
+  return (int)syscall(RV_SYS_XFER_RELAY, token, fd, idle_seconds);
+}
+
+/* Run a command on the agent. `shell` selects `/bin/sh -c` (non-zero) or a
+ * direct exec of the tokenized command line. The agent writes its combined
+ * output into the guest buffer and returns the byte count, so the guest owns
+ * the output. */
+int ExecCmd(const char *cmd, int shell, char *out, int out_cap, char *err,
+            int err_cap) {
+  guest_clear_err(err, err_cap);
+  return (int)syscall(RV_SYS_XFER_EXEC, cmd, shell, out, out_cap);
 }
 
 /* glibc-era BOFs call the versioned stat entry point directly. musl exposes

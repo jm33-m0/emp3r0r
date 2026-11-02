@@ -37,7 +37,7 @@ static void ms_close(void *ctx) {
   (void)ctx;
 }
 
-static const c2_stream_ops g_ms_ops = {ms_read, ms_write, ms_close};
+static const c2_stream_ops g_ms_ops = {ms_read, ms_write, ms_close, NULL};
 
 /* A polling stream that reports C2_STREAM_IDLE before it yields the bytes the
  * peer wrote, modelling an http_poll long-poll cycle with no data. */
@@ -63,7 +63,7 @@ static void ids_close(void *ctx) {
   (void)ctx;
 }
 
-static const c2_stream_ops g_ids_ops = {ids_read, ids_write, ids_close};
+static const c2_stream_ops g_ids_ops = {ids_read, ids_write, ids_close, NULL};
 
 int main(void) {
   uint32_t rng = 1;

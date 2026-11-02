@@ -36,13 +36,26 @@ typedef struct {
   mbedtls_ctr_drbg_context drbg;
 } mbedtls_ctx;
 
+/* One DRBG serves the whole agent and is not thread-safe, but a BOF relay
+ * encrypts on its own thread while the agent main thread keeps using the
+ * session. Every DRBG draw goes through this spinlock. */
+static volatile int drbg_lock;
+
+static int mb_drbg_random(void *ctx, unsigned char *out, size_t len) {
+  while (__atomic_test_and_set(&drbg_lock, __ATOMIC_ACQUIRE))
+    ;
+  int rc = mbedtls_ctr_drbg_random((mbedtls_ctr_drbg_context *)ctx, out, len);
+  __atomic_clear(&drbg_lock, __ATOMIC_RELEASE);
+  return rc;
+}
+
 /* ------------------------------------------------------------------------- */
 /* Primitives                                                                 */
 /* ------------------------------------------------------------------------- */
 
 static int mb_random(void *vctx, uint8_t *buf, size_t len) {
   mbedtls_ctx *c = (mbedtls_ctx *)vctx;
-  return mbedtls_ctr_drbg_random(&c->drbg, buf, len) == 0 ? 0 : -1;
+  return mb_drbg_random(&c->drbg, buf, len) == 0 ? 0 : -1;
 }
 
 static int mb_sha256(void *vctx, const uint8_t *data, size_t len,
@@ -182,10 +195,9 @@ static int mb_keygen(void *vctx, uint8_t priv[C2_P256_PRIV_BYTES],
   if (load_p256(&grp) != 0)
     return -1;
   int ok = 0;
-  if (mbedtls_ecp_gen_privkey(&grp, &d, mbedtls_ctr_drbg_random, &c->drbg) != 0)
+  if (mbedtls_ecp_gen_privkey(&grp, &d, mb_drbg_random, &c->drbg) != 0)
     goto done;
-  if (mbedtls_ecp_mul(&grp, &q, &d, &grp.G, mbedtls_ctr_drbg_random,
-                      &c->drbg) != 0)
+  if (mbedtls_ecp_mul(&grp, &q, &d, &grp.G, mb_drbg_random, &c->drbg) != 0)
     goto done;
   if (mbedtls_mpi_write_binary(&d, priv, C2_P256_PRIV_BYTES) != 0)
     goto done;
@@ -221,8 +233,7 @@ static int mb_pub_from_priv(void *vctx, const uint8_t priv[C2_P256_PRIV_BYTES],
     goto done;
   if (mbedtls_ecp_check_privkey(&grp, &d) != 0)
     goto done;
-  if (mbedtls_ecp_mul(&grp, &q, &d, &grp.G, mbedtls_ctr_drbg_random,
-                      &c->drbg) != 0)
+  if (mbedtls_ecp_mul(&grp, &q, &d, &grp.G, mb_drbg_random, &c->drbg) != 0)
     goto done;
   if (mbedtls_ecp_point_write_binary(&grp, &q, MBEDTLS_ECP_PF_UNCOMPRESSED,
                                      &olen, sec1, sizeof(sec1)) != 0 ||
@@ -260,8 +271,7 @@ static int mb_ecdh(void *vctx, const uint8_t priv[C2_P256_PRIV_BYTES],
     goto done;
   if (mbedtls_ecp_check_pubkey(&grp, &peer) != 0)
     goto done;
-  if (mbedtls_ecp_mul(&grp, &res, &d, &peer, mbedtls_ctr_drbg_random,
-                      &c->drbg) != 0)
+  if (mbedtls_ecp_mul(&grp, &res, &d, &peer, mb_drbg_random, &c->drbg) != 0)
     goto done;
   if (mbedtls_mpi_write_binary(&res.X, shared, C2_P256_COORD_BYTES) != 0)
     goto done;
@@ -282,8 +292,8 @@ static int ecdsa_from_priv(mbedtls_ctx *c, mbedtls_ecdsa_context *ec,
     goto fail;
   if (mbedtls_mpi_read_binary(&ec->d, priv, C2_P256_PRIV_BYTES) != 0)
     goto fail;
-  if (mbedtls_ecp_mul(&ec->grp, &ec->Q, &ec->d, &ec->grp.G,
-                      mbedtls_ctr_drbg_random, &c->drbg) != 0)
+  if (mbedtls_ecp_mul(&ec->grp, &ec->Q, &ec->d, &ec->grp.G, mb_drbg_random,
+                      &c->drbg) != 0)
     goto fail;
   return 0;
 fail:
@@ -304,7 +314,7 @@ static int mb_ecdsa_sign(void *vctx, const uint8_t priv[C2_P256_PRIV_BYTES],
   size_t n = 0;
   int rc = mbedtls_ecdsa_write_signature(&ec, MBEDTLS_MD_SHA256, digest,
                                          sizeof(digest), sig, sig_cap, &n,
-                                         mbedtls_ctr_drbg_random, &c->drbg);
+                                         mb_drbg_random, &c->drbg);
   mbedtls_ecdsa_free(&ec);
   if (rc != 0)
     return -1;

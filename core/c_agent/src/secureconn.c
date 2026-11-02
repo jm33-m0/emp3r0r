@@ -103,6 +103,7 @@ void c2_secureconn_init(c2_secureconn *sc, const c2_crypto_backend *be,
   sc->rxlen = 0;
   sc->rxoff = 0;
   sc->rx_owned = 0;
+  sc->abort = 0;
 }
 
 void c2_secureconn_set_key(c2_secureconn *sc,
@@ -131,6 +132,20 @@ void c2_secureconn_use_buffer(c2_secureconn *sc, uint8_t *buf, size_t cap) {
   sc->rxlen = 0;
   sc->rxoff = 0;
   sc->rx_owned = 0;
+}
+
+c2_status c2_secureconn_set_timeout(c2_secureconn *sc, int seconds) {
+  if (sc == NULL || sc->stream.ops == NULL ||
+      sc->stream.ops->set_timeout == NULL)
+    return C2_ERR_UNSUPPORTED;
+  return sc->stream.ops->set_timeout(sc->stream.ctx, seconds) == 0 ? C2_OK
+                                                                   : C2_ERR_IO;
+}
+
+void c2_secureconn_abort(c2_secureconn *sc) {
+  if (sc == NULL)
+    return;
+  __atomic_store_n(&sc->abort, 1, __ATOMIC_RELAXED);
 }
 
 void c2_secureconn_close(c2_secureconn *sc) {
@@ -383,6 +398,8 @@ long c2_secureconn_read(c2_secureconn *sc, uint8_t *buf, size_t cap) {
     return C2_ERR_ARG;
 
   for (;;) {
+    if (__atomic_load_n(&sc->abort, __ATOMIC_RELAXED))
+      return 0;
     if (sc->rxoff < sc->rxlen) {
       size_t avail = sc->rxlen - sc->rxoff;
       size_t n = avail < cap ? avail : cap;
@@ -398,8 +415,13 @@ long c2_secureconn_read(c2_secureconn *sc, uint8_t *buf, size_t cap) {
     size_t plen = 0;
     int eof = 0;
     c2_status st = read_one_frame(sc, &plain, &payload, &plen, &eof);
-    if (st == C2_ERR_TIMEOUT)
-      continue; /* idle long-poll: a streaming reader just keeps waiting */
+    if (st == C2_ERR_TIMEOUT) {
+      /* idle long-poll: a streaming reader just keeps waiting, unless another
+       * thread aborted this stream while it was blocked. */
+      if (__atomic_load_n(&sc->abort, __ATOMIC_RELAXED))
+        return 0;
+      continue;
+    }
     if (st != C2_OK)
       return st;
     if (eof)

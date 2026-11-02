@@ -317,9 +317,14 @@ func runCAgentEndToEnd(t *testing.T, format string) {
 	}
 
 	// --- File transfer: real module dispatch, both directions, 70 MiB ---
-	// Runs once: the transfer path does not depend on the agent's delivery form.
-	if format == "exe" {
-		runFileTransferChecks(t, agent, doneChan, &agentOut)
+	// The stager-delivered agent gets a masked-sleep cycle first, so the host
+	// bridge is proven to survive the mask; the size sweep itself is not
+	// duplicated for it unless a single size was requested.
+	switch {
+	case format == "exe":
+		runFileTransferChecks(t, agent, doneChan, &agentOut, false)
+	case format == "local-exe" && os.Getenv("EMP3R0R_E2E_SIZE") != "":
+		runFileTransferChecks(t, agent, doneChan, &agentOut, true)
 	}
 
 	// A portable BOF: the same SA_linux pwd source compiled as an RV32 object

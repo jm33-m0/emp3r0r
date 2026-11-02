@@ -54,6 +54,12 @@ typedef struct c2_stream_ops {
   long (*read)(void *ctx, uint8_t *buf, size_t cap);
   long (*write)(void *ctx, const uint8_t *buf, size_t len);
   void (*close)(void *ctx);
+  /*
+   * Bound how long read() blocks before reporting C2_STREAM_IDLE, in seconds
+   * (1..3600). A stream without it cannot be aborted from another thread and
+   * refuses a second reader; NULL means unsupported.
+   */
+  int (*set_timeout)(void *ctx, int seconds);
 } c2_stream_ops;
 
 typedef struct c2_stream {
@@ -80,6 +86,10 @@ typedef struct {
   size_t rxlen;
   size_t rxoff;
   int rx_owned;
+
+  /* Set by c2_secureconn_abort from another thread: the next read returns 0
+   * (clean EOF) so a relay worker blocked in read() can be torn down. */
+  int abort;
 } c2_secureconn;
 
 /* Initialise a SecureConn over an already-open raw stream, using `key`. */
@@ -92,6 +102,20 @@ void c2_secureconn_set_key(c2_secureconn *sc,
 
 /* Configure padding for normal writes. max < min is clamped to min. */
 void c2_secureconn_set_padding(c2_secureconn *sc, uint32_t min, uint32_t max);
+
+/*
+ * Bound one read() call on the underlying stream to `seconds` (clamped to
+ * 1..3600) so a reader blocked in the transport can be interrupted by
+ * c2_secureconn_abort. Returns C2_ERR_UNSUPPORTED when the stream does not
+ * implement set_timeout.
+ */
+c2_status c2_secureconn_set_timeout(c2_secureconn *sc, int seconds);
+
+/*
+ * Make every subsequent read return 0, including one already blocked in the
+ * transport. Safe to call from another thread than the reader.
+ */
+void c2_secureconn_abort(c2_secureconn *sc);
 
 /* Attach a caller-owned buffer for reassembling a decrypted frame larger than
  * the read() destination. Must be called before the first read when the

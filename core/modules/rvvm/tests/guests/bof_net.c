@@ -1,6 +1,7 @@
 /* Test BOF: socket syscalls. recvfrom has to write the source length back to
  * the guest, so the check uses the address the datagram came from. */
 #include <arpa/inet.h>
+#include <errno.h>
 #include <netinet/in.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -47,5 +48,12 @@ int go(char *args, int len) {
   if (fromlen != sizeof from || from.sin_family != AF_INET ||
       from.sin_port != self.sin_port)
     return 6;
+  /* Only descriptors the guest opened are addressable. stdin and a low number
+   * the guest never opened belong to the agent, so closing them must fail
+   * instead of reaching the host. */
+  if (close(0) == 0 || errno != EBADF)
+    return 7;
+  if (close(3) == 0 || errno != EBADF)
+    return 8;
   return 0;
 }

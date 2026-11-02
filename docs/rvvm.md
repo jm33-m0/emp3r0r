@@ -102,16 +102,20 @@ the RV32 Linux ABI for the calls used by musl and common BOFs:
   `writev`, `lseek`, `getdents64`, `readlinkat`, `fchmodat`, `statx`
 - memory and runtime: `brk`, `mmap`, `munmap`, `mprotect`, `set_tid_address`,
   `set_robust_list`, `rseq`, `prlimit64`, `getrandom`, `clock_gettime64`
-- network: `socket`, `bind`, `sendto`, `recvfrom`, `setsockopt`, `recvmsg`
+- network: `socket`, `bind`, `connect`, `getsockopt`, `sendto`, `recvfrom`,
+  `setsockopt`, `recvmsg`
+- waiting: `ppoll`, `ppoll_time64` (a signal mask is not supported)
 - startup: `getcwd`, `fcntl`
 
 Unsupported calls return `-ENOSYS`. Adding a capability normally means adding
 a library or a syscall case, not a BOF-specific proxy.
 
-The C agent additionally installs four private host-call syscalls for storage
-and C2 session primitives: `ReadFile`, `WriteFile`, `UploadFile`, and
-`Sha256Hex`. They are used by `get_file`; when the interpreter is run without the
-host bridge they return `-ENOSYS`.
+The C agent additionally installs six private host-call syscalls for storage,
+C2 session primitives, relaying and command execution: `ReadFile`, `WriteFile`,
+`UploadFile`, `Sha256Hex`, `RelaySocket` (`0x40000006`) and `ExecCmd`
+(`0x40000007`). `ReadFile`, `UploadFile` and `Sha256Hex` are used by `get_file`;
+`RelaySocket` is used by `socks5`; `ExecCmd` is used by `exec`. When the
+interpreter is run without the host bridge they return `-ENOSYS`.
 
 ## Constraints
 

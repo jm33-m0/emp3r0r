@@ -28,6 +28,8 @@
 
 typedef struct {
   int fd;
+  /* Non-zero when a relay bounded the read deadline (see tor_set_timeout). */
+  int read_timeout_s;
 } tor_ctx;
 
 static int ascii_space(char c) {
@@ -235,6 +237,8 @@ static long tor_read(void *ctx, uint8_t *buf, size_t cap) {
       return 0;
     if (errno == EINTR)
       continue;
+    if ((errno == EAGAIN || errno == EWOULDBLOCK) && t->read_timeout_s > 0)
+      return C2_STREAM_IDLE;
     return C2_ERR_IO;
   }
 }
@@ -257,7 +261,25 @@ static void tor_close(void *ctx) {
   free(t);
 }
 
-static const c2_stream_ops tor_ops = {tor_read, tor_write, tor_close};
+/* Bound one recv so a relay reader blocked on a silent Tor circuit wakes up and
+ * can observe an abort. */
+static int tor_set_timeout(void *ctx, int seconds) {
+  tor_ctx *t = (tor_ctx *)ctx;
+  if (t == NULL || t->fd < 0)
+    return -1;
+  if (seconds < 1)
+    seconds = 1;
+  if (seconds > 3600)
+    seconds = 3600;
+  struct timeval tv = {seconds, 0};
+  if (setsockopt(t->fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) != 0)
+    return -1;
+  t->read_timeout_s = seconds;
+  return 0;
+}
+
+static const c2_stream_ops tor_ops = {tor_read, tor_write, tor_close,
+                                      tor_set_timeout};
 
 static c2_status tor_open(void *ctx, const char *url,
                           const c2_http_profile *profile, c2_stream *out) {

@@ -552,7 +552,6 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
   }
 
   beacon_env_reset();
-  beacon_host_dlsym_reset();
   munmap(mem_base, (size_t)total_size);
   free(sec_offsets);
   bof_lock_release();
@@ -560,7 +559,6 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
 
 fail:
   beacon_env_reset();
-  beacon_host_dlsym_reset();
   if (mem_base != NULL) {
     munmap(mem_base, (size_t)total_size);
   }
