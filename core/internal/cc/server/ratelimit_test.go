@@ -22,6 +22,9 @@ func TestRateLimiterDirect(t *testing.T) {
 	}()
 
 	// Configure small rate limits for testing
+	origIPRate, origIPBurst := ipLimiterRate, ipLimiterBurst
+	ipLimiterRate, ipLimiterBurst = rate.Limit(10), 20
+	defer func() { ipLimiterRate, ipLimiterBurst = origIPRate, origIPBurst }()
 	globalLimiter = rate.NewLimiter(rate.Limit(5), 5)
 	ipLimiter = &ipRateLimiter{}
 
@@ -43,8 +46,7 @@ func TestRateLimiterDirect(t *testing.T) {
 
 	// Test per-IP rate limiter
 	lim2 := ipLimiter.getLimiter("5.6.7.8")
-	// By default, our per-IP limiter has limit 10, burst 20
-	// Let's check that it allows up to its burst
+	// The per-IP limiter allows up to its burst
 	for i := 0; i < 20; i++ {
 		if !lim2.Allow() {
 			t.Errorf("IP limiter rejected request %d early", i)
@@ -96,6 +98,9 @@ func TestPreflightRateLimited(t *testing.T) {
 // TestAllowClientRequestConcurrent stresses the shared limiter from many
 // goroutines and checks the per-IP bucket still bounds them.
 func TestAllowClientRequestConcurrent(t *testing.T) {
+	origIPRate, origIPBurst := ipLimiterRate, ipLimiterBurst
+	ipLimiterRate, ipLimiterBurst = rate.Limit(10), 20
+	defer func() { ipLimiterRate, ipLimiterBurst = origIPRate, origIPBurst }()
 	origGlobal := globalLimiter
 	origIP := ipLimiter
 	t.Cleanup(func() {
@@ -123,9 +128,9 @@ func TestAllowClientRequestConcurrent(t *testing.T) {
 	}
 	wg.Wait()
 
-	// Burst is 20; allow generous headroom for a scheduling stall long enough
-	// to refill a few tokens, but the flood must not pass wholesale.
-	if allowed < 1 || allowed > 64 {
+	// Burst is ipLimiterBurst; allow generous headroom for a scheduling stall
+	// long enough to refill a few tokens, but the flood must not pass wholesale.
+	if allowed < 1 || allowed > int64(ipLimiterBurst)*4 {
 		t.Fatalf("concurrent allowance out of bounds: %d", allowed)
 	}
 }

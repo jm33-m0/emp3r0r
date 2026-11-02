@@ -15,6 +15,16 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
+// Poll-streamed downloads (one request per 48 KiB) need a much larger budget
+// than session creation, so the limits are sized for a transfer and only bound
+// a flood. Vars so tests can shrink them.
+var (
+	ipLimiterRate   = rate.Limit(1000)
+	ipLimiterBurst  = 2000
+	globalRateLimit = rate.Limit(8000)
+	globalBurst     = 16000
+)
+
 type ipRateLimiter struct {
 	ips sync.Map
 }
@@ -25,7 +35,7 @@ func (l *ipRateLimiter) getLimiter(ip string) *rate.Limiter {
 			return limiter
 		}
 	}
-	newLimiter := rate.NewLimiter(rate.Limit(10), 20) // 10 rps per IP, burst of 20
+	newLimiter := rate.NewLimiter(ipLimiterRate, ipLimiterBurst)
 	val, _ := l.ips.LoadOrStore(ip, newLimiter)
 	if limiter, ok := val.(*rate.Limiter); ok && limiter != nil {
 		return limiter
@@ -36,7 +46,7 @@ func (l *ipRateLimiter) getLimiter(ip string) *rate.Limiter {
 }
 
 var (
-	globalLimiter = rate.NewLimiter(rate.Limit(100), 200) // 100 rps globally, burst of 200
+	globalLimiter = rate.NewLimiter(globalRateLimit, globalBurst)
 	ipLimiter     = &ipRateLimiter{}
 )
 

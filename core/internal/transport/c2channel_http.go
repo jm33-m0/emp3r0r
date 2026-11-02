@@ -376,6 +376,12 @@ func (s *HTTPClientStream) Close() error {
 var serverSessions sync.Map
 
 // HTTPServerStream is the virtual stream returned to CC
+// maxPollResponseBytes bounds one http_poll response body. The C agent reads a
+// response into a 64 KiB buffer, so a body that coalesced more than this is
+// truncated on the agent side and corrupts the stream. It also sets the poll
+// rate of a streamed download: one request per maxPollResponseBytes.
+const maxPollResponseBytes = 48 * 1024
+
 type HTTPServerStream struct {
 	sessionID    string
 	readBuf      []byte
@@ -555,25 +561,10 @@ func HandleHTTPServerSession(w http.ResponseWriter, req *http.Request, config *d
 			if _, err := w.Write(data); err != nil {
 				return nil, ErrPollingRequest
 			}
-			// Drain any additional buffered data to send in the same response
-			// We cap the total size to avoid massive responses that might be unstable
-			totalWritten := len(data)
-		loop:
-			for totalWritten < 50*1024*1024 { // Cap at 50MB per polling response
-				select {
-				case more, ok := <-stream.writeCh:
-					if !ok {
-						break loop
-					}
-					n, err := w.Write(more)
-					if err != nil {
-						break loop
-					}
-					totalWritten += n
-				default:
-					break loop
-				}
-			}
+			// One queued write per response. HTTPServerStream.Write already
+			// splits writes to maxPollResponseBytes, so the body always fits the
+			// C agent's fixed read buffer; merging further chunks would push it
+			// over that buffer and truncate the stream.
 			return nil, ErrPollingRequest
 		case <-time.After(pollTimeout):
 			if stream.isClosing() {
@@ -659,18 +650,22 @@ func (s *HTTPServerStream) Write(p []byte) (n int, err error) {
 		return 0, s.ctx.Err()
 	}
 
-	// We must allocate a new buffer as 'p' might be mutated by caller after we exit
-	buf := make([]byte, len(p))
-	copy(buf, p)
-
-	select {
-	case <-s.ctx.Done():
-		return 0, s.ctx.Err()
-	case s.writeCh <- buf:
-		return len(p), nil
-	case <-time.After(30 * time.Second): // Backpressure so we don't block forever
-		return 0, fmt.Errorf("write timeout: client not pulling")
+	// Split into poll-sized pieces: the C agent reads each poll response into a
+	// fixed 64 KiB buffer, so one write larger than that would be truncated on
+	// the agent side.
+	for off := 0; off < len(p); off += maxPollResponseBytes {
+		end := min(off+maxPollResponseBytes, len(p))
+		buf := make([]byte, end-off)
+		copy(buf, p[off:end])
+		select {
+		case <-s.ctx.Done():
+			return off, s.ctx.Err()
+		case s.writeCh <- buf:
+		case <-time.After(30 * time.Second): // Backpressure so we don't block forever
+			return off, fmt.Errorf("write timeout: client not pulling")
+		}
 	}
+	return len(p), nil
 }
 
 func (s *HTTPServerStream) Close() error {
