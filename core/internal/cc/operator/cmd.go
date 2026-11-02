@@ -389,10 +389,17 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Use:     "exec --cmd 'command'",
 			GroupID: "util",
 			Short:   "Execute a command on selected agent",
+			Long: "Run a command on the selected agent and print its output. A C agent runs it " +
+				"through /bin/sh -c in a child process (the exec BOF) unless --no-shell is set; " +
+				"a Go agent always runs the program directly.\n\n" +
+				"WARNING: process spawning is not opsec. The child process, its command line and " +
+				"its parent relationship are visible to process monitors and audit logs.",
 			Example: "exec --cmd 'ls -la'",
 			Run:     execCmd,
 		}
 		execCmd.Flags().StringP("cmd", "c", "", "Command to execute on agent")
+		execCmd.Flags().Bool("no-shell", false,
+			"Run the command directly instead of through /bin/sh (C agents; the Go agent never uses a shell)")
 		execCmd.MarkFlagRequired("cmd")
 
 		rootCmd.AddCommand(execCmd)
@@ -581,7 +588,13 @@ func execCmd(cmd *cobra.Command, args []string) {
 		Flags:     make(map[string]string),
 	}
 	ctx.Flags["cmd_to_exec"] = fmt.Sprintf("exec --cmd %s", strconv.Quote(cmdStr))
-	logging.Warningf("OPSEC: exec recorded as fork and run (High OPSEC Risk)")
+	// The C agent has no command interpreter: the controller runs the exec BOF
+	// with the command itself.
+	ctx.Flags["exec_cmd"] = cmdStr
+	if noShell, _ := cmd.Flags().GetBool("no-shell"); noShell {
+		ctx.Flags["exec_shell"] = "0"
+	}
+	logging.Warningf("OPSEC: exec spawns a child process on the agent; process spawning is not opsec (high risk)")
 	controllers.ExecuteRawCommand(ctx)
 }
 

@@ -324,6 +324,14 @@ func runCAgentEndToEnd(t *testing.T, format string) {
 		pivotRan = runSocks5PivotCheck(t, agent, doneChan, &agentOut)
 	}
 
+	// --- Command execution: the operator `exec` command on a C agent ---
+	// The controller dispatches the exec BOF; the agent spawns the command and
+	// returns its captured output. The host call is synchronous, so it cannot
+	// overlap the stager mask.
+	if format == "exe" || format == "local-exe" {
+		runExecChecks(t, agent, &agentOut)
+	}
+
 	// --- File transfer: real module dispatch, both directions, 70 MiB ---
 	// The stager-delivered agent gets a masked-sleep cycle first, so the host
 	// bridge is proven to survive the mask; the size sweep itself is not
