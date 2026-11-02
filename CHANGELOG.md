@@ -1,5 +1,47 @@
 # Changelog
 
+## [5.7.0](https://github.com/jm33-m0/emp3r0r/compare/v5.6.0...v5.7.0) (2026-11-02)
+
+
+### Features
+
+* **agent:** add portable RISC-V BOF execution module and agent support ([e19afd5](https://github.com/jm33-m0/emp3r0r/commit/e19afd5b968258ee2e99a02f053217b8f0335501))
+* **agent:** report the binary implementation ([cda64f9](https://github.com/jm33-m0/emp3r0r/commit/cda64f907ffdad35641da66b8d0cde5fb9ce2086))
+* **agent:** stream transfers and verify digests after the job ([af74520](https://github.com/jm33-m0/emp3r0r/commit/af7452071eee378043b8c66b2b3343eddbf87866))
+* **c_agent:** add put and the get_file BOF ([7e4475d](https://github.com/jm33-m0/emp3r0r/commit/7e4475d6c271afb97c9f782bbabb2c4b77d9426b))
+* **c_agent:** add relay/exec host primitives and a mask gate ([e5f3af7](https://github.com/jm33-m0/emp3r0r/commit/e5f3af71bb317c78ad7942eac5e94a8cec1d55d8))
+* **c_agent:** stream sessions and expose the BOF host bridge ([eaea79f](https://github.com/jm33-m0/emp3r0r/commit/eaea79f07559b5b594cbfa9b778b0781e6e37dc1))
+* **cc:** pivot C agents through the socks5 BOF ([477b548](https://github.com/jm33-m0/emp3r0r/commit/477b54893076b0fcceadc83fa893e12f3f9ec4ed))
+* **cc:** run exec on a C agent through the exec BOF ([156729e](https://github.com/jm33-m0/emp3r0r/commit/156729efe122576160d6ff2815da875f40179683))
+* **crypto:** validate SHA-256 hex digests ([8aeee19](https://github.com/jm33-m0/emp3r0r/commit/8aeee19dae9d0d837fa2623fc97c5b3f2ba45e0a))
+* **live:** bound agent round trips by the poll interval ([1b61dda](https://github.com/jm33-m0/emp3r0r/commit/1b61dda2a28149549b255b13a7b3980e9e5a1fbc))
+* **modules:** add the exec BOF with shell and direct modes ([913a94c](https://github.com/jm33-m0/emp3r0r/commit/913a94cf450c7c943f6a836622a52c2cef2033a1))
+* **modules:** internal parameters and per-agent hosted payloads ([f6efbde](https://github.com/jm33-m0/emp3r0r/commit/f6efbde5109217c3af1382e933b58c69a506a35c))
+* **operator:** run get through the get_file module ([279ad82](https://github.com/jm33-m0/emp3r0r/commit/279ad821ab6adfbb3429bc2c11d26397c8760a85))
+* **relay:** serve only operator-registered downloads ([dd50d28](https://github.com/jm33-m0/emp3r0r/commit/dd50d285b7b985896f846899c49aec09d68c74c9))
+
+
+### Bug Fixes
+
+* **bof:** remove identifiable artifacts; w^x segment packing ([ab594ab](https://github.com/jm33-m0/emp3r0r/commit/ab594abf79b69edbac1a26059922eb98dea9b276))
+* **bof:** revamp riscv BOF loader to use musl ([96c2f1b](https://github.com/jm33-m0/emp3r0r/commit/96c2f1b118ec5629351be1ba2535a8387693a17f))
+* **cc:** bind hosted downloads to one agent and one owner ([7eb3771](https://github.com/jm33-m0/emp3r0r/commit/7eb37715645724bdfb0fe9463e64cc15437cee07))
+* **mask:** skip writable mappings when probing for ELF headers ([d3cc87f](https://github.com/jm33-m0/emp3r0r/commit/d3cc87f78c4e255a84d48d0d8787d96c3a1e6a19))
+* **memmod:** be smarter with `dl*` in glibc ([342eecd](https://github.com/jm33-m0/emp3r0r/commit/342eecdf9fc14b5a7194efe9738f4de973db185d))
+* **module:** always refresh payloads ([4c57ff8](https://github.com/jm33-m0/emp3r0r/commit/4c57ff826ddce938cc50f097b72d808194257032))
+* **module:** bound gzip decompression ([82e624f](https://github.com/jm33-m0/emp3r0r/commit/82e624ff4bdb4307a15416fde0cb463d3903dcdf))
+* **modules:** never require an internal parameter ([e03297d](https://github.com/jm33-m0/emp3r0r/commit/e03297d05e3942884275e5758c703a538822099d))
+* **module:** stale module dependencies across module runs ([f31a6cf](https://github.com/jm33-m0/emp3r0r/commit/f31a6cf3aabb8111f4297d8348d2071ab9269d13))
+* **module:** Windows path not handled ([ce48421](https://github.com/jm33-m0/emp3r0r/commit/ce484219c70ba14a9748883560322577e9c8a6eb))
+* **relay:** drain queued frames before reporting EOF ([3261800](https://github.com/jm33-m0/emp3r0r/commit/32618008552bedf77e662270bbb723637b4c2032))
+* **socks5:** quote proxy_start and dns_query command arguments ([b38e314](https://github.com/jm33-m0/emp3r0r/commit/b38e314f61068d38f2faab7a71fb904dce4b00f5))
+* **socks5:** wait for the agent on its poll schedule ([7cde9ff](https://github.com/jm33-m0/emp3r0r/commit/7cde9ff2084b3e44a20be63d3e6a420cf530877d))
+
+
+### Performance Improvements
+
+* **transport:** stream poll responses and size the rate limits ([d1a511c](https://github.com/jm33-m0/emp3r0r/commit/d1a511c41aa5133fb6ea36a612eea4eb8598eb23))
+
 ## [5.6.0](https://github.com/jm33-m0/emp3r0r/compare/v5.5.1...v5.6.0) (2026-10-29)
 
 
