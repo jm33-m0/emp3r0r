@@ -212,7 +212,7 @@ func (ls *socks5Listener) relayDNSQuery(agent *def.Emp3r0rAgent, query []byte, d
 	if dnsServer != "" {
 		cmdLine += " --server " + dnsServer
 	}
-	if err := agents.SendCmd(cmdLine, token, agent); err != nil {
+	if err := sendAgentCommandOrQueue(cmdLine, token, agent); err != nil {
 		clearProxyJobBookkeeping(token)
 		return nil, fmt.Errorf("instruct agent: %w", err)
 	}

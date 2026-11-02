@@ -61,6 +61,14 @@ func prepareModuleParameters(config *def.ModuleConfig, target *def.Emp3r0rAgent,
 		}
 		flags["stream"] = transfer.Token
 		flags["offset"] = strconv.FormatInt(transfer.Offset, 10)
+	case ModSocks5:
+		// The SOCKS5 listener owns the token: it exists per CONNECT, together
+		// with the target the operator's client asked for. A console run has
+		// neither, so it is refused instead of asking for a value no operator
+		// can know.
+		if strings.TrimSpace(flags["token"]) == "" || strings.TrimSpace(flags["target"]) == "" {
+			return false, fmt.Errorf("%s is dispatched by socks_start, which supplies the token and target", ModSocks5)
+		}
 	}
 
 	return false, nil

@@ -1,0 +1,40 @@
+[
+  {
+    "name": "socks5",
+    "author": "jm33-m0",
+    "date": "2026-11-02",
+    "comment": "Internal SOCKS5 pivot relay",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "dependencies": [
+      "coffloader_linux"
+    ],
+    "parameters": [
+      {
+        "name": "token",
+        "description": "C2 proxy stream token",
+        "default": "",
+        "type": "cstr",
+        "internal": true
+      },
+      {
+        "name": "target",
+        "description": "Target host:port",
+        "default": "",
+        "type": "cstr",
+        "internal": true
+      }
+    ],
+    "agent_config": {
+      "exec": "",
+      "type": "coff",
+      "files": [
+        "socks5.o"
+      ]
+    },
+    "invocation": {
+      "coff_export": "go"
+    }
+  }
+]

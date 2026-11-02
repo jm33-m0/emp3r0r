@@ -118,6 +118,12 @@ func handleProxyRelayStream(conn io.ReadWriteCloser, agentUUID, streamID, remote
 	// The agent dials the target BEFORE opening this stream, so its arrival is
 	// the CONNECT acknowledgement — answer the operator now.
 	entry.markStreamUp(conn)
+	// A dispatch result that crossed this stream may already have failed the
+	// CONNECT: this stream then belongs to an attempt the operator was told
+	// about, so drop it instead of relaying.
+	if entry.resultFailed() {
+		return
+	}
 	// The outcome is decided: no dial-failure response will follow, so drop the
 	// job bookkeeping we registered when ordering the agent.
 	clearProxyJobBookkeeping(streamID)

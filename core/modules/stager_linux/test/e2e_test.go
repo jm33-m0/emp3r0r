@@ -13,6 +13,7 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"math/big"
 	"net"
 	"os"
@@ -61,6 +62,9 @@ type stagerOpts struct {
 	// agent PIC runs in a forked child that exits cleanly when idle and is
 	// restarted by the parent while caching the agent's ephemeral identity key.
 	supervised bool
+	// pivot also relays a real SOCKS5 CONNECT through this agent, covering the
+	// built-in !proxy_start relay with the same operator path a C agent uses.
+	pivot bool
 }
 
 // testECHConfigList is a syntactically valid ECHConfigList (RFC 9849). On a
@@ -367,7 +371,7 @@ func TestAgentEndToEndLifecycle(t *testing.T) {
 		for _, tr := range transports {
 			mode, tr := mode, tr
 			t.Run(mode+"/"+tr, func(t *testing.T) {
-				opts := stagerOpts{format: "shellcode", transport: tr}
+				opts := stagerOpts{format: "shellcode", transport: tr, pivot: mode == "http_poll" && tr == "http"}
 				runAgentEndToEndLifecycle(t, mode, opts)
 			})
 		}
@@ -1034,6 +1038,43 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 		t.Fatalf("Failed to receive command output")
 	}
 	logging.Println("Command output verification passed.")
+
+	// -----------------------------------------------------------------------
+	// 11b. SOCKS5 pivot: the C2 listener relays a real connection through this
+	//      Go agent's built-in !proxy_start relay. `socks_start` is the same
+	//      operator command a C agent pivot uses, so this guards the shared
+	//      listener and relay from regressing.
+	// -----------------------------------------------------------------------
+	if opts.pivot {
+		t.Run("socks5-pivot", func(t *testing.T) {
+			echoAddr := startEchoServer(t)
+			pivotPort := freeTCPPort(t)
+			startPivotListener(t, agent.Tag, pivotPort, doneChan, stdout)
+			t.Cleanup(func() { _ = server.StopSocks5Proxy(pivotPort, "") })
+
+			conn := socks5Connect(t, pivotPort, echoAddr, doneChan, stdout)
+			defer func() { _ = conn.Close() }()
+
+			payload := make([]byte, 8<<10)
+			if _, err := rand.Read(payload); err != nil {
+				t.Fatalf("generate pivot payload: %v", err)
+			}
+			if err := conn.SetDeadline(time.Now().Add(60 * time.Second)); err != nil {
+				t.Fatalf("set pivot deadline: %v", err)
+			}
+			if _, err := conn.Write(payload); err != nil {
+				t.Fatalf("write through the pivot: %v", err)
+			}
+			got := make([]byte, len(payload))
+			if _, err := io.ReadFull(conn, got); err != nil {
+				t.Fatalf("read through the pivot: %v", err)
+			}
+			if !bytes.Equal(payload, got) {
+				t.Fatalf("pivot echoed %d bytes, %d differ", len(got), countDiff(payload, got))
+			}
+			logging.Successf("SOCKS5 pivot: %d bytes round-tripped through the Go agent", len(got))
+		})
+	}
 
 	// -----------------------------------------------------------------------
 	// 12. Restart / reconnection test.

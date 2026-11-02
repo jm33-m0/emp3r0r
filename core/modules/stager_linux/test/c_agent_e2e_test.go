@@ -316,6 +316,14 @@ func runCAgentEndToEnd(t *testing.T, format string) {
 		t.Fatalf("custom_module output = %q\nAgent output:\n%s", got, agentOut.String())
 	}
 
+	// --- SOCKS5 pivot: real C2 listener, real relay ---
+	// Runs on the plain executable and on the stager-delivered agent whose
+	// sleep mask is bound: the relay must keep the mask off while it runs.
+	pivotRan := false
+	if format == "exe" || format == "local-exe" {
+		pivotRan = runSocks5PivotCheck(t, agent, doneChan, &agentOut)
+	}
+
 	// --- File transfer: real module dispatch, both directions, 70 MiB ---
 	// The stager-delivered agent gets a masked-sleep cycle first, so the host
 	// bridge is proven to survive the mask; the size sweep itself is not
@@ -385,7 +393,14 @@ func runCAgentEndToEnd(t *testing.T, format string) {
 
 	// A masked agent must not check in on every wake-up. The C2 keeps it
 	// listed through its grace and the agent reuses the message tunnel, so the
-	// persisted connection count stays at the initial enrollment.
+	// persisted connection count stays at the initial enrollment. A pivot adds
+	// one check-in for each poll-profile change: the agent reports the tuned
+	// profile (and the restored one) so the C2's removal deadline matches what
+	// the agent is actually running.
+	wantMaxCheckins := 1
+	if pivotRan {
+		wantMaxCheckins += 2
+	}
 	stored, err := agents.GetStoredAgent(agent.UUID)
 	if err != nil {
 		t.Fatalf("read stored agent: %v", err)
@@ -393,8 +408,9 @@ func runCAgentEndToEnd(t *testing.T, format string) {
 	if stored == nil {
 		t.Fatal("agent was removed from the database")
 	}
-	if stored.ConnectionCount != 1 {
-		t.Fatalf("agent checked in %d times; expected one initial check-in", stored.ConnectionCount)
+	if stored.ConnectionCount < 1 || stored.ConnectionCount > wantMaxCheckins {
+		t.Fatalf("agent checked in %d times; expected 1 (initial enrollment) plus at most %d for pivot profile changes",
+			stored.ConnectionCount, wantMaxCheckins-1)
 	}
 }
 
@@ -679,7 +695,7 @@ func startCAgentOperator(t *testing.T, opPort int) {
 			go func() {
 				// Only files this operator registered for an agent are served,
 				// like serveWWWRelay.
-				val, found := network.WWWDownloads.Load("name:" + filepath.Base(streamID))
+				val, found := network.WWWDownloads.Load(network.LocalWWWDownloadKey(filepath.Base(streamID)))
 				if !found {
 					logging.Warningf("operator: refusing unregistered download %q", streamID)
 					_ = send(&def.OperatorMsg{Tag: def.TagWWWRelayErrorPrefix + streamID, Response: []byte("unregistered download")})
@@ -687,7 +703,7 @@ func startCAgentOperator(t *testing.T, opPort int) {
 				}
 				dl, _ := val.(*network.WWWDownload)
 				defer func() {
-					network.WWWDownloads.Delete("name:" + filepath.Base(streamID))
+					network.WWWDownloads.Delete(network.LocalWWWDownloadKey(filepath.Base(streamID)))
 					if dl != nil && dl.Transient {
 						_ = os.Remove(filepath.Join(paths.WWWRoot, dl.Name))
 					}
