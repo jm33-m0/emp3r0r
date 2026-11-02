@@ -1,0 +1,54 @@
+[
+  {
+    "name": "get_file",
+    "author": "jm33-m0",
+    "date": "2026-11-02",
+    "comment": "Download a file from the agent over the FTP route",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "dependencies": [
+      "coffloader_linux"
+    ],
+    "parameters": [
+      {
+        "name": "path",
+        "description": "Remote file or directory",
+        "default": "",
+        "type": "cstr",
+        "required": true
+      },
+      {
+        "name": "offset",
+        "description": "Resume offset, filled in by the C2 from the partial download",
+        "default": "0",
+        "type": "int",
+        "internal": true
+      },
+      {
+        "name": "stream",
+        "description": "FTP stream token, registered by the C2 to receive the upload",
+        "default": "",
+        "type": "cstr",
+        "internal": true
+      },
+      {
+        "name": "filter",
+        "description": "Regex filter when path is a directory",
+        "default": "",
+        "type": "cstr",
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "",
+      "type": "coff",
+      "files": [
+        "get_file.o"
+      ]
+    },
+    "invocation": {
+      "coff_export": "go"
+    }
+  }
+]
