@@ -160,6 +160,31 @@
 #define RV_SYS_RSEQ 293
 #define RV_SYS_CLOCK_GETTIME64 403
 
+/* Private host calls, outside the Linux syscall range. A guest reaches them
+ * only when the agent installed a host bridge; otherwise they return -ENOSYS.
+ * Keep the numbers in sync with core/internal/cc/modules/rvguest/main.c. */
+#define RV_SYS_XFER_READ 0x40000001u
+#define RV_SYS_XFER_WRITE 0x40000002u
+#define RV_SYS_XFER_UPLOAD 0x40000004u
+#define RV_SYS_XFER_SHA256 0x40000005u
+
+typedef int (*rv_host_read_fn)(void *ctx, const char *path, unsigned char **out,
+                               unsigned long *len, char *err, int err_cap);
+typedef int (*rv_host_write_fn)(void *ctx, const char *path,
+                                const unsigned char *data, unsigned long len,
+                                char *err, int err_cap);
+typedef int (*rv_host_upload_fn)(void *ctx, const char *token, const char *path,
+                                 unsigned long offset, char *err, int err_cap);
+typedef int (*rv_host_sha256_fn)(void *ctx, const unsigned char *data,
+                                 unsigned long len, char *hex,
+                                 unsigned long hex_cap, char *err, int err_cap);
+
+static void *rv_host_ctx;
+static rv_host_read_fn rv_host_read;
+static rv_host_write_fn rv_host_write;
+static rv_host_upload_fn rv_host_upload;
+static rv_host_sha256_fn rv_host_sha256;
+
 static void rv_mmio_store(uint32_t addr, uint32_t val);
 static uint32_t rv_mmio_load(uint32_t addr);
 
@@ -505,6 +530,79 @@ static void rv_guest_munmap(uint32_t addr, uint32_t len) {
     pages = RV_MAP_PAGES - first;
   for (size_t i = 0; i < pages; i++)
     rv_map_used[first + i] = 0;
+}
+
+/* Host file transfer: every path and buffer crosses the guest boundary here,
+ * and each one is bounds-checked against guest RAM before it is touched. */
+static int64_t rv_host_read_into_guest(char *path, uint32_t out_addr,
+                                       uint32_t cap) {
+  unsigned char *data = NULL;
+  unsigned long len = 0;
+  char err[160] = {0};
+  if (rv_host_read == NULL)
+    return -38;
+  int rc = rv_host_read(rv_host_ctx, path, &data, &len, err, (int)sizeof(err));
+  if (rc != 0)
+    return rc;
+  /* A NULL destination is a size query: the guest allocates and asks again. */
+  if (out_addr == 0) {
+    free(data);
+    return (int64_t)len;
+  }
+  if (len > cap) {
+    free(data);
+    return -34;
+  }
+  if (len > 0) {
+    void *dst = rv_gptr(out_addr, (uint32_t)len);
+    if (dst == NULL) {
+      free(data);
+      return -14;
+    }
+    rv_memcpy(dst, data, len);
+  }
+  free(data);
+  return (int64_t)len;
+}
+
+static int64_t rv_host_write_from_guest(char *path, uint32_t src_addr,
+                                        uint32_t len) {
+  const void *src = rv_gptr(src_addr, len);
+  if (src == NULL && len != 0)
+    return -14;
+  if (rv_host_write == NULL)
+    return -38;
+  char err[160] = {0};
+  return rv_host_write(rv_host_ctx, path, src, len, err, (int)sizeof(err));
+}
+
+static int64_t rv_host_upload_from_guest(uint32_t token_addr,
+                                         uint32_t path_addr, uint32_t offset) {
+  char token[1024];
+  char path[1024];
+  if (rv_guest_path(token_addr, token, sizeof(token)) != 0 ||
+      rv_guest_path(path_addr, path, sizeof(path)) != 0)
+    return -22;
+  if (rv_host_upload == NULL)
+    return -38;
+  char err[160] = {0};
+  return rv_host_upload(rv_host_ctx, token, path, (unsigned long)offset, err,
+                        (int)sizeof(err));
+}
+
+static int64_t rv_host_sha256_to_guest(uint32_t src_addr, uint32_t len,
+                                       uint32_t hex_addr, uint32_t hex_cap) {
+  const void *src = rv_gptr(src_addr, len);
+  if (src == NULL && len != 0)
+    return -14;
+  void *hex = rv_gptr(hex_addr, hex_cap);
+  if (hex == NULL || hex_cap < 65)
+    return -22;
+  if (rv_host_sha256 == NULL)
+    return -38;
+  char err[160] = {0};
+  return rv_host_sha256(rv_host_ctx, src, len, (char *)hex, hex_cap, err,
+                        (int)sizeof(err));
 }
 
 static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
@@ -860,6 +958,22 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
     return getgid();
   case RV_SYS_GETEGID:
     return getegid();
+  case RV_SYS_XFER_READ: {
+    char path[1024];
+    if (rv_guest_path(a0, path, sizeof(path)) != 0)
+      return -22;
+    return rv_host_read_into_guest(path, a1, a2);
+  }
+  case RV_SYS_XFER_WRITE: {
+    char path[1024];
+    if (rv_guest_path(a0, path, sizeof(path)) != 0)
+      return -22;
+    return rv_host_write_from_guest(path, a1, a2);
+  }
+  case RV_SYS_XFER_UPLOAD:
+    return rv_host_upload_from_guest(a0, a1, a2);
+  case RV_SYS_XFER_SHA256:
+    return rv_host_sha256_to_guest(a0, a1, a2, a3);
   default:
     return -38;
   }
@@ -1226,6 +1340,16 @@ RV_EXPORT char *Run(const uint8_t *image, size_t len,
 RV_EXPORT const char *LastError(void) { return rv_err; }
 
 RV_EXPORT int ExitCode(void) { return rv_guest_status; }
+
+RV_EXPORT void SetHostBridge(void *ctx, rv_host_read_fn read,
+                             rv_host_write_fn write, rv_host_upload_fn upload,
+                             rv_host_sha256_fn sha256) {
+  rv_host_ctx = ctx;
+  rv_host_read = read;
+  rv_host_write = write;
+  rv_host_upload = upload;
+  rv_host_sha256 = sha256;
+}
 
 RV_EXPORT void Free(char *out) {
   if (out == NULL || out != rv_out)

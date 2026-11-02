@@ -92,7 +92,7 @@ static void bof_lock_release(void) {
 
 // Saved signal handlers
 static struct sigaction old_sa[32];
-static int handled_sigs[] = { SIGSEGV, SIGBUS, SIGILL, SIGFPE };
+static int handled_sigs[] = {SIGSEGV, SIGBUS, SIGILL, SIGFPE};
 #define NUM_HANDLED_SIGS (sizeof(handled_sigs) / sizeof(handled_sigs[0]))
 
 // Crash-recovery state. bof_run serializes every execution with bof_lock, so
@@ -170,7 +170,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
 
   const char *entry_name = (func_name && func_name[0]) ? func_name : "go";
 
-  uint8_t empty_args[4] = { 0 };
+  uint8_t empty_args[4] = {0};
   if (!args_buf || args_len <= 0) {
     args_buf = empty_args;
     args_len = (int)sizeof(empty_args);
@@ -201,7 +201,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
     goto fail;
   }
 
-  uint64_t seg_size[BOF_SEG_COUNT] = { 0 };
+  uint64_t seg_size[BOF_SEG_COUNT] = {0};
   for (int i = 0; i < ehdr->e_shnum; i++) {
     if (!(shdrs[i].sh_flags & SHF_ALLOC)) {
       continue;
@@ -439,8 +439,9 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
       case R_X86_64_PLT32: {
         int64_t val = (int64_t)sym_addr + rel.r_addend - (int64_t)patch_addr;
         if (val > 2147483647L || val < -2147483648L) {
-          set_errf(err_buf, "relocation overflow for symbol %s (type %u): "
-                            "distance %ld exceeds 32 bits",
+          set_errf(err_buf,
+                   "relocation overflow for symbol %s (type %u): "
+                   "distance %ld exceeds 32 bits",
                    sym_name, type, val);
           goto fail;
         }
@@ -551,6 +552,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
   }
 
   beacon_env_reset();
+  beacon_host_dlsym_reset();
   munmap(mem_base, (size_t)total_size);
   free(sec_offsets);
   bof_lock_release();
@@ -558,6 +560,7 @@ static int bof_run_impl(const uint8_t *obj_buf, size_t object_size,
 
 fail:
   beacon_env_reset();
+  beacon_host_dlsym_reset();
   if (mem_base != NULL) {
     munmap(mem_base, (size_t)total_size);
   }
@@ -573,11 +576,9 @@ fail:
  * returned buffer with Free(). */
 static char bof_err_buf[512];
 
-__attribute__((visibility("default"))) char *Run(const uint8_t *obj_buf,
-                                                 size_t object_size,
-                                                 const char *func_name,
-                                                 const uint8_t *args_buf,
-                                                 int args_len) {
+__attribute__((visibility("default"))) char *
+Run(const uint8_t *obj_buf, size_t object_size, const char *func_name,
+    const uint8_t *args_buf, int args_len) {
   char *out = NULL;
   char *err = NULL;
 
@@ -608,4 +609,6 @@ __attribute__((visibility("default"))) const char *LastError(void) {
   return bof_err_buf;
 }
 
-__attribute__((visibility("default"))) void Free(char *p) { free(p); }
+__attribute__((visibility("default"))) void Free(char *p) {
+  free(p);
+}

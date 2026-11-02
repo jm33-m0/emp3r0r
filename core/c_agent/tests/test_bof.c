@@ -119,7 +119,7 @@ int main(void) {
 
   char *out = NULL;
   CHECK_EQ_LONG(c2_bof_run(loader, loader_len, bof, bof_len, "go", packed,
-                           packed_len, &out),
+                           packed_len, NULL, &out),
                 C2_OK);
   CHECK(out != NULL && strstr(out, "Hello World!") != NULL);
   free(out);
@@ -128,7 +128,7 @@ int main(void) {
    * failure *out carries the loader's error message, if any. */
   out = NULL;
   CHECK(c2_bof_run(loader, loader_len, bof, bof_len, "does_not_exist", packed,
-                   packed_len, &out) != C2_OK);
+                   packed_len, NULL, &out) != C2_OK);
   if (out != NULL) {
     CHECK(strstr(out, "not found") != NULL);
     free(out);

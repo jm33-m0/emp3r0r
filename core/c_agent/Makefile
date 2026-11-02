@@ -228,7 +228,7 @@ TINYCBOR_SRC = vendor/tinycbor/cborencoder.c \
 PORTABLE_SRC = src/util/rc4.c src/util/packer.c src/util/dynload.c src/util/dynload_hosted.c \
                src/util/debug.c src/common.c src/crypto.c \
                src/messages.c src/agent_info.c src/config.c \
-               src/secureconn.c src/session.c src/memfile.c \
+               src/secureconn.c src/session.c src/memfile.c src/bof_host.c \
                src/sysinfo.c src/agent_identity.c src/stager_iface.c \
                $(BOF_SRC) $(RVVM_SRC) $(MODULE_SUPPORT_SRC) $(DOH_SRC) \
                $(GZIP_SRC) $(CRYPTO_SRC) $(TRANSPORT_SRC) $(TRANSPORT_SUPPORT_SRC) \
@@ -278,14 +278,15 @@ $(BUILD)/libagent.a: $(PORTABLE_SRC) $(TINYCBOR_SRC) | $(BUILD)
 # startup (it has nothing to decrypt).
 CONFIG_SRC ?=
 
-# The agent links only what it reaches at runtime. rc4, packer, the debug shim
-# and the c2_status_str table are stager/test-only; four of the six vendored
-# tinycbor translation units are never called by the agent. Dropping them by
-# name keeps the binary small even before --gc-sections.
+# The agent links only what it reaches at runtime. rc4, packer and the debug
+# shim are stager/test-only; four of the six vendored tinycbor translation units
+# are never called by the agent. Dropping them by name keeps the binary small
+# even before --gc-sections.
 AGENT_COMMON_SRC = src/agent_args.c src/util/dynload.c src/util/dynload_hosted.c \
-                   src/crypto.c src/messages.c \
+                   src/crypto.c src/messages.c src/common.c \
                    src/agent_info.c src/config.c src/secureconn.c \
-                   src/session.c src/memfile.c src/sysinfo.c \
+                   src/session.c src/memfile.c src/bof_host.c \
+                   src/sysinfo.c \
                    src/agent_identity.c src/stager_iface.c
 TINYCBOR_MIN_SRC = vendor/tinycbor/cborencoder.c vendor/tinycbor/cborparser.c
 

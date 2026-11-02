@@ -47,8 +47,8 @@ and `memmod`, the C agent through `core/c_agent/src/util/elfload.c`):
   error instead of killing the agent.
 - Rejects images larger than 64 MiB and truncates captured output at 8 MiB.
 
-`Run` is the only entry point; every other symbol is built with
-`-fvisibility=hidden`.
+`Run` is the public entry point. `SetHostBridge` is the only other exported
+symbol; every other symbol is built with `-fvisibility=hidden`.
 
 The parser validates every offset and length against the object size before it
 reads: the section-header table, each section payload, the symtab/strtab, each
@@ -62,6 +62,29 @@ The loader implements the Beacon compatibility API that BOFs commonly use:
 `BeaconDataShort`, `BeaconDataLength`, `BeaconDataExtract`, the
 `BeaconFormat*` family, `BeaconIsAdmin`, `swap_endianess`, `getEnviron` and
 `getOSName`. Their output is returned to the caller through `char **out`.
+
+### Host primitives
+
+An agent can install storage and session primitives with
+`SetHostBridge(ctx, read, write, upload, sha256)`. BOFs resolve the wrappers
+below through the same symbol table:
+
+```c
+int ReadFile(const char *path, unsigned char **out, unsigned long *len,
+             char *err, int err_cap);
+int WriteFile(const char *path, const unsigned char *data, unsigned long len,
+              char *err, int err_cap);
+int UploadFile(const char *token, const char *path, unsigned long offset,
+               char *err, int err_cap);
+int Sha256Hex(const unsigned char *data, unsigned long len, char *hex,
+              unsigned long hex_cap, char *err, int err_cap);
+```
+
+Each returns `0` on success and a negative status otherwise. Without installed
+callbacks they return `-9` (unsupported). `UploadFile` streams the named file
+through the registered FTP route from `offset`, so a BOF sends a file without
+holding it in memory; downloads are not a BOF concern, because `put` is an agent
+command.
 
 ## Arguments
 

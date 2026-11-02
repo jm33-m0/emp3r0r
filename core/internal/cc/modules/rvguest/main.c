@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 extern char **environ;
 int go(char *args, int len);
@@ -43,6 +44,66 @@ char **getEnviron(void) {
   if (environ != NULL && environ[0] != NULL)
     return environ;
   return rv_bof_hdr.env;
+}
+
+/* Host file-transfer primitives installed by the C agent. */
+#define RV_SYS_XFER_READ 0x40000001u
+#define RV_SYS_XFER_WRITE 0x40000002u
+#define RV_SYS_XFER_UPLOAD 0x40000004u
+#define RV_SYS_XFER_SHA256 0x40000005u
+
+/* 32-byte SHA-256 digest written as hex, NUL terminated (the guest has no
+ * access to the agent's common.h constants). */
+#define RV_SHA256_HEX_BYTES 65
+
+static void guest_clear_err(char *err, int err_cap) {
+  if (err != NULL && err_cap > 0)
+    err[0] = '\0';
+}
+
+/* ReadFile asks the host for the size first, then for the bytes, because the
+ * host places them in guest memory and the guest owns its heap. */
+int ReadFile(const char *path, unsigned char **out, unsigned long *len,
+             char *err, int err_cap) {
+  guest_clear_err(err, err_cap);
+  if (path == NULL || out == NULL || len == NULL)
+    return -22;
+  *out = NULL;
+  *len = 0;
+  long need = syscall(RV_SYS_XFER_READ, path, NULL, 0);
+  if (need < 0)
+    return (int)need;
+  unsigned char *buf = malloc(need > 0 ? (size_t)need : 1);
+  if (buf == NULL)
+    return -2;
+  long got = syscall(RV_SYS_XFER_READ, path, buf, (unsigned long)need);
+  if (got != need) {
+    free(buf);
+    return got < 0 ? (int)got : -5;
+  }
+  *out = buf;
+  *len = (unsigned long)got;
+  return 0;
+}
+
+int WriteFile(const char *path, const unsigned char *data, unsigned long len,
+              char *err, int err_cap) {
+  guest_clear_err(err, err_cap);
+  return (int)syscall(RV_SYS_XFER_WRITE, path, data, len);
+}
+
+int UploadFile(const char *token, const char *path, unsigned long offset,
+               char *err, int err_cap) {
+  guest_clear_err(err, err_cap);
+  return (int)syscall(RV_SYS_XFER_UPLOAD, token, path, offset);
+}
+
+int Sha256Hex(const unsigned char *data, unsigned long len, char *hex,
+              unsigned long hex_cap, char *err, int err_cap) {
+  guest_clear_err(err, err_cap);
+  if (hex == NULL || hex_cap < RV_SHA256_HEX_BYTES)
+    return -22;
+  return (int)syscall(RV_SYS_XFER_SHA256, data, len, hex, hex_cap);
 }
 
 /* glibc-era BOFs call the versioned stat entry point directly. musl exposes
@@ -179,9 +240,8 @@ char *BeaconFormatToString(formatp *format, int *size) {
   if (format == NULL || format->original == NULL)
     return NULL;
   if (format->size > 0)
-    format->original
-        [format->length < format->size ? format->length : format->size - 1] =
-        '\0';
+    format->original[format->length < format->size ? format->length
+                                                   : format->size - 1] = '\0';
   return format->original;
 }
 

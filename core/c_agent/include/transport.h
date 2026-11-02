@@ -308,13 +308,30 @@ c2_status c2_session_send_result(c2_agent_session *s, c2_secureconn *msg,
                                  c2_str job_id, const c2_str_list *cmd_slice,
                                  const uint8_t *response, size_t response_len);
 
-/* File upload over the FTP route: open(ftp, token), gzip the file bytes, and
- * write them onto the SecureConn. The C2 relays the gzip stream to the
- * operator, which gunzips it. `data`/`len` is the raw (uncompressed) file. */
-c2_status c2_session_upload(c2_agent_session *s, c2_str token,
-                            const uint8_t *data, size_t len);
+/* Pulls the next slice of an upload. Returns C2_OK with *len == 0 at the end
+ * of the stream; any other status aborts the transfer. */
+typedef c2_status (*c2_upload_reader_fn)(void *ctx, uint8_t *out, size_t cap,
+                                         size_t *len);
 
-/* File download over the WWW route: open(www, name) and read until EOF. */
+/* File upload over the FTP route: open(ftp, token), pull chunks from `next`,
+ * and write each one as its own gzip member. The operator's gunzip reader
+ * consumes the members back to back, so neither side holds the whole file in
+ * memory. */
+c2_status c2_session_upload_stream(c2_agent_session *s, c2_str token,
+                                   c2_upload_reader_fn next, void *ctx);
+
+/* Receives the next slice of a download. Returning anything but C2_OK aborts
+ * the transfer. */
+typedef c2_status (*c2_download_sink_fn)(void *ctx, const uint8_t *data,
+                                         size_t len);
+
+/* File download over the WWW route, streamed: open(www, name), then hand every
+ * slice to `sink` until EOF. The session layer buffers nothing, so the caller
+ * decides where the bytes go (disk, memory, a hash). */
+c2_status c2_session_download_stream(c2_agent_session *s, c2_str name,
+                                     c2_download_sink_fn sink, void *ctx);
+
+/* File download over the WWW route into a caller buffer of `out_cap` bytes. */
 c2_status c2_session_download(c2_agent_session *s, c2_str name, uint8_t *out,
                               size_t out_cap, size_t *out_len);
 

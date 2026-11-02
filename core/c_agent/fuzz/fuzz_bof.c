@@ -51,7 +51,8 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     return 0;
 
   char *out = NULL;
-  (void)c2_bof_run(g_loader, g_loader_len, data, size, "go", NULL, 0, &out);
+  (void)c2_bof_run(g_loader, g_loader_len, data, size, "go", NULL, 0, NULL,
+                   &out);
   free(out);
   return 0;
 }

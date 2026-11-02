@@ -24,6 +24,9 @@ void *beacon_api_lookup(const char *name);
 /* Resolve a host symbol from the process global symbol scope. */
 void *beacon_host_dlsym(const char *name);
 
+/* Release any host-library handle kept for symbol resolution. */
+void beacon_host_dlsym_reset(void);
+
 /* Captured BeaconPrintf/BeaconOutput data. take transfers ownership. */
 void beacon_output_reset(void);
 char *beacon_output_take(void);

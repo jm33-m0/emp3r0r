@@ -51,6 +51,44 @@ static int mb_sha256(void *vctx, const uint8_t *data, size_t len,
   return mbedtls_sha256(data, len, out, 0) == 0 ? 0 : -1;
 }
 
+typedef struct {
+  mbedtls_sha256_context c;
+} mb_sha256_stream;
+
+static void *mb_sha256_new(void *vctx) {
+  (void)vctx;
+  mb_sha256_stream *s = (mb_sha256_stream *)malloc(sizeof(*s));
+  if (s == NULL)
+    return NULL;
+  mbedtls_sha256_init(&s->c);
+  if (mbedtls_sha256_starts(&s->c, 0) != 0) {
+    mbedtls_sha256_free(&s->c);
+    free(s);
+    return NULL;
+  }
+  return s;
+}
+
+static int mb_sha256_update(void *vctx, void *h, const uint8_t *data,
+                            size_t len) {
+  (void)vctx;
+  mb_sha256_stream *s = (mb_sha256_stream *)h;
+  if (s == NULL || (len > 0 && data == NULL))
+    return -1;
+  return mbedtls_sha256_update(&s->c, data, len) == 0 ? 0 : -1;
+}
+
+static int mb_sha256_final(void *vctx, void *h, uint8_t out[C2_SHA256_BYTES]) {
+  (void)vctx;
+  mb_sha256_stream *s = (mb_sha256_stream *)h;
+  if (s == NULL || out == NULL)
+    return -1;
+  int rc = mbedtls_sha256_finish(&s->c, out) == 0 ? 0 : -1;
+  mbedtls_sha256_free(&s->c);
+  free(s);
+  return rc;
+}
+
 static int mb_md5(void *vctx, const uint8_t *data, size_t len,
                   uint8_t out[C2_MD5_BYTES]) {
   (void)vctx;
@@ -331,6 +369,9 @@ c2_crypto_backend *c2_crypto_open(void) {
   be->aes256_gcm_seal = mb_seal;
   be->aes256_gcm_open = mb_open;
   be->sha256 = mb_sha256;
+  be->sha256_new = mb_sha256_new;
+  be->sha256_update = mb_sha256_update;
+  be->sha256_final = mb_sha256_final;
   be->md5 = mb_md5;
   be->hkdf_sha256 = mb_hkdf;
   be->pbkdf2_sha256 = mb_pbkdf2;

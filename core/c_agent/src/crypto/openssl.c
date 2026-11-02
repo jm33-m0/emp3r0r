@@ -29,6 +29,7 @@
 
 /* Opaque OpenSSL types. */
 typedef struct engine_st ENGINE;
+typedef struct evp_md_ctx_st EVP_MD_CTX;
 typedef struct evp_cipher_ctx_st EVP_CIPHER_CTX;
 typedef struct evp_cipher_st EVP_CIPHER;
 typedef struct evp_md_st EVP_MD;
@@ -52,6 +53,13 @@ typedef struct {
   int (*PKCS5_PBKDF2_HMAC)(const char *, int, const unsigned char *, int, int,
                            const EVP_MD *, int, unsigned char *);
   const EVP_MD *(*EVP_sha256)(void);
+  EVP_MD_CTX *(*EVP_MD_CTX_new)(void); /* 1.1+: new/create are aliases */
+  EVP_MD_CTX *(*EVP_MD_CTX_create)(void);
+  void (*EVP_MD_CTX_free)(EVP_MD_CTX *);
+  void (*EVP_MD_CTX_destroy)(EVP_MD_CTX *);
+  int (*EVP_DigestInit_ex)(EVP_MD_CTX *, const EVP_MD *, ENGINE *);
+  int (*EVP_DigestUpdate)(EVP_MD_CTX *, const void *, size_t);
+  int (*EVP_DigestFinal_ex)(EVP_MD_CTX *, unsigned char *, unsigned int *);
 
   EVP_CIPHER_CTX *(*EVP_CIPHER_CTX_new)(void);
   void (*EVP_CIPHER_CTX_free)(EVP_CIPHER_CTX *);
@@ -138,6 +146,13 @@ static int load_symbols(openssl_ctx *c) {
   LOAD(HMAC, "HMAC");
   LOAD(PKCS5_PBKDF2_HMAC, "PKCS5_PBKDF2_HMAC");
   LOAD(EVP_sha256, "EVP_sha256");
+  LOAD_OPT(EVP_MD_CTX_new, "EVP_MD_CTX_new");
+  LOAD_OPT(EVP_MD_CTX_create, "EVP_MD_CTX_create");
+  LOAD_OPT(EVP_MD_CTX_free, "EVP_MD_CTX_free");
+  LOAD_OPT(EVP_MD_CTX_destroy, "EVP_MD_CTX_destroy");
+  LOAD_OPT(EVP_DigestInit_ex, "EVP_DigestInit_ex");
+  LOAD_OPT(EVP_DigestUpdate, "EVP_DigestUpdate");
+  LOAD_OPT(EVP_DigestFinal_ex, "EVP_DigestFinal_ex");
   LOAD(EVP_CIPHER_CTX_new, "EVP_CIPHER_CTX_new");
   LOAD(EVP_CIPHER_CTX_free, "EVP_CIPHER_CTX_free");
   LOAD(EVP_aes_256_gcm, "EVP_aes_256_gcm");
@@ -205,6 +220,70 @@ static int os_sha256(void *vctx, const uint8_t *data, size_t len,
                      uint8_t out[C2_SHA256_BYTES]) {
   openssl_ctx *c = (openssl_ctx *)vctx;
   return c->SHA256(data, len, out) != NULL ? 0 : -1;
+}
+
+/* Streaming SHA-256 on EVP_MD_CTX. The context is allocated by the provider so
+ * callers never see OpenSSL types. */
+typedef struct {
+  EVP_MD_CTX *ctx;
+} os_sha256_stream;
+
+static EVP_MD_CTX *os_md_ctx_new(openssl_ctx *c) {
+  if (c->EVP_MD_CTX_new != NULL)
+    return c->EVP_MD_CTX_new();
+  if (c->EVP_MD_CTX_create != NULL)
+    return c->EVP_MD_CTX_create();
+  return NULL;
+}
+
+static void os_md_ctx_free(openssl_ctx *c, EVP_MD_CTX *ctx) {
+  if (ctx == NULL)
+    return;
+  if (c->EVP_MD_CTX_free != NULL)
+    c->EVP_MD_CTX_free(ctx);
+  else if (c->EVP_MD_CTX_destroy != NULL)
+    c->EVP_MD_CTX_destroy(ctx);
+}
+
+static void *os_sha256_new(void *vctx) {
+  openssl_ctx *c = (openssl_ctx *)vctx;
+  if (c == NULL || c->EVP_DigestInit_ex == NULL)
+    return NULL;
+  os_sha256_stream *s = (os_sha256_stream *)malloc(sizeof(*s));
+  if (s == NULL)
+    return NULL;
+  s->ctx = os_md_ctx_new(c);
+  if (s->ctx == NULL ||
+      c->EVP_DigestInit_ex(s->ctx, c->EVP_sha256(), NULL) != 1) {
+    os_md_ctx_free(c, s->ctx);
+    free(s);
+    return NULL;
+  }
+  return s;
+}
+
+static int os_sha256_update(void *vctx, void *h, const uint8_t *data,
+                            size_t len) {
+  openssl_ctx *c = (openssl_ctx *)vctx;
+  os_sha256_stream *s = (os_sha256_stream *)h;
+  if (c == NULL || s == NULL || c->EVP_DigestUpdate == NULL ||
+      (len > 0 && data == NULL))
+    return -1;
+  return c->EVP_DigestUpdate(s->ctx, data, len) == 1 ? 0 : -1;
+}
+
+static int os_sha256_final(void *vctx, void *h, uint8_t out[C2_SHA256_BYTES]) {
+  openssl_ctx *c = (openssl_ctx *)vctx;
+  os_sha256_stream *s = (os_sha256_stream *)h;
+  if (c == NULL || s == NULL || out == NULL || c->EVP_DigestFinal_ex == NULL)
+    return -1;
+  unsigned int n = 0;
+  int rc = c->EVP_DigestFinal_ex(s->ctx, out, &n) == 1 && n == C2_SHA256_BYTES
+               ? 0
+               : -1;
+  os_md_ctx_free(c, s->ctx);
+  free(s);
+  return rc;
 }
 
 static int os_md5(void *vctx, const uint8_t *data, size_t len,
@@ -634,6 +713,9 @@ c2_crypto_backend *c2_crypto_open(void) {
   be->aes256_gcm_seal = os_seal;
   be->aes256_gcm_open = os_open;
   be->sha256 = os_sha256;
+  be->sha256_new = os_sha256_new;
+  be->sha256_update = os_sha256_update;
+  be->sha256_final = os_sha256_final;
   be->md5 = os_md5;
   be->hkdf_sha256 = os_hkdf;
   be->pbkdf2_sha256 = os_pbkdf2;

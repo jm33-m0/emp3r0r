@@ -111,18 +111,41 @@ static void test_key_normalization(void) {
   CHECK(n > 0 && strcmp(key, "memfs:///bar.bin") == 0);
   n = c2_memfile_key("memfs:///x", strlen("memfs:///x"), key, sizeof(key));
   CHECK(n > 0 && strcmp(key, "memfs:///x") == 0);
+
+  /* A user-supplied memfs path keeps its subpath, unlike the basename key the
+   * module cache uses. */
+  n = c2_memfile_path_key("memfs:///a/b.bin", key, sizeof(key));
+  CHECK(n == strlen("memfs:///a/b.bin"));
+  CHECK(strcmp(key, "memfs:///a/b.bin") == 0);
+  n = c2_memfile_path_key("memfs://b.bin", key, sizeof(key));
+  CHECK(n > 0 && strcmp(key, "memfs:///b.bin") == 0);
+  n = c2_memfile_path_key("memfs://///b.bin", key, sizeof(key));
+  CHECK(n > 0 && strcmp(key, "memfs:///b.bin") == 0);
+
+  /* Not a memfs path, empty key, or too small a buffer: rejected. */
+  CHECK_EQ_LONG(c2_memfile_path_key("/tmp/b.bin", key, sizeof(key)), 0);
+  CHECK_EQ_LONG(c2_memfile_path_key("memfs:///", key, sizeof(key)), 0);
+  char tiny[12];
+  CHECK_EQ_LONG(c2_memfile_path_key("memfs:///b.bin", tiny, sizeof(tiny)), 0);
+
+  CHECK(c2_memfile_is_path("memfs:///x"));
+  CHECK(!c2_memfile_is_path("/tmp/x"));
+  CHECK(!c2_memfile_is_path(NULL));
 }
 
 int main(void) {
+  /* Key normalization needs no crypto backend. */
+  test_key_normalization();
+
   c2_crypto_backend *be = c2_crypto_open();
   if (be == NULL) {
     printf("%s: crypto backend unavailable, skipped\n", __FILE__);
+    TEST_DONE();
     return 0;
   }
   test_roundtrip_with_encryption(be);
   test_roundtrip_without_encryption(be);
   test_budget(be);
-  test_key_normalization();
   c2_crypto_close(be);
   TEST_DONE();
 }

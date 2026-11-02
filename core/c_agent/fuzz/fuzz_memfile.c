@@ -96,5 +96,14 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   if (tiny_len >= tiny_cap)
     c2_fuzz_fail("memfile key exceeded the destination capacity");
 
+  /* 6. memfs path normalization for BOF/put destinations: whatever comes
+   * back is a NUL-terminated memfs:/// key that fits, or zero. */
+  size_t path_cap = sizeof(key);
+  size_t path_len = c2_memfile_path_key((const char *)data, key, path_cap);
+  if (path_len >= path_cap || (path_len > 0 && key[path_len] != '\0'))
+    c2_fuzz_fail("memfile path key was not NUL-terminated within its buffer");
+  if (path_len > 0 && strncmp(key, "memfs:///", 9) != 0)
+    c2_fuzz_fail("memfile path key lost its scheme");
+
   return 0;
 }

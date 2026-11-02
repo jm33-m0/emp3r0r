@@ -15,6 +15,7 @@
  * run on Linux agents only.
  */
 
+#include "bof.h"
 #include "common.h"
 
 #ifdef __cplusplus
@@ -32,7 +33,8 @@ extern "C" {
  */
 c2_status c2_rv_run(const uint8_t *loader_so, size_t loader_len,
                     const uint8_t *image, size_t image_len,
-                    const uint8_t *bof_args, size_t bof_len, char **out);
+                    const uint8_t *bof_args, size_t bof_len,
+                    const c2_bof_host *host, char **out);
 
 #ifdef __cplusplus
 }

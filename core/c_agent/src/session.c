@@ -39,7 +39,9 @@
 /* Small helpers                                                              */
 /* ------------------------------------------------------------------------- */
 
-static int64_t now_unix(void) { return (int64_t)time(NULL); }
+static int64_t now_unix(void) {
+  return (int64_t)time(NULL);
+}
 
 static int64_t now_unix_ms(void) {
   struct timespec ts;
@@ -370,8 +372,8 @@ c2_status c2_session_hello(c2_agent_session *s, c2_secureconn *msg,
 
   char rand_str[17];
   rand_hex(s->be, rand_str, 8);
-  c2_str cmd_items[1] = { c2_str_of(rand_str, 16) };
-  c2_str_list cmd = { cmd_items, 1, 1 };
+  c2_str cmd_items[1] = {c2_str_of(rand_str, 16)};
+  c2_str_list cmd = {cmd_items, 1, 1};
 
   if (send_ephem) {
     if (s->be->ec_p256_keygen == NULL)
@@ -381,7 +383,7 @@ c2_status c2_session_hello(c2_agent_session *s, c2_secureconn *msg,
     s->pfs_pending = 1;
   }
 
-  char job_id[40] = { 0 };
+  char job_id[40] = {0};
   rand_uuid(s->be, job_id, sizeof(job_id));
   memcpy(s->hello_job_id, job_id, sizeof(s->hello_job_id));
 
@@ -486,9 +488,9 @@ c2_status c2_session_send_result(c2_agent_session *s, c2_secureconn *msg,
 /* File streams */
 /* ------------------------------------------------------------------------- */
 
-c2_status c2_session_upload(c2_agent_session *s, c2_str token,
-                            const uint8_t *data, size_t len) {
-  if (s == NULL || (len > 0 && data == NULL))
+c2_status c2_session_upload_stream(c2_agent_session *s, c2_str token,
+                                   c2_upload_reader_fn next, void *ctx) {
+  if (s == NULL || next == NULL)
     return C2_ERR_ARG;
 
   c2_secureconn sc;
@@ -496,28 +498,42 @@ c2_status c2_session_upload(c2_agent_session *s, c2_str token,
   if (st != C2_OK)
     return st;
 
-  size_t gz_cap = c2_gzip_bound(len);
+  /* One chunk per gzip member: the file is never held in memory, and the
+   * operator's gzip reader continues across members transparently. */
+  const size_t chunk = 1024u * 1024u;
+  size_t gz_cap = c2_gzip_bound(chunk);
+  uint8_t *in = (uint8_t *)malloc(chunk);
   uint8_t *gz = (uint8_t *)malloc(gz_cap);
-  if (gz == NULL) {
+  if (in == NULL || gz == NULL) {
+    free(in);
+    free(gz);
     c2_secureconn_close(&sc);
     return C2_ERR_NOMEM;
   }
-  size_t gz_len = 0;
-  st = c2_gzip_compress(data, len, gz, gz_cap, &gz_len);
-  /* Write the gzip stream in frames; the C2 relays the bytes verbatim. */
-  const size_t chunk = 1024u * 1024u;
-  for (size_t off = 0; st == C2_OK && off < gz_len; off += chunk) {
-    size_t n = gz_len - off < chunk ? gz_len - off : chunk;
-    st = c2_secureconn_write_bulk(&sc, gz + off, n);
+
+  for (;;) {
+    size_t n = 0;
+    st = next(ctx, in, chunk, &n);
+    if (st != C2_OK || n == 0)
+      break;
+    size_t gz_len = 0;
+    st = c2_gzip_compress(in, n, gz, gz_cap, &gz_len);
+    if (st != C2_OK)
+      break;
+    st = c2_secureconn_write_bulk(&sc, gz, gz_len);
+    if (st != C2_OK)
+      break;
   }
+
+  free(in);
   free(gz);
   c2_secureconn_close(&sc);
   return st;
 }
 
-c2_status c2_session_download(c2_agent_session *s, c2_str name, uint8_t *out,
-                              size_t out_cap, size_t *out_len) {
-  if (s == NULL || out == NULL || out_len == NULL)
+c2_status c2_session_download_stream(c2_agent_session *s, c2_str name,
+                                     c2_download_sink_fn sink, void *ctx) {
+  if (s == NULL || sink == NULL)
     return C2_ERR_ARG;
 
   c2_secureconn sc;
@@ -525,23 +541,54 @@ c2_status c2_session_download(c2_agent_session *s, c2_str name, uint8_t *out,
   if (st != C2_OK)
     return st;
 
-  size_t total = 0;
+  const size_t chunk = 64u * 1024u;
+  uint8_t *buf = (uint8_t *)malloc(chunk);
+  if (buf == NULL) {
+    c2_secureconn_close(&sc);
+    return C2_ERR_NOMEM;
+  }
+
   for (;;) {
-    if (total >= out_cap) {
-      st = C2_ERR_NOMEM;
-      break;
-    }
-    long n = c2_secureconn_read(&sc, out + total, out_cap - total);
+    long n = c2_secureconn_read(&sc, buf, chunk);
     if (n < 0) {
       st = (c2_status)n;
       break;
     }
     if (n == 0)
       break; /* clean EOF: the operator closed the stream */
-    total += (size_t)n;
+    st = sink(ctx, buf, (size_t)n);
+    if (st != C2_OK)
+      break;
   }
+
+  free(buf);
   c2_secureconn_close(&sc);
+  return st;
+}
+
+typedef struct {
+  uint8_t *out;
+  size_t cap;
+  size_t len;
+} download_buffer;
+
+static c2_status buffer_sink(void *vctx, const uint8_t *data, size_t len) {
+  download_buffer *b = (download_buffer *)vctx;
+  if (len > b->cap - b->len)
+    return C2_ERR_NOMEM;
+  memcpy(b->out + b->len, data, len);
+  b->len += len;
+  return C2_OK;
+}
+
+c2_status c2_session_download(c2_agent_session *s, c2_str name, uint8_t *out,
+                              size_t out_cap, size_t *out_len) {
+  if (s == NULL || out == NULL || out_len == NULL)
+    return C2_ERR_ARG;
+
+  download_buffer b = {out, out_cap, 0};
+  c2_status st = c2_session_download_stream(s, name, buffer_sink, &b);
   if (st == C2_OK)
-    *out_len = total;
+    *out_len = b.len;
   return st;
 }

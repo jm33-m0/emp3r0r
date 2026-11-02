@@ -48,6 +48,15 @@ typedef struct c2_crypto_backend {
              uint8_t out[C2_MD5_BYTES]);
 
   /*
+   * Streaming SHA-256 for data that must not be held in memory, such as a file
+   * streamed to disk. _new returns an opaque handle (NULL when the backend
+   * cannot stream); _final writes the digest and releases the handle.
+   */
+  void *(*sha256_new)(void *ctx);
+  int (*sha256_update)(void *ctx, void *h, const uint8_t *data, size_t len);
+  int (*sha256_final)(void *ctx, void *h, uint8_t out[C2_SHA256_BYTES]);
+
+  /*
    * HKDF-SHA256 (RFC 5869). salt/info may be NULL when their length is 0.
    * `out_len` may be any length up to 255*32.
    */

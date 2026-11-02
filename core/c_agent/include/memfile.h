@@ -18,6 +18,8 @@
 
 #include "crypto.h"
 
+#include <string.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -48,6 +50,16 @@ void c2_memfile_free(c2_memfile *m);
 
 /* Canonical key: "memfs:///" + the basename of `name`. Returns its length. */
 size_t c2_memfile_key(const char *name, size_t name_len, char *out, size_t cap);
+
+/* Whether `path` names a memfs entry rather than a disk path. */
+static inline int c2_memfile_is_path(const char *path) {
+  return path != NULL && strncmp(path, "memfs://", 8) == 0;
+}
+
+/* Canonical key for a user-supplied memfs path ("memfs:///k" or "memfs://k"),
+ * preserving everything after the scheme. Returns the key length, or 0 when
+ * the path is not a memfs path or does not fit in `cap`. */
+size_t c2_memfile_path_key(const char *path, char *out, size_t cap);
 
 /* Transparent write: gzip then encrypt, then store (replacing any prior
  * entry). Returns C2_ERR_NOMEM when the byte budget would be exceeded. */

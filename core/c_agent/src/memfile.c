@@ -76,6 +76,25 @@ size_t c2_memfile_key(const char *name, size_t name_len, char *out,
   return prefix_len + base_len;
 }
 
+size_t c2_memfile_path_key(const char *path, char *out, size_t cap) {
+  static const char scheme[] = "memfs://";
+  if (path == NULL || out == NULL || cap == 0)
+    return 0;
+  if (strncmp(path, scheme, sizeof(scheme) - 1) != 0)
+    return 0;
+  const char *rest = path + sizeof(scheme) - 1;
+  while (*rest == '/')
+    rest++;
+  size_t rest_len = strlen(rest);
+  size_t prefix_len = sizeof(C2_MEMFILE_PREFIX) - 1;
+  if (rest_len == 0 || prefix_len + rest_len + 1 > cap)
+    return 0;
+  memcpy(out, C2_MEMFILE_PREFIX, prefix_len);
+  memcpy(out + prefix_len, rest, rest_len);
+  out[prefix_len + rest_len] = '\0';
+  return prefix_len + rest_len;
+}
+
 c2_status c2_memfile_write(c2_memfile *m, c2_str key, const uint8_t *data,
                            size_t len) {
   if (m == NULL || m->be == NULL)
