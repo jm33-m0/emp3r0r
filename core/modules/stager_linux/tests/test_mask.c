@@ -11,6 +11,7 @@
 #define _GNU_SOURCE
 #include <dlfcn.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,6 +28,16 @@ typedef int (*mask_fn)(unsigned seconds, uintptr_t probe, void *stack_top,
 #define STACK_SIZE (64u * 1024u)
 
 static volatile unsigned char *g_canary;
+
+/* glibc keeps joined thread stacks mapped, and a stack's guard page can be
+ * merged into the reported VMA while staying unreadable. Range discovery must
+ * not fault reading such a mapping's base. */
+static void *touch_stack(void *arg) {
+  volatile unsigned char buf[16u * 1024u];
+  for (size_t i = 0; i < sizeof(buf); i++)
+    buf[i] = (unsigned char)((uintptr_t)arg + i);
+  return NULL;
+}
 
 static int read_mem(int fd, uintptr_t addr, void *buf, size_t len) {
   size_t off = 0;
@@ -65,6 +76,17 @@ int main(void) {
   }
   for (uintptr_t i = 0; i < CANARY_SIZE; i++)
     g_canary[i] = (unsigned char)(0x11u * (unsigned)i + 0x5au);
+
+  /* Fill and join threads so glibc caches their stacks. The cache keeps each
+   * guard page unreadable while /proc/self/maps can merge the stacks into one
+   * readable-looking VMA. */
+  pthread_t threads[3];
+  for (size_t i = 0; i < 3; i++)
+    if (pthread_create(&threads[i], NULL, touch_stack, (void *)(uintptr_t)i) !=
+        0)
+      return 2;
+  for (size_t i = 0; i < 3; i++)
+    (void)pthread_join(threads[i], NULL);
 
   int go[2], ready[2];
   if (pipe(go) != 0 || pipe(ready) != 0)

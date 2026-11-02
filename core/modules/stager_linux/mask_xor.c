@@ -334,10 +334,14 @@ static size_t find_ranges(struct mask_scratch *sc, uintptr_t keep_start,
 
   /* Every anonymous ELF image: the live agent and any decompressed copy
    * malasada left behind. Adding all PT_LOAD mappings, not just the header
-   * mapping, is what makes the r-xp code segment actually masked. */
+   * mapping, is what makes the r-xp code segment actually masked. Only
+   * read-only mappings are inspected: a thread stack is writable and glibc
+   * can merge its unreadable guard page into the stack VMA, so a load at that
+   * base faults even where the mapping is reported readable. Every in-memory
+   * image maps its header segment read-only. */
   for (size_t i = 0; i < nmaps; i++) {
     if (!maps[i].anonymous || !(maps[i].prot & PROT_READ) ||
-        maps[i].end - maps[i].start < 4)
+        (maps[i].prot & PROT_WRITE) || maps[i].end - maps[i].start < 4)
       continue;
     const uint8_t *m = (const uint8_t *)maps[i].start;
     if (m[0] != 0x7f || m[1] != 'E' || m[2] != 'L' || m[3] != 'F')

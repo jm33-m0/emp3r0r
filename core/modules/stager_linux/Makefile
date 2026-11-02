@@ -385,7 +385,7 @@ $(MASK_TEST_LIB): mask.c $(MASK_DEPS) $(MASK_SRC) | tests
 	$(CC) -O2 -fPIC -shared -I. -I../../c_agent/include -o $@ mask.c $(MASK_SRC) $(MASK_EXTRA_SRC)
 
 $(MASK_TEST_BIN): tests/test_mask.c | tests
-	$(CC) -O2 -I. -o $@ tests/test_mask.c -ldl
+	$(CC) -O2 -I. -o $@ tests/test_mask.c -ldl -pthread
 
 tests:
 	mkdir -p tests
