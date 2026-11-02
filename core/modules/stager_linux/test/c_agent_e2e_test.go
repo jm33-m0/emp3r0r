@@ -8,6 +8,7 @@ import (
 	"debug/elf"
 	"encoding/base64"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -61,9 +62,7 @@ func TestCAgentEndToEnd(t *testing.T) {
 // test can delay them (for example to observe a sleep-mask cycle first).
 func setupCAgentWorkspace(t *testing.T, tmpDir string) string {
 	t.Helper()
-	c2Port := util.RandInt(50000, 60000)
-	c2PortStr := fmt.Sprintf("%d", c2Port)
-	c2HTTPPortStr := fmt.Sprintf("%d", c2Port+1)
+	c2PortStr, c2HTTPPortStr := freePortPair(t)
 
 	live.EmpWorkSpace = tmpDir
 	live.IsServer = true
@@ -284,13 +283,15 @@ func runCAgentEndToEnd(t *testing.T, format string) {
 	// --- BOF execution: dispatch the `hello_linux` coff module, exactly like
 	// the operator console does. The operator message tunnel serves the module
 	// download over the www route. ---
-	hostBOFModules(t)
+	hostBOFModules(t, agent)
 	// Bind the operator service to loopback: the test host has no WireGuard
 	// address, and loopback makes the C2 trust the operator_session header.
 	origWGServerIP := wireguard.WgServerIP
 	wireguard.WgServerIP = "127.0.0.1"
 	t.Cleanup(func() { wireguard.WgServerIP = origWGServerIP })
-	opPort := util.RandInt(50000, 60000)
+	// Probe for a free port: a random one can collide with a listener left by an
+	// earlier subtest, which aborts the run with a bind error.
+	opPort := freeLoopbackPort(t)
 	go server.StartOperatorServer(opPort)
 	waitForC2Listener(t, fmt.Sprintf("127.0.0.1:%d", opPort))
 	// The www relay needs exactly one online operator; drop the placeholder the
@@ -313,6 +314,12 @@ func runCAgentEndToEnd(t *testing.T, format string) {
 		checksum, strconv.Quote(invB64))
 	if got := runC2Command(t, agent, doneChan, &agentOut, customCmd); !strings.Contains(got, "Hello BOF Tester!") {
 		t.Fatalf("custom_module output = %q\nAgent output:\n%s", got, agentOut.String())
+	}
+
+	// --- File transfer: real module dispatch, both directions, 70 MiB ---
+	// Runs once: the transfer path does not depend on the agent's delivery form.
+	if format == "exe" {
+		runFileTransferChecks(t, agent, doneChan, &agentOut)
 	}
 
 	// A portable BOF: the same SA_linux pwd source compiled as an RV32 object
@@ -471,7 +478,7 @@ func runC2Command(t *testing.T, agent *def.Emp3r0rAgent, doneChan <-chan error, 
 // this target.
 // hostBOFModules builds the Linux BOF and its loader and hosts them as
 // `<name>.amd64.gz` under paths.WWWRoot, the way the C2 hosts a module.
-func hostBOFModules(t *testing.T) {
+func hostBOFModules(t *testing.T, agent *def.Emp3r0rAgent) {
 	t.Helper()
 	coreDir, err := filepath.Abs(filepath.Join("..", "..", ".."))
 	if err != nil {
@@ -501,6 +508,14 @@ func hostBOFModules(t *testing.T) {
 		if werr := os.WriteFile(filepath.Join(ww, hosted), gz, 0o600); werr != nil {
 			t.Fatalf("host %s: %v", hosted, werr)
 		}
+		// The C2 only serves a www name an operator registered for the agent.
+		// The test runs the C2 and the operator in one process, so the local
+		// registry is the one the relay consults.
+		network.WWWDownloads.Store("name:"+hosted, &network.WWWDownload{
+			Name:            hosted,
+			AgentUUID:       agent.UUID,
+			OperatorSession: "c-agent-test-operator",
+		})
 	}
 	host := func(moduleDir, src, hosted string, extraArgs ...string) {
 		buildModule(moduleDir, extraArgs...)
@@ -543,6 +558,62 @@ func hostBOFModules(t *testing.T) {
 		host("modules/SA_linux", "SA/src/pwd.o", "sa_linux_pwd.amd64.gz")
 		host("modules/SA_linux", "SA/src/cat.o", "sa_linux_cat.amd64.gz")
 	}
+}
+
+// freeLoopbackPort reserves and releases a loopback port so the operator
+// service can bind it without racing another listener.
+// freePortPair reserves and releases two consecutive loopback ports for the
+// TLS frontend and the plain-HTTP endpoint. A random port collides with a
+// listener an earlier subtest has not shut down yet.
+func freePortPair(t *testing.T) (string, string) {
+	t.Helper()
+	for attempt := 0; attempt < 64; attempt++ {
+		first, ok := tryFreePort(t)
+		if !ok {
+			continue
+		}
+		if _, ok := tryFreePortOn(t, first+1); !ok {
+			continue
+		}
+		return fmt.Sprintf("%d", first), fmt.Sprintf("%d", first+1)
+	}
+	t.Fatalf("no free port pair for the C2 endpoints")
+	return "", ""
+}
+
+func tryFreePort(t *testing.T) (int, bool) {
+	t.Helper()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return 0, false
+	}
+	port := l.Addr().(*net.TCPAddr).Port
+	_ = l.Close()
+	return port, true
+}
+
+func tryFreePortOn(t *testing.T, port int) (int, bool) {
+	t.Helper()
+	if port > 65535 {
+		return 0, false
+	}
+	l, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	if err != nil {
+		return 0, false
+	}
+	_ = l.Close()
+	return port, true
+}
+
+func freeLoopbackPort(t *testing.T) int {
+	t.Helper()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("probe free port: %v", err)
+	}
+	port := l.Addr().(*net.TCPAddr).Port
+	_ = l.Close()
+	return port
 }
 
 // startCAgentOperator connects a minimal operator message tunnel to the C2 and
@@ -590,20 +661,44 @@ func startCAgentOperator(t *testing.T, opPort int) {
 			if err := dec.Decode(&msg); err != nil {
 				return
 			}
+			if testFTPRelayMessage(msg.Tag, msg.Response) {
+				continue
+			}
 			if !strings.HasPrefix(msg.Tag, def.TagWWWRelayRequestPrefix) {
 				continue
 			}
 			streamID := strings.TrimPrefix(msg.Tag, def.TagWWWRelayRequestPrefix)
-			t.Logf("operator: www relay request %q", streamID)
+			logging.Debugf("operator: www relay request %q", streamID)
 			go func() {
+				// Only files this operator registered for an agent are served,
+				// like serveWWWRelay.
+				val, found := network.WWWDownloads.Load("name:" + filepath.Base(streamID))
+				if !found {
+					logging.Warningf("operator: refusing unregistered download %q", streamID)
+					_ = send(&def.OperatorMsg{Tag: def.TagWWWRelayErrorPrefix + streamID, Response: []byte("unregistered download")})
+					return
+				}
+				dl, _ := val.(*network.WWWDownload)
+				defer func() {
+					network.WWWDownloads.Delete("name:" + filepath.Base(streamID))
+					if dl != nil && dl.Transient {
+						_ = os.Remove(filepath.Join(paths.WWWRoot, dl.Name))
+					}
+				}()
 				data, err := os.ReadFile(filepath.Join(paths.WWWRoot, filepath.Base(streamID)))
 				if err != nil {
 					_ = send(&def.OperatorMsg{Tag: def.TagWWWRelayErrorPrefix + streamID, Response: []byte(err.Error())})
 					return
 				}
-				if err := send(&def.OperatorMsg{Tag: def.TagWWWRelayDataPrefix + streamID, Response: data}); err != nil {
-					t.Logf("www relay send: %v", err)
-					return
+				// Chunk like serveWWWRelay: one operator message per 64 KiB, so a
+				// large body stays inside the tunnel frame limit.
+				const chunkSize = 64 * 1024
+				for off := 0; off < len(data); off += chunkSize {
+					end := min(off+chunkSize, len(data))
+					if err := send(&def.OperatorMsg{Tag: def.TagWWWRelayDataPrefix + streamID, Response: data[off:end]}); err != nil {
+						logging.Warningf("www relay send: %v", err)
+						return
+					}
 				}
 				_ = send(&def.OperatorMsg{Tag: def.TagWWWRelayDonePrefix + streamID})
 			}()
@@ -655,7 +750,9 @@ func buildCAgentResult(t *testing.T, tmpDir, format string, stager bool) *builde
 			PollInterval: &pollInterval,
 			Jitter:       &jitter,
 		},
-		builder.CAgentProviders{Dynload: dynload, Format: format, Libc: libc},
+		// Pin the oldest supported glibc ABI so the test agent runs on any host,
+		// not only on the machine that built it.
+		builder.CAgentProviders{Dynload: dynload, Glibc: "2.17", Format: format, Libc: libc},
 		func(u string) (string, error) { return signUUID(u, transport.CaKeyFile) },
 	)
 	if err != nil {
@@ -675,6 +772,7 @@ func buildLocalStager(t *testing.T, tmpDir, picPath, stagerFormat string) []stri
 	}
 	build := exec.Command("./build.sh",
 		"--format", stagerFormat,
+		"--dynload-mode", "auto",
 		"--agent-pic", picPath)
 	build.Dir = stagerDir
 	build.Env = append(os.Environ(), "CGO_ENABLED=0")
