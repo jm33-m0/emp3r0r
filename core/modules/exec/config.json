@@ -1,0 +1,39 @@
+[
+  {
+    "name": "exec",
+    "author": "jm33-m0",
+    "date": "2026-11-02",
+    "comment": "Run a shell command; process spawning is not opsec",
+    "is_local": false,
+    "platform": "Linux",
+    "path": "",
+    "dependencies": ["coffloader_linux"],
+    "parameters": [
+      {
+        "name": "cmd",
+        "description": "Command line to run",
+        "default": "",
+        "type": "cstr",
+        "internal": false,
+        "required": true
+      },
+      {
+        "name": "mode",
+        "description": "shell: run through /bin/sh -c; exec: split the command line and exec it directly without a shell",
+        "default": "shell",
+        "choices": ["shell", "exec"],
+        "type": "cstr",
+        "internal": false,
+        "required": false
+      }
+    ],
+    "agent_config": {
+      "exec": "",
+      "type": "coff",
+      "files": ["exec.o"]
+    },
+    "invocation": {
+      "coff_export": "go"
+    }
+  }
+]
