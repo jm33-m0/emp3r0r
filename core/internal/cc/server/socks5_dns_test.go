@@ -37,6 +37,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/miekg/dns"
 )
 
@@ -76,29 +77,12 @@ func startRealDNSRelayServer(t *testing.T) (int, func()) {
 	// agents.SendCmd is the transport: instead of a TLS tunnel it feeds the
 	// command to the real agent-side command dispatcher. The handler reads the
 	// query/server flags and runs forwardDNSQuery against the real upstream.
+	origSendCmd := agents.SendCmd
 	agents.SendCmd = func(cmd, jobID string, a *def.Emp3r0rAgent) error {
 		if a == nil || !strings.Contains(cmd, def.C2CmdDNSQuery) {
 			return nil
 		}
-		parts := strings.Fields(cmd)
-		var queryB64, server string
-		for i, p := range parts {
-			if p == "--query" && i+1 < len(parts) {
-				queryB64 = parts[i+1]
-			}
-			if p == "--server" && i+1 < len(parts) {
-				server = parts[i+1]
-			}
-		}
-		// Reconstruct what the tunnel delivers to HandleC2Command.
-		cmdSlice := []string{def.C2CmdDNSQuery, "--token", jobID}
-		if queryB64 != "" {
-			cmdSlice = append(cmdSlice, "--query", queryB64)
-		}
-		if server != "" {
-			cmdSlice = append(cmdSlice, "--server", server)
-		}
-		handler.HandleC2Command(&def.MsgTunData{JobID: jobID, CmdSlice: cmdSlice})
+		handler.HandleC2Command(&def.MsgTunData{JobID: jobID, CmdSlice: util.ParseCmd(cmd)})
 		return nil
 	}
 
@@ -108,7 +92,7 @@ func startRealDNSRelayServer(t *testing.T) (int, func()) {
 	}
 	return port, func() {
 		_ = StopSocks5Proxy(port, "")
-		agents.SendCmd = nil
+		agents.SendCmd = origSendCmd
 		live.ForgetAgent(agent.UUID)
 		_ = agentPipe.Close()
 		_ = ccPipe.Close()

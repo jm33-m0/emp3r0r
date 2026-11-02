@@ -21,6 +21,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
+	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
 // startUDPAssociateTest starts a SOCKS5 pivot whose agent answers !dns_query
@@ -32,6 +33,7 @@ func startUDPAssociateTest(t *testing.T) (int, func()) {
 	srv, _ := net.Pipe()
 	live.PublishAgent(&live.AgentRecord{Agent: agent, Control: &live.AgentControl{Index: 0, Conn: srv}})
 
+	origSendCmd := agents.SendCmd
 	agents.SendCmd = func(cmd, jobID string, a *def.Emp3r0rAgent) error {
 		if a == nil || !strings.Contains(cmd, def.C2CmdDNSQuery) {
 			return nil
@@ -54,9 +56,9 @@ func startUDPAssociateTest(t *testing.T) (int, func()) {
 	}
 	return port, func() {
 		// Stop first: StopSocks5Proxy drains in-flight handlers, so none can
-		// still be calling agents.SendCmd when we nil it.
+		// still be calling agents.SendCmd when we restore it.
 		_ = StopSocks5Proxy(port, "")
-		agents.SendCmd = nil
+		agents.SendCmd = origSendCmd
 		live.ForgetAgent(agent.UUID)
 		_ = srv.Close()
 	}
@@ -182,8 +184,11 @@ func TestSocks5UDPAssociateConcurrentQueries(t *testing.T) {
 			t.Fatalf("read: %v (got %v)", err, got)
 		}
 		_, _, start, ok := parseSocks5UDPAddr(b[:n])
-		if !ok || n-start < 2 {
+		if !ok || n-start < 12 {
 			continue
+		}
+		if rcode := binary.BigEndian.Uint16(b[start+2:start+4]) & 0xf; rcode != 0 {
+			t.Fatalf("unexpected rcode %d in reply: %x", rcode, b[start:n])
 		}
 		got[binary.BigEndian.Uint16(b[start:start+2])] = true
 	}
@@ -202,6 +207,7 @@ func TestSocks5UDPAssociateAgentErrorSynthesizesServfail(t *testing.T) {
 	srv, _ := net.Pipe()
 	live.PublishAgent(&live.AgentRecord{Agent: agent, Control: &live.AgentControl{Index: 0, Conn: srv}})
 
+	origSendCmd := agents.SendCmd
 	agents.SendCmd = func(cmd, jobID string, a *def.Emp3r0rAgent) error {
 		if a == nil || !strings.Contains(cmd, def.C2CmdDNSQuery) {
 			return nil
@@ -216,7 +222,7 @@ func TestSocks5UDPAssociateAgentErrorSynthesizesServfail(t *testing.T) {
 	}
 	defer func() {
 		_ = StopSocks5Proxy(port, "")
-		agents.SendCmd = nil
+		agents.SendCmd = origSendCmd
 		live.ForgetAgent(agent.UUID)
 		_ = srv.Close()
 	}()
@@ -291,7 +297,7 @@ func fakeAgentDNSReply(query []byte) []byte {
 
 // flagValue returns the value following flag in a command line ("" if absent).
 func flagValue(cmd, flag string) string {
-	parts := strings.Fields(cmd)
+	parts := util.ParseCmd(cmd)
 	for i, p := range parts {
 		if p == flag && i+1 < len(parts) {
 			return parts[i+1]
