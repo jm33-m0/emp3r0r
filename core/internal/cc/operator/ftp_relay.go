@@ -29,11 +29,21 @@ func newRelayFTPConn() *relayFTPConn {
 
 func (c *relayFTPConn) Read(p []byte) (int, error) {
 	for len(c.buf) == 0 {
-		chunk, ok := <-c.ch
-		if !ok {
-			return 0, io.EOF
+		select {
+		case chunk := <-c.ch:
+			c.buf = chunk
+		case <-c.closed:
+			// The transfer is over, but a frame that was already queued still
+			// belongs to the stream: the receiver's gzip reader fails with
+			// "unexpected EOF" if the tail is dropped.
+			select {
+			case chunk := <-c.ch:
+				c.buf = chunk
+				continue
+			default:
+				return 0, io.EOF
+			}
 		}
-		c.buf = chunk
 	}
 	n := copy(p, c.buf)
 	c.buf = c.buf[n:]
@@ -45,23 +55,26 @@ func (c *relayFTPConn) Write(_ []byte) (int, error) {
 }
 
 func (c *relayFTPConn) Close() error {
-	c.once.Do(func() {
-		close(c.ch)
-		close(c.closed)
-	})
+	// The queue is never closed: a frame can arrive after the transfer ends,
+	// and sending on a closed channel would panic. Readers stop on c.closed
+	// once the queue is empty.
+	c.once.Do(func() { close(c.closed) })
 	return nil
 }
 
 func (c *relayFTPConn) Push(data []byte) error {
+	chunk := append([]byte(nil), data...)
 	select {
 	case <-c.closed:
 		return io.EOF
 	default:
 	}
-	chunk := make([]byte, len(data))
-	copy(chunk, data)
-	c.ch <- chunk
-	return nil
+	select {
+	case c.ch <- chunk:
+		return nil
+	case <-c.closed:
+		return io.EOF
+	}
 }
 
 var ftpRelayConns sync.Map // map[token]*relayFTPConn
