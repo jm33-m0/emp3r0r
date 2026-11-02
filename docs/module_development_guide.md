@@ -222,6 +222,7 @@ value in the module invocation.
 | `choices`     | Restrict the value to one of a fixed list. Enforced for `coff`/`dll`, **not** for `starlark`.                                                           |
 | `min`, `max`  | Numeric bounds, enforced for `int`/`uint`/`short` on `coff`/`dll` modules. Not enforced for `starlark`.                                                 |
 | `argv_flag`   | Prefix inserted before the value when building the argv list, e.g. `--user`. Only affects `starlark`; BOF arguments are packed from the type, not argv. |
+| `internal`    | The C2 fills the value in before the invocation is packed. The parameter is still packed as a BOF argument but gets no console flag, so operators are never asked for a value only the C2 can know. Use it for upload stream tokens and hosted file names. |
 
 Avoid the name `help` for a parameter: it collides with the built-in
 `--help` flag.
@@ -314,10 +315,11 @@ On the C2 (`moduleCustom`):
 1. If `build` is set, run it in the module directory with the current flags.
 2. If `is_local` is true, stop: the module ran on the C2 with no target
    required and no platform check (see §1).
-3. Resolve and validate the invocation from the console flags.
-4. Pre-host every `dependencies` payload for the target architecture so a
+3. Fill the `internal` parameters the C2 owns, e.g. an upload stream token.
+4. Resolve and validate the invocation from the console flags.
+5. Pre-host every `dependencies` payload for the target architecture so a
    missing dependency fails fast.
-5. Compress the selected payload with gzip into `WWWRoot` and send the agent a
+6. Compress the selected payload with gzip into `WWWRoot` and send the agent a
    `!custom_module` job:
 
    ```text
@@ -706,6 +708,7 @@ Pair with the `scshell` BOF to execute an uploaded file on the target.
 | `procinfo`                      | Minimal Linux Starlark module that reads `/proc`.                                                                          |
 | `SA/`                           | A suite of Windows Starlark modules, including token inspection in `whoami.star`.                                          |
 | `SA_linux/`                     | TrustedSec ELFLoader SA BOFs ported to Linux; requires a dynamically linked agent with libc.                               |
+| `file_transfer_bof/`            | `get_file`: streams an agent file to the operator over the registered FTP route; `put` is the operator upload command.        |
 | `cifs/`                         | Token/ticket-aware SMB I/O.                                                                                                |
 | `kkyum/`                        | Multi-file Starlark module loading a kernel driver from a companion `.sys` cached in memfs (`module_files_memfs`).         |
 | `injection/`                    | Remote thread injection under an operator-selected token.                                                                  |

@@ -80,6 +80,17 @@ Both are reached by the C2's `!custom_module --type <coff|rv> ...` dispatch
 and share `src/module.c` (invocation decoding) and `src/util/elfload.c`. Set
 `BOF=0`/`RVVM=0` to compile either out.
 
+The BOF host bridge exposes `ReadFile`, `WriteFile`, `UploadFile`, and
+`Sha256Hex`. `UploadFile` streams the named file through the FTP route in chunks,
+so the `get_file` BOF never holds the file in memory; the same BOF runs as an
+RV32 guest, with the primitives forwarded through the `rvvm_linux` syscall gate.
+
+Operator uploads (`put`) need no BOF: the agent streams the www route into the
+destination and verifies the digest after the transfer, using the same download
+primitive a module payload uses. Every download is operator-registered: the C2
+refuses a name no operator registered for this agent. See
+[`docs/file_transfer_bof.md`](../../docs/file_transfer_bof.md).
+
 ### Output formats
 
 `agent` is a hosted executable, `so` is a PIC `ET_DYN` shared object exporting

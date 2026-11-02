@@ -108,6 +108,11 @@ the RV32 Linux ABI for the calls used by musl and common BOFs:
 Unsupported calls return `-ENOSYS`. Adding a capability normally means adding
 a library or a syscall case, not a BOF-specific proxy.
 
+The C agent additionally installs four private host-call syscalls for storage
+and C2 session primitives: `ReadFile`, `WriteFile`, `UploadFile`, and
+`Sha256Hex`. They are used by `get_file`; when the interpreter is run without the
+host bridge they return `-ENOSYS`.
+
 ## Constraints
 
 - RV32IMA only; no compressed instructions, no floating point, no MMU.
