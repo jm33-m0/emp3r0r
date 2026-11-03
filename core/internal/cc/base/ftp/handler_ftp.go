@@ -230,17 +230,53 @@ func HandleFTPStream(conn io.ReadWriteCloser, token, remoteAddr string, cancel c
 	logging.Debugf("Initial sizes: target %d, current %d", targetSize, nowSize)
 	go progressMonitor(bar, filewrite, targetFile, targetSize)
 
-	// On-exit cleanup.
+	// On-exit cleanup. The destination is finalized before the stream
+	// registration is dropped: the operator treats a vanished registration as
+	// the end of the transfer and immediately inspects the destination, so the
+	// rename and the lock removal have to be done by then or a finished
+	// transfer looks truncated to the caller.
 	cleanup := func() {
 		// Close the write handle before measuring and renaming: Windows refuses
 		// to rename a file that is still open, and the size/checksum must be
 		// taken after the data is flushed.
 		_ = f.Close()
 
+		nowSize = util.FileSize(filewrite)
+		targetSize = util.FileSize(targetFile)
+		if targetSize == 0 && sh.ExpectedSize > 0 {
+			targetSize = sh.ExpectedSize
+		}
+		switch {
+		case nowSize == targetSize && nowSize >= 0:
+			// Verify the digest before publishing: the renamed file is what the
+			// operator keeps, so a mismatch must not reach the destination path.
+			// A token whose checksum part is empty carries no expected digest:
+			// the agent could not hash the file, so the transferred size is the
+			// only integrity check.
+			checksum := crypto.SHA256SumFile(filewrite)
+			if mustHaveChecksum != "" && checksum != mustHaveChecksum {
+				logging.Notify(logging.ERROR,
+					"%s: checksum mismatch: got %s, want %s, left in %s",
+					targetFile, checksum, mustHaveChecksum, filewrite)
+				break
+			}
+			if renameErr := os.Rename(filewrite, targetFile); renameErr != nil {
+				logging.Errorf("Rename file error %s: %v", targetFile, renameErr)
+				break
+			}
+			logging.Notify(logging.SUCCESS, "Downloaded %d bytes to %s (%s)", nowSize, targetFile, checksum)
+		case nowSize > targetSize:
+			logging.Notify(logging.ERROR, "%s: downloaded (%d of %d bytes), error", targetFile, nowSize, targetSize)
+		default:
+			logging.Warningf("Incomplete download: %.4f%% (%d of %d bytes)", float64(nowSize)*100/float64(targetSize), nowSize, targetSize)
+		}
+		if rmErr := os.Remove(lock); rmErr != nil {
+			logging.Warningf("Remove lock %s: %v", lock, rmErr)
+		}
+
 		if sh != nil {
-			err = sh.Close()
-			if err != nil {
-				logging.Errorf("Failed to close connection: %v", err)
+			if closeErr := sh.Close(); closeErr != nil {
+				logging.Errorf("Failed to close connection: %v", closeErr)
 			}
 			if sh.Cancel != nil {
 				sh.Cancel()
@@ -249,36 +285,6 @@ func HandleFTPStream(conn io.ReadWriteCloser, token, remoteAddr string, cancel c
 		network.FTPStreams.Delete(mapKey)
 		network.FTPStreams.Delete("token:" + token)
 		logging.Warningf("Closed FTP connection from %s", remoteAddr)
-		err = os.Remove(lock)
-		if err != nil {
-			logging.Warningf("Remove lock %s: %v", lock, err)
-		}
-		nowSize = util.FileSize(filewrite)
-		targetSize = util.FileSize(targetFile)
-		if targetSize == 0 && sh.ExpectedSize > 0 {
-			targetSize = sh.ExpectedSize
-		}
-		if nowSize == targetSize && nowSize >= 0 {
-			err = os.Rename(filewrite, targetFile)
-			if err != nil {
-				logging.Errorf("Rename file error %s: %v", targetFile, err)
-			}
-			checksum := crypto.SHA256SumFile(targetFile)
-			// A token whose checksum part is empty carries no expected digest:
-			// the agent could not hash the file, so the transferred size is the
-			// only integrity check.
-			if mustHaveChecksum == "" || checksum == mustHaveChecksum {
-				logging.Notify(logging.SUCCESS, "Downloaded %d bytes to %s (%s)", nowSize, targetFile, checksum)
-				return
-			}
-			logging.Notify(logging.ERROR, "%s downloaded but checksum mismatch: %s vs %s", targetFile, checksum, mustHaveChecksum)
-			return
-		}
-		if nowSize > targetSize {
-			logging.Notify(logging.ERROR, "%s: downloaded (%d of %d bytes), error", targetFile, nowSize, targetSize)
-			return
-		}
-		logging.Warningf("Incomplete download: %.4f%% (%d of %d bytes)", float64(nowSize)*100/float64(targetSize), nowSize, targetSize)
 	}
 	defer cleanup()
 

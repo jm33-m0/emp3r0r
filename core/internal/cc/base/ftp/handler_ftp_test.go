@@ -2,11 +2,17 @@ package ftp
 
 import (
 	"bytes"
+	"compress/gzip"
+	"crypto/sha256"
 	"errors"
+	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
@@ -225,5 +231,157 @@ func TestFileAllocate_BoundsAndDirGuard(t *testing.T) {
 	}
 	if err := util.FileAllocate(tmpDir, 64); err == nil {
 		t.Fatal("expected error when FileAllocate targets an existing directory")
+	}
+}
+
+// streamConn feeds a fixed byte stream to the receiver; bytes.Reader reports a
+// clean io.EOF once the stream is exhausted, which is what the agent's
+// connection does at the end of an upload.
+type streamConn struct {
+	r *bytes.Reader
+}
+
+func (c *streamConn) Read(p []byte) (int, error)  { return c.r.Read(p) }
+func (c *streamConn) Write(p []byte) (int, error) { return len(p), nil }
+func (c *streamConn) Close() error                { return nil }
+
+// gzipStream compresses payload the way the agent does, one gzip member for the
+// whole body.
+func gzipStream(t *testing.T, payload []byte) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	if _, err := gz.Write(payload); err != nil {
+		t.Fatalf("gzip write: %v", err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatalf("gzip close: %v", err)
+	}
+	return buf.Bytes()
+}
+
+// receiveOneTransfer registers an FTP stream for remotePath, feeds it `stream`
+// through the real receiver, and returns once the receiver has unregistered the
+// stream, which is the signal an operator waits for.
+func receiveOneTransfer(t *testing.T, remotePath string, stream []byte, payloadSize int, checksum string) {
+	t.Helper()
+	token := util.RandHexString() + "-" + checksum
+	sh := &network.StreamHandler{
+		Token:           token,
+		OperatorSession: "test-operator",
+		ExpectedSize:    int64(payloadSize),
+		Checksum:        checksum,
+	}
+	network.FTPStreams.Store(remotePath, sh)
+	network.FTPStreams.Store("token:"+token, sh)
+	t.Cleanup(func() {
+		network.FTPStreams.Delete(remotePath)
+		network.FTPStreams.Delete("token:" + token)
+	})
+
+	go HandleFTPStream(&streamConn{r: bytes.NewReader(stream)}, token, "test", func() {})
+
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		if _, ok := network.FTPStreams.Load(remotePath); !ok {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("receiver never unregistered %s", remotePath)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// prepareDownloadDir points the receiver at a private download directory for
+// one test and reports the destination paths for remotePath.
+func prepareDownloadDir(t *testing.T, remotePath string) (saveToFile, tempname, lock string) {
+	t.Helper()
+	live.FileGetDir = t.TempDir()
+	writeDir, saveToFile, tempname, lock := GenerateGetFilePaths(remotePath)
+	if err := os.MkdirAll(writeDir, 0o700); err != nil {
+		t.Fatalf("mkdir %s: %v", writeDir, err)
+	}
+	return saveToFile, tempname, lock
+}
+
+// TestHandleFTPStreamFinalizesBeforeUnregistering pins the operator-visible
+// contract: a vanished stream registration means the destination is final, so a
+// caller that checks the destination right after the transfer ends never sees
+// the temp file of a transfer that is still being renamed.
+func TestHandleFTPStreamFinalizesBeforeUnregistering(t *testing.T) {
+	payload := bytes.Repeat([]byte("transfer-finalize-"), 8192)
+	compressed := gzipStream(t, payload)
+	digest := fmt.Sprintf("%x", sha256.Sum256(payload))
+	const remotePath = "/var/log/finalize.log"
+	saveToFile, tempname, lock := prepareDownloadDir(t, remotePath)
+
+	receiveOneTransfer(t, remotePath, compressed, len(payload), digest)
+
+	got, err := os.ReadFile(saveToFile)
+	if err != nil {
+		t.Fatalf("read %s: %v", saveToFile, err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Fatalf("%s: got %d bytes, want %d", saveToFile, len(got), len(payload))
+	}
+	if util.IsFileExist(tempname) {
+		t.Fatalf("temp file survived a completed transfer: %s", tempname)
+	}
+	if util.IsFileExist(lock) {
+		t.Fatalf("lock file survived a completed transfer: %s", lock)
+	}
+}
+
+// TestHandleFTPStreamMarksIncompleteTransfer keeps the other side of the
+// contract: a transfer that ends early keeps its temp file, so the caller can
+// tell it apart from a finished one instead of trusting a size-verified file
+// that is not complete. The lock only marks an in-progress transfer and is
+// always removed.
+func TestHandleFTPStreamMarksIncompleteTransfer(t *testing.T) {
+	payload := bytes.Repeat([]byte("truncated-body-"), 16384)
+	compressed := gzipStream(t, payload)
+	truncated := compressed[:len(compressed)/2]
+	digest := fmt.Sprintf("%x", sha256.Sum256(payload))
+	const remotePath = "/var/log/truncated.log"
+	saveToFile, tempname, lock := prepareDownloadDir(t, remotePath)
+
+	receiveOneTransfer(t, remotePath, truncated, len(payload), digest)
+
+	if !util.IsFileExist(tempname) {
+		t.Fatalf("truncated transfer did not leave its temp file: %s", tempname)
+	}
+	if util.IsFileExist(lock) {
+		t.Fatalf("truncated transfer left its lock file behind: %s", lock)
+	}
+	if util.IsFileExist(saveToFile) {
+		t.Fatalf("truncated transfer produced a final file: %s", saveToFile)
+	}
+}
+
+// TestHandleFTPStreamRejectsChecksumMismatch pins that the digest is verified
+// before the temp file is published. A same-size transfer with a different
+// digest must not appear at the destination: the operator keeps whatever is
+// there, and the transfer is reported as failed.
+func TestHandleFTPStreamRejectsChecksumMismatch(t *testing.T) {
+	payload := bytes.Repeat([]byte("tampered-body-"), 8192)
+	compressed := gzipStream(t, payload)
+	wrongDigest := fmt.Sprintf("%x", sha256.Sum256([]byte("something else")))
+	const remotePath = "/var/log/tampered.log"
+	saveToFile, tempname, lock := prepareDownloadDir(t, remotePath)
+
+	receiveOneTransfer(t, remotePath, compressed, len(payload), wrongDigest)
+
+	if util.IsFileExist(saveToFile) {
+		t.Fatalf("checksum mismatch was published to %s", saveToFile)
+	}
+	if !util.IsFileExist(tempname) {
+		t.Fatalf("checksum mismatch discarded the received bytes: %s", tempname)
+	}
+	if got := util.FileSize(tempname); got != int64(len(payload)) {
+		t.Fatalf("%s: kept %d bytes, want %d", tempname, got, len(payload))
+	}
+	if util.IsFileExist(lock) {
+		t.Fatalf("checksum mismatch left the lock behind: %s", lock)
 	}
 }
