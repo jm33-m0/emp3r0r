@@ -223,7 +223,10 @@ func downloadGetFileTransfer(target *def.Emp3r0rAgent, path string, flags map[st
 	}
 	_, saveToFile, tempname, lock := ftp.GenerateGetFilePaths(path)
 	if util.IsFileExist(tempname) || util.IsFileExist(lock) || !util.IsFileExist(saveToFile) {
-		return fmt.Errorf("%s: download did not complete", path)
+		// A transfer that never started has no temp file, and FileSize reports
+		// -1 for a missing path.
+		received := max(util.FileSize(tempname), 0)
+		return fmt.Errorf("%s: transfer stopped after %d bytes", path, received)
 	}
 	logging.Successf("Downloaded %s to %s", path, saveToFile)
 	return nil
@@ -252,9 +255,11 @@ func waitForGetFile(jobID, path string) error {
 	for {
 		if out, ok := live.CmdResultString(jobID); ok && !strings.Contains(out, " sent") {
 			live.CmdResults.Delete(jobID)
-			return fmt.Errorf("%s: %s", path, strings.TrimSpace(out))
+			return fmt.Errorf("%s: %s", path, strings.TrimSpace(util.SanitizeText(out)))
 		}
 		if _, ok := network.FTPStreams.Load(path); !ok {
+			// The receiver finalizes the destination before it unregisters the
+			// stream, so a vanished registration means the transfer is over.
 			return nil
 		}
 		if size := util.FileSize(tempname); size != lastSize {
