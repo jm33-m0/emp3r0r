@@ -29,6 +29,85 @@ typedef int (*mask_fn)(unsigned seconds, uintptr_t probe, void *stack_top,
 
 static volatile unsigned char *g_canary;
 
+/* A whole ELF file image in writable anonymous memory, the shape a loader's
+ * decompression buffer has. The provider masks it like any other anonymous
+ * image: leaving it readable would expose the payload for the whole sleep. */
+static void *g_file_copy;
+
+/* A writable anonymous mapping whose base holds an ELF header but only part of
+ * a file image, standing in for an image whose header page is writable. It has
+ * to be masked too, not skipped because it is writable. */
+static void *g_live_header;
+
+/* Copy a shared object into anonymous writable memory so the process holds a
+ * complete ELF file image, the way a loader's decompression buffer does. The
+ * wrapped payload is always a shared object (ET_DYN), which is what a live
+ * in-memory image can also be, so this is the shape the provider has to
+ * recognise. */
+static int build_file_copy(void) {
+  int fd = open("./tests/libmask_test.so", O_RDONLY);
+  if (fd < 0)
+    return -1;
+  off_t size = lseek(fd, 0, SEEK_END);
+  if (size <= 0 || lseek(fd, 0, SEEK_SET) != 0) {
+    close(fd);
+    return -1;
+  }
+  size_t len = ((size_t)size + 4095u) & ~(size_t)4095u;
+  size_t span = len + 2u * 4096u;
+  void *raw = mmap(NULL, span, PROT_READ | PROT_WRITE,
+                   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  if (raw == MAP_FAILED) {
+    close(fd);
+    return -1;
+  }
+  /* The first page is left unreadable so the kernel cannot merge the copy with
+   * the neighbouring mappings into one VMA: the ELF header has to stay at the
+   * base of the mapping for the provider to see it. */
+  if (mprotect(raw, 4096u, PROT_NONE) != 0 ||
+      mprotect((unsigned char *)raw + 4096u + len, 4096u, PROT_NONE) != 0) {
+    close(fd);
+    munmap(raw, span);
+    return -1;
+  }
+  unsigned char *map = (unsigned char *)raw + 4096u;
+  size_t off = 0;
+  while (off < (size_t)size) {
+    ssize_t n = pread(fd, map + off, (size_t)size - off, (off_t)off);
+    if (n <= 0) {
+      close(fd);
+      munmap(raw, span);
+      return -1;
+    }
+    off += (size_t)n;
+  }
+  close(fd);
+  g_file_copy = map;
+  return 0;
+}
+
+/* A writable mapping that starts with an ELF header but holds only part of the
+ * file image: the section header table the header points at lies past the end
+ * of the mapping, the way it does for a live image. */
+static int build_live_header(void) {
+  if (g_file_copy == NULL)
+    return -1;
+  size_t len = 2u * 4096u;
+  void *map = mmap(NULL, len + 2u * 4096u, PROT_READ | PROT_WRITE,
+                   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  if (map == MAP_FAILED)
+    return -1;
+  if (mprotect(map, 4096u, PROT_NONE) != 0 ||
+      mprotect((unsigned char *)map + 4096u + len, 4096u, PROT_NONE) != 0) {
+    munmap(map, len + 2u * 4096u);
+    return -1;
+  }
+  unsigned char *p = (unsigned char *)map + 4096u;
+  memcpy(p, g_file_copy, len);
+  g_live_header = p;
+  return 0;
+}
+
 /* glibc keeps joined thread stacks mapped, and a stack's guard page can be
  * merged into the reported VMA while staying unreadable. Range discovery must
  * not fault reading such a mapping's base. */
@@ -77,6 +156,11 @@ int main(void) {
   for (uintptr_t i = 0; i < CANARY_SIZE; i++)
     g_canary[i] = (unsigned char)(0x11u * (unsigned)i + 0x5au);
 
+  if (build_file_copy() != 0 || build_live_header() != 0) {
+    fprintf(stderr, "build ELF mappings: %m\n");
+    return 2;
+  }
+
   /* Fill and join threads so glibc caches their stacks. The cache keeps each
    * guard page unreadable while /proc/self/maps can merge the stacks into one
    * readable-looking VMA. */
@@ -114,6 +198,16 @@ int main(void) {
     unsigned char after[CANARY_SIZE];
     if (read_mem(fd, addr, before, sizeof(before)) != 0)
       _exit(4);
+
+    /* Both ELF mappings must be readable while the agent runs, so the child can
+     * sample them before, during and after the mask. */
+    unsigned char copy_page[64];
+    unsigned char header_page[64];
+    if (read_mem(fd, (uintptr_t)g_file_copy, copy_page, sizeof(copy_page)) != 0)
+      _exit(9);
+    if (read_mem(fd, (uintptr_t)g_live_header, header_page,
+                 sizeof(header_page)) != 0)
+      _exit(9);
     if (write(ready[1], "R", 1) != 1)
       _exit(5);
     close(ready[1]);
@@ -121,14 +215,39 @@ int main(void) {
     usleep(400000);
     if (read_mem(fd, addr, during, sizeof(during)) != 0)
       _exit(6);
+    unsigned char copy_during[64];
+    if (read_mem(fd, (uintptr_t)g_file_copy, copy_during,
+                 sizeof(copy_during)) != 0)
+      _exit(12);
+    unsigned char header_during[64];
+    if (read_mem(fd, (uintptr_t)g_live_header, header_during,
+                 sizeof(header_during)) != 0)
+      _exit(10);
     usleep(3000000);
     if (read_mem(fd, addr, after, sizeof(after)) != 0)
       _exit(7);
+    unsigned char copy_after[64];
+    if (read_mem(fd, (uintptr_t)g_file_copy, copy_after, sizeof(copy_after)) !=
+        0)
+      _exit(13);
+    unsigned char header_after[64];
+    if (read_mem(fd, (uintptr_t)g_live_header, header_after,
+                 sizeof(header_after)) != 0)
+      _exit(11);
     close(fd);
 
     int changed = memcmp(before, during, sizeof(before)) != 0;
     int restored = memcmp(before, after, sizeof(before)) == 0;
-    _exit(changed && restored ? 0 : 8);
+    int copy_masked = memcmp(copy_page, copy_during, sizeof(copy_page)) != 0;
+    int copy_restored = memcmp(copy_page, copy_after, sizeof(copy_page)) == 0;
+    int header_masked =
+        memcmp(header_page, header_during, sizeof(header_page)) != 0;
+    int header_restored =
+        memcmp(header_page, header_after, sizeof(header_page)) == 0;
+    _exit(changed && restored && copy_masked && copy_restored &&
+                  header_masked && header_restored
+              ? 0
+              : 8);
   }
 
   close(go[0]);
