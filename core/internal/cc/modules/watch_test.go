@@ -350,6 +350,66 @@ func TestModuleWatchPrefersWorkspaceCopy(t *testing.T) {
 	}
 }
 
+func TestModuleWatchReloadKeepsModuleRegistered(t *testing.T) {
+	searchDir, workspace := newWatchTestRoot(t)
+	defer setTestModuleDirs(t, searchDir, workspace)()
+	wsModules := filepath.Join(workspace, "modules")
+	live.ModuleDirs = []string{searchDir, wsModules}
+
+	def.Modules.Delete("watch_atomic")
+	deleteModuleRunner("watch_atomic")
+
+	body := func(tag string) string {
+		return fmt.Sprintf(`{
+		"name": "watch_atomic",
+		"comment": "atomic reload %s",
+		"is_local": true,
+		"platform": "Linux",
+		"agent_config": {"exec": "", "files": []},
+		"parameters": [],
+		"invocation": {"argv": [{"literal": "x.sh"}]}
+	}`, tag)
+	}
+
+	writeModule(t, searchDir, "watch_atomic", body("v1"))
+	InitModules()
+
+	w := &moduleWatch{state: make(map[string]string)}
+	w.seedState()
+
+	stop := make(chan struct{})
+	errCh := make(chan error, 1)
+	go func() {
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				if !moduleLoaded("watch_atomic") {
+					select {
+					case errCh <- fmt.Errorf("watch_atomic transiently disappeared from def.Modules during reload"):
+					default:
+					}
+					return
+				}
+			}
+		}
+	}()
+
+	for i := 0; i < 20; i++ {
+		writeModule(t, searchDir, "watch_atomic", body(fmt.Sprintf("p%d", i)))
+		w.reconcileOnce()
+		writeModule(t, wsModules, "watch_atomic", body(fmt.Sprintf("w%d", i)))
+		w.reconcileOnce()
+	}
+	close(stop)
+	select {
+	case err := <-errCh:
+		t.Fatal(err)
+	default:
+	}
+}
+
 // TestModuleWatchIntegrationRepoModules runs the watcher against the repo's
 // own real module tree (many configs, subdirs, shared bof_common dir, etc.)
 // with a temp workspace, verifying that an idle watch changes nothing and an

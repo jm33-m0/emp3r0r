@@ -346,11 +346,6 @@ func (w *moduleWatch) reconcileOnce() []string {
 	}
 	var loaded []loadedMod
 	for _, a := range actions {
-		// editing a config may have removed/renamed entries: drop the dir's
-		// previous registrations before re-registering from the new config
-		if !a.add {
-			unregisterModuleConfigs(a.dir)
-		}
 		names, err := loadModuleDir(a.dir)
 		touched = append(touched, a.dir)
 		if err != nil {

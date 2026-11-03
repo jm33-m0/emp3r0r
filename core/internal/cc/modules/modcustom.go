@@ -1083,6 +1083,18 @@ func loadModuleDir(moduleDir string) ([]string, error) {
 		return nil, readConfigErr
 	}
 
+	// Keep the currently registered module names for this directory so any
+	// entries removed or renamed in the updated config can be dropped after
+	// the surviving entries are re-registered in place.
+	prevNames := make(map[string]struct{})
+	absModuleDir, _ := filepath.Abs(moduleDir)
+	def.ForEachModule(func(name string, cfg *def.ModuleConfig) {
+		absPath, _ := filepath.Abs(cfg.Path)
+		if absPath == absModuleDir || absPath == absWsDir {
+			prevNames[name] = struct{}{}
+		}
+	})
+
 	names := make([]string, 0, len(configs))
 	var copiedPath string
 	var hasCopied bool
@@ -1094,7 +1106,12 @@ func loadModuleDir(moduleDir string) ([]string, error) {
 		}
 		if config != nil && config.Name != "" {
 			names = append(names, config.Name)
+			delete(prevNames, config.Name)
 		}
+	}
+	for stale := range prevNames {
+		def.Modules.Delete(stale)
+		deleteModuleRunner(stale)
 	}
 	return names, nil
 }
@@ -1200,10 +1217,12 @@ func sameModuleDef(a, b *def.ModuleConfig) bool {
 // itself, so a module that a workspace copy overrides is left alone.
 func unregisterModuleConfigs(moduleDir string) []string {
 	absDir, _ := filepath.Abs(moduleDir)
+	wsDir := filepath.Join(live.EmpWorkSpace, "modules", filepath.Base(moduleDir))
+	absWsDir, _ := filepath.Abs(wsDir)
 	unregister := make([]string, 0)
 	def.ForEachModule(func(name string, config *def.ModuleConfig) {
 		absPath, _ := filepath.Abs(config.Path)
-		if absPath == absDir {
+		if absPath == absDir || (absPath == absWsDir && !util.IsFileExist(filepath.Join(wsDir, "config.json"))) {
 			unregister = append(unregister, name)
 		}
 	})
