@@ -1,5 +1,17 @@
 # Changelog
 
+## [5.7.1](https://github.com/jm33-m0/emp3r0r/compare/v5.7.0...v5.7.1) (2026-11-04)
+
+
+### Bug Fixes
+
+* **ftp:** finalize download before disconnecting ([187e284](https://github.com/jm33-m0/emp3r0r/commit/187e2840e4a5eae4fa50863ca53a3c4ba6cb18ac))
+* **mask:** mask writable ELF images ([862a27b](https://github.com/jm33-m0/emp3r0r/commit/862a27b54f2348bcddc15806d908c9f8c14d010d))
+* **mask:** pass syscall args in ABI regs ([c237be6](https://github.com/jm33-m0/emp3r0r/commit/c237be6ad2bd5c8f3703c14be7bcd21f3a1338ef))
+* **mask:** refine stager ABI for masking ([35e4aef](https://github.com/jm33-m0/emp3r0r/commit/35e4aefdd702180e384bf4fdef4e6767bcefbb8a))
+* **module:** module watcher race ([6d2efa1](https://github.com/jm33-m0/emp3r0r/commit/6d2efa1877a936fd226a53c344c8359b0dac8bc4))
+* **module:** report reasons why `get_file` stops ([eaaffb8](https://github.com/jm33-m0/emp3r0r/commit/eaaffb835e4c764d91387d9b470f3bb96c6dbfac))
+
 ## [5.7.0](https://github.com/jm33-m0/emp3r0r/compare/v5.6.0...v5.7.0) (2026-11-02)
 
 
