@@ -29,6 +29,10 @@ typedef int (*mask_fn)(unsigned seconds, uintptr_t probe, void *stack_top,
 
 static volatile unsigned char *g_canary;
 
+/* The provider bounds the masked stack by the caller's stack pointer. This
+ * canary sits on the process stack, inside the frames the mask must cover. */
+static volatile unsigned char *g_stack_canary;
+
 /* A whole ELF file image in writable anonymous memory, the shape a loader's
  * decompression buffer has. The provider masks it like any other anonymous
  * image: leaving it readable would expose the payload for the whole sleep. */
@@ -147,6 +151,12 @@ int main(void) {
     fprintf(stderr, "malloc: %m\n");
     return 2;
   }
+  /* Keep the canary well below argv/env: those pages are excluded from the
+   * stack mask, and a scalar in main's topmost frame can share their page. */
+  volatile unsigned char stack_canary[CANARY_SIZE + 8192u];
+  for (uintptr_t i = 0; i < CANARY_SIZE; i++)
+    stack_canary[i] = (unsigned char)(0x93u * (unsigned)i + 0x24u);
+  g_stack_canary = stack_canary;
   void *stack = mmap(NULL, STACK_SIZE, PROT_READ | PROT_WRITE,
                      MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   if (stack == MAP_FAILED) {
@@ -193,10 +203,16 @@ int main(void) {
       _exit(3);
 
     uintptr_t addr = (uintptr_t)(void *)g_canary;
+    uintptr_t stack_addr = (uintptr_t)(void *)g_stack_canary;
     unsigned char before[CANARY_SIZE];
     unsigned char during[CANARY_SIZE];
     unsigned char after[CANARY_SIZE];
+    unsigned char stack_before[CANARY_SIZE];
+    unsigned char stack_during[CANARY_SIZE];
+    unsigned char stack_after[CANARY_SIZE];
     if (read_mem(fd, addr, before, sizeof(before)) != 0)
+      _exit(4);
+    if (read_mem(fd, stack_addr, stack_before, sizeof(stack_before)) != 0)
       _exit(4);
 
     /* Both ELF mappings must be readable while the agent runs, so the child can
@@ -215,6 +231,8 @@ int main(void) {
     usleep(400000);
     if (read_mem(fd, addr, during, sizeof(during)) != 0)
       _exit(6);
+    if (read_mem(fd, stack_addr, stack_during, sizeof(stack_during)) != 0)
+      _exit(6);
     unsigned char copy_during[64];
     if (read_mem(fd, (uintptr_t)g_file_copy, copy_during,
                  sizeof(copy_during)) != 0)
@@ -225,6 +243,8 @@ int main(void) {
       _exit(10);
     usleep(3000000);
     if (read_mem(fd, addr, after, sizeof(after)) != 0)
+      _exit(7);
+    if (read_mem(fd, stack_addr, stack_after, sizeof(stack_after)) != 0)
       _exit(7);
     unsigned char copy_after[64];
     if (read_mem(fd, (uintptr_t)g_file_copy, copy_after, sizeof(copy_after)) !=
@@ -238,14 +258,19 @@ int main(void) {
 
     int changed = memcmp(before, during, sizeof(before)) != 0;
     int restored = memcmp(before, after, sizeof(before)) == 0;
+    int stack_changed =
+        memcmp(stack_before, stack_during, sizeof(stack_before)) != 0;
+    int stack_restored =
+        memcmp(stack_before, stack_after, sizeof(stack_before)) == 0;
     int copy_masked = memcmp(copy_page, copy_during, sizeof(copy_page)) != 0;
     int copy_restored = memcmp(copy_page, copy_after, sizeof(copy_page)) == 0;
     int header_masked =
         memcmp(header_page, header_during, sizeof(header_page)) != 0;
     int header_restored =
         memcmp(header_page, header_after, sizeof(header_page)) == 0;
-    _exit(changed && restored && copy_masked && copy_restored &&
-                  header_masked && header_restored
+    _exit(changed && restored && stack_changed && stack_restored &&
+                  copy_masked && copy_restored && header_masked &&
+                  header_restored
               ? 0
               : 8);
   }
@@ -265,8 +290,8 @@ int main(void) {
 
   uintptr_t keep_start = (uintptr_t)stack;
   uintptr_t keep_end = keep_start + STACK_SIZE;
-  int rc = mask(2, (uintptr_t)(void *)main, (void *)(keep_end & ~(uintptr_t)15),
-                keep_start, keep_end);
+  int rc = mask(2, (uintptr_t)(void *)g_stack_canary,
+                (void *)(keep_end & ~(uintptr_t)15), keep_start, keep_end);
   int status = 0;
   waitpid(child, &status, 0);
 

