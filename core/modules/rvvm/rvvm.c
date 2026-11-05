@@ -28,10 +28,11 @@
  *             const struct rv_bof_args *args);
  *   const char *LastError(void);
  *   int ExitCode(void);
+ *   void SetHostBridge(void *ctx, rv_host_read_fn read, ...);
  *   void Free(char *out);
  *
- * rv_bof_args carries the packed BOF argument block. The module is
- * single-threaded: one call at a time.
+ * rv_bof_args is declared in core/c_agent/include/rvvm_abi.h. The module is
+ * single-threaded: one call at a time; callers serialize their runs.
  */
 
 #define _GNU_SOURCE
@@ -39,7 +40,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
-#include <sched.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -51,6 +51,8 @@
 #include <sys/utsname.h>
 #include <time.h>
 #include <unistd.h>
+
+#include "rvvm_abi.h"
 
 #define RV_EXPORT __attribute__((visibility("default")))
 
@@ -208,14 +210,6 @@ static uint32_t rv_mmio_load(uint32_t addr);
 struct MiniRV32IMAState;
 static void rv_host_postexec(struct MiniRV32IMAState *state, uint32_t *pc,
                              uint32_t ir, uint32_t *trap);
-
-/* Keep this layout in sync with core/c_agent/src/rvvm.c and the Go runner. */
-struct rv_bof_args {
-  const uint8_t *buf; /* packed BOF argument buffer */
-  size_t len;
-  const uint8_t *env; /* NUL-separated KEY=VALUE block, ... NUL */
-  size_t env_len;
-};
 
 static uint8_t *rv_ram;
 static char *rv_out;
@@ -563,6 +557,46 @@ static uint8_t *rv_gptr(uint32_t addr, uint32_t len) {
   return rv_ram + (addr - RV_RAM_BASE);
 }
 
+/* Fill dst from the kernel RNG. Returns 0, or -1 with errno set when neither
+ * getrandom nor /dev/urandom can supply the bytes. A seccomp profile that
+ * denies getrandom still leaves the character device for AT_RANDOM setup. */
+static int rv_random_fill(void *dst, size_t len) {
+  uint8_t *out = (uint8_t *)dst;
+  size_t off = 0;
+  while (off < len) {
+    long n = syscall(SYS_getrandom, out + off, len - off, 0);
+    if (n > 0) {
+      off += (size_t)n;
+      continue;
+    }
+    if (n < 0 && errno == EINTR)
+      continue;
+    break;
+  }
+  if (off == len)
+    return 0;
+
+  int fd = open("/dev/urandom", O_RDONLY | O_CLOEXEC);
+  if (fd < 0)
+    return -1;
+  while (off < len) {
+    ssize_t n = read(fd, out + off, len - off);
+    if (n > 0) {
+      off += (size_t)n;
+      continue;
+    }
+    if (n < 0 && errno == EINTR)
+      continue;
+    break;
+  }
+  int saved = errno;
+  close(fd);
+  if (off == len)
+    return 0;
+  errno = saved;
+  return -1;
+}
+
 /* The guest passes a 64-bit off_t struct flock; the module only targets 64-bit
  * hosts, whose layout is identical. */
 _Static_assert(sizeof(struct flock) == 32,
@@ -631,7 +665,7 @@ static int64_t rv_host_read_into_guest(char *path, uint32_t out_addr,
   unsigned long len = 0;
   char err[160] = {0};
   if (rv_host_read == NULL)
-    return -38;
+    return -ENOSYS;
   int rc = rv_host_read(rv_host_ctx, path, &data, &len, err, (int)sizeof(err));
   if (rc != 0)
     return rc;
@@ -648,7 +682,7 @@ static int64_t rv_host_read_into_guest(char *path, uint32_t out_addr,
     void *dst = rv_gptr(out_addr, (uint32_t)len);
     if (dst == NULL) {
       free(data);
-      return -14;
+      return -EFAULT;
     }
     rv_memcpy(dst, data, len);
   }
@@ -660,9 +694,9 @@ static int64_t rv_host_write_from_guest(char *path, uint32_t src_addr,
                                         uint32_t len) {
   const void *src = rv_gptr(src_addr, len);
   if (src == NULL && len != 0)
-    return -14;
+    return -EFAULT;
   if (rv_host_write == NULL)
-    return -38;
+    return -ENOSYS;
   char err[160] = {0};
   return rv_host_write(rv_host_ctx, path, src, len, err, (int)sizeof(err));
 }
@@ -673,9 +707,9 @@ static int64_t rv_host_upload_from_guest(uint32_t token_addr,
   char path[1024];
   if (rv_guest_path(token_addr, token, sizeof(token)) != 0 ||
       rv_guest_path(path_addr, path, sizeof(path)) != 0)
-    return -22;
+    return -EINVAL;
   if (rv_host_upload == NULL)
-    return -38;
+    return -ENOSYS;
   char err[160] = {0};
   return rv_host_upload(rv_host_ctx, token, path, (unsigned long)offset, err,
                         (int)sizeof(err));
@@ -685,12 +719,12 @@ static int64_t rv_host_sha256_to_guest(uint32_t src_addr, uint32_t len,
                                        uint32_t hex_addr, uint32_t hex_cap) {
   const void *src = rv_gptr(src_addr, len);
   if (src == NULL && len != 0)
-    return -14;
+    return -EFAULT;
   void *hex = rv_gptr(hex_addr, hex_cap);
   if (hex == NULL || hex_cap < 65)
-    return -22;
+    return -EINVAL;
   if (rv_host_sha256 == NULL)
-    return -38;
+    return -ENOSYS;
   char err[160] = {0};
   return rv_host_sha256(rv_host_ctx, src, len, (char *)hex, hex_cap, err,
                         (int)sizeof(err));
@@ -702,9 +736,9 @@ static int64_t rv_host_relay_from_guest(uint32_t token_addr, int fd,
                                         uint32_t idle_seconds) {
   char token[1024];
   if (rv_guest_path(token_addr, token, sizeof(token)) != 0)
-    return -22;
+    return -EINVAL;
   if (rv_host_relay == NULL)
-    return -38;
+    return -ENOSYS;
   char err[160] = {0};
   return rv_host_relay(rv_host_ctx, token, fd, (int)idle_seconds, err,
                        (int)sizeof(err));
@@ -716,16 +750,16 @@ static int64_t rv_host_exec_to_guest(uint32_t cmd_addr, int32_t shell,
                                      uint32_t out_addr, uint32_t cap) {
   char cmd[1024];
   if (rv_guest_path(cmd_addr, cmd, sizeof(cmd)) != 0)
-    return -22;
+    return -EINVAL;
   if (rv_host_exec == NULL)
-    return -38;
+    return -ENOSYS;
   if (cap == 0)
-    return -22;
+    return -EINVAL;
   if (cap > (64u << 10))
     cap = 64u << 10;
   char *buf = (char *)malloc(cap);
   if (buf == NULL)
-    return -12;
+    return -ENOMEM;
   char err[160] = {0};
   int rc = rv_host_exec(rv_host_ctx, cmd, shell, buf, (unsigned long)cap, err,
                         (int)sizeof(err));
@@ -733,7 +767,7 @@ static int64_t rv_host_exec_to_guest(uint32_t cmd_addr, int32_t shell,
     void *dst = rv_gptr(out_addr, (uint32_t)rc);
     if (dst == NULL) {
       free(buf);
-      return -14;
+      return -EFAULT;
     }
     rv_memcpy(dst, buf, (size_t)rc);
   }
@@ -747,18 +781,18 @@ static int64_t rv_host_exec_to_guest(uint32_t cmd_addr, int32_t shell,
 static int64_t rv_guest_ppoll(uint32_t fds_addr, uint32_t nfds,
                               uint32_t tsp_addr, uint32_t sigmask, int time64) {
   if (sigmask != 0)
-    return -38;
+    return -ENOSYS;
   if (nfds > RV_POLL_MAX_FDS)
-    return -22;
+    return -EINVAL;
   size_t bytes = (size_t)nfds * sizeof(struct pollfd);
   struct pollfd *fds = NULL;
   if (bytes > 0) {
     const void *guest = rv_gptr(fds_addr, (uint32_t)bytes);
     if (guest == NULL)
-      return -22;
+      return -EINVAL;
     fds = (struct pollfd *)malloc(bytes);
     if (fds == NULL)
-      return -12;
+      return -ENOMEM;
     rv_memcpy(fds, guest, bytes);
   }
   /* Translate guest descriptors. An unowned one reports POLLNVAL, like poll()
@@ -779,7 +813,7 @@ static int64_t rv_guest_ppoll(uint32_t fds_addr, uint32_t nfds,
     const uint8_t *g = rv_gptr(tsp_addr, time64 ? 16u : 12u);
     if (g == NULL) {
       free(fds);
-      return -22;
+      return -EINVAL;
     }
     int64_t sec = 0;
     int64_t nsec = 0;
@@ -793,7 +827,7 @@ static int64_t rv_guest_ppoll(uint32_t fds_addr, uint32_t nfds,
     }
     if (sec < 0 || nsec < 0 || nsec >= 1000000000 || sec > INT32_MAX / 1000) {
       free(fds);
-      return -22;
+      return -EINVAL;
     }
     timeout_ms = (int)(sec * 1000 + (nsec + 999999) / 1000000);
   }
@@ -811,7 +845,7 @@ static int64_t rv_guest_ppoll(uint32_t fds_addr, uint32_t nfds,
     void *back = rv_gptr(fds_addr, (uint32_t)bytes);
     if (back == NULL) {
       free(fds);
-      return -22;
+      return -EINVAL;
     }
     rv_memcpy(back, fds, bytes);
   }
@@ -845,7 +879,7 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
   case RV_SYS_MMAP:
   case RV_SYS_MMAP2: {
     uint32_t p = rv_guest_mmap(a1);
-    return p == 0 ? -12 : p;
+    return p == 0 ? -ENOMEM : (int64_t)p;
   }
   case RV_SYS_MUNMAP:
     rv_guest_munmap(a0, a1);
@@ -860,7 +894,7 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
   case RV_SYS_FCNTL: {
     int fd = rv_guest_fd_host_of((int)a0);
     if (fd < 0)
-      return -9; /* EBADF: not a descriptor the guest opened */
+      return -EBADF; /* not a descriptor the guest opened */
     /* Lock commands pass a struct flock. Translate it through a local copy so
      * the raw guest address never reaches the kernel. musl numbers the
      * 64-bit-offset lock commands 12/13/14 on 32-bit guests. */
@@ -881,7 +915,7 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
     case 38: /* F_OFD_SETLKW */
       gfl = rv_gptr(a2, sizeof(fl));
       if (gfl == NULL)
-        return -22;
+        return -EINVAL;
       rv_memcpy(&fl, gfl, sizeof(fl));
       arg = &fl;
       if (cmd == 12)
@@ -902,23 +936,23 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
     return r;
   }
   case RV_SYS_SOCKET: {
-    int host_fd = socket((int)a0, (int)a1, (int)a2);
+    int host_fd = socket((int)a0, (int)a1 | SOCK_CLOEXEC, (int)a2);
     if (host_fd < 0)
       return -errno;
     int guest_fd = rv_guest_fd_alloc(host_fd);
     if (guest_fd < 0) {
       close(host_fd);
-      return -24; /* EMFILE */
+      return -EMFILE;
     }
     return guest_fd;
   }
   case RV_SYS_BIND: {
     int fd = rv_guest_fd_host_of((int)a0);
     if (fd < 0)
-      return -9;
+      return -EBADF;
     const void *addr = rv_gptr(a1, a2);
     return addr == NULL
-               ? -22
+               ? -EINVAL
                : (bind(fd, (const struct sockaddr *)addr, a2) < 0 ? -errno : 0);
   }
   case RV_SYS_CONNECT: {
@@ -927,10 +961,10 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
      */
     int fd = rv_guest_fd_host_of((int)a0);
     if (fd < 0)
-      return -9;
+      return -EBADF;
     const void *addr = rv_gptr(a1, a2);
     if (a2 > RV_SOCKADDR_MAX || (addr == NULL && a2 != 0))
-      return -22;
+      return -EINVAL;
     return connect(fd, (const struct sockaddr *)addr, (socklen_t)a2) < 0
                ? -errno
                : 0;
@@ -938,11 +972,11 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
   case RV_SYS_SENDTO: {
     int fd = rv_guest_fd_host_of((int)a0);
     if (fd < 0)
-      return -9;
+      return -EBADF;
     const void *buf = rv_gptr(a1, a2);
     const void *addr = rv_gptr(a4, a5);
     if (buf == NULL || (a5 > 0 && addr == NULL))
-      return -22;
+      return -EINVAL;
     ssize_t n = sendto(fd, buf, a2, (int)a3, (const struct sockaddr *)addr, a5);
     return n < 0 ? -errno : n;
   }
@@ -952,21 +986,21 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
      * address, as musl's recv() passes, has no length word either. */
     int fd = rv_guest_fd_host_of((int)a0);
     if (fd < 0)
-      return -9;
+      return -EBADF;
     struct sockaddr *addr = NULL;
     void *alenp = NULL;
     socklen_t alen = 0;
     void *buf = rv_gptr(a1, a2);
     if (buf == NULL)
-      return -22;
+      return -EINVAL;
     if (a4 != 0) {
       alenp = rv_gptr(a5, sizeof(alen));
       if (alenp == NULL)
-        return -22;
+        return -EINVAL;
       rv_memcpy(&alen, alenp, sizeof(alen));
       addr = (struct sockaddr *)rv_gptr(a4, alen);
       if (addr == NULL)
-        return -22;
+        return -EINVAL;
     }
     ssize_t n =
         recvfrom(fd, buf, a2, (int)a3, addr, alenp != NULL ? &alen : NULL);
@@ -977,10 +1011,10 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
   case RV_SYS_SETSOCKOPT: {
     int fd = rv_guest_fd_host_of((int)a0);
     if (fd < 0)
-      return -9;
+      return -EBADF;
     const void *opt = rv_gptr(a3, a4);
     if (opt == NULL && a4 != 0)
-      return -22;
+      return -EINVAL;
     return setsockopt(fd, (int)a1, (int)a2, opt, a4) < 0 ? -errno : 0;
   }
   case RV_SYS_GETSOCKOPT: {
@@ -988,17 +1022,17 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
      * word is copied in and out of the local variable. */
     int fd = rv_guest_fd_host_of((int)a0);
     if (fd < 0)
-      return -9;
+      return -EBADF;
     socklen_t optlen = 0;
     void *optlenp = rv_gptr(a4, sizeof(optlen));
     if (optlenp == NULL)
-      return -22;
+      return -EINVAL;
     rv_memcpy(&optlen, optlenp, sizeof(optlen));
     if (optlen > 512)
-      return -22;
+      return -EINVAL;
     void *optval = rv_gptr(a3, optlen);
     if (optval == NULL && optlen != 0)
-      return -22;
+      return -EINVAL;
     if (getsockopt(fd, (int)a1, (int)a2, optval, &optlen) < 0)
       return -errno;
     rv_memcpy(optlenp, &optlen, sizeof(optlen));
@@ -1010,10 +1044,10 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
   case RV_SYS_RECVMSG: {
     int fd = rv_guest_fd_host_of((int)a0);
     if (fd < 0)
-      return -9;
+      return -EBADF;
     uint8_t *g = rv_gptr(a1, 28);
     if (g == NULL)
-      return -22;
+      return -EINVAL;
     uint32_t gname = rv_le32(g + 0);
     uint32_t namelen = rv_le32(g + 4);
     uint32_t giov = rv_le32(g + 8);
@@ -1021,17 +1055,17 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
     uint32_t gctl = rv_le32(g + 16);
     uint32_t ctllen = rv_le32(g + 20);
     if (iovcnt > 16)
-      return -22;
+      return -EINVAL;
     uint8_t *giovp = rv_gptr(giov, iovcnt * 8u);
     if (giovp == NULL && iovcnt != 0)
-      return -22;
+      return -EINVAL;
     struct iovec iov[16];
     for (uint32_t i = 0; i < iovcnt; i++) {
       uint32_t base = rv_le32(giovp + i * 8u);
       uint32_t len = rv_le32(giovp + i * 8u + 4);
       void *p = rv_gptr(base, len);
       if (p == NULL)
-        return -22;
+        return -EINVAL;
       iov[i].iov_base = p;
       iov[i].iov_len = len;
     }
@@ -1043,6 +1077,11 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
     msg.msg_iovlen = iovcnt;
     msg.msg_control = rv_gptr(gctl, ctllen);
     msg.msg_controllen = ctllen;
+    /* A non-zero length with an untranslatable address would hand the host a
+     * null buffer that it treats as valid for no data. */
+    if ((namelen != 0 && msg.msg_name == NULL) ||
+        (ctllen != 0 && msg.msg_control == NULL))
+      return -EFAULT;
     ssize_t n = recvmsg(fd, &msg, (int)a2);
     if (n < 0)
       return -errno;
@@ -1055,23 +1094,32 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
     /* riscv32 passes a 64-bit off_t in the a1/a2 register pair. */
     int fd = rv_guest_fd_host_of((int)a0);
     if (fd < 0)
-      return -9;
+      return -EBADF;
     off_t off = (off_t)(((uint64_t)a2 << 32) | a1);
     off_t r = lseek(fd, off, (int)a3);
     return r < 0 ? -errno : r;
   }
-  case RV_SYS_SCHED_GETAFFINITY:
-    return sched_getaffinity((pid_t)a0, (size_t)a1,
-                             (cpu_set_t *)rv_gptr(a2, a1)) < 0
-               ? -errno
-               : 0;
+  case RV_SYS_SCHED_GETAFFINITY: {
+    /* musl passes 0 for the calling thread; the guest has exactly one. The
+     * host may not be interrogated about unrelated processes. */
+    pid_t pid = (pid_t)a0;
+    if (pid != 0 && (uint32_t)pid != (uint32_t)getpid())
+      return -EINVAL;
+    void *mask = rv_gptr(a2, a1);
+    if (mask == NULL)
+      return -EFAULT;
+    long r = syscall(SYS_sched_getaffinity, pid, (size_t)a1, mask);
+    if (r < 0)
+      return -errno;
+    return r;
+  }
   case RV_SYS_GETDENTS64: {
     int fd = rv_guest_fd_host_of((int)a0);
     if (fd < 0)
-      return -9;
+      return -EBADF;
     void *dst = rv_gptr(a1, a2);
     if (dst == NULL)
-      return -22;
+      return -EINVAL;
     long n = syscall(SYS_getdents64, fd, dst, (size_t)a2);
     return n < 0 ? -errno : n;
   }
@@ -1079,12 +1127,12 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
     char path[1024];
     int dfd = rv_guest_dirfd(a0);
     if (dfd == -1)
-      return -9;
+      return -EBADF;
     void *dst = rv_gptr(a4, 256);
     if (dst == NULL)
-      return -22;
+      return -EINVAL;
     if (rv_guest_path(a1, path, sizeof(path)) != 0)
-      return -22;
+      return -EINVAL;
     long n = syscall(SYS_statx, dfd, path, (int)a2, (unsigned int)a3, dst);
     return n < 0 ? -errno : n;
   }
@@ -1094,7 +1142,7 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
     /* struct __kernel_timespec is two 64-bit fields; write them by hand so the
      * gate does not depend on the host's time_t width. */
     if (rv_gptr(a1, 16) == NULL)
-      return -22;
+      return -EINVAL;
     struct timespec ts;
     if (clock_gettime((clockid_t)a0, &ts) != 0)
       return -errno;
@@ -1109,89 +1157,81 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
   case RV_SYS_GETRANDOM: {
     void *dst = rv_gptr(a0, a1);
     if (dst == NULL)
-      return -22;
-    long n = syscall(SYS_getrandom, dst, (size_t)a1, 0);
-    if (n >= 0)
-      return n;
-    uint32_t x = (uint32_t)getpid() ^ a0 ^ 0x9e3779b9u;
-    for (uint32_t i = 0; i < a1; i++) {
-      x ^= x << 13;
-      x ^= x >> 17;
-      x ^= x << 5;
-      ((uint8_t *)dst)[i] = (uint8_t)x;
-    }
+      return -EFAULT;
+    if (rv_random_fill(dst, a1) != 0)
+      return -errno;
     return (int64_t)a1;
   }
   case RV_SYS_GETCWD: {
     char *dst = (char *)rv_gptr(a0, a1);
     if (dst == NULL)
-      return -22;
+      return -EINVAL;
     return getcwd(dst, a1) == NULL ? -errno : (int64_t)a1;
   }
   case RV_SYS_OPENAT: {
     char path[1024];
     int dfd = rv_guest_dirfd(a0);
     if (dfd == -1)
-      return -9;
+      return -EBADF;
     if (rv_guest_path(a1, path, sizeof(path)) != 0)
-      return -22;
-    int host_fd = openat(dfd, path, (int)a2, (mode_t)a3);
+      return -EINVAL;
+    int host_fd = openat(dfd, path, (int)a2 | O_CLOEXEC, (mode_t)a3);
     if (host_fd < 0)
       return -errno;
     int guest_fd = rv_guest_fd_alloc(host_fd);
     if (guest_fd < 0) {
       close(host_fd);
-      return -24; /* EMFILE */
+      return -EMFILE;
     }
     return guest_fd;
   }
   case RV_SYS_CLOSE: {
     int host_fd = rv_guest_fd_take((int)a0);
     if (host_fd < 0)
-      return -9;
+      return -EBADF;
     return close(host_fd) < 0 ? -errno : 0;
   }
   case RV_SYS_READ: {
     int fd = rv_guest_fd_host_of((int)a0);
     if (fd < 0)
-      return -9;
+      return -EBADF;
     void *dst = rv_gptr(a1, a2);
     if (dst == NULL)
-      return -22;
+      return -EINVAL;
     ssize_t n = read(fd, dst, a2);
     return n < 0 ? -errno : n;
   }
   case RV_SYS_WRITE: {
     const void *src = rv_gptr(a1, a2);
     if (src == NULL)
-      return -22;
+      return -EINVAL;
     if (a0 == 1 || a0 == 2) {
       if (rv_out_append(src, a2) != 0)
-        return -28;
+        return -ENOSPC;
       return (int64_t)a2;
     }
     int fd = rv_guest_fd_host_of((int)a0);
     if (fd < 0)
-      return -9;
+      return -EBADF;
     ssize_t n = write(fd, src, a2);
     return n < 0 ? -errno : n;
   }
   case RV_SYS_READV: {
     if (a2 > 64)
-      return -22;
+      return -EINVAL;
     int fd = rv_guest_fd_host_of((int)a0);
     if (fd < 0)
-      return -9;
+      return -EBADF;
     const uint8_t *iov = rv_gptr(a1, a2 * 8u);
     if (iov == NULL && a2 != 0)
-      return -22;
+      return -EINVAL;
     int64_t total = 0;
     for (uint32_t i = 0; i < a2; i++) {
       uint32_t base = rv_le32(iov + i * 8u);
       uint32_t n = rv_le32(iov + i * 8u + 4);
       void *dst = rv_gptr(base, n);
       if (dst == NULL)
-        return -22;
+        return -EINVAL;
       ssize_t got = read(fd, dst, n);
       if (got < 0)
         return total > 0 ? total : -errno;
@@ -1203,24 +1243,24 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
   }
   case RV_SYS_WRITEV: {
     if (a2 > 64)
-      return -22;
+      return -EINVAL;
     const uint8_t *iov = rv_gptr(a1, a2 * 8u);
     if (iov == NULL && a2 != 0)
-      return -22;
+      return -EINVAL;
     int64_t total = 0;
     for (uint32_t i = 0; i < a2; i++) {
       uint32_t base = rv_le32(iov + i * 8u);
       uint32_t n = rv_le32(iov + i * 8u + 4);
       const void *src = rv_gptr(base, n);
       if (src == NULL)
-        return -22;
+        return -EINVAL;
       if (a0 == 1 || a0 == 2) {
         if (rv_out_append(src, n) != 0)
-          return -28;
+          return -ENOSPC;
       } else {
         int fd = rv_guest_fd_host_of((int)a0);
         if (fd < 0)
-          return -9;
+          return -EBADF;
         if (write(fd, src, n) < 0)
           return -errno;
       }
@@ -1232,10 +1272,10 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
     char path[1024];
     int dfd = rv_guest_dirfd(a0);
     if (dfd == -1)
-      return -9;
+      return -EBADF;
     void *dst = rv_gptr(a2, a3);
     if (dst == NULL || rv_guest_path(a1, path, sizeof(path)) != 0)
-      return -22;
+      return -EINVAL;
     ssize_t n = readlinkat(dfd, path, (char *)dst, a3);
     return n < 0 ? -errno : n;
   }
@@ -1243,24 +1283,24 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
     char path[1024];
     int dfd = rv_guest_dirfd(a0);
     if (dfd == -1)
-      return -9;
+      return -EBADF;
     if (rv_guest_path(a1, path, sizeof(path)) != 0)
-      return -22;
+      return -EINVAL;
     return fchmodat(dfd, path, (mode_t)a2, 0) < 0 ? -errno : 0;
   }
   case RV_SYS_GETGROUPS: {
     if (a0 > 65536u)
-      return -22;
+      return -EINVAL;
     gid_t *dst = (gid_t *)rv_gptr(a1, a0 * (uint32_t)sizeof(gid_t));
     if (dst == NULL && a0 != 0)
-      return -22;
+      return -EINVAL;
     int n = getgroups((int)a0, dst);
     return n < 0 ? -errno : n;
   }
   case RV_SYS_UNAME: {
     struct utsname *u = (struct utsname *)rv_gptr(a0, sizeof(*u));
     if (u == NULL)
-      return -22;
+      return -EINVAL;
     return uname(u) < 0 ? -errno : 0;
   }
   case RV_SYS_GETPID:
@@ -1278,13 +1318,13 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
   case RV_SYS_XFER_READ: {
     char path[1024];
     if (rv_guest_path(a0, path, sizeof(path)) != 0)
-      return -22;
+      return -EINVAL;
     return rv_host_read_into_guest(path, a1, a2);
   }
   case RV_SYS_XFER_WRITE: {
     char path[1024];
     if (rv_guest_path(a0, path, sizeof(path)) != 0)
-      return -22;
+      return -EINVAL;
     return rv_host_write_from_guest(path, a1, a2);
   }
   case RV_SYS_XFER_UPLOAD:
@@ -1296,13 +1336,13 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
      * table before the call so the guest can never touch it again. */
     int host_fd = rv_guest_fd_take((int)a1);
     if (host_fd < 0)
-      return -9;
+      return -EBADF;
     return rv_host_relay_from_guest(a0, host_fd, a2);
   }
   case RV_SYS_XFER_EXEC:
     return rv_host_exec_to_guest(a0, (int32_t)a1, a2, a3);
   default:
-    return -38;
+    return -ENOSYS;
   }
 }
 
@@ -1596,8 +1636,10 @@ static int rv_run_exec(const uint8_t *image, size_t len,
     return -1;
   }
   uint32_t rnd = p;
-  for (uint32_t i = 0; i < 16; i++)
-    rv_ram[rnd - RV_RAM_BASE + i] = (uint8_t)(0xa5u ^ (i * 37u));
+  if (rv_random_fill(rv_ram + (rnd - RV_RAM_BASE), 16) != 0) {
+    rv_set_err("random unavailable");
+    return -1;
+  }
   uint32_t aux = envp + (written + 1u) * 4u;
 
   rv_wr32(base - RV_RAM_BASE + 0, 1);            /* argc */
