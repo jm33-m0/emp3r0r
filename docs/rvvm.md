@@ -131,3 +131,15 @@ interpreter is run without the host bridge they return `-ENOSYS`.
   ELF image or a budget overrun reports an error; it never crashes the agent.
 - The interpreter is mapped only for the run and unmapped immediately
   afterwards. `RVVM=0` compiles the C agent support out.
+- The gate checks every guest pointer before it reaches the host. Calls that
+  hand the kernel a raw buffer (`recvmsg`, `sched_getaffinity`, `getrandom`)
+  reject an untranslatable address with `EFAULT`; malformed other arguments use
+  `EINVAL`. `sched_getaffinity` accepts only the guest process, because the
+  guest has one thread.
+- File and socket descriptors opened through the gate are close-on-exec, so a
+  BOF that spawns a process cannot leak them.
+- `AT_RANDOM` and `getrandom` are filled from the kernel RNG (with
+  `/dev/urandom` as a seccomp fallback). A run fails rather than returning
+  predictable bytes when neither source is available.
+- Runs are serialized: the interpreter's ABI and its per-image state allow one
+  call at a time.
