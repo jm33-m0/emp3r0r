@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"sync"
 	"unsafe"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/coffloader"
@@ -20,15 +21,22 @@ func dependencyName() string { return "rvvm_linux" }
 // corrupted return value cannot make the agent scan unmapped memory forever.
 const maxGuestOutput = (8 << 20) + 16
 
-// bofArgs mirrors struct rv_bof_args in the interpreter module: the packed
-// COFF argument buffer and the NUL-separated environment block. Pointers are
-// machine words, so the layout matches on 32- and 64-bit hosts.
+// bofArgs mirrors struct rv_bof_args in
+// core/c_agent/include/rvvm_abi.h: the packed COFF argument buffer and the
+// NUL-separated environment block. Pointers are machine words, so the layout
+// matches on 32- and 64-bit hosts.
 type bofArgs struct {
 	Buf    unsafe.Pointer
 	Len    uintptr
 	Env    unsafe.Pointer
 	EnvLen uintptr
 }
+
+// runMu serializes interpreter runs. The module keeps per-image state in
+// file-scope variables and its ABI allows one call at a time; memdeps maps a
+// fresh image for every use, and the lock keeps that contract independent of
+// the resolver's caching.
+var runMu sync.Mutex
 
 // RunRiscvBof executes a portable BOF. The payload is a static RV32 musl
 // executable; the interpreter starts at musl _start and the guest entry shim
@@ -37,6 +45,8 @@ func RunRiscvBof(payload []byte, args []coffloader.CoffArg, opts ...memdeps.UseO
 	if err := checkPlatform(); err != nil {
 		return "", err
 	}
+	runMu.Lock()
+	defer runMu.Unlock()
 	if len(payload) == 0 {
 		return "", errors.New("empty payload")
 	}
