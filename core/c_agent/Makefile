@@ -385,7 +385,8 @@ RVVM_BOF_CFLAGS = -target riscv32-linux-musl -mcpu=generic_rv32 -O2 -g0 \
                   -fvisibility=hidden
 RVVM_BOF_GUESTS = $(BUILD)/rv_bof_exec $(BUILD)/rv_bof_spam_exec \
                   $(BUILD)/rv_bof_time_exec $(BUILD)/rv_bof_net_exec \
-                  $(BUILD)/rv_bof_lock_exec
+                  $(BUILD)/rv_bof_lock_exec \
+                  $(BUILD)/rv_bof_bounds_exec $(BUILD)/rv_bof_random_exec
 RVVM_GUEST_DIR = ../internal/cc/modules/rvguest
 ifneq ($(wildcard $(RVVM_MODULE_DIR)/rvvm.c),)
   RVVM_TEST = $(BUILD)/test_rvvm
@@ -629,7 +630,7 @@ $(BUILD)/rv_%_exec: $(BUILD)/rv_%.o $(RVVM_GUEST_DIR)/main.c \
 	  $< -femit-bin=$@
 
 $(BUILD)/test_rvvm: tests/test_rvvm.c $(BUILD)/rvvm_linux.so \
-                      $(RVVM_BOF_GUESTS) tests/test.h | $(BUILD)
+                      $(RVVM_BOF_GUESTS) tests/test.h include/rvvm_abi.h | $(BUILD)
 	$(HOSTCC) $(TEST_CFLAGS) \
 	  -DRVVM_MODULE_PATH='"$(BUILD)/rvvm_linux.so"' \
 	  -DRVVM_BOF_EXEC_PATH='"$(BUILD)/rv_bof_exec"' \
@@ -637,6 +638,8 @@ $(BUILD)/test_rvvm: tests/test_rvvm.c $(BUILD)/rvvm_linux.so \
 	  -DRVVM_BOF_TIME_EXEC_PATH='"$(BUILD)/rv_bof_time_exec"' \
 	  -DRVVM_BOF_NET_EXEC_PATH='"$(BUILD)/rv_bof_net_exec"' \
 	  -DRVVM_BOF_LOCK_EXEC_PATH='"$(BUILD)/rv_bof_lock_exec"' \
+	  -DRVVM_BOF_BOUNDS_EXEC_PATH='"$(BUILD)/rv_bof_bounds_exec"' \
+	  -DRVVM_BOF_RANDOM_EXEC_PATH='"$(BUILD)/rv_bof_random_exec"' \
 	  tests/test_rvvm.c src/util/elfload.c src/util/dynload.c \
 	  src/util/dynload_hosted.c -o $@
 
@@ -802,7 +805,8 @@ $(BUILD)/fuzz_bof: fuzz/fuzz_bof.c $(FUZZ_DRIVER) src/bof.c \
 		$< $(FUZZ_DRIVER) src/bof.c src/util/dynload.c src/util/elfload.c -o $@
 
 $(BUILD)/fuzz_rvvm: fuzz/fuzz_rvvm.c $(FUZZ_DRIVER) $(RVVM_MODULE_DIR)/rvvm.c \
-                    $(BUILD)/rv_bof_exec fuzz/fuzz_common.h | $(BUILD)
+                    $(BUILD)/rv_bof_exec fuzz/fuzz_common.h include/rvvm_abi.h \
+                    | $(BUILD)
 	$(HOSTCC) $(FUZZ_CFLAGS) \
 	  -DRV_MAX_INSNS=100000 \
 	  -DRVVM_SEED='"$(BUILD)/rv_bof_exec"' \

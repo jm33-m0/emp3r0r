@@ -9,6 +9,7 @@
 
 #include "test.h"
 
+#include "rvvm_abi.h"
 #include "util/elfload.h"
 
 #include <stdio.h>
@@ -33,17 +34,15 @@
 #ifndef RVVM_BOF_LOCK_EXEC_PATH
 #define RVVM_BOF_LOCK_EXEC_PATH ""
 #endif
-
-/* Must match struct rv_bof_args in the module. */
-typedef struct {
-  const uint8_t *buf;
-  size_t len;
-  const uint8_t *env;
-  size_t env_len;
-} rv_bof_args;
+#ifndef RVVM_BOF_BOUNDS_EXEC_PATH
+#define RVVM_BOF_BOUNDS_EXEC_PATH ""
+#endif
+#ifndef RVVM_BOF_RANDOM_EXEC_PATH
+#define RVVM_BOF_RANDOM_EXEC_PATH ""
+#endif
 
 typedef char *(*rv_run_fn)(const uint8_t *image, size_t image_len,
-                           const rv_bof_args *args);
+                           const struct rv_bof_args *args);
 typedef const char *(*rv_last_fn)(void);
 typedef int (*rv_code_fn)(void);
 typedef void (*rv_free_fn)(char *);
@@ -121,7 +120,7 @@ static int open_module(void) {
 static char *bof_run(const uint8_t *img, size_t len, const uint8_t *args,
                      size_t args_len) {
   static const uint8_t env[] = "PATH=/usr/bin:/bin";
-  rv_bof_args a;
+  struct rv_bof_args a;
   a.buf = args;
   a.len = args_len;
   a.env = env;
@@ -134,8 +133,8 @@ int main(void) {
     return 1;
 
   /* Packed arguments: u32 body length | u32 string length | "alpha\0". */
-  static const uint8_t packed[] = { 0x0a, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00,
-                                    0x00, 'a',  'l',  'p',  'h',  'a',  0x00 };
+  static const uint8_t packed[] = {0x0a, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00,
+                                   0x00, 'a',  'l',  'p',  'h',  'a',  0x00};
   size_t exec_len = 0;
   uint8_t *exec_img = slurp(RVVM_BOF_EXEC_PATH, &exec_len);
   CHECK(exec_img != NULL);
@@ -270,6 +269,47 @@ int main(void) {
       CHECK_EQ_LONG(g_code(), 0);
       g_release(out);
       free(lock_img);
+    }
+  }
+
+  /* The gate rejects untranslatable pointers and marks guest descriptors
+   * close-on-exec. */
+  {
+    size_t bounds_len = 0;
+    uint8_t *bounds_img = slurp(RVVM_BOF_BOUNDS_EXEC_PATH, &bounds_len);
+    CHECK(bounds_img != NULL);
+    if (bounds_img != NULL) {
+      out = bof_run(bounds_img, bounds_len, NULL, 0);
+      CHECK(out != NULL);
+      CHECK_EQ_LONG(g_code(), 0);
+      g_release(out);
+      free(bounds_img);
+    }
+  }
+
+  /* AT_RANDOM must be fresh for every run, not a build-time pattern. */
+  {
+    size_t random_len = 0;
+    uint8_t *random_img = slurp(RVVM_BOF_RANDOM_EXEC_PATH, &random_len);
+    CHECK(random_img != NULL);
+    if (random_img != NULL) {
+      char *first = bof_run(random_img, random_len, NULL, 0);
+      CHECK(first != NULL);
+      if (first != NULL) {
+        size_t n = strlen(first);
+        char *saved = (char *)malloc(n + 1);
+        CHECK(saved != NULL);
+        if (saved != NULL)
+          memcpy(saved, first, n + 1);
+        g_release(first);
+        out = bof_run(random_img, random_len, NULL, 0);
+        CHECK(out != NULL);
+        CHECK(saved != NULL && out != NULL && strcmp(saved, out) != 0);
+        CHECK_EQ_LONG(g_code(), 0);
+        free(saved);
+        g_release(out);
+      }
+      free(random_img);
     }
   }
 
