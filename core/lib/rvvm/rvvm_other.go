@@ -8,12 +8,12 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/memmod"
 )
 
-func checkPlatform() error {
-	return errors.New("rv modules run on Linux agents only")
-}
+var errUnsupported = errors.New("rv modules run on Linux agents only")
+
+func checkPlatform() error { return errUnsupported }
 
 func callRun(*memmod.Module, ...uintptr) (uintptr, error) {
-	return 0, errors.New("RISC-V BOFs are supported on Linux and Windows only")
+	return 0, errUnsupported
 }
 
 func callLastError(*memmod.Module) string { return "" }
