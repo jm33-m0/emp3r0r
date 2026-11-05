@@ -7,6 +7,7 @@
 
 #ifdef __linux__
 
+#include "rvvm_abi.h"
 #include "util/elfload.h"
 
 extern char **environ;
@@ -14,16 +15,8 @@ extern char **environ;
 #include <stdlib.h>
 #include <string.h>
 
-/* Must match struct rv_bof_args in core/modules/rvvm/rvvm.c. */
-typedef struct {
-  const uint8_t *buf;
-  size_t len;
-  const uint8_t *env;
-  size_t env_len;
-} rv_bof_args;
-
 typedef char *(*c2_rv_run_fn)(const uint8_t *image, size_t image_len,
-                              const rv_bof_args *args);
+                              const struct rv_bof_args *args);
 typedef const char *(*c2_rv_err_fn)(void);
 typedef void (*c2_rv_free_fn)(char *);
 
@@ -92,7 +85,7 @@ c2_status c2_rv_run(const uint8_t *loader_so, size_t loader_len,
     }
   }
 
-  rv_bof_args args;
+  struct rv_bof_args args;
   args.buf = bof_args;
   args.len = bof_len;
   args.env = env;

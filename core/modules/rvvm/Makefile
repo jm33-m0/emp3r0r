@@ -13,6 +13,7 @@ ZIG_TARGET ?= x86_64-linux-gnu.2.17
 # millions of guest instructions, so the bound is loose.
 RV_MAX_INSNS ?= 0xffffffff
 CFLAGS = -O2 -fPIC -std=c99 -Wall -Wextra -Werror -fvisibility=hidden \
+         -I../../c_agent/include \
          -fno-builtin -fno-stack-protector -fno-sanitize=all -fno-ident \
          -ffunction-sections -fdata-sections \
          -DRV_MAX_INSNS=$(RV_MAX_INSNS)
@@ -20,7 +21,7 @@ LDFLAGS = -shared -Wl,--gc-sections -Wl,--build-id=none -Wl,-z,noexecstack \
           -Wl,--hash-style=both
 TARGET = rvvm_linux.so
 SOURCES = rvvm.c
-HEADERS = vendor/mini-rv32ima/mini-rv32ima.h
+HEADERS = vendor/mini-rv32ima/mini-rv32ima.h ../../c_agent/include/rvvm_abi.h
 
 all: $(TARGET)
 

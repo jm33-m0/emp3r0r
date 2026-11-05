@@ -1,4 +1,5 @@
 #include "fuzz_common.h"
+#include "rvvm_abi.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -25,15 +26,8 @@
 #define RVVM_SEED ""
 #endif
 
-/* Must match struct rv_bof_args in the interpreter module. */
-typedef struct {
-  const uint8_t *buf;
-  size_t len;
-  const uint8_t *env;
-  size_t env_len;
-} rv_bof_args;
-
-extern char *Run(const uint8_t *image, size_t len, const rv_bof_args *args);
+extern char *Run(const uint8_t *image, size_t len,
+                 const struct rv_bof_args *args);
 extern void Free(char *out);
 
 static uint8_t *g_seed = NULL;
@@ -76,7 +70,7 @@ static void load_seed(void) {
 
 static char *run(const uint8_t *image, size_t len, const uint8_t *args,
                  size_t args_len) {
-  rv_bof_args a;
+  struct rv_bof_args a;
   a.buf = args;
   a.len = args_len;
   /* Fuzz the environment-block parser as well as the argument parser. */

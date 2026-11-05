@@ -50,9 +50,19 @@ func buildModuleWith(t *testing.T, env ...string) {
 
 	// Build in a private copy: the repository module directory is also read
 	// by other test packages, and concurrent in-tree builds race with them.
-	buildDir := filepath.Join(t.TempDir(), "rvvm")
+	// The layout mirrors the operator workspace: modules/ and c_agent/ are
+	// siblings, because the module Makefile includes ../../c_agent/include.
+	root := t.TempDir()
+	buildDir := filepath.Join(root, "modules", "rvvm")
+	if err := os.MkdirAll(filepath.Dir(buildDir), 0o700); err != nil {
+		t.Fatalf("create build tree: %v", err)
+	}
 	if err := os.CopyFS(buildDir, os.DirFS(moduleDir)); err != nil {
 		t.Fatalf("copy rvvm module: %v", err)
+	}
+	if err := os.CopyFS(filepath.Join(root, "c_agent", "include"),
+		os.DirFS("../../c_agent/include")); err != nil {
+		t.Fatalf("copy shared includes: %v", err)
 	}
 	buildEnv := append(os.Environ(), env...)
 	clean := exec.Command("make", "-C", buildDir, "clean")
