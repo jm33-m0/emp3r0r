@@ -1,5 +1,15 @@
 # Changelog
 
+## [5.7.2](https://github.com/jm33-m0/emp3r0r/compare/v5.7.1...v5.7.2) (2026-11-06)
+
+
+### Bug Fixes
+
+* **rvvm:** harden syscall gate, descriptors, and entropy ([36ad1f1](https://github.com/jm33-m0/emp3r0r/commit/36ad1f1f4ec65a44af76b7d97a501ad66d6d75f8))
+* **rvvm:** serialize interpreter runs ([ef06631](https://github.com/jm33-m0/emp3r0r/commit/ef06631024afdcc7ee454c7ebae03c825fca8c01))
+* **rvvm:** skip 0 length iovecs ([eeacb58](https://github.com/jm33-m0/emp3r0r/commit/eeacb58782c5e9d7ddb68b8f739327a52b84989f))
+* **rvvm:** unify non-linux error message ([92a28d7](https://github.com/jm33-m0/emp3r0r/commit/92a28d7977b8928e1451734cd81ba533aa05e197))
+
 ## [5.7.1](https://github.com/jm33-m0/emp3r0r/compare/v5.7.0...v5.7.1) (2026-11-04)
 
 
