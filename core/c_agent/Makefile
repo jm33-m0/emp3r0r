@@ -385,7 +385,7 @@ RVVM_BOF_CFLAGS = -target riscv32-linux-musl -mcpu=generic_rv32 -O2 -g0 \
                   -fvisibility=hidden
 RVVM_BOF_GUESTS = $(BUILD)/rv_bof_exec $(BUILD)/rv_bof_spam_exec \
                   $(BUILD)/rv_bof_time_exec $(BUILD)/rv_bof_net_exec \
-                  $(BUILD)/rv_bof_lock_exec \
+                  $(BUILD)/rv_bof_lock_exec $(BUILD)/rv_bof_iov_exec \
                   $(BUILD)/rv_bof_bounds_exec $(BUILD)/rv_bof_random_exec
 RVVM_GUEST_DIR = ../internal/cc/modules/rvguest
 ifneq ($(wildcard $(RVVM_MODULE_DIR)/rvvm.c),)
@@ -638,6 +638,7 @@ $(BUILD)/test_rvvm: tests/test_rvvm.c $(BUILD)/rvvm_linux.so \
 	  -DRVVM_BOF_TIME_EXEC_PATH='"$(BUILD)/rv_bof_time_exec"' \
 	  -DRVVM_BOF_NET_EXEC_PATH='"$(BUILD)/rv_bof_net_exec"' \
 	  -DRVVM_BOF_LOCK_EXEC_PATH='"$(BUILD)/rv_bof_lock_exec"' \
+	  -DRVVM_BOF_IOV_EXEC_PATH='"$(BUILD)/rv_bof_iov_exec"' \
 	  -DRVVM_BOF_BOUNDS_EXEC_PATH='"$(BUILD)/rv_bof_bounds_exec"' \
 	  -DRVVM_BOF_RANDOM_EXEC_PATH='"$(BUILD)/rv_bof_random_exec"' \
 	  tests/test_rvvm.c src/util/elfload.c src/util/dynload.c \

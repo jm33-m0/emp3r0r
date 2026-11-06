@@ -1229,6 +1229,10 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
     for (uint32_t i = 0; i < a2; i++) {
       uint32_t base = rv_le32(iov + i * 8u);
       uint32_t n = rv_le32(iov + i * 8u + 4);
+      /* A zero-length iovec carries no readable address; musl passes one with
+       * a NULL base whenever a stdio buffer has no pending bytes. */
+      if (n == 0)
+        continue;
       void *dst = rv_gptr(base, n);
       if (dst == NULL)
         return -EINVAL;
@@ -1251,6 +1255,10 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
     for (uint32_t i = 0; i < a2; i++) {
       uint32_t base = rv_le32(iov + i * 8u);
       uint32_t n = rv_le32(iov + i * 8u + 4);
+      /* Zero-length iovecs are ignored, as on Linux; stdio hands one over
+       * with a NULL base when its write buffer is empty. */
+      if (n == 0)
+        continue;
       const void *src = rv_gptr(base, n);
       if (src == NULL)
         return -EINVAL;

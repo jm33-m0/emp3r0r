@@ -34,6 +34,9 @@
 #ifndef RVVM_BOF_LOCK_EXEC_PATH
 #define RVVM_BOF_LOCK_EXEC_PATH ""
 #endif
+#ifndef RVVM_BOF_IOV_EXEC_PATH
+#define RVVM_BOF_IOV_EXEC_PATH ""
+#endif
 #ifndef RVVM_BOF_BOUNDS_EXEC_PATH
 #define RVVM_BOF_BOUNDS_EXEC_PATH ""
 #endif
@@ -269,6 +272,22 @@ int main(void) {
       CHECK_EQ_LONG(g_code(), 0);
       g_release(out);
       free(lock_img);
+    }
+  }
+
+  /* Zero-length iovecs carry no address and must not fail readv or writev;
+   * libc passes one with a NULL base on buffered stdio calls. */
+  {
+    size_t iov_len = 0;
+    uint8_t *iov_img = slurp(RVVM_BOF_IOV_EXEC_PATH, &iov_len);
+    CHECK(iov_img != NULL);
+    if (iov_img != NULL) {
+      out = bof_run(iov_img, iov_len, NULL, 0);
+      CHECK(out != NULL);
+      CHECK(out != NULL && strcmp(out, "iov") == 0);
+      CHECK_EQ_LONG(g_code(), 0);
+      g_release(out);
+      free(iov_img);
     }
   }
 
