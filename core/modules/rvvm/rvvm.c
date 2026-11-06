@@ -54,6 +54,10 @@
 
 #include "rvvm_abi.h"
 
+#ifdef RV_TRACE
+#include <stdio.h>
+#endif
+
 #define RV_EXPORT __attribute__((visibility("default")))
 
 #define RV_RAM_BASE 0x80000000u
@@ -222,6 +226,13 @@ static int rv_bad_bus;
 static uint32_t rv_insn_budget = RV_MAX_INSNS;
 static uint32_t rv_heap_cur;
 static uint32_t rv_brk_min;
+
+#ifdef RV_TRACE
+/* Debug builds (tools/rvvmrun) can trace the syscall gate to a stream chosen
+ * at run time; the shipped module compiles this out. */
+static FILE *rv_trace;
+static uint64_t rv_trace_insns;
+#endif
 
 /* One byte per mmap-arena page: 0 free, 1 mapped. A page bitmap models Linux
  * mmap/munmap exactly, including partial unmaps, so a guest allocator that
@@ -1354,15 +1365,157 @@ static int64_t rv_guest_syscall(uint32_t nr, uint32_t a0, uint32_t a1,
   }
 }
 
+#ifdef RV_TRACE
+static const char *rv_syscall_name(uint32_t nr) {
+  switch (nr) {
+  case RV_SYS_GETCWD:
+    return "getcwd";
+  case RV_SYS_FCNTL:
+    return "fcntl";
+  case RV_SYS_FCHMODAT:
+    return "fchmodat";
+  case RV_SYS_OPENAT:
+    return "openat";
+  case RV_SYS_CLOSE:
+    return "close";
+  case RV_SYS_GETDENTS64:
+    return "getdents64";
+  case RV_SYS_LSEEK:
+    return "lseek";
+  case RV_SYS_READ:
+    return "read";
+  case RV_SYS_WRITE:
+    return "write";
+  case RV_SYS_READV:
+    return "readv";
+  case RV_SYS_WRITEV:
+    return "writev";
+  case RV_SYS_PPOLL:
+    return "ppoll";
+  case RV_SYS_PPOLL_TIME64:
+    return "ppoll_time64";
+  case RV_SYS_READLINKAT:
+    return "readlinkat";
+  case RV_SYS_EXIT:
+    return "exit";
+  case RV_SYS_EXIT_GROUP:
+    return "exit_group";
+  case RV_SYS_SET_TID_ADDRESS:
+    return "set_tid_address";
+  case RV_SYS_SET_ROBUST_LIST:
+    return "set_robust_list";
+  case RV_SYS_SCHED_GETAFFINITY:
+    return "sched_getaffinity";
+  case RV_SYS_GETGROUPS:
+    return "getgroups";
+  case RV_SYS_UNAME:
+    return "uname";
+  case RV_SYS_GETPID:
+    return "getpid";
+  case RV_SYS_GETPPID:
+    return "getppid";
+  case RV_SYS_GETUID:
+    return "getuid";
+  case RV_SYS_GETEUID:
+    return "geteuid";
+  case RV_SYS_GETGID:
+    return "getgid";
+  case RV_SYS_GETEGID:
+    return "getegid";
+  case RV_SYS_BRK:
+    return "brk";
+  case RV_SYS_MUNMAP:
+    return "munmap";
+  case RV_SYS_MMAP2:
+    return "mmap2";
+  case RV_SYS_MMAP:
+    return "mmap";
+  case RV_SYS_MPROTECT:
+    return "mprotect";
+  case RV_SYS_PRLIMIT64:
+    return "prlimit64";
+  case RV_SYS_GETRANDOM:
+    return "getrandom";
+  case RV_SYS_STATX:
+    return "statx";
+  case RV_SYS_RSEQ:
+    return "rseq";
+  case RV_SYS_CLOCK_GETTIME64:
+    return "clock_gettime64";
+  case RV_SYS_SOCKET:
+    return "socket";
+  case RV_SYS_BIND:
+    return "bind";
+  case RV_SYS_CONNECT:
+    return "connect";
+  case RV_SYS_SENDTO:
+    return "sendto";
+  case RV_SYS_RECVFROM:
+    return "recvfrom";
+  case RV_SYS_SETSOCKOPT:
+    return "setsockopt";
+  case RV_SYS_GETSOCKOPT:
+    return "getsockopt";
+  case RV_SYS_RECVMSG:
+    return "recvmsg";
+  case RV_SYS_XFER_READ:
+    return "ReadFile";
+  case RV_SYS_XFER_WRITE:
+    return "WriteFile";
+  case RV_SYS_XFER_UPLOAD:
+    return "UploadFile";
+  case RV_SYS_XFER_SHA256:
+    return "Sha256Hex";
+  case RV_SYS_XFER_RELAY:
+    return "RelaySocket";
+  case RV_SYS_XFER_EXEC:
+    return "ExecCmd";
+  default:
+    return NULL;
+  }
+}
+
+static void rv_trace_ecall(uint32_t nr, const uint32_t *a, int64_t result) {
+  const char *name = rv_syscall_name(nr);
+  if (name != NULL)
+    fprintf(rv_trace,
+            "[rv] %s a0=0x%08x a1=0x%08x a2=0x%08x a3=0x%08x a4=0x%08x "
+            "a5=0x%08x = %lld\n",
+            name, a[0], a[1], a[2], a[3], a[4], a[5], (long long)result);
+  else
+    fprintf(rv_trace,
+            "[rv] syscall %u a0=0x%08x a1=0x%08x a2=0x%08x a3=0x%08x "
+            "a4=0x%08x a5=0x%08x = %lld\n",
+            nr, a[0], a[1], a[2], a[3], a[4], a[5], (long long)result);
+}
+
+static void rv_trace_summary(void) {
+  if (rv_trace == NULL)
+    return;
+  fprintf(rv_trace, "[rv] %llu guest instructions, exit status %d\n",
+          (unsigned long long)rv_trace_insns, rv_guest_status);
+}
+#endif
+
 /* Guest ECALL: a7 is the Linux syscall number. */
 static void rv_host_postexec(struct MiniRV32IMAState *state, uint32_t *pc,
                              uint32_t ir, uint32_t *trap) {
   (void)ir;
+#ifdef RV_TRACE
+  rv_trace_insns++;
+#endif
   if (*trap != 12)
     return; /* M-mode ECALL is trap 12 here; everything else is a real trap. */
   int64_t result = rv_guest_syscall(
       state->regs[17], state->regs[10], state->regs[11], state->regs[12],
       state->regs[13], state->regs[14], state->regs[15]);
+#ifdef RV_TRACE
+  if (rv_trace != NULL) {
+    const uint32_t a[6] = {state->regs[10], state->regs[11], state->regs[12],
+                           state->regs[13], state->regs[14], state->regs[15]};
+    rv_trace_ecall(state->regs[17], a, result);
+  }
+#endif
   state->regs[10] = (uint32_t)result;
   state->regs[11] = (uint32_t)(result >> 32);
   *trap = 0;
@@ -1450,6 +1603,9 @@ static void rv_reset(void) {
   rv_heap_cur = 0;
   rv_memzero(rv_map_used, sizeof(rv_map_used));
   rv_guest_fds_reset();
+#ifdef RV_TRACE
+  rv_trace_insns = 0;
+#endif
 }
 
 /* The guest entry shim reserves a section for the argument handoff. Return
@@ -1698,6 +1854,9 @@ RV_EXPORT char *Run(const uint8_t *image, size_t len,
     return NULL;
   }
   if (rv_run_exec(image, len, args) != 0) {
+#ifdef RV_TRACE
+    rv_trace_summary();
+#endif
     rv_guest_fds_reset();
     rv_ram_unmap();
     return NULL;
@@ -1712,6 +1871,9 @@ RV_EXPORT char *Run(const uint8_t *image, size_t len,
     rv_out[0] = '\0';
     rv_out_cap = 1;
   }
+#ifdef RV_TRACE
+  rv_trace_summary();
+#endif
   rv_guest_fds_reset();
   rv_ram_unmap();
   return rv_out;
@@ -1720,6 +1882,13 @@ RV_EXPORT char *Run(const uint8_t *image, size_t len,
 RV_EXPORT const char *LastError(void) { return rv_err; }
 
 RV_EXPORT int ExitCode(void) { return rv_guest_status; }
+
+#ifdef RV_TRACE
+RV_EXPORT void SetTrace(FILE *out) {
+  rv_trace = out;
+  rv_trace_insns = 0;
+}
+#endif
 
 RV_EXPORT void SetHostBridge(void *ctx, rv_host_read_fn read,
                              rv_host_write_fn write, rv_host_upload_fn upload,

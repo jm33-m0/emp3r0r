@@ -143,3 +143,53 @@ interpreter is run without the host bridge they return `-ENOSYS`.
   predictable bytes when neither source is available.
 - Runs are serialized: the interpreter's ABI and its per-image state allow one
   call at a time.
+
+## Debugging a guest locally
+
+`core/modules/rvvm/tools/rvvmrun` runs a guest in the interpreter as an
+ordinary host process. It links `rvvm.c` directly instead of mapping
+`rvvm_linux.so`, so a debugger stops in the loader, the guest memory bus and
+the syscall gate with full symbols:
+
+```sh
+make -C core/modules/rvvm/tools
+gdb --args core/modules/rvvm/tools/rvvmrun /tmp/pwd.rv
+(gdb) break rv_guest_syscall
+```
+
+The runner takes a guest image produced by the C2 (`<name>.rv`) unchanged, or
+links one from the same objects the C2 links:
+
+```sh
+make -C core/modules/SA_linux
+core/modules/rvvm/tools/rvvmrun build -o /tmp/pwd.rv \
+  core/modules/SA_linux/SA/src/pwd.rv.o
+core/modules/rvvm/tools/rvvmrun /tmp/pwd.rv
+core/modules/rvvm/tools/rvvmrun /tmp/cat.rv /etc/hostname
+```
+
+`build` uses the guest entry shim and linker script the C2 embeds and keeps
+the guest symbol table, so a trapped guest is reported by function name:
+
+```console
+$ rvvmrun trap.rv
+rvvmrun: store access fault at 0x8008006c
+rvvmrun: 0x8008006c is go+0x14
+```
+
+Options:
+
+- `-v` prints the image layout, the packed argument block, the environment
+  size and the guest exit status. Diagnostics go to stderr; guest output goes
+  to stdout.
+- `-t` traces every syscall the gate handles, with arguments and result, to
+  stderr. Only this debug build compiles the trace in; the module does not.
+- `-E KEY=VALUE` sets or replaces one guest environment entry. The guest
+  otherwise sees the runner's environment, like a native BOF sees the agent's.
+
+BOF arguments use the C2 wire format: `z:string` (the default for a bare
+argument), `i:int32`, `s:int16`, `b:hexbytes`, `Z:wide-string`.
+
+The runner exits with the guest's exit status. A rejected image, a guest trap
+or an output-limit overrun exits with status 125 and reports the error. As in
+the agent, only the output captured before a successful exit is returned.
