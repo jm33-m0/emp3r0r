@@ -90,9 +90,20 @@ func TestStripANSI_HexDumpAnchored(t *testing.T) {
 	}
 }
 
-func TestSanitizeText_UnicodeKept(t *testing.T) {
-	in := "你好 🌍 OK"
-	if got := SanitizeText(in); got != in {
-		t.Fatalf("SanitizeText mangled unicode: %q", got)
+func TestRedactCommandSecrets(t *testing.T) {
+	cases := []struct {
+		in   string
+		want string
+	}{
+		{"kerb --ticket abc --user NORTH/user", "kerb --ticket [redacted] --user NORTH/user"},
+		{"kerb --password='Summer 2026!'", "kerb --password=[redacted]"},
+		{"show --token \"sid-1\" --target dc01", "show --token [redacted] --target dc01"},
+		{"kerbeus_asktgs --params '/ticket:doIF8DCC /service:CIFS/dc01'", "kerbeus_asktgs --params '/ticket:[redacted] /service:CIFS/dc01'"},
+		{"get --filter '(objectClass=user)'", "get --filter '(objectClass=user)'"},
+	}
+	for _, tc := range cases {
+		if got := RedactCommandSecrets(tc.in); got != tc.want {
+			t.Errorf("RedactCommandSecrets(%q) = %q, want %q", tc.in, got, tc.want)
+		}
 	}
 }

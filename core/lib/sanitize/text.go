@@ -2,6 +2,7 @@ package sanitize
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -144,4 +145,27 @@ func SanitizeText(str string) string {
 // It collapses all whitespace (including newlines/tabs) into single spaces.
 func SanitizeOneLine(str string) string {
 	return strings.Join(strings.Fields(SanitizeText(str)), " ")
+}
+
+// secretFlagPattern matches a flag whose value is a credential. The flag name
+// is kept so the audit record still shows which material was used; the value is
+// replaced.
+var secretFlagPattern = regexp.MustCompile(`(?i)(--?[a-z0-9_.-]*(?:pass|pwd|secret|token|ticket|hash|key|cred|session|cookie)[a-z0-9_.-]*)(=\s*|\s+)(?:'[^']*'|"[^"]*"|\S+)`)
+
+// credentialArgPattern matches the slash-prefixed credential arguments used by
+// BOFs such as Kerbeus, where the secret is inside a --params value rather than
+// a flag value.
+var credentialArgPattern = regexp.MustCompile(`(?i)(/(?:ticket|password|pass|pwd|rc4|aes128|aes256|ntlm|hash|key|pfx|p12|kirbi):)(?:'[^']*'|"[^"]*"|\S+)`)
+
+// RedactCommandSecrets replaces values of credential-bearing flags and BOF
+// credential arguments in a command line before it is written to an audit log.
+// It is intentionally format-agnostic: it handles "--flag value",
+// "--flag=value", quoted values, and "/ticket:value" style arguments, and
+// leaves flags such as --user and --target intact.
+func RedactCommandSecrets(command string) string {
+	if command == "" {
+		return ""
+	}
+	command = secretFlagPattern.ReplaceAllString(command, `${1}${2}[redacted]`)
+	return credentialArgPattern.ReplaceAllString(command, `${1}[redacted]`)
 }
