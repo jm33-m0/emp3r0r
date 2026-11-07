@@ -123,7 +123,7 @@ func LoadPolicy(path string) (Policy, error) {
 	if err := json.Unmarshal(data, &policy); err != nil {
 		return policy, fmt.Errorf("parse %s: %w", path, err)
 	}
-	if info, statErr := os.Stat(path); statErr == nil && info.Mode().Perm()&0o022 != 0 {
+	if info, statErr := os.Stat(path); statErr == nil && isGroupOrWorldWritable(info) {
 		return policy, fmt.Errorf("%s is group- or world-writable; chmod 600 it before starting MCP", path)
 	}
 	if err := policy.Validate(); err != nil {

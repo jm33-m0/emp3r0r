@@ -191,6 +191,13 @@ func TestUprobeSessionAttachFailure(t *testing.T) {
 	if found {
 		t.Fatal("failed session left registered")
 	}
+
+	withFakeUprobeRunner(t, func(libbpf.UprobeCapture) error {
+		return nil // returns without calling OnAttached
+	})
+	if _, err := startUprobeSession(testUprobeConfig("failmod", "memfs:///uprobe_session_fail.log", nil)); err == nil || !strings.Contains(err.Error(), "capture ended before it started") {
+		t.Fatalf("start without attach = %v, want capture ended before it started", err)
+	}
 }
 
 // TestUprobeSessionReplacesFinishedSession lets a module start a new capture

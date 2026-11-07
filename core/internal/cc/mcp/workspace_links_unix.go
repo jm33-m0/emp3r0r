@@ -10,7 +10,7 @@ import (
 // hasMultipleLinks reports whether info names an inode reachable through more
 // than one directory entry. Writing such a file could modify content outside
 // the workspace root.
-func hasMultipleLinks(info os.FileInfo) bool {
+func hasMultipleLinks(_ string, info os.FileInfo) bool {
 	st, ok := info.Sys().(*syscall.Stat_t)
 	return ok && st.Nlink > 1
 }

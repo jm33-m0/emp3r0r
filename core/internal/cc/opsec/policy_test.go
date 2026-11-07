@@ -3,6 +3,7 @@ package opsec
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -168,14 +169,16 @@ func TestLoadPolicyRejectsInvalidInput(t *testing.T) {
 			t.Fatalf("expected %s to be rejected", body)
 		}
 	}
-	permPath := filepath.Join(dir, "writable.json")
-	if err := os.WriteFile(permPath, []byte(`{"max_noise":"high"}`), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chmod(permPath, 0o666); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := LoadPolicy(permPath); err == nil {
-		t.Fatal("group/world-writable policy was accepted")
+	if runtime.GOOS != "windows" {
+		permPath := filepath.Join(dir, "writable.json")
+		if err := os.WriteFile(permPath, []byte(`{"max_noise":"high"}`), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chmod(permPath, 0o666); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := LoadPolicy(permPath); err == nil {
+			t.Fatal("group/world-writable policy was accepted")
+		}
 	}
 }

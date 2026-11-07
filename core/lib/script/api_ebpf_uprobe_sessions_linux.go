@@ -182,15 +182,20 @@ func startUprobeSession(cfg uprobeStartConfig) (*uprobeSession, error) {
 	case <-s.start:
 		return s, nil
 	case <-s.done:
-		uprobeSessionsMu.Lock()
-		uprobeSessions.Delete(id)
-		uprobeSessionsMu.Unlock()
 		s.mu.Lock()
 		err := s.err
 		s.mu.Unlock()
 		if err == nil {
-			err = fmt.Errorf("capture ended before it started")
+			select {
+			case <-s.start:
+				return s, nil
+			default:
+				err = fmt.Errorf("capture ended before it started")
+			}
 		}
+		uprobeSessionsMu.Lock()
+		uprobeSessions.Delete(id)
+		uprobeSessionsMu.Unlock()
 		return nil, err
 	case <-time.After(uprobeStartWait):
 		cancel()

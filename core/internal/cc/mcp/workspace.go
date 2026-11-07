@@ -267,7 +267,7 @@ func (w *Workspace) resolve(rel string, write bool) (string, error) {
 	if rel == "" || rel == "." {
 		return w.root, nil
 	}
-	if filepath.IsAbs(rel) {
+	if filepath.IsAbs(rel) || strings.HasPrefix(rel, "/") || strings.HasPrefix(rel, `\`) || filepath.VolumeName(rel) != "" {
 		return "", fmt.Errorf("path must be relative to the workspace")
 	}
 	clean := filepath.Clean(rel)
@@ -301,7 +301,7 @@ func (w *Workspace) resolve(rel string, write bool) (string, error) {
 		if info.Mode()&os.ModeSymlink != 0 {
 			return "", fmt.Errorf("%s is a symlink", rel)
 		}
-		if info.Mode().IsRegular() && hasMultipleLinks(info) {
+		if info.Mode().IsRegular() && hasMultipleLinks(full, info) {
 			return "", fmt.Errorf("%s has multiple hardlinks", rel)
 		}
 	}
