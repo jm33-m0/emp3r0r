@@ -2,6 +2,7 @@ package assistant
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -88,10 +89,10 @@ type ldapTemplate struct {
 
 type ldapDomain struct {
 	DN                  string `json:"dn,omitempty"`
-	MinPwdLength        int    `json:"min_pwd_length,omitempty"`
-	LockoutThreshold    int    `json:"lockout_threshold,omitempty"`
-	MaxPwdAgeDays       int    `json:"max_pwd_age_days,omitempty"`
-	MachineAccountQuota int    `json:"machine_account_quota,omitempty"`
+	MinPwdLength        int64  `json:"min_pwd_length,omitempty"`
+	LockoutThreshold    int64  `json:"lockout_threshold,omitempty"`
+	MaxPwdAgeDays       int64  `json:"max_pwd_age_days,omitempty"`
+	MachineAccountQuota int64  `json:"machine_account_quota,omitempty"`
 	HasQuota            bool   `json:"has_machine_account_quota,omitempty"`
 }
 
@@ -483,17 +484,17 @@ func summarizeDomain(e ldapEntry) *ldapDomain {
 	}
 	d := &ldapDomain{DN: e.first("distinguishedName")}
 	if v, ok := parseIntAttr(e, "minPwdLength"); ok {
-		d.MinPwdLength = int(v)
+		d.MinPwdLength = v
 	}
 	if v, ok := parseIntAttr(e, "lockoutThreshold"); ok {
-		d.LockoutThreshold = int(v)
+		d.LockoutThreshold = v
 	}
-	if age, ok := parseIntAttr(e, "maxPwdAge"); ok && age < 0 {
-		// maxPwdAge is a negative 100-ns interval.
-		d.MaxPwdAgeDays = int((-age) / (86400 * 10000000))
+	if age, ok := parseIntAttr(e, "maxPwdAge"); ok && age < 0 && age > math.MinInt64 {
+		// maxPwdAge is a negative 100-ns interval; MinInt64 means passwords never expire.
+		d.MaxPwdAgeDays = (-age) / (86400 * 10000000)
 	}
 	if quota, ok := parseIntAttr(e, "ms-DS-MachineAccountQuota"); ok {
-		d.MachineAccountQuota = int(quota)
+		d.MachineAccountQuota = quota
 		d.HasQuota = true
 	}
 	return d

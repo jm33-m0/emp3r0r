@@ -126,6 +126,29 @@ func TestFiletimeDescription(t *testing.T) {
 	}
 }
 
+func TestSummarizeDomain64BitBounds(t *testing.T) {
+	e := ldapEntry{
+		attrs: map[string][]string{
+			"objectClass":               {"domainDNS"},
+			"distinguishedName":         {"DC=corp,DC=local"},
+			"minPwdLength":              {"2147483648"},
+			"lockoutThreshold":          {"2147483649"},
+			"maxPwdAge":                 {"-9223372036854775808"},
+			"ms-DS-MachineAccountQuota": {"2147483650"},
+		},
+	}
+	d := summarizeDomain(e)
+	if d == nil {
+		t.Fatal("expected non-nil domain summary")
+	}
+	if d.MinPwdLength != 2147483648 || d.LockoutThreshold != 2147483649 || d.MachineAccountQuota != 2147483650 {
+		t.Fatalf("unexpected 64-bit domain attributes: %+v", d)
+	}
+	if d.MaxPwdAgeDays != 0 {
+		t.Fatalf("expected MaxPwdAgeDays = 0 for MinInt64 never-expire interval, got %d", d.MaxPwdAgeDays)
+	}
+}
+
 func hasFinding(findings []finding, title string) bool {
 	for _, f := range findings {
 		if f.Title == title {
