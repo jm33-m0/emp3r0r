@@ -110,6 +110,11 @@
     "is_local": false,
     "platform": "Windows",
     "path": "",
+    "examples": [
+      "sa_ldapsearch --filter '(objectClass=user)' --attributes sAMAccountName,memberOf,userAccountControl,servicePrincipalName,adminCount --scope 2 --results_count 500",
+      "sa_ldapsearch --filter '(objectClass=trustedDomain)' --attributes trustPartner,trustDirection,trustAttributes"
+    ],
+    "help": "Paged LDAP query through wldap32. --scope 2 searches the whole subtree under the base DN. --attributes limits the returned values; request only what you need. Without --hostname the module discovers a domain controller, and without --domain it derives the base DN from the current user. Use --ldaps for port 636.",
     "parameters": [
       {
         "name": "filter",

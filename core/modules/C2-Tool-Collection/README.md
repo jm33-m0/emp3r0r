@@ -6,7 +6,8 @@
 > adopted as an emp3r0r module suite. `config.json` registers every BOF as a
 > top-level console command; the per-parameter help text (shown by
 > `<command> --help`) is the command documentation. Run `./make_all.sh` to
-> build the `.o` objects, or let `core/build.py` do it during a release build.
+> build the `.o` objects; the C2 runs it on first use when a declared payload
+> is missing.
 >
 > Deviations from upstream needed by the emp3r0r build/loader:
 >
