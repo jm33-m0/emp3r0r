@@ -652,6 +652,17 @@ Supporting commands:
 There is no separate `make_token` or `import_ticket` command: the session is
 created and the ticket imported as part of the module invocation.
 
+The Go agent applies all three options per module invocation. `--user` selects
+the account (a netonly logon session), `--token` selects a stolen token or a
+cached netlogon session, and `--ticket` imports the KRB-CRED into that module's
+session. The identity is scoped to the module and cleared afterward.
+
+Do not add `/ptt` to a module's parameters, and do not run a separate `ptt`
+step. The per-module `--ticket` flag already imports the ticket for that
+invocation. A global `/ptt` submits the ticket into the agent's shared logon
+session, changes the identity used by later commands, and adds a detectable
+global ticket-cache change.
+
 ### How impersonation reaches the module
 
 - **Starlark** builtins that do I/O (`read_file`, `win_call`, `http_get`, ...)
@@ -671,17 +682,17 @@ Strike's `make_token` or `runas /netonly`. The password is never validated
 identity while lending the supplied credentials to outbound network
 connections.
 
-Typical pass-the-ticket flow:
+Typical pass-the-ticket flow uses the per-module flags; no `/ptt` is needed:
 
 ```text
 kerbeus_klist --user CORP.LOCAL/jdoe --ticket <base64 TGT>
-kerbeus_asktgt --params '/user:jdoe ... /ptt' --token CORP.LOCAL/jdoe
+kerbeus_asktgs --params '/ticket:<base64 TGT> /service:CIFS/dc01.corp.local' \
+  --user CORP.LOCAL/jdoe --ticket <base64 TGT>
 ```
 
-The first command creates the netonly session and imports the ticket; the
-second reuses that session by name. Without an imported ticket, network
-access falls back to the (dummy-password) netonly credentials and fails
-against remote resources.
+Each command creates or reuses the netonly session and imports the ticket into
+that module's session. Without `--ticket`, network access falls back to the
+(dummy-password) netonly credentials and fails against remote resources.
 
 ### SMB/CIFS to agent-less hosts
 

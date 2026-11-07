@@ -466,6 +466,16 @@ This is the normal CDN path: the CDN terminates HTTPS and forwards HTTP to the
 C2, so no special transport is needed. For a transport that is not HTTP, see
 [Custom transports](./CUSTOM_C2.md).
 
+## Operator assistant
+
+The console has an optional read-only assistant. `ask` explains modules and
+analyses existing command output; it never executes anything. Configuration,
+usage, and data-handling rules are in [ASSISTANT.md](ASSISTANT.md).
+
+`emp3r0r mcp` serves the operator surface over the Model Context Protocol, so
+an external agent such as Claude Code or Codex can act autonomously after a
+deterministic OPSEC screen. See [MCP.md](MCP.md).
+
 ## tmux console
 
 The console, every shell it opens, and every pane run under one tmux session.
