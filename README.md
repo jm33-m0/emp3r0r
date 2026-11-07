@@ -2,7 +2,7 @@
 
 <img align="left" width="130" height="130" alt="emp3r0r" src="img/emp3r0r.svg" />
 
-Linux-first multi-operator C2 built to stay quiet and keep working. Self-healing mesh with assisted discovery, in-memory execution with encrypted storage, scriptable agents, cross-platform BOFs, SOCKS5 pivoting, and a modular C agent delivered by a sleep-masking stager.
+Linux-first multi-operator C2 built to stay quiet and keep working. Self-healing mesh with assisted discovery, in-memory execution with encrypted storage, scriptable agents, cross-platform BOFs, SOCKS5 pivoting, an OPSEC-screened MCP server and operator assistant, and a modular C agent delivered by a sleep-masking stager.
 
 <br clear="all" />
 
@@ -18,7 +18,7 @@ Linux-first multi-operator C2 built to stay quiet and keep working. Self-healing
 
 ## What is emp3r0r?
 
-emp3r0r started as a Linux post-exploitation framework with interactive remote shells and autonomous network pivoting. Over time it grew into a multi-operator C2 with modular agents, a P2P mesh, and in-memory execution on both Linux and Windows.
+emp3r0r started as a Linux post-exploitation framework with interactive remote shells and autonomous network pivoting. Over time it grew into a multi-operator C2 with modular Go and C agents, a P2P mesh, in-memory execution on both Linux and Windows, and an OPSEC-screened MCP server and local AI assistant for operator workflows.
 
 ## Features
 
@@ -130,6 +130,18 @@ Only the listed subnet goes through the agent. Everything else keeps using the o
 On Windows, emp3r0r can use an access token from another process for Go modules, [Starlark](#scriptable-agents), and [BOFs](#compiled-modules). Modules accept `--token` for an existing token, `--user` for a disposable netonly session, and `--ticket` for a Kerberos ticket.
 
 A netonly session keeps the agent's local identity and borrows the target user only for outbound authentication. A ticket can be imported into the same session, so the network identity becomes the ticket's identity while the local process stays unchanged. Because the session is disposable, the credential material can be purged when the operation is done.
+
+### AI and automation
+
+#### MCP server and OPSEC screen
+
+`emp3r0r mcp` exposes the operator surface over the Model Context Protocol on stdin/stdout so external MCP clients such as Claude Code and Codex can select targets, inspect and run modules, transfer files, read job output, edit module sources in the workspace, and build Go or C agents.
+
+Every mutating tool call passes through a deterministic OPSEC screen before reaching the target. The screen classifies module metadata and command lines into telemetry capabilities (such as process creation, filesystem writes, CLR loading, and credential access), noise bands, and reversibility, then enforces the operator's `mcp.json` policy (`allow`, `warn`, or `block`) and writes pre- and post-execution records to the audit log. The C2 still enforces WireGuard peer identity, single-owner target locks, and job ownership. See the [MCP server guide](./docs/MCP.md).
+
+#### Operator assistant
+
+Inside the console, `ask` runs a read-only assistant backed by a local OpenAI-compatible endpoint (`Ollama`, `vLLM`, `llama.cpp`, or `LM Studio` on loopback by default). It can search modules, inspect parameters, summarize job output and operator logs, and review a command's OPSEC footprint without dispatching work to an agent. See the [operator assistant guide](./docs/ASSISTANT.md).
 
 ### Build profiles
 
