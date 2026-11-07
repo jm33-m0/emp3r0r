@@ -86,6 +86,13 @@ func ReadConfigs(file string) (configs []*def.ModuleConfig, err error) {
 		// read_file("memfs:///...").
 		ModuleFilesMemFS bool     `json:"module_files_memfs"`
 		RiscvLibraries   []string `json:"riscv_libraries"`
+		// Optional operator-facing help: ready-to-run examples and a longer
+		// description. They are metadata only and never change invocation.
+		Examples []string `json:"examples"`
+		Help     string   `json:"help"`
+		// Opsec describes the module's operational footprint for the
+		// deterministic reviewer. Metadata only.
+		Opsec *def.OpsecProfile `json:"opsec"`
 	}
 
 	jsonData, err := os.ReadFile(file)
@@ -119,6 +126,9 @@ func ReadConfigs(file string) (configs []*def.ModuleConfig, err error) {
 				Type:  raw.AgentConfig.Type,
 			},
 			ModuleFilesMemFS: raw.ModuleFilesMemFS,
+			Examples:         raw.Examples,
+			Help:             raw.Help,
+			Opsec:            raw.Opsec,
 		}
 
 		config.Invocation.CoffExport = raw.Invocation.CoffExport
@@ -565,6 +575,18 @@ func renderOptionValue(opt *def.ModOption, val string) (string, any, error) {
 	default:
 		return val, val, nil
 	}
+}
+
+// ValidateOption checks one operator-supplied value against its declaration
+// without packing it. Callers that only render or vet a command line (help
+// output, the operator assistant) use it to reject unknown choices and
+// malformed numbers before the operator runs anything.
+func ValidateOption(opt *def.ModOption, val string) error {
+	if opt == nil {
+		return fmt.Errorf("unknown option")
+	}
+	_, _, err := renderOptionValue(opt, val)
+	return err
 }
 
 // CoffArgsFromResolved converts a resolved COFF invocation into the

@@ -146,7 +146,11 @@ func downloadGetFileListing(target *def.Emp3r0rAgent, flags map[string]string, r
 	// The BOF prints a summary line after the paths; without it the listing
 	// failed and the output is the agent's error message.
 	if !strings.Contains(out, " file(s) in ") {
-		return fmt.Errorf("list %s: %s", flags["path"], strings.TrimSpace(out))
+		detail := strings.TrimSpace(util.SanitizeText(out))
+		if len(detail) > 4096 {
+			detail = detail[:4096]
+		}
+		return fmt.Errorf("list %s: %s", flags["path"], detail)
 	}
 	if !recursive {
 		return nil

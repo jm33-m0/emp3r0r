@@ -194,7 +194,7 @@ func runFileTransferChecks(t *testing.T, agent *def.Emp3r0rAgent, doneChan <-cha
 	prevSender, prevFTPSender := modules.CmdSender, ftp.ExecCmd
 	prevTarget := live.GetActiveAgent()
 	modules.CmdSender = controllers.ExecuteCommand
-	ftp.ExecCmd = controllers.ExecuteCommand
+	ftp.ExecCmd = controllers.ExecuteCommandWithJob
 	t.Cleanup(func() {
 		modules.CmdSender = prevSender
 		ftp.ExecCmd = prevFTPSender

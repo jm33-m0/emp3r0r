@@ -205,6 +205,15 @@ type ModuleConfig struct {
 	// the interpreter when the module runs with --riscv. They are hosted and
 	// delivered through the normal module-files path (memfs only).
 	RiscvLibraries []string `cbor:"15,keyasint"`
+
+	// Examples are ready-to-run console invocations. Optional metadata for
+	// help output and the operator assistant; they are never executed.
+	Examples []string `cbor:"16,keyasint"`
+	// Help is a longer operator-facing description of the module. Optional.
+	Help string `cbor:"17,keyasint"`
+	// Opsec is optional operational-footprint metadata used by the
+	// deterministic reviewer for suggestions. It never changes execution.
+	Opsec *OpsecProfile `cbor:"18,keyasint"`
 }
 
 // Module help info and options

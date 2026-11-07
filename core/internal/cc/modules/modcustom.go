@@ -17,6 +17,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/ftp"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/paths"
 	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/jobs"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
@@ -526,7 +527,15 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 		cmd += fmt.Sprintf(" --peer %s", strconv.Quote(peerIP))
 	}
 	if jobID == "" {
-		jobID = uuid.NewString()
+		// Register the module run as a job so the console can list it and a
+		// follow-up `ask --last` can find its output. Callers that key their
+		// own stream (the SOCKS5 listener) pass a job ID and stay untouched.
+		job := jobs.CreateJob(config.Name, config.Name, ctx.Target.Tag)
+		if job != nil {
+			jobID = job.ID
+		} else {
+			jobID = uuid.NewString()
+		}
 	}
 	logging.Debugf("Sending command %s to %s", cmd, ctx.Target.Tag)
 	if CmdSender == nil {

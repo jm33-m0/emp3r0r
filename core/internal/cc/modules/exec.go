@@ -15,9 +15,9 @@ import (
 // ModExec is the command-execution BOF a C agent runs for `exec`.
 const ModExec = "exec"
 
-// execDispatchMu serializes the module selection around a dispatch: the module
+// dispatchMu serializes the module selection around a dispatch: the module
 // runner reads live.ActiveModule, which the console also owns.
-var execDispatchMu sync.Mutex
+var dispatchMu sync.Mutex
 
 // CanRunExecBOF reports whether target runs `exec` through the exec BOF. The Go
 // agent has command execution built in; the C agent runs the BOF. x86-64 runs
@@ -64,8 +64,8 @@ func DispatchExec(target *def.Emp3r0rAgent, command string, shell bool) (string,
 		flags["skip_rv_build"] = "1"
 	}
 
-	execDispatchMu.Lock()
-	defer execDispatchMu.Unlock()
+	dispatchMu.Lock()
+	defer dispatchMu.Unlock()
 	prev := live.ActiveModule
 	SetActiveModule(ModExec)
 	defer func() { live.ActiveModule = prev }()

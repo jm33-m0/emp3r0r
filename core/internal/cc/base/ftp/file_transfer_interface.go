@@ -47,7 +47,7 @@ func DownloadFromAgent(target *def.Emp3r0rAgent, filePath string, isRecursive bo
 		logging.Infof("Waiting for response from agent %s", target.Tag)
 		jobID := uuid.NewString()
 		res, err := live.AwaitCmdResult(jobID, live.AgentReplyTimeout(), func() error {
-			return ExecCmd(cmdStr, jobID, target.Tag)
+			return sendCommand(cmdStr, jobID, target.Tag)
 		})
 		if err != nil {
 			return fmt.Errorf("cannot get file list: %w", err)

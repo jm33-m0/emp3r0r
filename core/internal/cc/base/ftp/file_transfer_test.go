@@ -14,7 +14,7 @@ import (
 
 func TestStatFile(t *testing.T) {
 	// Mock ExecCmd
-	ExecCmd = func(cmd, job_id, tag string) error {
+	ExecCmd = func(cmd, job_id, tag string) (string, error) {
 		// Simulate agent response
 		go func() {
 			time.Sleep(100 * time.Millisecond)
@@ -32,7 +32,7 @@ func TestStatFile(t *testing.T) {
 			live.CmdResults.Store(job_id, string(data))
 			live.SignalCmdResultReady(job_id)
 		}()
-		return nil
+		return job_id, nil
 	}
 
 	// Clear in place: reassigning `= sync.Map{}` would race any concurrent

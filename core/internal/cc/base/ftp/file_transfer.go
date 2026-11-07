@@ -21,17 +21,24 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
-type ExecCmdFunc func(string, string, string) error
+// ExecCmdFunc sends one command to an agent and returns the job ID that
+// tracks its result.
+type ExecCmdFunc func(string, string, string) (string, error)
 
 // Inject this function to send command to agent
 var ExecCmd ExecCmdFunc
+
+func sendCommand(cmd, jobID, tag string) error {
+	_, err := ExecCmd(cmd, jobID, tag)
+	return err
+}
 
 // StatFile Get stat info of a file on agent
 func StatFile(filepath string, a *def.Emp3r0rAgent) (fi *util.FileStat, err error) {
 	cmd := fmt.Sprintf("%s --path %s", def.C2CmdStat, strconv.Quote(filepath))
 	jobID := uuid.NewString()
 	res, err := live.AwaitCmdResult(jobID, live.AgentReplyTimeout(), func() error {
-		return ExecCmd(cmd, jobID, a.Tag)
+		return sendCommand(cmd, jobID, a.Tag)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("stat %s: %w", filepath, err)
@@ -116,13 +123,19 @@ func RegisterWWWDownload(name, agentUUID string, size int64, checksum string, tr
 // PutFile put file to agent. The destination path selects the storage: a
 // memfs:/// key is kept in encrypted RAM, any other path is written to disk.
 func PutFile(lpath, rpath string, a *def.Emp3r0rAgent) error {
+	_, err := PutFileWithJob(lpath, rpath, a)
+	return err
+}
+
+// PutFileWithJob is PutFile with the job ID that tracks the agent's fetch.
+func PutFileWithJob(lpath, rpath string, a *def.Emp3r0rAgent) (string, error) {
 	// file size
 	size := util.FileSize(lpath)
 	sizemB := float32(size) / 1024 / 1024
 	// host the file and hash it in one step
 	hosted, sum, err := HostFileForAgent(lpath, a)
 	if err != nil {
-		return err
+		return "", err
 	}
 	logging.Notify(
 		logging.INFO, "\nPutFile:\nUploading '%s' to\n'%s' "+
@@ -141,11 +154,12 @@ func PutFile(lpath, rpath string, a *def.Emp3r0rAgent) error {
 	// operator's local path.
 	cmd := fmt.Sprintf("put --file %s --path %s --checksum %s --size %d",
 		strconv.Quote(hosted), strconv.Quote(rpath), strconv.Quote(sum), size)
-	if err := ExecCmd(cmd, "", a.Tag); err != nil {
-		return fmt.Errorf("PutFile send command: %v", err)
+	jobID, err := ExecCmd(cmd, "", a.Tag)
+	if err != nil {
+		return "", fmt.Errorf("PutFile send command: %w", err)
 	}
-	logging.Infof("Waiting for response from agent %s", a.Tag)
-	return nil
+	logging.Infof("Dispatched upload to agent %s", a.Tag)
+	return jobID, nil
 }
 
 // GenerateGetFilePaths generates paths and filenames for GetFile
@@ -316,7 +330,7 @@ func getFile(filePath string, agent *def.Emp3r0rAgent) (*network.StreamHandler, 
 
 	cmd := fmt.Sprintf("get --file_path %s --offset %d --token %s",
 		strconv.Quote(filePath), transfer.Offset, strconv.Quote(transfer.Token))
-	if err := ExecCmd(cmd, "", agent.Tag); err != nil {
+	if err := sendCommand(cmd, "", agent.Tag); err != nil {
 		logging.Errorf("GetFile send command: %v", err)
 		return nil, err
 	}
