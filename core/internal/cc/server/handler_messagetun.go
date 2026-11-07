@@ -383,12 +383,14 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 				// are never owned by an operator session — do not treat their
 				// arrival as an operator-facing problem.
 				socksInternal := strings.HasPrefix(msg.JobID, socksProxyTokenPrefix)
+				ownerSession, hasOwner := getJobOwner(msg.JobID)
 				if _, knownJob := live.CmdTime.Load(msg.JobID); knownJob {
 					responseToCache := msg.Response
 					if len(responseToCache) > maxCmdResultCacheBytes {
 						logging.Warningf("handleMessageTunnel: truncating oversized response for job %s from %d to %d bytes", strconv.Quote(msg.JobID), len(responseToCache), maxCmdResultCacheBytes)
 						responseToCache = responseToCache[:maxCmdResultCacheBytes]
 					}
+					_, hasLocalWaiter := live.CmdResultsReady.Load(msg.JobID)
 					live.CmdResults.Store(msg.JobID, string(responseToCache))
 					// Signal any goroutine waiting for this job's result.
 					live.SignalCmdResultReady(msg.JobID)
@@ -396,12 +398,13 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 					if !socksInternal && shouldPersistJobResponse(&msg) {
 						jobs.HandleOutput(msg.JobID, responseToCache)
 					}
-					if !socksInternal {
+					if !socksInternal && hasOwner && !hasLocalWaiter {
 						// Operator job output is persisted and relayed to the
-						// owning operator. The C2 copy has no reader after the
-						// wait signal, so drop it instead of retaining every
-						// result for the process lifetime. SOCKS5 entries stay
-						// until the pivot consumes them.
+						// owning operator. When no local waiter registered on
+						// CmdResultsReady, the C2 copy has no reader, so drop
+						// it instead of retaining every result for the process
+						// lifetime. Local/in-process jobs and SOCKS5 entries
+						// stay until their caller consumes them.
 						live.CmdResults.Delete(msg.JobID)
 						live.CmdTime.Delete(msg.JobID)
 					}
@@ -409,7 +412,7 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 					logging.Warningf("handleMessageTunnel: dropping response for unknown job ID %s", strconv.Quote(msg.JobID))
 				}
 
-				if ownerSession, ok := getJobOwner(msg.JobID); ok {
+				if hasOwner {
 					// Forward asynchronously. A slow/stuck operator must not block
 					// this goroutine, otherwise keep-alive hellos stop being
 					// processed and the agent is falsely timed out after 10m.

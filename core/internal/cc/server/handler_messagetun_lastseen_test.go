@@ -289,6 +289,44 @@ func TestMessageTunnelCommandResponseWithOperator(t *testing.T) {
 	}
 }
 
+func TestMessageTunnelCachesLocalJobResponse(t *testing.T) {
+	uuid := "test-uuid-local-job"
+	serverSecure, clientSecure, cleanup := setupMessageTunnelTest(t, uuid)
+	defer cleanup()
+
+	dec := cbor.NewDecoder(serverSecure)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	tunnelDone := startMessageTunnel(serverSecure, dec, "127.0.0.1:1", ctx, uuid)
+	defer stopMessageTunnel(t, tunnelDone, cancel, serverSecure, clientSecure)
+
+	enc := cbor.NewEncoder(clientSecure)
+	jobID := "local-job-unowned"
+	live.CmdTime.Store(jobID, time.Now())
+	t.Cleanup(func() {
+		live.CmdTime.Delete(jobID)
+		live.CmdResults.Delete(jobID)
+	})
+
+	if err := enc.Encode(&def.MsgTunData{JobID: jobID, Response: []byte("local-output")}); err != nil {
+		t.Fatalf("encode local job response: %v", err)
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	var got string
+	var found bool
+	for time.Now().Before(deadline) {
+		if got, found = live.CmdResultString(jobID); found {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if !found || got != "local-output" {
+		t.Fatalf("local job result = %q (found=%v), want %q", got, found, "local-output")
+	}
+}
+
 // TestMessageTunnelSurvivesSetActiveAgent verifies that the operator `target`
 // flow (SetActiveAgent + encoding the active agent) does not kill the tunnel.
 func TestMessageTunnelSurvivesSetActiveAgent(t *testing.T) {
