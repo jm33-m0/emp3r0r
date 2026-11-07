@@ -250,7 +250,9 @@ func StartMessageTunnel(onData func(*def.OperatorMsg), onError func(error)) {
 		notifyMsgTunUpdate()
 
 		// Channel to receive decode results
-		msgCh := make(chan *def.OperatorMsg, 10)
+		// The reader must keep draining control frames (pings) even while a
+		// burst of agent responses waits for the console to render it.
+		msgCh := make(chan *def.OperatorMsg, 64)
 		errCh := make(chan error, 1)
 
 		// Single goroutine to continuously read messages

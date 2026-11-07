@@ -45,7 +45,7 @@ var (
 	AgentRefreshCh = make(chan struct{}, 1)
 )
 
-func backgroundJobs() {
+func backgroundJobs(onData func(*def.OperatorMsg)) {
 	client.HTTPClient = createOperatorHTTPClient()
 	// The operator's stable identity is its provisioned WireGuard IP: the C2
 	// sees that IP as the tunnel peer address, so both sides agree on identity
@@ -65,7 +65,7 @@ func backgroundJobs() {
 	logging.Infof("Operator's WireGuard address: %s", client.RootURL)
 
 	// set up command senders
-	ftp.ExecCmd = controllers.ExecuteCommand
+	ftp.ExecCmd = controllers.ExecuteCommandWithJob
 	modules.CmdSender = controllers.ExecuteCommand
 	// track per-agent operator idle (time since the agent last received a
 	// command from this operator)
@@ -73,9 +73,42 @@ func backgroundJobs() {
 	// refresh agent list every 10 seconds
 	go agentListRefresher()
 	// handle messages from operator
-	go client.StartMessageTunnel(processAgentData, func(err error) {
+	go client.StartMessageTunnel(onData, func(err error) {
 		logging.Errorf("Message tunnel: %v", err)
 	})
+}
+
+// StartClient initializes the operator session shared by the console and the
+// MCP server: modules, the operator HTTP client, the message tunnel, and the
+// agent list refresher. It starts no UI.
+func StartClient(wgServerIP string, wgServerPort int) {
+	StartClientWithHandler(wgServerIP, wgServerPort, processAgentData)
+}
+
+// StartClientWithHandler is StartClient with an explicit message-tunnel data
+// handler. MCP passes a handler that records results without rendering console
+// output, so a large response cannot block the tunnel read loop and make the
+// C2 ping time out.
+func StartClientWithHandler(wgServerIP string, wgServerPort int, onData func(*def.OperatorMsg)) {
+	if onData == nil {
+		onData = processAgentData
+	}
+	OperatorPort = wgServerPort + 1
+	ServerIP = wgServerIP
+
+	// unlock incomplete downloads
+	if err := tools.UnlockDownloads(); err != nil {
+		logging.Debugf("UnlockDownloads: %v", err)
+	}
+	// Load modules before any consumer builds a command tree so module commands
+	// and flags exist for completion and for the MCP tool schemas.
+	modules.InitModules()
+	// Hot-reload module dir changes: new/edited/removed module configs are
+	// re-synced into def.Modules (and thus into the command tree, which is
+	// rebuilt from it on every prompt cycle). Only the changed modules are
+	// logged.
+	modules.StartModuleWatch()
+	backgroundJobs(onData)
 }
 
 // CliMain launches the commandline UI
@@ -86,21 +119,8 @@ func CliMain(wg_server_ip string, wg_server_port int) {
 		}
 		logging.Infof("CliMain resumed (or returned normally)")
 	}()
-	OperatorPort = wg_server_port + 1
-	ServerIP = wg_server_ip
+	StartClient(wg_server_ip, wg_server_port)
 
-	// unlock incomplete downloads
-	err := tools.UnlockDownloads()
-	if err != nil {
-		logging.Debugf("UnlockDownloads: %v", err)
-	}
-	// Load modules before command tree creation so module_name commands and flags exist for completion.
-	modules.InitModules()
-	// Hot-reload module dir changes: new/edited/removed module configs are
-	// re-synced into def.Modules (and thus into the command tree, which is
-	// rebuilt from it on every prompt cycle). Only the changed modules are
-	// logged.
-	modules.StartModuleWatch()
 	mainMenu := EMP3R0R_CONSOLE.ActiveMenu()
 	EMP3R0R_CONSOLE.SetPrintLogo(CliBanner)
 
@@ -135,7 +155,7 @@ func CliMain(wg_server_ip string, wg_server_port int) {
 
 	// Tmux setup, we will need to log to tmux window
 	cli.CAT = live.CAT // emp3r0r-cat is set up in internal/live/config.go
-	err = cli.TmuxInitWindows()
+	err := cli.TmuxInitWindows()
 	if err != nil {
 		logging.Fatalf("Fatal TMUX error: %v, please run `tmux kill-session -t emp3r0r` and re-run emp3r0r", err)
 	}
@@ -146,15 +166,15 @@ func CliMain(wg_server_ip string, wg_server_port int) {
 		logging.Fatalf("Failed to open tmux pane: %v", err)
 	}
 	logging.AddWriter(f)
+	// Assistant output uses the agent output pane.
+	// The command prompt pane is never used for streaming.
+	SetOutputPane(f)
 
 	// when the console is closed, deinit tmux windows
 	defer cli.TmuxDeinitWindows()
 	// Also run tmux cleanup for explicit process exits (live.Exit), which skip
 	// deferred functions because they terminate the process.
 	live.OnShutdown(cli.TmuxDeinitWindows)
-
-	// Background jobs
-	backgroundJobs()
 
 	// Run the console
 	logging.Fatal(EMP3R0R_CONSOLE.Start())

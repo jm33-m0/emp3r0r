@@ -52,4 +52,6 @@ const (
 	OperatorSocks5Stop = OperatorRoot + "/socks5_stop"
 	// OperatorSocks5List lists running C2-resident SOCKS5 pivots
 	OperatorSocks5List = OperatorRoot + "/socks5_list"
+	// OperatorJobOutput returns a bounded slice of a job's persisted output
+	OperatorJobOutput = OperatorRoot + "/job_output"
 )

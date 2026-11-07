@@ -5,6 +5,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -110,6 +111,28 @@ func TestStopSocks5ProxyOwnership(t *testing.T) {
 	}
 	if err := StopSocks5Proxy(port, "op-a"); err != nil {
 		t.Fatalf("op-a should stop its own pivot: %v", err)
+	}
+}
+
+func TestOperatorRegistryRejectsOversizedKeys(t *testing.T) {
+	MarkOperatorOnline("op-a")
+	t.Cleanup(func() { MarkOperatorOffline("op-a") })
+
+	token := strings.Repeat("t", maxFTPTokenBytes+1)
+	rec := httptest.NewRecorder()
+	handleRegisterFTPStream(rec, operatorHTTPRequest(t, "op-a", def.FTPStreamRequest{Token: token, FilePath: "/tmp/x"}))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("oversized FTP token = %d, want 400", rec.Code)
+	}
+	if _, ok := network.FTPStreams.Load("token:" + token); ok {
+		t.Fatal("oversized FTP token was stored")
+	}
+
+	name := strings.Repeat("n", maxWWWDownloadNameBytes+1)
+	rec = httptest.NewRecorder()
+	handleRegisterWWWDownload(rec, operatorHTTPRequest(t, "op-a", def.WWWDownloadRequest{Name: name, AgentUUID: "agent-x"}))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("oversized download name = %d, want 400", rec.Code)
 	}
 }
 

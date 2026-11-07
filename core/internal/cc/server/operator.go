@@ -13,6 +13,7 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/fxamacker/cbor/v2"
+	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/wireguard"
@@ -51,12 +52,20 @@ const (
 	// maxFTPStreamsPerOperator bounds concurrent FTP streams per operator so one
 	// operator cannot grow the server's stream registry without limit.
 	maxFTPStreamsPerOperator = 64
+	// maxFTPTokenBytes bounds the token used as an FTP registry key.
+	maxFTPTokenBytes = 256
+	// maxWWWDownloadNameBytes bounds the name used as a download registry key.
+	maxWWWDownloadNameBytes = 255
 	// maxWWWDownloadsPerOperator bounds registered downloads per operator so an
 	// agent cannot make one operator hold an unbounded registry. Module and
 	// loader archives stay registered across fetches so a retry can find them,
 	// so the bound must cover every agent's hosted dependencies rather than one
 	// transfer at a time.
 	maxWWWDownloadsPerOperator = 1024
+	// operatorPingTimeout bounds how long the C2 waits for a pong. The client
+	// may be processing a large agent response; a tight deadline would tear
+	// down a healthy tunnel and force an unnecessary reconnect.
+	operatorPingTimeout = 15 * time.Second
 )
 
 // DecodeCBORBody decodes CBOR HTTP request body
@@ -148,6 +157,10 @@ func handleSetActiveAgent(wrt http.ResponseWriter, req *http.Request) {
 			http.Error(wrt, "Internal server error", http.StatusInternalServerError)
 		}
 	}()
+	operatorID, ok := requireOperatorIdentity(wrt, req)
+	if !ok {
+		return
+	}
 	// Decode CBOR request body
 	operation, err := DecodeCBORBody[def.Operation](wrt, req)
 	if err != nil {
@@ -170,10 +183,6 @@ func handleSetActiveAgent(wrt http.ResponseWriter, req *http.Request) {
 	// switch: a successful claim releases the operator's other claims below. A
 	// live claim by another operator is rejected with a conflict so the UI can
 	// show who owns the agent.
-	operatorID, ok := requireOperatorIdentity(wrt, req)
-	if !ok {
-		return
-	}
 	if acquired, heldBy := acquireAgentLock(agent.UUID, operatorID, operatorDisplayName(operatorID)); !acquired {
 		msg := fmt.Sprintf("Agent %s is operated by %s", agent.Tag, heldBy)
 		logging.Warningf("%s (operator %s)", msg, operatorID)
@@ -237,24 +246,34 @@ func handleSendCommand(wrt http.ResponseWriter, req *http.Request) {
 	// The operator's target is its active agent; drop any other claim so a
 	// stale lock never blocks another operator.
 	releaseAgentLocksForOperatorExcept(operatorID, agent.UUID)
-	setJobOwner(*operation.JobID, operatorID)
+	// Job IDs become log file names and result-map keys. The console always
+	// generates UUIDs; reject anything else from a direct API caller before it
+	// reaches setJobOwner or the persistence path.
+	jobID := strings.TrimSpace(*operation.JobID)
+	parsedJobID, err := uuid.Parse(jobID)
+	if err != nil {
+		http.Error(wrt, "JobID must be a UUID", http.StatusBadRequest)
+		return
+	}
+	jobID = parsedJobID.String()
+	setJobOwner(jobID, operatorID)
 	auditOperatorAction(operatorID, "command", util.AgentRef(agent.UUID), *operation.Command)
 
 	// Track the job ID so the message tunnel accepts the response
-	live.CmdTime.Store(*operation.JobID, time.Now())
+	live.CmdTime.Store(jobID, time.Now())
 
 	// Any accepted command resets the operator-idle timer.
 	touchOperatorCommand()
 
 	// Send command to agent. If the agent has no live message tunnel, queue the
 	// command so it is pulled when the agent is next admitted.
-	if err = agents.SendCmd(*operation.Command, *operation.JobID, agent); err != nil {
+	if err = agents.SendCmd(*operation.Command, jobID, agent); err != nil {
 		if agent.UUID == "" {
 			http.Error(wrt, "Agent has no UUID", http.StatusInternalServerError)
 			return
 		}
 		msg := def.MsgTunData{
-			JobID:    *operation.JobID,
+			JobID:    jobID,
 			CmdSlice: util.ParseCmd(*operation.Command),
 			Tag:      agent.Tag,
 			Time:     time.Now().UnixMilli(),
@@ -338,9 +357,10 @@ func handleForgetAgent(wrt http.ResponseWriter, req *http.Request) {
 	}
 
 	// An operator cannot forget an agent another operator is actively running.
-	if owner := agentLockOwner(uuid); owner != "" && owner != operatorDisplayName(operatorID) {
-		msg := fmt.Sprintf("Agent %s is operated by %s; release target before forgetting it", util.AgentRef(uuid), owner)
-		auditOperatorAction(operatorID, "forget_agent_denied", util.AgentRef(uuid), "held by "+owner)
+	if owner := agentLockOwnerSession(uuid); owner != "" && owner != operatorID {
+		name := operatorDisplayName(owner)
+		msg := fmt.Sprintf("Agent %s is operated by %s; release target before forgetting it", util.AgentRef(uuid), name)
+		auditOperatorAction(operatorID, "forget_agent_denied", util.AgentRef(uuid), "held by "+name)
 		http.Error(wrt, msg, http.StatusConflict)
 		return
 	}
@@ -421,6 +441,10 @@ func handleRegisterFTPStream(wrt http.ResponseWriter, req *http.Request) {
 	if _, online := OPERATORS.Load(operatorSession); !online {
 		logging.Warningf("Reject ftp stream registration from %s: operator session is not connected", req.RemoteAddr)
 		http.Error(wrt, "operator session not connected", http.StatusUnauthorized)
+		return
+	}
+	if ftpReq.Token == "" || len(ftpReq.Token) > maxFTPTokenBytes {
+		http.Error(wrt, "invalid stream token", http.StatusBadRequest)
 		return
 	}
 	// An operator may not hijack a token that another operator already owns.
@@ -599,6 +623,10 @@ func handleRegisterWWWDownload(wrt http.ResponseWriter, req *http.Request) {
 	}
 	if dlReq.Name == "" || dlReq.AgentUUID == "" {
 		http.Error(wrt, "name and agent UUID are required", http.StatusBadRequest)
+		return
+	}
+	if len(dlReq.Name) > maxWWWDownloadNameBytes {
+		http.Error(wrt, "file name is too long", http.StatusBadRequest)
 		return
 	}
 	if filepath.Base(dlReq.Name) != dlReq.Name || strings.ContainsAny(dlReq.Name, "/\\") {
@@ -813,7 +841,7 @@ func handleOperatorConn(wrt http.ResponseWriter, req *http.Request) {
 			return
 		case <-pingTicker.C:
 			// Send WebSocket ping to detect silent disconnections
-			pingCtx, pingCancel := context.WithTimeout(ctx, 5*time.Second)
+			pingCtx, pingCancel := context.WithTimeout(ctx, operatorPingTimeout)
 			err := wsConn.Ping(pingCtx)
 			pingCancel()
 			if err != nil {

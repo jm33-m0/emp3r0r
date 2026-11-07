@@ -3,7 +3,32 @@ package operator
 import (
 	"testing"
 	"time"
+
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
+	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 )
+
+// TestRenderAgentTableWithoutTmux covers the MCP/headless refresher: there is
+// no CommandPane, so the status-bar and window-title helpers must be skipped
+// instead of dereferenced.
+func TestRenderAgentTableWithoutTmux(t *testing.T) {
+	prevPane := cli.CommandPane
+	cli.CommandPane = nil
+	t.Cleanup(func() {
+		cli.CommandPane = prevPane
+		live.ClearAgents()
+		live.SetActiveAgent(nil)
+	})
+
+	target := &def.Emp3r0rAgent{Tag: "tag-1", UUID: "uuid-1", Name: "host"}
+	live.ClearAgents()
+	live.PublishAgent(&live.AgentRecord{Agent: target})
+	live.SetActiveAgent(target)
+
+	// Before the guard this panicked on cli.CommandPane.WindowID.
+	RenderAgentTable([]*def.Emp3r0rAgent{target})
+}
 
 func TestFormatIdle(t *testing.T) {
 	tests := []struct {

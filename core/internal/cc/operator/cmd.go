@@ -384,6 +384,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			Run:     cmdSearchModule,
 		}
 		rootCmd.AddCommand(searchCmd)
+		rootCmd.AddCommand(askCmd())
 
 		execCmd := &cobra.Command{
 			Use:     "exec --cmd 'command'",

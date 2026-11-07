@@ -142,6 +142,8 @@ C2 server binaries keep the full feature set, so one server can handle every age
 ## Documentation
 
 - [Operator guide](./docs/OPERATOR.md): installation, quick start, operator setup, container notes, tmux keybindings, and agent generation.
+- [Operator assistant](./docs/ASSISTANT.md): the read-only `ask` command and its model configuration.
+- [MCP server](./docs/MCP.md): autonomous operator tools for Claude Code, Codex, and other MCP clients, with the deterministic OPSEC screen and workspace editing.
 - [Custom transport guide](./docs/CUSTOM_C2.md): Tor hidden-service quick start, Go and C agent dialers, C2 bridge socket protocol, and running multiple custom transports.
 - [RISC-V BOF modules](./docs/rvvm.md): running portable BOFs with `--riscv`, linking static libraries, and the RV32IMA interpreter.
 - [Module development guide](./docs/module_development_guide.md)

@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
@@ -19,13 +20,29 @@ var OnCommandSent func(agentTag string)
 // ExecuteCommand sends a command to an agent through the operator HTTP service
 // over WireGuard. This replaces operator.operatorSendCommand2Agent
 func ExecuteCommand(cmd, jobID, agentTag string) error {
+	_, err := ExecuteCommandWithJob(cmd, jobID, agentTag)
+	return err
+}
+
+// ExecuteCommandWithJob is ExecuteCommand with the job ID it actually used.
+// Callers that need to wait for the result (the assistant's action tools) use
+// the returned ID; the command is still sent asynchronously.
+func ExecuteCommandWithJob(cmd, jobID, agentTag string) (string, error) {
 	if jobID == "" {
 		// create a job to track this command
 		job := jobs.CreateJob(cmd, "command", agentTag)
 		if job == nil {
-			return fmt.Errorf("failed to create job for command: %s", cmd)
+			return "", fmt.Errorf("failed to create job for command: %s", cmd)
 		}
 		jobID = job.ID
+	}
+	// Remember the latest dispatch so a follow-up console command can refer to
+	// its output without the operator copying a UUID. Completion helpers run
+	// quiet internal commands and must not steal that reference.
+	if !strings.Contains(cmd, "--quiet") &&
+		!strings.HasPrefix(cmd, def.C2CmdListDir) &&
+		!strings.HasPrefix(cmd, def.C2CmdStat) {
+		live.SetLastJobID(jobID)
 	}
 	operation := def.Operation{
 		AgentTag: agentTag,
@@ -52,5 +69,5 @@ func ExecuteCommand(cmd, jobID, agentTag string) error {
 		}
 	}()
 
-	return nil
+	return jobID, nil
 }

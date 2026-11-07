@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
@@ -25,7 +26,10 @@ func StartOperatorServer(port int) {
 	}
 
 	network.OperatorServer = &http.Server{
-		Handler: r,
+		Handler:           r,
+		ReadHeaderTimeout: 10 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		MaxHeaderBytes:    1 << 20,
 	}
 	network.OperatorServerCtx, network.OperatorServerCancel = context.WithCancel(context.Background())
 	logging.Successf("🚀 Starting C2 operator service (HTTP over WireGuard) at port %d", port)

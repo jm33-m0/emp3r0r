@@ -54,8 +54,13 @@ func AwaitCmdResult(jobID string, timeout time.Duration, send func() error) (str
 	}
 
 	ready := make(chan struct{}, 1)
-	CmdResultsReady.Store(jobID, ready)
-	defer CmdResultsReady.Delete(jobID)
+	actual, loaded := CmdResultsReady.LoadOrStore(jobID, ready)
+	if loaded {
+		if existing, ok := actual.(chan struct{}); ok {
+			ready = existing
+		}
+	}
+	defer func() { CmdResultsReady.CompareAndDelete(jobID, ready) }()
 
 	// A caller that dispatches first and waits afterwards can observe a result
 	// that was cached before the waiter existed; the notification channel will
@@ -82,5 +87,49 @@ func AwaitCmdResult(jobID string, timeout time.Duration, send func() error) (str
 		return "", fmt.Errorf("agent result for job %s was not cached", jobID)
 	}
 	CmdResults.Delete(jobID)
+	return res, nil
+}
+
+// WaitCmdResult waits for a job that was already dispatched and leaves the
+// cached result in place, so the output pane and later tools can still read it.
+// A zero timeout uses AgentReplyTimeout.
+func WaitCmdResult(jobID string, timeout time.Duration) (string, error) {
+	if jobID == "" {
+		return "", fmt.Errorf("empty job ID")
+	}
+	if res, ok := CmdResultString(jobID); ok {
+		return res, nil
+	}
+
+	ready := make(chan struct{}, 1)
+	actual, loaded := CmdResultsReady.LoadOrStore(jobID, ready)
+	if loaded {
+		if existing, ok := actual.(chan struct{}); ok {
+			ready = existing
+		}
+	}
+	defer func() { CmdResultsReady.CompareAndDelete(jobID, ready) }()
+
+	// A result that arrived between the cache check and the registration would
+	// never signal the channel; check again before waiting.
+	if res, ok := CmdResultString(jobID); ok {
+		return res, nil
+	}
+
+	if timeout <= 0 {
+		timeout = AgentReplyTimeout()
+	}
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case <-ready:
+	case <-timer.C:
+		return "", fmt.Errorf("no result from agent after %s", timeout)
+	}
+
+	res, ok := CmdResultString(jobID)
+	if !ok {
+		return "", fmt.Errorf("agent result for job %s was not cached", jobID)
+	}
 	return res, nil
 }

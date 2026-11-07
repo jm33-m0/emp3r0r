@@ -2,6 +2,7 @@ package transport
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -47,6 +48,48 @@ func TestActiveHTTPServerSessionRequiresAuth(t *testing.T) {
 	stream.MarkAuthenticated()
 	if !IsActiveHTTPServerSession(req, config) {
 		t.Fatalf("authenticated session should bypass the rate limiter")
+	}
+}
+
+// TestHTTPServerStreamCloseDrainsQueuedResponses guards the www relay
+// truncation: a busy relay queues response chunks faster than the agent polls,
+// and a fixed close timer deleted the session while data was still queued.
+func TestHTTPServerStreamCloseDrainsQueuedResponses(t *testing.T) {
+	const sessionID = "c2channel-close-drain"
+	config := &def.MalleableHTTPConfig{
+		SessionHeader: "Cookie",
+		SessionValue:  "sessionID=%s",
+		InitHeader:    "X-Init",
+		InitValue:     "1",
+		CloseHeader:   "X-Close",
+		CloseValue:    "1",
+	}
+	stream := newHTTPServerStream(sessionID)
+	serverSessions.Store(sessionID, stream)
+	defer serverSessions.Delete(sessionID)
+
+	payload := bytes.Repeat([]byte("x"), 3*maxPollResponseBytes)
+	if _, err := stream.Write(payload); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if err := stream.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+
+	// The previous fixed 5s cleanup deleted the session before a slow agent
+	// could poll the queued chunks.
+	time.Sleep(6 * time.Second)
+
+	var got []byte
+	for range 3 {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("Cookie", "sessionID="+sessionID)
+		rec := httptest.NewRecorder()
+		_, _ = HandleHTTPServerSession(rec, req, config)
+		got = append(got, rec.Body.Bytes()...)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Fatalf("got %d bytes after close, want %d", len(got), len(payload))
 	}
 }
 

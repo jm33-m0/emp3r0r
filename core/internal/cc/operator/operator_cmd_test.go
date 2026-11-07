@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/builder"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/reeflective/console"
@@ -113,14 +114,14 @@ func TestGenerateCommandsDocumentTransportPorts(t *testing.T) {
 }
 
 func TestCAgentEndpointPreservesTLSURL(t *testing.T) {
-	if got := cAgentEndpoint("https://front.example.com:8443/", "8080", def.C2ChannelModePlainHTTP); got != "https://front.example.com:8443" {
-		t.Fatalf("cAgentEndpoint(TLS URL) = %q", got)
+	if got := builder.CAgentEndpoint("https://front.example.com:8443/", "8080", def.C2ChannelModePlainHTTP); got != "https://front.example.com:8443" {
+		t.Fatalf("builder.CAgentEndpoint(TLS URL) = %q", got)
 	}
-	if got := cAgentEndpoint("c2.example.com", "8080", def.C2ChannelModePlainHTTP); got != "http://c2.example.com:8080" {
-		t.Fatalf("cAgentEndpoint(host) = %q", got)
+	if got := builder.CAgentEndpoint("c2.example.com", "8080", def.C2ChannelModePlainHTTP); got != "http://c2.example.com:8080" {
+		t.Fatalf("builder.CAgentEndpoint(host) = %q", got)
 	}
-	if got := cAgentEndpoint("example.onion:80", "8080", "tor"); got != "example.onion:80" {
-		t.Fatalf("cAgentEndpoint(custom) = %q", got)
+	if got := builder.CAgentEndpoint("example.onion:80", "8080", "tor"); got != "example.onion:80" {
+		t.Fatalf("builder.CAgentEndpoint(custom) = %q", got)
 	}
 }
 

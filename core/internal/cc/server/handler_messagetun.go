@@ -392,8 +392,19 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 					live.CmdResults.Store(msg.JobID, string(responseToCache))
 					// Signal any goroutine waiting for this job's result.
 					live.SignalCmdResultReady(msg.JobID)
-					// persistence
-					jobs.HandleOutput(msg.JobID, responseToCache)
+					// persistence (skip internal completion queries)
+					if !socksInternal && shouldPersistJobResponse(&msg) {
+						jobs.HandleOutput(msg.JobID, responseToCache)
+					}
+					if !socksInternal {
+						// Operator job output is persisted and relayed to the
+						// owning operator. The C2 copy has no reader after the
+						// wait signal, so drop it instead of retaining every
+						// result for the process lifetime. SOCKS5 entries stay
+						// until the pivot consumes them.
+						live.CmdResults.Delete(msg.JobID)
+						live.CmdTime.Delete(msg.JobID)
+					}
 				} else if !socksInternal {
 					logging.Warningf("handleMessageTunnel: dropping response for unknown job ID %s", strconv.Quote(msg.JobID))
 				}
@@ -452,4 +463,23 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 			}
 		}
 	}
+}
+
+// shouldPersistJobResponse filters the console's internal completion queries.
+// They run on every keystroke and their output is consumed immediately; writing
+// each one to a job log would fill the workspace with noise.
+func shouldPersistJobResponse(msg *def.MsgTunData) bool {
+	if len(msg.CmdSlice) == 0 {
+		return true
+	}
+	switch msg.CmdSlice[0] {
+	case def.C2CmdListDir, def.C2CmdStat:
+		return false
+	}
+	for _, arg := range msg.CmdSlice[1:] {
+		if arg == "--quiet" {
+			return false
+		}
+	}
+	return true
 }

@@ -14,6 +14,10 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
+// relaySend delivers one relay frame over the operator message tunnel. Tests
+// replace it to observe what a relay served without a live C2 connection.
+var relaySend = client.SendOperatorMsg
+
 func handleWWWRelayMessage(data *def.OperatorMsg) bool {
 	if data == nil {
 		return false
@@ -35,7 +39,7 @@ func serveWWWRelay(streamID string) {
 	localized, err := util.SecureLocalPath(streamID)
 	if err != nil {
 		logging.Errorf("WWW relay: refusing %q: %v", streamID, err)
-		_ = client.SendOperatorMsg(&def.OperatorMsg{Tag: def.TagWWWRelayErrorPrefix + streamID, Response: []byte(err.Error())})
+		_ = relaySend(&def.OperatorMsg{Tag: def.TagWWWRelayErrorPrefix + streamID, Response: []byte(err.Error())})
 		return
 	}
 	name := filepath.Base(localized)
@@ -45,13 +49,13 @@ func serveWWWRelay(streamID string) {
 	val, found := network.WWWDownloads.Load(network.LocalWWWDownloadKey(name))
 	if !found {
 		logging.Errorf("WWW relay: refusing %q: no operator-registered download for this agent")
-		_ = client.SendOperatorMsg(&def.OperatorMsg{Tag: def.TagWWWRelayErrorPrefix + streamID, Response: []byte("unregistered download")})
+		_ = relaySend(&def.OperatorMsg{Tag: def.TagWWWRelayErrorPrefix + streamID, Response: []byte("unregistered download")})
 		return
 	}
 	dl, ok := val.(*network.WWWDownload)
 	if !ok || dl == nil {
 		network.WWWDownloads.Delete(network.LocalWWWDownloadKey(name))
-		_ = client.SendOperatorMsg(&def.OperatorMsg{Tag: def.TagWWWRelayErrorPrefix + streamID, Response: []byte("invalid download registration")})
+		_ = relaySend(&def.OperatorMsg{Tag: def.TagWWWRelayErrorPrefix + streamID, Response: []byte("invalid download registration")})
 		return
 	}
 	defer func() {
@@ -74,7 +78,7 @@ func serveWWWRelay(streamID string) {
 	f, err := os.Open(path)
 	if err != nil {
 		logging.Errorf("WWW relay: cannot serve %q: %v (hosted files live in %s)", streamID, err, paths.WWWRoot)
-		_ = client.SendOperatorMsg(&def.OperatorMsg{Tag: def.TagWWWRelayErrorPrefix + streamID, Response: []byte(err.Error())})
+		_ = relaySend(&def.OperatorMsg{Tag: def.TagWWWRelayErrorPrefix + streamID, Response: []byte(err.Error())})
 		return
 	}
 	defer f.Close()
@@ -89,17 +93,17 @@ func serveWWWRelay(streamID string) {
 		if n > 0 {
 			chunk := make([]byte, n)
 			copy(chunk, buf[:n])
-			if err := client.SendOperatorMsg(&def.OperatorMsg{Tag: def.TagWWWRelayDataPrefix + streamID, Response: chunk}); err != nil {
+			if err := relaySend(&def.OperatorMsg{Tag: def.TagWWWRelayDataPrefix + streamID, Response: chunk}); err != nil {
 				logging.Errorf("WWW relay send failed for %q: %v", streamID, err)
 				return
 			}
 		}
 		if readErr != nil {
 			if readErr == io.EOF {
-				_ = client.SendOperatorMsg(&def.OperatorMsg{Tag: def.TagWWWRelayDonePrefix + streamID})
+				_ = relaySend(&def.OperatorMsg{Tag: def.TagWWWRelayDonePrefix + streamID})
 			} else {
 				logging.Errorf("WWW relay: reading %s failed: %v", path, readErr)
-				_ = client.SendOperatorMsg(&def.OperatorMsg{Tag: def.TagWWWRelayErrorPrefix + streamID, Response: []byte(readErr.Error())})
+				_ = relaySend(&def.OperatorMsg{Tag: def.TagWWWRelayErrorPrefix + streamID, Response: []byte(readErr.Error())})
 			}
 			return
 		}

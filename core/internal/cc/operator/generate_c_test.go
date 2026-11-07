@@ -56,20 +56,20 @@ func TestValidateCAgentPollTiming(t *testing.T) {
 		{60, -1, false},
 		{60, 101, false},
 	} {
-		err := validateCAgentPollTiming(tc.interval, tc.jitter)
+		err := builder.ValidateCAgentPollTiming(tc.interval, tc.jitter)
 		if (err == nil) != tc.ok {
-			t.Errorf("validateCAgentPollTiming(%d, %d) error = %v, want ok=%v",
+			t.Errorf("builder.ValidateCAgentPollTiming(%d, %d) error = %v, want ok=%v",
 				tc.interval, tc.jitter, err, tc.ok)
 		}
 	}
 }
 
 func TestCAgentStagerMode(t *testing.T) {
-	if !cAgentStagerMode("shellcode") {
+	if !builder.CAgentStagerMode("shellcode") {
 		t.Error("shellcode is the local stager payload and must enable stager mode")
 	}
 	for _, format := range []string{"exe", "so", ""} {
-		if cAgentStagerMode(format) {
+		if builder.CAgentStagerMode(format) {
 			t.Errorf("%q is not a stager-embedded artifact", format)
 		}
 	}
@@ -77,14 +77,14 @@ func TestCAgentStagerMode(t *testing.T) {
 
 func TestCAgentDynloadForLibc(t *testing.T) {
 	// An unset --dynload must follow the chosen libc, not the glibc default.
-	if got := cAgentDynloadForLibc("musl", "libc_dl", false); got != "public" {
+	if got := builder.CAgentDynloadForLibc("musl", "libc_dl", false); got != "public" {
 		t.Errorf("musl with default dynload = %q, want public", got)
 	}
 	// An explicit choice is preserved (and validated later).
-	if got := cAgentDynloadForLibc("musl", "public", true); got != "public" {
+	if got := builder.CAgentDynloadForLibc("musl", "public", true); got != "public" {
 		t.Errorf("explicit musl dynload changed: %q", got)
 	}
-	if got := cAgentDynloadForLibc("glibc", "libc_dl", false); got != "libc_dl" {
+	if got := builder.CAgentDynloadForLibc("glibc", "libc_dl", false); got != "libc_dl" {
 		t.Errorf("glibc default dynload changed: %q", got)
 	}
 }

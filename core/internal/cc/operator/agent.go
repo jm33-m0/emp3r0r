@@ -45,21 +45,18 @@ func operatorIdleFor(agentTag string) (time.Duration, bool) {
 	return time.Since(last), true
 }
 
-// cmdSetActiveAgent sets the active agent for the operator
-func CmdSetActiveAgent(cmd *cobra.Command, args []string) {
-	agent, err := client.SetActiveAgent(args[0])
+// SelectTarget points this operator at an agent. The server acquires the
+// operator lock for it, then the local registry, idle tracking, and agent list
+// follow. Shared by the console command and the MCP server.
+func SelectTarget(identifier string) (*def.Emp3r0rAgent, error) {
+	agent, err := client.SetActiveAgent(identifier)
 	if err != nil {
-		logging.Errorf("Failed to set active agent: %v", err)
-		return
+		return nil, fmt.Errorf("set active agent: %w", err)
 	}
 	if agent == nil {
-		logging.Errorf("Target does not exist, no target has been selected")
-		return
+		return nil, fmt.Errorf("target does not exist")
 	}
 	live.SetActiveAgent(agent)
-	logging.Successf("Now targeting %s (%s)", agent.Tag, agent.Name)
-	logging.Infof("  OS: %s\n  User: %s\n  IPs: %s",
-		agent.OS, agent.User, strings.Join(agent.IPs, ", "))
 
 	// Reset operator-idle tracking for the newly selected agent so the status
 	// bar shows "Operator idle: 0s" instead of "--".
@@ -68,11 +65,27 @@ func CmdSetActiveAgent(cmd *cobra.Command, args []string) {
 	// Refresh the list immediately so the newly selected agent's Last seen/RTT
 	// reflect the latest server state instead of waiting for the next 10s tick.
 	safeRefreshAgentList()
+	return agent, nil
+}
+
+// cmdSetActiveAgent sets the active agent for the operator
+func CmdSetActiveAgent(cmd *cobra.Command, args []string) {
+	agent, err := SelectTarget(args[0])
+	if err != nil {
+		logging.Errorf("Failed to set active agent: %v", err)
+		return
+	}
+	logging.Successf("Now targeting %s (%s)", agent.Tag, agent.Name)
+	logging.Infof("  OS: %s\n  User: %s\n  IPs: %s",
+		agent.OS, agent.User, strings.Join(agent.IPs, ", "))
 
 	// Update tmux window title to show the active agent's short identifier.
-	setTitleErr := cli.TmuxSetWindowTitle(tmuxSafeAgentID(agent.Tag), cli.CommandPane.WindowID)
-	if setTitleErr != nil {
-		logging.Warningf("Failed to set tmux window title: %v", setTitleErr)
+	// Headless callers (MCP) have no tmux panes.
+	if cli.CommandPane != nil {
+		setTitleErr := cli.TmuxSetWindowTitle(tmuxSafeAgentID(agent.Tag), cli.CommandPane.WindowID)
+		if setTitleErr != nil {
+			logging.Warningf("Failed to set tmux window title: %v", setTitleErr)
+		}
 	}
 }
 
@@ -204,23 +217,28 @@ func RenderAgentTable(agents []*def.Emp3r0rAgent) {
 		agentCountColor = "green"
 	}
 
-	// Status Left: [emp3r0r] 🛡️ AgentCount
-	status_left := fmt.Sprintf("#[fg=colour15,bg=colour235,bold] [emp3r0r] #[fg=%s,bg=colour235,nobold]🛡️ %d Agents ",
-		agentCountColor, len(agents))
-	_ = cli.TmuxSetStatusLeft(status_left)
+	// The status bar exists only inside the console's tmux session. Headless
+	// callers (MCP) have no panes, and spawning tmux on every refresh would
+	// fail once per tick.
+	if cli.CommandPane != nil {
+		// Status Left: [emp3r0r] 🛡️ AgentCount
+		status_left := fmt.Sprintf("#[fg=colour15,bg=colour235,bold] [emp3r0r] #[fg=%s,bg=colour235,nobold]🛡️ %d Agents ",
+			agentCountColor, len(agents))
+		_ = cli.TmuxSetStatusLeft(status_left)
 
-	// Status Right: RTT | Last seen | Operator idle.
-	// When no target is selected, avoid showing a misleading red "timeout"
-	// status; the per-agent Last seen column in the list carries that info.
-	var status_right string
-	if activeAgent == nil {
-		status_right = fmt.Sprintf("#[fg=colour15,bg=colour235,bold] %s | #[fg=yellow]No active target ",
-			rtt)
-	} else {
-		status_right = fmt.Sprintf("#[fg=colour15,bg=colour235,bold] %s | #[fg=%s]%s | #[fg=%s]%s ",
-			rtt, lastSeenColor, lastSeen, operatorIdleColor, operatorIdle)
+		// Status Right: RTT | Last seen | Operator idle.
+		// When no target is selected, avoid showing a misleading red "timeout"
+		// status; the per-agent Last seen column in the list carries that info.
+		var status_right string
+		if activeAgent == nil {
+			status_right = fmt.Sprintf("#[fg=colour15,bg=colour235,bold] %s | #[fg=yellow]No active target ",
+				rtt)
+		} else {
+			status_right = fmt.Sprintf("#[fg=colour15,bg=colour235,bold] %s | #[fg=%s]%s | #[fg=%s]%s ",
+				rtt, lastSeenColor, lastSeen, operatorIdleColor, operatorIdle)
+		}
+		_ = cli.TmuxSetStatusRight(status_right)
 	}
-	_ = cli.TmuxSetStatusRight(status_right)
 
 	header := []string{"ID", "Name", "Operator", "OS", "Process", "User", "IPs", "From", "C2", "Mesh", "UUID", "Last seen"}
 	tabStr := cli.BuildTable(header, tdata)
@@ -323,8 +341,10 @@ func refreshAgentList() error {
 		for _, a := range agents {
 			if a.UUID == active.UUID {
 				live.SetActiveAgent(a)
-				// Update tmux window title
-				_ = cli.TmuxSetWindowTitle(tmuxSafeAgentID(a.Tag), cli.CommandPane.WindowID)
+				// Update tmux window title; headless callers have no panes.
+				if cli.CommandPane != nil {
+					_ = cli.TmuxSetWindowTitle(tmuxSafeAgentID(a.Tag), cli.CommandPane.WindowID)
+				}
 				break
 			}
 		}

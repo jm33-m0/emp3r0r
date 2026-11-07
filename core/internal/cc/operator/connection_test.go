@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/google/uuid"
 	clientpkg "github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
@@ -78,7 +79,9 @@ func TestOperatorConnection(t *testing.T) {
 	}
 
 	cmd := "ls -la"
-	cmdID := "test-cmd-id"
+	// The operator service only accepts UUID job IDs: they become log file
+	// names and job-owner map keys.
+	cmdID := uuid.NewString()
 	op := def.Operation{
 		AgentTag: agentTag,
 		Action:   "command",

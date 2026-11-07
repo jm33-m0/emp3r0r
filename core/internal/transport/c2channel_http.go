@@ -278,10 +278,37 @@ func (s *HTTPClientStream) Read(p []byte) (n int, err error) {
 		return n, nil
 	}
 
-	// Wait for new data from polling
+	// Prefer data that was already received over a canceled context: closing
+	// the stream must not drop the last poll responses before the reader sees
+	// them.
+	select {
+	case data, ok := <-s.readCh:
+		if !ok {
+			return 0, io.EOF
+		}
+		n = copy(p, data)
+		if n < len(data) {
+			s.readBuf = append(s.readBuf, data[n:]...)
+		}
+		return n, nil
+	default:
+	}
+
 	select {
 	case <-s.ctx.Done():
-		return 0, io.EOF
+		select {
+		case data, ok := <-s.readCh:
+			if !ok {
+				return 0, io.EOF
+			}
+			n = copy(p, data)
+			if n < len(data) {
+				s.readBuf = append(s.readBuf, data[n:]...)
+			}
+			return n, nil
+		default:
+			return 0, io.EOF
+		}
 	case data, ok := <-s.readCh:
 		if !ok {
 			return 0, io.EOF
@@ -381,6 +408,14 @@ var serverSessions sync.Map
 // truncated on the agent side and corrupts the stream. It also sets the poll
 // rate of a streamed download: one request per maxPollResponseBytes.
 const maxPollResponseBytes = 48 * 1024
+
+// A closing stream keeps its queued response chunks until the agent polls them.
+// The poll interval bounds how quickly an empty queue is noticed; the ceiling
+// bounds how long a vanished client can keep the session in the map.
+const (
+	httpStreamDrainPoll = 50 * time.Millisecond
+	httpStreamDrainMax  = time.Minute
+)
 
 type HTTPServerStream struct {
 	sessionID    string
@@ -679,7 +714,14 @@ func (s *HTTPServerStream) Close() error {
 				logging.Errorf("HTTPServerStream: deferred cleanup panic for %s: %v", sessionID, r)
 			}
 		}()
-		<-time.After(5 * time.Second)
+		// A long download queues response chunks faster than the agent can poll
+		// them. Deleting the session on a fixed timer truncated the transfer at
+		// whatever the agent had pulled by then. Keep the session until the
+		// queue drains, with a ceiling so a vanished client cannot pin it.
+		deadline := time.Now().Add(httpStreamDrainMax)
+		for len(s.writeCh) > 0 && time.Now().Before(deadline) {
+			time.Sleep(httpStreamDrainPoll)
+		}
 		serverSessions.Delete(sessionID)
 	}(s.sessionID)
 	return nil

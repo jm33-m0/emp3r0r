@@ -131,6 +131,25 @@ func SendCommand(operation def.Operation) error {
 	return err
 }
 
+// GetJobOutput returns a bounded slice of a job's persisted output. The server
+// enforces that the caller owns the job.
+func GetJobOutput(jobID string, offset, limit int64, tail bool) (*def.JobOutputResponse, error) {
+	body, err := SendCBORRequest(transport.OperatorJobOutput, def.JobOutputRequest{
+		JobID:  jobID,
+		Offset: offset,
+		Limit:  limit,
+		Tail:   tail,
+	})
+	if err != nil {
+		return nil, err
+	}
+	var resp def.JobOutputResponse
+	if err := cbor.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("unmarshal job output: %w", err)
+	}
+	return &resp, nil
+}
+
 // UpdateOperatorIdleConfig updates the server-side operator idle timeout.
 func UpdateOperatorIdleConfig(timeout int) error {
 	_, err := SendCBORRequest(transport.OperatorUpdateConfig, def.OperatorIdleConfig{

@@ -160,3 +160,22 @@ func TestAwaitCmdResultDefaultTimeout(t *testing.T) {
 		t.Errorf("default timeout fired after %s, want at least one poll interval", elapsed)
 	}
 }
+
+func TestWaitCmdResultKeepsCachedResult(t *testing.T) {
+	CmdResults.Clear()
+	CmdResultsReady.Clear()
+	jobID := "wait-cached"
+	CmdResults.Store(jobID, "payload")
+
+	res, err := WaitCmdResult(jobID, time.Second)
+	if err != nil {
+		t.Fatalf("WaitCmdResult: %v", err)
+	}
+	if res != "payload" {
+		t.Fatalf("result = %q", res)
+	}
+	if _, ok := CmdResultString(jobID); !ok {
+		t.Fatal("WaitCmdResult deleted the cached result")
+	}
+	CmdResults.Delete(jobID)
+}

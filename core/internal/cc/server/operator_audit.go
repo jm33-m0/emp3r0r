@@ -10,6 +10,7 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/sanitize"
 )
 
 // operatorAuditFileName is the server-side audit log, kept next to the
@@ -41,6 +42,7 @@ func auditOperatorAction(operatorID, action, target, detail string) {
 		fmt.Sprintf("target=%q", target),
 	}
 	if strings.TrimSpace(detail) != "" {
+		detail = sanitize.RedactCommandSecrets(detail)
 		fields = append(fields, fmt.Sprintf("detail=%q", detail))
 	}
 	line := strings.Join(fields, " ") + "\n"

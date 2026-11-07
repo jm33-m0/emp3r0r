@@ -116,13 +116,36 @@ func handleListSessions(out []byte, target *def.Emp3r0rAgent) string {
 	return outTable
 }
 
+// handleRelayMessage serves operator-side stream traffic: an agent that wants
+// a file from this operator's www root, or an FTP transfer proxied through the
+// C2, arrives as a message on the operator tunnel. Relays carry no job output,
+// so they must be dispatched before any agent lookup treats the tag as a target
+// and drops the request. It reports whether the message was a relay frame.
+func handleRelayMessage(data *def.OperatorMsg) bool {
+	return handleFTPRelayMessage(data) || handleWWWRelayMessage(data)
+}
+
+// ProcessAgentDataOnly records an agent response without rendering console
+// output. The MCP server fetches job output through the operator API, but still
+// populates the in-process result cache and agent state. Skipping the render
+// path keeps the tunnel read loop responsive to C2 ping frames.
+//
+// Relays are transport, not rendering: they are still served here, otherwise a
+// module the agent asks this operator to deliver never arrives and its job
+// stays pending.
+func ProcessAgentDataOnly(data *def.OperatorMsg) {
+	if handleRelayMessage(data) {
+		return
+	}
+	if _, err := controllers.ProcessAgentResponse(data); err != nil {
+		logging.Errorf("%v", err)
+	}
+}
+
 // processAgentData handles data from agent side
 // UI layer - calls controller for business logic, renders output
 func processAgentData(data *def.OperatorMsg) {
-	if handleFTPRelayMessage(data) {
-		return
-	}
-	if handleWWWRelayMessage(data) {
+	if handleRelayMessage(data) {
 		return
 	}
 

@@ -68,6 +68,8 @@ func operationDispatcher(w http.ResponseWriter, r *http.Request) {
 		handleSocks5Stop(w, r)
 	case transport.OperatorSocks5List:
 		handleSocks5List(w, r)
+	case transport.OperatorJobOutput:
+		handleJobOutput(w, r)
 	default:
 		http.Error(w, fmt.Sprintf("Invalid API: %s", api), http.StatusNotFound)
 	}

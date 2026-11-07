@@ -72,3 +72,20 @@ type Socks5ProxyStatus struct {
 	AgentTag string `cbor:"2,keyasint"` // agent the pivot relays through
 	BindAddr string `cbor:"3,keyasint"` // C2 bind address
 }
+
+// JobOutputRequest asks the C2 for a bounded slice of a job's persisted
+// output. The caller must own the job.
+type JobOutputRequest struct {
+	JobID  string `cbor:"1,keyasint"`
+	Offset int64  `cbor:"2,keyasint"` // byte offset; ignored when Tail is set
+	Limit  int64  `cbor:"3,keyasint"` // maximum bytes
+	Tail   bool   `cbor:"4,keyasint"` // return the last Limit bytes
+}
+
+// JobOutputResponse is one slice of a job log.
+type JobOutputResponse struct {
+	JobID     string `cbor:"1,keyasint"`
+	Output    string `cbor:"2,keyasint"`
+	Size      int64  `cbor:"3,keyasint"`
+	Truncated bool   `cbor:"4,keyasint"`
+}

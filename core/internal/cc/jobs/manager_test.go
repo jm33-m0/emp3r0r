@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 )
@@ -61,5 +62,33 @@ func TestHandleOutput(t *testing.T) {
 	expected := "test output"
 	if string(content) != expected {
 		t.Errorf("Expected '%s', got '%s'", expected, string(content))
+	}
+}
+
+// The C2 server receives output for jobs created in the operator process, so
+// persistence must not depend on a local job record.
+func TestHandleOutputWithoutLocalJob(t *testing.T) {
+	tmpDir := t.TempDir()
+	originalWorkSpace := live.EmpWorkSpace
+	live.EmpWorkSpace = tmpDir
+	t.Cleanup(func() { live.EmpWorkSpace = originalWorkSpace })
+
+	jobID := uuid.NewString()
+	HandleOutput(jobID, []byte("server-side output"))
+
+	content, err := os.ReadFile(LogPath(jobID))
+	if err != nil {
+		t.Fatalf("read log: %v", err)
+	}
+	if string(content) != "server-side output" {
+		t.Fatalf("content = %q", content)
+	}
+}
+
+func TestLogPathRejectsTraversal(t *testing.T) {
+	for _, id := range []string{"", ".", "..", "../x", "a/b", "a\\b"} {
+		if got := LogPath(id); got != "" {
+			t.Errorf("LogPath(%q) = %q, want empty", id, got)
+		}
 	}
 }

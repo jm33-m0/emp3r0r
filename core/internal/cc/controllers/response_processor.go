@@ -80,6 +80,10 @@ func ProcessAgentResponse(data *def.OperatorMsg) (*ProcessedResponse, error) {
 	live.CmdResults.Store(data.JobID, resp.Output)
 	// Signal any waiting goroutine that a result is ready.
 	live.SignalCmdResultReady(data.JobID)
+	// The agent answered this job, so it is no longer pending. Errored
+	// commands still report through the normal output channel; the job is
+	// complete either way.
+	jobs.FinishJob(data.JobID, nil)
 
 	// Calculate time spent. CmdTime is the authoritative start time; fall back
 	// to the job creation time for commands whose dispatch path did not record
