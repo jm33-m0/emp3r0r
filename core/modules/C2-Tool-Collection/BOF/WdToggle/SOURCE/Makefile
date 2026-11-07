@@ -4,7 +4,7 @@ CC_x86 := i686-w64-mingw32-gcc
 CC_x64 := x86_64-w64-mingw32-gcc
 STRIP_x86 := i686-w64-mingw32-strip
 STRIP_x64 := x86_64-w64-mingw32-strip
-CFLAGS := -masm=intel
+CFLAGS := -masm=intel -Os -fno-stack-protector -fno-sanitize=all
 
 all: $(OBJS)
 
