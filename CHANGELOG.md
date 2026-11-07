@@ -1,5 +1,13 @@
 # Changelog
 
+## [5.7.3](https://github.com/jm33-m0/emp3r0r/compare/v5.7.2...v5.7.3) (2026-11-07)
+
+
+### Bug Fixes
+
+* **bof:** build without instrumentation ([c7351ae](https://github.com/jm33-m0/emp3r0r/commit/c7351aef080bcc299740dfeb45cb04054d86dc11))
+* **bof:** return meaningful errors ([f6ec166](https://github.com/jm33-m0/emp3r0r/commit/f6ec16651a392ad3556646ce7f7fe931ac7b98ae))
+
 ## [5.7.2](https://github.com/jm33-m0/emp3r0r/compare/v5.7.1...v5.7.2) (2026-11-06)
 
 
