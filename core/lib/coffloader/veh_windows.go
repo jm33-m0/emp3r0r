@@ -120,7 +120,7 @@ func vehExceptionHandler(exceptionPointers uintptr) uintptr {
 // of the call; if the DLL or BOF raises a native exception, the VEH handler
 // redirects execution to vehRecoveryStub which panics, and the panic unwinds
 // through this frame into RunWindowsCOFFViaDLL's recover.
-func guardedCallLoadAndRun(loadAndRun uintptr, buf []byte, callback uintptr) uintptr {
+func guardedCallLoadAndRun(loadAndRun uintptr, buf []byte, callback uintptr, detail func() string) (uintptr, string) {
 	initVEH()
 	runtime.LockOSThread()
 	vehMu.Lock()
@@ -132,7 +132,12 @@ func guardedCallLoadAndRun(loadAndRun uintptr, buf []byte, callback uintptr) uin
 		runtime.UnlockOSThread()
 	}()
 
-	return callLoadAndRun(loadAndRun, buf, callback)
+	ret := callLoadAndRun(loadAndRun, buf, callback)
+	info := ""
+	if int32(uint32(ret)) != 0 && detail != nil {
+		info = detail()
+	}
+	return ret, info
 }
 
 var kernel32AddVectoredExceptionHandler = windows.NewLazySystemDLL("kernel32.dll").NewProc("AddVectoredExceptionHandler")

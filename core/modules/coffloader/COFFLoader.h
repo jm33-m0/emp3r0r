@@ -115,6 +115,7 @@ typedef int (*goCallback)(char *, int);
 /* DLL export */
 #define EXPORT __declspec(dllexport)
 EXPORT int __cdecl LoadAndRun(char *argsBuffer, uint32_t bufferSize, goCallback callback);
+EXPORT const char *__cdecl LastErrorSymbol(void);
 #else
 /* EXE import */
 #define EXPORT __declspec(dllimport)

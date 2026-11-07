@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"runtime"
 	"strconv"
+	"strings"
+	"syscall"
 	"unicode/utf16"
 	"unsafe"
 
@@ -70,11 +72,67 @@ func runLoadAndRun(module *memmod.Module, buf []byte, token uintptr) (string, er
 		}()
 	}
 
-	r0 := guardedCallLoadAndRun(loadAndRun, buf, callback)
+	r0, symbol := guardedCallLoadAndRun(loadAndRun, buf, callback, func() string {
+		return lastErrorSymbol(module)
+	})
 	if ret := int32(uint32(r0)); ret != 0 {
-		return string(output), fmt.Errorf("LoadAndRun returned %d", ret)
+		return string(output), loadAndRunError(ret, symbol)
 	}
 	return string(output), nil
+}
+
+// Failure codes returned by the loader.
+const (
+	coffErrArgs   = 1
+	coffErrFormat = 2
+	coffErrImport = 3
+	coffErrSymbol = 4
+	coffErrRange  = 5
+	coffErrMemory = 6
+	coffErrReloc  = 7
+)
+
+// loadAndRunError maps a nonzero LoadAndRun result to a message.
+func loadAndRunError(code int32, symbol string) error {
+	switch code {
+	case coffErrArgs:
+		return fmt.Errorf("LoadAndRun returned %d: malformed argument buffer", code)
+	case coffErrFormat:
+		return fmt.Errorf("LoadAndRun returned %d: malformed object image", code)
+	case coffErrImport:
+		if symbol != "" {
+			return fmt.Errorf("LoadAndRun returned %d: unresolved import %s", code, symbol)
+		}
+		return fmt.Errorf("LoadAndRun returned %d: unresolved import", code)
+	case coffErrSymbol:
+		if symbol != "" {
+			return fmt.Errorf("LoadAndRun returned %d: undefined symbol in relocation %s", code, symbol)
+		}
+		return fmt.Errorf("LoadAndRun returned %d: undefined symbol in relocation", code)
+	case coffErrRange:
+		if symbol != "" {
+			return fmt.Errorf("LoadAndRun returned %d: relocation target out of range for %s", code, symbol)
+		}
+		return fmt.Errorf("LoadAndRun returned %d: relocation target out of range", code)
+	case coffErrMemory:
+		return fmt.Errorf("LoadAndRun returned %d: out of memory", code)
+	case coffErrReloc:
+		return fmt.Errorf("LoadAndRun returned %d: relocation failed", code)
+	}
+	return fmt.Errorf("LoadAndRun returned %d", code)
+}
+
+// lastErrorSymbol returns the symbol recorded for the last failed load.
+func lastErrorSymbol(module *memmod.Module) string {
+	fn, err := module.ProcAddressByName("LastErrorSymbol")
+	if err != nil || fn == 0 {
+		return ""
+	}
+	ptr, _, _ := syscall.SyscallN(fn)
+	if ptr == 0 {
+		return ""
+	}
+	return strings.TrimSpace(windows.BytePtrToString((*byte)(unsafe.Pointer(ptr))))
 }
 
 // RunWindowsCOFFViaDLL maps the caller-supplied DLL image, runs one BOF
