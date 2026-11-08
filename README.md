@@ -2,9 +2,7 @@
 
 <img align="left" width="130" height="130" alt="emp3r0r" src="img/emp3r0r.svg" />
 
-Linux-first multi-operator C2 built to stay quiet and keep working. Self-healing mesh with assisted discovery, in-memory execution with encrypted storage, scriptable agents, cross-platform BOFs, SOCKS5 pivoting, an OPSEC-screened MCP server and operator assistant, and a modular C agent delivered by a sleep-masking stager.
-
-<br clear="all" />
+Linux-first multi-operator C2 built to stay quiet and keep working. Self-healing mesh with assisted discovery, in-memory execution with encrypted storage, scriptable agents, cross-platform BOFs, SOCKS5 pivoting, an AI-driven OPSEC-screened MCP server and operator assistant, and a modular C agent delivered by a sleep-masking stager.<br clear="all" />
 
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-7289da?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/vU98aQtk9f)
 [![GitHub Sponsors](https://img.shields.io/badge/GitHub-Sponsor-ff69b4?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sponsors/jm33-m0)
