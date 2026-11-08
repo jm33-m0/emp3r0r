@@ -22,12 +22,18 @@ Always use the latest version
 
 Ranked by impact, from highest to lowest:
 
-1. **Agent → server/operator (primary threat, highest impact).** Agents are hostile. A compromised or malicious agent must not be able to take over the C2, another agent, or an operator. TOFU assumes only the first run of an agent is trustworthy. This gets the strongest controls (pinned identity, PFS session re-keying, per-session admission, signed peer lists, …).
-2. **Operator → server/other operators (secondary, lower impact).** An operator already holds a valid WireGuard credential (its private key is provisioned by the server and authenticates it to the tunnel) and was granted access, so this is misuse of privilege rather than a remote takeover. The damage is confined to the control plane (identity spoofing, cross-operator interference, or log tampering) and cannot exceed what the operators are collectively trusted to do. It is still in scope.
+1. **Agent → server/operator/model (primary threat, highest impact).** Agents and target outputs are hostile. A compromised or malicious agent must not be able to take over the C2, another agent, or an operator. TOFU assumes only the first run of an agent is trustworthy. This gets the strongest controls (pinned identity, PFS session re-keying, per-session admission, signed peer lists, terminal-escape sanitization, …). When `ask` or `emp3r0r mcp` is used, job output, process and file tables, and logs are untrusted target data that may carry indirect prompt-injection text:
+   - `ask` exposes only read-only tools and cannot dispatch work.
+   - `emp3r0r mcp` screens every mutating call through the deterministic `mcp.json` policy before it reaches a target or removes C2 state (`forget_agent`).
+   - `upload_file` and `put` reject protected operator files (`wg_config.json`, `emp3r0r.json`, `mcp.json`, `assistant.json`, private keys, SSH/cloud credentials, and symlinks to them) so an injected model turn cannot stage operator credentials on a target.
+2. **Autonomous model → target/C2 state (operational blast radius).** An MCP client runs on the operator host with the operator's local OS privileges; `emp3r0r mcp` is not a local filesystem sandbox for the MCP client. Its boundary is between the model and the C2/target surface: `mcp.json` enforces capability dispositions (`allow`, `warn`, `block`), `max_noise`, `allow_irreversible`, module allow/deny lists, rate limits, and fail-closed pre/post audit logging (`~/.emp3r0r/mcp_audit.log`).
+3. **Operator host → model provider (telemetry and credential egress).** Prompts and tool results can contain target hostnames, addresses, and credentials. `assistant.json` defaults to loopback (`allow_remote: false`), refuses HTTP redirects to non-loopback hosts without `allow_remote`, and rejects group/world-writable config files or world-readable inline `api_key` files. Audit logs redact credential-bearing flags and arguments.
+4. **Operator → server/other operators (secondary control-plane boundary).** An operator already holds a valid WireGuard credential (its private key is provisioned by the server and authenticates it to the tunnel) and was granted access, so this is misuse of privilege rather than a remote takeover. Both the console and `emp3r0r mcp` are untrusted operator clients of the C2 server: the server enforces WireGuard peer identity, single-owner target locks, and job ownership.
 
 ### Out of scope
 
 - An operator attacking the server in single-operator mode: the operator owns the server there.
+- Sandboxing the MCP client process against the local operator filesystem: the MCP client runs as the operator user and already owns its local file and shell tools.
 - Anything that requires the C2 host to already be compromised.
 - Denial of service that only affects the attacker's own connection.
 

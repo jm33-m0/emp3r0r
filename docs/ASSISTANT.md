@@ -204,8 +204,10 @@ by `ask`, help output, and the MCP screen; they never change how a module runs.
   target output can produce bad advice, never an action.
 - Target data is untrusted. Tool results are sanitized, bounded, and treated as
   data by the prompt.
-- Default configuration is loopback only. A non-loopback endpoint is refused
-  unless `allow_remote` is `true`.
+- Default configuration is loopback only. A non-loopback endpoint or an HTTP
+  redirect to a non-loopback host is refused unless `allow_remote` is `true`.
+- `assistant.json` must not be group- or world-writable, and must be mode
+  `0600` when `api_key` is set inline.
 - Job output is truncated before it is sent: `max_result_bytes` bounds the
   fetched output, and each tool result is capped independently.
 - Output can contain credentials, hashes, and SIDs. Point the assistant at a
