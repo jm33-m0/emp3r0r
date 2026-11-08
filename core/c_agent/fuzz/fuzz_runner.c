@@ -213,11 +213,22 @@ int main(int argc, char **argv) {
     memcpy(work, g_corpus[base].data, len);
     len = mutate(work, len);
 
-    g_current = work;
+    /* Copy into an exact-size heap allocation so ASan places a redzone right
+     * after `len`, matching libFuzzer's ExecuteCallback contract. */
+    uint8_t *input = (uint8_t *)malloc(len ? len : 1);
+    if (input == NULL)
+      continue;
+    if (len)
+      memcpy(input, work, len);
+    else
+      input[0] = 0;
+
+    g_current = input;
     g_current_len = len;
-    LLVMFuzzerTestOneInput(work, len);
+    LLVMFuzzerTestOneInput(input, len);
     g_current = NULL;
     g_current_len = 0;
+    free(input);
 
     if ((i & 255) == 0)
       corpus_add(work, len);

@@ -56,7 +56,7 @@ void c2_memfile_free(c2_memfile *m) {
 
 size_t c2_memfile_key(const char *name, size_t name_len, char *out,
                       size_t cap) {
-  if (name == NULL)
+  if (name == NULL || out == NULL || cap == 0)
     return 0;
   const char *base = name;
   size_t base_len = name_len;
@@ -68,7 +68,7 @@ size_t c2_memfile_key(const char *name, size_t name_len, char *out,
     }
   }
   size_t prefix_len = sizeof(C2_MEMFILE_PREFIX) - 1;
-  if (prefix_len + base_len + 1 > cap)
+  if (cap <= prefix_len || base_len >= cap - prefix_len)
     return 0;
   memcpy(out, C2_MEMFILE_PREFIX, prefix_len);
   memcpy(out + prefix_len, base, base_len);
@@ -87,7 +87,7 @@ size_t c2_memfile_path_key(const char *path, char *out, size_t cap) {
     rest++;
   size_t rest_len = strlen(rest);
   size_t prefix_len = sizeof(C2_MEMFILE_PREFIX) - 1;
-  if (rest_len == 0 || prefix_len + rest_len + 1 > cap)
+  if (rest_len == 0 || cap <= prefix_len || rest_len >= cap - prefix_len)
     return 0;
   memcpy(out, C2_MEMFILE_PREFIX, prefix_len);
   memcpy(out + prefix_len, rest, rest_len);
