@@ -133,7 +133,7 @@ A netonly session keeps the agent's local identity and borrows the target user o
 
 #### MCP server and OPSEC screen
 
-`emp3r0r mcp` exposes the operator surface over the Model Context Protocol on stdin/stdout so external MCP clients such as Claude Code and Codex can select targets, inspect and run modules, transfer files, read job output, edit module sources in the workspace, and build Go or C agents.
+`emp3r0r mcp` exposes the operator surface over the Model Context Protocol on stdin/stdout so external MCP clients such as Claude Code and Codex can select targets, inspect and run modules, transfer files, read job output, reload modules, and build Go or C agents.
 
 Every mutating tool call passes through a deterministic OPSEC screen before reaching the target. The screen classifies module metadata and command lines into telemetry capabilities (such as process creation, filesystem writes, CLR loading, and credential access), noise bands, and reversibility, then enforces the operator's `mcp.json` policy (`allow`, `warn`, or `block`) and writes pre- and post-execution records to the audit log. The C2 still enforces WireGuard peer identity, single-owner target locks, and job ownership. See the [MCP server guide](./docs/MCP.md).
 
@@ -153,7 +153,7 @@ C2 server binaries keep the full feature set, so one server can handle every age
 
 - [Operator guide](./docs/OPERATOR.md): installation, quick start, operator setup, container notes, tmux keybindings, and agent generation.
 - [Operator assistant](./docs/ASSISTANT.md): the read-only `ask` command and its model configuration.
-- [MCP server](./docs/MCP.md): autonomous operator tools for Claude Code, Codex, and other MCP clients, with the deterministic OPSEC screen and workspace editing.
+- [MCP server](./docs/MCP.md): autonomous operator tools for Claude Code, Codex, and other MCP clients, with the deterministic OPSEC screen.
 - [Custom transport guide](./docs/CUSTOM_C2.md): Tor hidden-service quick start, Go and C agent dialers, C2 bridge socket protocol, and running multiple custom transports.
 - [RISC-V BOF modules](./docs/rvvm.md): running portable BOFs with `--riscv`, linking static libraries, and the RV32IMA interpreter.
 - [Module development guide](./docs/module_development_guide.md)

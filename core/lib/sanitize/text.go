@@ -150,12 +150,12 @@ func SanitizeOneLine(str string) string {
 // secretFlagPattern matches a flag whose value is a credential. The flag name
 // is kept so the audit record still shows which material was used; the value is
 // replaced.
-var secretFlagPattern = regexp.MustCompile(`(?i)(--?[a-z0-9_.-]*(?:pass|pwd|secret|token|ticket|hash|key|cred|session|cookie)[a-z0-9_.-]*)(=\s*|\s+)(?:'[^']*'|"[^"]*"|\S+)`)
+var secretFlagPattern = regexp.MustCompile(`(?i)(--?[a-z0-9_.-]*(?:pass|pwd|secret|token|ticket|ntlm|hash|key|cred|session|cookie|ccache|kirbi|krb|pfx|cert|pin)[a-z0-9_.-]*)(=\s*|\s+)(?:'[^']*(?:'\\''[^']*)*'|"[^"\\]*(?:\\.[^"\\]*)*"|\S+)`)
 
 // credentialArgPattern matches the slash-prefixed credential arguments used by
 // BOFs such as Kerbeus, where the secret is inside a --params value rather than
 // a flag value.
-var credentialArgPattern = regexp.MustCompile(`(?i)(/(?:ticket|password|pass|pwd|rc4|aes128|aes256|ntlm|hash|key|pfx|p12|kirbi):)(?:'[^']*'|"[^"]*"|\S+)`)
+var credentialArgPattern = regexp.MustCompile(`(?i)(/(?:ticket|password|pass|pwd|rc4|aes128|aes256|ntlm|hash|key|pfx|p12|kirbi):)(?:'[^']*(?:'\\''[^']*)*'|"[^"\\]*(?:\\.[^"\\]*)*"|\S+)`)
 
 // RedactCommandSecrets replaces values of credential-bearing flags and BOF
 // credential arguments in a command line before it is written to an audit log.

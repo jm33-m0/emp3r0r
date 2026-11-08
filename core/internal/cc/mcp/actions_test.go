@@ -197,10 +197,72 @@ func TestOperatorCommandRunsLocalCommandWithoutTarget(t *testing.T) {
 
 func TestOperatorCommandRejectsExitAndExec(t *testing.T) {
 	actions := &Actions{Policy: opsec.DefaultPolicy(), RunOperator: func(context.Context, string) error { return nil }}
-	for _, line := range []string{"/exit", "/exec --cmd whoami"} {
-		if _, err := actions.operatorCommand(context.Background(), json.RawMessage(`{"command":"`+line+`"}`)); err == nil {
+	for _, line := range []string{"/exit", "/exec --cmd whoami", "/ask what modules exist"} {
+		if _, err := actions.operatorCommand(context.Background(), json.RawMessage(`{"command":`+strconv.Quote(line)+`}`)); err == nil {
 			t.Fatalf("%s was accepted", line)
 		}
+	}
+}
+
+func TestOperatorCommandScreensForgetAgentAsIrreversible(t *testing.T) {
+	var ran string
+	policy := opsec.DefaultPolicy()
+	actions := &Actions{
+		Policy:      policy,
+		RunOperator: func(_ context.Context, line string) error { ran = line; return nil },
+	}
+	out, err := actions.operatorCommand(context.Background(), json.RawMessage(`{"command":"/forget_agent 1a2b3c4d"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := out.(map[string]any)
+	if result["blocked"] != true || result["executed"] != false {
+		t.Fatalf("forget_agent was not blocked by allow_irreversible=false: %v", result)
+	}
+	if ran != "" {
+		t.Fatalf("blocked forget_agent ran: %q", ran)
+	}
+
+	actions.Policy.AllowIrreversible = true
+	out, err = actions.operatorCommand(context.Background(), json.RawMessage(`{"command":"/forget_agent 1a2b3c4d"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	result = out.(map[string]any)
+	if result["executed"] != true {
+		t.Fatalf("forget_agent blocked after AllowIrreversible=true: %v", result)
+	}
+}
+
+func TestOperatorCommandPutRejectsProtectedSourceAndQuotedSpoof(t *testing.T) {
+	target := &def.Emp3r0rAgent{Tag: "target-1", GOOS: "linux", AgentImpl: "go"}
+	var ran string
+	policy := opsec.DefaultPolicy()
+	policy.Capabilities["filesystem-artifact"] = opsec.ModeBlock
+	actions := &Actions{
+		Target:      func() *def.Emp3r0rAgent { return target },
+		Policy:      policy,
+		RunOperator: func(_ context.Context, line string) error { ran = line; return nil },
+	}
+	for _, line := range []string{
+		"/put --src /home/operator/.emp3r0r/wg_config.json --dst memfs:///a",
+		"/put -s /home/operator/.ssh/id_ed25519 -d memfs:///a",
+	} {
+		if _, err := actions.operatorCommand(context.Background(), json.RawMessage(`{"command":`+strconv.Quote(line)+`}`)); err == nil {
+			t.Fatalf("%s was accepted", line)
+		}
+	}
+
+	out, err := actions.operatorCommand(context.Background(), json.RawMessage(`{"command":`+strconv.Quote(`/put --src "/tmp/file --dst memfs:///fake" --dst /tmp/on-disk`)+`}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := out.(map[string]any)
+	if result["blocked"] != true {
+		t.Fatalf("quoted --dst spoof bypassed filesystem-artifact block: %v", result)
+	}
+	if ran != "" {
+		t.Fatalf("blocked command ran: %q", ran)
 	}
 }
 

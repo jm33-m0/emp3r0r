@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -35,21 +36,19 @@ type Executor interface {
 // Actions holds the mutating MCP tools. Every tool screens its action through
 // Policy before calling Executor, then records the decision.
 type Actions struct {
-	Target    func() *def.Emp3r0rAgent
-	Select    func(context.Context, string) (*def.Emp3r0rAgent, error)
-	Policy    opsec.Policy
-	Workspace *Workspace
-	Audit     *Audit
-	Limiter   *Limiter
-	Executor  Executor
-	Operator  string
+	Target   func() *def.Emp3r0rAgent
+	Select   func(context.Context, string) (*def.Emp3r0rAgent, error)
+	Policy   opsec.Policy
+	Audit    *Audit
+	Limiter  *Limiter
+	Executor Executor
+	Operator string
 
 	// RunOperator executes one operator console command line. The console
 	// command tree owns target selection, filesystem, FTP, pivot, and build
 	// commands; Actions screens the line before calling it.
 	RunOperator func(context.Context, string) error
 
-	modified sync.Map
 	selectMu sync.Mutex
 
 	// generateMu serializes agent builds: the builder mutates the shared
@@ -165,68 +164,6 @@ func (a *Actions) Tools() map[string]assistant.Tool {
 			},
 			Run: a.downloadFile,
 		},
-		"workspace_list": {
-			Def: assistant.ToolDef{
-				Type: "function",
-				Function: assistant.FunctionDef{
-					Name:        "workspace_list",
-					Description: "List one directory under the configured local workspace. Paths are relative to the workspace root.",
-					Parameters: assistant.ObjectSchema(map[string]any{
-						"path": assistant.StringProp("Relative directory, for example 'modules/stager_linux'"),
-					}),
-				},
-			},
-			ReadOnly: true,
-			Run:      a.workspaceList,
-		},
-		"workspace_read": {
-			Def: assistant.ToolDef{
-				Type: "function",
-				Function: assistant.FunctionDef{
-					Name:        "workspace_read",
-					Description: "Read a bounded slice of one workspace file. Binary files are returned as base64.",
-					Parameters: assistant.ObjectSchema(map[string]any{
-						"path":   assistant.StringProp("Relative file path"),
-						"offset": assistant.IntegerProp("Byte offset (default 0)"),
-						"limit":  assistant.IntegerProp("Maximum bytes, 1-1048576 (default 65536)"),
-					}, "path"),
-				},
-			},
-			ReadOnly: true,
-			Run:      a.workspaceRead,
-		},
-		"workspace_write": {
-			Def: assistant.ToolDef{
-				Type: "function",
-				Function: assistant.FunctionDef{
-					Name:        "workspace_write",
-					Description: "Create or replace one workspace file atomically. Parent directories are created. Existing symlinks and hardlinks are rejected. Screen applies.",
-					Parameters: assistant.ObjectSchema(map[string]any{
-						"path":    assistant.StringProp("Relative file path"),
-						"content": assistant.StringProp("Complete file content"),
-					}, "path", "content"),
-				},
-			},
-			Destructive: true,
-			Run:         a.workspaceWrite,
-		},
-		"workspace_edit": {
-			Def: assistant.ToolDef{
-				Type: "function",
-				Function: assistant.FunctionDef{
-					Name:        "workspace_edit",
-					Description: "Replace an exact string in one workspace file. A non-unique match is rejected unless replace_all is true. Screen applies.",
-					Parameters: assistant.ObjectSchema(map[string]any{
-						"path":        assistant.StringProp("Relative file path"),
-						"old_string":  assistant.StringProp("Exact text to replace"),
-						"new_string":  assistant.StringProp("Replacement text"),
-						"replace_all": assistant.BooleanProp("Replace every occurrence"),
-					}, "path", "old_string", "new_string"),
-				},
-			},
-			Destructive: true,
-			Run:         a.workspaceEdit,
-		},
 		"reload_modules": {
 			Def: assistant.ToolDef{
 				Type: "function",
@@ -243,7 +180,7 @@ func (a *Actions) Tools() map[string]assistant.Tool {
 				Type: "function",
 				Function: assistant.FunctionDef{
 					Name:        "opsec_policy",
-					Description: "Return the capability screen: per-capability allow, warn, or block modes, maximum noise, reversibility, module lists, workspace, and rate limit.",
+					Description: "Return the capability screen: per-capability allow, warn, or block modes, maximum noise, reversibility, module lists, and rate limit.",
 					Parameters:  assistant.ObjectSchema(map[string]any{}),
 				},
 			},
@@ -309,17 +246,14 @@ func (a *Actions) runModule(ctx context.Context, raw json.RawMessage) (any, erro
 		return nil, fmt.Errorf("executor is not configured")
 	}
 	review := assistant.ReviewModule(mod, normalized, command, target)
-	if a.wasModified(mod) {
-		review = markTampered(review, "module files were changed through the workspace tools in this process")
-	}
-	decision, auditErr := a.screen("run_module", mod.Name, command, target, review)
+	decision, auditErr := a.screenWithFlags("run_module", mod.Name, command, normalized, target, review)
 	if !decision.Allowed {
 		return actionBlocked("run_module", command, mod.Name, target, review, decision, auditErr), nil
 	}
 
 	if mod.IsLocal {
 		out, err := a.Executor.BuildLocalModule(ctx, mod.Name, normalized)
-		result := a.actionResult("run_module", command, mod.Name, target, review, decision, auditErr, "", err, true)
+		result := a.actionResultWithFlags("run_module", command, mod.Name, normalized, target, review, decision, auditErr, "", err, true)
 		result["local"] = true
 		result["output"] = truncate(out, 64<<10)
 		if err != nil {
@@ -329,7 +263,7 @@ func (a *Actions) runModule(ctx context.Context, raw json.RawMessage) (any, erro
 	}
 
 	jobID, err := a.Executor.RunModule(ctx, target, mod.Name, normalized)
-	result := a.actionResult("run_module", command, mod.Name, target, review, decision, auditErr, jobID, err, err == nil)
+	result := a.actionResultWithFlags("run_module", command, mod.Name, normalized, target, review, decision, auditErr, jobID, err, err == nil)
 	if err != nil {
 		result["error"] = err.Error()
 	}
@@ -441,8 +375,8 @@ func (a *Actions) uploadFile(ctx context.Context, raw json.RawMessage) (any, err
 	if err != nil {
 		return nil, err
 	}
-	if forbiddenPath(src) {
-		return nil, fmt.Errorf("src %q is a protected operator file", src)
+	if err := validateUploadSource(src); err != nil {
+		return nil, err
 	}
 	dst := strings.TrimSpace(args.Dst)
 	if dst == "" {
@@ -578,7 +512,6 @@ func transferPath(name, value string) (string, error) {
 
 var (
 	operatorLocalCommands = map[string]bool{
-		"ask":          true,
 		"debug":        true,
 		"forget_agent": true,
 		"help":         true,
@@ -629,7 +562,10 @@ func (a *Actions) operatorCommand(ctx context.Context, raw json.RawMessage) (any
 	if strings.ContainsAny(command, "\r\n") {
 		return nil, fmt.Errorf("command must be a single line")
 	}
-	fields := strings.Fields(command)
+	fields, err := splitCommandTokens(command)
+	if err != nil {
+		return nil, err
+	}
 	if len(fields) == 0 {
 		return nil, fmt.Errorf("command is empty")
 	}
@@ -642,6 +578,8 @@ func (a *Actions) operatorCommand(ctx context.Context, raw json.RawMessage) (any
 		return nil, fmt.Errorf("%s would terminate the MCP server", first)
 	case "reset_layout":
 		return nil, fmt.Errorf("reset_layout controls the interactive console and is unavailable over MCP")
+	case "ask":
+		return nil, fmt.Errorf("ask is an interactive console command and is unavailable over MCP")
 	case "exec":
 		return nil, fmt.Errorf("use run_exec for shell commands")
 	case "generate", "generate_c":
@@ -669,6 +607,15 @@ func (a *Actions) operatorCommand(ctx context.Context, raw json.RawMessage) (any
 	if !local && first != "socks_start" && modules.CanRunExecBOF(target) {
 		return nil, fmt.Errorf("this C agent supports only run_exec (the exec BOF), not built-in agent commands")
 	}
+	if first == "put" {
+		src, err := transferPath("src", commandFlagValue(fields, "src", "s"))
+		if err != nil {
+			return nil, err
+		}
+		if err := validateUploadSource(src); err != nil {
+			return nil, err
+		}
+	}
 
 	var review def.OpsecReview
 	if local {
@@ -681,15 +628,19 @@ func (a *Actions) operatorCommand(ctx context.Context, raw json.RawMessage) (any
 		if first == "tun2socks" && len(fields) > 1 && strings.EqualFold(fields[1], "start") {
 			addOperatorRule(&review, "data-transfer", "routes operator traffic through a SOCKS5 pivot")
 		}
+		if first == "forget_agent" {
+			review.Reversible = false
+			addOperatorRule(&review, "destructive", "permanently removes the agent record from the C2")
+		}
 	} else {
-		review = operatorCommandReview(first, command, target)
+		review = operatorCommandReview(first, fields, command, target)
 	}
 	decision, auditErr := a.screen("command", "", command, target, review)
 	if !decision.Allowed {
 		return actionBlocked("command", command, "", target, review, decision, auditErr), nil
 	}
 
-	err := a.RunOperator(ctx, command)
+	err = a.RunOperator(ctx, command)
 	result := map[string]any{
 		"executed": err == nil,
 		"command":  command,
@@ -718,7 +669,7 @@ func (a *Actions) operatorCommand(ctx context.Context, raw json.RawMessage) (any
 // ReviewBuiltin covers the command tree's own file, query, and destructive
 // patterns; the explicit rules cover command names whose footprint is not in
 // the command text (an FTP get, a pivot, a kill).
-func operatorCommandReview(first, command string, target *def.Emp3r0rAgent) def.OpsecReview {
+func operatorCommandReview(first string, fields []string, command string, target *def.Emp3r0rAgent) def.OpsecReview {
 	var review def.OpsecReview
 	switch first {
 	case "kill", "suicide":
@@ -734,7 +685,7 @@ func operatorCommandReview(first, command string, target *def.Emp3r0rAgent) def.
 	case "cp", "decrypt", "mkdir", "mv":
 		addOperatorRule(&review, "filesystem-artifact", "writes files on the target")
 	case "put":
-		if dest := commandFlagValue(command, "dst"); !strings.HasPrefix(strings.ToLower(dest), "memfs://") {
+		if dest := commandFlagValue(fields, "dst", "d"); !util.IsMemPath(dest) {
 			addOperatorRule(&review, "filesystem-artifact", "writes files on the target")
 		}
 	}
@@ -749,22 +700,36 @@ func isInternalAgentCommand(token string) bool {
 	return strings.HasPrefix(token, "!")
 }
 
-func commandFlagValue(command, name string) string {
-	fields := strings.Fields(command)
-	long := "--" + name
-	short := "-" + name
-	for i, field := range fields {
-		if field == long || field == short {
-			if i+1 < len(fields) {
-				return strings.Trim(fields[i+1], `"'`)
+func commandFlagValue(fields []string, names ...string) string {
+	var matched string
+	for _, name := range names {
+		long := "--" + name
+		short := "-" + name
+		for i := 0; i < len(fields); i++ {
+			field := fields[i]
+			if field == "--" {
+				break
 			}
-			return ""
-		}
-		if strings.HasPrefix(field, long+"=") {
-			return strings.Trim(strings.TrimPrefix(field, long+"="), `"'`)
+			if field == long || field == short {
+				if i+1 < len(fields) {
+					matched = fields[i+1]
+					i++
+				} else {
+					matched = ""
+				}
+				continue
+			}
+			if strings.HasPrefix(field, long+"=") {
+				matched = strings.TrimPrefix(field, long+"=")
+				continue
+			}
+			if len(name) == 1 && strings.HasPrefix(field, short+"=") {
+				matched = strings.TrimPrefix(field, short+"=")
+				continue
+			}
 		}
 	}
-	return ""
+	return strings.TrimSpace(matched)
 }
 
 func addOperatorRule(review *def.OpsecReview, rule, reason string) {
@@ -822,110 +787,6 @@ func (a *Actions) selectAgent(ctx context.Context, raw json.RawMessage) (any, er
 	}, nil
 }
 
-func (a *Actions) workspaceList(_ context.Context, raw json.RawMessage) (any, error) {
-	if a.Workspace == nil {
-		return nil, fmt.Errorf("workspace is not configured")
-	}
-	var args struct {
-		Path string `json:"path"`
-	}
-	if err := json.Unmarshal(raw, &args); err != nil {
-		return nil, fmt.Errorf("parse arguments: %w", err)
-	}
-	result, err := a.Workspace.List(args.Path)
-	return a.auditRead("workspace_list", args.Path, result, err)
-}
-
-func (a *Actions) workspaceRead(_ context.Context, raw json.RawMessage) (any, error) {
-	if a.Workspace == nil {
-		return nil, fmt.Errorf("workspace is not configured")
-	}
-	var args struct {
-		Path   string `json:"path"`
-		Offset int64  `json:"offset"`
-		Limit  int64  `json:"limit"`
-	}
-	if err := json.Unmarshal(raw, &args); err != nil {
-		return nil, fmt.Errorf("parse arguments: %w", err)
-	}
-	result, err := a.Workspace.Read(args.Path, args.Offset, args.Limit)
-	return a.auditRead("workspace_read", args.Path, result, err)
-}
-
-func (a *Actions) auditRead(tool, path string, result any, err error) (any, error) {
-	if err != nil {
-		return nil, err
-	}
-	rec := AuditRecord{
-		Operator: a.Operator, Tool: tool, Path: path,
-		Phase: "result", Allowed: true, Reason: "local workspace read",
-	}
-	if m, ok := result.(map[string]any); ok {
-		rec.Bytes, _ = m["bytes"].(int)
-		rec.SHA256, _ = m["sha256"].(string)
-	}
-	if logErr := a.Audit.Log(rec); logErr != nil {
-		return nil, fmt.Errorf("audit log unavailable; result withheld: %w", logErr)
-	}
-	return result, nil
-}
-
-func (a *Actions) workspaceWrite(_ context.Context, raw json.RawMessage) (any, error) {
-	if a.Workspace == nil {
-		return nil, fmt.Errorf("workspace is not configured")
-	}
-	var args struct {
-		Path    string `json:"path"`
-		Content string `json:"content"`
-	}
-	if err := json.Unmarshal(raw, &args); err != nil {
-		return nil, fmt.Errorf("parse arguments: %w", err)
-	}
-	review := localReview("write", args.Path)
-	decision, auditErr := a.screen("workspace_write", "", args.Path, nil, review)
-	if !decision.Allowed {
-		return actionBlocked("workspace_write", args.Path, "", nil, review, decision, auditErr), nil
-	}
-	result, err := a.Workspace.Write(args.Path, args.Content)
-	if err == nil {
-		a.markModified(args.Path)
-	}
-	if err != nil {
-		_ = a.Audit.Log(AuditRecord{Operator: a.Operator, Tool: "workspace_write", Path: args.Path, Allowed: true, Error: err.Error()})
-		return nil, err
-	}
-	return a.localResult("workspace_write", args.Path, result, review, decision, auditErr), nil
-}
-
-func (a *Actions) workspaceEdit(_ context.Context, raw json.RawMessage) (any, error) {
-	if a.Workspace == nil {
-		return nil, fmt.Errorf("workspace is not configured")
-	}
-	var args struct {
-		Path       string `json:"path"`
-		OldString  string `json:"old_string"`
-		NewString  string `json:"new_string"`
-		ReplaceAll bool   `json:"replace_all"`
-	}
-	if err := json.Unmarshal(raw, &args); err != nil {
-		return nil, fmt.Errorf("parse arguments: %w", err)
-	}
-	review := localReview("edit", args.Path)
-	decision, auditErr := a.screen("workspace_edit", "", args.Path, nil, review)
-	if !decision.Allowed {
-		return actionBlocked("workspace_edit", args.Path, "", nil, review, decision, auditErr), nil
-	}
-	result, err := a.Workspace.Edit(args.Path, args.OldString, args.NewString, args.ReplaceAll)
-	if err == nil {
-		a.markModified(args.Path)
-	}
-	if err != nil {
-		_ = a.Audit.Log(AuditRecord{Operator: a.Operator, Tool: "workspace_edit", Path: args.Path, Allowed: true, Error: err.Error()})
-		return nil, err
-	}
-	return a.localResult("workspace_edit", args.Path, result, review, decision, auditErr), nil
-}
-
 func (a *Actions) reloadModules(ctx context.Context, _ json.RawMessage) (any, error) {
 	if a.Executor == nil {
 		return nil, fmt.Errorf("executor is not configured")
@@ -967,7 +828,6 @@ func (a *Actions) policyInfo(_ context.Context, _ json.RawMessage) (any, error) 
 		"allowed_modules":        p.AllowedModules,
 		"denied_modules":         p.DeniedModules,
 		"capabilities":           p.Capabilities,
-		"workspace":              a.workspaceRoot(),
 	}
 	if err := a.Audit.Log(AuditRecord{
 		Operator: a.Operator, Tool: "opsec_policy", Phase: "result",
@@ -979,13 +839,17 @@ func (a *Actions) policyInfo(_ context.Context, _ json.RawMessage) (any, error) 
 }
 
 func (a *Actions) screen(tool, module, command string, target *def.Emp3r0rAgent, review def.OpsecReview) (opsec.Decision, error) {
+	return a.screenWithFlags(tool, module, command, nil, target, review)
+}
+
+func (a *Actions) screenWithFlags(tool, module, command string, flags map[string]string, target *def.Emp3r0rAgent, review def.OpsecReview) (opsec.Decision, error) {
 	if ok, wait := a.Limiter.Allow(); !ok {
 		decision := opsec.Decision{
 			Reason: fmt.Sprintf("rate limit reached; retry after %s", wait.Round(1000000)),
 		}
 		err := a.Audit.Log(AuditRecord{
 			Operator: a.Operator, Tool: tool, Target: targetTag(target), Module: module,
-			Command: command, Rules: review.Rules, Noise: review.Noise,
+			Command: command, Flags: flags, Rules: review.Rules, Noise: review.Noise,
 			Allowed: false, Reason: decision.Reason, Phase: "decision",
 		})
 		return decision, err
@@ -993,7 +857,7 @@ func (a *Actions) screen(tool, module, command string, target *def.Emp3r0rAgent,
 	decision := a.Policy.Evaluate(module, review)
 	rec := AuditRecord{
 		Operator: a.Operator, Tool: tool, Target: targetTag(target), Module: module,
-		Command: command, Rules: review.Rules, Noise: review.Noise,
+		Command: command, Flags: flags, Rules: review.Rules, Noise: review.Noise,
 		Allowed: decision.Allowed, Reason: decision.Reason, Phase: "decision",
 	}
 	if err := a.Audit.Log(rec); err != nil {
@@ -1003,6 +867,10 @@ func (a *Actions) screen(tool, module, command string, target *def.Emp3r0rAgent,
 }
 
 func (a *Actions) actionResult(tool, command, module string, target *def.Emp3r0rAgent, review def.OpsecReview, decision opsec.Decision, auditErr error, jobID string, err error, executed bool) map[string]any {
+	return a.actionResultWithFlags(tool, command, module, nil, target, review, decision, auditErr, jobID, err, executed)
+}
+
+func (a *Actions) actionResultWithFlags(tool, command, module string, flags map[string]string, target *def.Emp3r0rAgent, review def.OpsecReview, decision opsec.Decision, auditErr error, jobID string, err error, executed bool) map[string]any {
 	result := map[string]any{
 		"executed": executed,
 		"opsec":    review,
@@ -1034,7 +902,7 @@ func (a *Actions) actionResult(tool, command, module string, target *def.Emp3r0r
 	}
 	rec := AuditRecord{
 		Operator: a.Operator, Tool: tool, Target: targetTag(target), Module: module,
-		Command: command, Rules: review.Rules, Noise: review.Noise,
+		Command: command, Flags: flags, Rules: review.Rules, Noise: review.Noise,
 		Phase: "result", Allowed: decision.Allowed, Reason: decision.Reason,
 		JobID: jobID, Error: errorString(err),
 	}
@@ -1043,35 +911,6 @@ func (a *Actions) actionResult(tool, command, module string, target *def.Emp3r0r
 		logging.Errorf("mcp audit: %v", err)
 	}
 	return result
-}
-
-func (a *Actions) localResult(tool, path string, result any, review def.OpsecReview, decision opsec.Decision, auditErr error) map[string]any {
-	out := map[string]any{
-		"executed": true,
-		"result":   result,
-		"opsec":    review,
-		"decision": decision,
-	}
-	if len(decision.Warnings) > 0 {
-		out["warnings"] = decision.Warnings
-	}
-	if auditErr != nil {
-		out["audit_error"] = auditErr.Error()
-	}
-	rec := AuditRecord{
-		Operator: a.Operator, Tool: tool, Path: path,
-		Rules: review.Rules, Noise: review.Noise, Phase: "result",
-		Allowed: decision.Allowed, Reason: decision.Reason,
-	}
-	if m, ok := result.(map[string]any); ok {
-		rec.Bytes, _ = m["bytes"].(int)
-		rec.SHA256, _ = m["sha256"].(string)
-	}
-	if err := a.Audit.Log(rec); err != nil {
-		out["audit_error"] = err.Error()
-		logging.Errorf("mcp audit: %v", err)
-	}
-	return out
 }
 
 func actionBlocked(tool, command, module string, target *def.Emp3r0rAgent, review def.OpsecReview, decision opsec.Decision, auditErr error) map[string]any {
@@ -1103,52 +942,6 @@ func actionBlocked(tool, command, module string, target *def.Emp3r0rAgent, revie
 	return result
 }
 
-func (a *Actions) markModified(rel string) {
-	if a.Workspace == nil {
-		return
-	}
-	a.modified.Store(canonicalPath(filepath.Join(a.Workspace.Root(), rel)), struct{}{})
-}
-
-func (a *Actions) wasModified(mod *def.ModuleConfig) bool {
-	if mod == nil || mod.Path == "" {
-		return false
-	}
-	modPath := canonicalPath(mod.Path)
-	tampered := false
-	a.modified.Range(func(key, _ any) bool {
-		path, ok := key.(string)
-		if !ok {
-			return true
-		}
-		if path == modPath || strings.HasPrefix(path, modPath+string(filepath.Separator)) {
-			tampered = true
-			return false
-		}
-		return true
-	})
-	return tampered
-}
-
-func markTampered(review def.OpsecReview, reason string) def.OpsecReview {
-	review.Rules = append(review.Rules, "tampered-module")
-	review.Reasons = append(review.Reasons, reason)
-	return review
-}
-
-// canonicalPath resolves a path through symlinks so a workspace root and a
-// module directory that name the same files compare equal.
-func canonicalPath(path string) string {
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		return path
-	}
-	if real, err := filepath.EvalSymlinks(abs); err == nil {
-		return real
-	}
-	return abs
-}
-
 func moduleNameFold(name string) string {
 	found := ""
 	def.ForEachModule(func(module string, _ *def.ModuleConfig) {
@@ -1166,13 +959,6 @@ func (a *Actions) target() *def.Emp3r0rAgent {
 	return a.Target()
 }
 
-func (a *Actions) workspaceRoot() string {
-	if a.Workspace == nil {
-		return ""
-	}
-	return a.Workspace.Root()
-}
-
 func targetTag(agent *def.Emp3r0rAgent) string {
 	if agent == nil {
 		return ""
@@ -1180,13 +966,84 @@ func targetTag(agent *def.Emp3r0rAgent) string {
 	return sanitize.SanitizeText(agent.Tag)
 }
 
-func localReview(action, path string) def.OpsecReview {
-	return def.OpsecReview{
-		Noise:      "low",
-		Reversible: true,
-		Reasons:    []string{"local workspace " + action},
-		Artifacts:  []string{"local file " + action + ": " + sanitize.SanitizeOneLine(path)},
+func validateUploadSource(src string) error {
+	if forbiddenPath(src) || forbiddenPath(filepath.Clean(src)) {
+		return fmt.Errorf("src %q is a protected operator file", src)
 	}
+	if abs, err := filepath.Abs(src); err == nil && forbiddenPath(abs) {
+		return fmt.Errorf("src %q is a protected operator file", src)
+	}
+	if info, err := os.Lstat(src); err == nil {
+		if info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("src %q is a symlink", src)
+		}
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("src %q is not a regular file", src)
+		}
+	}
+	if real, err := evalExisting(src); err == nil && forbiddenPath(real) {
+		return fmt.Errorf("src %q resolves to a protected operator file", src)
+	}
+	return nil
+}
+
+func splitCommandTokens(line string) ([]string, error) {
+	var args []string
+	var cur strings.Builder
+	var quote rune
+	inToken := false
+
+	for i := 0; i < len(line); i++ {
+		c := rune(line[i])
+		switch {
+		case quote == '\'':
+			if c == '\'' {
+				quote = 0
+			} else {
+				cur.WriteByte(line[i])
+			}
+		case quote == '"':
+			switch c {
+			case '"':
+				quote = 0
+			case '\\':
+				if i+1 < len(line) && (line[i+1] == '"' || line[i+1] == '\\') {
+					i++
+				}
+				cur.WriteByte(line[i])
+			default:
+				cur.WriteByte(line[i])
+			}
+		default:
+			switch c {
+			case ' ', '\t':
+				if inToken {
+					args = append(args, cur.String())
+					cur.Reset()
+					inToken = false
+				}
+			case '\'', '"':
+				quote = c
+				inToken = true
+			case '\\':
+				if i+1 < len(line) && (line[i+1] == ' ' || line[i+1] == '\t' || line[i+1] == '"' || line[i+1] == '\'' || line[i+1] == '\\') {
+					i++
+				}
+				cur.WriteByte(line[i])
+				inToken = true
+			default:
+				cur.WriteByte(line[i])
+				inToken = true
+			}
+		}
+	}
+	if quote != 0 {
+		return nil, fmt.Errorf("unterminated %c quote in command", quote)
+	}
+	if inToken {
+		args = append(args, cur.String())
+	}
+	return args, nil
 }
 
 func validateActionCommand(command string) error {

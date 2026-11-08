@@ -79,8 +79,16 @@ type HTTPProvider struct {
 // NewHTTPProvider returns a provider for cfg.
 func NewHTTPProvider(cfg Config) *HTTPProvider {
 	return &HTTPProvider{
-		cfg:    cfg,
-		client: &http.Client{Timeout: cfg.Timeout()},
+		cfg: cfg,
+		client: &http.Client{
+			Timeout: cfg.Timeout(),
+			CheckRedirect: func(req *http.Request, _ []*http.Request) error {
+				if !cfg.AllowRemote && !isLoopbackHost(req.URL.Hostname()) {
+					return fmt.Errorf("redirect to non-loopback host %q refused without allow_remote", req.URL.Hostname())
+				}
+				return http.ErrUseLastResponse
+			},
+		},
 	}
 }
 

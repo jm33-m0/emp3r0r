@@ -1,8 +1,12 @@
 package assistant
 
 import (
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -86,5 +90,48 @@ func TestConfigRejectsKeyInEnvName(t *testing.T) {
 	cfg.APIKeyEnv = "sk-850bb029bf098a8c4b304f26e6ea872412cc9b271461e165cbe40f7f8768dd0d"
 	if err := cfg.Validate(); err == nil {
 		t.Fatal("expected a key in api_key_env to be rejected")
+	}
+}
+
+func TestLoadConfigRejectsInsecurePermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("permission bits not enforced on Windows")
+	}
+	dir := t.TempDir()
+	writable := filepath.Join(dir, "writable.json")
+	if err := os.WriteFile(writable, []byte(`{"api":"chat"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(writable, 0o666); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadConfig(writable); err == nil {
+		t.Fatal("group/world-writable assistant.json was accepted")
+	}
+
+	inlineKey := filepath.Join(dir, "inline.json")
+	if err := os.WriteFile(inlineKey, []byte(`{"api_key":"sk-secret"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(inlineKey, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadConfig(inlineKey); err == nil {
+		t.Fatal("world-readable assistant.json with inline api_key was accepted")
+	}
+}
+
+func TestHTTPProviderRefusesRedirectToRemoteHost(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "https://api.example.com/v1/chat/completions", http.StatusTemporaryRedirect)
+	}))
+	defer srv.Close()
+
+	cfg := DefaultConfig()
+	cfg.BaseURL = srv.URL
+	cfg.Stream = false
+	provider := NewHTTPProvider(cfg)
+	if _, err := provider.Chat(context.Background(), []Message{{Role: "user", Content: "hi"}}, nil, "", nil); err == nil {
+		t.Fatal("redirect to non-loopback host succeeded without allow_remote")
 	}
 }

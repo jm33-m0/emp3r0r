@@ -50,15 +50,12 @@ var capabilityOrder = []string{
 	"kernel-module-load",
 	"container-tools",
 	"network-capture",
-	"tampered-module",
 }
 
 // DefaultCapabilities is the detectability-first baseline. Common in-process
 // BOFs run without a warning. Every operational capability that leaves an
 // observable footprint runs with a warning, so the caller sees the matched
-// rules and can stop before a higher-footprint step. The tampered-module
-// integrity gate stays blocked because a module write is an operator-code
-// change on the C2 host, not a target footprint. The operator may set any
+// rules and can stop before a higher-footprint step. The operator may set any
 // capability to block in the policy file.
 func DefaultCapabilities() map[string]Mode {
 	return map[string]Mode{
@@ -85,7 +82,6 @@ func DefaultCapabilities() map[string]Mode {
 		"kernel-module-load":        ModeWarn,
 		"container-tools":           ModeWarn,
 		"network-capture":           ModeWarn,
-		"tampered-module":           ModeBlock,
 	}
 }
 
@@ -317,8 +313,6 @@ func capabilityReason(id string) string {
 		return "uses container or namespace management tools"
 	case "network-capture":
 		return "captures network traffic on the target"
-	case "tampered-module":
-		return "module files were changed through the workspace tools"
 	default:
 		return "matched capability"
 	}

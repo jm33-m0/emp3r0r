@@ -97,6 +97,8 @@ func TestRedactCommandSecrets(t *testing.T) {
 	}{
 		{"kerb --ticket abc --user NORTH/user", "kerb --ticket [redacted] --user NORTH/user"},
 		{"kerb --password='Summer 2026!'", "kerb --password=[redacted]"},
+		{"kerb --password 'it'\\''s a secret'", "kerb --password [redacted]"},
+		{"kerb --ntlm aad3b435b51404eeaad3b435b51404ee:31d6cfe0d16ae931b73c59d7e0c089c0", "kerb --ntlm [redacted]"},
 		{"show --token \"sid-1\" --target dc01", "show --token [redacted] --target dc01"},
 		{"kerbeus_asktgs --params '/ticket:doIF8DCC /service:CIFS/dc01'", "kerbeus_asktgs --params '/ticket:[redacted] /service:CIFS/dc01'"},
 		{"get --filter '(objectClass=user)'", "get --filter '(objectClass=user)'"},

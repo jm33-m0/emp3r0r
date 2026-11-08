@@ -49,13 +49,6 @@ func TestDefaultPolicyWarnsForSevereActions(t *testing.T) {
 	}
 }
 
-func TestDefaultPolicyBlocksTamperedModule(t *testing.T) {
-	p := DefaultPolicy()
-	if got := p.Evaluate("", testReview([]string{"tampered-module"}, "low", true)); got.Allowed {
-		t.Fatalf("tampered module allowed by default: %+v", got)
-	}
-}
-
 func TestCapabilityModes(t *testing.T) {
 	p := DefaultPolicy()
 	p.Capabilities["process-creation"] = ModeAllow

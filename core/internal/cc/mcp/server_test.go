@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"sort"
 	"testing"
@@ -380,14 +379,14 @@ func TestMergedToolsetScreensActions(t *testing.T) {
 	h.send(map[string]any{"jsonrpc": "2.0", "id": 7, "method": "tools/list"})
 	result, _ := h.next().Result.(map[string]any)
 	tools, _ := result["tools"].([]any)
-	if len(tools) != 23 {
-		t.Fatalf("tools = %d, want 23", len(tools))
+	if len(tools) != 19 {
+		t.Fatalf("tools = %d, want 19", len(tools))
 	}
 	seen := map[string]bool{}
 	for _, raw := range tools {
 		seen[raw.(map[string]any)["name"].(string)] = true
 	}
-	for _, name := range []string{"run_module", "run_exec", "command", "upload_file", "download_file", "workspace_write", "select_agent", "generate", "generate_c"} {
+	for _, name := range []string{"run_module", "run_exec", "command", "upload_file", "download_file", "reload_modules", "select_agent", "generate", "generate_c"} {
 		if !seen[name] {
 			t.Fatalf("missing action tool %q", name)
 		}
@@ -558,134 +557,6 @@ func TestReadMessageFraming(t *testing.T) {
 	}
 	if _, err := readMessage(r); err != io.EOF {
 		t.Fatalf("err = %v, want EOF", err)
-	}
-}
-
-type buildExecutor struct {
-	built int
-}
-
-func (*buildExecutor) RunModule(context.Context, *def.Emp3r0rAgent, string, map[string]string) (string, error) {
-	return "job", nil
-}
-
-func (b *buildExecutor) BuildLocalModule(context.Context, string, map[string]string) (string, error) {
-	b.built++
-	return "build log", nil
-}
-
-func (*buildExecutor) RunExec(context.Context, *def.Emp3r0rAgent, string, bool) (string, error) {
-	return "job", nil
-}
-
-func (*buildExecutor) RunCommand(context.Context, *def.Emp3r0rAgent, string) (string, error) {
-	return "job", nil
-}
-
-func (*buildExecutor) UploadFile(context.Context, *def.Emp3r0rAgent, string, string) (string, error) {
-	return "job", nil
-}
-
-func (*buildExecutor) DownloadFile(context.Context, *def.Emp3r0rAgent, string, string, bool) (string, error) {
-	return "", nil
-}
-func (*buildExecutor) ReloadModules(context.Context) error { return nil }
-
-func TestModifiedModuleBuildIsScreenedHigh(t *testing.T) {
-	root := t.TempDir()
-	ws, err := NewWorkspace(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	modDir := filepath.Join(root, "demo")
-	if err := os.MkdirAll(modDir, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	mod := &def.ModuleConfig{
-		Name: "demo", IsLocal: true, Build: "true", Path: modDir,
-		Options: def.ModOptions{"x": {Name: "x", Type: "string"}},
-	}
-	def.Modules.Store("demo", mod)
-	t.Cleanup(func() { def.Modules.Delete("demo") })
-
-	exec := &buildExecutor{}
-	policy := opsec.DefaultPolicy()
-	policy.Capabilities["tampered-module"] = opsec.ModeBlock
-	actions := &Actions{
-		Workspace: ws,
-		Policy:    policy,
-		Executor:  exec,
-	}
-	if _, err := ws.Write("demo/stub.c", "int x;"); err != nil {
-		t.Fatal(err)
-	}
-	actions.markModified("demo/stub.c")
-
-	out, err := actions.runModule(context.Background(), json.RawMessage(`{"module":"demo","flags":{"x":"1"}}`))
-	if err != nil {
-		t.Fatal(err)
-	}
-	result := out.(map[string]any)
-	if result["blocked"] != true {
-		t.Fatalf("modified module was not blocked: %v", result)
-	}
-	if exec.built != 0 {
-		t.Fatal("modified module build reached the executor")
-	}
-
-	actions.Policy.Capabilities["tampered-module"] = opsec.ModeAllow
-	out, err = actions.runModule(context.Background(), json.RawMessage(`{"module":"demo","flags":{"x":"1"}}`))
-	if err != nil {
-		t.Fatal(err)
-	}
-	result = out.(map[string]any)
-	if result["executed"] != true || exec.built != 1 {
-		t.Fatalf("allowed build = %v (built=%d)", result, exec.built)
-	}
-}
-
-func TestModifiedModuleBuildIsScreenedThroughSymlinkedWorkspace(t *testing.T) {
-	realRoot := t.TempDir()
-	linkedRoot := filepath.Join(t.TempDir(), "workspace")
-	if err := os.Symlink(realRoot, linkedRoot); err != nil {
-		t.Skipf("symlink unavailable: %v", err)
-	}
-	ws, err := NewWorkspace(linkedRoot)
-	if err != nil {
-		t.Fatal(err)
-	}
-	modDir := filepath.Join(realRoot, "demo_symlink")
-	if err := os.MkdirAll(modDir, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	mod := &def.ModuleConfig{
-		Name: "demo_symlink", IsLocal: true, Build: "true", Path: modDir,
-		Options: def.ModOptions{"x": {Name: "x", Type: "string"}},
-	}
-	def.Modules.Store("demo_symlink", mod)
-	t.Cleanup(func() { def.Modules.Delete("demo_symlink") })
-
-	exec := &buildExecutor{}
-	actions := &Actions{
-		Workspace: ws,
-		Policy:    opsec.DefaultPolicy(),
-		Executor:  exec,
-	}
-	if _, err := ws.Write("demo_symlink/stub.c", "int x;"); err != nil {
-		t.Fatal(err)
-	}
-	actions.markModified("demo_symlink/stub.c")
-
-	out, err := actions.runModule(context.Background(), json.RawMessage(`{"module":"demo_symlink","flags":{"x":"1"}}`))
-	if err != nil {
-		t.Fatal(err)
-	}
-	result := out.(map[string]any)
-	if result["blocked"] != true {
-		t.Fatalf("modified module behind a symlinked workspace was not blocked: %v", result)
-	}
-	if exec.built != 0 {
-		t.Fatal("modified module build reached the executor")
 	}
 }
 

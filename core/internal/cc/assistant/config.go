@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -89,8 +90,18 @@ func LoadConfig(path string) (Config, error) {
 		}
 		return cfg, fmt.Errorf("read %s: %w", path, err)
 	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return cfg, fmt.Errorf("stat %s: %w", path, err)
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o022 != 0 {
+		return cfg, fmt.Errorf("config file %s must not be group- or world-writable", path)
+	}
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return cfg, fmt.Errorf("parse %s: %w", path, err)
+	}
+	if runtime.GOOS != "windows" && strings.TrimSpace(cfg.APIKey) != "" && info.Mode().Perm()&0o077 != 0 {
+		return cfg, fmt.Errorf("config file %s contains an inline api_key and must be mode 0600", path)
 	}
 	if err := cfg.Validate(); err != nil {
 		return cfg, fmt.Errorf("%s: %w", path, err)
