@@ -16,7 +16,7 @@ Linux-first multi-operator C2 built to stay quiet and keep working. Self-healing
 
 ## What is emp3r0r?
 
-emp3r0r started as a Linux post-exploitation framework with interactive remote shells and autonomous network pivoting. Over time it grew into a multi-operator C2 with modular Go and C agents, a P2P mesh, in-memory execution on both Linux and Windows, and an OPSEC-screened MCP server and local AI assistant for operator workflows.
+emp3r0r started as a Linux post-exploitation framework with interactive remote shells and autonomous network pivoting. Over time it grew into a multi-operator C2 featuring modular Go and C agents, a self-healing P2P mesh, in-memory execution across Linux and Windows, and an OPSEC-screened MCP server that lets operators turn their own private AI harness into a fully interactive, natural-language C2 interface.
 
 ## Features
 
