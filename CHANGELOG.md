@@ -1,5 +1,24 @@
 # Changelog
 
+## [5.8.0](https://github.com/jm33-m0/emp3r0r/compare/v5.7.2...v5.8.0) (2026-11-08)
+
+
+### Features
+
+* **ai:** add MCP to emp3r0r ([36a272b](https://github.com/jm33-m0/emp3r0r/commit/36a272b072c83a6f1d3964cbb2d6d0fa71bd8078))
+* **ai:** integrate basic `ask` AI chatbot and OPSEC rules ([d61657b](https://github.com/jm33-m0/emp3r0r/commit/d61657b3dd5c948acc874acdd28046732d52d56a))
+* **module:** add programmatic module dispatch, OPSEC metadata, and job ID tracking ([af88155](https://github.com/jm33-m0/emp3r0r/commit/af88155e8a379149a850ada2c6e816fe659c0ecf))
+
+
+### Bug Fixes
+
+* **ai:** remove confusing MCP rules ([3c243e8](https://github.com/jm33-m0/emp3r0r/commit/3c243e82f47f2490e4e5ba379908aee441e06f5d))
+* **bof:** build without instrumentation ([c7351ae](https://github.com/jm33-m0/emp3r0r/commit/c7351aef080bcc299740dfeb45cb04054d86dc11))
+* **bof:** return meaningful errors ([f6ec166](https://github.com/jm33-m0/emp3r0r/commit/f6ec16651a392ad3556646ce7f7fe931ac7b98ae))
+* **c_agent:** harden key bounds ([a811003](https://github.com/jm33-m0/emp3r0r/commit/a811003d659d72cac034d6666156ca557cee7f69))
+* **codeql:** int conversion ([e3edde5](https://github.com/jm33-m0/emp3r0r/commit/e3edde5656776a9209dfa136ec81ab2382b1b8ca))
+* **race:** local c2 job result deleted prematurely ([962f00d](https://github.com/jm33-m0/emp3r0r/commit/962f00daf02aabe87a9d087bb45985f030227683))
+
 ## [5.7.2](https://github.com/jm33-m0/emp3r0r/compare/v5.7.1...v5.7.2) (2026-11-06)
 
 
