@@ -141,6 +141,8 @@ Every mutating tool call passes through a deterministic OPSEC screen before reac
 
 Inside the console, `ask` runs a read-only assistant backed by a local OpenAI-compatible endpoint (`Ollama`, `vLLM`, `llama.cpp`, or `LM Studio` on loopback by default). It can search modules, inspect parameters, summarize job output and operator logs, and review a command's OPSEC footprint without dispatching work to an agent. See the [operator assistant guide](./docs/ASSISTANT.md).
 
+Both surfaces trust the operator harness and treat target output as hostile data. emp3r0r does not control the harness and cannot mitigate all AI-related threats; isolation and the harness's own security controls remain the operator's responsibility. See [AI security](./docs/SECURITY.md#ai-security) for prompt-injection guidance, data-egress rules, and the policy controls to apply before letting a model act autonomously.
+
 ### Build profiles
 
 #### Modular agent builds

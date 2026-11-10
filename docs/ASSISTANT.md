@@ -200,8 +200,22 @@ by `ask`, help output, and the MCP screen; they never change how a module runs.
 
 ## Security
 
+See [AI security](./SECURITY.md#ai-security) for the shared trust model and
+prompt-injection guidance. The harness is trusted and outside this threat
+model: it already has the operator's local privileges, and emp3r0r does not
+control the model, provider, prompt, or the harness's own tools. `ask` cannot
+mitigate all AI-related threats; rely on host isolation and the harness's own
+security controls.
+
 - Read-only by design. The assistant exposes only read-only tools; injection in
   target output can produce bad advice, never an action.
+- Tool results are untrusted data. The model may repeat, summarize, or act on
+  injected instructions in its answer; the operator decides what to do next.
+- A hosted provider receives the question, the tool results, and the
+  conversation history. Use a local endpoint when target data must stay on the
+  operator host, and keep `allow_remote` off otherwise.
+- Conversation history is model context, not a trusted record. Reset it after
+  reading adversarial output so poisoned text does not carry into later turns.
 - Target data is untrusted. Tool results are sanitized, bounded, and treated as
   data by the prompt.
 - Default configuration is loopback only. A non-loopback endpoint or an HTTP
