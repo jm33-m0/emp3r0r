@@ -2,9 +2,9 @@
 set -e
 
 # Default configuration values
-FORMAT="shellcode"
+FORMAT="raw"
 TRANSPORT="http"
-PAYLOAD_HOST="127.0.0.1"
+PAYLOAD_HOST=""
 PAYLOAD_PORT="8000"
 PAYLOAD_PATH="/"
 PAYLOAD_KEY=""
@@ -128,6 +128,11 @@ if [[ -n "$AGENT_PIC" ]]; then
   PAYLOAD="local"
 else
   PAYLOAD="download"
+fi
+
+if [[ "$PAYLOAD" == "download" && -z "$PAYLOAD_HOST" ]]; then
+  echo "[-] download mode requires --payload-host; pass --agent-pic to embed a payload instead" >&2
+  exit 1
 fi
 
 echo "[+] Building shellcode stager with options:"

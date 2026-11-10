@@ -11,7 +11,7 @@
     {
       "name": "format",
       "description": "Stager can be generated as shared library (.so), ELF executable, raw shellcode (.bin), or self-unpacking packed shellcode (.bin)",
-      "default": "shellcode",
+      "default": "raw",
       "choices": ["so", "executable", "raw", "packed"],
       "type": "cstr"
     },
