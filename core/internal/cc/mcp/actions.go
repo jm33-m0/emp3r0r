@@ -1031,9 +1031,9 @@ func validateUploadSource(src string) error {
 // operator files: /proc/self/cmdline can carry the WireGuard key passed in
 // argv and /proc/self/environ can carry provider keys.
 func pseudoFilePath(path string) bool {
-	clean := filepath.Clean(path)
+	clean := filepath.ToSlash(filepath.Clean(strings.TrimPrefix(path, filepath.VolumeName(path))))
 	for _, root := range []string{"/proc", "/sys", "/dev", "/run"} {
-		if clean == root || strings.HasPrefix(clean, root+string(filepath.Separator)) {
+		if clean == root || strings.HasPrefix(clean, root+"/") {
 			return true
 		}
 	}
