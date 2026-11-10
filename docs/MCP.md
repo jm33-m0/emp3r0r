@@ -96,6 +96,9 @@ Remote C2:
 5. `run_module`, `run_exec`, `run_command`, `upload_file`, `download_file`, or
    `command` — screen and execute.
 6. `list_jobs` / `read_job_output` / `result_summary` — read results.
+7. Report the task outcome with Summary, Scope, Actions and job IDs, Results,
+   Evidence, OPSEC warnings/rules, Changes, Risks, and Next steps. Cite an
+   inspectable proof for every claim; state missing proof explicitly.
 
 A mutating call returns:
 
@@ -196,8 +199,8 @@ Evaluation order and rules:
 
 | Tool | Purpose |
 | --- | --- |
-| `list_modules` | Search installed modules by name and description, filtered by target OS. |
-| `module_help` | Parameters, defaults, usage line, examples, and OPSEC metadata. |
+| `list_modules` | Search installed modules by name and description, filtered by target OS. Local modules are always listed. |
+| `module_help` | Parameters, defaults, usage line, examples, workspace path, and OPSEC metadata. |
 | `list_agents` | Connected-agent detail (host, OS, user, privilege, process, network, mesh, transport, memfs, owner). Pass `{"agent":"<tag>"}` for one agent. |
 | `select_agent` | Make one agent the active target; acquires the C2 target lock. |
 | `list_jobs` | Jobs dispatched by this MCP process, newest first. |
@@ -222,10 +225,10 @@ carry `destructiveHint: true`.
 
 The `command` tool runs console commands that are not covered by a dedicated
 typed tool (for example `socks_start`, `socks_stop`, `tun2socks`, `kill`,
-`suicide`, or `forget_agent`). Module names, `exec`, `generate`, `generate_c`,
-`ask`, `exit`, and `reset_layout` are rejected in favor of their dedicated
-tools or interactive console use. `forget_agent` is marked irreversible and
-carries `destructive`.
+`suicide`, or `forget_agent`). Module names, `exec`, `put`, `get`, `generate`,
+`generate_c`, `ask`, `exit`, and `reset_layout` are rejected in favor of their
+dedicated tools or interactive console use. `forget_agent` is marked
+irreversible and carries `destructive`.
 
 ## Agent generation
 
@@ -234,28 +237,229 @@ carries `destructive`.
 returning its path, UUID, and configuration size:
 
 ```json
-{"cc": "c2.example.com", "type": "linux_so", "arch": "amd64"}
-{"cc": "c2.example.com", "type": "glibc", "arch": "amd64", "format": "exe"}
+{"type": "linux_so", "arch": "amd64"}
 ```
+
+```json
+{"type": "glibc", "arch": "amd64", "format": "exe"}
+```
+
+`cc` is optional. When it is omitted, the C2 address configured on the operator
+is used and reported in the result. Do not substitute `127.0.0.1` unless the C2
+really is local; pass `cc` only when the operator wants a different address.
+
+Windows `generate` types (`windows_executable` and `windows_dll`) are converted
+to Donut shellcode automatically. The result includes `shellcode_file`; use
+that path when packaging a loader instead of running Donut yourself:
+
+```json
+{"module": "loader_windows",
+ "flags": {"shellcode": "/home/operator/.emp3r0r/agent.exe.bin",
+           "format": "dll", "arch": "x64"}}
+```
+
+`loader_windows` is a local module: it builds on the operator host and needs no
+selected target. Call `module_help` for its process, injection, and verification
+options. Do not edit its source or run its `build.sh`.
+
+`generate_c` uses `type` for the libc ABI (`glibc` or `musl`) and `format` for
+`exe`, `so`, or `shellcode`. `format: shellcode` is glibc/amd64-only. Both
+builders are serialized.
+
+Linux C agents are staged with `stager_linux`, another local module. Build the
+PIC first, then embed it or point the stager at a payload listener:
+
+```json
+{"type": "glibc", "arch": "amd64", "format": "shellcode"}
+```
+
+```json
+{"module": "stager_linux",
+ "flags": {"format": "executable",
+           "agent-pic": "/home/operator/.emp3r0r/agent.bin"}}
+```
+
+Embed mode ignores the `payload-*` flags. Download mode omits `agent-pic` and
+sets `payload-host`, `payload-port`, `payload-path` (HTTP only), and
+`payload-key` to match `emp3r0r-listener`. `format` is `raw` (default),
+`executable`, `so`, or `packed`; `transport` is `http`, `tcp`, `udp`,
+`libcurl`, or `libssl`. `unpacker` is `rc4` or `lzss` for `packed`. See the
+[Linux stager guide](./stager_linux.md) for the full option set.
 
 ## Module development
 
-The MCP client uses its own local file tools to add or edit modules under
-`~/.emp3r0r/modules`, then calls `reload_modules` followed by `list_modules` or
-`run_module`. When the C2 is remote, module sources and build toolchains must
-exist on the host where the module runner executes.
+The operator workspace is the development surface. Local and buildable modules
+are copied to `~/.emp3r0r/modules/<module>` (or
+`$EMP3R0R_WORKSPACE/modules/<module>`), and a workspace copy takes precedence
+over the read-only install tree. `module_help` returns the authoritative
+`path`; edit that directory, using the workspace copy when the path points at
+the installed tree.
+
+The MCP client can use its own local file tools to change module source, add a
+module, or add a detection-sandbox harness under the workspace. After a config
+or source change, call `reload_modules` followed by `list_modules` or
+`module_help`; the module watcher may also reload automatically. Build through
+`run_module` after editing.
+
+Keep the module contract intact: a valid `config.json`, the existing flag names
+unless the operator asked for new ones, and matching `opsec` metadata. Source
+edits are local code execution on the operator host; review them like any other
+operator change, and do not edit source to bypass the OPSEC screen. Keep
+`emp3r0r.json`, `assistant.json`, `mcp.json`, and the audit logs out of source
+changes; policy and audit are operator decisions.
+
+When the C2 is remote, module sources and build toolchains must exist on the
+host where the module runner executes.
 
 ## Security
 
-- See [Security Policy](./SECURITY.md) for the full threat model.
-- Target output is untrusted data. The OPSEC screen is deterministic and cannot
-  be altered by target output.
-- `upload_file` and `put` reject protected operator files (`wg_config.json`,
-  `emp3r0r.json`, `mcp.json`, `assistant.json`, private keys, SSH/cloud
-  credentials, and symlinks to them) so prompt injection in target output
-  cannot exfiltrate operator credentials to a target.
-- With the same WireGuard key, `emp3r0r mcp` and the console share one operator
-  identity. Provision a separate operator for MCP when both run concurrently.
+See [Security Policy](./SECURITY.md) for the full threat model and the
+[AI security](./SECURITY.md#ai-security) guidance. This section covers what
+this server enforces and what the operator must configure.
+
+### Trust boundary
+
+The AI harness is trusted and outside this threat model. It runs with the
+operator's privileges and already has full control of the operator host;
+restricting MCP tool calls does not contain it, and no server-side check can
+stop it from using another path. If the harness is compromised, that is an
+operator-host compromise, not an MCP vulnerability.
+
+`emp3r0r mcp` is a stdio server. It does not authenticate its client: the
+process that starts it and speaks on its stdin/stdout is the trusted harness.
+The server is not a sandbox for it.
+
+The security-relevant chain is agent-originated: target output carries a prompt
+injection into the model context, the model emits a tool call, and that call
+reaches the C2, the operator, or another target. The screen and the C2 are the
+enforcement points for that chain. A tool call produced by an injected model is
+screened exactly like one produced by the operator.
+
+### Architecture limitation
+
+`emp3r0r mcp` cannot mitigate all AI-related threats because it does not control
+the AI harness, the model, the prompt, the model provider, or the harness's own
+file and shell tools. Examples outside its control include a compromised or
+misconfigured harness, a malicious model or provider, provider-side prompt and
+tool-result logging, the harness reading local credentials directly, or the
+harness bypassing MCP tools entirely.
+
+These risks are the operator's responsibility. Rely on harness security
+controls and host isolation: a dedicated operator VM or container with no host
+or cloud credentials, restricted network egress, and a harness configuration
+you have reviewed. The policy, audit log, and tool screen only bound calls made
+through this server; they are not a sandbox for the harness.
+
+### What is enforced
+
+- Every tool that runs a module, command, transfer, or build is screened by
+  `mcp.json` before dispatch. A blocked call returns `executed: false` and never
+  reaches the target. `select_agent` only acquires the target lock; it is
+  rate-limited and audited.
+- `warn` **executes**. It returns `warnings`; it does not wait for approval.
+  Set a capability to `block` to stop it.
+- `allowed_modules`, when non-empty, is an allowlist. `denied_modules` always
+  wins. Unknown capabilities fail closed.
+- `allow_irreversible: false` refuses actions whose review marks a target or C2
+  state change, including `forget_agent`.
+- The token bucket (`max_actions_per_minute`) limits mutating calls per server
+  process, not per operator or per target.
+- The C2 enforces WireGuard peer identity, single-owner target locks, and job
+  ownership. The screen does not replace those checks.
+- The pre-execution audit record must be written or the action is refused. A
+  post-execution write failure is reported in the tool result.
+- Tool annotations (`readOnlyHint`, `destructiveHint`) are hints to the client,
+  not server-side enforcement.
+
+The screen is deliberately narrow substring and token matching. Obfuscated
+commands, novel tooling, and module behaviour the metadata does not describe
+can be missed. A missing rule is not a safety claim.
+
+### Hardened policy for autonomous use
+
+The stock policy warns for every operational capability. That is suitable for
+an operator watching each call, not for an unattended agent. A conservative
+autonomous policy blocks high-impact capabilities and keeps the noise ceiling
+low:
+
+```json
+{
+  "max_noise": "medium",
+  "allow_irreversible": false,
+  "max_actions_per_minute": 10,
+  "allowed_modules": [],
+  "denied_modules": [],
+  "capabilities": {
+    "credential-access": "block",
+    "credential-prompt": "block",
+    "kerberos-credential": "block",
+    "directory-credential-read": "block",
+    "injection": "block",
+    "persistence": "block",
+    "defense-tampering": "block",
+    "privilege-change": "block",
+    "account-manipulation": "block",
+    "adcs-abuse": "block",
+    "remote-execution": "block",
+    "service-control": "block",
+    "destructive": "block",
+    "kernel-module-load": "block",
+    "network-capture": "block"
+  }
+}
+```
+
+Capabilities omitted from the map inherit the defaults, so list only the ones
+you change. Raise individual capabilities to `warn` for a particular
+engagement, and keep `allow_irreversible` off.
+
+### Prompt injection
+
+Job output, process tables, filenames, LDAP attributes, and logs are data. The
+model may treat them as instructions anyway. This is the attack chain the
+screen exists to bound: an injected model can only reach capabilities the
+policy allows. Keep high-impact capabilities at `block`, keep
+`allow_irreversible` off, and keep the session on one target. Client-side
+approval prompts are an operator preference, not a security boundary. The
+server cannot detect intent; it can only refuse capabilities.
+
+### Files and credentials
+
+- `upload_file` and `put` reject protected operator files by name and
+  directory (`wg_config.json`, `emp3r0r.json`, `mcp.json`, `assistant.json`,
+  private keys, SSH and cloud credentials, and symlinks to them), and reject
+  pseudo-files under `/proc`, `/sys`, `/dev`, and `/run`. This is aimed at an
+  injected model, not at sandboxing the harness. It blocks the common
+  exfiltration paths, not all of them: a sensitive file with an innocuous name
+  is still not recognized. Review uploads and keep unrelated credentials out of
+  the operator account.
+- `download_file` writes target data into the operator download directory.
+  Treat downloaded files as hostile; do not open them with tools that execute
+  content, and do not attach them to the model unless needed.
+- `read_log` returns a bounded tail of the operator log. It strips terminal
+  escapes but not credentials or hashes that modules and the target wrote
+  there.
+- `generate` and `generate_c` compile on the operator host. Review the returned
+  path, C2 address, and any `transport_options` before deploying an artifact.
+- Prefer `--operator-wg-key-file` with mode `0600`; `--operator-wg-key` is
+  visible in the process list.
+
+### Operator identity
+
+With the same WireGuard key, `emp3r0r mcp` and the console share one operator
+identity. Provision a separate operator for MCP when both run concurrently.
+Then a confused or stolen MCP session owns only its own jobs and locks, and the
+server can revoke it without touching the console. Run the operator host in an
+isolated VM or container without host credentials.
+
+### Audit
+
+Every screened action writes a `decision` record before execution and a
+`result` record after it to `~/.emp3r0r/mcp_audit.log` (`0600`). Credential-
+bearing flag values and command arguments are redacted. The log is append-only
+for the life of the process; preserve it for incident review and rotate it
+between sessions. Audit records are operator-side evidence, not a substitute
+for the C2's own operator audit log.
 
 ## Troubleshooting
 
