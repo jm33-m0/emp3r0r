@@ -43,7 +43,7 @@ func buildTools(rt *toolRuntime) map[string]Tool {
 			Type: "function",
 			Function: FunctionDef{
 				Name:        "list_modules",
-				Description: "List modules whose platform and text match a query. Use this before naming a module.",
+				Description: "List modules whose platform and text match a query. Local modules build on the operator host and are always listed, regardless of the target OS. Use this before naming a module.",
 				Parameters: ObjectSchema(map[string]any{
 					"query":    StringProp("Case-insensitive text matched against module name and description"),
 					"platform": StringProp("Target OS: linux, windows, or any. Defaults to the selected target's OS."),
@@ -236,7 +236,9 @@ func (rt *toolRuntime) listModules(_ context.Context, raw json.RawMessage) (any,
 			return
 		}
 		p := strings.ToLower(strings.TrimSpace(mod.Platform))
-		if platform != "" && p != "" && p != "generic" && p != platform {
+		// A local module builds on the operator host, not on the selected
+		// target. Keep it visible even when its artifact targets another OS.
+		if !mod.IsLocal && platform != "" && p != "" && p != "generic" && p != platform {
 			return
 		}
 		allNames = append(allNames, mod.Name)
@@ -298,6 +300,7 @@ type paramInfo struct {
 
 type moduleInfo struct {
 	Name       string            `json:"name"`
+	Path       string            `json:"path,omitempty"`
 	Comment    string            `json:"comment"`
 	Platform   string            `json:"platform"`
 	Type       string            `json:"type"`
@@ -361,6 +364,7 @@ func describeModule(mod *def.ModuleConfig) moduleInfo {
 	}
 	return moduleInfo{
 		Name:       mod.Name,
+		Path:       sanitize.SanitizeText(mod.Path),
 		Comment:    sanitize.SanitizeText(mod.Comment),
 		Platform:   mod.Platform,
 		Type:       mod.AgentConfig.Type,

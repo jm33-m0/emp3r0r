@@ -59,9 +59,13 @@ func TestUsageLine(t *testing.T) {
 
 func TestDescribeModuleIncludesHelpMetadata(t *testing.T) {
 	mod := testModule()
+	mod.Path = "/workspace/modules/demo"
 	info := describeModule(mod)
 	if len(info.Examples) != 1 || info.Help == "" {
 		t.Fatalf("missing help metadata: %+v", info)
+	}
+	if info.Path != mod.Path {
+		t.Fatalf("path = %q, want %q", info.Path, mod.Path)
 	}
 	if len(info.Parameters) != 4 {
 		t.Fatalf("parameters = %d", len(info.Parameters))
@@ -195,6 +199,27 @@ func TestTableSummarySanitizesUntrustedCells(t *testing.T) {
 	}
 	if len(rows[0][1]) != 1024 {
 		t.Fatalf("long cell length = %d", len(rows[0][1]))
+	}
+}
+
+func TestListModulesIncludesLocalModulesForOtherPlatforms(t *testing.T) {
+	def.Modules.Store("zz_local_windows", &def.ModuleConfig{
+		Name: "zz_local_windows", Comment: "local Windows loader",
+		Platform: "Windows", IsLocal: true,
+	})
+	t.Cleanup(func() { def.Modules.Delete("zz_local_windows") })
+
+	rt := &toolRuntime{
+		cfg:    DefaultConfig(),
+		target: &def.Emp3r0rAgent{GOOS: "linux"},
+	}
+	out, err := rt.listModules(context.Background(), json.RawMessage(`{"query":"zz_local_windows"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows := out.(map[string]any)["modules"].([]moduleRow)
+	if len(rows) != 1 || rows[0].Name != "zz_local_windows" {
+		t.Fatalf("local module hidden by target platform: %+v", rows)
 	}
 }
 
