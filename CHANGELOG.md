@@ -1,5 +1,17 @@
 # Changelog
 
+## [5.8.1](https://github.com/jm33-m0/emp3r0r/compare/v5.8.0...v5.8.1) (2026-11-10)
+
+
+### Bug Fixes
+
+* **ai:** refine mcp instructions ([277179c](https://github.com/jm33-m0/emp3r0r/commit/277179c44d33f8265ea620ea77b25bbf3edb9658))
+* **ai:** refine operator skills to improve agent efficiency ([2415373](https://github.com/jm33-m0/emp3r0r/commit/2415373bbcb87a414c435bd2647c07ed122a7e39))
+* **ai:** screen mcp actions ([754ab1a](https://github.com/jm33-m0/emp3r0r/commit/754ab1a3dd3ac59a2401c202fbf785b5c4572696))
+* **ai:** tell ai how to use `generate` ([abac4bf](https://github.com/jm33-m0/emp3r0r/commit/abac4bff7a62120544ac47f47c2536aa8aa61896))
+* **ai:** tell ai how to use local modules ([762ed58](https://github.com/jm33-m0/emp3r0r/commit/762ed5841a6c31bafbdfb338de414172f91d493d))
+* **stager:** refine defaults to work with ai models ([60ad053](https://github.com/jm33-m0/emp3r0r/commit/60ad053e567a8fb8c296c2b4e1fbddbefdb1b459))
+
 ## [5.8.0](https://github.com/jm33-m0/emp3r0r/compare/v5.7.2...v5.8.0) (2026-11-08)
 
 
