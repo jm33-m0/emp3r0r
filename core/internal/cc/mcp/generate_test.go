@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/builder"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
 )
 
 func TestGenerateToolDefinitions(t *testing.T) {
@@ -19,8 +21,8 @@ func TestGenerateToolDefinitions(t *testing.T) {
 		}
 		params := tool.Def.Function.Parameters
 		required, _ := params["required"].([]string)
-		if len(required) != 1 || required[0] != "cc" {
-			t.Fatalf("%s required = %v, want [cc]", name, required)
+		if len(required) != 0 {
+			t.Fatalf("%s required = %v, want cc to be optional", name, required)
 		}
 	}
 }
@@ -57,6 +59,51 @@ func TestNewGoBuildSpecRejectsBadInput(t *testing.T) {
 		TransportOptions: map[string]string{" ": "x"},
 	}); err == nil {
 		t.Fatal("empty transport option key accepted")
+	}
+}
+
+func TestBuildSpecsDefaultToConfiguredCC(t *testing.T) {
+	goSpec, err := newGoBuildSpecWithCC(goGenerateArgs{}, "https://c2.example.com/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if goSpec.CC != "https://c2.example.com" {
+		t.Fatalf("go cc = %q, want the configured address without a trailing slash", goSpec.CC)
+	}
+	if goSpec.Config.CCAddress == nil || *goSpec.Config.CCAddress != goSpec.CC {
+		t.Fatalf("go config cc = %v, want %q", goSpec.Config.CCAddress, goSpec.CC)
+	}
+
+	cSpec, err := newCBuildSpecWithCC(cGenerateArgs{}, "https://c2.example.com/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cSpec.CC != "https://c2.example.com" {
+		t.Fatalf("C cc = %q, want the configured address without a trailing slash", cSpec.CC)
+	}
+	if cSpec.Config.CCAddress == nil || *cSpec.Config.CCAddress != cSpec.CC {
+		t.Fatalf("C config cc = %v, want %q", cSpec.Config.CCAddress, cSpec.CC)
+	}
+}
+
+func TestBuildSpecsIgnoreMutatedRuntimeCC(t *testing.T) {
+	old := live.GetRuntimeConfig()
+	t.Cleanup(func() { live.SetRuntimeConfig(old) })
+	live.SetRuntimeConfig(&def.Config{CCAddress: "https://mutated.example.com"})
+
+	goSpec, err := newGoBuildSpecWithCC(goGenerateArgs{}, "https://initial.example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if goSpec.CC != "https://initial.example.com" {
+		t.Fatalf("go cc = %q, want the captured session address", goSpec.CC)
+	}
+	cSpec, err := newCBuildSpecWithCC(cGenerateArgs{}, "https://initial.example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cSpec.CC != "https://initial.example.com" {
+		t.Fatalf("C cc = %q, want the captured session address", cSpec.CC)
 	}
 }
 

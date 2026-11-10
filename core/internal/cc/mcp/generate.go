@@ -32,7 +32,7 @@ func (a *Actions) generateTools() map[string]assistant.Tool {
 				Type: "function",
 				Function: assistant.FunctionDef{
 					Name:        "generate",
-					Description: "Build a Go agent payload on this operator host. Defaults match the console: payload type linux_so and architecture amd64. cc is required. The call is screened and audited like other mutating tools.",
+					Description: "Build a Go agent payload on this operator host. Defaults match the console: payload type linux_so and architecture amd64. Windows executable and DLL builds are also converted to Donut shellcode automatically; the result includes shellcode_file for use with loader_windows. Omit cc to use the configured C2 address. The call is screened and audited like other mutating tools.",
 					Parameters: assistant.ObjectSchema(map[string]any{
 						"type": map[string]any{
 							"type":        "string",
@@ -44,7 +44,7 @@ func (a *Actions) generateTools() map[string]assistant.Tool {
 							"enum":        builder.ArchListAll,
 							"description": "Target architecture. Default amd64; valid values depend on type.",
 						},
-						"cc":                     assistant.StringProp("C2 hostname, or an explicit http(s) URL for TLS. Required."),
+						"cc":                     assistant.StringProp("C2 hostname, or an explicit http(s) URL for TLS. Omit to use the C2 address already configured on this operator; never guess or substitute 127.0.0.1."),
 						"c2_channel_mode":        assistant.StringProp("C2 channel mode. Default http_poll."),
 						"allow_custom_transport": assistant.BooleanProp("Allow a c2_channel_mode that is not built into this C2. The agent build must include the matching dialer."),
 						"transport_options": map[string]any{
@@ -73,7 +73,7 @@ func (a *Actions) generateTools() map[string]assistant.Tool {
 						},
 						"ncsi":   assistant.BooleanProp("Check Internet connectivity with NCSI before connecting to C2."),
 						"stager": assistant.BooleanProp("Build for the stager: enables memory encryption and suspension."),
-					}, "cc"),
+					}),
 				},
 			},
 			Destructive: true,
@@ -84,7 +84,7 @@ func (a *Actions) generateTools() map[string]assistant.Tool {
 				Type: "function",
 				Function: assistant.FunctionDef{
 					Name:        "generate_c",
-					Description: "Build the native C agent on this operator host. type selects the libc ABI and arch selects the C toolchain target. cc is required. The call is screened and audited like other mutating tools.",
+					Description: "Build the native C agent on this operator host. type selects the libc ABI and arch selects the C toolchain target; format=shellcode produces a malasada-wrapped raw PIC blob. Omit cc to use the configured C2 address. The call is screened and audited like other mutating tools.",
 					Parameters: assistant.ObjectSchema(map[string]any{
 						"type": map[string]any{
 							"type":        "string",
@@ -96,7 +96,7 @@ func (a *Actions) generateTools() map[string]assistant.Tool {
 							"enum":        builder.CAgentArches,
 							"description": "C toolchain target architecture. Default amd64.",
 						},
-						"cc":                     assistant.StringProp("C2 hostname, or an explicit http(s) URL for TLS. Required."),
+						"cc":                     assistant.StringProp("C2 hostname, or an explicit http(s) URL for TLS. Omit to use the C2 address already configured on this operator; never guess or substitute 127.0.0.1."),
 						"cc_http_port":           assistant.StringProp("HTTP polling port baked into the agent."),
 						"doh":                    assistant.StringProp("DNS over HTTPS resolver URL."),
 						"c2_channel_mode":        assistant.StringProp("C2 channel mode. Default http_poll."),
@@ -118,7 +118,7 @@ func (a *Actions) generateTools() map[string]assistant.Tool {
 						"jitter":        assistant.IntegerProp("Beacon jitter percentage, 0-100. Default 50."),
 						"poll_window":   assistant.IntegerProp("Seconds to wait for commands after hello before masked sleep. Default 5."),
 						"offline_grace": assistant.IntegerProp("Seconds a sleeping agent stays listed before removal. Default 0."),
-					}, "cc"),
+					}),
 				},
 			},
 			Destructive: true,
@@ -156,6 +156,7 @@ type goGenerateArgs struct {
 type goBuildSpec struct {
 	PayloadType string
 	Arch        string
+	CC          string
 	Config      builder.AgentConfig
 	IdleTimeout int
 	SetIdle     bool
@@ -163,6 +164,10 @@ type goBuildSpec struct {
 }
 
 func newGoBuildSpec(args goGenerateArgs) (*goBuildSpec, error) {
+	return newGoBuildSpecWithCC(args, "")
+}
+
+func newGoBuildSpecWithCC(args goGenerateArgs, defaultCC string) (*goBuildSpec, error) {
 	payloadType := strings.TrimSpace(args.Type)
 	if payloadType == "" {
 		payloadType = builder.PayloadTypeLinuxSO
@@ -180,7 +185,7 @@ func newGoBuildSpec(args goGenerateArgs) (*goBuildSpec, error) {
 	if !builder.IsArchValid(payloadType, arch) {
 		return nil, fmt.Errorf("invalid arch %q for payload type %q (available: %v)", arch, payloadType, builder.ArchListAll)
 	}
-	cc, err := requiredAgentString(args.CC, "cc")
+	cc, err := resolveCCAddress(args.CC, defaultCC)
 	if err != nil {
 		return nil, err
 	}
@@ -225,6 +230,7 @@ func newGoBuildSpec(args goGenerateArgs) (*goBuildSpec, error) {
 	return &goBuildSpec{
 		PayloadType: payloadType,
 		Arch:        arch,
+		CC:          cc,
 		Config:      opts,
 		IdleTimeout: idleTimeout,
 		SetIdle:     args.OperatorIdleTimeout != nil,
@@ -241,7 +247,7 @@ func (a *Actions) generateGoAgent(_ context.Context, raw json.RawMessage) (any, 
 	if err := json.Unmarshal(raw, &args); err != nil {
 		return nil, fmt.Errorf("parse arguments: %w", err)
 	}
-	spec, err := newGoBuildSpec(args)
+	spec, err := newGoBuildSpecWithCC(args, a.DefaultCC)
 	if err != nil {
 		return nil, err
 	}
@@ -273,6 +279,7 @@ func (a *Actions) runGoBuild(spec *goBuildSpec) map[string]any {
 		"executed":  err == nil,
 		"type":      spec.PayloadType,
 		"arch":      spec.Arch,
+		"cc":        spec.CC,
 		"opsec":     review,
 		"decision":  decision,
 		"transport": builder.DescribeGoAgentTransport(),
@@ -344,10 +351,15 @@ type cBuildSpec struct {
 	Config      builder.AgentConfig
 	Providers   builder.CAgentProviders
 	ChannelMode string
+	CC          string
 	Flags       map[string]string
 }
 
 func newCBuildSpec(args cGenerateArgs) (*cBuildSpec, error) {
+	return newCBuildSpecWithCC(args, "")
+}
+
+func newCBuildSpecWithCC(args cGenerateArgs, defaultCC string) (*cBuildSpec, error) {
 	libc := defaultAgentChoice(args.Type, builder.CAgentLibcs[0])
 	arch := defaultAgentChoice(args.Arch, builder.CAgentArches[0])
 	crypto := defaultAgentChoice(args.Crypto, builder.CAgentCryptoProviders[0])
@@ -374,7 +386,7 @@ func newCBuildSpec(args cGenerateArgs) (*cBuildSpec, error) {
 			return nil, fmt.Errorf("unknown %s %q", name, choice.value)
 		}
 	}
-	cc, err := requiredAgentString(args.CC, "cc")
+	cc, err := resolveCCAddress(args.CC, defaultCC)
 	if err != nil {
 		return nil, err
 	}
@@ -449,6 +461,7 @@ func newCBuildSpec(args cGenerateArgs) (*cBuildSpec, error) {
 		Config:      opts,
 		Providers:   providers,
 		ChannelMode: channelMode,
+		CC:          cc,
 		Flags: map[string]string{
 			"type":      libc,
 			"arch":      arch,
@@ -465,7 +478,7 @@ func (a *Actions) generateCAgent(_ context.Context, raw json.RawMessage) (any, e
 	if err := json.Unmarshal(raw, &args); err != nil {
 		return nil, fmt.Errorf("parse arguments: %w", err)
 	}
-	spec, err := newCBuildSpec(args)
+	spec, err := newCBuildSpecWithCC(args, a.DefaultCC)
 	if err != nil {
 		return nil, err
 	}
@@ -493,6 +506,7 @@ func (a *Actions) runCBuild(spec *cBuildSpec) map[string]any {
 		"type":         spec.Providers.Libc,
 		"arch":         spec.Providers.Arch,
 		"format":       spec.Providers.Format,
+		"cc":           spec.CC,
 		"transport":    spec.Providers.Transport,
 		"channel_mode": spec.ChannelMode,
 		"endpoint":     endpoint,
@@ -542,18 +556,26 @@ func buildReview(kind string) def.OpsecReview {
 	}
 }
 
-func requiredAgentString(value *string, name string) (string, error) {
-	if value == nil {
-		return "", fmt.Errorf("%s is required", name)
+// resolveCCAddress returns the caller-supplied C2 address or the address
+// captured when the MCP session started. Builders mutate live.RuntimeConfig,
+// so the fallback is passed in rather than read here; an earlier explicit cc
+// must not leak into later builds.
+func resolveCCAddress(value *string, fallback string) (string, error) {
+	if value != nil {
+		if s := strings.TrimSpace(*value); s != "" {
+			if len(s) > maxAgentPathBytes {
+				return "", fmt.Errorf("cc is too long")
+			}
+			return s, nil
+		}
 	}
-	s := strings.TrimSpace(*value)
-	if s == "" {
-		return "", fmt.Errorf("%s is required", name)
+	if s := strings.TrimSpace(fallback); s != "" {
+		if len(s) > maxAgentPathBytes {
+			return "", fmt.Errorf("configured cc is too long")
+		}
+		return strings.TrimSuffix(s, "/"), nil
 	}
-	if len(s) > maxAgentPathBytes {
-		return "", fmt.Errorf("%s is too long", name)
-	}
-	return s, nil
+	return "", fmt.Errorf("cc is required: no C2 address is configured on this operator; pass the C2 hostname explicitly")
 }
 
 func normalizeTransportOptions(options map[string]string) (map[string]string, error) {
