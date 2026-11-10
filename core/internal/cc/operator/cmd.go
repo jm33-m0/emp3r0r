@@ -262,6 +262,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			GroupID: "filesystem",
 			Short:   "Download a file from selected agent",
 			Example: "get [--recursive] [--regex '*.pdf'] --path /tmp/1.txt",
+			Args:    cobra.NoArgs,
 			Run: func(cmd *cobra.Command, args []string) {
 				target := agents.MustGetActiveAgent()
 				if target == nil {
@@ -294,6 +295,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 			GroupID: "filesystem",
 			Short:   "Upload a file to selected agent. Supports memfs:///path/to/file paths.",
 			Example: "put --src /tmp/1.txt --dst /tmp/2.txt\nput --src /tmp/loader.so --dst memfs:///loader.so",
+			Args:    cobra.NoArgs,
 			Run: func(cmd *cobra.Command, args []string) {
 				target := agents.MustGetActiveAgent()
 				if target == nil {

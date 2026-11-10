@@ -27,7 +27,7 @@ func HeadlessCommand(ctx context.Context, line string) error {
 	if line == "" {
 		return fmt.Errorf("command is empty")
 	}
-	args, err := splitCommandLine(line)
+	args, err := SplitCommandLine(line)
 	if err != nil {
 		return err
 	}
@@ -67,10 +67,10 @@ func headlessTree() *cobra.Command {
 	return root
 }
 
-// splitCommandLine splits a command line into arguments. It supports single
+// SplitCommandLine splits a command line into arguments. It supports single
 // and double quotes and backslash escapes outside single quotes, which covers
 // the flags and paths the console commands accept.
-func splitCommandLine(line string) ([]string, error) {
+func SplitCommandLine(line string) ([]string, error) {
 	args := make([]string, 0, 8)
 	var word strings.Builder
 	inWord := false

@@ -12,6 +12,7 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/assistant"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/operator"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/opsec"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -43,6 +44,11 @@ type Actions struct {
 	Limiter  *Limiter
 	Executor Executor
 	Operator string
+	// DefaultCC is the C2 address captured when the MCP session starts. It is
+	// the fallback for generate and generate_c when the caller omits cc.
+	// Builders mutate live.RuntimeConfig, so reading it per call would make an
+	// earlier explicit cc leak into later builds.
+	DefaultCC string
 
 	// RunOperator executes one operator console command line. The console
 	// command tree owns target selection, filesystem, FTP, pivot, and build
@@ -125,7 +131,7 @@ func (a *Actions) Tools() map[string]assistant.Tool {
 				Type: "function",
 				Function: assistant.FunctionDef{
 					Name:        "command",
-					Description: "Run an operator console command line, such as '/target 1a2b3c4d', '/ls /tmp', '/jobs', or '/generate --cc c2.example.com'. The leading slash is optional. Target commands are screened by the OPSEC policy; local commands are audited. Output goes to the operator log; use read_log and list_jobs.",
+					Description: "Run an operator console command line, such as '/target 1a2b3c4d', '/ls /tmp', or '/jobs'. The leading slash is optional. Target commands are screened by the OPSEC policy; local commands are audited. Module names, exec, put, get, generate, and generate_c are rejected in favor of their dedicated tools. Output goes to the operator log; use read_log and list_jobs.",
 					Parameters: assistant.ObjectSchema(map[string]any{
 						"command": assistant.StringProp("Operator command line, for example '/target 1a2b3c4d'"),
 					}, "command"),
@@ -232,6 +238,13 @@ func (a *Actions) runModule(ctx context.Context, raw json.RawMessage) (any, erro
 			"command":  command,
 			"problems": problems,
 		}, nil
+	}
+	if mod.IsLocal {
+		for key, value := range normalized {
+			if err := validateLocalBuildPath(key, value); err != nil {
+				return nil, fmt.Errorf("flag --%s: %w", key, err)
+			}
+		}
 	}
 	target := a.target()
 	if !mod.IsLocal && target == nil {
@@ -530,14 +543,12 @@ var (
 		"cd":          true,
 		"cp":          true,
 		"decrypt":     true,
-		"get":         true,
 		"kill":        true,
 		"ls":          true,
 		"mkdir":       true,
 		"mv":          true,
 		"net_helper":  true,
 		"ps":          true,
-		"put":         true,
 		"pwd":         true,
 		"rm":          true,
 		"socks_start": true,
@@ -562,7 +573,7 @@ func (a *Actions) operatorCommand(ctx context.Context, raw json.RawMessage) (any
 	if strings.ContainsAny(command, "\r\n") {
 		return nil, fmt.Errorf("command must be a single line")
 	}
-	fields, err := splitCommandTokens(command)
+	fields, err := operator.SplitCommandLine(command)
 	if err != nil {
 		return nil, err
 	}
@@ -582,6 +593,10 @@ func (a *Actions) operatorCommand(ctx context.Context, raw json.RawMessage) (any
 		return nil, fmt.Errorf("ask is an interactive console command and is unavailable over MCP")
 	case "exec":
 		return nil, fmt.Errorf("use run_exec for shell commands")
+	case "put":
+		return nil, fmt.Errorf("use upload_file for local file uploads; it applies the protected-file check")
+	case "get":
+		return nil, fmt.Errorf("use download_file for target downloads")
 	case "generate", "generate_c":
 		return nil, fmt.Errorf("%s builds an agent on this host; use the %s tool so builds are serialized", first, first)
 	}
@@ -607,15 +622,6 @@ func (a *Actions) operatorCommand(ctx context.Context, raw json.RawMessage) (any
 	if !local && first != "socks_start" && modules.CanRunExecBOF(target) {
 		return nil, fmt.Errorf("this C agent supports only run_exec (the exec BOF), not built-in agent commands")
 	}
-	if first == "put" {
-		src, err := transferPath("src", commandFlagValue(fields, "src", "s"))
-		if err != nil {
-			return nil, err
-		}
-		if err := validateUploadSource(src); err != nil {
-			return nil, err
-		}
-	}
 
 	var review def.OpsecReview
 	if local {
@@ -633,7 +639,7 @@ func (a *Actions) operatorCommand(ctx context.Context, raw json.RawMessage) (any
 			addOperatorRule(&review, "destructive", "permanently removes the agent record from the C2")
 		}
 	} else {
-		review = operatorCommandReview(first, fields, command, target)
+		review = operatorCommandReview(first, command, target)
 	}
 	decision, auditErr := a.screen("command", "", command, target, review)
 	if !decision.Allowed {
@@ -668,8 +674,8 @@ func (a *Actions) operatorCommand(ctx context.Context, raw json.RawMessage) (any
 // operatorCommandReview scores a console command that touches the target.
 // ReviewBuiltin covers the command tree's own file, query, and destructive
 // patterns; the explicit rules cover command names whose footprint is not in
-// the command text (an FTP get, a pivot, a kill).
-func operatorCommandReview(first string, fields []string, command string, target *def.Emp3r0rAgent) def.OpsecReview {
+// the command text (a pivot or a kill).
+func operatorCommandReview(first, command string, target *def.Emp3r0rAgent) def.OpsecReview {
 	var review def.OpsecReview
 	switch first {
 	case "kill", "suicide":
@@ -678,16 +684,12 @@ func operatorCommandReview(first string, fields []string, command string, target
 		review = assistant.ReviewBuiltin(command, target)
 	}
 	switch first {
-	case "get", "put", "socks_start":
+	case "socks_start":
 		addOperatorRule(&review, "data-transfer", "moves data between the operator and the target")
 	}
 	switch first {
 	case "cp", "decrypt", "mkdir", "mv":
 		addOperatorRule(&review, "filesystem-artifact", "writes files on the target")
-	case "put":
-		if dest := commandFlagValue(fields, "dst", "d"); !util.IsMemPath(dest) {
-			addOperatorRule(&review, "filesystem-artifact", "writes files on the target")
-		}
 	}
 	if first == "rm" || first == "suicide" {
 		addOperatorRule(&review, "destructive", "removes target state")
@@ -698,38 +700,6 @@ func operatorCommandReview(first string, fields []string, command string, target
 func isInternalAgentCommand(token string) bool {
 	token = strings.TrimLeft(strings.TrimSpace(token), `"'\`)
 	return strings.HasPrefix(token, "!")
-}
-
-func commandFlagValue(fields []string, names ...string) string {
-	var matched string
-	for _, name := range names {
-		long := "--" + name
-		short := "-" + name
-		for i := 0; i < len(fields); i++ {
-			field := fields[i]
-			if field == "--" {
-				break
-			}
-			if field == long || field == short {
-				if i+1 < len(fields) {
-					matched = fields[i+1]
-					i++
-				} else {
-					matched = ""
-				}
-				continue
-			}
-			if strings.HasPrefix(field, long+"=") {
-				matched = strings.TrimPrefix(field, long+"=")
-				continue
-			}
-			if len(name) == 1 && strings.HasPrefix(field, short+"=") {
-				matched = strings.TrimPrefix(field, short+"=")
-				continue
-			}
-		}
-	}
-	return strings.TrimSpace(matched)
 }
 
 func addOperatorRule(review *def.OpsecReview, rule, reason string) {
@@ -966,84 +936,108 @@ func targetTag(agent *def.Emp3r0rAgent) string {
 	return sanitize.SanitizeText(agent.Tag)
 }
 
-func validateUploadSource(src string) error {
-	if forbiddenPath(src) || forbiddenPath(filepath.Clean(src)) {
-		return fmt.Errorf("src %q is a protected operator file", src)
+// validateLocalBuildPath rejects a local module flag that points at a
+// protected operator path. Local builds run on the operator/C2 host and can
+// write their output path, so an injected model must not be able to overwrite
+// policy, audit, or key files through a module flag. File-path flags must also
+// resolve to a regular file when they exist: a FIFO would block the build.
+func validateLocalBuildPath(flag, value string) error {
+	if value == "" {
+		return nil
 	}
-	if abs, err := filepath.Abs(src); err == nil && forbiddenPath(abs) {
-		return fmt.Errorf("src %q is a protected operator file", src)
+	if forbiddenPath(value) || pseudoFilePath(value) {
+		return fmt.Errorf("%q is a protected operator path", value)
 	}
-	if info, err := os.Lstat(src); err == nil {
+	abs, err := filepath.Abs(value)
+	if err != nil {
+		return nil
+	}
+	if forbiddenPath(abs) || pseudoFilePath(abs) {
+		return fmt.Errorf("%q is a protected operator path", value)
+	}
+	if info, err := os.Lstat(abs); err == nil {
 		if info.Mode()&os.ModeSymlink != 0 {
-			return fmt.Errorf("src %q is a symlink", src)
+			return fmt.Errorf("%q is a symlink", value)
 		}
-		if !info.Mode().IsRegular() {
-			return fmt.Errorf("src %q is not a regular file", src)
-		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("inspect %q: %w", value, err)
 	}
-	if real, err := evalExisting(src); err == nil && forbiddenPath(real) {
-		return fmt.Errorf("src %q resolves to a protected operator file", src)
+	real, err := evalExisting(abs)
+	if err != nil {
+		return fmt.Errorf("resolve %q: %w", value, err)
+	}
+	if forbiddenPath(real) || pseudoFilePath(real) {
+		return fmt.Errorf("%q resolves to a protected operator path", value)
+	}
+	if !isLocalFilePathFlag(flag) {
+		return nil
+	}
+	info, err := os.Lstat(real)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("inspect %q: %w", value, err)
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("%q is not a regular file", value)
 	}
 	return nil
 }
 
-func splitCommandTokens(line string) ([]string, error) {
-	var args []string
-	var cur strings.Builder
-	var quote rune
-	inToken := false
+// isLocalFilePathFlag reports whether a module option is expected to be a
+// local file path. This keeps remote path options such as stager_linux's
+// payload-path out of the regular-file check.
+func isLocalFilePathFlag(flag string) bool {
+	switch strings.ToLower(strings.TrimSpace(flag)) {
+	case "src", "dst", "output", "out", "outfile", "output-path", "input", "file", "shellcode", "agent-pic", "dll":
+		return true
+	default:
+		return false
+	}
+}
 
-	for i := 0; i < len(line); i++ {
-		c := rune(line[i])
-		switch {
-		case quote == '\'':
-			if c == '\'' {
-				quote = 0
-			} else {
-				cur.WriteByte(line[i])
+func validateUploadSource(src string) error {
+	if forbiddenPath(src) || forbiddenPath(filepath.Clean(src)) || pseudoFilePath(src) {
+		return fmt.Errorf("src %q is a protected operator file", src)
+	}
+	if abs, err := filepath.Abs(src); err == nil {
+		if forbiddenPath(abs) || pseudoFilePath(abs) {
+			return fmt.Errorf("src %q is a protected operator file", src)
+		}
+		if info, err := os.Lstat(abs); err == nil {
+			if info.Mode()&os.ModeSymlink != 0 {
+				return fmt.Errorf("src %q is a symlink", src)
 			}
-		case quote == '"':
-			switch c {
-			case '"':
-				quote = 0
-			case '\\':
-				if i+1 < len(line) && (line[i+1] == '"' || line[i+1] == '\\') {
-					i++
-				}
-				cur.WriteByte(line[i])
-			default:
-				cur.WriteByte(line[i])
+			if !info.Mode().IsRegular() {
+				return fmt.Errorf("src %q is not a regular file", src)
 			}
-		default:
-			switch c {
-			case ' ', '\t':
-				if inToken {
-					args = append(args, cur.String())
-					cur.Reset()
-					inToken = false
-				}
-			case '\'', '"':
-				quote = c
-				inToken = true
-			case '\\':
-				if i+1 < len(line) && (line[i+1] == ' ' || line[i+1] == '\t' || line[i+1] == '"' || line[i+1] == '\'' || line[i+1] == '\\') {
-					i++
-				}
-				cur.WriteByte(line[i])
-				inToken = true
-			default:
-				cur.WriteByte(line[i])
-				inToken = true
-			}
+		} else if !os.IsNotExist(err) {
+			return fmt.Errorf("inspect src %q: %w", src, err)
+		}
+		real, err := evalExisting(abs)
+		if err != nil {
+			return fmt.Errorf("resolve src %q: %w", src, err)
+		}
+		if forbiddenPath(real) || pseudoFilePath(real) {
+			return fmt.Errorf("src %q resolves to a protected operator file", src)
 		}
 	}
-	if quote != 0 {
-		return nil, fmt.Errorf("unterminated %c quote in command", quote)
+	return nil
+}
+
+// pseudoFilePath reports whether path is on a virtual filesystem that exposes
+// process memory, command lines, or environment. These are not regular
+// operator files: /proc/self/cmdline can carry the WireGuard key passed in
+// argv and /proc/self/environ can carry provider keys.
+func pseudoFilePath(path string) bool {
+	clean := filepath.Clean(path)
+	for _, root := range []string{"/proc", "/sys", "/dev", "/run"} {
+		if clean == root || strings.HasPrefix(clean, root+string(filepath.Separator)) {
+			return true
+		}
 	}
-	if inToken {
-		args = append(args, cur.String())
-	}
-	return args, nil
+	return false
 }
 
 func validateActionCommand(command string) error {

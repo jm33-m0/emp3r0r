@@ -6,7 +6,7 @@ import (
 )
 
 func TestSplitCommandLine(t *testing.T) {
-	got, err := splitCommandLine(`exec --cmd "echo hello world" --path '/tmp/a b'`)
+	got, err := SplitCommandLine(`exec --cmd "echo hello world" --path '/tmp/a b'`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -22,7 +22,7 @@ func TestSplitCommandLine(t *testing.T) {
 }
 
 func TestSplitCommandLineRejectsUnterminatedQuote(t *testing.T) {
-	if _, err := splitCommandLine(`exec --cmd "echo`); err == nil {
+	if _, err := SplitCommandLine(`exec --cmd "echo`); err == nil {
 		t.Fatal("unterminated quote was accepted")
 	}
 }
@@ -40,7 +40,7 @@ func TestHeadlessCommandRunsHelp(t *testing.T) {
 }
 
 func TestSplitCommandLinePreservesWindowsPaths(t *testing.T) {
-	got, err := splitCommandLine(`cat C:\Windows\System32\drivers\etc\hosts`)
+	got, err := SplitCommandLine(`cat C:\Windows\System32\drivers\etc\hosts`)
 	if err != nil {
 		t.Fatal(err)
 	}

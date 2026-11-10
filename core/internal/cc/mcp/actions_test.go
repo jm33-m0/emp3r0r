@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/opsec"
@@ -105,6 +106,37 @@ func TestRunCommandRejectsQuotedExec(t *testing.T) {
 	}
 }
 
+func TestOperatorCommandRejectsFileTransferAliases(t *testing.T) {
+	target := &def.Emp3r0rAgent{Tag: "target-1", GOOS: "linux", AgentImpl: "go"}
+	ran := false
+	actions := &Actions{
+		Target:      func() *def.Emp3r0rAgent { return target },
+		Policy:      opsec.DefaultPolicy(),
+		RunOperator: func(_ context.Context, _ string) error { ran = true; return nil },
+	}
+	// put/get have dedicated tools with structured arguments. Keeping the
+	// console aliases reachable would force the screen to reimplement pflag's
+	// shorthand, attached-value, and flag-consumption semantics.
+	commands := []string{
+		"put --src /tmp/safe\u00a0--src /home/operator/.emp3r0r/wg_config.json --dst memfs:///x",
+		"put --src /tmp/safe\u2003--src /home/operator/.emp3r0r/wg_config.json --dst memfs:///x",
+		"put -s /tmp/safe --src /home/operator/.emp3r0r/wg_config.json --dst memfs:///x",
+		"put --src /tmp/safe -s/home/operator/.emp3r0r/wg_config.json --dst memfs:///x",
+		"put --src /tmp/safe --dst memfs:///x -d/tmp/dropped_on_disk",
+		"put -s /home/operator/.emp3r0r/wg_config.json -d --src /tmp/safe",
+		"get --path /etc/passwd",
+	}
+	for _, command := range commands {
+		_, err := actions.operatorCommand(context.Background(), json.RawMessage(`{"command":`+strconv.Quote(command)+`}`))
+		if err == nil || (!strings.Contains(err.Error(), "upload_file") && !strings.Contains(err.Error(), "download_file")) {
+			t.Fatalf("transfer alias was not rejected: %q: %v", command, err)
+		}
+	}
+	if ran {
+		t.Fatal("rejected command reached the operator console")
+	}
+}
+
 func TestOperatorCommandScreensDestructiveTargetCommand(t *testing.T) {
 	target := &def.Emp3r0rAgent{Tag: "target-1", GOOS: "linux", AgentImpl: "go"}
 	var ran string
@@ -132,47 +164,22 @@ func TestOperatorCommandScreensDataTransfer(t *testing.T) {
 	target := &def.Emp3r0rAgent{Tag: "target-1", GOOS: "linux", AgentImpl: "go"}
 	var ran string
 	policy := opsec.DefaultPolicy()
-	policy.Capabilities["filesystem-artifact"] = opsec.ModeBlock
+	policy.Capabilities["data-transfer"] = opsec.ModeBlock
 	actions := &Actions{
 		Target:      func() *def.Emp3r0rAgent { return target },
 		Policy:      policy,
 		RunOperator: func(_ context.Context, line string) error { ran = line; return nil },
 	}
-	out, err := actions.operatorCommand(context.Background(), json.RawMessage(`{"command":"/put --src /tmp/a --dst /tmp/b"}`))
+	out, err := actions.operatorCommand(context.Background(), json.RawMessage(`{"command":"/socks_start 1080"}`))
 	if err != nil {
 		t.Fatal(err)
 	}
 	result := out.(map[string]any)
 	if result["blocked"] != true {
-		t.Fatalf("put was not blocked: %v", result)
+		t.Fatalf("socks_start was not blocked: %v", result)
 	}
 	if ran != "" {
 		t.Fatalf("blocked command reached the console: %q", ran)
-	}
-}
-
-func TestOperatorCommandWarnsForMemfsStaging(t *testing.T) {
-	target := &def.Emp3r0rAgent{Tag: "target-1", GOOS: "linux", AgentImpl: "go"}
-	var ran string
-	actions := &Actions{
-		Target:      func() *def.Emp3r0rAgent { return target },
-		Policy:      opsec.DefaultPolicy(),
-		RunOperator: func(_ context.Context, line string) error { ran = line; return nil },
-	}
-	out, err := actions.operatorCommand(context.Background(), json.RawMessage(`{"command":"/put --src /tmp/a --dst memfs:///a"}`))
-	if err != nil {
-		t.Fatal(err)
-	}
-	result := out.(map[string]any)
-	if result["blocked"] == true || result["executed"] != true {
-		t.Fatalf("memfs staging was blocked: %v", result)
-	}
-	warnings, _ := result["warnings"].([]string)
-	if len(warnings) == 0 {
-		t.Fatalf("memfs staging had no warning: %v", result)
-	}
-	if ran != "put --src /tmp/a --dst memfs:///a" {
-		t.Fatalf("console received %q", ran)
 	}
 }
 
@@ -231,38 +238,6 @@ func TestOperatorCommandScreensForgetAgentAsIrreversible(t *testing.T) {
 	result = out.(map[string]any)
 	if result["executed"] != true {
 		t.Fatalf("forget_agent blocked after AllowIrreversible=true: %v", result)
-	}
-}
-
-func TestOperatorCommandPutRejectsProtectedSourceAndQuotedSpoof(t *testing.T) {
-	target := &def.Emp3r0rAgent{Tag: "target-1", GOOS: "linux", AgentImpl: "go"}
-	var ran string
-	policy := opsec.DefaultPolicy()
-	policy.Capabilities["filesystem-artifact"] = opsec.ModeBlock
-	actions := &Actions{
-		Target:      func() *def.Emp3r0rAgent { return target },
-		Policy:      policy,
-		RunOperator: func(_ context.Context, line string) error { ran = line; return nil },
-	}
-	for _, line := range []string{
-		"/put --src /home/operator/.emp3r0r/wg_config.json --dst memfs:///a",
-		"/put -s /home/operator/.ssh/id_ed25519 -d memfs:///a",
-	} {
-		if _, err := actions.operatorCommand(context.Background(), json.RawMessage(`{"command":`+strconv.Quote(line)+`}`)); err == nil {
-			t.Fatalf("%s was accepted", line)
-		}
-	}
-
-	out, err := actions.operatorCommand(context.Background(), json.RawMessage(`{"command":`+strconv.Quote(`/put --src "/tmp/file --dst memfs:///fake" --dst /tmp/on-disk`)+`}`))
-	if err != nil {
-		t.Fatal(err)
-	}
-	result := out.(map[string]any)
-	if result["blocked"] != true {
-		t.Fatalf("quoted --dst spoof bypassed filesystem-artifact block: %v", result)
-	}
-	if ran != "" {
-		t.Fatalf("blocked command ran: %q", ran)
 	}
 }
 
