@@ -204,7 +204,7 @@ func TestOperatorCommandRunsLocalCommandWithoutTarget(t *testing.T) {
 
 func TestOperatorCommandRejectsExitAndExec(t *testing.T) {
 	actions := &Actions{Policy: opsec.DefaultPolicy(), RunOperator: func(context.Context, string) error { return nil }}
-	for _, line := range []string{"/exit", "/exec --cmd whoami", "/ask what modules exist"} {
+	for _, line := range []string{"/exit", "/exec --cmd whoami"} {
 		if _, err := actions.operatorCommand(context.Background(), json.RawMessage(`{"command":`+strconv.Quote(line)+`}`)); err == nil {
 			t.Fatalf("%s was accepted", line)
 		}

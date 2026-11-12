@@ -226,9 +226,92 @@ carry `destructiveHint: true`.
 The `command` tool runs console commands that are not covered by a dedicated
 typed tool (for example `socks_start`, `socks_stop`, `tun2socks`, `kill`,
 `suicide`, or `forget_agent`). Module names, `exec`, `put`, `get`, `generate`,
-`generate_c`, `ask`, `exit`, and `reset_layout` are rejected in favor of their
+`generate_c`, `exit`, and `reset_layout` are rejected in favor of their
 dedicated tools or interactive console use. `forget_agent` is marked
 irreversible and carries `destructive`.
+
+### What the read-only tools expose
+
+- The installed module catalog and its metadata. `list_modules` filters by the
+  selected target's OS, and local modules are always listed because they build
+  on the operator host. `module_help` works by name even when a module targets
+  another platform.
+- Agent host, identity, OS, process, network, mesh, and transport detail.
+- Jobs dispatched by this MCP process and their persisted output.
+- Parsed results:
+  - LDAP: accounts, groups, trusts, domain password policy, ADCS templates, and
+    deterministic findings such as AS-REP roastable accounts, kerberoastable
+    accounts, delegation, LAPS readability, SID history, and ESC1 candidates.
+  - `ps`, `ls`, `stat`, `list_tokens`, and `list_sessions` tables.
+  - Other output: a bounded head/tail sample.
+- A bounded tail of the operator log. It can contain target output and secrets.
+- The deterministic OPSEC verdict for a module invocation or command line.
+
+`review_command` returns the same review the action screen uses:
+
+```json
+{
+  "kind": "module",
+  "valid": true,
+  "command": "sa_ldapsearch --filter '(objectClass=user)'",
+  "opsec": {
+    "rules": [],
+    "reasons": [],
+    "artifacts": ["target query"],
+    "noise": "medium",
+    "reversible": true,
+    "requires": [],
+    "unknowns": ["module has no opsec metadata; capabilities are matched from its description"]
+  }
+}
+```
+
+- `rules` lists the capability IDs that matched; the policy maps each ID to
+  `allow`, `warn`, or `block`.
+- `noise` is independent of capability. A BOF can read credentials with low
+  noise; a subprocess has at least medium noise. Scripts and broad enumeration
+  raise noise to high.
+- Modules without `opsec` metadata are matched by their rendered command and
+  flag values, plus high-confidence action phrases in the module name, comment,
+  or help. A broad filter such as `(objectClass=*)` carries `noisy-query`; a
+  precise filter does not.
+- `writes_disk` metadata adds `filesystem-artifact`. `touches_credentials` adds
+  `credential-access`.
+- Command rules are detectability-first: process creation, filesystem artifacts
+  (including memfd/`/dev/shm`), script execution, CLR loading, LOLBins,
+  credential access, Kerberos ticket access, persistence, defense or audit
+  tampering, injection, privilege changes, noisy enumeration, data transfer,
+  and destructive commands.
+- `run_exec` always carries `process-creation`; built-in agent commands do not.
+- `reversible` is rule-specific. Destructive rules and target-state changes are
+  irreversible; reading a credential or listing tickets is not.
+
+## Module help metadata
+
+Manifests may add optional `examples`, `help`, and `opsec` fields. They are used
+by `module_help`, help output, and the OPSEC screen; they never change how a
+module runs.
+
+```json
+{
+  "name": "sa_ldapsearch",
+  "comment": "LDAP search",
+  "examples": [
+    "sa_ldapsearch --filter '(objectClass=user)' --attributes sAMAccountName,memberOf --scope 2"
+  ],
+  "help": "Longer operator-facing description, including flag semantics.",
+  "opsec": {
+    "noise": "low",
+    "writes_disk": false,
+    "network_egress": ["ldap"],
+    "touches_credentials": false,
+    "requires_admin": false,
+    "artifacts": ["4624"],
+    "reversible": true,
+    "notes": "Read-only LDAP query."
+  }
+}
+```
 
 ## Agent generation
 
@@ -305,7 +388,7 @@ Keep the module contract intact: a valid `config.json`, the existing flag names
 unless the operator asked for new ones, and matching `opsec` metadata. Source
 edits are local code execution on the operator host; review them like any other
 operator change, and do not edit source to bypass the OPSEC screen. Keep
-`emp3r0r.json`, `assistant.json`, `mcp.json`, and the audit logs out of source
+`emp3r0r.json`, `mcp.json`, and the audit logs out of source
 changes; policy and audit are operator decisions.
 
 When the C2 is remote, module sources and build toolchains must exist on the
@@ -426,7 +509,7 @@ server cannot detect intent; it can only refuse capabilities.
 ### Files and credentials
 
 - `upload_file` and `put` reject protected operator files by name and
-  directory (`wg_config.json`, `emp3r0r.json`, `mcp.json`, `assistant.json`,
+  directory (`wg_config.json`, `emp3r0r.json`, `mcp.json`,
   private keys, SSH and cloud credentials, and symlinks to them), and reject
   pseudo-files under `/proc`, `/sys`, `/dev`, and `/run`. This is aimed at an
   injected model, not at sandboxing the harness. It blocks the common

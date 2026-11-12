@@ -579,7 +579,7 @@ func renderOptionValue(opt *def.ModOption, val string) (string, any, error) {
 
 // ValidateOption checks one operator-supplied value against its declaration
 // without packing it. Callers that only render or vet a command line (help
-// output, the operator assistant) use it to reject unknown choices and
+// output, the MCP toolset) use it to reject unknown choices and
 // malformed numbers before the operator runs anything.
 func ValidateOption(opt *def.ModOption, val string) error {
 	if opt == nil {

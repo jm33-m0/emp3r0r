@@ -10,7 +10,7 @@ import (
 func forbiddenPath(path string) bool {
 	base := strings.ToLower(filepath.Base(path))
 	switch base {
-	case "assistant.json", "mcp.json", "mcp_audit.log", "emp3r0r.log",
+	case "mcp.json", "mcp_audit.log", "emp3r0r.log",
 		"operator_audit.log", "wg_config.json", "emp3r0r.json",
 		"id_rsa", "id_ed25519", "id_ecdsa", "id_dsa", "authorized_keys",
 		"known_hosts", "credentials", "credentials.json", "serviceaccountkey.json",

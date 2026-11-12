@@ -8,7 +8,6 @@ import (
 
 func TestValidateUploadSourceRejectsProtectedAndSymlinkPaths(t *testing.T) {
 	for _, path := range []string{
-		"assistant.json",
 		"sub/mcp_audit.log",
 		".git/config",
 		"operator.key",

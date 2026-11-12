@@ -2,7 +2,7 @@
 
 <img align="left" width="130" height="130" alt="emp3r0r" src="img/emp3r0r.svg" />
 
-Linux-first multi-operator C2 built to stay quiet and keep working. Self-healing mesh with assisted discovery, in-memory execution with encrypted storage, scriptable agents, cross-platform BOFs, SOCKS5 pivoting, an AI-driven OPSEC-screened MCP server and operator assistant, and a modular C agent delivered by a sleep-masking stager.<br clear="all" />
+Linux-first multi-operator C2 built to stay quiet and keep working. Self-healing mesh with assisted discovery, in-memory execution with encrypted storage, scriptable agents, cross-platform BOFs, SOCKS5 pivoting, an AI-driven OPSEC-screened MCP server, and a modular C agent delivered by a sleep-masking stager.<br clear="all" />
 
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-7289da?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/vU98aQtk9f)
 [![GitHub Sponsors](https://img.shields.io/badge/GitHub-Sponsor-ff69b4?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sponsors/jm33-m0)
@@ -137,11 +137,9 @@ A netonly session keeps the agent's local identity and borrows the target user o
 
 Every mutating tool call passes through a deterministic OPSEC screen before reaching the target. The screen classifies module metadata and command lines into telemetry capabilities (such as process creation, filesystem writes, CLR loading, and credential access), noise bands, and reversibility, then enforces the operator's `mcp.json` policy (`allow`, `warn`, or `block`) and writes pre- and post-execution records to the audit log. The C2 still enforces WireGuard peer identity, single-owner target locks, and job ownership. See the [MCP server guide](./docs/MCP.md).
 
-#### Operator assistant
+Read-only tools expose the module registry, target detail, job output, and the operator log, and `review_command` computes the same deterministic OPSEC verdict without executing anything.
 
-Inside the console, `ask` runs a read-only assistant backed by a local OpenAI-compatible endpoint (`Ollama`, `vLLM`, `llama.cpp`, or `LM Studio` on loopback by default). It can search modules, inspect parameters, summarize job output and operator logs, and review a command's OPSEC footprint without dispatching work to an agent. See the [operator assistant guide](./docs/ASSISTANT.md).
-
-Both surfaces trust the operator harness and treat target output as hostile data. emp3r0r does not control the harness and cannot mitigate all AI-related threats; isolation and the harness's own security controls remain the operator's responsibility. See [AI security](./docs/SECURITY.md#ai-security) for prompt-injection guidance, data-egress rules, and the policy controls to apply before letting a model act autonomously.
+MCP trusts the operator harness and treats target output as hostile data. emp3r0r does not control the harness and cannot mitigate all AI-related threats; isolation and the harness's own security controls remain the operator's responsibility. See [AI security](./docs/SECURITY.md#ai-security) for prompt-injection guidance, data-egress rules, and the policy controls to apply before letting a model act autonomously.
 
 ### Build profiles
 
@@ -154,7 +152,6 @@ C2 server binaries keep the full feature set, so one server can handle every age
 ## Documentation
 
 - [Operator guide](./docs/OPERATOR.md): installation, quick start, operator setup, container notes, tmux keybindings, and agent generation.
-- [Operator assistant](./docs/ASSISTANT.md): the read-only `ask` command and its model configuration.
 - [MCP server](./docs/MCP.md): autonomous operator tools for Claude Code, Codex, and other MCP clients, with the deterministic OPSEC screen.
 - [Custom transport guide](./docs/CUSTOM_C2.md): Tor hidden-service quick start, Go and C agent dialers, C2 bridge socket protocol, and running multiple custom transports.
 - [RISC-V BOF modules](./docs/rvvm.md): running portable BOFs with `--riscv`, linking static libraries, and the RV32IMA interpreter.

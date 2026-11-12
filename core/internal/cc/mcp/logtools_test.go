@@ -1,4 +1,4 @@
-package assistant
+package mcp
 
 import (
 	"context"
@@ -24,7 +24,7 @@ func writeTestLog(t *testing.T, content string) {
 
 func TestReadLogTailAndMatch(t *testing.T) {
 	writeTestLog(t, "line one\nline two ERROR\nline three\nline four ERROR\n")
-	rt := &toolRuntime{cfg: DefaultConfig()}
+	rt := &toolRuntime{}
 
 	out, err := rt.readLog(context.Background(), json.RawMessage(`{"lines":2}`))
 	if err != nil {
@@ -50,7 +50,7 @@ func TestReadLogMissingFile(t *testing.T) {
 	live.EmpLogFile = filepath.Join(t.TempDir(), "absent.log")
 	t.Cleanup(func() { live.EmpLogFile = prev })
 
-	rt := &toolRuntime{cfg: DefaultConfig()}
+	rt := &toolRuntime{}
 	if _, err := rt.readLog(context.Background(), json.RawMessage(`{}`)); err == nil {
 		t.Fatal("expected an error for a missing log")
 	}

@@ -1,4 +1,4 @@
-package assistant
+package mcp
 
 // defaultOpsecRules is the detectability capability table. Each rule is a
 // policy capability. Command indicators describe what will execute; context

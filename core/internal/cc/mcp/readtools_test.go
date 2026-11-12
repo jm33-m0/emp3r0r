@@ -1,4 +1,4 @@
-package assistant
+package mcp
 
 import (
 	"context"
@@ -77,7 +77,7 @@ func TestReviewCommandValidatesAndRenders(t *testing.T) {
 	def.Modules.Store(mod.Name, mod)
 	t.Cleanup(func() { def.Modules.Delete(mod.Name) })
 
-	rt := &toolRuntime{cfg: DefaultConfig()}
+	rt := &toolRuntime{}
 	raw, _ := json.Marshal(reviewArgs{
 		Module: "demo",
 		Flags: map[string]any{
@@ -106,7 +106,7 @@ func TestReviewCommandRejectsUnknownAndMissingRequired(t *testing.T) {
 	def.Modules.Store(mod.Name, mod)
 	t.Cleanup(func() { def.Modules.Delete(mod.Name) })
 
-	rt := &toolRuntime{cfg: DefaultConfig()}
+	rt := &toolRuntime{}
 	raw, _ := json.Marshal(reviewArgs{
 		Module: "demo",
 		Flags:  map[string]any{"nope": "value"},
@@ -210,7 +210,6 @@ func TestListModulesIncludesLocalModulesForOtherPlatforms(t *testing.T) {
 	t.Cleanup(func() { def.Modules.Delete("zz_local_windows") })
 
 	rt := &toolRuntime{
-		cfg:    DefaultConfig(),
 		target: &def.Emp3r0rAgent{GOOS: "linux"},
 	}
 	out, err := rt.listModules(context.Background(), json.RawMessage(`{"query":"zz_local_windows"}`))
@@ -229,7 +228,7 @@ func TestListModulesHintsWhenNothingMatches(t *testing.T) {
 	})
 	t.Cleanup(func() { def.Modules.Delete("zz_hint_module") })
 
-	rt := &toolRuntime{cfg: DefaultConfig()}
+	rt := &toolRuntime{}
 	out, err := rt.listModules(context.Background(), json.RawMessage(`{"query":"zzzz-no-such-module"}`))
 	if err != nil {
 		t.Fatal(err)

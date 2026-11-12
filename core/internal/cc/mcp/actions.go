@@ -10,9 +10,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/assistant"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/operator"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/opsec"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -27,8 +24,6 @@ const maxActionCommandBytes = 4096
 type Executor interface {
 	RunModule(ctx context.Context, target *def.Emp3r0rAgent, module string, flags map[string]string) (string, error)
 	BuildLocalModule(ctx context.Context, module string, flags map[string]string) (string, error)
-	RunExec(ctx context.Context, target *def.Emp3r0rAgent, command string, shell bool) (string, error)
-	RunCommand(ctx context.Context, target *def.Emp3r0rAgent, command string) (string, error)
 	UploadFile(ctx context.Context, target *def.Emp3r0rAgent, src, dst string) (string, error)
 	DownloadFile(ctx context.Context, target *def.Emp3r0rAgent, path, filter string, recursive bool) (string, error)
 	ReloadModules(ctx context.Context) error
@@ -50,11 +45,6 @@ type Actions struct {
 	// earlier explicit cc leak into later builds.
 	DefaultCC string
 
-	// RunOperator executes one operator console command line. The console
-	// command tree owns target selection, filesystem, FTP, pivot, and build
-	// commands; Actions screens the line before calling it.
-	RunOperator func(context.Context, string) error
-
 	selectMu sync.Mutex
 
 	// generateMu serializes agent builds: the builder mutates the shared
@@ -63,29 +53,29 @@ type Actions struct {
 }
 
 // Tools returns the action tools keyed by MCP name.
-func (a *Actions) Tools() map[string]assistant.Tool {
-	tools := map[string]assistant.Tool{
+func (a *Actions) Tools() map[string]Tool {
+	tools := map[string]Tool{
 		"select_agent": {
-			Def: assistant.ToolDef{
+			Def: ToolDef{
 				Type: "function",
-				Function: assistant.FunctionDef{
+				Function: FunctionDef{
 					Name:        "select_agent",
 					Description: "Select one connected agent as the active target. Call list_agents first. The C2's operator lock still applies.",
-					Parameters: assistant.ObjectSchema(map[string]any{
-						"agent": assistant.StringProp("Agent tag from list_agents"),
+					Parameters: ObjectSchema(map[string]any{
+						"agent": StringProp("Agent tag from list_agents"),
 					}, "agent"),
 				},
 			},
 			Run: a.selectAgent,
 		},
 		"run_module": {
-			Def: assistant.ToolDef{
+			Def: ToolDef{
 				Type: "function",
-				Function: assistant.FunctionDef{
+				Function: FunctionDef{
 					Name:        "run_module",
 					Description: "Validate a module invocation, screen its OPSEC review, and execute it. Payload modules run on the target; local C2 modules are built and their build log is returned. The screen may block the action.",
-					Parameters: assistant.ObjectSchema(map[string]any{
-						"module": assistant.StringProp("Exact module name from list_modules"),
+					Parameters: ObjectSchema(map[string]any{
+						"module": StringProp("Exact module name from list_modules"),
 						"flags": map[string]any{
 							"type":                 "object",
 							"description":          "Flag name to value. Boolean flags take true or false.",
@@ -97,58 +87,15 @@ func (a *Actions) Tools() map[string]assistant.Tool {
 			Destructive: true,
 			Run:         a.runModule,
 		},
-		"run_exec": {
-			Def: assistant.ToolDef{
-				Type: "function",
-				Function: assistant.FunctionDef{
-					Name:        "run_exec",
-					Description: "Execute one shell command on the selected target after the OPSEC screen. A C agent uses the exec BOF; a Go agent executes the program directly.",
-					Parameters: assistant.ObjectSchema(map[string]any{
-						"command": assistant.StringProp("Single-line command"),
-						"shell":   assistant.BooleanProp("Run through a shell on a C agent (default true)"),
-					}, "command"),
-				},
-			},
-			Destructive: true,
-			Run:         a.runExec,
-		},
-		"run_command": {
-			Def: assistant.ToolDef{
-				Type: "function",
-				Function: assistant.FunctionDef{
-					Name:        "run_command",
-					Description: "Send a built-in agent command line, such as 'ls --dst /tmp' or 'ps', to the selected target after the OPSEC screen. Use run_module for modules and run_exec for arbitrary shell commands.",
-					Parameters: assistant.ObjectSchema(map[string]any{
-						"command": assistant.StringProp("Single-line agent command, for example 'ls --dst /tmp'"),
-					}, "command"),
-				},
-			},
-			Destructive: true,
-			Run:         a.runCommand,
-		},
-		"command": {
-			Def: assistant.ToolDef{
-				Type: "function",
-				Function: assistant.FunctionDef{
-					Name:        "command",
-					Description: "Run an operator console command line, such as '/target 1a2b3c4d', '/ls /tmp', or '/jobs'. The leading slash is optional. Target commands are screened by the OPSEC policy; local commands are audited. Module names, exec, put, get, generate, and generate_c are rejected in favor of their dedicated tools. Output goes to the operator log; use read_log and list_jobs.",
-					Parameters: assistant.ObjectSchema(map[string]any{
-						"command": assistant.StringProp("Operator command line, for example '/target 1a2b3c4d'"),
-					}, "command"),
-				},
-			},
-			Destructive: true,
-			Run:         a.operatorCommand,
-		},
 		"upload_file": {
-			Def: assistant.ToolDef{
+			Def: ToolDef{
 				Type: "function",
-				Function: assistant.FunctionDef{
+				Function: FunctionDef{
 					Name:        "upload_file",
 					Description: "Upload one local file to the selected target. The destination defaults to memfs:///<file name>, which keeps the body in encrypted agent memory; pass dst to choose another memfs key or a target disk path. A disk destination carries filesystem-artifact and is warned under the default policy. The returned job ID tracks the target's fetch.",
-					Parameters: assistant.ObjectSchema(map[string]any{
-						"src": assistant.StringProp("Local file path on the operator host"),
-						"dst": assistant.StringProp("Destination on the target: memfs:///name or an absolute disk path. Defaults to memfs:///<file name>"),
+					Parameters: ObjectSchema(map[string]any{
+						"src": StringProp("Local file path on the operator host"),
+						"dst": StringProp("Destination on the target: memfs:///name or an absolute disk path. Defaults to memfs:///<file name>"),
 					}, "src"),
 				},
 			},
@@ -156,38 +103,38 @@ func (a *Actions) Tools() map[string]assistant.Tool {
 			Run:         a.uploadFile,
 		},
 		"download_file": {
-			Def: assistant.ToolDef{
+			Def: ToolDef{
 				Type: "function",
-				Function: assistant.FunctionDef{
+				Function: FunctionDef{
 					Name:        "download_file",
 					Description: "Download a file or directory from the selected target into the operator download directory. A directory is listed; set recursive to download every matching file. Data transfer carries a warning by default.",
-					Parameters: assistant.ObjectSchema(map[string]any{
-						"path":      assistant.StringProp("Remote file or directory path"),
-						"recursive": assistant.BooleanProp("Download every file in a directory listing"),
-						"regex":     assistant.StringProp("Regular expression to filter directory listings"),
+					Parameters: ObjectSchema(map[string]any{
+						"path":      StringProp("Remote file or directory path"),
+						"recursive": BooleanProp("Download every file in a directory listing"),
+						"regex":     StringProp("Regular expression to filter directory listings"),
 					}, "path"),
 				},
 			},
 			Run: a.downloadFile,
 		},
 		"reload_modules": {
-			Def: assistant.ToolDef{
+			Def: ToolDef{
 				Type: "function",
-				Function: assistant.FunctionDef{
+				Function: FunctionDef{
 					Name:        "reload_modules",
 					Description: "Rescan the module directories after editing or adding a module. The module watcher also reloads on file changes.",
-					Parameters:  assistant.ObjectSchema(map[string]any{}),
+					Parameters:  ObjectSchema(map[string]any{}),
 				},
 			},
 			Run: a.reloadModules,
 		},
 		"opsec_policy": {
-			Def: assistant.ToolDef{
+			Def: ToolDef{
 				Type: "function",
-				Function: assistant.FunctionDef{
+				Function: FunctionDef{
 					Name:        "opsec_policy",
 					Description: "Return the capability screen: per-capability allow, warn, or block modes, maximum noise, reversibility, module lists, and rate limit.",
-					Parameters:  assistant.ObjectSchema(map[string]any{}),
+					Parameters:  ObjectSchema(map[string]any{}),
 				},
 			},
 			ReadOnly: true,
@@ -229,7 +176,7 @@ func (a *Actions) runModule(ctx context.Context, raw json.RawMessage) (any, erro
 		}
 		flags[key] = val
 	}
-	command, problems, normalized := assistant.NormalizeModuleFlags(mod, flags)
+	command, problems, normalized := NormalizeModuleFlags(mod, flags)
 	if len(problems) > 0 {
 		return map[string]any{
 			"executed": false,
@@ -258,7 +205,7 @@ func (a *Actions) runModule(ctx context.Context, raw json.RawMessage) (any, erro
 	if a.Executor == nil {
 		return nil, fmt.Errorf("executor is not configured")
 	}
-	review := assistant.ReviewModule(mod, normalized, command, target)
+	review := ReviewModule(mod, normalized, command, target)
 	decision, auditErr := a.screenWithFlags("run_module", mod.Name, command, normalized, target, review)
 	if !decision.Allowed {
 		return actionBlocked("run_module", command, mod.Name, target, review, decision, auditErr), nil
@@ -277,97 +224,6 @@ func (a *Actions) runModule(ctx context.Context, raw json.RawMessage) (any, erro
 
 	jobID, err := a.Executor.RunModule(ctx, target, mod.Name, normalized)
 	result := a.actionResultWithFlags("run_module", command, mod.Name, normalized, target, review, decision, auditErr, jobID, err, err == nil)
-	if err != nil {
-		result["error"] = err.Error()
-	}
-	return result, nil
-}
-
-type execArgs struct {
-	Command string `json:"command"`
-	Shell   *bool  `json:"shell"`
-}
-
-func (a *Actions) runExec(ctx context.Context, raw json.RawMessage) (any, error) {
-	var args execArgs
-	if err := json.Unmarshal(raw, &args); err != nil {
-		return nil, fmt.Errorf("parse arguments: %w", err)
-	}
-	command := strings.TrimSpace(args.Command)
-	if err := validateActionCommand(command); err != nil {
-		return nil, err
-	}
-	target := a.target()
-	if target == nil {
-		return map[string]any{"executed": false, "command": command, "reason": "no active target; call list_agents and select_agent"}, nil
-	}
-	if a.Executor == nil {
-		return nil, fmt.Errorf("executor is not configured")
-	}
-	review := assistant.ReviewExec(command, target)
-	decision, auditErr := a.screen("run_exec", "", command, target, review)
-	if !decision.Allowed {
-		return actionBlocked("run_exec", command, "", target, review, decision, auditErr), nil
-	}
-	shell := true
-	if args.Shell != nil {
-		shell = *args.Shell
-	}
-	jobID, err := a.Executor.RunExec(ctx, target, command, shell)
-	result := a.actionResult("run_exec", command, "", target, review, decision, auditErr, jobID, err, err == nil)
-	if err != nil {
-		result["error"] = err.Error()
-	}
-	return result, nil
-}
-
-type commandArgs struct {
-	Command string `json:"command"`
-}
-
-func (a *Actions) runCommand(ctx context.Context, raw json.RawMessage) (any, error) {
-	var args commandArgs
-	if err := json.Unmarshal(raw, &args); err != nil {
-		return nil, fmt.Errorf("parse arguments: %w", err)
-	}
-	command := strings.TrimSpace(args.Command)
-	if err := validateActionCommand(command); err != nil {
-		return nil, err
-	}
-	tokens := util.ParseCmd(command)
-	if len(tokens) == 0 {
-		return nil, fmt.Errorf("command is empty")
-	}
-	first := strings.TrimLeft(tokens[0], "\"'\\")
-	if first == "" {
-		return nil, fmt.Errorf("command is empty")
-	}
-	if isInternalAgentCommand(first) {
-		return nil, fmt.Errorf("%s is an internal agent API; use run_module for modules and run_exec for shell commands", first)
-	}
-	if strings.EqualFold(first, "exec") {
-		return nil, fmt.Errorf("use run_exec for shell commands")
-	}
-	if moduleNameFold(first) != "" {
-		return nil, fmt.Errorf("%q is a module; use run_module so its OPSEC metadata is screened", first)
-	}
-	target := a.target()
-	if target == nil {
-		return map[string]any{"executed": false, "command": command, "reason": "no active target; call list_agents and select_agent"}, nil
-	}
-	if a.Executor == nil {
-		return nil, fmt.Errorf("executor is not configured")
-	}
-	if modules.CanRunExecBOF(target) {
-		return nil, fmt.Errorf("this C agent supports only run_exec (the exec BOF), not arbitrary agent commands")
-	}
-	review := assistant.ReviewBuiltin(strings.Join(tokens, " "), target)
-	decision, auditErr := a.screen("run_command", "", command, target, review)
-	if !decision.Allowed {
-		return actionBlocked("run_command", command, "", target, review, decision, auditErr), nil
-	}
-	jobID, err := a.Executor.RunCommand(ctx, target, command)
-	result := a.actionResult("run_command", command, "", target, review, decision, auditErr, jobID, err, err == nil)
 	if err != nil {
 		result["error"] = err.Error()
 	}
@@ -432,7 +288,7 @@ func (a *Actions) uploadFile(ctx context.Context, raw json.RawMessage) (any, err
 }
 
 func uploadReview(command, dst string, target *def.Emp3r0rAgent) def.OpsecReview {
-	review := assistant.ReviewBuiltin(command, target)
+	review := ReviewBuiltin(command, target)
 	addOperatorRule(&review, "data-transfer", "moves data from the operator to the target")
 	if !util.IsMemPath(dst) {
 		addOperatorRule(&review, "filesystem-artifact", "writes the file to the target's disk")
@@ -460,7 +316,7 @@ func (a *Actions) downloadFile(ctx context.Context, raw json.RawMessage) (any, e
 		return nil, fmt.Errorf("regex is longer than %d bytes", maxActionCommandBytes)
 	}
 	if filter != "" {
-		if err := assistant.ValidateCommandLine(filter); err != nil {
+		if err := ValidateCommandLine(filter); err != nil {
 			return nil, fmt.Errorf("regex: %w", err)
 		}
 	}
@@ -501,7 +357,7 @@ func (a *Actions) downloadFile(ctx context.Context, raw json.RawMessage) (any, e
 }
 
 func downloadReview(command string, target *def.Emp3r0rAgent) def.OpsecReview {
-	review := assistant.ReviewBuiltin(command, target)
+	review := ReviewBuiltin(command, target)
 	addOperatorRule(&review, "data-transfer", "moves data from the target to the operator")
 	return review
 }
@@ -517,189 +373,10 @@ func transferPath(name, value string) (string, error) {
 	if len(value) > maxActionCommandBytes {
 		return "", fmt.Errorf("%s is longer than %d bytes", name, maxActionCommandBytes)
 	}
-	if err := assistant.ValidateCommandLine(value); err != nil {
+	if err := ValidateCommandLine(value); err != nil {
 		return "", fmt.Errorf("%s: %w", name, err)
 	}
 	return value, nil
-}
-
-var (
-	operatorLocalCommands = map[string]bool{
-		"debug":        true,
-		"forget_agent": true,
-		"help":         true,
-		"jobs":         true,
-		"ls_modules":   true,
-		"ls_targets":   true,
-		"resume":       true,
-		"search":       true,
-		"socks_status": true,
-		"socks_stop":   true,
-		"target":       true,
-		"tun2socks":    true,
-	}
-	operatorTargetCommands = map[string]bool{
-		"cat":         true,
-		"cd":          true,
-		"cp":          true,
-		"decrypt":     true,
-		"kill":        true,
-		"ls":          true,
-		"mkdir":       true,
-		"mv":          true,
-		"net_helper":  true,
-		"ps":          true,
-		"pwd":         true,
-		"rm":          true,
-		"socks_start": true,
-		"suicide":     true,
-	}
-)
-
-// operatorCommand runs a console command line, so an external agent can use
-// the operator surface directly, for example as "/target <tag>" or "/ls /tmp".
-// It screens target-touching commands before the console handler dispatches
-// them and audits both local and target commands.
-func (a *Actions) operatorCommand(ctx context.Context, raw json.RawMessage) (any, error) {
-	var args commandArgs
-	if err := json.Unmarshal(raw, &args); err != nil {
-		return nil, fmt.Errorf("parse arguments: %w", err)
-	}
-	command := strings.TrimSpace(args.Command)
-	command = strings.TrimSpace(strings.TrimPrefix(command, "/"))
-	if err := validateActionCommand(command); err != nil {
-		return nil, err
-	}
-	if strings.ContainsAny(command, "\r\n") {
-		return nil, fmt.Errorf("command must be a single line")
-	}
-	fields, err := operator.SplitCommandLine(command)
-	if err != nil {
-		return nil, err
-	}
-	if len(fields) == 0 {
-		return nil, fmt.Errorf("command is empty")
-	}
-	first := strings.ToLower(fields[0])
-	if isInternalAgentCommand(first) {
-		return nil, fmt.Errorf("%s is an internal agent API; use run_module or run_exec", first)
-	}
-	switch first {
-	case "exit", "quit", "q", "bye", "logout", "shutdown", "stop":
-		return nil, fmt.Errorf("%s would terminate the MCP server", first)
-	case "reset_layout":
-		return nil, fmt.Errorf("reset_layout controls the interactive console and is unavailable over MCP")
-	case "ask":
-		return nil, fmt.Errorf("ask is an interactive console command and is unavailable over MCP")
-	case "exec":
-		return nil, fmt.Errorf("use run_exec for shell commands")
-	case "put":
-		return nil, fmt.Errorf("use upload_file for local file uploads; it applies the protected-file check")
-	case "get":
-		return nil, fmt.Errorf("use download_file for target downloads")
-	case "generate", "generate_c":
-		return nil, fmt.Errorf("%s builds an agent on this host; use the %s tool so builds are serialized", first, first)
-	}
-	if a.RunOperator == nil {
-		return nil, fmt.Errorf("operator command runner is not configured")
-	}
-
-	if moduleName := moduleNameFold(first); moduleName != "" {
-		return nil, fmt.Errorf("%q is a module; use run_module so defaults and flags are normalized and screened", moduleName)
-	}
-	local := operatorLocalCommands[first]
-	target := a.target()
-	if !local && target == nil {
-		return map[string]any{
-			"executed": false,
-			"command":  command,
-			"reason":   "no active target; call list_agents and select_agent, or use /target",
-		}, nil
-	}
-	if !local && !operatorTargetCommands[first] {
-		return nil, fmt.Errorf("unknown operator command %q", first)
-	}
-	if !local && first != "socks_start" && modules.CanRunExecBOF(target) {
-		return nil, fmt.Errorf("this C agent supports only run_exec (the exec BOF), not built-in agent commands")
-	}
-
-	var review def.OpsecReview
-	if local {
-		review = def.OpsecReview{
-			Noise:      "low",
-			Reversible: true,
-			Reasons:    []string{"local operator command; no target execution"},
-			Artifacts:  []string{"operator audit entry"},
-		}
-		if first == "tun2socks" && len(fields) > 1 && strings.EqualFold(fields[1], "start") {
-			addOperatorRule(&review, "data-transfer", "routes operator traffic through a SOCKS5 pivot")
-		}
-		if first == "forget_agent" {
-			review.Reversible = false
-			addOperatorRule(&review, "destructive", "permanently removes the agent record from the C2")
-		}
-	} else {
-		review = operatorCommandReview(first, command, target)
-	}
-	decision, auditErr := a.screen("command", "", command, target, review)
-	if !decision.Allowed {
-		return actionBlocked("command", command, "", target, review, decision, auditErr), nil
-	}
-
-	err = a.RunOperator(ctx, command)
-	result := map[string]any{
-		"executed": err == nil,
-		"command":  command,
-		"opsec":    review,
-		"decision": decision,
-		"note":     "The command ran in the operator console. Use read_log for its output and list_jobs for asynchronous work.",
-	}
-	if len(decision.Warnings) > 0 {
-		result["warnings"] = decision.Warnings
-	}
-	if err != nil {
-		result["error"] = err.Error()
-	}
-	auditErr = a.Audit.Log(AuditRecord{
-		Operator: a.Operator, Tool: "command", Target: targetTag(target),
-		Command: command, Rules: review.Rules, Noise: review.Noise,
-		Allowed: true, Reason: decision.Reason, Error: errorString(err),
-	})
-	if auditErr != nil {
-		result["audit_error"] = auditErr.Error()
-	}
-	return result, nil
-}
-
-// operatorCommandReview scores a console command that touches the target.
-// ReviewBuiltin covers the command tree's own file, query, and destructive
-// patterns; the explicit rules cover command names whose footprint is not in
-// the command text (a pivot or a kill).
-func operatorCommandReview(first, command string, target *def.Emp3r0rAgent) def.OpsecReview {
-	var review def.OpsecReview
-	switch first {
-	case "kill", "suicide":
-		review = assistant.ReviewExec(command, target)
-	default:
-		review = assistant.ReviewBuiltin(command, target)
-	}
-	switch first {
-	case "socks_start":
-		addOperatorRule(&review, "data-transfer", "moves data between the operator and the target")
-	}
-	switch first {
-	case "cp", "decrypt", "mkdir", "mv":
-		addOperatorRule(&review, "filesystem-artifact", "writes files on the target")
-	}
-	if first == "rm" || first == "suicide" {
-		addOperatorRule(&review, "destructive", "removes target state")
-	}
-	return review
-}
-
-func isInternalAgentCommand(token string) bool {
-	token = strings.TrimLeft(strings.TrimSpace(token), `"'\`)
-	return strings.HasPrefix(token, "!")
 }
 
 func addOperatorRule(review *def.OpsecReview, rule, reason string) {
@@ -912,23 +589,6 @@ func actionBlocked(tool, command, module string, target *def.Emp3r0rAgent, revie
 	return result
 }
 
-func moduleNameFold(name string) string {
-	found := ""
-	def.ForEachModule(func(module string, _ *def.ModuleConfig) {
-		if found == "" && strings.EqualFold(module, name) {
-			found = module
-		}
-	})
-	return found
-}
-
-func (a *Actions) target() *def.Emp3r0rAgent {
-	if a.Target == nil {
-		return nil
-	}
-	return a.Target()
-}
-
 func targetTag(agent *def.Emp3r0rAgent) string {
 	if agent == nil {
 		return ""
@@ -1038,16 +698,6 @@ func pseudoFilePath(path string) bool {
 		}
 	}
 	return false
-}
-
-func validateActionCommand(command string) error {
-	if command == "" {
-		return fmt.Errorf("command is empty")
-	}
-	if len(command) > maxActionCommandBytes {
-		return fmt.Errorf("command is longer than %d bytes", maxActionCommandBytes)
-	}
-	return assistant.ValidateCommandLine(command)
 }
 
 func flagString(value any) string {

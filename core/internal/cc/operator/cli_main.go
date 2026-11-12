@@ -166,9 +166,6 @@ func CliMain(wg_server_ip string, wg_server_port int) {
 		logging.Fatalf("Failed to open tmux pane: %v", err)
 	}
 	logging.AddWriter(f)
-	// Assistant output uses the agent output pane.
-	// The command prompt pane is never used for streaming.
-	SetOutputPane(f)
 
 	// when the console is closed, deinit tmux windows
 	defer cli.TmuxDeinitWindows()

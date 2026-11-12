@@ -1,4 +1,4 @@
-package assistant
+package mcp
 
 import (
 	"context"
@@ -23,19 +23,19 @@ import (
 )
 
 const (
-	maxModuleResults = 50
-	maxJobResults    = 100
-	maxReadBytes     = 256 << 10
-	defaultReadBytes = 32 << 10
-	maxTableRows     = 200
+	maxModuleResults  = 50
+	maxJobResults     = 100
+	maxReadBytes      = 256 << 10
+	defaultReadBytes  = 32 << 10
+	maxTableRows      = 200
+	maxJobResultBytes = 4 << 20
 )
 
 type toolRuntime struct {
-	cfg    Config
 	target *def.Emp3r0rAgent
 }
 
-func buildTools(rt *toolRuntime) map[string]Tool {
+func buildReadTools(rt *toolRuntime) map[string]Tool {
 	tools := map[string]Tool{}
 
 	tools["list_modules"] = Tool{
@@ -319,16 +319,6 @@ func (rt *toolRuntime) moduleHelp(_ context.Context, raw json.RawMessage) (any, 
 	}
 	name := strings.TrimSpace(args.Name)
 	mod, ok := def.GetModule(name)
-	if !ok {
-		return nil, fmt.Errorf("module %q not found%s", name, similarModules(name))
-	}
-	return describeModule(mod), nil
-}
-
-// DescribeModule returns the same structure the module_help tool emits. The
-// console uses it to pre-load context for `ask --module`.
-func DescribeModule(name string) (any, error) {
-	mod, ok := def.GetModule(strings.TrimSpace(name))
 	if !ok {
 		return nil, fmt.Errorf("module %q not found%s", name, similarModules(name))
 	}
@@ -733,29 +723,12 @@ func (rt *toolRuntime) resultSummary(_ context.Context, raw json.RawMessage) (an
 	if err != nil {
 		return nil, err
 	}
-	out, truncated, err := loadJobOutput(jobID, rt.cfg.MaxResultBytes)
+	out, truncated, err := loadJobOutput(jobID, maxJobResultBytes)
 	if err != nil {
 		return nil, err
 	}
 	jobName := ""
 	if job := jobs.GetJob(jobID); job != nil {
-		jobName = job.Name
-	}
-	return summarizeOutput(jobName, out, truncated), nil
-}
-
-// SummarizeJob is the console-facing entry point for `ask --job`.
-func SummarizeJob(jobID string, maxBytes int64) (any, error) {
-	id, err := canonicalJobID(jobID)
-	if err != nil {
-		return nil, err
-	}
-	out, truncated, err := loadJobOutput(id, maxBytes)
-	if err != nil {
-		return nil, err
-	}
-	jobName := ""
-	if job := jobs.GetJob(id); job != nil {
 		jobName = job.Name
 	}
 	return summarizeOutput(jobName, out, truncated), nil
@@ -778,7 +751,7 @@ func loadJobOutput(jobID string, maxBytes int64) (string, bool, error) {
 	}
 	limit := maxBytes
 	if limit <= 0 {
-		limit = defaultMaxResultBytes
+		limit = maxJobResultBytes
 	}
 	resp, err := client.GetJobOutput(jobID, 0, limit, false)
 	if err != nil {
@@ -985,12 +958,6 @@ func (rt *toolRuntime) reviewCommand(_ context.Context, raw json.RawMessage) (an
 		result["status"] = "invalid"
 	}
 	return result, nil
-}
-
-// RenderModuleCommand validates flags and renders the exact console command.
-func RenderModuleCommand(mod *def.ModuleConfig, flags map[string]string) (string, []string) {
-	command, problems, _ := NormalizeModuleFlags(mod, flags)
-	return command, problems
 }
 
 // NormalizeModuleFlags validates flags, applies required defaults, and returns

@@ -1,6 +1,6 @@
 // Package mcp serves the operator toolset over the Model Context Protocol, so
 // an external agent (Claude Code, Codex, and other MCP clients) can drive
-// emp3r0r through the same tools the console assistant uses.
+// emp3r0r through the operator toolset.
 //
 // The server is a presentation layer only. Every tool call ends in the
 // operator API request the console would send, so the C2 still derives the
@@ -21,8 +21,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/assistant"
 )
 
 const (
@@ -53,10 +51,10 @@ const (
 
 var errMessageTooLarge = errors.New("message exceeds size limit")
 
-// ToolSet is the tool source served over MCP. *assistant.Toolset implements it.
+// ToolSet is the tool source served over MCP. *Toolset implements it.
 type ToolSet interface {
-	Definitions() []assistant.ToolDef
-	Lookup(name string) (assistant.Tool, bool)
+	Definitions() []ToolDef
+	Lookup(name string) (Tool, bool)
 	Call(ctx context.Context, name string, args json.RawMessage) (any, error)
 }
 

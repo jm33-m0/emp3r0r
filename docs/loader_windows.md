@@ -15,7 +15,7 @@ Run it from the operator console.
 - `nasm` is required on the C2 for the default `--smw on` on x64. Use
   `--smw off` to build without it.
 
-## Console assistant
+## MCP workflow
 
 1. `generate` with `type=windows_dll` or `type=windows_executable` and
    `arch=amd64`; the result carries `shellcode_file`.

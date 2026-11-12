@@ -207,7 +207,7 @@ type ModuleConfig struct {
 	RiscvLibraries []string `cbor:"15,keyasint"`
 
 	// Examples are ready-to-run console invocations. Optional metadata for
-	// help output and the operator assistant; they are never executed.
+	// help output and the MCP toolset; they are never executed.
 	Examples []string `cbor:"16,keyasint"`
 	// Help is a longer operator-facing description of the module. Optional.
 	Help string `cbor:"17,keyasint"`

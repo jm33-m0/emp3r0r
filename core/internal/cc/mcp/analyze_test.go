@@ -1,4 +1,4 @@
-package assistant
+package mcp
 
 import (
 	"strings"

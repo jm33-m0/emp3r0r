@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/assistant"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/opsec"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 )
@@ -84,15 +83,15 @@ func (h *harness) next() response {
 }
 
 type fakeTools struct {
-	tools map[string]assistant.Tool
+	tools map[string]Tool
 }
 
 func newFakeTools() *fakeTools {
-	return &fakeTools{tools: map[string]assistant.Tool{
+	return &fakeTools{tools: map[string]Tool{
 		"echo": {
-			Def: assistant.ToolDef{
+			Def: ToolDef{
 				Type: "function",
-				Function: assistant.FunctionDef{
+				Function: FunctionDef{
 					Name:        "echo",
 					Description: "echo the arguments",
 					Parameters:  map[string]any{"type": "object", "properties": map[string]any{}},
@@ -104,9 +103,9 @@ func newFakeTools() *fakeTools {
 			},
 		},
 		"fail": {
-			Def: assistant.ToolDef{
+			Def: ToolDef{
 				Type: "function",
-				Function: assistant.FunctionDef{
+				Function: FunctionDef{
 					Name:       "fail",
 					Parameters: map[string]any{"type": "object"},
 				},
@@ -116,9 +115,9 @@ func newFakeTools() *fakeTools {
 			},
 		},
 		"wait": {
-			Def: assistant.ToolDef{
+			Def: ToolDef{
 				Type: "function",
-				Function: assistant.FunctionDef{
+				Function: FunctionDef{
 					Name:       "wait",
 					Parameters: map[string]any{"type": "object"},
 				},
@@ -131,20 +130,20 @@ func newFakeTools() *fakeTools {
 	}}
 }
 
-func (f *fakeTools) Definitions() []assistant.ToolDef {
+func (f *fakeTools) Definitions() []ToolDef {
 	names := make([]string, 0, len(f.tools))
 	for name := range f.tools {
 		names = append(names, name)
 	}
 	sort.Strings(names)
-	defs := make([]assistant.ToolDef, 0, len(names))
+	defs := make([]ToolDef, 0, len(names))
 	for _, name := range names {
 		defs = append(defs, f.tools[name].Def)
 	}
 	return defs
 }
 
-func (f *fakeTools) Lookup(name string) (assistant.Tool, bool) {
+func (f *fakeTools) Lookup(name string) (Tool, bool) {
 	tool, ok := f.tools[name]
 	return tool, ok
 }
@@ -370,7 +369,7 @@ func TestMergedToolsetScreensActions(t *testing.T) {
 	opts := Options{
 		Name: "real",
 		Tools: func() ToolSet {
-			return NewToolset(assistant.NewToolset(assistant.DefaultConfig(), target), actions)
+			return NewToolset(target, actions)
 		},
 	}
 	h := startServer(t, opts)
@@ -506,7 +505,7 @@ func TestRealToolsetServesReadOnlyTools(t *testing.T) {
 	opts := Options{
 		Name: "real",
 		Tools: func() ToolSet {
-			return assistant.NewToolset(assistant.DefaultConfig(), nil)
+			return NewToolset(nil, nil)
 		},
 	}
 	h := startServer(t, opts)
@@ -571,7 +570,7 @@ func TestProtocolRunsOperatorCommand(t *testing.T) {
 	opts := Options{
 		Name: "real",
 		Tools: func() ToolSet {
-			return NewToolset(assistant.NewToolset(assistant.DefaultConfig(), target), actions)
+			return NewToolset(target, actions)
 		},
 	}
 	h := startServer(t, opts)

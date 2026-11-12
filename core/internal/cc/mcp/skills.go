@@ -1,9 +1,8 @@
-package assistant
+package mcp
 
-// OperatorSkills is the emp3r0r-specific operational reference shared by the
-// console assistant and the MCP session instructions. It describes how the
-// operator surface is meant to be used; the deterministic policy remains the
-// authority on what may run.
+// OperatorSkills is the emp3r0r-specific operational reference returned as the
+// MCP session instructions. It describes how the operator surface is meant to
+// be used; the deterministic policy remains the authority on what may run.
 func OperatorSkills() string {
 	return `EMP3R0R OPERATOR SKILLS
 
@@ -24,8 +23,8 @@ Use the tools, not the filesystem
 - The read-only tools are list_modules, module_help, list_agents, list_jobs,
   read_job_output, result_summary, read_log, review_command, and opsec_policy.
   read_log returns a bounded tail of the operator log and can contain target
-  output and secrets. If an action tool is unavailable (the console ask
-  command), explain the step instead of imitating it.
+  output and secrets. When a tool is unavailable, explain the step instead of
+  imitating it.
 - list_modules filters by the selected target's OS, but local modules are
   always listed because they build on the operator host. module_help works by
   name even when the module targets another platform.
@@ -93,7 +92,7 @@ Tool selection
 - command: operator console commands not covered by a typed tool, such as
   jobs, target, socks_start, kill, suicide, or forget_agent. Target-touching
   lines are screened and local lines are audited. Module names, exec, put, get,
-  generate, generate_c, ask, exit, and reset_layout are rejected; use the
+  generate, generate_c, exit, and reset_layout are rejected; use the
   dedicated tool. forget_agent is irreversible and removes the C2 record.
 - opsec_policy returns the active dispositions, noise ceiling, module lists,
   and rate limit.
@@ -245,7 +244,7 @@ Workspace source edits and detection integration
   is the read-only install prefix, edit the workspace copy; if the operator is
   running from a development checkout, edit the source there and rebuild.
 - Edit only module source, build inputs, and sandbox fixtures. Do not edit
-  emp3r0r.json, assistant.json, mcp.json, mcp_audit.log, or
+  emp3r0r.json, mcp.json, mcp_audit.log, or
   operator_audit.log; policy and audit changes are the operator's call.
 - Routine operation still uses list_modules, module_help, and run_module. Read
   source only when the task is to change behavior, integrate a detection

@@ -12,9 +12,9 @@ Run it from the operator console.
 - For download mode, serve that `.bin` with `emp3r0r-listener` and use the same
   `--payload-key` on both sides.
 
-## Console assistant
+## MCP workflow
 
-The console assistant builds a Linux C agent with two tool calls:
+An MCP session builds a Linux C agent with two tool calls:
 
 1. `generate_c` with `type=glibc`, `arch=amd64`, `format=shellcode`. The result
    carries `output_file` and `shellcode_file`.

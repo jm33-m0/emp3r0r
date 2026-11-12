@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/assistant"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/builder"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -25,15 +24,15 @@ const (
 // generateTools returns the agent generation tools. They build a payload on the
 // host running this MCP server, using the same builder as the console's
 // generate and generate_c commands.
-func (a *Actions) generateTools() map[string]assistant.Tool {
-	return map[string]assistant.Tool{
+func (a *Actions) generateTools() map[string]Tool {
+	return map[string]Tool{
 		"generate": {
-			Def: assistant.ToolDef{
+			Def: ToolDef{
 				Type: "function",
-				Function: assistant.FunctionDef{
+				Function: FunctionDef{
 					Name:        "generate",
 					Description: "Build a Go agent payload on this operator host. Defaults match the console: payload type linux_so and architecture amd64. Windows executable and DLL builds are also converted to Donut shellcode automatically; the result includes shellcode_file for use with loader_windows. Omit cc to use the configured C2 address. The call is screened and audited like other mutating tools.",
-					Parameters: assistant.ObjectSchema(map[string]any{
+					Parameters: ObjectSchema(map[string]any{
 						"type": map[string]any{
 							"type":        "string",
 							"enum":        builder.PayloadTypeList,
@@ -44,35 +43,35 @@ func (a *Actions) generateTools() map[string]assistant.Tool {
 							"enum":        builder.ArchListAll,
 							"description": "Target architecture. Default amd64; valid values depend on type.",
 						},
-						"cc":                     assistant.StringProp("C2 hostname, or an explicit http(s) URL for TLS. Omit to use the C2 address already configured on this operator; never guess or substitute 127.0.0.1."),
-						"c2_channel_mode":        assistant.StringProp("C2 channel mode. Default http_poll."),
-						"allow_custom_transport": assistant.BooleanProp("Allow a c2_channel_mode that is not built into this C2. The agent build must include the matching dialer."),
+						"cc":                     StringProp("C2 hostname, or an explicit http(s) URL for TLS. Omit to use the C2 address already configured on this operator; never guess or substitute 127.0.0.1."),
+						"c2_channel_mode":        StringProp("C2 channel mode. Default http_poll."),
+						"allow_custom_transport": BooleanProp("Allow a c2_channel_mode that is not built into this C2. The agent build must include the matching dialer."),
 						"transport_options": map[string]any{
 							"type":                 "object",
 							"description":          "Custom transport options as key to value.",
 							"additionalProperties": map[string]any{"type": "string"},
 						},
-						"quic_standard_key":     assistant.BooleanProp("QUIC only: speak stock QUIC instead of the custom static-key obfuscation."),
-						"proxy":                 assistant.StringProp("Hard-coded proxy URL for the agent C2 transport, for example socks5://127.0.0.1:9050."),
-						"doh":                   assistant.StringProp("DNS over HTTPS resolver URL."),
-						"ech":                   assistant.StringProp("ECH: DNS name whose HTTPS RR carries the ECHConfigList, fetched over doh."),
-						"cc_http_port":          assistant.StringProp("HTTP polling port baked into the agent."),
-						"interval":              assistant.IntegerProp("Beacon interval in seconds."),
-						"jitter":                assistant.IntegerProp("Beacon jitter percentage, 0-100."),
-						"operator_idle_timeout": assistant.IntegerProp("C2 operator idle timeout in seconds. Default 1800; 0 disables it."),
-						"p2p":                   assistant.BooleanProp("Enable P2P mesh networking."),
-						"p2p_transport":         assistant.StringProp("P2P mesh transport: kcp/mtls, or smb for Windows payloads."),
-						"p2p_relay_port":        assistant.StringProp("Custom P2P relay port."),
-						"mesh_gossip_port":      assistant.StringProp("Custom mesh gossip port."),
-						"direct_c2":             assistant.BooleanProp("Gateway mode: contact C2 directly and relay for silent nodes."),
-						"persistent_router":     assistant.BooleanProp("Keep the current router while it is alive."),
+						"quic_standard_key":     BooleanProp("QUIC only: speak stock QUIC instead of the custom static-key obfuscation."),
+						"proxy":                 StringProp("Hard-coded proxy URL for the agent C2 transport, for example socks5://127.0.0.1:9050."),
+						"doh":                   StringProp("DNS over HTTPS resolver URL."),
+						"ech":                   StringProp("ECH: DNS name whose HTTPS RR carries the ECHConfigList, fetched over doh."),
+						"cc_http_port":          StringProp("HTTP polling port baked into the agent."),
+						"interval":              IntegerProp("Beacon interval in seconds."),
+						"jitter":                IntegerProp("Beacon jitter percentage, 0-100."),
+						"operator_idle_timeout": IntegerProp("C2 operator idle timeout in seconds. Default 1800; 0 disables it."),
+						"p2p":                   BooleanProp("Enable P2P mesh networking."),
+						"p2p_transport":         StringProp("P2P mesh transport: kcp/mtls, or smb for Windows payloads."),
+						"p2p_relay_port":        StringProp("Custom P2P relay port."),
+						"mesh_gossip_port":      StringProp("Custom mesh gossip port."),
+						"direct_c2":             BooleanProp("Gateway mode: contact C2 directly and relay for silent nodes."),
+						"persistent_router":     BooleanProp("Keep the current router while it is alive."),
 						"peers": map[string]any{
 							"type":        "array",
 							"items":       map[string]any{"type": "string"},
 							"description": "Gossip bootstrap peers in ip:port form.",
 						},
-						"ncsi":   assistant.BooleanProp("Check Internet connectivity with NCSI before connecting to C2."),
-						"stager": assistant.BooleanProp("Build for the stager: enables memory encryption and suspension."),
+						"ncsi":   BooleanProp("Check Internet connectivity with NCSI before connecting to C2."),
+						"stager": BooleanProp("Build for the stager: enables memory encryption and suspension."),
 					}),
 				},
 			},
@@ -80,12 +79,12 @@ func (a *Actions) generateTools() map[string]assistant.Tool {
 			Run:         a.generateGoAgent,
 		},
 		"generate_c": {
-			Def: assistant.ToolDef{
+			Def: ToolDef{
 				Type: "function",
-				Function: assistant.FunctionDef{
+				Function: FunctionDef{
 					Name:        "generate_c",
 					Description: "Build the native C agent on this operator host. type selects the libc ABI and arch selects the C toolchain target; format=shellcode produces a malasada-wrapped raw PIC blob. Omit cc to use the configured C2 address. The call is screened and audited like other mutating tools.",
-					Parameters: assistant.ObjectSchema(map[string]any{
+					Parameters: ObjectSchema(map[string]any{
 						"type": map[string]any{
 							"type":        "string",
 							"enum":        builder.CAgentLibcs,
@@ -96,11 +95,11 @@ func (a *Actions) generateTools() map[string]assistant.Tool {
 							"enum":        builder.CAgentArches,
 							"description": "C toolchain target architecture. Default amd64.",
 						},
-						"cc":                     assistant.StringProp("C2 hostname, or an explicit http(s) URL for TLS. Omit to use the C2 address already configured on this operator; never guess or substitute 127.0.0.1."),
-						"cc_http_port":           assistant.StringProp("HTTP polling port baked into the agent."),
-						"doh":                    assistant.StringProp("DNS over HTTPS resolver URL."),
-						"c2_channel_mode":        assistant.StringProp("C2 channel mode. Default http_poll."),
-						"allow_custom_transport": assistant.BooleanProp("Allow a custom c2_channel_mode and transport provider shipped under the C agent source tree."),
+						"cc":                     StringProp("C2 hostname, or an explicit http(s) URL for TLS. Omit to use the C2 address already configured on this operator; never guess or substitute 127.0.0.1."),
+						"cc_http_port":           StringProp("HTTP polling port baked into the agent."),
+						"doh":                    StringProp("DNS over HTTPS resolver URL."),
+						"c2_channel_mode":        StringProp("C2 channel mode. Default http_poll."),
+						"allow_custom_transport": BooleanProp("Allow a custom c2_channel_mode and transport provider shipped under the C agent source tree."),
 						"transport_options": map[string]any{
 							"type":                 "object",
 							"description":          "Custom transport options as key to value.",
@@ -109,15 +108,15 @@ func (a *Actions) generateTools() map[string]assistant.Tool {
 						"crypto":        map[string]any{"type": "string", "enum": builder.CAgentCryptoProviders, "description": "Crypto provider. Default openssl."},
 						"format":        map[string]any{"type": "string", "enum": builder.CAgentFormats, "description": "Artifact format: exe, so, or shellcode. Default exe."},
 						"gzip":          map[string]any{"type": "string", "enum": builder.CAgentGzipProviders, "description": "Compression provider. Default miniz."},
-						"transport":     assistant.StringProp("Transport provider: libcurl, http_raw, libssl, tor, or a custom provider name with allow_custom_transport."),
+						"transport":     StringProp("Transport provider: libcurl, http_raw, libssl, tor, or a custom provider name with allow_custom_transport."),
 						"dynload":       map[string]any{"type": "string", "enum": builder.CAgentDynloadModes, "description": "libc dynamic-loader symbols. Default libc_dl; musl forces public."},
 						"glibc_version": map[string]any{"type": "string", "enum": builder.CAgentGlibcVersions, "description": "Oldest glibc ABI to link against. Default 2.17."},
-						"bof":           assistant.BooleanProp("Include COFF/BOF support. Default true."),
-						"rvvm":          assistant.BooleanProp("Include RISC-V BOF support. Default true."),
-						"interval":      assistant.IntegerProp("Beacon interval in seconds. Default 60."),
-						"jitter":        assistant.IntegerProp("Beacon jitter percentage, 0-100. Default 50."),
-						"poll_window":   assistant.IntegerProp("Seconds to wait for commands after hello before masked sleep. Default 5."),
-						"offline_grace": assistant.IntegerProp("Seconds a sleeping agent stays listed before removal. Default 0."),
+						"bof":           BooleanProp("Include COFF/BOF support. Default true."),
+						"rvvm":          BooleanProp("Include RISC-V BOF support. Default true."),
+						"interval":      IntegerProp("Beacon interval in seconds. Default 60."),
+						"jitter":        IntegerProp("Beacon jitter percentage, 0-100. Default 50."),
+						"poll_window":   IntegerProp("Seconds to wait for commands after hello before masked sleep. Default 5."),
+						"offline_grace": IntegerProp("Seconds a sleeping agent stays listed before removal. Default 0."),
 					}),
 				},
 			},

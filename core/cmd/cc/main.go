@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/assistant"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/ftp"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/wireguard"
@@ -283,7 +282,6 @@ func runMCPMode(opts *Options) {
 	connectClient(opts)
 	operator.StartClientWithHandler(opts.c2_server_ip, opts.c2_operator_server_port, operator.ProcessAgentDataOnly)
 
-	cfg := assistant.DefaultConfig()
 	logf := func(line string) { logging.Infof("%s", line) }
 
 	selectTarget := func(_ context.Context, tag string) (*def.Emp3r0rAgent, error) {
@@ -326,7 +324,7 @@ func runMCPMode(opts *Options) {
 		Version:      def.BuildVersion,
 		Instructions: mcpInstructions(),
 		Tools: func() mcp.ToolSet {
-			return mcp.NewToolset(assistant.NewToolset(cfg, live.GetActiveAgent()), actions)
+			return mcp.NewToolset(live.GetActiveAgent(), actions)
 		},
 		Logf: logf,
 	})
@@ -421,7 +419,7 @@ Proof must be inspectable (job ID plus output excerpt, path plus size or hash,
 build artifact, audit record, or review verdict). Never claim a result without
 proof; state missing proof explicitly.
 
-` + assistant.OperatorSkills()
+` + mcp.OperatorSkills()
 }
 
 func runServerMode(opts *Options) {
