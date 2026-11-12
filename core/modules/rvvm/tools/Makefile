@@ -5,8 +5,12 @@
 # compiled with RV_TRACE so `rvvmrun -t` can trace guest syscalls; the module
 # build never defines it.
 
-CC ?= cc
 ZIG ?= zig
+# Build with the pinned zig so the runner targets the same glibc ABI as the
+# module and does not depend on the host gcc's headers. Older glibc headers,
+# such as the builder image's, do not declare SYS_statx.
+CC = $(ZIG) cc
+ZIG_TARGET ?= x86_64-linux-gnu.2.17
 
 # Debug builds: no optimisation, full symbols. The vendored interpreter trips
 # -Wsign-compare, which is not actionable here.
@@ -23,7 +27,8 @@ all: rvvmrun
 
 rvvmrun: rvvmrun.c ../rvvm.c ../vendor/mini-rv32ima/mini-rv32ima.h \
          ../../../c_agent/include/rvvm_abi.h
-	$(CC) $(CFLAGS) $(GUEST_DEFS) -o $@ rvvmrun.c ../rvvm.c
+	$(CC) -target $(ZIG_TARGET) $(CFLAGS) $(GUEST_DEFS) -o $@ \
+	  rvvmrun.c ../rvvm.c
 
 clean:
 	rm -f rvvmrun
