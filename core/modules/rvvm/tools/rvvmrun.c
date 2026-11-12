@@ -28,11 +28,13 @@
 #define _GNU_SOURCE
 
 #include <errno.h>
+#include <fcntl.h>
 #include <getopt.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -766,6 +768,26 @@ static const char *resolve_path(const char *env_name, const char *fallback) {
   return fallback;
 }
 
+/* zig reports an input it cannot read as `CacheCheckFailed` on the file's
+ * first line and hides the cause. Check the files the linker will open so a
+ * permission problem names the path and the errno. O_NONBLOCK keeps a FIFO
+ * from stalling the check, and a directory or device is not a link input. */
+static int check_readable(const char *path) {
+  int fd = open(path, O_RDONLY | O_CLOEXEC | O_NONBLOCK);
+  if (fd < 0) {
+    fprintf(stderr, "rvvmrun: cannot read %s: %s\n", path, strerror(errno));
+    return 0;
+  }
+  struct stat st;
+  int regular = fstat(fd, &st) == 0 && S_ISREG(st.st_mode);
+  close(fd);
+  if (!regular) {
+    fprintf(stderr, "rvvmrun: %s: not a regular file\n", path);
+    return 0;
+  }
+  return 1;
+}
+
 static int run_linker(char **cmd, int verbose) {
   if (verbose) {
     fprintf(stderr, "rvvmrun:");
@@ -861,6 +883,12 @@ static int cmd_build(int argc, char **argv) {
             "rvvmrun: guest shim and linker script are unknown; pass --shim "
             "and --ld\n");
     return 2;
+  }
+  if (!check_readable(shim) || !check_readable(ld))
+    return 1;
+  for (int k = optind; k < argc; k++) {
+    if (!check_readable(argv[k]))
+      return 1;
   }
 
   int inputs = argc - optind;
