@@ -15,6 +15,17 @@ Run it from the operator console.
 - `nasm` is required on the C2 for the default `--smw on` on x64. Use
   `--smw off` to build without it.
 
+## Console assistant
+
+1. `generate` with `type=windows_dll` or `type=windows_executable` and
+   `arch=amd64`; the result carries `shellcode_file`.
+2. `run_module` with `module=loader_windows` and
+   `shellcode=<shellcode_file>`, plus `format`, `arch`, and the injection or
+   masking options the operator asked for.
+
+Never pass the DLL itself: the loader consumes Donut sRDI shellcode. The
+returned path is the deliverable; do not execute it on the operator host.
+
 ## Usage
 
 ```bash

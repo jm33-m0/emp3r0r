@@ -9,10 +9,12 @@ func OperatorSkills() string {
 
 Use the tools, not the filesystem
 - The installed module registry is authoritative. Discover modules with
-  list_modules, then confirm every flag with module_help. Do not read
-  core/modules, ~/.emp3r0r/modules, build.sh, config.json, or source files to
-  learn how to run a module; those are source, not the live registry. When the
-  task is to change behavior, use the workspace source-edit workflow below.
+  list_modules; module_help returns everything needed to run one: usage,
+  parameters, defaults, choices, examples, and the per-module workflow. Never
+  read core/modules, ~/.emp3r0r/modules, build.sh, config.json, README files,
+  or docs/*.md to prepare a run; read docs or source only when the operator
+  explicitly asks for a source change. When the task is to change behavior, use
+  the workspace source-edit workflow below.
 - Use generate, generate_c, or run_module for builds; they invoke the same
   builders and screen the action. Run a module's build.sh directly only while
   debugging a source change, not as a substitute for run_module.
@@ -138,42 +140,24 @@ Agent builds
   output_file, agent_uuid, config_size, and shellcode_file when present. If the
   result has error or shellcode_error, report it; do not invent a path.
 
-Windows loader recipe
-- Use the loader_windows module; it is a local C2 module that packages Donut
-  shellcode into a service, executable, or DLL. Do not edit its source or run
-  its build.sh.
-- Steps: generate with type=windows_dll (or windows_executable), keep
-  shellcode_file; call run_module with module=loader_windows and flags
-  shellcode=<shellcode_file>, format=service|exe|dll, and arch=x64 for amd64
-  or x86 for 386. No target selection is needed.
-- Call module_help loader_windows for process, process-args, inject, smw,
-  verify-ms, key, and output. Use the returned output path.
+Linux C agent
+- generate_c with type=glibc, arch=amd64, format=shellcode, then run_module
+  stager_linux with agent-pic=<output_file>. module_help stager_linux returns
+  the formats, download mode, option defaults, and output rules.
+- The shellcode is position-independent data, not an ELF. Its transport
+  library must exist on the target: libcurl (the generate_c default) or
+  http_raw when the target may lack it. That is not an operator-host concern.
 
-Linux stager recipe
-- Use the stager_linux module; it is a local Linux module that builds a stager
-  on the operator host. Do not edit its source or run build.sh.
-- Build the payload first: generate_c with format=shellcode, type=glibc, and
-  arch=amd64. Keep output_file; that .bin is the C agent PIC.
-- Embed mode: run_module with module=stager_linux and agent-pic=<the .bin>.
-  The payload download options are ignored and the downloader is compiled out.
-- Download mode: omit agent-pic and set payload-host, payload-port,
-  payload-path, and payload-key to match emp3r0r-listener. Serve the .bin with
-  the listener using the same key and transport.
-- format: raw (default, raw shellcode stager.bin), executable (ELF stager),
-  so (stager.so), or packed (self-unpacking stager-packed.bin).
-- transport: http, tcp, and udp are built in. libcurl and libssl need the
-  target runtime library; libssl is HTTPS with the malleable HTTP profile and
-  supports ECH. payload-path applies only to HTTP transports.
-- unpacker: rc4 (default) or lzss, packed format only.
-- dynload-mode: public for glibc 2.34+, libc_dl for older glibc. hash-style:
-  auto, sysv, or gnu when the target dynamic loader needs one.
-- mask: xor (default) is the sleep-mask provider compiled into the stager.
-- supervise: on requires an agent built for the stager (Go stager=true or C
-  format=shellcode). It runs the PIC in a child and preserves the C2 identity
-  across restarts; supervise-sleep-min and supervise-sleep-max bound the delay.
-- The result is a build log and an operator-host artifact, not a target job.
-  Deploy the chosen format with the loader or execution path it is built for.
-- Call module_help stager_linux before the first build.
+Windows loader
+- generate with type=windows_dll or windows_executable and keep
+  shellcode_file; run_module loader_windows with that file. module_help
+  loader_windows returns the formats, process, injection, and masking
+  options. Never pass the DLL itself.
+
+C2 address and certificates
+- Changing the C2 address makes the server issue a certificate for the new
+  address and restart on its own. Do not ask the operator to delete or
+  regenerate certificates, and do not restart the server yourself.
 
 Files and memfs
 - memfs is encrypted RAM on the agent. Use memfs:/// paths for staging and

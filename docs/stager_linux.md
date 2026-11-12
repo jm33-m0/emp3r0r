@@ -12,6 +12,23 @@ Run it from the operator console.
 - For download mode, serve that `.bin` with `emp3r0r-listener` and use the same
   `--payload-key` on both sides.
 
+## Console assistant
+
+The console assistant builds a Linux C agent with two tool calls:
+
+1. `generate_c` with `type=glibc`, `arch=amd64`, `format=shellcode`. The result
+   carries `output_file` and `shellcode_file`.
+2. `run_module` with `module=stager_linux` and `agent-pic=<output_file>`, plus
+   `format` when the operator wants something other than the default.
+
+`raw` and `packed` are stager shellcode for a loader; `executable` is the
+runnable ELF; `so` is a shared library. In download mode, omit `agent-pic` and
+set `payload-host`, `payload-port`, `payload-path`, and `payload-key` to match
+`emp3r0r-listener`.
+
+The build result is the verification. Do not execute the output, check
+listeners or ports, trace it, or read the C agent source on the operator host.
+
 ## Usage
 
 ```bash

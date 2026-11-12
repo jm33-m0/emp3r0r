@@ -362,8 +362,11 @@ host isolation and the harness's own security controls; this server only
 screens calls made through it.
 
 Use these MCP tools for emp3r0r work. Do not use your own file or shell tools
-to inspect module source, run build scripts, or generate payloads; the module
-registry and the generate, generate_c, and run_module tools are the interface.
+to inspect module source, read module docs, run build scripts, generate
+payloads, or execute build outputs; the module registry and the generate,
+generate_c, and run_module tools are the interface, and module_help returns the
+module README. Read docs or source only when the operator explicitly asks for a
+source change.
 
 Workflow: list_agents, then select_agent with a tag. list_agents returns the
 same host, process, network, mesh, transport, privilege, and memfs detail the
@@ -384,11 +387,16 @@ download directory and report local_path.
 Use generate for a Go agent and generate_c for the native C agent. Both build
 on this operator host and do not need a selected target. Windows executable
 and DLL builds are converted to Donut shellcode automatically; the result
-includes shellcode_file for loader_windows. For Linux, generate_c with
-type=glibc, arch=amd64, and format=shellcode produces the PIC; pass that .bin
-to stager_linux with agent-pic, or set its payload listener options. Omit cc
-to use the configured C2 address; never substitute 127.0.0.1 or an example
-address.
+includes shellcode_file for loader_windows. Omit cc to use the configured C2
+address; never substitute 127.0.0.1 or an example address.
+
+A C agent is generate_c with type=glibc, arch=amd64, and format=shellcode,
+then run_module stager_linux with agent-pic=<output_file>. module_help
+stager_linux carries the formats, download mode, and defaults. The build
+results are the deliverable. Do not run, strace, gdb, readelf, or otherwise
+test a build output on the operator host: the shellcode is position-independent
+data, the stager is built for the target, and both exit on a host that is not
+the target. Target runtime libraries are the target's concern, not this host's.
 
 Configured C2 address: ` + cc + `
 
@@ -398,8 +406,7 @@ build scripts. When the task is to change behavior, integrate a detection
 sandbox, or make a targeted improvement, edit the workspace copy returned by
 module_help under ~/.emp3r0r/modules, then call reload_modules. The installed
 prefix is read-only. A local module such as loader_windows builds on this host
-and does not need a target. The loader_windows module takes the shellcode_file
-from a Windows generate call, not the DLL itself.
+and does not need a target.
 
 After adding or editing a module under ~/.emp3r0r/modules with your own file
 tools, call reload_modules so the module registry picks up the change.
