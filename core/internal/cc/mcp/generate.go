@@ -31,17 +31,17 @@ func (a *Actions) generateTools() map[string]Tool {
 				Type: "function",
 				Function: FunctionDef{
 					Name:        "generate",
-					Description: "Build a Go agent payload on this operator host. Defaults match the console: payload type linux_so and architecture amd64. Windows executable and DLL builds are also converted to Donut shellcode automatically; the result includes shellcode_file for use with loader_windows. Omit cc to use the configured C2 address. The call is screened and audited like other mutating tools.",
+					Description: "Build a Go agent payload on this operator host. Screened, audited, and serialized with other builds. type is linux_executable, linux_so (default), windows_executable, or windows_dll; arch must be valid for that type. Windows outputs are PEs plus Donut sRDI shellcode. Omit cc to use the configured C2 address; pass an explicit http(s) URL for TLS. c2_channel_mode defaults to http_poll; a custom mode needs allow_custom_transport and a matching dialer. p2p enables the mesh with p2p_transport kcp/mtls, or smb for Windows payloads. stager enables stager mode with memory encryption and suspension for use with stager_linux. Returns executed, agent_uuid, output_file, stub_file, config_size, transport, warnings, opsec, and decision. linux_so and Windows builds also return shellcode_file (and shellcode_error on conversion failure). A linux_executable is the deployment artifact; a linux_so shellcode_file is for a loader; a Windows shellcode_file is the shellcode argument for loader_windows. Never execute build outputs on the operator host. Example: {\"type\":\"linux_so\",\"arch\":\"amd64\"} or {\"type\":\"windows_dll\",\"arch\":\"amd64\"} followed by module loader_windows. A cc name not covered by the C2 certificate is added automatically: the C2 adds the name, regenerates the certificate only when the SAN set changes, and reloads the in-process certificate used by new TLS/QUIC handshakes; it does not restart. An external TLS front proxy or CDN must still cover the name itself, and custom transports skip this certificate automation.",
 					Parameters: ObjectSchema(map[string]any{
 						"type": map[string]any{
 							"type":        "string",
 							"enum":        builder.PayloadTypeList,
-							"description": "Payload type. Default linux_so.",
+							"description": "Payload type. Default linux_so. Windows types produce a PE plus Donut shellcode.",
 						},
 						"arch": map[string]any{
 							"type":        "string",
 							"enum":        builder.ArchListAll,
-							"description": "Target architecture. Default amd64; valid values depend on type.",
+							"description": "Target architecture. Default amd64; the valid subset depends on type.",
 						},
 						"cc":                     StringProp("C2 hostname, or an explicit http(s) URL for TLS. Omit to use the C2 address already configured on this operator; never guess or substitute 127.0.0.1."),
 						"c2_channel_mode":        StringProp("C2 channel mode. Default http_poll."),
@@ -83,17 +83,17 @@ func (a *Actions) generateTools() map[string]Tool {
 				Type: "function",
 				Function: FunctionDef{
 					Name:        "generate_c",
-					Description: "Build the native C agent on this operator host. type selects the libc ABI and arch selects the C toolchain target; format=shellcode produces a malasada-wrapped raw PIC blob. Omit cc to use the configured C2 address. The call is screened and audited like other mutating tools.",
+					Description: "Build the native C agent on this operator host. Screened, audited, and serialized with other builds. type is glibc (default) or musl; arch is amd64 (default), 386, arm, arm64, or riscv64; format is exe (default), so, or shellcode. format=shellcode is glibc+amd64 only and produces a malasada-wrapped raw PIC blob for stager_linux. transport is libcurl (default), http_raw, libssl, or tor; http_raw cannot use TLS, and a custom c2_channel_mode must match its transport. crypto is openssl (default) or mbedtls; gzip is miniz (default) or none; dynload is libc_dl (default for glibc), public, or auto, and musl forces public; glibc_version is 2.17 (default) or 2.34 and is ignored for musl. bof and rvvm default to true. Beacon defaults are interval 60, jitter 50, poll_window 5, offline_grace 0. Omit cc to use the configured C2 address; pass an explicit http(s) URL for TLS. Returns executed, agent_uuid, output_file, source_dir, config_size, endpoint, transport, channel_mode, warnings, opsec, and decision. For format=shellcode, pass output_file to stager_linux as agent-pic; for exe or so, output_file is the deployment artifact. Never execute build outputs on the operator host. Example: {\"type\":\"glibc\",\"arch\":\"amd64\",\"format\":\"shellcode\"} then module stager_linux with agent-pic=<output_file>. A cc name not covered by the C2 certificate is added automatically: the C2 adds the name, regenerates the certificate only when the SAN set changes, and reloads the in-process certificate used by new TLS/QUIC handshakes; it does not restart. An external TLS front proxy or CDN must still cover the name itself, and custom transports skip this certificate automation.",
 					Parameters: ObjectSchema(map[string]any{
 						"type": map[string]any{
 							"type":        "string",
 							"enum":        builder.CAgentLibcs,
-							"description": "libc ABI. Default glibc.",
+							"description": "libc ABI. Default glibc. musl forces dynload=public and ignores glibc_version.",
 						},
 						"arch": map[string]any{
 							"type":        "string",
 							"enum":        builder.CAgentArches,
-							"description": "C toolchain target architecture. Default amd64.",
+							"description": "C toolchain target architecture. Default amd64; shellcode requires amd64.",
 						},
 						"cc":                     StringProp("C2 hostname, or an explicit http(s) URL for TLS. Omit to use the C2 address already configured on this operator; never guess or substitute 127.0.0.1."),
 						"cc_http_port":           StringProp("HTTP polling port baked into the agent."),
@@ -106,11 +106,11 @@ func (a *Actions) generateTools() map[string]Tool {
 							"additionalProperties": map[string]any{"type": "string"},
 						},
 						"crypto":        map[string]any{"type": "string", "enum": builder.CAgentCryptoProviders, "description": "Crypto provider. Default openssl."},
-						"format":        map[string]any{"type": "string", "enum": builder.CAgentFormats, "description": "Artifact format: exe, so, or shellcode. Default exe."},
+						"format":        map[string]any{"type": "string", "enum": builder.CAgentFormats, "description": "Artifact format. Default exe: a deployable ELF. so is a shared object. shellcode is glibc+amd64 raw PIC for stager_linux."},
 						"gzip":          map[string]any{"type": "string", "enum": builder.CAgentGzipProviders, "description": "Compression provider. Default miniz."},
-						"transport":     StringProp("Transport provider: libcurl, http_raw, libssl, tor, or a custom provider name with allow_custom_transport."),
-						"dynload":       map[string]any{"type": "string", "enum": builder.CAgentDynloadModes, "description": "libc dynamic-loader symbols. Default libc_dl; musl forces public."},
-						"glibc_version": map[string]any{"type": "string", "enum": builder.CAgentGlibcVersions, "description": "Oldest glibc ABI to link against. Default 2.17."},
+						"transport":     StringProp("Transport provider: libcurl (default), http_raw, libssl, or tor. http_raw cannot use TLS. A custom c2_channel_mode must match its transport."),
+						"dynload":       map[string]any{"type": "string", "enum": builder.CAgentDynloadModes, "description": "libc dynamic-loader symbols. Default libc_dl for glibc; musl forces public; auto falls back at runtime."},
+						"glibc_version": map[string]any{"type": "string", "enum": builder.CAgentGlibcVersions, "description": "Oldest glibc ABI to link against. Default 2.17; 2.34 requires dynload=public. Ignored for musl."},
 						"bof":           BooleanProp("Include COFF/BOF support. Default true."),
 						"rvvm":          BooleanProp("Include RISC-V BOF support. Default true."),
 						"interval":      IntegerProp("Beacon interval in seconds. Default 60."),

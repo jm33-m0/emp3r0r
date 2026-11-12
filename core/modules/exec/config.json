@@ -4,10 +4,18 @@
     "author": "jm33-m0",
     "date": "2026-11-02",
     "comment": "Run a shell command; process spawning is not opsec",
+    "help": "Run one command on a Linux target and return combined stdout and stderr. mode=shell (default) runs through /bin/sh -c so redirection, pipes, and quoting work; mode=exec splits the command line into words and execs the program directly, creating no shell process. Process creation is visible in the process table, command line, auditd, and EDR. Prefer a module when one covers the task. Requires coffloader_linux.",
+    "examples": [
+      "exec --cmd 'id'",
+      "exec --cmd 'uname -a 2>&1'",
+      "exec --cmd 'find /tmp -name \"*.log\"' --mode exec"
+    ],
     "is_local": false,
     "platform": "Linux",
     "path": "",
-    "dependencies": ["coffloader_linux"],
+    "dependencies": [
+      "coffloader_linux"
+    ],
     "parameters": [
       {
         "name": "cmd",
@@ -21,7 +29,10 @@
         "name": "mode",
         "description": "shell: run through /bin/sh -c; exec: split the command line and exec it directly without a shell",
         "default": "shell",
-        "choices": ["shell", "exec"],
+        "choices": [
+          "shell",
+          "exec"
+        ],
         "type": "cstr",
         "internal": false,
         "required": false
@@ -30,7 +41,9 @@
     "agent_config": {
       "exec": "",
       "type": "coff",
-      "files": ["exec.o"]
+      "files": [
+        "exec.o"
+      ]
     },
     "invocation": {
       "coff_export": "go"

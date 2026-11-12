@@ -4,6 +4,11 @@
   "author": "jm33-ng",
   "date": "2026-06-22",
   "comment": "Display detailed information of a Linux process",
+  "help": "Read /proc fields for one Linux process: command line, identity, capabilities, cgroups, namespaces, environment, and resource limits. --pid defaults to the agent process (self). Use the agent's ps tool first when the PID is unknown.",
+  "examples": [
+    "procinfo --pid 1",
+    "procinfo"
+  ],
   "is_local": false,
   "platform": "Linux",
   "path": "",
@@ -18,7 +23,9 @@
   ],
   "agent_config": {
     "exec": "run.star",
-    "files": ["run.star"],
+    "files": [
+      "run.star"
+    ],
     "type": "starlark"
   },
   "invocation": {}

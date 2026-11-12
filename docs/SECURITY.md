@@ -24,8 +24,8 @@ Ranked by impact, from highest to lowest:
 
 1. **Agent → server/operator/model (primary threat, highest impact).** Agents and target outputs are hostile. A compromised or malicious agent must not be able to take over the C2, another agent, or an operator. TOFU assumes only the first run of an agent is trustworthy. This gets the strongest controls (pinned identity, PFS session re-keying, per-session admission, signed peer lists, terminal-escape sanitization, …). When `emp3r0r mcp` is used, job output, process and file tables, and logs are untrusted target data that may carry indirect prompt-injection text:
    - Read-only tools expose C2 and job state but cannot dispatch work.
-   - `emp3r0r mcp` screens every mutating call through the deterministic `mcp.json` policy before it reaches a target or removes C2 state (`forget_agent`).
-   - `upload_file` and `put` reject protected operator files (`wg_config.json`, `emp3r0r.json`, `mcp.json`, private keys, SSH/cloud credentials, and symlinks to them) so an injected model turn cannot stage operator credentials on a target.
+   - `emp3r0r mcp` screens every mutating call through the deterministic `mcp.json` policy before it reaches a target.
+   - `upload_file` rejects protected operator files (`wg_config.json`, `emp3r0r.json`, `mcp.json`, private keys, SSH/cloud credentials, and symlinks to them) so an injected model turn cannot stage operator credentials on a target.
 2. **Autonomous model → target/C2 state (operational blast radius).** An MCP client runs on the operator host with the operator's local OS privileges; `emp3r0r mcp` is not a local filesystem sandbox for the MCP client. Its boundary is between the model and the C2/target surface: `mcp.json` enforces capability dispositions (`allow`, `warn`, `block`), `max_noise`, `allow_irreversible`, module allow/deny lists, rate limits, and fail-closed pre/post audit logging (`~/.emp3r0r/mcp_audit.log`).
 3. **Operator host → model provider (telemetry and credential egress).** Prompts and tool results can contain target hostnames, addresses, and credentials. The harness chooses the provider and its data-handling policy; emp3r0r does not control that egress. Audit logs redact credential-bearing flags and arguments.
 4. **Operator → server/other operators (secondary control-plane boundary).** An operator already holds a valid WireGuard credential (its private key is provisioned by the server and authenticates it to the tunnel) and was granted access, so this is misuse of privilege rather than a remote takeover. Both the console and `emp3r0r mcp` are untrusted operator clients of the C2 server: the server enforces WireGuard peer identity, single-owner target locks, and job ownership.
@@ -134,7 +134,7 @@ when the harness sends context off-host.
   No MCP-side control contains the harness. Run the operator host in an
   isolated VM or container without host credentials, cloud tokens, or SSH
   agent forwarding; the isolation is the operator's responsibility.
-- `upload_file` and `put` reject known operator secrets by filename and
+- `upload_file` rejects known operator secrets by filename and
   directory, and reject pseudo-files under `/proc`, `/sys`, `/dev`, and `/run`,
   to stop an injected model, not to sandbox the harness. That is a
   prompt-injection speed bump, not data-loss prevention: a sensitive file with

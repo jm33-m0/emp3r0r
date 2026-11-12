@@ -4,6 +4,13 @@
   "author": "jm33-ng",
   "date": "2026-10-04",
   "comment": "Capture clear-text SSH credentials with an eBPF uprobe on the sshd authentication path (no ptrace, no breakpoints)",
+  "help": "Capture clear-text SSH credentials with an eBPF uprobe on the sshd authentication path, without ptrace or breakpoints. The default probe watches sshd's password store on x86_64; override reg-name, code-pattern, path, or pid for a different build or process. timeout stops the capture automatically; disable stops it and reports the credentials collected so far. The agent must hold CAP_BPF/CAP_PERFMON and CAP_SYS_ADMIN or equivalent.",
+  "examples": [
+    "ssh_harvest",
+    "ssh_harvest --pid 1234",
+    "ssh_harvest --timeout 300",
+    "ssh_harvest --disable"
+  ],
   "is_local": false,
   "platform": "Linux",
   "module_files_memfs": true,
@@ -53,9 +60,14 @@
   ],
   "agent_config": {
     "exec": "ssh_harvest.star",
-    "files": ["ssh_harvest.star", "probe.bpf.o"],
+    "files": [
+      "ssh_harvest.star",
+      "probe.bpf.o"
+    ],
     "type": "starlark"
   },
   "invocation": {},
-  "dependencies": ["libbpf"]
+  "dependencies": [
+    "libbpf"
+  ]
 }

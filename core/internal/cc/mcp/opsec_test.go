@@ -7,23 +7,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 )
 
-func TestReviewExecBaseline(t *testing.T) {
-	review := ReviewExec("whoami", &def.Emp3r0rAgent{Tag: "t", User: "alice", GOOS: "linux"})
-	if review.Noise != "medium" {
-		t.Fatalf("noise = %q, want medium", review.Noise)
-	}
-	if !review.Reversible {
-		t.Fatal("whoami should be reversible")
-	}
-	if !contains(review.Rules, "process-creation") {
-		t.Fatalf("rules = %v, want process-creation", review.Rules)
-	}
-	if !contains(review.Reasons, "child process") {
-		t.Fatalf("reasons = %v", review.Reasons)
-	}
-}
-
-func TestReviewExecCapabilities(t *testing.T) {
+func TestReviewBuiltinCapabilities(t *testing.T) {
 	cases := []struct {
 		command string
 		rule    string
@@ -40,34 +24,34 @@ func TestReviewExecCapabilities(t *testing.T) {
 		{"rm -rf /tmp/x", "destructive"},
 	}
 	for _, tc := range cases {
-		review := ReviewExec(tc.command, nil)
+		review := ReviewBuiltin(tc.command, nil)
 		if !contains(review.Rules, tc.rule) {
 			t.Errorf("%q rules = %v, want %s", tc.command, review.Rules, tc.rule)
 		}
 	}
 }
 
-func TestReviewExecRedirectionToDeviceIsNotAFile(t *testing.T) {
-	review := ReviewExec("cat /etc/hosts 2>/dev/null", nil)
+func TestReviewBuiltinRedirectionToDeviceIsNotAFile(t *testing.T) {
+	review := ReviewBuiltin("cat /etc/hosts 2>/dev/null", nil)
 	if contains(review.Rules, "filesystem-artifact") {
 		t.Fatalf("/dev/null redirect marked as a file write: %v", review.Rules)
 	}
-	review = ReviewExec("echo x > /tmp/y", nil)
+	review = ReviewBuiltin("echo x > /tmp/y", nil)
 	if !contains(review.Rules, "filesystem-artifact") {
 		t.Fatalf("file redirect not marked: %v", review.Rules)
 	}
 }
 
-func TestReviewExecTokenBoundaries(t *testing.T) {
-	review := ReviewExec("blacklist", nil)
+func TestReviewBuiltinTokenBoundaries(t *testing.T) {
+	review := ReviewBuiltin("blacklist", nil)
 	if contains(review.Rules, "kerberos-credential") {
 		t.Fatalf("blacklist matched the klist token: %v", review.Rules)
 	}
-	review = ReviewExec("cat config.json", nil)
+	review = ReviewBuiltin("cat config.json", nil)
 	if contains(review.Rules, "script-execution") {
 		t.Fatalf(".json matched the .js script token: %v", review.Rules)
 	}
-	review = ReviewExec("cat excellent.txt", nil)
+	review = ReviewBuiltin("cat excellent.txt", nil)
 	if contains(review.Rules, "lolbin-execution") {
 		t.Fatalf("excellent matched the excel token: %v", review.Rules)
 	}
@@ -102,14 +86,14 @@ func TestReviewETWMatchesOnlyWholeWord(t *testing.T) {
 	}
 }
 
-func TestReviewExecDestructiveUsesWordBoundaries(t *testing.T) {
+func TestReviewBuiltinDestructiveUsesWordBoundaries(t *testing.T) {
 	for _, command := range []string{"echo model", "skill", "Perform S4U constrained delegation abuse"} {
-		review := ReviewExec(command, nil)
+		review := ReviewBuiltin(command, nil)
 		if contains(review.Rules, "destructive") {
 			t.Fatalf("%q matched destructive inside a word: %v", command, review.Rules)
 		}
 	}
-	review := ReviewExec("rm -rf /tmp/x", nil)
+	review := ReviewBuiltin("rm -rf /tmp/x", nil)
 	if !contains(review.Rules, "destructive") || review.Reversible {
 		t.Fatalf("rm -rf review = %+v", review)
 	}
@@ -248,7 +232,7 @@ func TestReviewLocalModuleHasNoTargetFootprint(t *testing.T) {
 }
 
 func TestReviewDedupes(t *testing.T) {
-	review := ReviewExec("lsass lsass", nil)
+	review := ReviewBuiltin("lsass lsass", nil)
 	seen := map[string]int{}
 	for _, r := range review.Reasons {
 		seen[r]++

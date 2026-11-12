@@ -5,6 +5,13 @@
     "author": "jm33-ng",
     "date": "2026-09-08",
     "comment": "Generate a self-unpacking Windows loader (service exe, plain exe, or DLL) that early-bird injects RC4-encrypted Donut sRDI shellcode (e.g. the agent.exe.bin produced by `agent generate --type exe`) into a sacrificial process (svchost.exe, dllhost.exe). The stager carries the real loader as an RC4-encrypted DLL and reflectively maps it in memory; the loader decrypts the blob, injects and verifies the child. Injection syscalls are indirect and, on x64, spoofed with SilentMoonwalk.",
+    "help": "Build a self-unpacking Windows loader for a Donut sRDI shellcode blob. The loader early-bird injects the shellcode into a sacrificial process and is packaged as a service (default), a plain executable, or a DLL exporting Run(). Build the Windows agent first with generate; pass its shellcode_file as --shellcode, never the DLL. arch must match the shellcode. smw=on (default on x64) uses SilentMoonwalk and requires nasm on the C2; smw=off drops that dependency. With inject=ct choose a long-lived sacrificial process such as notepad.exe; the default apc injection parks the process. output defaults next to the shellcode with _svc.exe, .exe, or .dll appended. The returned artifact path is the deliverable; do not execute it on the operator host. Installing the service on the target needs administrator rights; remove it with sc delete.",
+    "examples": [
+      "loader_windows --shellcode /path/to/agent.exe.bin",
+      "loader_windows --shellcode /path/to/agent.exe.bin --format exe --output /tmp/loader.exe",
+      "loader_windows --shellcode /path/to/agent.exe.bin --format dll",
+      "loader_windows --shellcode /path/to/agent.exe.bin --inject ct --process notepad.exe"
+    ],
     "is_local": true,
     "platform": "Windows",
     "path": "",
@@ -27,7 +34,11 @@
         "name": "format",
         "description": "Host container to build: service = resident Windows service that injects once and stays up until stopped (default), exe = plain console executable, dll = DLL exporting Run() for in-memory or normal loading",
         "default": "service",
-        "choices": ["service", "exe", "dll"],
+        "choices": [
+          "service",
+          "exe",
+          "dll"
+        ],
         "type": "string",
         "required": false
       },
@@ -49,7 +60,10 @@
         "name": "arch",
         "description": "Architecture of the shellcode and of the generated loader; must match the Donut blob",
         "default": "x64",
-        "choices": ["x64", "x86"],
+        "choices": [
+          "x64",
+          "x86"
+        ],
         "type": "string",
         "required": false
       },
@@ -64,7 +78,10 @@
         "name": "inject",
         "description": "Load method baked into the loader: apc = early-bird QueueUserAPC into a parked sacrificial (default), ct = classic CreateRemoteThread (sacrificial must stay alive, e.g. notepad.exe or a real service host)",
         "default": "apc",
-        "choices": ["apc", "ct"],
+        "choices": [
+          "apc",
+          "ct"
+        ],
         "type": "string",
         "required": false
       },
@@ -72,7 +89,10 @@
         "name": "smw",
         "description": "SilentMoonwalk call-stack spoofing for the loader's indirect syscalls (x64 only): on (default) or off. Off also drops the nasm build dependency.",
         "default": "on",
-        "choices": ["on", "off"],
+        "choices": [
+          "on",
+          "off"
+        ],
         "type": "string",
         "required": false
       },
@@ -87,7 +107,10 @@
         "name": "debug",
         "description": "Keep verbose diagnostics in the binary (default false: production builds compile all logging out)",
         "default": "false",
-        "choices": ["false", "true"],
+        "choices": [
+          "false",
+          "true"
+        ],
         "type": "string",
         "required": false
       }

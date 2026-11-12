@@ -150,20 +150,6 @@ func ReviewModule(mod *def.ModuleConfig, flags map[string]string, rendered strin
 	return review
 }
 
-// ReviewExec scores a raw shell command. Process creation is a hard gate and
-// is always reported, even when no other rule matches.
-func ReviewExec(command string, target *def.Emp3r0rAgent) def.OpsecReview {
-	review := def.OpsecReview{
-		Noise:      "medium",
-		Reversible: true,
-		Reasons:    []string{"spawns a child process on the target"},
-		Artifacts:  []string{"process create (4688/Sysmon 1; auditd execve/Sysmon for Linux 1)", "command line", "shell history"},
-		Rules:      []string{"process-creation"},
-		Unknowns:   contextUnknowns(target),
-	}
-	return scoreCommand(command, review, platformOf(targetGOOS(target)))
-}
-
 // ReviewBuiltin scores a built-in agent command. It runs inside the agent
 // process, so it has no process-creation footprint. Rules still apply: a
 // built-in that writes a file or performs a broad query is gated.

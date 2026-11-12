@@ -4,12 +4,16 @@
   "author": "jm33-ng",
   "date": "2026-10-01",
   "comment": "libbpf shared-library dependency backing the ebpf_* Linux Starlark builtins. Not runnable directly; declare it in another module's dependencies.",
+  "help": "Dependency module only: provides the libbpf shared library that backs the ebpf_* Linux Starlark builtins. It has no entry point and cannot be run directly. Declare libbpf in another module's dependencies so the agent maps it on demand.",
+  "examples": [],
   "is_local": false,
   "platform": "Linux",
   "parameters": [],
   "agent_config": {
     "exec": "",
-    "files": ["libbpf.so"],
+    "files": [
+      "libbpf.so"
+    ],
     "type": "so"
   },
   "invocation": {}

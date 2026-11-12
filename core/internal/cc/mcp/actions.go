@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/operator"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/opsec"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -26,7 +27,17 @@ type Executor interface {
 	BuildLocalModule(ctx context.Context, module string, flags map[string]string) (string, error)
 	UploadFile(ctx context.Context, target *def.Emp3r0rAgent, src, dst string) (string, error)
 	DownloadFile(ctx context.Context, target *def.Emp3r0rAgent, path, filter string, recursive bool) (string, error)
+	RunBuiltin(ctx context.Context, target *def.Emp3r0rAgent, command string) (string, error)
 	ReloadModules(ctx context.Context) error
+	ResumeOperator(ctx context.Context) error
+	ForgetAgent(ctx context.Context, agent string) (string, error)
+	StartSocks5(ctx context.Context, port int, bind string) (operator.Socks5Pivot, error)
+	StopSocks5(ctx context.Context, port int) error
+	ListSocks5(ctx context.Context) ([]operator.Socks5Pivot, error)
+	StartTun2Socks(ctx context.Context, opts operator.Tun2SocksOptions) (operator.Tun2SocksState, error)
+	StopTun2Socks(ctx context.Context, name string) error
+	Tun2SocksStatus(ctx context.Context) []operator.Tun2SocksState
+	SetDebugLevel(ctx context.Context, level int) error
 }
 
 // Actions holds the mutating MCP tools. Every tool screens its action through
@@ -60,7 +71,7 @@ func (a *Actions) Tools() map[string]Tool {
 				Type: "function",
 				Function: FunctionDef{
 					Name:        "select_agent",
-					Description: "Select one connected agent as the active target. Call list_agents first. The C2's operator lock still applies.",
+					Description: "Select one connected agent from list_agents as the active target and acquire the C2 single-owner lock. Takes the agent tag. Another operator holding the lock yields 409.",
 					Parameters: ObjectSchema(map[string]any{
 						"agent": StringProp("Agent tag from list_agents"),
 					}, "agent"),
@@ -73,7 +84,7 @@ func (a *Actions) Tools() map[string]Tool {
 				Type: "function",
 				Function: FunctionDef{
 					Name:        "run_module",
-					Description: "Validate a module invocation, screen its OPSEC review, and execute it. Payload modules run on the target; local C2 modules are built and their build log is returned. The screen may block the action.",
+					Description: "Validate, screen, and execute one installed module by exact name. flags maps flag names to string values; booleans are true or false. Payload modules return a job ID; local C2 modules build on the operator host and return their build log. Use module_help first. A blocked result did not execute.",
 					Parameters: ObjectSchema(map[string]any{
 						"module": StringProp("Exact module name from list_modules"),
 						"flags": map[string]any{
@@ -92,7 +103,7 @@ func (a *Actions) Tools() map[string]Tool {
 				Type: "function",
 				Function: FunctionDef{
 					Name:        "upload_file",
-					Description: "Upload one local file to the selected target. The destination defaults to memfs:///<file name>, which keeps the body in encrypted agent memory; pass dst to choose another memfs key or a target disk path. A disk destination carries filesystem-artifact and is warned under the default policy. The returned job ID tracks the target's fetch.",
+					Description: "Upload one local file to the selected target. dst defaults to memfs:///<file name>, keeping the body in encrypted agent memory; a disk destination adds filesystem-artifact. Protected operator files are rejected. Returns a job ID that tracks the target fetch.",
 					Parameters: ObjectSchema(map[string]any{
 						"src": StringProp("Local file path on the operator host"),
 						"dst": StringProp("Destination on the target: memfs:///name or an absolute disk path. Defaults to memfs:///<file name>"),
@@ -107,7 +118,7 @@ func (a *Actions) Tools() map[string]Tool {
 				Type: "function",
 				Function: FunctionDef{
 					Name:        "download_file",
-					Description: "Download a file or directory from the selected target into the operator download directory. A directory is listed; set recursive to download every matching file. Data transfer carries a warning by default.",
+					Description: "Download a file or directory from the selected target into the operator download directory. Set recursive to fetch every matching file and regex to filter listings. Returns local_path and the OPSEC decision.",
 					Parameters: ObjectSchema(map[string]any{
 						"path":      StringProp("Remote file or directory path"),
 						"recursive": BooleanProp("Download every file in a directory listing"),
@@ -122,7 +133,7 @@ func (a *Actions) Tools() map[string]Tool {
 				Type: "function",
 				Function: FunctionDef{
 					Name:        "reload_modules",
-					Description: "Rescan the module directories after editing or adding a module. The module watcher also reloads on file changes.",
+					Description: "Rescan module directories after adding or editing a module. The module watcher may also reload automatically. Takes no arguments and returns the loaded module count.",
 					Parameters:  ObjectSchema(map[string]any{}),
 				},
 			},
@@ -133,7 +144,7 @@ func (a *Actions) Tools() map[string]Tool {
 				Type: "function",
 				Function: FunctionDef{
 					Name:        "opsec_policy",
-					Description: "Return the capability screen: per-capability allow, warn, or block modes, maximum noise, reversibility, module lists, and rate limit.",
+					Description: "Return the active OPSEC policy: per-capability allow, warn, or block modes, maximum noise, reversibility, module allow and deny lists, and the rate limit. Takes no arguments.",
 					Parameters:  ObjectSchema(map[string]any{}),
 				},
 			},
@@ -142,6 +153,12 @@ func (a *Actions) Tools() map[string]Tool {
 		},
 	}
 	for name, tool := range a.generateTools() {
+		tools[name] = tool
+	}
+	for name, tool := range a.builtinTools() {
+		tools[name] = tool
+	}
+	for name, tool := range a.controlTools() {
 		tools[name] = tool
 	}
 	return tools
@@ -587,6 +604,13 @@ func actionBlocked(tool, command, module string, target *def.Emp3r0rAgent, revie
 		logging.Errorf("mcp audit: %v", auditErr)
 	}
 	return result
+}
+
+func (a *Actions) target() *def.Emp3r0rAgent {
+	if a.Target == nil {
+		return nil
+	}
+	return a.Target()
 }
 
 func targetTag(agent *def.Emp3r0rAgent) string {

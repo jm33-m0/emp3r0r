@@ -21,16 +21,17 @@ Use the tools, not the filesystem
   addresses. If the registry or a tool result does not provide it, ask the
   operator.
 - The read-only tools are list_modules, module_help, list_agents, list_jobs,
-  read_job_output, result_summary, read_log, review_command, and opsec_policy.
-  read_log returns a bounded tail of the operator log and can contain target
-  output and secrets. When a tool is unavailable, explain the step instead of
-  imitating it.
+  read_job_output, result_summary, read_log, review_command, ls, cat, pwd, ps,
+  net_helper, and opsec_policy. read_log returns a bounded tail of the operator
+  log and can contain target output and secrets. When a tool is unavailable,
+  explain the step instead of imitating it.
 - list_modules filters by the selected target's OS, but local modules are
   always listed because they build on the operator host. module_help works by
   name even when the module targets another platform.
-- Prefer the dedicated tool over command: select_agent instead of /target,
-  run_module instead of a module name, run_exec instead of /exec, and generate
-  or generate_c instead of /generate or /generate_c.
+- Use the typed target tools for built-in operations: ls, cat, pwd, ps, cd,
+  cp, mv, rm, mkdir, kill, net_helper, and decrypt. Use select_agent to choose
+  a target, run_module to run a module, and generate or generate_c to build an
+  agent.
 
 Common mistakes
 - Reading core/modules or ~/.emp3r0r/modules for flags. Use module_help.
@@ -41,7 +42,7 @@ Common mistakes
 - Passing a C agent .so or executable to stager_linux. Pass the .bin from
   generate_c format=shellcode, or set the download listener options.
 - Hardcoding cc=127.0.0.1. Omit cc and let the configured address apply.
-- Using command for a module or for generate. Use run_module or generate.
+- Trying to run an arbitrary agent command. Use run_module or one of the typed target tools.
 - Passing an operator-host artifact path to run_module as a target path. Upload
   it first.
 - Resubmitting a pending job. Check list_jobs and read_job_output.
@@ -49,7 +50,7 @@ Common mistakes
   ask the operator.
 
 OPSEC screening
-- Every tool that runs a module, command, transfer, or build is screened
+- Every tool that runs a module, built-in target operation, transfer, or build is screened
   before dispatch. review_command runs the same screen without executing.
 - In an action result, warnings mean the action executed. Report every warning
   and matched rule to the operator before continuing with a higher-footprint
@@ -57,9 +58,9 @@ OPSEC screening
 - In an action result, blocked=true means it did not execute. Read
   decision.reason and opsec.rules, then choose a lower-footprint module or
   path. Do not retry the same action expecting a different decision.
-- Never try to get around a block by rephrasing the action, switching to
-  run_exec, invoking a build script, or using command. Explain the block and
-  ask the operator to change mcp.json if the capability is intended.
+- Never try to get around a block by rephrasing the action, invoking a build
+  script, or switching tools. Explain the block and ask the operator to change
+  mcp.json if the capability is intended.
 - Defaults warn for every operational capability that leaves an observable
   footprint: child-process creation, disk writes, credential and process
   access, injection, persistence, defense or audit tampering, kernel-module
@@ -71,7 +72,7 @@ OPSEC screening
   claim; obfuscated commands and novel tooling can be missed. Module metadata
   and descriptions are advisory; the policy and matched rules are
   authoritative.
-- Prefer in-process BOFs over run_exec, memfs over disk, a precise LDAP filter
+- Prefer in-process BOFs over child processes, memfs over disk, a precise LDAP filter
   over a wildcard, and per-module identity over a global logon change.
 - Before a mutating call, pick the lowest-footprint path and state the expected
   capability or artifact in one line. If the operator asked for a
@@ -82,18 +83,11 @@ Tool selection
 - run_module: payload modules on the target, or local C2 modules. It
   normalizes flags, validates required values, screens the invocation, and
   dispatches. Flags are strings; booleans are "true" or "false".
-- run_command: one built-in agent command such as ls, ps, cat, or get. It runs
-  inside the agent process. A C agent that only supports the exec BOF rejects
-  run_command; use run_exec or a module.
-- run_exec: one shell command in a child process. It is the highest-footprint
-  way to run anything; use a module when one exists. shell defaults to true;
-  set it to false to execute the program directly. On a C agent it uses the
-  exec BOF.
-- command: operator console commands not covered by a typed tool, such as
-  jobs, target, socks_start, kill, suicide, or forget_agent. Target-touching
-  lines are screened and local lines are audited. Module names, exec, put, get,
-  generate, generate_c, exit, and reset_layout are rejected; use the
-  dedicated tool. forget_agent is irreversible and removes the C2 record.
+- ls, cat, pwd, ps, and net_helper read target state. Each returns a job ID;
+  read the result with read_job_output or result_summary.
+- cd changes the agent's working directory. cp, mv, rm, mkdir, kill, and
+  decrypt change target state and are screened accordingly.
+- A C agent does not run built-in commands; use run_module on C targets.
 - opsec_policy returns the active dispositions, noise ceiling, module lists,
   and rate limit.
 
@@ -113,9 +107,9 @@ Modules
   does not run on one.
 - A payload module runs on the target and returns a job_id.
 - Local module and generate outputs are operator-host paths, not target paths.
-  To run one on a target, stage it with upload_file and execute it with
-  run_exec or a module that consumes it. Do not pass an operator path to
-  run_module as if it were a target path.
+  To run one on a target, stage it with upload_file and use a module that
+  consumes it. Do not pass an operator path to run_module as if it were a
+  target path.
 - module_help works by name even when the module targets another platform.
 - reload_modules is only for a newly added or edited module. The watcher may
   already have reloaded it; it is not needed to inspect existing modules.
@@ -154,9 +148,12 @@ Windows loader
   options. Never pass the DLL itself.
 
 C2 address and certificates
-- Changing the C2 address makes the server issue a certificate for the new
-  address and restart on its own. Do not ask the operator to delete or
-  regenerate certificates, and do not restart the server yourself.
+- Changing the C2 address makes the built-in TLS/QUIC certificate cover the new
+  name: the server adds the SAN, regenerates only when the set changes, and
+  reloads the in-process certificate for new handshakes. It does not restart.
+  An external TLS front proxy or CDN must cover the name itself, and custom
+  transports skip this certificate automation. Do not ask the operator to
+  delete certificates or restart the server.
 
 Files and memfs
 - memfs is encrypted RAM on the agent. Use memfs:/// paths for staging and
@@ -195,7 +192,7 @@ Linux notes
 - A Linux Go agent runs BOFs through the in-memory ELF loader; a C agent uses
   the coffloader_linux dependency. BOFs execute in the agent process.
 - Linux Starlark modules often call syscalls directly. Read module_help before
-  assuming a shell command or a child process is involved.
+  assuming a child process is involved.
 - Do not use memfd_create, /proc/self/fd, or a named temporary file to load
   code. Those are detection signals. Dependencies are mapped on use and
   released on return.

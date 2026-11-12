@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/operator"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/opsec"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 )
@@ -322,9 +323,10 @@ func TestCancellationStopsInflightTool(t *testing.T) {
 }
 
 type recordingExecutor struct {
-	execs     []string
+	builtins  []string
 	uploads   []string
 	downloads []string
+	forgot    []string
 }
 
 func (r *recordingExecutor) RunModule(context.Context, *def.Emp3r0rAgent, string, map[string]string) (string, error) {
@@ -335,13 +337,9 @@ func (r *recordingExecutor) BuildLocalModule(context.Context, string, map[string
 	return "build log", nil
 }
 
-func (r *recordingExecutor) RunExec(_ context.Context, _ *def.Emp3r0rAgent, command string, _ bool) (string, error) {
-	r.execs = append(r.execs, command)
-	return "job-exec", nil
-}
-
-func (r *recordingExecutor) RunCommand(context.Context, *def.Emp3r0rAgent, string) (string, error) {
-	return "job-command", nil
+func (r *recordingExecutor) RunBuiltin(_ context.Context, _ *def.Emp3r0rAgent, command string) (string, error) {
+	r.builtins = append(r.builtins, command)
+	return "job-builtin", nil
 }
 
 func (r *recordingExecutor) UploadFile(_ context.Context, _ *def.Emp3r0rAgent, src, dst string) (string, error) {
@@ -354,6 +352,35 @@ func (r *recordingExecutor) DownloadFile(_ context.Context, _ *def.Emp3r0rAgent,
 	return "/downloads/" + filepath.Base(path), nil
 }
 func (r *recordingExecutor) ReloadModules(context.Context) error { return nil }
+
+func (r *recordingExecutor) ResumeOperator(context.Context) error { return nil }
+
+func (r *recordingExecutor) ForgetAgent(_ context.Context, agent string) (string, error) {
+	r.forgot = append(r.forgot, agent)
+	return "forgotten", nil
+}
+
+func (r *recordingExecutor) StartSocks5(context.Context, int, string) (operator.Socks5Pivot, error) {
+	return operator.Socks5Pivot{Port: 1080, Bind: "127.0.0.1", Agent: "target-1"}, nil
+}
+
+func (r *recordingExecutor) StopSocks5(context.Context, int) error { return nil }
+
+func (r *recordingExecutor) ListSocks5(context.Context) ([]operator.Socks5Pivot, error) {
+	return nil, nil
+}
+
+func (r *recordingExecutor) StartTun2Socks(context.Context, operator.Tun2SocksOptions) (operator.Tun2SocksState, error) {
+	return operator.Tun2SocksState{Name: "emp3r0r0", Socks5: "127.0.0.1:1080"}, nil
+}
+
+func (r *recordingExecutor) StopTun2Socks(context.Context, string) error { return nil }
+
+func (r *recordingExecutor) Tun2SocksStatus(context.Context) []operator.Tun2SocksState {
+	return nil
+}
+
+func (r *recordingExecutor) SetDebugLevel(context.Context, int) error { return nil }
 
 func TestMergedToolsetScreensActions(t *testing.T) {
 	target := &def.Emp3r0rAgent{Tag: "target-1", GOOS: "linux", AgentImpl: "go"}
@@ -378,14 +405,14 @@ func TestMergedToolsetScreensActions(t *testing.T) {
 	h.send(map[string]any{"jsonrpc": "2.0", "id": 7, "method": "tools/list"})
 	result, _ := h.next().Result.(map[string]any)
 	tools, _ := result["tools"].([]any)
-	if len(tools) != 19 {
-		t.Fatalf("tools = %d, want 19", len(tools))
+	if len(tools) != 38 {
+		t.Fatalf("tools = %d, want 38", len(tools))
 	}
 	seen := map[string]bool{}
 	for _, raw := range tools {
 		seen[raw.(map[string]any)["name"].(string)] = true
 	}
-	for _, name := range []string{"run_module", "run_exec", "command", "upload_file", "download_file", "reload_modules", "select_agent", "generate", "generate_c"} {
+	for _, name := range []string{"run_module", "ls", "ps", "cd", "socks_start", "tun2socks_start", "forget_agent", "upload_file", "download_file", "reload_modules", "select_agent", "generate", "generate_c"} {
 		if !seen[name] {
 			t.Fatalf("missing action tool %q", name)
 		}
@@ -393,7 +420,7 @@ func TestMergedToolsetScreensActions(t *testing.T) {
 
 	h.send(map[string]any{
 		"jsonrpc": "2.0", "id": 8, "method": "tools/call",
-		"params": map[string]any{"name": "run_exec", "arguments": map[string]any{"command": "whoami"}},
+		"params": map[string]any{"name": "ls", "arguments": map[string]any{"path": "/tmp"}},
 	})
 	call, _ := h.next().Result.(map[string]any)
 	if call["isError"] == true {
@@ -404,16 +431,16 @@ func TestMergedToolsetScreensActions(t *testing.T) {
 	if err := json.Unmarshal([]byte(text), &payload); err != nil {
 		t.Fatalf("text %q: %v", text, err)
 	}
-	if payload["executed"] != true || payload["job_id"] != "job-exec" {
+	if payload["executed"] != true || payload["job_id"] != "job-builtin" {
 		t.Fatalf("payload = %v", payload)
 	}
-	if len(exec.execs) != 1 || exec.execs[0] != "whoami" {
-		t.Fatalf("executor = %v", exec.execs)
+	if len(exec.builtins) != 1 || exec.builtins[0] != `ls --dst "/tmp"` {
+		t.Fatalf("executor = %v", exec.builtins)
 	}
 
 	h.send(map[string]any{
 		"jsonrpc": "2.0", "id": 9, "method": "tools/call",
-		"params": map[string]any{"name": "run_exec", "arguments": map[string]any{"command": "rm -rf /"}},
+		"params": map[string]any{"name": "rm", "arguments": map[string]any{"path": "/tmp/x"}},
 	})
 	call, _ = h.next().Result.(map[string]any)
 	text = call["content"].([]any)[0].(map[string]any)["text"].(string)
@@ -424,8 +451,8 @@ func TestMergedToolsetScreensActions(t *testing.T) {
 	if payload["blocked"] != true || payload["executed"] != false {
 		t.Fatalf("payload = %v", payload)
 	}
-	if len(exec.execs) != 1 {
-		t.Fatalf("blocked action reached the executor: %v", exec.execs)
+	if len(exec.builtins) != 1 {
+		t.Fatalf("blocked action reached the executor: %v", exec.builtins)
 	}
 }
 
@@ -556,43 +583,5 @@ func TestReadMessageFraming(t *testing.T) {
 	}
 	if _, err := readMessage(r); err != io.EOF {
 		t.Fatalf("err = %v, want EOF", err)
-	}
-}
-
-func TestProtocolRunsOperatorCommand(t *testing.T) {
-	target := &def.Emp3r0rAgent{Tag: "target-1", GOOS: "linux", AgentImpl: "go"}
-	var ran string
-	actions := &Actions{
-		Target:      func() *def.Emp3r0rAgent { return target },
-		Policy:      opsec.DefaultPolicy(),
-		RunOperator: func(_ context.Context, line string) error { ran = line; return nil },
-	}
-	opts := Options{
-		Name: "real",
-		Tools: func() ToolSet {
-			return NewToolset(target, actions)
-		},
-	}
-	h := startServer(t, opts)
-	mustInitialize(t, h)
-
-	h.send(map[string]any{
-		"jsonrpc": "2.0", "id": 10, "method": "tools/call",
-		"params": map[string]any{"name": "command", "arguments": map[string]any{"command": "/target 1a2b3c4d"}},
-	})
-	call, _ := h.next().Result.(map[string]any)
-	if call["isError"] == true {
-		t.Fatalf("call = %v", call)
-	}
-	text := call["content"].([]any)[0].(map[string]any)["text"].(string)
-	var payload map[string]any
-	if err := json.Unmarshal([]byte(text), &payload); err != nil {
-		t.Fatalf("text %q: %v", text, err)
-	}
-	if payload["executed"] != true {
-		t.Fatalf("payload = %v", payload)
-	}
-	if ran != "target 1a2b3c4d" {
-		t.Fatalf("runner received %q", ran)
 	}
 }

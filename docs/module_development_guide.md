@@ -188,6 +188,9 @@ A manifest is a single module object or an array of module objects.
 | -------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `name`               | yes                   | Console command name. Must be unique.                                                                                                                                                                                          |
 | `comment`            | strongly recommended  | One-line description shown in module help and `search`.                                                                                                                                                                        |
+| `help`               | yes                   | Complete operator-facing description: what it does, when to use it, prerequisites, side effects, and constraints. `module_help` returns it verbatim. Do not move this content into a separate usage document.                  |
+| `examples`           | yes                   | Ready-to-run invocations, one per entry. `module_help` returns them. Cover the common and destructive paths.                                                                                                                     |
+| `opsec`              | for agent modules     | Footprint metadata: noise, disk writes, network egress, credential access, required privilege, artifacts, reversibility, and notes. The deterministic screen uses it.                                                          |
 | `author`, `date`     | no                    | Metadata only.                                                                                                                                                                                                                 |
 | `is_local`           | no (default `false`)  | `true` runs the module on the C2 instead of dispatching to an agent.                                                                                                                                                           |
 | `platform`           | yes for agent modules | `Linux`, `Windows`, or `Generic` (case-insensitive). At run time the C2 rejects the module unless it matches the agent's OS or is `Generic`.                                                                                   |
@@ -206,6 +209,15 @@ A manifest is a single module object or an array of module objects.
 | `type`  | `coff`, `starlark`, `dll`, `rv`, or `so`. A manifest with any other type (or an empty type on a non-local module) is rejected at load time.                                                                                                                |
 | `files` | Payload files, relative to the module directory. For `starlark`, `files[0]` is the entry script. For `coff`/`dll`/`so`, list per-architecture variants (`.x64.o`/`.x86.o`, `x64.dll`/`x86.dll`, `libbpf.so`); the C2 selects by the agent's architecture. A BOF recompiled with `--riscv` is architecture-independent; the module build emits `.rv.o`, which the C2 links with RV32 musl into `.rv`, and `riscv_libraries` lists RV32 static libraries linked into it. |
 | `exec`  | Only meaningful for built-in Go modules, which use `"built-in"`. Custom modules may omit it; the entry is `files[0]`.                                                                                                                                     |
+
+### Help and examples
+
+`module_help` is the module's documentation surface. Its output already includes
+`comment`, every parameter description, the generated usage line, `help`,
+`examples`, `opsec`, and the workspace path. Keep those fields complete enough
+that an operator can run the module without reading a separate guide. Reserve
+dedicated docs for source layout, build contracts, and extension notes; do not
+duplicate usage there.
 
 ### `parameters`
 
@@ -726,8 +738,8 @@ Pair with the `scshell` BOF to execute an uploaded file on the target.
 | `coffloader/`                   | The Windows in-memory COFF loader DLL (`dll` module).                                                                      |
 | `libbpf/`                       | Builds a self-contained `libbpf.so` (zig) used by the Go `core/lib/libbpf` loader and the `ebpf_*` builtins.               |
 | `ssh_harvest/`                  | eBPF uprobe credential capture: zig-compiled BPF object + `ebpf_code_offset`/`ebpf_uprobe_start`/`ebpf_uprobe_stop` from a Starlark module.                                        |
-| `loader_windows/`               | Local C2 module that builds a self-unpacking loader. User guide: [loader_windows.md](loader_windows.md).                    |
-| `stager_linux/`                 | Local C2 module that builds the Linux stager. User guide: [stager_linux.md](stager_linux.md).                               |
+| `loader_windows/`               | Local C2 module that builds a self-unpacking loader. Internals: [loader_windows.md](loader_windows.md).                    |
+| `stager_linux/`                 | Local C2 module that builds the Linux stager. Internals: [stager_linux.md](stager_linux.md).                               |
 | `CS-Situational-Awareness-BOF/` | A large third-party BOF suite imported as-is; every command is a top-level console command with one flag per BOF argument. |
 | `C2-Tool-Collection/`           | BOF suite with `choices`/`required` flags and a `make_all.sh` that builds a nested `BOF/` tree.                            |
 | `SQL-BOF/`                      | SQL Server BOF suite; fixed-value wrapper commands over a shared `togglemodule` BOF and a `binary` (base64) parameter.     |

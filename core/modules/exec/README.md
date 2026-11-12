@@ -9,4 +9,4 @@ guest through the interpreter. The `mode` parameter selects `/bin/sh -c`
 Process spawning is not opsec: the command runs in a child process with a
 readable command line and leaves process-table and audit artefacts.
 
-Usage and constraints: [docs/exec_bof.md](../../../docs/exec_bof.md).
+Implementation and constraints: [docs/exec_bof.md](../../../docs/exec_bof.md).

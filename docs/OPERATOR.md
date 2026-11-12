@@ -319,8 +319,9 @@ deadline the agent reports for keeping its last-seen record after a disconnect;
 zero derives `interval + poll window + interval/2`. The C2 keeps the record
 until that per-agent deadline, so the operator list shows the real last-seen
 time instead of treating sleep as death. A `shellcode` artifact is marked
-stager-run; pass it to the [Linux stager](stager_linux.md) with `--agent-pic`
-to embed it and compile out the downloader.
+stager-run; pass it to the `stager_linux` module as `agent-pic` to embed it and
+compile out the downloader; `module_help stager_linux` lists the formats and
+embedding options.
 
 Available `--type`: `glibc`, `musl`. Available `--arch`: `amd64`, `386`, `arm`,
 `arm64`, `riscv64`. `riscv64` requires `--type musl`; `--format shellcode`
@@ -470,7 +471,8 @@ C2, so no special transport is needed. For a transport that is not HTTP, see
 
 `emp3r0r mcp` serves the operator surface over the Model Context Protocol, so
 an external agent such as Claude Code or Codex can inspect modules and targets,
-run screened actions, and read job output. See [MCP.md](MCP.md).
+run screened actions, and read job output. Tool help is served over MCP; see
+[MCP.md](MCP.md) for server development.
 
 ## tmux console
 

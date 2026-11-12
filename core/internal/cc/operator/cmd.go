@@ -119,17 +119,6 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		rootCmd.AddCommand(targetCmd)
 		carapace.Gen(targetCmd).PositionalCompletion(carapace.ActionCallback(listAgents))
 
-		upgradeAgentCmd := &cobra.Command{
-			Use:     "upgrade_agent",
-			GroupID: "agent",
-			Short:   "Upgrade agent on selected target, put agent binary in /tmp/emp3r0r/www/agent first",
-			Run: func(cmd *cobra.Command, args []string) {
-				logging.Errorf("Not implemented yet")
-			},
-			Args: cobra.NoArgs,
-		}
-		rootCmd.AddCommand(upgradeAgentCmd)
-
 		lsCmd := &cobra.Command{
 			Use:     "ls [dir]",
 			GroupID: "filesystem",
@@ -488,36 +477,17 @@ func socks5StartCmdRun(cmd *cobra.Command, args []string) {
 		port = p
 	}
 	bind, _ := cmd.Flags().GetString("bind")
-	agent := agents.MustGetActiveAgent()
-	if agent == nil {
-		logging.Errorf("No active agent selected (use `target <id>` first)")
-		return
-	}
-	// A C agent serves the pivot by running the socks5 BOF; host it (and its
-	// loader) for that agent now. The operator experience stays the same: one
-	// socks_start command, exactly as for a Go agent.
-	if err := modules.HostSocks5Relay(agent); err != nil {
+	pivot, err := StartSocks5Pivot(port, bind)
+	if err != nil {
 		logging.Errorf("socks_start: %v", err)
 		return
 	}
-	if err := client.StartSocks5Proxy(agent.Tag, port, bind); err != nil {
-		logging.Errorf("socks_start: %v", err)
-		return
+	logging.Successf("SOCKS5 pivot on %s:%d via agent %s", pivot.Bind, pivot.Port, pivot.Agent)
+	if pivot.Warning != "" {
+		logging.Warningf("%s", pivot.Warning)
 	}
-	if modules.CanRunSocks5BOF(agent) {
-		// The operator must see this here, not only in the C2 log: a pivot
-		// temporarily trades the agent's stealth for latency.
-		logging.Warningf("A C agent needs to poll often for this pivot: until `socks_stop %d` it polls every %ds with a %ds window and stays unmasked while relays run, which raises detection risk; its configured profile is restored on socks_stop",
-			port, def.Socks5PivotPollInterval, def.Socks5PivotPollWindow)
-	}
-	proxyAddr := socks5ProxyHost()
-	if bind != "" && bind != "0.0.0.0" {
-		proxyAddr = bind
-	}
-	logging.Successf("SOCKS5 pivot on %s:%d via agent %s", proxyAddr, port, agent.Tag)
-	logging.Infof("Route target networks through it with tun2socks (dials the pivot inside WireGuard):")
-	logging.Infof("  tun2socks start --route <target-network>/24")
-	logging.Infof("Plain SOCKS5 clients can use %s:%d, reachable only over the WireGuard tunnel.", proxyAddr, port)
+	logging.Infof("Route target networks through it with tun2socks (dials the pivot inside WireGuard).")
+	logging.Infof("Plain SOCKS5 clients can use %s:%d, reachable only over the WireGuard tunnel.", pivot.Bind, pivot.Port)
 }
 
 // socks5ProxyHost returns the address the operator should reach the C2-side
@@ -532,35 +502,31 @@ func socks5ProxyHost() string {
 	return wireguard.WgServerIP
 }
 
-func socks5StopCmdRun(cmd *cobra.Command, args []string) {
+func socks5StopCmdRun(_ *cobra.Command, args []string) {
 	port, err := strconv.Atoi(args[0])
 	if err != nil {
 		logging.Errorf("Invalid port: %s", args[0])
 		return
 	}
-	if err := client.StopSocks5Proxy(port); err != nil {
+	if err := StopSocks5Pivot(port); err != nil {
 		logging.Errorf("socks_stop: %v", err)
 		return
 	}
 	logging.Successf("SOCKS5 pivot on port %d stopped", port)
 }
 
-func socks5StatusCmdRun(cmd *cobra.Command, _ []string) {
-	proxies, err := client.ListSocks5Proxies()
+func socks5StatusCmdRun(_ *cobra.Command, _ []string) {
+	pivots, err := Socks5Pivots()
 	if err != nil {
 		logging.Errorf("socks_status: %v", err)
 		return
 	}
-	if len(proxies) == 0 {
+	if len(pivots) == 0 {
 		logging.Infof("No SOCKS5 pivot is running on the C2")
 		return
 	}
-	for _, p := range proxies {
-		bind := p.BindAddr
-		if bind == "" || bind == "0.0.0.0" {
-			bind = "0.0.0.0 (any interface)"
-		}
-		logging.Infof("SOCKS5 pivot on %s:%d via agent %s", bind, p.Port, p.AgentTag)
+	for _, pivot := range pivots {
+		logging.Infof("SOCKS5 pivot on %s:%d via agent %s", pivot.Bind, pivot.Port, pivot.Agent)
 	}
 	logging.Infof("Reach it at the WireGuard address %s (tun2socks picks it up automatically)", socks5ProxyHost())
 }

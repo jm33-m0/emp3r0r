@@ -46,54 +46,61 @@ var (
 	tun2socksInstances = make(map[string]*tun2socksInstance)
 )
 
-func tun2socksStartCmdRun(cmd *cobra.Command, _ []string) {
-	port, _ := cmd.Flags().GetInt("port")
-	host, _ := cmd.Flags().GetString("host")
-	override, _ := cmd.Flags().GetString("socks5")
-	tunName, _ := cmd.Flags().GetString("name")
-	addr, _ := cmd.Flags().GetString("addr")
-	mtu, _ := cmd.Flags().GetInt("mtu")
-	routes, _ := cmd.Flags().GetStringSlice("route")
-	excludes, _ := cmd.Flags().GetStringSlice("exclude")
+// Tun2SocksOptions describes one transparent-proxy instance.
+type Tun2SocksOptions struct {
+	Port     int
+	Host     string
+	Socks5   string
+	Name     string
+	Addr     string
+	MTU      int
+	Routes   []string
+	Excludes []string
+}
 
+// Tun2SocksState is one running transparent-proxy instance.
+type Tun2SocksState struct {
+	Name   string `json:"name"`
+	Socks5 string `json:"socks5"`
+}
+
+// StartTun2Socks creates a TUN and routes opts.Routes through the C2 SOCKS5
+// pivot. An empty Host or a zero Port auto-discovers the running pivot.
+func StartTun2Socks(opts Tun2SocksOptions) (Tun2SocksState, error) {
 	// Destinations to route through the TUN. Required: the default route is
 	// intentionally never changed, so without explicit targets nothing would
 	// be proxied (and with AutoRoute alone sing-tun would hijack everything).
-	routePrefixes := make([]netip.Prefix, 0, len(routes))
-	for _, r := range routes {
+	routePrefixes := make([]netip.Prefix, 0, len(opts.Routes))
+	for _, r := range opts.Routes {
 		p, err := netip.ParsePrefix(r)
 		if err != nil {
-			logging.Errorf("tun2socks: invalid --route %q: %v", r, err)
-			return
+			return Tun2SocksState{}, fmt.Errorf("invalid route %q: %w", r, err)
 		}
 		routePrefixes = append(routePrefixes, p.Masked())
 	}
 	if len(routePrefixes) == 0 {
-		logging.Errorf("tun2socks: specify at least one --route prefix (e.g. `tun2socks start --route 10.10.0.0/24`); the default route is never modified")
-		return
+		return Tun2SocksState{}, fmt.Errorf("at least one route prefix is required (for example 10.10.0.0/24); the default route is never modified")
 	}
 
-	socksAddr := override
+	socksAddr := opts.Socks5
 	if socksAddr == "" {
-		if !cmd.Flags().Changed("host") {
+		host := opts.Host
+		port := opts.Port
+		if host == "" {
 			host = socks5ProxyHost()
 		}
-		if !cmd.Flags().Changed("port") {
+		if port <= 0 {
 			proxies, err := client.ListSocks5Proxies()
 			if err != nil {
-				logging.Errorf("tun2socks: query running pivots: %v", err)
-				return
+				return Tun2SocksState{}, fmt.Errorf("query running pivots: %w", err)
 			}
 			switch len(proxies) {
 			case 0:
-				logging.Errorf("tun2socks: no SOCKS5 pivot is running on the C2 — run `socks_start <port>` on the target agent first")
-				return
+				return Tun2SocksState{}, fmt.Errorf("no SOCKS5 pivot is running on the C2; start one first")
 			case 1:
 				port = proxies[0].Port
-				logging.Infof("tun2socks: auto-using running pivot on port %d (agent %s)", proxies[0].Port, proxies[0].AgentTag)
 			default:
-				logging.Errorf("tun2socks: multiple SOCKS5 pivots are running; pick one with --port")
-				return
+				return Tun2SocksState{}, fmt.Errorf("multiple SOCKS5 pivots are running; pick one by port")
 			}
 		}
 		if port <= 0 {
@@ -101,12 +108,15 @@ func tun2socksStartCmdRun(cmd *cobra.Command, _ []string) {
 		}
 		socksAddr = fmt.Sprintf("%s:%d", host, port)
 	}
+	tunName := opts.Name
 	if tunName == "" {
 		tunName = defaultTunName
 	}
+	addr := opts.Addr
 	if addr == "" {
 		addr = defaultTunAddr
 	}
+	mtu := opts.MTU
 	if mtu <= 0 {
 		mtu = defaultTunMTU
 	}
@@ -116,12 +126,11 @@ func tun2socksStartCmdRun(cmd *cobra.Command, _ []string) {
 	// pivot host is added by IP, resolving hostnames too: a hostname that
 	// resolves inside a routed prefix would otherwise capture the engine's own
 	// SOCKS dials and loop forever.
-	prefixes := make([]netip.Prefix, 0, len(excludes)+1)
-	for _, e := range excludes {
+	prefixes := make([]netip.Prefix, 0, len(opts.Excludes)+1)
+	for _, e := range opts.Excludes {
 		p, err := netip.ParsePrefix(e)
 		if err != nil {
-			logging.Errorf("tun2socks: invalid --exclude %q: %v", e, err)
-			return
+			return Tun2SocksState{}, fmt.Errorf("invalid exclude %q: %w", e, err)
 		}
 		prefixes = append(prefixes, p.Masked())
 	}
@@ -147,16 +156,14 @@ func tun2socksStartCmdRun(cmd *cobra.Command, _ []string) {
 	conn, err := wireguard.DialContext(dialCtx, "tcp", socksAddr)
 	cancelDial()
 	if err != nil {
-		logging.Errorf("SOCKS5 pivot at %s is not reachable (run `socks_start` first): %v", socksAddr, err)
-		return
+		return Tun2SocksState{}, fmt.Errorf("SOCKS5 pivot at %s is not reachable: %w", socksAddr, err)
 	}
 	_ = conn.Close()
 
 	tun2socksMu.Lock()
 	if _, exists := tun2socksInstances[tunName]; exists {
 		tun2socksMu.Unlock()
-		logging.Errorf("tun2socks %q is already running", tunName)
-		return
+		return Tun2SocksState{}, fmt.Errorf("tun2socks %q is already running", tunName)
 	}
 	tun2socksMu.Unlock()
 
@@ -164,8 +171,7 @@ func tun2socksStartCmdRun(cmd *cobra.Command, _ []string) {
 	if p, err := netip.ParsePrefix(addr); err == nil {
 		inet4 = []netip.Prefix{p}
 	} else {
-		logging.Errorf("tun2socks: invalid tun address %q: %v", addr, err)
-		return
+		return Tun2SocksState{}, fmt.Errorf("invalid tun address %q: %w", addr, err)
 	}
 
 	eng, err := tun2socks.Start(tun2socks.Config{
@@ -179,47 +185,93 @@ func tun2socksStartCmdRun(cmd *cobra.Command, _ []string) {
 		LogTag:        tunName,
 	})
 	if err != nil {
-		logging.Errorf("tun2socks start: %v", err)
-		return
+		return Tun2SocksState{}, fmt.Errorf("start tun2socks: %w", err)
 	}
 
 	tun2socksMu.Lock()
 	tun2socksInstances[tunName] = &tun2socksInstance{name: tunName, socksAddr: socksAddr, engine: eng}
 	tun2socksMu.Unlock()
 
-	logging.Successf("tun2socks %q started: SOCKS5 %s, tun %s; routing %v through the TUN (default route untouched)", tunName, socksAddr, addr, routePrefixes)
-	logging.Warningf("Use `tun2socks stop` to remove routes and the TUN device")
+	return Tun2SocksState{Name: tunName, Socks5: socksAddr}, nil
 }
 
-func tun2socksStopCmdRun(cmd *cobra.Command, args []string) {
-	tunName := defaultTunName
-	if len(args) > 0 {
-		tunName = args[0]
+// StopTun2Socks closes one transparent-proxy instance.
+func StopTun2Socks(name string) error {
+	if name == "" {
+		name = defaultTunName
 	}
 	tun2socksMu.Lock()
-	inst, ok := tun2socksInstances[tunName]
+	inst, ok := tun2socksInstances[name]
 	if ok {
-		delete(tun2socksInstances, tunName)
+		delete(tun2socksInstances, name)
 	}
 	tun2socksMu.Unlock()
 	if !ok || inst == nil {
-		logging.Errorf("tun2socks %q is not running", tunName)
-		return
+		return fmt.Errorf("tun2socks %q is not running", name)
 	}
 	if err := inst.engine.Close(); err != nil {
-		logging.Errorf("tun2socks stop: %v", err)
+		return fmt.Errorf("stop tun2socks %q: %w", name, err)
 	}
+	return nil
 }
 
-func tun2socksStatusCmdRun(cmd *cobra.Command, _ []string) {
+// Tun2SocksStatus lists the running transparent-proxy instances.
+func Tun2SocksStatus() []Tun2SocksState {
 	tun2socksMu.Lock()
 	defer tun2socksMu.Unlock()
-	if len(tun2socksInstances) == 0 {
+	out := make([]Tun2SocksState, 0, len(tun2socksInstances))
+	for name, inst := range tun2socksInstances {
+		out = append(out, Tun2SocksState{Name: name, Socks5: inst.socksAddr})
+	}
+	return out
+}
+
+func tun2socksStartCmdRun(cmd *cobra.Command, _ []string) {
+	opts := Tun2SocksOptions{}
+	opts.Port, _ = cmd.Flags().GetInt("port")
+	opts.Host, _ = cmd.Flags().GetString("host")
+	if !cmd.Flags().Changed("port") {
+		opts.Port = 0
+	}
+	if !cmd.Flags().Changed("host") {
+		opts.Host = ""
+	}
+	opts.Socks5, _ = cmd.Flags().GetString("socks5")
+	opts.Name, _ = cmd.Flags().GetString("name")
+	opts.Addr, _ = cmd.Flags().GetString("addr")
+	opts.MTU, _ = cmd.Flags().GetInt("mtu")
+	opts.Routes, _ = cmd.Flags().GetStringSlice("route")
+	opts.Excludes, _ = cmd.Flags().GetStringSlice("exclude")
+
+	state, err := StartTun2Socks(opts)
+	if err != nil {
+		logging.Errorf("tun2socks start: %v", err)
+		return
+	}
+	logging.Successf("tun2socks %q started: SOCKS5 %s; routing %v through the TUN (default route untouched)", state.Name, state.Socks5, opts.Routes)
+	logging.Warningf("Use `tun2socks stop` to remove routes and the TUN device")
+}
+
+func tun2socksStopCmdRun(_ *cobra.Command, args []string) {
+	name := defaultTunName
+	if len(args) > 0 {
+		name = args[0]
+	}
+	if err := StopTun2Socks(name); err != nil {
+		logging.Errorf("tun2socks stop: %v", err)
+		return
+	}
+	logging.Successf("tun2socks %q stopped", name)
+}
+
+func tun2socksStatusCmdRun() {
+	states := Tun2SocksStatus()
+	if len(states) == 0 {
 		logging.Infof("No tun2socks instance is running")
 		return
 	}
-	for name, inst := range tun2socksInstances {
-		logging.Infof("tun2socks %q: SOCKS5 %s", name, inst.socksAddr)
+	for _, state := range states {
+		logging.Infof("tun2socks %q: SOCKS5 %s", state.Name, state.Socks5)
 	}
 }
 
@@ -265,7 +317,7 @@ SOCKS5 pivot, i.e. it appears to originate from the selected agent.`,
 	statusCmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show running tun2socks instances",
-		Run:   func(*cobra.Command, []string) { tun2socksStatusCmdRun(nil, nil) },
+		Run:   func(*cobra.Command, []string) { tun2socksStatusCmdRun() },
 	}
 	root.AddCommand(statusCmd)
 

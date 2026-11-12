@@ -4,10 +4,16 @@
   "author": "jm33-ng",
   "date": "2026-01-26",
   "comment": "Linux BOF Hello World",
+  "help": "Linux BOF that prints a greeting from inside the agent process. --who is a C string and defaults to World. The module depends on coffloader_linux; build it before use. Output is returned in the job result.",
+  "examples": [
+    "hello_linux --who World"
+  ],
   "is_local": false,
   "platform": "Linux",
   "path": "",
-  "dependencies": ["coffloader_linux"],
+  "dependencies": [
+    "coffloader_linux"
+  ],
   "parameters": [
     {
       "name": "who",
@@ -19,7 +25,9 @@
   ],
   "agent_config": {
     "exec": "",
-    "files": ["hello_linux.o"],
+    "files": [
+      "hello_linux.o"
+    ],
     "type": "coff"
   },
   "invocation": {

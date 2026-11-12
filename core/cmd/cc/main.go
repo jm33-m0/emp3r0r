@@ -308,15 +308,14 @@ func runMCPMode(opts *Options) {
 	defer audit.Close()
 
 	actions := &mcp.Actions{
-		Target:      live.GetActiveAgent,
-		Select:      selectTarget,
-		Policy:      policy,
-		Audit:       audit,
-		Limiter:     mcp.NewLimiter(policy.MaxActionsPerMinute, 5),
-		Executor:    mcp.C2Executor{},
-		Operator:    client.SessionID,
-		DefaultCC:   configuredC2Address(),
-		RunOperator: operator.HeadlessCommand,
+		Target:    live.GetActiveAgent,
+		Select:    selectTarget,
+		Policy:    policy,
+		Audit:     audit,
+		Limiter:   mcp.NewLimiter(policy.MaxActionsPerMinute, 5),
+		Executor:  mcp.C2Executor{},
+		Operator:  client.SessionID,
+		DefaultCC: configuredC2Address(),
 	}
 
 	err = mcp.Serve(context.Background(), os.Stdin, os.Stdout, mcp.Options{
@@ -369,12 +368,22 @@ source change.
 Workflow: list_agents, then select_agent with a tag. list_agents returns the
 same host, process, network, mesh, transport, privilege, and memfs detail the
 console shows; pass an agent tag to narrow it. Call list_modules and
-module_help before run_module; never invent a module or flag. Use run_exec only
-when no module covers the task, and run_command only for built-in agent
-commands such as ls or ps. Use command for an operator console command line
-such as /target <tag>, /ls /tmp, or /jobs; target commands are screened, local
-commands are audited, and module names are rejected in favor of run_module.
-Use review_command when you only need the review.
+module_help before run_module; never invent a module or flag. Use the typed
+target tools for built-in operations: ls, cat, pwd, ps, cd, cp, mv, rm, mkdir,
+kill, net_helper, and decrypt. There is no generic command or exec tool;
+modules and these typed tools are the only execution paths. Use
+review_command when you only need the review.
+
+Control tools cover C2-side state: resume_operator, forget_agent, socks_start,
+socks_stop, socks_status, tun2socks_start, tun2socks_stop, tun2socks_status,
+set_debug, and suicide. Use them directly instead of asking for a console
+command.
+
+Every result includes executed, opsec, and decision; target actions also
+return job_id. blocked=true means nothing ran: read decision.reason and
+opsec.rules, then choose a lower-footprint path. warnings means the action ran;
+report every warning and matched rule. Read target output with
+read_job_output and result_summary.
 
 Use upload_file to stage a local file on the target and download_file to pull
 a target file or directory to the operator. upload_file defaults to
@@ -397,6 +406,12 @@ data, the stager is built for the target, and both exit on a host that is not
 the target. Target runtime libraries are the target's concern, not this host's.
 
 Configured C2 address: ` + cc + `
+
+A cc name that the C2 certificate does not cover is added automatically to the
+built-in TLS/QUIC certificate: the server adds the SAN, regenerates only when
+the set changes, and reloads the in-process certificate for new handshakes. It
+does not restart. With an external TLS front proxy or CDN, that proxy must cover
+the name itself. Custom transports skip this certificate automation.
 
 Installed modules are the authoritative interface for running work: use
 list_modules, module_help, and run_module instead of reading source or running

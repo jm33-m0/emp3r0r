@@ -4,6 +4,11 @@
     "author": "jm33-m0",
     "date": "2026-11-02",
     "comment": "Download a file from the agent over the FTP route",
+    "help": "Download one file or directory from the agent to the operator over the FTP route. path is the remote target. filter applies a regex when path is a directory. offset and stream are internal C2 fields and cannot be supplied directly. Use the download_file MCP tool instead of running this BOF yourself.",
+    "examples": [
+      "get_file --path /etc/passwd",
+      "get_file --path /tmp --filter '.*\\.log'"
+    ],
     "is_local": false,
     "platform": "Linux",
     "path": "",

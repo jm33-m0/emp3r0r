@@ -4,12 +4,16 @@
   "author": "jm33-ng",
   "date": "2026-10-14",
   "comment": "Load and execute Linux relocatable BOFs in memory. A dependency for Linux 'coff' modules; not runnable directly.",
+  "help": "Dependency module only: maps and executes Linux relocatable BOFs in memory for modules of type coff. It has no entry point and cannot be run directly. Declare coffloader_linux in a BOF module's dependencies; the loader is mapped on demand.",
+  "examples": [],
   "is_local": false,
   "platform": "Linux",
   "parameters": [],
   "agent_config": {
     "exec": "",
-    "files": ["coffloader_linux.so"],
+    "files": [
+      "coffloader_linux.so"
+    ],
     "type": "so"
   },
   "invocation": {}

