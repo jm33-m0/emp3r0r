@@ -6,6 +6,10 @@
   `Dockerfile`; install podman and build the image if it is missing. Use the
   container for all work unless you must test a Windows build. Sync files to
   WSL's native filesystem before testing.
+- Mount the tree with a shared SELinux label (`-v /path/to/repo:/work:z`).
+  Without a label a container cannot read a tree that an earlier `:Z` mount
+  relabelled, and zig reports the unreadable source as `CacheCheckFailed` on
+  line 1 of the file.
 - The Go module root is `core/`. Read `README.md` and `docs/TESTING.md` before
   changing code.
 - Do not read the whole codebase first. Find the relevant files, start coding,
