@@ -1,5 +1,14 @@
 # Changelog
 
+## [5.8.2](https://github.com/jm33-m0/emp3r0r/compare/v5.8.1...v5.8.2) (2026-11-12)
+
+
+### Bug Fixes
+
+* **ai:** consolidate module/tool help ([a994122](https://github.com/jm33-m0/emp3r0r/commit/a9941229aa0207e6ca2ce0cb92be2d6e0a98bde3))
+* **ai:** optimize module workflows ([bf4aa5f](https://github.com/jm33-m0/emp3r0r/commit/bf4aa5fd73bb1933f3ab8d13bcfc2fe55ea4ebf3))
+* **ai:** remove `ask` and consolidate everything into mcp ([f2d6d19](https://github.com/jm33-m0/emp3r0r/commit/f2d6d19d4330e56956504e12e01a5d452910b98a))
+
 ## [5.8.1](https://github.com/jm33-m0/emp3r0r/compare/v5.8.0...v5.8.1) (2026-11-10)
 
 
