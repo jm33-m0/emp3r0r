@@ -2,6 +2,7 @@ package modules
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	c2context "github.com/jm33-m0/emp3r0r/core/internal/cc/context"
@@ -21,16 +22,46 @@ func BuildLocalModule(moduleName string, flags map[string]string) (string, error
 	if !ok || mod == nil {
 		return "", fmt.Errorf("module %q is not installed", moduleName)
 	}
+	return buildLocalModule(mod, flags)
+}
+
+// BuildLocalModuleAt builds a local module from an explicit source directory
+// instead of the installed module registry. The autonomous detection loop uses
+// it so the repository copy it edits is the copy it builds.
+func BuildLocalModuleAt(moduleDir string, moduleName string, flags map[string]string) (string, error) {
+	moduleDir = strings.TrimSpace(moduleDir)
+	if moduleDir == "" {
+		return "", fmt.Errorf("module directory is required")
+	}
+	configs, err := modconfig.ReadConfigs(filepath.Join(moduleDir, "config.json"))
+	if err != nil {
+		return "", fmt.Errorf("read module config: %w", err)
+	}
+	var mod *def.ModuleConfig
+	for _, candidate := range configs {
+		if candidate != nil && strings.EqualFold(candidate.Name, moduleName) {
+			mod = candidate
+			break
+		}
+	}
+	if mod == nil {
+		return "", fmt.Errorf("module %q is not defined in %s", moduleName, moduleDir)
+	}
+	mod.Path = moduleDir
+	return buildLocalModule(mod, flags)
+}
+
+func buildLocalModule(mod *def.ModuleConfig, flags map[string]string) (string, error) {
 	if !mod.IsLocal {
-		return "", fmt.Errorf("module %q is not a local C2 module", moduleName)
+		return "", fmt.Errorf("module %q is not a local C2 module", mod.Name)
 	}
 	if mod.Build == "" {
-		return "", fmt.Errorf("module %q has no build step", moduleName)
+		return "", fmt.Errorf("module %q has no build step", mod.Name)
 	}
 	for name, value := range flags {
 		opt, ok := mod.Options[name]
 		if !ok || opt == nil {
-			return "", fmt.Errorf("unknown option --%s for %s", name, moduleName)
+			return "", fmt.Errorf("unknown option --%s for %s", name, mod.Name)
 		}
 		if opt.Internal {
 			return "", fmt.Errorf("--%s is filled in by the C2", name)
@@ -39,7 +70,6 @@ func BuildLocalModule(moduleName string, flags map[string]string) (string, error
 			return "", err
 		}
 	}
-
 	dispatchMu.Lock()
 	defer dispatchMu.Unlock()
 	out, err := build_module(mod, flags)

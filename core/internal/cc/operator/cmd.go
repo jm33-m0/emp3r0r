@@ -91,6 +91,7 @@ func Emp3r0rCommands(app *console.Console) console.Commands {
 		// this command will be used to generate an agent binary
 		rootCmd.AddCommand(gen_agent_cmd())
 		rootCmd.AddCommand(gen_c_cmd())
+		rootCmd.AddCommand(detectLoopCmd())
 
 		setDebuglevelCmd := &cobra.Command{
 			Use:     "debug",

@@ -24,7 +24,9 @@ description or module manifest in the same change.
 | `internal/cc/mcp/builtin.go` | Typed built-in target operations such as `ls`, `ps`, `cd`, and `rm`. |
 | `internal/cc/mcp/control_tools.go` | C2-side controls such as SOCKS5 pivots, TUN routing, and operator resume. |
 | `internal/cc/mcp/generate.go` | Go and C agent builders. |
+| `internal/cc/mcp/detection.go` | Sandbox detection plans, runs, and source-mapped feedback. |
 | `internal/cc/mcp/opsec.go` | Deterministic OPSEC capability review. |
+| `internal/cc/detection/` | LitterBox client, plan/run/feedback engine, and the Norma analyst. |
 | `internal/cc/mcp/audit.go` | Pre- and post-execution audit records. |
 | `internal/cc/mcp/executor.go` | Production bridge to the operator client and builders. |
 
@@ -98,3 +100,24 @@ go test -race ./internal/cc/mcp
 
 Cover argument validation, blocked actions, and the Executor boundary. Do not
 assert exact tool-description prose; test the behavior a client can observe.
+
+## Detection tools
+
+`detection_plan`, `detection_run`, `detection_feedback`, `detection_runs`,
+`detection_telemetry_import`, `detection_query`, `detection_loop`,
+`detection_payloads`, `detection_compare`, and `detection_report` are the
+detection tools;
+keep `TestMergedToolsetScreensActions` in sync when adding or removing one.
+Operator usage is in [detection.md](detection.md). `detection_run` screens
+active stages as `process-creation` and keeps static uploads passive. The build
+hook in `runModule` attaches the plan for `loader_windows` and `stager_linux`;
+it must never turn a successful build into a failed call.
+
+Dynamic results feed the telemetry SQLite database. Each artifact gets a
+`payloads` row and a `payload_<hash>` view containing only that payload's
+events; `detection_payloads` and `detection_compare` expose the list and diff.
+`detection_loop` runs the autonomous Norma loop and edits module source, so it
+requires `approve_execution=true`. `detection_query` opens a read-only
+connection and accepts one SELECT or WITH statement; it rejects comments, extra
+statements, PRAGMAs, writes, and schema keywords. Keep the analyst's
+`TelemetryQuery` tool on the same path.

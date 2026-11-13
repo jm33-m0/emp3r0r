@@ -16,6 +16,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/wireguard"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/detection"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/mcp"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/operator"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/opsec"
@@ -159,6 +160,29 @@ job ownership, and operator locks.`,
 	mcpCmd.Flags().StringVar(&opts.wg_operator_key_file, "operator-wg-key-file", "", "Read the operator WireGuard private key from this file instead of argv")
 	mcpCmd.Flags().StringVar(&opts.mcp_policy, "policy", "", "OPSEC policy file (default: <EmpWorkSpace>/mcp.json)")
 
+	// Detached detection-loop worker. The console detect_loop command starts
+	// this process with Setsid; it has no MCP or C2 dependency.
+	detectLoopWorkerCmd := &cobra.Command{
+		Use:    "detect-loop-worker",
+		Short:  "Run one autonomous detection loop (internal)",
+		Hidden: true,
+		Args:   cobra.NoArgs,
+		Run:    runDetectLoopWorkerCmd,
+	}
+	detectLoopWorkerCmd.Flags().String("module", "loader_windows", "Module name")
+	detectLoopWorkerCmd.Flags().String("module-dir", "", "Module source directory")
+	detectLoopWorkerCmd.Flags().String("shellcode", "", "Go agent shellcode")
+	detectLoopWorkerCmd.Flags().String("sandbox", "", "LitterBox URL")
+	detectLoopWorkerCmd.Flags().Int("iterations", 3, "Maximum detection cycles")
+	detectLoopWorkerCmd.Flags().StringSlice("stages", []string{"static", "dynamic"}, "Stages")
+	detectLoopWorkerCmd.Flags().String("process", "", "Sacrificial process override")
+	detectLoopWorkerCmd.Flags().String("format", "exe", "Loader host format")
+	detectLoopWorkerCmd.Flags().String("inject", "apc", "Injection method")
+	detectLoopWorkerCmd.Flags().String("smw", "on", "SilentMoonwalk")
+	detectLoopWorkerCmd.Flags().Int("turns", 60, "Maximum Norma turns")
+	detectLoopWorkerCmd.Flags().Duration("timeout", 0, "Worker deadline; 0 means no deadline")
+	detectLoopWorkerCmd.Flags().String("loop-id", "", "Loop ID")
+
 	// Completion command
 	completionCmd := &cobra.Command{
 		Use:   "completion [bash|zsh]",
@@ -192,7 +216,7 @@ Zsh:
 	}
 
 	// Add subcommands to root
-	rootCmd.AddCommand(clientCmd, serverCmd, mcpCmd, completionCmd)
+	rootCmd.AddCommand(clientCmd, serverCmd, mcpCmd, detectLoopWorkerCmd, completionCmd)
 
 	// Default behavior if no subcommand is given (backwards compatibility)
 	rootCmd.Run = func(cmd *cobra.Command, args []string) {
@@ -216,6 +240,12 @@ func runClientMode(opts *Options) {
 // connectClient joins the C2 as an operator: WireGuard when keys are given,
 // the operator config bundle, and the shared operator config.
 func connectClient(opts *Options) {
+	if loaded, envErr := live.LoadOperatorEnv(); envErr != nil {
+		logging.Warningf("Operator env: %v", envErr)
+	} else if loaded > 0 {
+		logging.Infof("Loaded %d operator environment variables from %s", loaded,
+			filepath.Join(live.EmpWorkSpace, "operator.env"))
+	}
 	err := live.CopyStubs()
 	if err != nil {
 		logging.Fatalf("Failed to copy stubs: %v", err)
@@ -307,6 +337,17 @@ func runMCPMode(opts *Options) {
 	}
 	defer audit.Close()
 
+	detectionLoop, err := detection.NewLoop(detection.LoopConfig{
+		SandboxURL: os.Getenv("EMP3R0R_DETECTION_SANDBOX"),
+		StoreRoot:  filepath.Join(live.EmpWorkSpace, "detection"),
+		AnalystFactory: func(workingDir string, telemetry *detection.TelemetryDB) (*detection.Analyst, error) {
+			return detection.ConfiguredAnalyst(workingDir, telemetry, func(line string) { logging.Infof("%s", line) })
+		},
+	})
+	if err != nil {
+		logging.Fatalf("detection loop: %v", err)
+	}
+
 	actions := &mcp.Actions{
 		Target:    live.GetActiveAgent,
 		Select:    selectTarget,
@@ -315,6 +356,7 @@ func runMCPMode(opts *Options) {
 		Limiter:   mcp.NewLimiter(policy.MaxActionsPerMinute, 5),
 		Executor:  mcp.C2Executor{},
 		Operator:  client.SessionID,
+		Detection: detectionLoop,
 		DefaultCC: configuredC2Address(),
 	}
 
@@ -404,6 +446,20 @@ results are the deliverable. Do not run, strace, gdb, readelf, or otherwise
 test a build output on the operator host: the shellcode is position-independent
 data, the stager is built for the target, and both exit on a host that is not
 the target. Target runtime libraries are the target's concern, not this host's.
+
+A successful loader_windows or stager_linux build also returns a detection
+block: the artifact hash, the sandbox test plan, a run ID, the passive static
+score, and the source file and line for each detection indicator. Use
+detection_plan to inspect a plan, detection_run to run static or, with
+approve_execution=true, dynamic and EDR stages, and detection_feedback to get
+source-mapped findings and, when configured, analyst-proposed edits. Dynamic
+stages import RedEdr ETW events into the detection SQLite database; each
+artifact gets a payload row and a payload_<hash> view, which detection_payloads
+and detection_compare expose. detection_query runs one read-only SELECT.
+detection_telemetry_import ingests offline RedEdr or DefenderObserver data.
+detection_loop lets a Norma agent run the whole build/detonate/edit/re-test
+cycle and requires approve_execution=true. Active stages detonate the payload in
+the local sandbox; they never touch a target.
 
 Configured C2 address: ` + cc + `
 
@@ -518,4 +574,58 @@ func connectWg(opts *Options) {
 	wireguard.WgOperator = wgDev
 	go wgDev.Wait()
 	logging.Infof("WireGuard userspace tunnel established")
+}
+
+func runDetectLoopWorkerCmd(cmd *cobra.Command, _ []string) {
+	if err := live.SetupFilePaths(); err != nil {
+		fmt.Fprintf(os.Stderr, "detect-loop-worker: %v\n", err)
+		os.Exit(1)
+	}
+	// Keep the worker log separate from emp3r0r.log: the parent redirects
+	// stdout/stderr to the loop log.
+	logging.SetOutput(logging.PlainFileWriter(os.Stdout))
+	if loaded, envErr := live.LoadOperatorEnv(); envErr != nil {
+		fmt.Fprintf(os.Stdout, "operator env: %v\n", envErr)
+	} else if loaded > 0 {
+		fmt.Fprintf(os.Stdout, "loaded %d operator environment variables\n", loaded)
+	}
+	module, _ := cmd.Flags().GetString("module")
+	moduleDir, _ := cmd.Flags().GetString("module-dir")
+	shellcode, _ := cmd.Flags().GetString("shellcode")
+	sandbox, _ := cmd.Flags().GetString("sandbox")
+	iterations, _ := cmd.Flags().GetInt("iterations")
+	stages, _ := cmd.Flags().GetStringSlice("stages")
+	process, _ := cmd.Flags().GetString("process")
+	format, _ := cmd.Flags().GetString("format")
+	inject, _ := cmd.Flags().GetString("inject")
+	smw, _ := cmd.Flags().GetString("smw")
+	turns, _ := cmd.Flags().GetInt("turns")
+	timeout, _ := cmd.Flags().GetDuration("timeout")
+	loopID, _ := cmd.Flags().GetString("loop-id")
+	if sandbox == "" {
+		sandbox = os.Getenv("EMP3R0R_DETECTION_SANDBOX")
+	}
+	var (
+		ctx    context.Context
+		cancel context.CancelFunc
+	)
+	if timeout > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+	} else {
+		ctx = context.Background()
+	}
+	err := operator.RunDetectLoopWorker(ctx, detection.EvolveConfig{
+		LoopID: loopID, Module: module, ModuleDir: moduleDir,
+		Shellcode: shellcode, SandboxURL: sandbox,
+		StoreRoot: filepath.Join(live.EmpWorkSpace, "detection"),
+		Process:   process, Format: format, Inject: inject, SMW: smw,
+		Stages: stages, Iterations: iterations, Turns: turns,
+	})
+	if err != nil {
+		// The loop log is stdout; write there directly so a release build
+		// cannot hide the failure behind a no-op logger.
+		fmt.Fprintf(os.Stdout, "detect-loop-worker: %v\n", err)
+		os.Exit(1)
+	}
 }

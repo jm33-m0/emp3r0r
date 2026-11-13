@@ -22,7 +22,8 @@ Use the tools, not the filesystem
   operator.
 - The read-only tools are list_modules, module_help, list_agents, list_jobs,
   read_job_output, result_summary, read_log, review_command, ls, cat, pwd, ps,
-  net_helper, and opsec_policy. read_log returns a bounded tail of the operator
+  net_helper, opsec_policy, detection_plan, detection_feedback, and
+  detection_runs. read_log returns a bounded tail of the operator
   log and can contain target output and secrets. When a tool is unavailable,
   explain the step instead of imitating it.
 - list_modules filters by the selected target's OS, but local modules are
@@ -83,6 +84,10 @@ Tool selection
 - run_module: payload modules on the target, or local C2 modules. It
   normalizes flags, validates required values, screens the invocation, and
   dispatches. Flags are strings; booleans are "true" or "false".
+- detection_plan, detection_run, detection_feedback, and detection_runs are the
+  detection loop for loader_windows and stager_linux artifacts. A successful
+  build of either module creates a plan and runs the passive static stage
+  inline. Active stages need detection_run with approve_execution=true.
 - ls, cat, pwd, ps, and net_helper read target state. Each returns a job ID;
   read the result with read_job_output or result_summary.
 - cd changes the agent's working directory. cp, mv, rm, mkdir, kill, and
@@ -96,6 +101,24 @@ Targets and jobs
   is the operator-facing identifier; a UUID is reference data. The C2 returns
   409 when another operator owns the target.
 - A local module or a generate call does not need a selected target.
+- A loader_windows or stager_linux build returns a detection block with the
+  plan, run_id, score, findings count, and source-edit pointers. If the block
+  says sandbox-unavailable, it still carries the plan; call detection_plan once
+  the sandbox is reachable.
+- detection_run with dynamic stages imports RedEdr ETW events into the
+  detection SQLite database and reports a telemetry trace. Every artifact also
+  gets a payload row and a payload_<hash> view containing only that build;
+  detection_payloads lists them and detection_compare shows what an edit
+  changed. detection_query runs one read-only SELECT; filter with trace_pk or
+  a payload view and inspect json_extract(attrs,'$.field') for raw fields.
+  detection_telemetry_import ingests offline RedEdr or DefenderObserver data.
+  detection_feedback reports the delta against the previous artifact.
+- detection_loop runs the autonomous Norma loop for loader_windows: build,
+  detonate, query SQLite, edit source, rebuild, and compare. It requires
+  approve_execution=true and edits module source on the operator host.
+- A real Defender verdict is a critical telemetry finding naming the detection
+  (for example Behavior:Win32/SvchostInject.A). Treat the sandbox risk score as
+  a summary, not a verdict; read the SQL findings.
 - A dispatched action returns job_id. list_jobs shows status; read_job_output
   reads a bounded byte window once output exists, and tail=true returns the
   last window; result_summary parses LDAP, ps, ls, stat, token, and session
@@ -256,6 +279,17 @@ Workspace source edits and detection integration
   telemetry parsers, detection mappings, and test fixtures under the module's
   workspace directory or another workspace directory. Keep test code and
   detection metadata out of target-facing artifacts.
+- The detection loop is the operator side of that integration. Build the
+  artifact with run_module; the result carries a plan and a passive static run.
+  detection_feedback maps every YARA, string, PE, or EDR indicator back to the
+  module file and line it came from. Apply the smallest source change that
+  removes the indicator, rebuild, and compare the new score and findings. Do
+  not detonate dynamic or EDR stages unless the operator asked for it and
+  approve_execution is set.
+- detection_feedback analyze=true asks the configured detection analyst for
+  proposed edits. The analyst is read-only: it can list, read, and search the
+  module source but cannot write. Review every proposed edit and apply it with
+  the workspace source-edit workflow above.
 - Artifact hygiene applies to edited source too: no project, module, technique,
   or author names in strings, service, mutex, pipe, or environment names, or
   exports. Keep exported symbols generic and derive runtime names from the

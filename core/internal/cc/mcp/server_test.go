@@ -405,14 +405,14 @@ func TestMergedToolsetScreensActions(t *testing.T) {
 	h.send(map[string]any{"jsonrpc": "2.0", "id": 7, "method": "tools/list"})
 	result, _ := h.next().Result.(map[string]any)
 	tools, _ := result["tools"].([]any)
-	if len(tools) != 38 {
-		t.Fatalf("tools = %d, want 38", len(tools))
+	if len(tools) != 48 {
+		t.Fatalf("tools = %d, want 48", len(tools))
 	}
 	seen := map[string]bool{}
 	for _, raw := range tools {
 		seen[raw.(map[string]any)["name"].(string)] = true
 	}
-	for _, name := range []string{"run_module", "ls", "ps", "cd", "socks_start", "tun2socks_start", "forget_agent", "upload_file", "download_file", "reload_modules", "select_agent", "generate", "generate_c"} {
+	for _, name := range []string{"run_module", "ls", "ps", "cd", "socks_start", "tun2socks_start", "forget_agent", "upload_file", "download_file", "reload_modules", "select_agent", "generate", "generate_c", "detection_plan", "detection_run", "detection_feedback", "detection_runs", "detection_telemetry_import", "detection_query", "detection_loop", "detection_payloads", "detection_compare", "detection_report"} {
 		if !seen[name] {
 			t.Fatalf("missing action tool %q", name)
 		}

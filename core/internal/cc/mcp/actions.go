@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/detection"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/operator"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/opsec"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -50,6 +51,9 @@ type Actions struct {
 	Limiter  *Limiter
 	Executor Executor
 	Operator string
+	// Detection plans and runs payload detonation tests against a sandbox.
+	// It is optional; when nil the detection tools report that it is off.
+	Detection *detection.Loop
 	// DefaultCC is the C2 address captured when the MCP session starts. It is
 	// the fallback for generate and generate_c when the caller omits cc.
 	// Builders mutate live.RuntimeConfig, so reading it per call would make an
@@ -161,6 +165,9 @@ func (a *Actions) Tools() map[string]Tool {
 	for name, tool := range a.controlTools() {
 		tools[name] = tool
 	}
+	for name, tool := range a.detectionTools() {
+		tools[name] = tool
+	}
 	return tools
 }
 
@@ -235,6 +242,8 @@ func (a *Actions) runModule(ctx context.Context, raw json.RawMessage) (any, erro
 		result["output"] = truncate(out, 64<<10)
 		if err != nil {
 			result["error"] = err.Error()
+		} else if block := a.attachDetection(ctx, mod, out); block != nil {
+			result["detection"] = block
 		}
 		return result, nil
 	}

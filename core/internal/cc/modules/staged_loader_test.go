@@ -184,8 +184,8 @@ func TestStagedLoaderConfigParse(t *testing.T) {
 		t.Fatalf("shellcode parameter should be required")
 	}
 	proc := mustOption("process")
-	if proc.Val != "svchost.exe" {
-		t.Fatalf("process default = %q, want svchost.exe", proc.Val)
+	if proc.Val != "dllhost.exe" {
+		t.Fatalf("process default = %q, want dllhost.exe", proc.Val)
 	}
 	arch := mustOption("arch")
 	if arch.Val != "x64" {

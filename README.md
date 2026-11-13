@@ -153,6 +153,7 @@ C2 server binaries keep the full feature set, so one server can handle every age
 
 - [Operator guide](./docs/OPERATOR.md): installation, quick start, operator setup, container notes, tmux keybindings, and agent generation.
 - [MCP server development](./docs/MCP.md): tool registration, the OPSEC screen, audit path, and tests.
+- [Detection testing](./docs/detection.md): sandbox plans, build-time feedback, source mapping, and the analyst.
 - [Custom transport guide](./docs/CUSTOM_C2.md): Tor hidden-service quick start, Go and C agent dialers, C2 bridge socket protocol, and running multiple custom transports.
 - [RISC-V BOF modules](./docs/rvvm.md): running portable BOFs with `--riscv`, linking static libraries, and the RV32IMA interpreter.
 - [Module development guide](./docs/module_development_guide.md)
