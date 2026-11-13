@@ -12,7 +12,8 @@ Linux-first multi-operator C2 built to stay quiet and keep working. Self-healing
 ![GitHub License](https://img.shields.io/github/license/jm33-m0/emp3r0r)
 [![GitHub release](https://img.shields.io/github/release/jm33-m0/emp3r0r.svg)](https://github.com/jm33-m0/emp3r0r/releases)
 
-<img width="1756" height="1387" alt="emp3r0r-ai" src="https://github.com/user-attachments/assets/6a9c3dc7-bc49-43e8-9456-ddd540ef5539" />
+<img width="2060" height="1187" alt="Screenshot From 2026-11-14 00-12-04" src="https://github.com/user-attachments/assets/66e2e292-0677-44bb-9e9f-4548cc4e2135" />
+
 
 ## What is emp3r0r?
 
