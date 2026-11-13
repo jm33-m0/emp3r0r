@@ -27,7 +27,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # ---- parameters (defaults mirror config.json) ----
 SHELLCODE=""
 OUTPUT=""
-PROCESS="svchost.exe"
+PROCESS="dllhost.exe"
 PROCESS_ARGS=""
 ARCH="x64"
 KEY=""
@@ -54,7 +54,7 @@ options:
                          exe     = plain console executable
                          dll     = DLL exporting Run()
   --process <name>     sacrificial process: bare name (System32) or full path
-                       (default: svchost.exe, e.g. dllhost.exe)
+                       (default: dllhost.exe, e.g. svchost.exe)
   --process-args <s>   optional args for the sacrificial process
   --arch <x64|x86>     architecture of blob and loader (default: x64)
   --cc <cmd>           cross compiler command, optionally with arguments

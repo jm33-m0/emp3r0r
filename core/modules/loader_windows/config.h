@@ -8,7 +8,7 @@
 
 /* Sacrificial process: a bare name is resolved under System32, anything with
  * a path separator or drive letter is used verbatim. */
-#define SACRIFICIAL_PROCESS L"svchost.exe"
+#define SACRIFICIAL_PROCESS L"dllhost.exe"
 
 /* Optional command line passed to the sacrificial process. The primary
  * thread is parked right after the injected blob runs, so in the early-bird
