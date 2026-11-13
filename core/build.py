@@ -97,7 +97,7 @@ PROXY_NS_IMAGE_BIN = pathlib.Path("/opt/proxy-ns/proxy-ns")
 # default so the kit/install can drop it at the compiled-in /etc path.
 PROXY_NS_IMAGE_CONFIG = pathlib.Path("/opt/proxy-ns/config.json")
 PROXY_NS_SYSTEM_CONFIG = pathlib.Path("/etc/proxy-ns/config.json")
-REQUIRED_GO_VERSION = "1.26.2"
+REQUIRED_GO_VERSION = "1.26.11"
 REQUIRED_ZIG_VERSION = "0.16.0"
 # zig is the explicit cross compiler for the Windows loader (and backs the
 # mingw shims in the builder image), so the builder image ships it as well.

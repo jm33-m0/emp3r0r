@@ -1,4 +1,6 @@
 cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
+github.com/Autumn-27/norma v0.4.4 h1:wdifhqGJKiCvtGz5tv81C/dVA6eK5yvBWka3ZkoWeNU=
+github.com/Autumn-27/norma v0.4.4/go.mod h1:BudWrf7iHl96FgHqFr/HwN3mKYmGjJDt+xL2ZHXfFZw=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/Code-Hex/Neo-cowsay/v2 v2.0.4 h1:y80Hd9hmB+rsEH/p4c5ti5PbO0PhBmxw4NgbpFZvoHg=
 github.com/Code-Hex/Neo-cowsay/v2 v2.0.4/go.mod h1:6k40Pwrc2FazLf1BUbmAC36E9LvT+DErjZr30isbXhg=

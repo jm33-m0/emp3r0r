@@ -1,8 +1,9 @@
 module github.com/jm33-m0/emp3r0r/core
 
-go 1.26.2
+go 1.26.11
 
 require (
+	github.com/Autumn-27/norma v0.4.4
 	github.com/Code-Hex/Neo-cowsay/v2 v2.0.4
 	github.com/alecthomas/chroma v0.10.0
 	github.com/carapace-sh/carapace v1.13.3
@@ -53,6 +54,7 @@ require (
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/carapace-sh/carapace-shlex v1.1.1 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
+	github.com/creack/pty v1.1.24 // indirect
 	github.com/dlclark/regexp2 v1.12.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
@@ -65,6 +67,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/go-sockaddr v1.0.7 // indirect
 	github.com/hashicorp/golang-lru v1.0.2 // indirect
+	github.com/hinshun/vt10x v0.0.0-20220301184237-5011da428d02 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/klauspost/compress v1.19.1 // indirect
