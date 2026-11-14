@@ -660,27 +660,46 @@ func (e *evolver) needsMoreWork(ctx context.Context) bool {
 // --- Norma agent -----------------------------------------------------------
 
 func (e *evolver) hooks() *hook.Registry {
-	return hook.NewRegistry().On(hook.PreToolUse, func(_ context.Context, event hook.Event) hook.Result {
+	hooks := hook.NewRegistry().On(hook.PreToolUse, func(_ context.Context, event hook.Event) hook.Result {
 		switch event.ToolName {
 		case "SourceList", "SourceRead", "SourceSearch", "TelemetryQuery",
-			"InspectFeedback", "Payloads", "ComparePayloads", "DetectionCycle", "EditSource":
+			"InspectFeedback", "Payloads", "ComparePayloads", "DetectionCycle", "EditSource",
+			"BuildShellcode", "RevertToPayload", "KnowledgeSearch", "KnowledgeRead":
 			return hook.Result{}
 		}
 		return hook.Result{Decision: "block", Message: "tool is not part of the detection loop"}
 	})
+	hooks.On(hook.PostToolUse, func(_ context.Context, event hook.Event) hook.Result {
+		status := "ok"
+		if event.IsError {
+			status = "error"
+		}
+		preview := clip(sanitizeLine(string(event.Result)), 300)
+		if preview == "" {
+			preview = "(no output)"
+		}
+		e.logClass(logging.ClassToolResult, "%s %s: %s", event.ToolName, status, preview)
+		return hook.Result{}
+	})
+	return hooks
 }
 
 func (e *evolver) tools() []tool.CoreTool {
 	tools := []tool.CoreTool{
-		analystListTool(e.cfg.ModuleDir),
-		analystReadTool(e.cfg.ModuleDir),
-		analystSearchTool(e.cfg.ModuleDir),
+		moduleListTool(e.roots),
+		moduleReadTool(e.roots),
+		moduleSearchTool(e.roots),
 		analystTelemetryTool(e.db),
 		e.detectionCycleTool(),
 		e.inspectFeedbackTool(),
 		e.payloadsTool(),
 		e.comparePayloadsTool(),
 		e.editSourceTool(),
+		e.buildShellcodeTool(),
+		e.revertPayloadTool(),
+	}
+	if e.knowledge != nil {
+		tools = append(tools, e.knowledgeSearchTool(), e.knowledgeReadTool())
 	}
 	return tools
 }

@@ -62,15 +62,19 @@ Set the model through the environment:
 	cmd.Flags().String("arch", "amd64", "Agent architecture")
 	cmd.Flags().String("cc", "", "C2 address for the generated agent; defaults to the current config")
 	cmd.Flags().String("sandbox", "", "LitterBox URL; defaults to EMP3R0R_DETECTION_SANDBOX or 127.0.0.1:1337")
-	cmd.Flags().Int("iterations", 3, "Maximum detection cycles, including the baseline")
+	cmd.Flags().Int("iterations", 3, "Maximum detection cycles including the baseline (at most 50)")
 	cmd.Flags().StringSlice("stages", []string{"static", "dynamic"}, "Stages to run")
 	cmd.Flags().String("process", "", "Override the sacrificial process; empty uses the module default")
 	cmd.Flags().String("format", "exe", "Loader host format: exe, service, or dll")
-	cmd.Flags().String("inject", "apc", "Injection method: apc or ct")
+	cmd.Flags().String("inject", "", "Override the injection method; empty uses the module default")
 	cmd.Flags().String("smw", "on", "SilentMoonwalk: on or off")
-	cmd.Flags().Int("turns", 60, "Maximum Norma agent turns")
+	cmd.Flags().StringSlice("producer", nil, "Shellcode producer module as name=path (donut=..., crystal_pack=...)")
+	cmd.Flags().StringSlice("read-root", nil, "Read-only source root the model may inspect (repeatable)")
+	cmd.Flags().String("knowledge", "", "Knowledge cache path; defaults to <detection store>/knowledge.db")
+	cmd.Flags().Int("turns", 60, "Maximum Norma agent turns (at most 240)")
 	cmd.Flags().Duration("timeout", 0, "Worker deadline; 0 means no deadline")
 	cmd.Flags().Bool("tmux", true, "Open a separate tmux window tailing the loop log")
+	cmd.AddCommand(KnowledgeSyncCmd())
 	return cmd
 }
 
@@ -261,12 +265,65 @@ func shellQuotePath(path string) string {
 	return "'" + strings.ReplaceAll(path, "'", `'\''`) + "'"
 }
 
+// KnowledgeSyncCmd refreshes the offline reference cache. The loop itself
+// never makes network calls, so this command is the only writer.
+func KnowledgeSyncCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "knowledge-sync",
+		Short: "Refresh the offline reference notebook used by the detection loop",
+		Long: `Download document summaries from a notebook MCP server into the detection
+store's SQLite FTS cache. The loop reads this cache; it does not have network
+access. Add --content to cache full document text as well.`,
+		Args: cobra.NoArgs,
+		Run: func(cmd *cobra.Command, _ []string) {
+			urlFlag, _ := cmd.Flags().GetString("url")
+			dbPath, _ := cmd.Flags().GetString("db")
+			notebook, _ := cmd.Flags().GetString("notebook")
+			content, _ := cmd.Flags().GetBool("content")
+			if dbPath == "" {
+				dbPath = defaultKnowledgePath()
+			}
+			db, err := detection.OpenKnowledgeDB(dbPath, true)
+			if err != nil {
+				logging.Errorf("knowledge-sync: %v", err)
+				return
+			}
+			defer func() { _ = db.Close() }()
+			stats, err := detection.SyncKnowledge(context.Background(), db, detection.KnowledgeSyncOptions{
+				URL: urlFlag, Notebook: notebook, Content: content,
+				Logf: func(line string) { fmt.Println(line) },
+			})
+			if err != nil {
+				logging.Errorf("knowledge-sync: %v", err)
+				return
+			}
+			logging.Successf("Knowledge cache %s: %d summaries, %d contents from %d notebooks",
+				dbPath, stats.Summaries, stats.Contents, stats.Notebooks)
+		},
+	}
+	cmd.Flags().String("url", "https://archeotech.r00ted.ch/mcp", "Notebook MCP endpoint")
+	cmd.Flags().String("db", "", "Cache path; defaults to <detection store>/knowledge.db")
+	cmd.Flags().String("notebook", "", "Only sync one notebook")
+	cmd.Flags().Bool("content", false, "Also cache full document content")
+	return cmd
+}
+
+// defaultKnowledgePath resolves the cache location outside an initialized
+// console workspace.
+func defaultKnowledgePath() string {
+	root := strings.TrimSpace(live.EmpWorkSpace)
+	if root == "" {
+		if home, err := os.UserHomeDir(); err == nil {
+			root = filepath.Join(home, ".emp3r0r")
+		}
+	}
+	return detection.KnowledgePath(filepath.Join(root, "detection"))
+}
+
 // RunDetectLoopWorker is the detached worker entry point. It does not start the
 // C2 client, MCP, or tmux; it only builds, detonates, and edits.
 func RunDetectLoopWorker(ctx context.Context, cfg detection.EvolveConfig) error {
-	cfg.Logf = func(line string) {
-		fmt.Fprintf(os.Stdout, "%s %s\n", time.Now().UTC().Format("15:04:05"), line)
-	}
+	cfg.Logf = logging.Classf
 	_, err := detection.RunEvolve(ctx, cfg)
 	return err
 }

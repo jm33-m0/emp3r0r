@@ -177,8 +177,11 @@ job ownership, and operator locks.`,
 	detectLoopWorkerCmd.Flags().StringSlice("stages", []string{"static", "dynamic"}, "Stages")
 	detectLoopWorkerCmd.Flags().String("process", "", "Sacrificial process override")
 	detectLoopWorkerCmd.Flags().String("format", "exe", "Loader host format")
-	detectLoopWorkerCmd.Flags().String("inject", "apc", "Injection method")
+	detectLoopWorkerCmd.Flags().String("inject", "", "Injection method override; empty uses the module default")
 	detectLoopWorkerCmd.Flags().String("smw", "on", "SilentMoonwalk")
+	detectLoopWorkerCmd.Flags().StringSlice("producer", nil, "Shellcode producer module as name=path")
+	detectLoopWorkerCmd.Flags().StringSlice("read-root", nil, "Read-only source root")
+	detectLoopWorkerCmd.Flags().String("knowledge", "", "Knowledge cache path")
 	detectLoopWorkerCmd.Flags().Int("turns", 60, "Maximum Norma turns")
 	detectLoopWorkerCmd.Flags().Duration("timeout", 0, "Worker deadline; 0 means no deadline")
 	detectLoopWorkerCmd.Flags().String("loop-id", "", "Loop ID")
@@ -216,7 +219,7 @@ Zsh:
 	}
 
 	// Add subcommands to root
-	rootCmd.AddCommand(clientCmd, serverCmd, mcpCmd, detectLoopWorkerCmd, completionCmd)
+	rootCmd.AddCommand(clientCmd, serverCmd, mcpCmd, detectLoopWorkerCmd, operator.KnowledgeSyncCmd(), completionCmd)
 
 	// Default behavior if no subcommand is given (backwards compatibility)
 	rootCmd.Run = func(cmd *cobra.Command, args []string) {
