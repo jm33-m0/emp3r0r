@@ -240,11 +240,25 @@ func (l *Loop) RunPlan(ctx context.Context, plan Plan, opts RunOptions) (Run, er
 				PayloadKey: trace.PayloadKey, PayloadTable: trace.PayloadTable,
 				Source: trace.Source, Events: trace.Events,
 				First: trace.First, Last: trace.Last,
+				PayloadPID: trace.PayloadPID, PayloadImage: trace.PayloadImage,
+				Attribution: trace.Attribution, Coverage: trace.Coverage,
 			}
 			if findings, findErr := l.Telemetry.Findings(ctx, trace.ID); findErr != nil {
 				run.Notes = append(run.Notes, "telemetry findings: "+findErr.Error())
 			} else {
 				run.Telemetry.Findings = findings
+			}
+			if stats, statErr := l.Telemetry.Stats(ctx, trace.ID); statErr != nil {
+				run.Notes = append(run.Notes, "telemetry stats: "+statErr.Error())
+			} else {
+				run.Telemetry.Stats = &stats
+			}
+			if trace.Attribution == "unknown" {
+				run.Notes = append(run.Notes, "telemetry: no payload PEB was captured; the trace cannot be attributed to the sample")
+			}
+			if len(trace.Coverage.Missing) > 0 {
+				run.Notes = append(run.Notes,
+					"telemetry coverage missing: "+strings.Join(trace.Coverage.Missing, ", "))
 			}
 		}
 	}

@@ -232,12 +232,13 @@ Rules:
   behavior the scanner keys on over deleting functionality.
 - Keep the module's flags, config.json schema, and build entrypoint unchanged.
 - If a feedback report carries telemetry, run TelemetryQuery before proposing
-  an edit. The tables are traces(id, run_id, external_id, module, artifact_sha256,
-  source, captured_at, path, meta JSON) and events(id, trace_pk, ts_ns, type,
-  source, event, provider, pid, tid, process, path, image, address, size,
-  category, severity, attrs JSON). Filter with trace_pk, group by event, and use
-  json_extract(attrs,'$.field') for the raw ETW fields. Only one SELECT or WITH
-  statement is allowed.
+  an edit. Use the findings table for the deterministic result, then the events
+  table for evidence. Events carry actor_pid, target_pid, operation, process,
+  target_image, path, image, protection, status, proto, endpoints, stack,
+  category, signal, and payload_role. Categories include memory (ETW-TI), hook,
+  and module. Filter with trace_pk, ignore signal='noise'/'baseline' unless
+  corroborating another finding, and use json_extract(attrs,'$.field') for raw
+  ETW fields. Only one SELECT or WITH statement is allowed.
 - If an indicator has no source match, say so; it may come from a dependency or
   a build input.
 - Answer with one JSON object and nothing else:
@@ -480,18 +481,29 @@ payloads(id, payload_key, sha256, module, label, artifact_path, table_name,
   parent_id, created_at) — one row per build; table_name is a view containing
   that payload's events only.
 traces(id, payload_id, run_id, external_id, module, artifact_sha256, source,
-  captured_at, path, meta JSON)
-events(id, payload_id, trace_pk, ts_ns, type, source, event, provider, pid, tid,
-  process, path, image, address, size, category, severity, attrs JSON)
+  captured_at, path, meta JSON, payload_pid, payload_image, attribution,
+  coverage JSON, event_count, findings_count)
+events(id, payload_id, trace_pk, event_key, ts_ns, type, source, event,
+  provider, event_id, pid, tid, actor_pid, target_pid, target_tid, parent_pid,
+  operation, process, target_image, path, image, address, size, protection,
+  access, status, command, proto, src_addr, src_port, dst_addr, dst_port, bytes,
+  stack, category, severity, signal, payload_role, attrs JSON)
+findings(id, trace_pk, payload_id, stage, tool, severity, rule, indicator,
+  detail, signal, created_at)
 loop_cycles(loop_id, iteration, payload_id, run_id, score, level, findings,
   verdicts, trace_id, summary JSON), loop_feedback(loop_id, iteration,
   payload_id, run_id, body JSON), loop_results(loop_id, answer JSON),
   loop_builds(loop_id, iteration, payload_id,
   artifact, sha256, log), loop_edits(loop_id, iteration, payload_id,
   next_payload_id, file, old, new, reason)
-Categories: process, image, file, network, audit, thread, defender, query, other, meta.
+Categories: process, image, module, file, network, audit, thread, defender,
+query, hook, memory (ETW-TI), other.
+payload_role: payload, payload-child, payload-target, payload-scan, ambient, unknown.
+signal: signal, verdict, scan, info, baseline, noise.
 Use trace_pk to scope one trace, or query payloads.table_name for one payload.
-json_extract(attrs,'$.processid') reads raw ETW fields.`
+Use findings for the deterministic result and events for evidence; ignore
+signal='noise' and signal='baseline' unless corroborating another finding.
+json_extract(attrs,'$.field') reads raw ETW fields that have no column.`
 
 func analystTelemetryTool(db *TelemetryDB) tool.CoreTool {
 	return tool.Build(tool.Spec{

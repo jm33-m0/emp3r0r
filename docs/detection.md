@@ -36,7 +36,7 @@ unreachable, the block says `sandbox-unavailable` and carries the plan;
 | `detection_run`      | Upload the artifact and run selected stages: `static`, `dynamic`, `edr`. Default `static`.     |
 | `detection_feedback` | Return score, findings, source locations, pending stages, prior-run comparison, and optional analyst edits. |
 | `detection_runs`     | List recorded runs, newest first, with telemetry trace and event counts.                       |
-| `detection_telemetry_import` | Import RedEdr or DefenderObserver telemetry from a local file or HTTP(S) URL.          |
+| `detection_telemetry_import` | Import RedEdr or DefenderObserver telemetry from a local file or the configured sandbox origin. |
 | `detection_query`    | Run one read-only SELECT over the telemetry database (500 rows maximum).                      |
 | `detection_loop`     | Run the autonomous Norma loop: build, detonate, edit source, rebuild, compare. Needs approval. |
 | `detection_payloads` | List payloads with their per-payload SQLite view, parent, score, and verdict count.           |
@@ -129,24 +129,45 @@ deterministic findings to the run. Offline data is imported the same way:
 - a LitterBox result that nests `rededr.findings`.
 
 `detection_telemetry_import` accepts `path` or `url` plus optional `module`,
-`artifact`, `run_id`, and `source`. `detection_run` imports the RedEdr trace
-automatically when a dynamic stage completes.
+`artifact`, `run_id`, and `source`. A `url` must use the configured LitterBox
+origin, and redirects may not leave it; save remote telemetry locally and pass
+`path` instead. `detection_run` imports the RedEdr trace automatically when a
+dynamic stage completes.
 
-Every JSON event line from RedEdr's `raw_output` is stored, not only Defender
-verdicts: process, image, file, network, audit, thread, defender, and query
-events all land in `events` and the payload view. The deterministic findings
-now cover all of those categories, and the autonomous loop is instructed to
-minimize the full finding count and score. A zero verdict count is not treated
-as safe; static high findings and medium telemetry findings remain actionable
-until the iteration limit, with inherent items recorded as residuals.
+Every JSON event from RedEdr is stored, including `findings.events`,
+`raw_output`, kernel callbacks, ntdll hooks, PEB and loaded-DLL queries, ETW-TI
+memory operations, and Defender behavior. The importer merges those sources
+and deduplicates by trace/id. Each event gets actor and target identities,
+operation, source coverage, payload attribution, and a signal class:
+
+- `payload_role`: `payload`, `payload-child`, `payload-target`, `payload-scan`,
+  `ambient`, or `unknown`.
+- `signal`: `signal`, `verdict`, `scan`, `info`, `baseline`, or `noise`.
+- `category`: `process`, `image`, `module`, `file`, `network`, `audit`, `thread`,
+  `defender`, `query`, `hook`, `memory` (ETW-TI), or `other`.
+
+Payload attribution comes from the PEB query. A trace that never observed the
+payload PEB is marked `unknown` instead of attributing Defender traffic to the
+sample. `traces.coverage` records which sources delivered events and which
+enabled sources produced none.
+
+The deterministic findings cover every category, including cross-process
+ETW-TI writes/protects/suspends, self-modifying memory, kernel and ntdll hooks,
+audit API calls, child processes, user-writable images and modules, file
+writes, network flows, and Defender verdicts. The findings are materialized in
+the `findings` table and the autonomous loop is instructed to minimize the full
+finding count and score. A zero verdict count is not treated as safe; high
+static findings and high/medium telemetry findings remain actionable until the
+iteration limit, with inherent items recorded as residuals.
 
 Schema:
 
 | Table | Columns |
 | --- | --- |
 | `payloads` | one row per artifact: `payload_key`, `sha256`, `module`, `label`, `table_name`, `parent_id` |
-| `traces` | `id`, `payload_id`, `run_id`, `external_id`, `module`, `artifact_sha256`, `source`, `captured_at`, `path`, `meta` |
-| `events` | `id`, `payload_id`, `trace_pk`, `ts_ns`, `type`, `source`, `event`, `provider`, `pid`, `tid`, `process`, `path`, `image`, `address`, `size`, `category`, `severity`, `attrs` |
+| `traces` | `id`, `payload_id`, `run_id`, `external_id`, `module`, `artifact_sha256`, `source`, `captured_at`, `path`, `meta`, `payload_pid`, `payload_image`, `attribution`, `coverage`, `event_count`, `findings_count` |
+| `events` | `id`, `payload_id`, `trace_pk`, `event_key`, `ts_ns`, `type`, `source`, `event`, `provider`, `event_id`, `pid`, `tid`, `actor_pid`, `target_pid`, `target_tid`, `parent_pid`, `operation`, `process`, `target_image`, `path`, `image`, `address`, `size`, `protection`, `access`, `status`, `command`, `proto`, `src_addr`, `src_port`, `dst_addr`, `dst_port`, `bytes`, `stack`, `category`, `severity`, `signal`, `payload_role`, `attrs` |
+| `findings` | `trace_pk`, `payload_id`, `stage`, `tool`, `severity`, `rule`, `indicator`, `detail`, `signal` |
 | `loop_cycles` | `loop_id`, `iteration`, `payload_id`, `run_id`, `score`, `level`, `findings`, `verdicts`, `trace_id`, `summary` |
 | `loop_feedback` | full feedback JSON per cycle |
 | `loop_builds` | full build log per cycle |
@@ -169,9 +190,11 @@ SELECT category, event, count(*) FROM payload_<hash> GROUP BY category, event;
 `loop_edits.next_payload_id` links each edit to the build it produced; query it
 with the payload row to explain every change.
 
-`events.category` is one of `process`, `image`, `file`, `network`, `audit`,
-`thread`, `defender`, `query`, or `other`. `attrs` is the original event object;
-use `json_extract` for fields that have no dedicated column.
+`events.attrs` is the original event object; use `json_extract` for fields that
+have no dedicated column. `events.signal` and `events.payload_role` are the
+fast filter for “is this the payload acting” and “is this worth investigating”.
+The `findings` table is the materialized result of the same attribution, so a
+model can read findings without replaying every event.
 
 `detection_query` and the analyst's `TelemetryQuery` accept one `SELECT` or
 `WITH` statement. Comments, semicolons inside the statement, PRAGMAs, ATTACH,
@@ -194,10 +217,29 @@ SELECT event, path FROM events
 WHERE trace_pk = 1 AND category = 'file' AND pid = 1234
   AND path NOT LIKE '%\Windows\%';
 
+-- ETW-TI memory operations with caller and target
+SELECT operation, pid AS caller, target_pid, target_image, count(*),
+       max(size), max(bytes), max(protection)
+FROM events WHERE trace_pk = 1 AND category = 'memory'
+GROUP BY operation, pid, target_pid, target_image;
+
+-- ntdll hooks and kernel callbacks
+SELECT category, event, pid, target_pid, protection, status, stack
+FROM events WHERE trace_pk = 1 AND category IN ('hook', 'thread');
+
+-- Payload network flows; ambient Defender flows are excluded
+SELECT proto, src_addr, src_port, dst_addr, dst_port, bytes
+FROM events WHERE trace_pk = 1 AND category = 'network'
+  AND payload_role IN ('payload', 'payload-child');
+
 -- Defender verdicts versus scan activity
-SELECT event, path, json_extract(attrs, '$.name') AS verdict
+SELECT severity, signal, event, path, detail
 FROM events WHERE trace_pk = 1 AND category = 'defender'
-  AND json_extract(attrs, '$.name') IS NOT NULL;
+ORDER BY id;
+
+-- Materialized findings, including ETW-TI and hook rules
+SELECT severity, rule, indicator, detail FROM findings
+WHERE trace_pk = 1 ORDER BY severity, rule;
 ```
 
 A real verdict is an event such as `Behavior Monitoring BmDetection` with a

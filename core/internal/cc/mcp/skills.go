@@ -105,14 +105,18 @@ Targets and jobs
   plan, run_id, score, findings count, and source-edit pointers. If the block
   says sandbox-unavailable, it still carries the plan; call detection_plan once
   the sandbox is reachable.
-- detection_run with dynamic stages imports RedEdr ETW events into the
-  detection SQLite database and reports a telemetry trace. Every artifact also
+- detection_run with dynamic stages imports every RedEdr event into the
+  detection SQLite database and reports a telemetry trace. The events include
+  ETW, ETW-TI memory operations, kernel callbacks, ntdll hooks, PEB/loaded-DLL
+  queries, and Defender behavior, with actor/target PIDs, operation, signal,
+  payload_role, protection, endpoints, and stack frames. Every artifact also
   gets a payload row and a payload_<hash> view containing only that build;
   detection_payloads lists them and detection_compare shows what an edit
   changed. detection_query runs one read-only SELECT; filter with trace_pk or
-  a payload view and inspect json_extract(attrs,'$.field') for raw fields.
-  detection_telemetry_import ingests offline RedEdr or DefenderObserver data.
-  detection_feedback reports the delta against the previous artifact.
+  a payload view, read the findings table, and use json_extract(attrs,'$.field')
+  for raw fields. detection_telemetry_import ingests offline RedEdr or
+  DefenderObserver data. detection_feedback reports the delta against the
+  previous artifact.
 - detection_loop runs the autonomous Norma loop for loader_windows: build,
   detonate, query SQLite, edit source, rebuild, and compare. It requires
   approve_execution=true and edits module source on the operator host.
@@ -282,10 +286,11 @@ Workspace source edits and detection integration
 - The detection loop is the operator side of that integration. Build the
   artifact with run_module; the result carries a plan and a passive static run.
   detection_feedback maps every YARA, string, PE, or EDR indicator back to the
-  module file and line it came from. Apply the smallest source change that
-  removes the indicator, rebuild, and compare the new score and findings. Do
-  not detonate dynamic or EDR stages unless the operator asked for it and
-  approve_execution is set.
+  module file and line it came from. Prefer the smallest source change that
+  removes the indicator, but change the design when telemetry shows the design
+  itself is detected; renaming or hiding the same behavior is not a fix.
+  Rebuild and compare the new score and findings. Do not detonate dynamic or
+  EDR stages unless the operator asked for it and approve_execution is set.
 - detection_feedback analyze=true asks the configured detection analyst for
   proposed edits. The analyst is read-only: it can list, read, and search the
   module source but cannot write. Review every proposed edit and apply it with

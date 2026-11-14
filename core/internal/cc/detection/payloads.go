@@ -38,12 +38,19 @@ type Payload struct {
 // PayloadChange is one normalized event signature whose count differs between
 // two payloads.
 type PayloadChange struct {
-	Category string `json:"category"`
-	Event    string `json:"event"`
-	Path     string `json:"path,omitempty"`
-	Image    string `json:"image,omitempty"`
-	PID      int64  `json:"pid,omitempty"`
-	Count    int64  `json:"count"`
+	Category    string `json:"category"`
+	Event       string `json:"event"`
+	Operation   string `json:"operation,omitempty"`
+	Path        string `json:"path,omitempty"`
+	Image       string `json:"image,omitempty"`
+	TargetImage string `json:"target_image,omitempty"`
+	PID         int64  `json:"pid,omitempty"`
+	ActorPID    int64  `json:"actor_pid,omitempty"`
+	TargetPID   int64  `json:"target_pid,omitempty"`
+	Proto       string `json:"proto,omitempty"`
+	SrcAddr     string `json:"src_addr,omitempty"`
+	DstAddr     string `json:"dst_addr,omitempty"`
+	Count       int64  `json:"count"`
 }
 
 // PayloadDiff lists event signatures added and removed between two payloads.
@@ -86,6 +93,8 @@ func (t *TelemetryDB) ListPayloads(ctx context.Context, limit int) ([]Payload, e
 			return nil, fmt.Errorf("scan payload: %w", err)
 		}
 		p.CreatedAt = time.UnixMilli(created).UTC()
+		p.Label = sanitizeLine(p.Label)
+		p.ArtifactPath = sanitizeLine(p.ArtifactPath)
 		out = append(out, p)
 	}
 	return out, rows.Err()
@@ -116,6 +125,8 @@ func (t *TelemetryDB) PayloadByKey(ctx context.Context, key string) (Payload, er
 		return Payload{}, fmt.Errorf("payload %q not found: %w", key, err)
 	}
 	p.CreatedAt = time.UnixMilli(created).UTC()
+	p.Label = sanitizeLine(p.Label)
+	p.ArtifactPath = sanitizeLine(p.ArtifactPath)
 	return p, nil
 }
 
@@ -176,8 +187,13 @@ func (t *TelemetryDB) payloadEvents(ctx context.Context, table string) (map[stri
 		return nil, fmt.Errorf("invalid payload table %q", table)
 	}
 	rows, err := t.db.QueryContext(ctx, fmt.Sprintf(`
-		SELECT category, event, path, image, COALESCE(pid, 0), COUNT(*)
-		FROM %s GROUP BY category, event, path, image, COALESCE(pid, 0)`, table))
+		SELECT category, event, operation, path, image, target_image,
+		       COALESCE(pid, 0), COALESCE(actor_pid, 0), COALESCE(target_pid, 0),
+		       proto, src_addr, dst_addr, COUNT(*)
+		FROM %s
+		GROUP BY category, event, operation, path, image, target_image,
+		         COALESCE(pid, 0), COALESCE(actor_pid, 0), COALESCE(target_pid, 0),
+		         proto, src_addr, dst_addr`, table))
 	if err != nil {
 		return nil, fmt.Errorf("payload events: %w", err)
 	}
@@ -185,18 +201,25 @@ func (t *TelemetryDB) payloadEvents(ctx context.Context, table string) (map[stri
 	out := map[string]PayloadChange{}
 	for rows.Next() {
 		var change PayloadChange
-		if err := rows.Scan(&change.Category, &change.Event, &change.Path,
-			&change.Image, &change.PID, &change.Count); err != nil {
+		if err := rows.Scan(&change.Category, &change.Event, &change.Operation,
+			&change.Path, &change.Image, &change.TargetImage, &change.PID,
+			&change.ActorPID, &change.TargetPID, &change.Proto, &change.SrcAddr,
+			&change.DstAddr, &change.Count); err != nil {
 			return nil, fmt.Errorf("scan payload event: %w", err)
 		}
+		sanitizePayloadChange(&change)
 		out[payloadChangeKey(change)] = change
 	}
 	return out, rows.Err()
 }
 
 func payloadChangeKey(change PayloadChange) string {
-	return change.Category + "\x00" + change.Event + "\x00" + change.Path +
-		"\x00" + change.Image + "\x00" + fmt.Sprint(change.PID)
+	return strings.Join([]string{
+		change.Category, change.Event, change.Operation, change.Path,
+		change.Image, change.TargetImage, fmt.Sprint(change.PID),
+		fmt.Sprint(change.ActorPID), fmt.Sprint(change.TargetPID),
+		change.Proto, change.SrcAddr, change.DstAddr,
+	}, "\x00")
 }
 
 func topChanges(changes []PayloadChange, limit int) []PayloadChange {

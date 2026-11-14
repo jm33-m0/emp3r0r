@@ -190,10 +190,17 @@ count and risk score as far as possible. High static findings (for example
 execute), and import findings all count. Do not stop just because verdicts are
 zero, and do not game static checks with size-inflating encoding or padding.
 
-Use every RedEdr event, not only Defender verdicts: query the payload view by
-category (process, image, file, network, audit, thread, defender, query) and
-compare payloads after each edit. Stop only at the iteration limit, or when no
-actionable high/critical finding remains and every residual is explained with
+Use every telemetry source, not only Defender verdicts. The events table now
+carries ETW, ETW-TI memory operations, kernel callbacks, ntdll hooks, PEB and
+loaded-DLL queries, and Defender behavior. Each row has actor_pid, target_pid,
+operation, category, signal, payload_role, src/dst endpoints, protection,
+status, and the top kernel stack frames. payload_role is payload,
+payload-child, payload-target, payload-scan, ambient, or unknown. Treat
+signal='noise' and signal='baseline' as evidence only, not as findings. Query
+the findings table for the deterministic result and the payload view for the
+raw events, then compare payloads after every edit. If coverage.missing is not
+empty, say which source degraded. Stop only at the iteration limit, or when no
+actionable high/medium finding remains and every residual is explained with
 evidence. Return the final JSON object.`,
 		cfg.LoopID, cfg.Module, cfg.ModuleDir, cfg.Shellcode, baselineJSON)
 
@@ -358,23 +365,24 @@ func parseEvolveStages(stages []string) (static, dynamic bool, err error) {
 }
 
 type cycleSummary struct {
-	LoopID       string       `json:"loop_id"`
-	Iteration    int          `json:"iteration"`
-	PayloadKey   string       `json:"payload_key"`
-	PayloadTable string       `json:"payload_table"`
-	RunID        string       `json:"run_id"`
-	SHA256       string       `json:"sha256"`
-	Score        float64      `json:"score"`
-	Level        string       `json:"level,omitempty"`
-	Findings     int          `json:"findings"`
-	Verdicts     []string     `json:"verdicts,omitempty"`
-	TraceID      int64        `json:"trace_id,omitempty"`
-	Events       int          `json:"telemetry_events"`
-	SourceEdits  int          `json:"source_edits"`
-	TopFindings  []string     `json:"top_findings,omitempty"`
-	BuildTail    []string     `json:"build_tail,omitempty"`
-	Edits        []EditRecord `json:"edits,omitempty"`
-	Note         string       `json:"note,omitempty"`
+	LoopID       string          `json:"loop_id"`
+	Iteration    int             `json:"iteration"`
+	PayloadKey   string          `json:"payload_key"`
+	PayloadTable string          `json:"payload_table"`
+	RunID        string          `json:"run_id"`
+	SHA256       string          `json:"sha256"`
+	Score        float64         `json:"score"`
+	Level        string          `json:"level,omitempty"`
+	Findings     int             `json:"findings"`
+	Verdicts     []string        `json:"verdicts,omitempty"`
+	TraceID      int64           `json:"trace_id,omitempty"`
+	Events       int             `json:"telemetry_events"`
+	Telemetry    *TelemetryStats `json:"telemetry,omitempty"`
+	SourceEdits  int             `json:"source_edits"`
+	TopFindings  []string        `json:"top_findings,omitempty"`
+	BuildTail    []string        `json:"build_tail,omitempty"`
+	Edits        []EditRecord    `json:"edits,omitempty"`
+	Note         string          `json:"note,omitempty"`
 }
 
 func (e *evolver) runCycle(ctx context.Context, note string) (Cycle, error) {
@@ -445,7 +453,7 @@ func (e *evolver) runCycle(ctx context.Context, note string) (Cycle, error) {
 			Timeout: 10 * time.Minute, ParentKey: parentKey,
 		})
 		cancel()
-		if runErr == nil && run.Telemetry != nil {
+		if runErr == nil && run.Telemetry != nil && run.Telemetry.Attribution != "unknown" {
 			break
 		}
 		if ctx.Err() != nil {
@@ -459,8 +467,13 @@ func (e *evolver) runCycle(ctx context.Context, note string) (Cycle, error) {
 					stageErrors = append(stageErrors, stage.Tool+": "+stage.Error)
 				}
 			}
-			reason = fmt.Errorf("dynamic run produced no telemetry (%s) notes=%v",
-				strings.Join(stageErrors, "; "), run.Notes)
+			if run.Telemetry != nil && run.Telemetry.Attribution == "unknown" {
+				reason = fmt.Errorf("telemetry has no payload PEB (%s) notes=%v",
+					strings.Join(stageErrors, "; "), run.Notes)
+			} else {
+				reason = fmt.Errorf("dynamic run produced no telemetry (%s) notes=%v",
+					strings.Join(stageErrors, "; "), run.Notes)
+			}
 		}
 		if !e.recover(ctx, attempt, "detection run", reason) {
 			return Cycle{}, ctx.Err()
@@ -507,7 +520,7 @@ func (e *evolver) runCycle(ctx context.Context, note string) (Cycle, error) {
 func summarizeCycle(loopID string, iteration int, run Run, feedback Feedback, buildLog, note string) cycleSummary {
 	summary := cycleSummary{
 		LoopID: loopID, Iteration: iteration, RunID: run.ID,
-		SHA256: run.Plan.Artifact.SHA256, Score: feedback.Score, Level: feedback.Level,
+		SHA256: run.Plan.Artifact.SHA256, Score: feedback.Score, Level: sanitizeLine(feedback.Level),
 		Findings: len(feedback.Findings), SourceEdits: len(feedback.SourceEdits),
 		Note: note,
 	}
@@ -516,15 +529,23 @@ func summarizeCycle(loopID string, iteration int, run Run, feedback Feedback, bu
 		summary.PayloadTable = run.Telemetry.PayloadTable
 		summary.TraceID = run.Telemetry.TraceID
 		summary.Events = run.Telemetry.Events
+		summary.Telemetry = run.Telemetry.Stats
+		if summary.Telemetry == nil {
+			summary.Telemetry = &TelemetryStats{
+				TraceID: run.Telemetry.TraceID, Events: run.Telemetry.Events,
+				Findings: len(run.Telemetry.Findings), Coverage: run.Telemetry.Coverage,
+			}
+		}
 		for _, finding := range run.Telemetry.Findings {
 			if finding.Rule == "defender/verdict" {
-				summary.Verdicts = appendUnique(summary.Verdicts, finding.Indicator)
+				summary.Verdicts = appendUnique(summary.Verdicts, sanitizeLine(finding.Indicator))
 			}
 		}
 	}
 	for _, finding := range feedback.Findings {
 		summary.TopFindings = append(summary.TopFindings,
-			fmt.Sprintf("%s %s %s", finding.Severity, finding.Rule, finding.Indicator))
+			fmt.Sprintf("%s %s %s", sanitizeLine(finding.Severity), sanitizeLine(finding.Rule),
+				sanitizeLine(finding.Indicator)))
 		if len(summary.TopFindings) >= 8 {
 			break
 		}
@@ -1021,25 +1042,37 @@ func (e *evolver) editsForPayload(ctx context.Context, payloadKey string) ([]Edi
 }
 
 func feedbackSummary(feedback Feedback, runID, payloadKey string, edits []EditRecord) map[string]any {
+	SanitizeFeedback(&feedback)
 	out := map[string]any{
 		"run_id": runID, "payload_key": payloadKey,
 		"score": feedback.Score, "level": feedback.Level,
 		"findings": len(feedback.Findings), "source_edits": len(feedback.SourceEdits),
 	}
 	if feedback.Telemetry != nil {
-		out["telemetry"] = map[string]any{
+		telemetry := map[string]any{
 			"trace_id": feedback.Telemetry.TraceID, "events": feedback.Telemetry.Events,
 			"payload_table": feedback.Telemetry.PayloadTable,
+			"payload_pid":   feedback.Telemetry.PayloadPID,
+			"attribution":   feedback.Telemetry.Attribution,
+			"coverage":      feedback.Telemetry.Coverage,
 		}
+		if feedback.Telemetry.Stats != nil {
+			telemetry["stats"] = feedback.Telemetry.Stats
+		}
+		out["telemetry"] = telemetry
 	}
 	var findings []map[string]any
 	for _, finding := range feedback.Findings {
 		if len(findings) >= 15 {
 			break
 		}
-		row := map[string]any{"severity": finding.Severity, "rule": finding.Rule, "indicator": finding.Indicator}
+		row := map[string]any{
+			"severity":  sanitizeLine(finding.Severity),
+			"rule":      sanitizeLine(finding.Rule),
+			"indicator": sanitizeLine(finding.Indicator),
+		}
 		if finding.Detail != "" {
-			row["detail"] = clip(finding.Detail, 300)
+			row["detail"] = clipUTF8(sanitizeLine(finding.Detail), 300)
 		}
 		if len(finding.Sources) > 0 {
 			row["sources"] = finding.Sources
@@ -1075,26 +1108,45 @@ Data policy:
 - Use InspectFeedback for a bounded summary, Payloads to see build history,
   ComparePayloads to see what your edit changed, and TelemetryQuery for SQL.
 - Use only the read-only SQL tool; it accepts one SELECT or WITH statement.
-- Query trace_pk-scoped events or the per-payload view. Defender verdicts are
-  rows with category='defender' and an event such as BmDetection carrying a
-  threat name. BmModuleLoad, BmNotificationHandle*, and Cache* are scan noise.
+- The findings table holds the deterministic telemetry findings for a trace;
+  the events table holds every raw event. Query trace_pk-scoped events or the
+  per-payload view.
+- Attribution columns matter: actor_pid performed the operation, pid is the
+  subject, target_pid is the target or child, payload_role says whether the
+  event belongs to the payload, a child, the payload as a target, a Defender
+  scan, or ambient traffic. signal is signal/verdict/scan/info/baseline/noise.
+- Categories include process, image, file, network, audit, thread, defender,
+  query, module, hook, and memory (ETW-TI). ETW-TI rows carry operation,
+  protection, size, bytes, status, and stack. Hook rows carry the intercepted
+  Nt* API. Ambient MsMpEng events are stored but are not payload actions.
 
 Work loop:
-1. Inspect the baseline and identify a real defender verdict or a high telemetry
-   finding that maps to module source.
-2. Read the relevant source. Prefer one minimal, grounded EditSource call per
-   issue. Update every default that controls the behavior, not a dead copy.
+1. Inspect the baseline and identify a real defender verdict or a high/medium
+   telemetry finding that maps to module source. Use the findings table first,
+   then the payload view for the events behind a finding.
+2. Read the relevant source and trace the detection to its cause. Prefer a
+   minimal, grounded EditSource call when that removes the detection. A design
+   change is allowed and expected when the current design is what the sandbox
+   detects: add, remove, split, merge, or replace source files and components,
+   restructure data flow, change the loading or call path, and rewrite the
+   implementation. Do not preserve a detected design just because it already
+   exists, and do not settle for renaming, reordering, or hiding the same
+   behavior. Update every default that controls the behavior, not a dead copy.
+   Use multiple EditSource calls when a redesign needs them.
 3. Call DetectionCycle. It rebuilds from the current source and returns a
    bounded summary plus the new payload key.
 4. ComparePayloads the previous and new payloads. If the real verdict is gone,
    check for replacement findings; otherwise iterate.
 5. Do not edit tests, generated artifacts, or files outside the module. Do not
-   weaken the module's build contract or remove functionality just to silence a
-   scanner. Do not stop at the first lower score: the sandbox risk score has
-   known false positives; read the SQL verdict rows.
+   remove externally required functionality or invalidate config.json, the
+   documented flags, opsec metadata, or the build entrypoint. Internal APIs,
+   file layout, and component boundaries may change. A redesign that preserves
+   required behavior is not a weakened build contract. Do not stop at the first
+   lower score: the sandbox risk score has known false positives; read the SQL
+   verdict rows.
 
-Stop when no real defender verdict remains and no high telemetry finding
-remains, or when the iteration limit is reached. Return one JSON object:
+Stop when no real defender verdict remains and no high or medium telemetry
+finding remains, or when the iteration limit is reached. Return one JSON object:
 {"summary":"what changed and why","verdicts_before":["..."],"verdicts_after":["..."],"edits":[{"file":"...","reason":"..."}],"residual":["..."],"cycles":<number>}
 
 The host will store your answer. Be concise.`

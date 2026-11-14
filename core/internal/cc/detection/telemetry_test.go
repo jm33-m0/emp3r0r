@@ -2,11 +2,16 @@ package detection
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -150,7 +155,8 @@ func TestTelemetryImportsDefenderObserverJSONL(t *testing.T) {
 	payload := `{"timestamp":"2026-11-12T09:43:06.4430000Z","providerName":"Microsoft-Antimalware-Engine",` +
 		`"id":19,"symbol":"BmEvent","task":"BehaviorMonitoring","processId":43940,` +
 		`"processName":"sample.exe","threadId":4,"payload":{"Path":"C:\\Users\\Public\\sample.exe","ThreatName":""}}`
-	trace, err := db.Import(context.Background(), []byte(payload+"\n"+payload), ImportOptions{})
+	second := strings.Replace(payload, "09:43:06.4430000Z", "09:43:06.4440000Z", 1)
+	trace, err := db.Import(context.Background(), []byte(payload+"\n"+second), ImportOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -330,8 +336,14 @@ func TestCompareRunsReportsResolvedAndAdded(t *testing.T) {
 }
 
 func TestFetchTelemetryRejectsNonHTTPScheme(t *testing.T) {
-	if _, err := FetchTelemetry(context.Background(), "file:///etc/passwd"); err == nil {
+	if _, err := FetchTelemetry(context.Background(), "file:///etc/passwd", "http://127.0.0.1:1337"); err == nil {
 		t.Fatal("file scheme accepted")
+	}
+}
+
+func TestFetchTelemetryRejectsForeignOrigin(t *testing.T) {
+	if _, err := FetchTelemetry(context.Background(), "http://example.com/telemetry.json", "http://127.0.0.1:1337"); err == nil {
+		t.Fatal("foreign origin accepted")
 	}
 }
 
@@ -396,5 +408,251 @@ func TestPayloadViewsAndDiff(t *testing.T) {
 	}
 	if len(again) != 2 {
 		t.Fatalf("re-import created a payload: %+v", again)
+	}
+}
+
+func TestTelemetryUsesETWTIKernelHooksAndCoverage(t *testing.T) {
+	db := openTestTelemetry(t)
+	fixture := `[
+	 {"type":"meta","func":"init","trace_id":9,"do_etw":true,"do_etwti":true,"do_kernel":true,"do_hook":true},
+	 {"type":"process_query","func":"peb","pid":100,"image_path":"C:\\Users\\Public\\sample.exe","event_time":134382680109164370},
+	 {"type":"etw","event":"KERNEL_THREATINT_TASK_WRITEVM","etw_provider_name":"Microsoft-Windows-Threat-Intelligence","etw_pid":100,"callingprocessid":100,"targetprocessid":200,"baseaddress":4096,"bytescopied":4096,"etw_time":134382680150000000},
+	 {"type":"etw","event":"KERNEL_THREATINT_TASK_PROTECTVM","etw_provider_name":"Microsoft-Windows-Threat-Intelligence","etw_pid":100,"callingprocessid":100,"targetprocessid":200,"baseaddress":4096,"regionsize":4096,"protectionmask":"R-X","lastprotectionmask":"RW-","etw_time":134382680151000000},
+	 {"type":"etw","event":"KERNEL_THREATINT_TASK_SUSPENDRESUME_THREAD","etw_provider_name":"Microsoft-Windows-Threat-Intelligence","etw_pid":100,"callingprocessid":100,"targetprocessid":200,"targetthreadid":201,"etw_time":134382680152000000},
+	 {"type":"etw","event":"KERNEL_THREATINT_TASK_READVM","etw_provider_name":"Microsoft-Windows-Threat-Intelligence","etw_pid":100,"callingprocessid":100,"targetprocessid":200,"regionsize":4096,"etw_time":134382680153000000},
+	 {"type":"dll","func":"NtProtectVirtualMemory","pid":100,"tid":101,"addr":4096,"size":4096,"protect":"R-X","return":0,"time":134382680154000000},
+	 {"type":"kernel","func":"thread_create","pid":200,"krn_pid":100,"ppid":100,"threadid":201,"event_time":134382680155000000},
+	 {"type":"etw","event":"KERNEL_NETWORK_TASK_TCPIPConnection attempted.","etw_provider_name":"Microsoft-Windows-Kernel-Network","etw_pid":100,"saddr":16777343,"daddr":134744072,"sport":50000,"dport":443,"size":1200,"etw_time":134382680156000000},
+	 {"type":"etw","event":"KERNEL_NETWORK_TASK_TCPIPConnection attempted.","etw_provider_name":"Microsoft-Windows-Kernel-Network","etw_pid":999,"etw_process":"MsMpEng.exe","saddr":1,"daddr":2,"sport":1,"dport":2,"etw_time":134382680157000000}
+	]`
+	trace, err := db.Import(context.Background(), []byte(fixture), ImportOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if trace.PayloadPID != 100 || trace.Attribution != "peb" {
+		t.Fatalf("attribution = %+v", trace)
+	}
+	delivered := strings.Join(trace.Coverage.Delivered, ",")
+	for _, source := range []string{"etw", "etwti", "kernel", "hook"} {
+		if !strings.Contains(delivered, source) {
+			t.Fatalf("coverage missing %s: %+v", source, trace.Coverage)
+		}
+	}
+	if len(trace.Coverage.Missing) != 0 {
+		t.Fatalf("coverage = %+v", trace.Coverage)
+	}
+	findings, err := db.Findings(context.Background(), trace.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rules := findingRules(findings)
+	for _, rule := range []string{
+		"telemetry/cross-process-write", "telemetry/cross-process-protect",
+		"telemetry/thread-suspend", "telemetry/readvm", "telemetry/hook",
+		"telemetry/remote-thread", "telemetry/network",
+	} {
+		if _, ok := rules[rule]; !ok {
+			t.Fatalf("missing %s in %+v", rule, findings)
+		}
+	}
+	if rules["telemetry/cross-process-write"].Severity != "high" {
+		t.Fatalf("write finding = %+v", rules["telemetry/cross-process-write"])
+	}
+	if rules["telemetry/hook"].Indicator != "NtProtectVirtualMemory" {
+		t.Fatalf("hook finding = %+v", rules["telemetry/hook"])
+	}
+	var memory, hook, ambient int
+	if err := db.db.QueryRow(`SELECT count(*) FROM events WHERE trace_pk = ? AND category = 'memory'`, trace.ID).Scan(&memory); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.db.QueryRow(`SELECT count(*) FROM events WHERE trace_pk = ? AND category = 'hook'`, trace.ID).Scan(&hook); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.db.QueryRow(`SELECT count(*) FROM events WHERE trace_pk = ? AND payload_role = 'ambient'`, trace.ID).Scan(&ambient); err != nil {
+		t.Fatal(err)
+	}
+	if memory != 4 || hook != 1 || ambient != 1 {
+		t.Fatalf("memory=%d hook=%d ambient=%d", memory, hook, ambient)
+	}
+	var stored int
+	if err := db.db.QueryRow(`SELECT count(*) FROM findings WHERE trace_pk = ?`, trace.ID).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored != len(findings) {
+		t.Fatalf("stored findings = %d, returned %d", stored, len(findings))
+	}
+	stats, err := db.Stats(context.Background(), trace.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats.PayloadEvents < 7 || stats.SignalEvents == 0 {
+		t.Fatalf("stats = %+v", stats)
+	}
+}
+
+func TestTelemetryUnknownAttributionExcludesScannerEvents(t *testing.T) {
+	db := openTestTelemetry(t)
+	fixture := `[
+	 {"type":"meta","func":"init","trace_id":10},
+	 {"type":"process_query","func":"peb","pid":3112,"image_path":"","process_name":"MsMpEng.exe","event_time":134382680109164370},
+	 {"type":"etw","event":"Info","etw_event_id":5,"etw_provider_name":"Microsoft-Windows-Kernel-Audit-API-Calls","etw_pid":3112,"targetprocessid":100,"desiredaccess":2035711,"event_time":134382680150000000}
+	]`
+	trace, err := db.Import(context.Background(), []byte(fixture), ImportOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if trace.Attribution != "unknown" || trace.PayloadPID != 0 {
+		t.Fatalf("trace = %+v", trace)
+	}
+	findings, err := db.Findings(context.Background(), trace.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rules := findingRules(findings)
+	if _, ok := rules["telemetry/process-access"]; ok {
+		t.Fatalf("scanner event was attributed to the payload: %+v", findings)
+	}
+	if rules["telemetry/attribution"].Severity != "low" {
+		t.Fatalf("attribution finding = %+v", rules["telemetry/attribution"])
+	}
+}
+
+func TestTelemetryMergesFindingsAndRawOutput(t *testing.T) {
+	db := openTestTelemetry(t)
+	peb := map[string]any{
+		"type": "process_query", "func": "peb", "pid": 100,
+		"image_path": `C:\Users\Public\sample.exe`, "event_time": 134382680109164370,
+	}
+	raw := "INFO starting\n" +
+		`{"type":"process_query","func":"peb","pid":100,"image_path":"C:\\Users\\Public\\sample.exe","event_time":134382680109164370}` + "\n" +
+		`{"type":"kernel","func":"image_load","pid":100,"name":"C:\\Users\\Public\\stage.dll","event_time":134382680150000000}` + "\n" +
+		`{"type":"dll","func":"NtWriteVirtualMemory","pid":100,"tid":101,"addr":4096,"size":32,"return":0,"time":134382680151000000}`
+	wrapped, err := json.Marshal(map[string]any{"rededr": map[string]any{
+		"findings":   map[string]any{"events": []any{peb}},
+		"raw_output": raw,
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	trace, err := db.Import(context.Background(), wrapped, ImportOptions{Source: "litterbox-rededr"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if trace.Events != 3 {
+		t.Fatalf("events = %d", trace.Events)
+	}
+	result, err := db.Query(context.Background(), `SELECT category, count(*) FROM events GROUP BY category ORDER BY category`, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Rows) != 3 {
+		t.Fatalf("categories = %+v", result.Rows)
+	}
+}
+
+func TestTelemetryMigratesV1Database(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "telemetry.db")
+	raw, err := sql.Open("sqlite", "file:"+path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v1 := `
+CREATE TABLE payloads (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, payload_key TEXT NOT NULL UNIQUE,
+  sha256 TEXT NOT NULL DEFAULT '', module TEXT NOT NULL DEFAULT '',
+  label TEXT NOT NULL DEFAULT '', artifact_path TEXT NOT NULL DEFAULT '',
+  table_name TEXT NOT NULL DEFAULT '', parent_id INTEGER, created_at INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE traces (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, payload_id INTEGER, run_id TEXT NOT NULL DEFAULT '',
+  external_id TEXT NOT NULL DEFAULT '', module TEXT NOT NULL DEFAULT '',
+  artifact_sha256 TEXT NOT NULL DEFAULT '', source TEXT NOT NULL,
+  captured_at INTEGER NOT NULL DEFAULT 0, path TEXT NOT NULL DEFAULT '',
+  meta TEXT NOT NULL DEFAULT '{}', UNIQUE(run_id, source, external_id));
+CREATE TABLE events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, payload_id INTEGER, trace_pk INTEGER NOT NULL,
+  ts_ns INTEGER, type TEXT NOT NULL DEFAULT '', source TEXT NOT NULL DEFAULT '',
+  event TEXT NOT NULL DEFAULT '', provider TEXT NOT NULL DEFAULT '',
+  pid INTEGER, tid INTEGER, process TEXT NOT NULL DEFAULT '',
+  path TEXT NOT NULL DEFAULT '', image TEXT NOT NULL DEFAULT '',
+  address INTEGER, size INTEGER, category TEXT NOT NULL DEFAULT 'other',
+  severity TEXT NOT NULL DEFAULT '', attrs TEXT NOT NULL DEFAULT '{}');
+INSERT INTO payloads(payload_key, sha256, module, label, artifact_path, table_name, created_at)
+  VALUES('sha256:deadbeef', 'deadbeef', 'loader_windows', 'sample.exe', '/tmp/sample.exe', 'payload_0000000000000000', 1);
+INSERT INTO traces(payload_id, run_id, external_id, module, artifact_sha256, source, captured_at, path, meta)
+  VALUES(1, 'run-v1', 'trace:1', 'loader_windows', 'deadbeef', 'rededr', 1, '/tmp/t.json', '{}');
+INSERT INTO events(payload_id, trace_pk, type, source, event, provider, pid, category, attrs)
+  VALUES(1, 1, 'process_query', 'rededr', 'peb', '', 100, 'query',
+    '{"type":"process_query","func":"peb","pid":100,"image_path":"C:\\\\Users\\\\Public\\\\sample.exe","event_time":134382680109164370}');
+INSERT INTO events(payload_id, trace_pk, type, source, event, provider, pid, category, attrs)
+  VALUES(1, 1, 'etw', 'rededr', 'KERNEL_THREATINT_TASK_WRITEVM', 'Microsoft-Windows-Threat-Intelligence', 100, 'other',
+    '{"type":"etw","event":"KERNEL_THREATINT_TASK_WRITEVM","etw_provider_name":"Microsoft-Windows-Threat-Intelligence","etw_pid":100,"callingprocessid":100,"targetprocessid":200,"bytescopied":4096,"event_time":134382680150000000}');
+PRAGMA user_version = 1;
+`
+	if _, err := raw.Exec(v1); err != nil {
+		t.Fatal(err)
+	}
+	if err := raw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	db, err := OpenTelemetryDB(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	var version int
+	if err := db.db.QueryRow(`PRAGMA user_version`).Scan(&version); err != nil {
+		t.Fatal(err)
+	}
+	if version != TelemetrySchemaVersion {
+		t.Fatalf("version = %d", version)
+	}
+	var pid int64
+	var attribution string
+	if err := db.db.QueryRow(`SELECT COALESCE(payload_pid, 0), attribution FROM traces WHERE id = 1`).Scan(&pid, &attribution); err != nil {
+		t.Fatal(err)
+	}
+	if pid != 100 || attribution != "peb" {
+		t.Fatalf("payload pid=%d attribution=%q", pid, attribution)
+	}
+	var category, role, signal string
+	if err := db.db.QueryRow(`SELECT category, payload_role, signal FROM events WHERE trace_pk = 1 AND provider <> ''`).Scan(&category, &role, &signal); err != nil {
+		t.Fatal(err)
+	}
+	if category != "memory" || role != "payload" || signal != "signal" {
+		t.Fatalf("event category=%q role=%q signal=%q", category, role, signal)
+	}
+	findings, err := db.Findings(context.Background(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if findings == nil || findingRules(findings)["telemetry/cross-process-write"].Severity != "high" {
+		t.Fatalf("findings = %+v", findings)
+	}
+}
+
+func TestFetchTelemetryStaysOnSandboxOrigin(t *testing.T) {
+	var foreignHits atomic.Int32
+	foreign := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		foreignHits.Add(1)
+		fmt.Fprint(w, `[{"type":"meta","trace_id":1}]`)
+	}))
+	defer foreign.Close()
+	origin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/redirect" {
+			http.Redirect(w, r, foreign.URL, http.StatusFound)
+			return
+		}
+		fmt.Fprint(w, `[{"type":"meta","trace_id":1}]`)
+	}))
+	defer origin.Close()
+
+	if _, err := FetchTelemetry(context.Background(), origin.URL+"/redirect", origin.URL); err == nil {
+		t.Fatal("telemetry redirect to another origin was accepted")
+	}
+	if foreignHits.Load() != 0 {
+		t.Fatalf("foreign origin was contacted %d times", foreignHits.Load())
+	}
+	if _, err := FetchTelemetry(context.Background(), origin.URL+"/ok", origin.URL); err != nil {
+		t.Fatalf("same-origin telemetry failed: %v", err)
 	}
 }

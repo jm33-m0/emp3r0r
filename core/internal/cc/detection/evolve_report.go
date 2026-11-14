@@ -45,7 +45,7 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 	}
 	if len(edits) > 0 {
 		for _, edit := range edits {
-			fmt.Fprintf(&b, "- `%s`: %s\n", edit.File, strings.TrimSpace(edit.Reason))
+			fmt.Fprintf(&b, "- `%s`: %s\n", sanitizeLine(edit.File), sanitizeLine(edit.Reason))
 		}
 		achieved = true
 	}
@@ -72,15 +72,39 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 		for _, cycle := range cycles {
 			fmt.Fprintf(&b, "| %d | `%s` | `%s` | %.2f | %s | %d | %d | %d |\n",
 				cycle.Iteration, cycle.PayloadKey, shortSHA(strings.TrimPrefix(cycle.PayloadKey, "sha256:")),
-				cycle.Score, cycle.Level, cycle.Findings, cycle.Verdicts, cycle.TraceID)
+				cycle.Score, sanitizeLine(cycle.Level), cycle.Findings, cycle.Verdicts, cycle.TraceID)
 		}
 		b.WriteString("\n")
+	}
+
+	if len(cycles) > 0 {
+		if stats := telemetryStatsFromSummary(cycles[len(cycles)-1].Summary); stats != nil {
+			fmt.Fprintf(&b, "## Telemetry coverage\n\n")
+			fmt.Fprintf(&b, "| Events | Payload events | Signal events | Findings |\n")
+			fmt.Fprintf(&b, "| ---: | ---: | ---: | ---: |\n")
+			fmt.Fprintf(&b, "| %d | %d | %d | %d |\n\n",
+				stats.Events, stats.PayloadEvents, stats.SignalEvents, stats.Findings)
+			fmt.Fprintf(&b, "| Source | Status |\n| --- | --- |\n")
+			delivered := map[string]bool{}
+			for _, name := range stats.Coverage.Delivered {
+				name = sanitizeLine(name)
+				delivered[name] = true
+				fmt.Fprintf(&b, "| `%s` | delivered |\n", name)
+			}
+			for _, name := range stats.Coverage.Missing {
+				fmt.Fprintf(&b, "| `%s` | **missing** |\n", sanitizeLine(name))
+			}
+			if len(delivered) == 0 && len(stats.Coverage.Missing) == 0 {
+				fmt.Fprintf(&b, "| none | no RedEdr source produced events |\n")
+			}
+			b.WriteString("\n")
+		}
 	}
 
 	if len(edits) > 0 {
 		fmt.Fprintf(&b, "## Source edits\n\n")
 		for _, edit := range edits {
-			fmt.Fprintf(&b, "### `%s`\n\n%s\n\n", edit.File, strings.TrimSpace(edit.Reason))
+			fmt.Fprintf(&b, "### `%s`\n\n%s\n\n", sanitizeLine(edit.File), sanitizeMultiline(edit.Reason))
 		}
 	}
 
@@ -112,23 +136,34 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 	return b.String()
 }
 
+func telemetryStatsFromSummary(summary string) *TelemetryStats {
+	if strings.TrimSpace(summary) == "" {
+		return nil
+	}
+	var value struct {
+		Telemetry *TelemetryStats `json:"telemetry"`
+	}
+	if json.Unmarshal([]byte(summary), &value) != nil {
+		return nil
+	}
+	return value.Telemetry
+}
+
 func answerString(answer map[string]any, key string) string {
 	value, _ := answer[key].(string)
-	return value
+	return sanitizeMultiline(value)
 }
 
 func answerStrings(answer map[string]any, key string) []string {
 	raw, ok := answer[key].([]any)
 	if !ok {
-		if values, ok := answer[key].([]string); ok {
-			return values
-		}
-		return nil
+		values, _ := answer[key].([]string)
+		return sanitizeStrings(values)
 	}
 	var out []string
 	for _, item := range raw {
 		if text, ok := item.(string); ok && strings.TrimSpace(text) != "" {
-			out = append(out, text)
+			out = append(out, sanitizeLine(text))
 		}
 	}
 	return out

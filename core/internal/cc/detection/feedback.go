@@ -159,7 +159,8 @@ func addFinding(fb *Feedback, finding Finding, locate func(string) []SourceLocat
 	if len(fb.Findings) >= maxFeedbackFindings {
 		return
 	}
-	finding.Indicator = clip(finding.Indicator, 300)
+	sanitizeFindingText(&finding)
+	finding.Indicator = clipUTF8(finding.Indicator, 300)
 	if finding.Indicator == "" {
 		return
 	}

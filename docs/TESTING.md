@@ -86,9 +86,12 @@ Some packages compile C or load real object files and need extra tooling:
   loader tests, the `internal/cc/modules` integration tests, and the stager
   lifecycle, packer, TCP/UDP, and C agent end-to-end tests.
 - **Windows** sets up MSYS2 with mingw-w64 and `nasm`, assembles the
-  SilentMoonwalk object, runs `go test -v -race ./...` with cgo, then runs the
-  BOF/module integration tests with `-gcflags=all=-d=checkptr=0` and
-  `EMP3R0R_RACE_ON=0`.
+  SilentMoonwalk object, then runs the agent and shared-dependency tests with
+  `go test -v -race` and cgo. Operator and C2 packages (`internal/cc`,
+  `lib/cli`, `cmd/cc`, `cmd/listener`, `pkg/transportbridge`, and the Tor C2
+  bridge) are Linux-only and are excluded from the Windows package list. The
+  BOF/module integration step runs with `-gcflags=all=-d=checkptr=0` and
+  `EMP3R0R_RACE_ON=0` and covers the agent module loader only.
 - Linux coverage is uploaded to Codecov.
 
 ## Writing tests

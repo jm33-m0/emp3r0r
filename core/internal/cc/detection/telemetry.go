@@ -16,16 +16,17 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
-	"sync"
 	"time"
 
+	"github.com/jm33-m0/emp3r0r/core/lib/sanitize"
 	_ "modernc.org/sqlite"
 )
 
 const (
 	// TelemetrySchemaVersion is the SQLite schema version this package writes.
-	TelemetrySchemaVersion = 1
+	TelemetrySchemaVersion = 2
 	// maxTelemetryBytes bounds one imported telemetry file.
 	maxTelemetryBytes = 64 << 20
 	// maxTelemetryEvents bounds one trace.
@@ -62,6 +63,13 @@ CREATE TABLE IF NOT EXISTS traces (
 	captured_at INTEGER NOT NULL DEFAULT 0,
 	path TEXT NOT NULL DEFAULT '',
 	meta TEXT NOT NULL DEFAULT '{}',
+	payload_pid INTEGER,
+	payload_image TEXT NOT NULL DEFAULT '',
+	attribution TEXT NOT NULL DEFAULT '',
+	coverage TEXT NOT NULL DEFAULT '{}',
+	event_count INTEGER NOT NULL DEFAULT 0,
+	findings_count INTEGER NOT NULL DEFAULT 0,
+	findings_computed INTEGER NOT NULL DEFAULT 0,
 	UNIQUE(run_id, source, external_id)
 );
 CREATE INDEX IF NOT EXISTS traces_module ON traces(module, captured_at DESC);
@@ -71,20 +79,41 @@ CREATE TABLE IF NOT EXISTS events (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	payload_id INTEGER REFERENCES payloads(id),
 	trace_pk INTEGER NOT NULL REFERENCES traces(id) ON DELETE CASCADE,
+	event_key TEXT NOT NULL DEFAULT '',
 	ts_ns INTEGER,
 	type TEXT NOT NULL DEFAULT '',
 	source TEXT NOT NULL DEFAULT '',
 	event TEXT NOT NULL DEFAULT '',
 	provider TEXT NOT NULL DEFAULT '',
+	event_id INTEGER,
 	pid INTEGER,
 	tid INTEGER,
+	actor_pid INTEGER,
+	target_pid INTEGER,
+	target_tid INTEGER,
+	parent_pid INTEGER,
+	operation TEXT NOT NULL DEFAULT '',
 	process TEXT NOT NULL DEFAULT '',
+	target_image TEXT NOT NULL DEFAULT '',
 	path TEXT NOT NULL DEFAULT '',
 	image TEXT NOT NULL DEFAULT '',
 	address INTEGER,
 	size INTEGER,
+	protection TEXT NOT NULL DEFAULT '',
+	access INTEGER,
+	status TEXT NOT NULL DEFAULT '',
+	command TEXT NOT NULL DEFAULT '',
+	proto TEXT NOT NULL DEFAULT '',
+	src_addr TEXT NOT NULL DEFAULT '',
+	src_port INTEGER,
+	dst_addr TEXT NOT NULL DEFAULT '',
+	dst_port INTEGER,
+	bytes INTEGER,
+	stack TEXT NOT NULL DEFAULT '',
 	category TEXT NOT NULL DEFAULT 'other',
 	severity TEXT NOT NULL DEFAULT '',
+	signal TEXT NOT NULL DEFAULT '',
+	payload_role TEXT NOT NULL DEFAULT '',
 	attrs TEXT NOT NULL DEFAULT '{}'
 );
 CREATE INDEX IF NOT EXISTS events_trace ON events(trace_pk, id);
@@ -94,6 +123,20 @@ CREATE INDEX IF NOT EXISTS events_event ON events(trace_pk, event);
 CREATE INDEX IF NOT EXISTS events_pid ON events(trace_pk, pid);
 CREATE INDEX IF NOT EXISTS events_image ON events(trace_pk, image);
 CREATE INDEX IF NOT EXISTS events_path ON events(trace_pk, path);
+
+CREATE TABLE IF NOT EXISTS findings (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	trace_pk INTEGER NOT NULL REFERENCES traces(id) ON DELETE CASCADE,
+	payload_id INTEGER REFERENCES payloads(id),
+	stage TEXT NOT NULL DEFAULT 'telemetry',
+	tool TEXT NOT NULL DEFAULT 'telemetry',
+	severity TEXT NOT NULL DEFAULT '',
+	rule TEXT NOT NULL DEFAULT '',
+	indicator TEXT NOT NULL DEFAULT '',
+	detail TEXT NOT NULL DEFAULT '',
+	signal TEXT NOT NULL DEFAULT 'signal',
+	created_at INTEGER NOT NULL DEFAULT 0
+);
 
 CREATE TABLE IF NOT EXISTS loop_cycles (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -153,14 +196,28 @@ CREATE TABLE IF NOT EXISTS loop_edits (
 );
 `
 
+// telemetryIndexesV2 is applied after ensureColumn because older databases do
+// not have the columns yet when the base schema runs.
+const telemetryIndexesV2 = `
+CREATE INDEX IF NOT EXISTS traces_payload_pid ON traces(payload_pid);
+CREATE INDEX IF NOT EXISTS events_actor ON events(trace_pk, actor_pid);
+CREATE INDEX IF NOT EXISTS events_target ON events(trace_pk, target_pid);
+CREATE INDEX IF NOT EXISTS events_operation ON events(trace_pk, category, operation);
+CREATE INDEX IF NOT EXISTS events_role ON events(trace_pk, payload_role);
+CREATE INDEX IF NOT EXISTS events_signal ON events(trace_pk, signal);
+CREATE INDEX IF NOT EXISTS events_key ON events(trace_pk, event_key);
+CREATE INDEX IF NOT EXISTS findings_trace ON findings(trace_pk);
+CREATE INDEX IF NOT EXISTS findings_payload ON findings(payload_id, severity);
+`
+
 // TelemetryDB stores normalized ETW and DefenderObserver telemetry in SQLite.
-// Writes are serialized because SQLite has one writer; queries that the model
-// issues use a separate read-only connection and a single SELECT guard.
+// The write handle is limited to one connection, so imports and findings
+// updates serialize without a process lock held during disk I/O. Queries the
+// model issues use a separate read-only connection and a single SELECT guard.
 type TelemetryDB struct {
 	path string
 	db   *sql.DB
 	ro   *sql.DB
-	mu   sync.Mutex
 }
 
 // OpenTelemetryDB opens or creates the telemetry database at path.
@@ -198,7 +255,35 @@ func OpenTelemetryDB(path string) (*TelemetryDB, error) {
 	// per-payload views are created when the next trace is imported.
 	for _, column := range []struct{ table, name, typ string }{
 		{"traces", "payload_id", "INTEGER REFERENCES payloads(id)"},
+		{"traces", "payload_pid", "INTEGER"},
+		{"traces", "payload_image", "TEXT NOT NULL DEFAULT ''"},
+		{"traces", "attribution", "TEXT NOT NULL DEFAULT ''"},
+		{"traces", "coverage", "TEXT NOT NULL DEFAULT '{}'"},
+		{"traces", "event_count", "INTEGER NOT NULL DEFAULT 0"},
+		{"traces", "findings_count", "INTEGER NOT NULL DEFAULT 0"},
+		{"traces", "findings_computed", "INTEGER NOT NULL DEFAULT 0"},
 		{"events", "payload_id", "INTEGER REFERENCES payloads(id)"},
+		{"events", "event_key", "TEXT NOT NULL DEFAULT ''"},
+		{"events", "event_id", "INTEGER"},
+		{"events", "actor_pid", "INTEGER"},
+		{"events", "target_pid", "INTEGER"},
+		{"events", "target_tid", "INTEGER"},
+		{"events", "parent_pid", "INTEGER"},
+		{"events", "operation", "TEXT NOT NULL DEFAULT ''"},
+		{"events", "target_image", "TEXT NOT NULL DEFAULT ''"},
+		{"events", "protection", "TEXT NOT NULL DEFAULT ''"},
+		{"events", "access", "INTEGER"},
+		{"events", "status", "TEXT NOT NULL DEFAULT ''"},
+		{"events", "command", "TEXT NOT NULL DEFAULT ''"},
+		{"events", "proto", "TEXT NOT NULL DEFAULT ''"},
+		{"events", "src_addr", "TEXT NOT NULL DEFAULT ''"},
+		{"events", "src_port", "INTEGER"},
+		{"events", "dst_addr", "TEXT NOT NULL DEFAULT ''"},
+		{"events", "dst_port", "INTEGER"},
+		{"events", "bytes", "INTEGER"},
+		{"events", "stack", "TEXT NOT NULL DEFAULT ''"},
+		{"events", "signal", "TEXT NOT NULL DEFAULT ''"},
+		{"events", "payload_role", "TEXT NOT NULL DEFAULT ''"},
 		{"loop_edits", "next_payload_id", "INTEGER REFERENCES payloads(id)"},
 		{"loop_results", "report", "TEXT NOT NULL DEFAULT ''"},
 	} {
@@ -206,6 +291,14 @@ func OpenTelemetryDB(path string) (*TelemetryDB, error) {
 			db.Close()
 			return nil, err
 		}
+	}
+	if _, err := db.Exec(telemetryIndexesV2); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("create telemetry indexes: %w", err)
+	}
+	if err := migrateTelemetrySchema(db); err != nil {
+		db.Close()
+		return nil, err
 	}
 	ro, err := sql.Open("sqlite", dsn+"?mode=ro")
 	if err != nil {
@@ -248,31 +341,67 @@ type ImportOptions struct {
 	ParentKey string
 }
 
+// TelemetryCoverage records which telemetry sources produced events and which
+// were expected from the run metadata. It makes a silently degraded capture
+// visible to the loop instead of looking like a clean run.
+type TelemetryCoverage struct {
+	Delivered  []string       `json:"delivered,omitempty"`
+	Expected   []string       `json:"expected,omitempty"`
+	Missing    []string       `json:"missing,omitempty"`
+	Providers  map[string]int `json:"providers,omitempty"`
+	Categories map[string]int `json:"categories,omitempty"`
+	Roles      map[string]int `json:"roles,omitempty"`
+	Signals    map[string]int `json:"signals,omitempty"`
+}
+
+// TelemetryStats is the bounded per-trace summary attached to a run and shown
+// to the loop. Full events stay in SQLite.
+type TelemetryStats struct {
+	TraceID       int64             `json:"trace_id"`
+	Events        int               `json:"events"`
+	PayloadEvents int               `json:"payload_events"`
+	SignalEvents  int               `json:"signal_events"`
+	Findings      int               `json:"findings"`
+	ByCategory    map[string]int    `json:"by_category,omitempty"`
+	ByRule        map[string]int    `json:"by_rule,omitempty"`
+	BySeverity    map[string]int    `json:"by_severity,omitempty"`
+	Coverage      TelemetryCoverage `json:"coverage"`
+}
+
 // TelemetryTrace is one persisted telemetry trace.
 type TelemetryTrace struct {
-	ID           int64          `json:"id"`
-	PayloadID    int64          `json:"payload_id"`
-	PayloadKey   string         `json:"payload_key,omitempty"`
-	PayloadTable string         `json:"payload_table,omitempty"`
-	Source       string         `json:"source"`
-	ExternalID   string         `json:"external_id,omitempty"`
-	Events       int            `json:"events"`
-	First        time.Time      `json:"first,omitempty"`
-	Last         time.Time      `json:"last,omitempty"`
-	Meta         map[string]any `json:"meta,omitempty"`
+	ID           int64             `json:"id"`
+	PayloadID    int64             `json:"payload_id"`
+	PayloadKey   string            `json:"payload_key,omitempty"`
+	PayloadTable string            `json:"payload_table,omitempty"`
+	Source       string            `json:"source"`
+	ExternalID   string            `json:"external_id,omitempty"`
+	Events       int               `json:"events"`
+	First        time.Time         `json:"first,omitempty"`
+	Last         time.Time         `json:"last,omitempty"`
+	PayloadPID   int64             `json:"payload_pid,omitempty"`
+	PayloadImage string            `json:"payload_image,omitempty"`
+	Attribution  string            `json:"attribution,omitempty"`
+	Coverage     TelemetryCoverage `json:"coverage,omitempty"`
+	Meta         map[string]any    `json:"meta,omitempty"`
 }
 
 // TelemetryRun is the telemetry summary attached to a detection run.
 type TelemetryRun struct {
-	TraceID      int64     `json:"trace_id"`
-	PayloadID    int64     `json:"payload_id,omitempty"`
-	PayloadKey   string    `json:"payload_key,omitempty"`
-	PayloadTable string    `json:"payload_table,omitempty"`
-	Source       string    `json:"source"`
-	Events       int       `json:"events"`
-	First        time.Time `json:"first,omitempty"`
-	Last         time.Time `json:"last,omitempty"`
-	Findings     []Finding `json:"findings,omitempty"`
+	TraceID      int64             `json:"trace_id"`
+	PayloadID    int64             `json:"payload_id,omitempty"`
+	PayloadKey   string            `json:"payload_key,omitempty"`
+	PayloadTable string            `json:"payload_table,omitempty"`
+	Source       string            `json:"source"`
+	Events       int               `json:"events"`
+	First        time.Time         `json:"first,omitempty"`
+	Last         time.Time         `json:"last,omitempty"`
+	PayloadPID   int64             `json:"payload_pid,omitempty"`
+	PayloadImage string            `json:"payload_image,omitempty"`
+	Attribution  string            `json:"attribution,omitempty"`
+	Coverage     TelemetryCoverage `json:"coverage,omitempty"`
+	Stats        *TelemetryStats   `json:"stats,omitempty"`
+	Findings     []Finding         `json:"findings,omitempty"`
 }
 
 // QueryResult is the bounded result of one model-issued SELECT.
@@ -284,30 +413,55 @@ type QueryResult struct {
 }
 
 type telemetryEvent struct {
-	TS       time.Time
-	Type     string
-	Source   string
-	Event    string
-	Provider string
-	PID      int64
-	TID      int64
-	Process  string
-	Path     string
-	Image    string
-	Address  int64
-	Size     int64
-	Category string
-	Severity string
-	Attrs    string
+	TS          time.Time
+	EventKey    string
+	Type        string
+	Source      string
+	Event       string
+	Provider    string
+	EventID     int64
+	PID         int64
+	TID         int64
+	ActorPID    int64
+	TargetPID   int64
+	TargetTID   int64
+	ParentPID   int64
+	Operation   string
+	Process     string
+	TargetImage string
+	Path        string
+	Image       string
+	Address     int64
+	Size        int64
+	Protection  string
+	Access      int64
+	Status      string
+	Command     string
+	Proto       string
+	SrcAddr     string
+	SrcPort     int64
+	DstAddr     string
+	DstPort     int64
+	Bytes       int64
+	Stack       string
+	Category    string
+	Severity    string
+	Signal      string
+	Role        string
+	Attrs       string
 }
 
 type parsedTelemetry struct {
-	Source     string
-	ExternalID string
-	Meta       map[string]any
-	Events     []telemetryEvent
-	First      time.Time
-	Last       time.Time
+	Source       string
+	ExternalID   string
+	Meta         map[string]any
+	Events       []telemetryEvent
+	First        time.Time
+	Last         time.Time
+	PayloadPID   int64
+	PayloadImage string
+	Attribution  string
+	Coverage     TelemetryCoverage
 }
 
 // Import parses and stores one telemetry blob. The format is detected from the
@@ -327,6 +481,7 @@ func (t *TelemetryDB) Import(ctx context.Context, data []byte, opts ImportOption
 	if len(parsed.Events) > maxTelemetryEvents {
 		return TelemetryTrace{}, fmt.Errorf("telemetry has %d events, limit is %d", len(parsed.Events), maxTelemetryEvents)
 	}
+	prepareTelemetry(&parsed)
 	captured := parsed.First
 	if captured.IsZero() {
 		captured = time.Now().UTC()
@@ -335,14 +490,18 @@ func (t *TelemetryDB) Import(ctx context.Context, data []byte, opts ImportOption
 	if meta == nil {
 		meta = map[string]any{}
 	}
+	coverageJSON, err := json.Marshal(parsed.Coverage)
+	if err != nil {
+		return TelemetryTrace{}, fmt.Errorf("encode telemetry coverage: %w", err)
+	}
 	meta["source"] = parsed.Source
 	meta["events"] = len(parsed.Events)
 	meta["first"] = parsed.First
 	meta["last"] = parsed.Last
-	if pid, image := payloadIdentity(parsed.Events); pid != 0 || image != "" {
-		meta["payload_pid"] = pid
-		meta["payload_image"] = image
-	}
+	meta["payload_pid"] = parsed.PayloadPID
+	meta["payload_image"] = parsed.PayloadImage
+	meta["attribution"] = parsed.Attribution
+	meta["coverage"] = parsed.Coverage
 	metaJSON, err := json.Marshal(meta)
 	if err != nil {
 		return TelemetryTrace{}, fmt.Errorf("encode telemetry meta: %w", err)
@@ -352,9 +511,6 @@ func (t *TelemetryDB) Import(ctx context.Context, data []byte, opts ImportOption
 		sum := sha256.Sum256(data)
 		externalID = "sha256:" + hex.EncodeToString(sum[:12])
 	}
-
-	t.mu.Lock()
-	defer t.mu.Unlock()
 
 	tx, err := t.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -371,10 +527,12 @@ func (t *TelemetryDB) Import(ctx context.Context, data []byte, opts ImportOption
 		return TelemetryTrace{}, fmt.Errorf("replace telemetry trace: %w", err)
 	}
 	result, err := tx.ExecContext(ctx,
-		`INSERT INTO traces(payload_id, run_id, external_id, module, artifact_sha256, source, captured_at, path, meta)
-		 VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO traces(payload_id, run_id, external_id, module, artifact_sha256, source, captured_at, path,
+		 meta, payload_pid, payload_image, attribution, coverage, event_count, findings_count, findings_computed)
+		 VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
 		payload.ID, opts.RunID, externalID, opts.Module, opts.ArtifactSHA256, parsed.Source,
-		captured.UnixMilli(), opts.Path, string(metaJSON))
+		captured.UnixMilli(), opts.Path, string(metaJSON), nullableInt(parsed.PayloadPID),
+		parsed.PayloadImage, parsed.Attribution, string(coverageJSON), len(parsed.Events))
 	if err != nil {
 		return TelemetryTrace{}, fmt.Errorf("insert telemetry trace: %w", err)
 	}
@@ -383,9 +541,12 @@ func (t *TelemetryDB) Import(ctx context.Context, data []byte, opts ImportOption
 		return TelemetryTrace{}, fmt.Errorf("telemetry trace id: %w", err)
 	}
 	stmt, err := tx.PrepareContext(ctx,
-		`INSERT INTO events(payload_id, trace_pk, ts_ns, type, source, event, provider, pid, tid,
-		 process, path, image, address, size, category, severity, attrs)
-		 VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+		`INSERT INTO events(payload_id, trace_pk, event_key, ts_ns, type, source, event, provider,
+		 event_id, pid, tid, actor_pid, target_pid, target_tid, parent_pid, operation,
+		 process, target_image, path, image, address, size, protection, access, status,
+		 command, proto, src_addr, src_port, dst_addr, dst_port, bytes, stack,
+		 category, severity, signal, payload_role, attrs)
+		 VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return TelemetryTrace{}, fmt.Errorf("prepare telemetry event insert: %w", err)
 	}
@@ -395,13 +556,16 @@ func (t *TelemetryDB) Import(ctx context.Context, data []byte, opts ImportOption
 		if !event.TS.IsZero() {
 			ts = event.TS.UnixNano()
 		}
-		pid := nullableInt(event.PID)
-		tid := nullableInt(event.TID)
-		address := nullableInt(event.Address)
-		size := nullableInt(event.Size)
-		if _, err := stmt.ExecContext(ctx, payload.ID, traceID, ts, event.Type, event.Source,
-			event.Event, event.Provider, pid, tid, event.Process, event.Path,
-			event.Image, address, size, event.Category, event.Severity, event.Attrs); err != nil {
+		if _, err := stmt.ExecContext(ctx, payload.ID, traceID, event.EventKey, ts,
+			event.Type, event.Source, event.Event, event.Provider,
+			nullableInt(event.EventID), nullableInt(event.PID), nullableInt(event.TID),
+			nullableInt(event.ActorPID), nullableInt(event.TargetPID), nullableInt(event.TargetTID),
+			nullableInt(event.ParentPID), event.Operation, event.Process, event.TargetImage,
+			event.Path, event.Image, nullableInt(event.Address), nullableInt(event.Size),
+			event.Protection, nullableInt(event.Access), event.Status, event.Command,
+			event.Proto, event.SrcAddr, nullableInt(event.SrcPort), event.DstAddr,
+			nullableInt(event.DstPort), nullableInt(event.Bytes), event.Stack,
+			event.Category, event.Severity, event.Signal, event.Role, event.Attrs); err != nil {
 			return TelemetryTrace{}, fmt.Errorf("insert telemetry event: %w", err)
 		}
 	}
@@ -418,6 +582,10 @@ func (t *TelemetryDB) Import(ctx context.Context, data []byte, opts ImportOption
 		Events:       len(parsed.Events),
 		First:        parsed.First,
 		Last:         parsed.Last,
+		PayloadPID:   parsed.PayloadPID,
+		PayloadImage: parsed.PayloadImage,
+		Attribution:  parsed.Attribution,
+		Coverage:     parsed.Coverage,
 		Meta:         meta,
 	}, nil
 }
@@ -451,9 +619,20 @@ func (t *TelemetryDB) ImportFile(ctx context.Context, path string, opts ImportOp
 	return t.Import(ctx, data, opts)
 }
 
-// FetchTelemetry downloads one telemetry URL, bounded and with credentials and
-// non-HTTP schemes rejected.
-func FetchTelemetry(ctx context.Context, rawURL string) ([]byte, error) {
+// FetchTelemetry downloads one telemetry URL from the configured sandbox
+// origin. Redirects may not leave that origin: telemetry import is reachable
+// from an injected model turn, so it must not become an SSRF pivot.
+func FetchTelemetry(ctx context.Context, rawURL, allowedOrigin string) ([]byte, error) {
+	origin, err := url.Parse(strings.TrimSpace(allowedOrigin))
+	if err != nil {
+		return nil, fmt.Errorf("parse telemetry origin: %w", err)
+	}
+	if (origin.Scheme != "http" && origin.Scheme != "https") || origin.Host == "" {
+		return nil, fmt.Errorf("telemetry origin is invalid")
+	}
+	if origin.User != nil {
+		return nil, fmt.Errorf("telemetry origin must not carry credentials")
+	}
 	parsed, err := url.Parse(strings.TrimSpace(rawURL))
 	if err != nil {
 		return nil, fmt.Errorf("telemetry URL: %w", err)
@@ -467,11 +646,25 @@ func FetchTelemetry(ctx context.Context, rawURL string) ([]byte, error) {
 	if parsed.User != nil {
 		return nil, fmt.Errorf("telemetry URL must not carry credentials")
 	}
+	if !sameOrigin(origin, parsed) {
+		return nil, fmt.Errorf("telemetry URL must use the configured sandbox origin %s", origin.Host)
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, parsed.String(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("telemetry request: %w", err)
 	}
-	client := &http.Client{Timeout: 60 * time.Second}
+	client := &http.Client{
+		Timeout: 60 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 5 {
+				return fmt.Errorf("too many telemetry redirects")
+			}
+			if req.URL.User != nil || !sameOrigin(origin, req.URL) {
+				return fmt.Errorf("telemetry redirect left the sandbox origin")
+			}
+			return nil
+		},
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetch telemetry: %w", err)
@@ -488,6 +681,10 @@ func FetchTelemetry(ctx context.Context, rawURL string) ([]byte, error) {
 		return nil, fmt.Errorf("telemetry exceeds %d bytes", maxTelemetryBytes)
 	}
 	return data, nil
+}
+
+func sameOrigin(a, b *url.URL) bool {
+	return strings.EqualFold(a.Scheme, b.Scheme) && strings.EqualFold(a.Host, b.Host)
 }
 
 // Query runs one SELECT against the telemetry database. It is the only path
@@ -511,6 +708,9 @@ func (t *TelemetryDB) Query(ctx context.Context, statement string, limit int) (Q
 	columns, err := rows.Columns()
 	if err != nil {
 		return QueryResult{}, fmt.Errorf("telemetry columns: %w", err)
+	}
+	for i := range columns {
+		columns[i] = sanitize.SanitizeOneLine(columns[i])
 	}
 	result := QueryResult{Columns: columns, Rows: [][]any{}}
 	for rows.Next() {
@@ -541,13 +741,13 @@ func (t *TelemetryDB) Query(ctx context.Context, statement string, limit int) (Q
 func queryCell(value any) any {
 	switch typed := value.(type) {
 	case []byte:
-		return clipUTF8(string(typed), maxQueryCellBytes)
+		return clipUTF8(sanitize.SanitizeOneLine(string(typed)), maxQueryCellBytes)
 	case string:
-		return clipUTF8(typed, maxQueryCellBytes)
+		return clipUTF8(sanitize.SanitizeOneLine(typed), maxQueryCellBytes)
 	case int64, float64, bool, nil:
 		return typed
 	default:
-		return clipUTF8(fmt.Sprintf("%v", typed), maxQueryCellBytes)
+		return clipUTF8(sanitize.SanitizeOneLine(fmt.Sprintf("%v", typed)), maxQueryCellBytes)
 	}
 }
 
@@ -586,6 +786,11 @@ func validateQuery(statement string) (string, error) {
 // and returns source-mappable indicators. The SQL is intentionally exposed in
 // the finding detail so an operator can re-run it with detection_query.
 func (t *TelemetryDB) Findings(ctx context.Context, traceID int64) ([]Finding, error) {
+	if existing, computed, err := t.persistedFindings(ctx, traceID); err != nil {
+		return nil, err
+	} else if computed {
+		return existing, nil
+	}
 	meta, err := t.traceMeta(ctx, traceID)
 	if err != nil {
 		return nil, err
@@ -601,71 +806,80 @@ func (t *TelemetryDB) Findings(ctx context.Context, traceID int64) ([]Finding, e
 			Stage:     StageTelemetry,
 			Tool:      "telemetry",
 			Severity:  normalizeSeverity(severity),
-			Rule:      rule,
-			Indicator: indicator,
-			Detail:    clip(detail, 500),
+			Rule:      clipUTF8(sanitizeMultiline(rule), 200),
+			Indicator: clipUTF8(sanitizeMultiline(indicator), 300),
+			Detail:    clipUTF8(sanitizeMultiline(detail), 500),
 			Executes:  true,
 		})
 	}
 
-	// Defender verdicts and scan engagement. Without ETW-TI the engine can
-	// still report scan activity, so keep the two classes separate.
-	defender, err := t.rows(ctx, `SELECT event, pid, path, image, severity, attrs FROM events
+	// Defender verdicts and scan engagement. Internal Bm* plumbing is noise;
+	// behavior-monitor engagement is signal about how hard the engine looked.
+	defender, err := t.rows(ctx, `SELECT event, pid, path, image, severity, signal, attrs FROM events
 		WHERE trace_pk = ? AND category = 'defender' ORDER BY id LIMIT 2000`, traceID)
 	if err != nil {
 		return nil, err
 	}
 	scans := 0
 	for _, row := range defender {
-		event := row.string("event")
-		attrs := row.json("attrs")
-		if name := defenderThreatName(event, attrs); name != "" {
+		if row.string("signal") == "verdict" || row.string("severity") == "critical" {
+			name := row.string("event")
+			if name == "" {
+				name = defenderThreatName(row.string("event"), row.json("attrs"))
+			}
 			target := firstNonEmpty(row.string("path"), row.string("image"),
-				jsonString(attrs["imagepath"]), "the uploaded artifact")
+				jsonString(row.json("attrs")["imagepath"]), "the uploaded artifact")
 			add("critical", "defender/verdict", name, "Defender detection "+name+" on "+target)
 			continue
 		}
-		scans++
+		if row.string("signal") == "scan" {
+			scans++
+		}
 	}
 	if scans > 0 {
 		add("low", "defender/scan", "Defender scan activity",
-			fmt.Sprintf("Defender behavior monitoring produced %d scan/internal events", scans))
+			fmt.Sprintf("Defender behavior monitoring engaged the payload %d times", scans))
 	}
 
 	// Child process creation and its image path.
-	processes, err := t.rows(ctx, `SELECT event, pid, image, attrs FROM events
-		WHERE trace_pk = ? AND category = 'process' AND event LIKE 'ProcessStart%'
-		ORDER BY id LIMIT 20`, traceID)
+	processes, err := t.rows(ctx, `SELECT event, pid, image, command, payload_role FROM events
+		WHERE trace_pk = ? AND category = 'process' AND operation = 'create'
+		AND payload_role IN ('payload', 'payload-child') ORDER BY id LIMIT 20`, traceID)
 	if err != nil {
 		return nil, err
 	}
+	seenProcess := map[string]struct{}{}
 	for _, row := range processes {
-		attrs := row.json("attrs")
-		child := intFrom(attrs, "processid")
+		child := row.int("pid")
 		image := row.string("image")
+		key := fmt.Sprintf("%d|%s", child, image)
+		if _, ok := seenProcess[key]; ok {
+			continue
+		}
+		seenProcess[key] = struct{}{}
 		severity := "medium"
-		if image != "" && !isWindowsImagePath(image) {
+		if image == "" || !isWindowsImagePath(image) {
 			severity = "high"
 		}
-		add(severity, "telemetry/child-process", "CreateProcessW",
-			fmt.Sprintf("payload created process %d from %s", child, firstNonEmpty(image, "an unknown image")))
+		detail := fmt.Sprintf("payload created process %d from %s", child, firstNonEmpty(image, "an unknown image"))
+		if command := row.string("command"); command != "" {
+			detail += ": " + command
+		}
+		add(severity, "telemetry/child-process", "CreateProcessW", detail)
 	}
 
-	// File activity outside Windows directories, including opens, creates,
-	// writes, and name creation from every Kernel-File event.
-	files, err := t.rows(ctx, `SELECT event, pid, path FROM events
-		WHERE trace_pk = ? AND category = 'file' AND path <> ''
+	// File activity outside Windows directories.
+	files, err := t.rows(ctx, `SELECT event, operation, path FROM events
+		WHERE trace_pk = ? AND category = 'file' AND path <> '' AND signal = 'signal'
+		AND payload_role IN ('payload', 'payload-child')
 		ORDER BY id LIMIT 500`, traceID)
 	if err != nil {
 		return nil, err
 	}
 	seenFiles := map[string]struct{}{}
 	for _, row := range files {
-		if payloadPID == 0 || row.int("pid") != payloadPID {
-			continue
-		}
 		path := row.string("path")
-		if isWindowsImagePath(path) {
+		if isSystemImage(path) {
 			continue
 		}
 		key := strings.ToLower(path)
@@ -673,64 +887,67 @@ func (t *TelemetryDB) Findings(ctx context.Context, traceID int64) ([]Finding, e
 			continue
 		}
 		seenFiles[key] = struct{}{}
-		event := row.string("event")
+		operation := row.string("operation")
 		indicator := "CreateFileW"
-		if strings.Contains(strings.ToLower(event), "write") {
+		switch operation {
+		case "write":
 			indicator = "WriteFile"
+		case "delete":
+			indicator = "DeleteFileW"
+		case "rename":
+			indicator = "MoveFileExW"
 		}
 		add("medium", "telemetry/file-write", indicator,
-			fmt.Sprintf("payload performed %s on %s", event, path))
+			fmt.Sprintf("payload performed %s on %s", row.string("event"), path))
 		if len(seenFiles) >= 5 {
 			break
 		}
 	}
 
-	// Images loaded outside the Windows directories, excluding the payload
-	// image itself and the main executable.
-	images, err := t.rows(ctx, `SELECT event, pid, image FROM events
-		WHERE trace_pk = ? AND category = 'image' AND image <> ''
-		AND image NOT LIKE '%\Windows\%' ORDER BY id LIMIT 100`, traceID)
+	// Images and modules loaded outside the system directories.
+	images, err := t.rows(ctx, `SELECT event, category, image FROM events
+		WHERE trace_pk = ? AND category IN ('image', 'module') AND image <> ''
+		AND signal = 'signal' AND payload_role IN ('payload', 'payload-child')
+		ORDER BY id LIMIT 200`, traceID)
 	if err != nil {
 		return nil, err
 	}
 	seenImages := map[string]struct{}{}
 	for _, row := range images {
 		image := row.string("image")
-		if sameWindowsPath(image, payloadImage) {
+		if sameWindowsPath(image, payloadImage) || isSystemImage(image) {
 			continue
 		}
 		if _, ok := seenImages[strings.ToLower(image)]; ok {
 			continue
 		}
 		seenImages[strings.ToLower(image)] = struct{}{}
-		add("medium", "telemetry/user-image", filepath.Base(strings.ReplaceAll(image, `\`, "/")),
-			"payload loaded an image from a user-writable path: "+image)
+		base := filepath.Base(strings.ReplaceAll(image, `\`, "/"))
+		rule := "telemetry/user-image"
+		if row.string("category") == "module" {
+			rule = "telemetry/user-module"
+		}
+		add("medium", rule, base, "payload loaded an image from a user-writable path: "+image)
 		if len(seenImages) >= 5 {
 			break
 		}
 	}
 
-	// Audit API calls. A target PID different from the caller is remote
-	// process access; high desired-access masks are also notable.
-	audits, err := t.rows(ctx, `SELECT event, pid, attrs FROM events
-		WHERE trace_pk = ? AND category = 'audit' ORDER BY id LIMIT 50`, traceID)
+	// Audit API calls initiated by the payload. A target PID different from the
+	// caller is remote process access; high desired-access masks are also notable.
+	audits, err := t.rows(ctx, `SELECT event, event_id, pid, target_pid, target_tid, access, attrs
+		FROM events WHERE trace_pk = ? AND category = 'audit' AND payload_role = 'payload'
+		ORDER BY id LIMIT 100`, traceID)
 	if err != nil {
 		return nil, err
 	}
 	seenAudit := map[string]struct{}{}
 	for _, row := range audits {
-		if payloadPID == 0 {
-			continue
-		}
-		attrs := row.json("attrs")
-		target := intFrom(attrs, "targetprocessid")
-		targetThread := intFrom(attrs, "targetthreadid")
-		access := intFrom(attrs, "desiredaccess")
+		target := row.int("target_pid")
+		targetThread := row.int("target_tid")
+		access := row.int("access")
 		caller := row.int("pid")
-		if caller != payloadPID {
-			continue
-		}
-		eventID := intFrom(attrs, "etw_event_id")
+		eventID := row.int("event_id")
 		switch eventID {
 		case 3:
 			if _, ok := seenAudit["symlink"]; !ok {
@@ -765,28 +982,208 @@ func (t *TelemetryDB) Findings(ctx context.Context, traceID int64) ([]Finding, e
 			add("high", "telemetry/process-access", "OpenProcess",
 				fmt.Sprintf("audit-visible process handle: caller=%d target=%d access=0x%x event=%s",
 					caller, target, access, row.string("event")))
+		default:
+			key := fmt.Sprintf("audit-%d", eventID)
+			if _, ok := seenAudit[key]; ok {
+				continue
+			}
+			seenAudit[key] = struct{}{}
+			add("low", "telemetry/audit", "AuditAPI",
+				fmt.Sprintf("payload invoked an audited API: event_id=%d target_pid=%d event=%s",
+					eventID, target, row.string("event")))
 		}
 	}
 
-	// Outbound network activity, one finding per unique endpoint.
-	network, err := t.rows(ctx, `SELECT event, pid, attrs FROM events
-		WHERE trace_pk = ? AND category = 'network' ORDER BY id LIMIT 200`, traceID)
+	// Outbound network activity, one finding per unique payload flow. Ambient
+	// Defender traffic is excluded by payload_role.
+	network, err := t.rows(ctx, `SELECT event, proto, src_addr, src_port, dst_addr, dst_port, bytes
+		FROM events WHERE trace_pk = ? AND category = 'network' AND signal = 'signal'
+		AND payload_role IN ('payload', 'payload-child') ORDER BY id LIMIT 200`, traceID)
 	if err != nil {
 		return nil, err
 	}
 	seenNetwork := map[string]struct{}{}
 	for _, row := range network {
-		attrs := row.json("attrs")
-		local := fmt.Sprintf("%s:%d", firstNonEmpty(jsonString(attrs["saddr"]), "?"), intFrom(attrs, "sport"))
-		remote := fmt.Sprintf("%s:%d", firstNonEmpty(jsonString(attrs["daddr"]), "?"), intFrom(attrs, "dport"))
-		key := local + "->" + remote
+		local := displayEndpoint(firstNonEmpty(row.string("src_addr"), "?"), row.int("src_port"))
+		remote := displayEndpoint(firstNonEmpty(row.string("dst_addr"), "?"), row.int("dst_port"))
+		proto := row.string("proto")
+		key := proto + "|" + local + "->" + remote
 		if _, ok := seenNetwork[key]; ok {
 			continue
 		}
 		seenNetwork[key] = struct{}{}
-		add("medium", "telemetry/network", "connect",
-			fmt.Sprintf("payload network %s using %s", key, row.string("event")))
+		detail := fmt.Sprintf("payload network %s %s using %s", firstNonEmpty(proto, "flow"), key, row.string("event"))
+		if bytes := row.int("bytes"); bytes > 0 {
+			detail += fmt.Sprintf(" bytes=%d", bytes)
+		}
+		add("medium", "telemetry/network", "connect", detail)
 		if len(seenNetwork) >= 5 {
+			break
+		}
+	}
+
+	// ETW-TI memory operations. Grouping by caller/target/operation keeps a
+	// READVM flood from producing hundreds of identical findings.
+	memory, err := t.rows(ctx, `SELECT event, operation, pid, target_pid, target_image, size,
+		protection, bytes, status, stack FROM events
+		WHERE trace_pk = ? AND category = 'memory'
+		AND payload_role IN ('payload', 'payload-child') ORDER BY id LIMIT 2000`, traceID)
+	if err != nil {
+		return nil, err
+	}
+	type memoryGroup struct {
+		event, operation string
+		actor, target    int64
+		image            string
+		count            int
+		size, bytes      int64
+		protection       string
+		status, stack    string
+	}
+	groups := map[string]*memoryGroup{}
+	var order []string
+	for _, row := range memory {
+		key := fmt.Sprintf("%s|%d", row.string("operation"), row.int("target_pid"))
+		group := groups[key]
+		if group == nil {
+			group = &memoryGroup{
+				event: row.string("event"), operation: row.string("operation"),
+				actor: row.int("pid"), target: row.int("target_pid"),
+				image: row.string("target_image"), protection: row.string("protection"),
+				status: row.string("status"), stack: row.string("stack"),
+			}
+			groups[key] = group
+			order = append(order, key)
+		}
+		group.count++
+		if size := row.int("size"); size > group.size {
+			group.size = size
+		}
+		if bytes := row.int("bytes"); bytes > group.bytes {
+			group.bytes = bytes
+			group.stack = firstNonEmpty(row.string("stack"), group.stack)
+		}
+		if protection := row.string("protection"); protection != "" {
+			group.protection = protection
+		}
+	}
+	seenMemory := map[string]struct{}{}
+	for _, key := range order {
+		group := groups[key]
+		cross := group.target != 0 && group.target != group.actor
+		severity, rule, indicator := "low", "telemetry/memory", "VirtualAlloc"
+		switch group.operation {
+		case "write":
+			if cross {
+				severity, rule, indicator = "high", "telemetry/cross-process-write", "WriteProcessMemory"
+			} else {
+				severity, rule, indicator = "low", "telemetry/self-write", "NtWriteVirtualMemory"
+			}
+		case "protect":
+			if cross {
+				severity, rule, indicator = "high", "telemetry/cross-process-protect", "VirtualProtectEx"
+			} else {
+				severity, rule, indicator = "medium", "telemetry/self-protect", "VirtualProtect"
+			}
+		case "suspend":
+			severity, rule, indicator = "high", "telemetry/thread-suspend", "SuspendThread"
+		case "allocate":
+			if cross {
+				severity, rule, indicator = "medium", "telemetry/cross-process-alloc", "VirtualAllocEx"
+			} else {
+				severity, rule, indicator = "low", "telemetry/self-alloc", "VirtualAlloc"
+			}
+		case "read":
+			severity, rule, indicator = "low", "telemetry/readvm", "ReadProcessMemory"
+		case "map":
+			severity, rule, indicator = "medium", "telemetry/map-view", "MapViewOfFile"
+		}
+		dedupe := rule + "|" + indicator + "|" + strconv.FormatInt(group.target, 10)
+		if _, ok := seenMemory[dedupe]; ok {
+			continue
+		}
+		seenMemory[dedupe] = struct{}{}
+		detail := fmt.Sprintf("ETW-TI %s caller=%d target=%d", group.operation, group.actor, group.target)
+		if group.image != "" {
+			detail += " (" + group.image + ")"
+		}
+		if group.count > 1 {
+			detail += fmt.Sprintf(" count=%d", group.count)
+		}
+		if group.size > 0 {
+			detail += fmt.Sprintf(" size=%d", group.size)
+		}
+		if group.protection != "" {
+			detail += " protection=" + group.protection
+		}
+		if group.bytes > 0 {
+			detail += fmt.Sprintf(" bytes=%d", group.bytes)
+		}
+		if group.status != "" {
+			detail += " status=" + group.status
+		}
+		if group.stack != "" {
+			detail += " stack=" + group.stack
+		}
+		add(severity, rule, indicator, detail)
+		if len(seenMemory) >= 8 {
+			break
+		}
+	}
+
+	// ntdll hooks observed by RedEdrDll. The hooked API name is directly
+	// mappable to the loader source that calls it.
+	hooks, err := t.rows(ctx, `SELECT event, pid, tid, address, size, protection, status
+		FROM events WHERE trace_pk = ? AND category = 'hook' AND signal = 'signal'
+		AND payload_role IN ('payload', 'payload-child') ORDER BY id LIMIT 200`, traceID)
+	if err != nil {
+		return nil, err
+	}
+	seenHooks := map[string]struct{}{}
+	for _, row := range hooks {
+		api := row.string("event")
+		if api == "" {
+			continue
+		}
+		if _, ok := seenHooks[api]; ok {
+			continue
+		}
+		seenHooks[api] = struct{}{}
+		severity := "medium"
+		lower := strings.ToLower(api)
+		for _, sensitive := range []string{"write", "protect", "allocate", "map", "createthread", "queueuserapc", "setcontext"} {
+			if strings.Contains(lower, sensitive) {
+				severity = "high"
+				break
+			}
+		}
+		detail := fmt.Sprintf("ntdll hook observed %s pid=%d tid=%d addr=0x%x size=%d",
+			api, row.int("pid"), row.int("tid"), row.int("address"), row.int("size"))
+		if protection := row.string("protection"); protection != "" {
+			detail += " protect=" + protection
+		}
+		if status := row.string("status"); status != "" {
+			detail += " status=" + status
+		}
+		add(severity, "telemetry/hook", api, detail)
+		if len(seenHooks) >= 6 {
+			break
+		}
+	}
+
+	// Kernel-callback thread creation in a process other than the caller is a
+	// remote-thread indicator independent of the ETW-TI view.
+	if payloadPID != 0 {
+		threads, err := t.rows(ctx, `SELECT pid, actor_pid, target_tid, stack FROM events
+			WHERE trace_pk = ? AND type = 'kernel' AND category = 'thread' AND operation = 'start'
+			AND actor_pid = ? AND pid <> ? ORDER BY id LIMIT 20`, traceID, payloadPID, payloadPID)
+		if err != nil {
+			return nil, err
+		}
+		for _, row := range threads {
+			add("medium", "telemetry/remote-thread", "CreateRemoteThread",
+				fmt.Sprintf("kernel callback observed thread creation in remote process %d (tid=%d) stack=%s",
+					row.int("pid"), row.int("target_tid"), row.string("stack")))
 			break
 		}
 	}
@@ -798,9 +1195,32 @@ func (t *TelemetryDB) Findings(ctx context.Context, traceID int64) ([]Finding, e
 			WHERE trace_pk = ? AND type = 'process_query' AND event = 'peb' LIMIT 1`, traceID)
 		if err == nil && len(queries) == 1 {
 			attrs := queries[0].json("attrs")
-			if v, ok := attrs["is_debugged"].(json.Number); ok && v.String() != "0" {
-				add("info", "telemetry/debugged", "IsDebuggerPresent",
-					"the payload process was debugged in the sandbox")
+			for _, key := range []string{"is_debugged", "is_protected_process", "is_protected_process_light"} {
+				if v, ok := attrs[key].(json.Number); ok && v.String() != "0" {
+					add("info", "telemetry/debugged", key,
+						"the payload observed its own anti-analysis state: "+key+" is set")
+					break
+				}
+			}
+		}
+	}
+
+	attribution := metaString(meta, "attribution")
+	if attribution == "unknown" {
+		add("low", "telemetry/attribution", "payload identity",
+			"the capture has no payload PEB; events are stored but cannot be attributed to the sample")
+	}
+	if coverage, ok := meta["coverage"].(map[string]any); ok {
+		if missing, ok := coverage["missing"].([]any); ok && len(missing) > 0 {
+			names := make([]string, 0, len(missing))
+			for _, item := range missing {
+				if text, ok := item.(string); ok {
+					names = append(names, text)
+				}
+			}
+			if len(names) > 0 {
+				add("medium", "telemetry/coverage", "missing telemetry",
+					"expected telemetry sources produced no events: "+strings.Join(names, ", "))
 			}
 		}
 	}
@@ -810,8 +1230,14 @@ func (t *TelemetryDB) Findings(ctx context.Context, traceID int64) ([]Finding, e
 		if ri != rj {
 			return ri < rj
 		}
-		return findings[i].Rule < findings[j].Rule
+		if findings[i].Rule != findings[j].Rule {
+			return findings[i].Rule < findings[j].Rule
+		}
+		return findings[i].Indicator < findings[j].Indicator
 	})
+	if err := t.saveFindings(ctx, traceID, findings); err != nil {
+		return nil, err
+	}
 	return findings, nil
 }
 
@@ -901,69 +1327,95 @@ func parseTelemetry(data []byte, sourceHint string) (parsedTelemetry, error) {
 	if len(trimmed) == 0 {
 		return parsedTelemetry{}, fmt.Errorf("telemetry is empty")
 	}
-	var (
-		value any
-		err   error
-	)
-	if trimmed[0] == '{' && bytes.Contains(trimmed, []byte("\n")) {
-		if parsed, ok := parseTelemetryJSONL(trimmed, sourceHint); ok {
-			return parsed, nil
-		}
-	}
-	if trimmed[0] == '[' || trimmed[0] == '{' {
-		value, err = decodeJSON(trimmed)
-		if err == nil {
-			if parsed, parseErr := parseTelemetryValue(value, sourceHint); parseErr == nil {
-				return parsed, nil
+	// A complete document wins over JSONL. Formatted JSON can put one event
+	// across several lines, so the line decoder would otherwise accept a
+	// partial first event and drop the rest.
+	if trimmed[0] == '{' || trimmed[0] == '[' {
+		if json.Valid(trimmed) {
+			if value, err := decodeJSON(trimmed); err == nil {
+				if parsed, parseErr := parseTelemetryValue(value, sourceHint); parseErr == nil {
+					return parsed, nil
+				}
 			}
 		}
 	}
 	if parsed, ok := parseTelemetryJSONL(trimmed, sourceHint); ok {
 		return parsed, nil
 	}
+	value, err := decodeJSON(trimmed)
 	if err != nil {
 		return parsedTelemetry{}, fmt.Errorf("decode telemetry: %w", err)
+	}
+	if parsed, parseErr := parseTelemetryValue(value, sourceHint); parseErr == nil {
+		return parsed, nil
 	}
 	return parsedTelemetry{}, fmt.Errorf("unsupported telemetry format")
 }
 
 func parseTelemetryValue(value any, sourceHint string) (parsedTelemetry, error) {
-	switch typed := value.(type) {
-	case []any:
-		maps := make([]map[string]any, 0, len(typed))
-		for _, item := range typed {
-			object, ok := item.(map[string]any)
-			if !ok {
-				return parsedTelemetry{}, fmt.Errorf("telemetry array contains a non-object")
+	maps := collectTelemetryObjects(value)
+	if len(maps) == 0 {
+		return parsedTelemetry{}, fmt.Errorf("unsupported telemetry object")
+	}
+	return parseTelemetryMaps(maps, sourceHint)
+}
+
+// collectTelemetryObjects walks a LitterBox or RedEdr envelope and returns
+// every event object, merging RedEdr findings.events with raw_output and the
+// kernel/hook/query records that only raw_output carries.
+func collectTelemetryObjects(value any) []map[string]any {
+	seen := map[string]bool{}
+	var out []map[string]any
+	var walk func(any)
+	walk = func(value any) {
+		switch typed := value.(type) {
+		case []any:
+			for _, item := range typed {
+				walk(item)
 			}
-			maps = append(maps, object)
-		}
-		if len(maps) == 0 {
-			return parsedTelemetry{}, fmt.Errorf("telemetry array is empty")
-		}
-		return parseTelemetryMaps(maps, sourceHint)
-	case map[string]any:
-		if rededr, ok := findRedEdr(typed); ok {
-			return parseTelemetryValue(rededr, "litterbox-rededr")
-		}
-		if rawOutput, ok := typed["raw_output"].(string); ok {
-			if parsed, ok := parseRedEdrRawOutput(rawOutput, "litterbox-rededr"); ok {
-				return parsed, nil
+		case string:
+			for _, object := range decodeTelemetryLines(typed) {
+				walk(object)
 			}
-		}
-		if events, ok := typed["events"].([]any); ok {
-			return parseTelemetryValue(events, sourceHint)
-		}
-		if findings, ok := typed["findings"].(map[string]any); ok {
-			if events, ok := findings["events"].([]any); ok {
-				return parseTelemetryValue(events, sourceHint)
+		case map[string]any:
+			if isDefenderObserver(typed) || isRedEdrEvent(typed) {
+				encoded, _ := json.Marshal(typed)
+				key := string(encoded)
+				if !seen[key] {
+					seen[key] = true
+					out = append(out, typed)
+				}
+				return
 			}
-		}
-		if isDefenderObserver(typed) || isRedEdrEvent(typed) {
-			return parseTelemetryMaps([]map[string]any{typed}, sourceHint)
+			for _, key := range []string{"events", "findings", "rededr", "raw_output", "data"} {
+				if child, ok := typed[key]; ok {
+					walk(child)
+				}
+			}
 		}
 	}
-	return parsedTelemetry{}, fmt.Errorf("unsupported telemetry object")
+	walk(value)
+	return out
+}
+
+func decodeTelemetryLines(raw string) []map[string]any {
+	var out []map[string]any
+	for _, line := range strings.Split(raw, "\n") {
+		line = strings.TrimSpace(line)
+		if len(line) == 0 || line[0] != '{' {
+			continue
+		}
+		decoded, err := decodeJSON([]byte(line))
+		if err != nil {
+			continue
+		}
+		object, ok := decoded.(map[string]any)
+		if !ok || (!isRedEdrEvent(object) && !isDefenderObserver(object)) {
+			continue
+		}
+		out = append(out, object)
+	}
+	return out
 }
 
 func parseTelemetryMaps(maps []map[string]any, sourceHint string) (parsedTelemetry, error) {
@@ -972,12 +1424,9 @@ func parseTelemetryMaps(maps []map[string]any, sourceHint string) (parsedTelemet
 	}
 	source := strings.ToLower(strings.TrimSpace(sourceHint))
 	if source == "" || source == "auto" {
-		switch {
-		case isDefenderObserver(maps[0]):
+		if isDefenderObserver(maps[0]) {
 			source = "defender_observer"
-		case isRedEdrEvent(maps[0]):
-			source = "rededr"
-		default:
+		} else {
 			source = "rededr"
 		}
 	}
@@ -989,22 +1438,25 @@ func parseTelemetryMaps(maps []map[string]any, sourceHint string) (parsedTelemet
 			}
 			continue
 		}
-		event := telemetryEvent{Source: source}
-		switch source {
-		case "defender_observer":
-			event = normalizeDefenderObserver(object)
-		default:
-			event = normalizeRedEdr(object)
+		normalizerSource := source
+		switch {
+		case isDefenderObserver(object):
+			normalizerSource = "defender_observer"
+		case isRedEdrEvent(object):
+			normalizerSource = "rededr"
 		}
-		if event.Event == "" && event.Image == "" && event.Path == "" {
-			continue
-		}
-		parsed.Events = append(parsed.Events, event)
-		if parsed.First.IsZero() || (!event.TS.IsZero() && event.TS.Before(parsed.First)) {
-			parsed.First = event.TS
-		}
-		if event.TS.After(parsed.Last) {
-			parsed.Last = event.TS
+		for _, event := range normalizeTelemetryObject(normalizerSource, object) {
+			event.Source = source
+			if event.EventKey == "" {
+				event.EventKey = telemetryObjectKey(event.Attrs, "")
+			}
+			parsed.Events = append(parsed.Events, event)
+			if parsed.First.IsZero() || (!event.TS.IsZero() && event.TS.Before(parsed.First)) {
+				parsed.First = event.TS
+			}
+			if event.TS.After(parsed.Last) {
+				parsed.Last = event.TS
+			}
 		}
 	}
 	parsed.ExternalID = telemetryExternalID(parsed.Source, parsed.Meta, parsed.Events)
@@ -1022,8 +1474,11 @@ func isRedEdrEvent(object map[string]any) bool {
 		return true
 	}
 	eventType, _ := object["type"].(string)
-	return strings.EqualFold(strings.TrimSpace(eventType), "etw") ||
-		strings.EqualFold(strings.TrimSpace(eventType), "process_query")
+	switch strings.ToLower(strings.TrimSpace(eventType)) {
+	case "etw", "process_query", "proces_query", "kernel", "dll", "meta":
+		return true
+	}
+	return false
 }
 
 func isDefenderObserver(object map[string]any) bool {
@@ -1031,142 +1486,6 @@ func isDefenderObserver(object map[string]any) bool {
 	_, hasTimestamp := object["timestamp"]
 	_, hasPayload := object["payload"]
 	return hasProvider && hasTimestamp && hasPayload
-}
-
-func findRedEdr(value any) (map[string]any, bool) {
-	switch typed := value.(type) {
-	case map[string]any:
-		for key, child := range typed {
-			if strings.EqualFold(key, "rededr") {
-				if object, ok := child.(map[string]any); ok {
-					if _, ok := object["findings"]; ok {
-						return object, true
-					}
-				}
-			}
-			if found, ok := findRedEdr(child); ok {
-				return found, true
-			}
-		}
-	case []any:
-		for _, child := range typed {
-			if found, ok := findRedEdr(child); ok {
-				return found, true
-			}
-		}
-	}
-	return nil, false
-}
-
-func normalizeRedEdr(object map[string]any) telemetryEvent {
-	eventName := strings.TrimSpace(jsonString(object["event"]))
-	provider := jsonString(object["etw_provider_name"])
-	eventType := strings.TrimSpace(jsonString(object["type"]))
-	category := redEdrCategory(provider, eventName, eventType)
-	event := telemetryEvent{
-		Type:     eventType,
-		Event:    eventName,
-		Provider: provider,
-		PID:      firstInt(object, "etw_pid", "processid", "pid"),
-		TID:      firstInt(object, "etw_tid", "threadid"),
-		Process:  firstString(object, "etw_process", "process_name"),
-		Image:    firstString(object, "imagename", "imagepath"),
-		Path:     firstString(object, "filename", "filepath"),
-		Address:  firstInt(object, "imagebase", "image_base", "addr"),
-		Size:     firstInt(object, "imagesize"),
-		Category: category,
-	}
-	// A Defender BmDetection uses "name" for the threat verdict, not a path.
-	if event.Path == "" && category != "defender" {
-		event.Path = firstString(object, "name")
-	}
-	if strings.EqualFold(eventType, "process_query") {
-		if eventName == "" {
-			event.Event = strings.TrimSpace(jsonString(object["func"]))
-		}
-		event.Path = jsonString(object["working_dir"])
-		event.Image = firstString(object, "image_path")
-	}
-	if event.Image == "" && strings.EqualFold(eventType, "process_query") {
-		event.Image = jsonString(object["process_name"])
-	}
-	if event.TS = telemetryTime(object); event.TS.IsZero() {
-		event.TS = telemetryTimeKey(object, "createtime")
-	}
-	if event.Category == "defender" && defenderThreatName(eventName, object) != "" {
-		event.Severity = "high"
-	}
-	event.Attrs = encodeObject(object)
-	return event
-}
-
-func normalizeDefenderObserver(object map[string]any) telemetryEvent {
-	payload, _ := object["payload"].(map[string]any)
-	event := telemetryEvent{
-		Type:     "defender_observer",
-		Event:    firstString(object, "symbol", "summary", "task", "opcode"),
-		Provider: firstString(object, "providerName"),
-		PID:      firstInt(object, "processId"),
-		TID:      firstInt(object, "threadId"),
-		Process:  firstString(object, "processName"),
-		Category: "other",
-	}
-	if strings.Contains(strings.ToLower(event.Provider), "antimalware") ||
-		strings.Contains(strings.ToLower(event.Provider), "defender") {
-		event.Category = "defender"
-	}
-	if timestamp := jsonString(object["timestamp"]); timestamp != "" {
-		if parsed, err := time.Parse(time.RFC3339Nano, timestamp); err == nil {
-			event.TS = parsed.UTC()
-		}
-	}
-	for key, value := range payload {
-		text, ok := value.(string)
-		if !ok || text == "" {
-			continue
-		}
-		lower := strings.ToLower(key)
-		switch {
-		case strings.Contains(lower, "image"):
-			if event.Image == "" {
-				event.Image = text
-			}
-		case strings.Contains(lower, "path") || strings.Contains(lower, "file"):
-			if event.Path == "" {
-				event.Path = text
-			}
-		}
-	}
-	if event.Category == "defender" && defenderThreatName(event.Event, payload) != "" {
-		event.Severity = "high"
-	}
-	event.Attrs = encodeObject(object)
-	return event
-}
-
-func redEdrCategory(provider, event, eventType string) string {
-	switch {
-	case strings.EqualFold(eventType, "process_query"), strings.EqualFold(eventType, "proces_query"):
-		return "query"
-	case strings.Contains(provider, "Audit-API"):
-		return "audit"
-	case strings.Contains(provider, "Antimalware"):
-		return "defender"
-	case strings.Contains(provider, "Kernel-File"):
-		return "file"
-	case strings.Contains(provider, "Kernel-Network"):
-		return "network"
-	case strings.Contains(provider, "Kernel-Process"):
-		switch {
-		case strings.HasPrefix(event, "ImageLoad"), strings.HasPrefix(event, "ImageUnload"):
-			return "image"
-		case strings.HasPrefix(event, "ProcessStart"):
-			return "process"
-		case strings.HasPrefix(event, "ThreadStart"):
-			return "thread"
-		}
-	}
-	return "other"
 }
 
 func telemetryTime(object map[string]any) time.Time {
@@ -1218,47 +1537,6 @@ func telemetryExternalID(source string, meta map[string]any, events []telemetryE
 		}
 	}
 	return ""
-}
-
-func payloadIdentity(events []telemetryEvent) (int64, string) {
-	var fallbackPID int64
-	var fallbackImage string
-	for _, event := range events {
-		if event.Type != "process_query" {
-			continue
-		}
-		var object map[string]any
-		dec := json.NewDecoder(strings.NewReader(event.Attrs))
-		dec.UseNumber()
-		if dec.Decode(&object) != nil {
-			continue
-		}
-		funcName := strings.ToLower(strings.TrimSpace(jsonString(object["func"])))
-		if funcName != "peb" && !strings.EqualFold(event.Event, "peb") {
-			continue
-		}
-		pid := intFrom(object, "pid")
-		image := firstString(object, "image_path")
-		lower := strings.ToLower(image)
-		// The sandbox also traces MsMpEng; its PEB has no image or a Windows
-		// image and must not become the payload identity.
-		if image == "" || strings.Contains(lower, `\windows\`) || strings.Contains(lower, "msmpeng") {
-			if fallbackPID == 0 && pid != 0 {
-				fallbackPID, fallbackImage = pid, image
-			}
-			continue
-		}
-		return pid, image
-	}
-	if fallbackPID != 0 {
-		return fallbackPID, fallbackImage
-	}
-	for _, event := range events {
-		if event.PID != 0 {
-			return event.PID, event.Image
-		}
-	}
-	return 0, ""
 }
 
 // --- value helpers ---------------------------------------------------------
@@ -1401,54 +1679,14 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-// parseTelemetryJSONL accepts one JSON object per line and requires at least
-// two objects, so a pretty-printed single object is left to the JSON decoder.
+// parseTelemetryJSONL accepts one JSON event object per line, tolerating the
+// loguru INFO lines RedEdr interleaves with its JSON output.
 func parseTelemetryJSONL(data []byte, sourceHint string) (parsedTelemetry, bool) {
-	var maps []map[string]any
-	for _, line := range bytes.Split(data, []byte("\n")) {
-		line = bytes.TrimSpace(line)
-		if len(line) == 0 || line[0] != '{' {
-			continue
-		}
-		decoded, err := decodeJSON(line)
-		if err != nil {
-			continue
-		}
-		if object, ok := decoded.(map[string]any); ok {
-			maps = append(maps, object)
-		}
-	}
-	if len(maps) < 2 {
-		return parsedTelemetry{}, false
-	}
-	parsed, err := parseTelemetryMaps(maps, sourceHint)
-	if err != nil {
-		return parsedTelemetry{}, false
-	}
-	return parsed, true
-}
-
-// parseRedEdrRawOutput extracts the JSON event lines from RedEdr's stdout,
-// which interleaves loguru INFO lines with one JSON object per event.
-func parseRedEdrRawOutput(raw, source string) (parsedTelemetry, bool) {
-	var maps []map[string]any
-	for _, line := range strings.Split(raw, "\n") {
-		line = strings.TrimSpace(line)
-		if len(line) == 0 || line[0] != '{' {
-			continue
-		}
-		decoded, err := decodeJSON([]byte(line))
-		if err != nil {
-			continue
-		}
-		if object, ok := decoded.(map[string]any); ok {
-			maps = append(maps, object)
-		}
-	}
+	maps := decodeTelemetryLines(string(data))
 	if len(maps) == 0 {
 		return parsedTelemetry{}, false
 	}
-	parsed, err := parseTelemetryMaps(maps, source)
+	parsed, err := parseTelemetryMaps(maps, sourceHint)
 	if err != nil {
 		return parsedTelemetry{}, false
 	}

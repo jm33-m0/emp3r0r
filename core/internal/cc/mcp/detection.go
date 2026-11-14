@@ -11,6 +11,7 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/detection"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/sanitize"
 )
 
 const (
@@ -87,10 +88,10 @@ func (a *Actions) detectionTools() map[string]Tool {
 				Type: "function",
 				Function: FunctionDef{
 					Name:        "detection_telemetry_import",
-					Description: "Import ETW/Defender telemetry into the detection SQLite database. Reads a RedEdr JSON array or JSONL, a LitterBox dynamic result containing RedEdr findings, or DefenderObserver JSONL from path or url. Associate it with a recorded module build with module and optional artifact; returns the trace id, normalized event counts, and deterministic findings. Query the result with detection_query.",
+					Description: "Import ETW/Defender telemetry into the detection SQLite database. Reads a RedEdr JSON array or JSONL, a LitterBox dynamic result (merging findings.events and raw_output, including kernel callbacks, ntdll hooks, PEB/loaded-DLL queries, and ETW-TI), or DefenderObserver JSONL from path or url. A url must use the configured sandbox origin; redirects may not leave it. Associate it with a recorded module build with module and optional artifact; returns the trace id, payload attribution, source coverage, normalized event counts, and deterministic findings. Query the result with detection_query.",
 					Parameters: ObjectSchema(map[string]any{
 						"path":     StringProp("Local telemetry file. Mutually exclusive with url."),
-						"url":      StringProp("HTTP(S) telemetry URL. Mutually exclusive with path."),
+						"url":      StringProp("HTTP(S) telemetry URL on the configured sandbox origin. Mutually exclusive with path."),
 						"module":   StringProp("Optional module name (loader_windows or stager_linux) to associate with the trace."),
 						"artifact": StringProp("Optional recorded module artifact; defaults to the newest build when module is set."),
 						"run_id":   StringProp("Optional detection run ID to associate with the trace."),
@@ -105,7 +106,7 @@ func (a *Actions) detectionTools() map[string]Tool {
 				Type: "function",
 				Function: FunctionDef{
 					Name:        "detection_query",
-					Description: "Run one read-only SQL SELECT or WITH statement against the detection telemetry database. Tables: payloads (one row per artifact, with table_name a per-payload view), traces, events (payload_id, trace_pk, ts_ns, type, source, event, provider, pid, tid, process, path, image, address, size, category, severity, attrs JSON), loop_cycles, loop_feedback, loop_results, loop_builds, and loop_edits. Query payloads.table_name for one payload, filter by trace_pk or payload_id, and use json_extract(attrs,'$.field') for raw fields. Returns columns, rows, and a truncation flag; at most 500 rows.",
+					Description: "Run one read-only SQL SELECT or WITH statement against the detection telemetry database. Tables: payloads (one row per artifact, with table_name a per-payload view), traces, events (payload_id, trace_pk, event_key, ts_ns, type, source, event, provider, event_id, pid, tid, actor_pid, target_pid, target_tid, parent_pid, operation, process, target_image, path, image, address, size, protection, access, status, command, proto, src_addr, src_port, dst_addr, dst_port, bytes, stack, category, severity, signal, payload_role, attrs JSON), findings, loop_cycles, loop_feedback, loop_results, loop_builds, and loop_edits. Query payloads.table_name for one payload, filter by trace_pk or payload_id, and use json_extract(attrs,'$.field') for raw fields. Categories include memory (ETW-TI), hook, and module; payload_role separates the payload, its children, targets, scans, and ambient Defender events. Returns columns, rows, and a truncation flag; at most 500 rows.",
 					Parameters: ObjectSchema(map[string]any{
 						"sql":   StringProp("One SELECT or WITH statement. No comments, PRAGMAs, writes, or multiple statements."),
 						"limit": IntegerProp("Maximum rows. Default 200, at most 500."),
@@ -297,7 +298,9 @@ func (a *Actions) detectionRun(ctx context.Context, raw json.RawMessage) (any, e
 	runCtx, cancel := context.WithTimeout(ctx, 15*time.Minute)
 	defer cancel()
 	run, runErr := a.Detection.RunPlan(runCtx, plan, opts)
+	detection.SanitizeRisk(&run.Risk)
 	feedback := detection.BuildFeedback(run)
+	detection.SanitizeFeedback(&feedback)
 	result := a.actionResultWithFlags("detection_run", command, mod.Name, nil, nil, review, decision, auditErr, "", runErr, run.Executed)
 	result["run_id"] = run.ID
 	result["artifact"] = run.Plan.Artifact
@@ -348,6 +351,7 @@ func (a *Actions) detectionFeedback(ctx context.Context, raw json.RawMessage) (a
 	if err != nil {
 		return nil, err
 	}
+	detection.SanitizeFeedback(&feedback)
 	result := map[string]any{"run_id": feedback.RunID, "feedback": feedback}
 	if feedback.Telemetry != nil {
 		result["telemetry"] = map[string]any{
@@ -389,6 +393,7 @@ func (a *Actions) detectionFeedback(ctx context.Context, raw json.RawMessage) (a
 			result["analysis_error"] = analyzeErr.Error()
 			return result, nil
 		}
+		detection.SanitizeFeedback(&analyzed)
 		result["feedback"] = analyzed
 		result["analysis"] = detection.RedactAnalysis(analyzed)
 	}
@@ -599,14 +604,14 @@ func stageSummaries(run detection.Run) []map[string]any {
 	out := make([]map[string]any, 0, len(run.Stages))
 	for _, stage := range run.Stages {
 		row := map[string]any{
-			"kind": string(stage.Kind), "tool": stage.Tool,
+			"kind": string(stage.Kind), "tool": sanitize.SanitizeOneLine(stage.Tool),
 			"status": stage.Status, "executes": stage.Executes,
 		}
 		if stage.Reason != "" {
-			row["reason"] = stage.Reason
+			row["reason"] = sanitize.SanitizeText(stage.Reason)
 		}
 		if stage.Error != "" {
-			row["error"] = stage.Error
+			row["error"] = sanitize.SanitizeText(stage.Error)
 		}
 		out = append(out, row)
 	}
@@ -625,6 +630,9 @@ func (a *Actions) detectionImport(ctx context.Context, raw json.RawMessage) (any
 	rawURL := strings.TrimSpace(args.URL)
 	if (path == "") == (rawURL == "") {
 		return nil, fmt.Errorf("pass exactly one of path or url")
+	}
+	if rawURL != "" && a.Detection.Client == nil {
+		return nil, fmt.Errorf("detection sandbox is not configured")
 	}
 	if len(path) > maxDetectionArtifactPath || len(rawURL) > maxDetectionTelemetryURL {
 		return nil, fmt.Errorf("telemetry location is too long")
@@ -663,7 +671,7 @@ func (a *Actions) detectionImport(ctx context.Context, raw json.RawMessage) (any
 			opts.ArtifactSHA256 = latest.SHA256
 		}
 	}
-	command := "detection_telemetry_import " + firstNonEmpty(path, rawURL)
+	command := "detection_telemetry_import " + sanitize.SanitizeOneLine(firstNonEmpty(path, rawURL))
 	review := def.OpsecReview{
 		Noise:      "low",
 		Reversible: true,
@@ -684,7 +692,7 @@ func (a *Actions) detectionImport(ctx context.Context, raw json.RawMessage) (any
 	} else {
 		fetchCtx, fetchCancel := context.WithTimeout(ctx, 90*time.Second)
 		var data []byte
-		data, err = detection.FetchTelemetry(fetchCtx, rawURL)
+		data, err = detection.FetchTelemetry(fetchCtx, rawURL, a.Detection.Client.URL())
 		fetchCancel()
 		if err == nil {
 			opts.Path = rawURL
@@ -696,6 +704,7 @@ func (a *Actions) detectionImport(ctx context.Context, raw json.RawMessage) (any
 	}
 	findings, findErr := a.Detection.Telemetry.Findings(importCtx, trace.ID)
 	result := a.actionResultWithFlags("detection_telemetry_import", command, opts.Module, nil, nil, review, decision, auditErr, "", findErr, false)
+	detection.SanitizeTelemetryTrace(&trace)
 	result["trace"] = trace
 	result["findings"] = findings
 	result["note"] = "query raw events with detection_query using trace_pk = trace.id"
@@ -753,7 +762,7 @@ func (a *Actions) detectionLoop(ctx context.Context, raw json.RawMessage) (any, 
 			moduleDir = mod.Path
 		}
 	}
-	command := fmt.Sprintf("detection_loop %s %s", module, shellcode)
+	command := fmt.Sprintf("detection_loop %s %s", sanitize.SanitizeOneLine(module), sanitize.SanitizeOneLine(shellcode))
 	review := def.OpsecReview{
 		Noise:      "high",
 		Reversible: false,
