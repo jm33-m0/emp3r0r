@@ -23,7 +23,7 @@ There are two kinds of modules:
 
 - **C2 modules** (`"is_local": true`) run on the operator host. They execute
   their `build` command on the C2 and are used to produce payloads
-  (`loader_windows`, `stager_linux`, `crystal_pack`). They have no
+  (`loader_windows`, `stager_linux`, `crystal_pack`, `donut`). They have no
   `agent_config`. Because they never reach an agent, they run without a
   selected target and their `platform` field (when set) is informational
   only: it describes the OS the produced payload targets, not where the

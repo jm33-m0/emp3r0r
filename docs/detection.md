@@ -87,6 +87,80 @@ Palace/Crystal-Kit PICO from `crystal_pack` can replace the generated Donut
 shellcode. Norma can change the loader, wrapper, injection path, or shellcode
 producer when telemetry points at that design.
 
+### Trust model and isolation
+
+The loop is a code-execution feature driven by an untrusted model, not a
+sandbox. The model can edit module and producer source, and the builds it
+triggers run on the operator host: `build.sh`, the generator it compiles, and
+the source edits themselves execute with the operator's privileges. Prompt
+injection from sandbox telemetry, module source, or cached knowledge can steer
+those edits, so a rogue model is equivalent to code execution on the host.
+
+Emp3r0r cannot bound that from inside the loop. Run the loop on a dedicated,
+disposable VM or container:
+
+- give it no host credentials, no production C2 server keys, and no access to
+  the operator's home directory or SSH agent;
+- restrict egress to the model provider and the LitterBox sandbox;
+- rebuild or discard the VM after a run instead of reusing a workstation;
+- keep the model provider's data handling in mind: source excerpts, build logs,
+  and sandbox telemetry leave the host.
+
+The next step is to run the worker itself in a disposable VM managed alongside
+LitterBox, so a host-side build is no longer a trust boundary.
+
+### Producers
+
+`--producer name=dir` exposes a shellcode producer module to the model. The
+installed `donut` and `crystal_pack` modules are added automatically. The
+model may read and edit a producer's source (`EditSource module=donut`), then
+call `BuildShellcode`. The `donut` module rebuilds its x86/x64 loader stubs and
+generator from `core/modules/donut/src` on every build, so loader edits take
+effect in the generated shellcode. `BuildShellcode`:
+
+- validates options against the module's `config.json` (unknown, internal, and
+  out-of-choice values are rejected);
+- fills the input from the agent executable next to `--shellcode` unless the
+  model passes one, and requires input and decoy files to live in the operator
+  payload directory;
+- writes the artifact under `<store>/shellcode/<loop>/`;
+- rejects non-regular or oversized output and hashes the result;
+- makes the artifact the shellcode for every later cycle.
+
+`--read-root dir` adds a read-only source root (repeatable). By default the
+loader's shared build inputs (`modules/common`, `c_agent/*/util`) are exposed
+read-only, so the model can trace linked code without being able to edit it.
+
+If a cycle regresses, `RevertToPayload` replays the inverse of every recorded
+edit made after the chosen payload and restores the module and producer source.
+The cycle budget and the active shellcode are shown in the prompt and in every
+`DetectionCycle` result; `--iterations` is capped at 50 and `--turns` at 240.
+
+### Reference cache
+
+`knowledge-sync` downloads notebook summaries over the notebook MCP endpoint
+into an FTS5 SQLite cache at `<store>/knowledge.db`. The loop reads the cache
+offline; it never makes network calls. The endpoint must use `http` or `https`,
+must not embed credentials, and redirects may not leave its origin. Cached text
+is stripped of terminal escapes, C1 controls, and bidi overrides before it is
+stored. `KnowledgeSearch` ranks cached documents
+and `KnowledgeRead` returns a bounded summary or full text. Cached text is
+untrusted reference material, not instructions.
+
+```bash
+emp3r0r knowledge-sync --url https://archeotech.r00ted.ch/mcp
+emp3r0r knowledge-sync --content          # also cache full document text
+emp3r0r knowledge-sync --notebook maldev  # one notebook only
+```
+
+The console exposes the same command as `detect_loop knowledge-sync`.
+
+`--inject` and `--process` are overrides. When they are omitted, the module's
+own default controls the load path, so the model can change that default in
+source and have the next cycle use it. `--iterations` and `--turns` are not
+capped by the loop; the values you pass are the values it uses, and the cycle
+budget is shown in the prompt and in every `DetectionCycle` result.
+
 The worker writes one log file under `<workspace>/detection/` and opens a
 separate tmux window tailing it; `emp3r0r.log` is untouched. It does not need
 MCP or a C2 connection. Transient sandbox, build, detection, and agent-session
@@ -96,6 +170,12 @@ the requested JSON object is stored as the summary with `parse_error` instead
 of ending the run. The worker writes the human-readable Markdown report to
 `<workspace>/detection/reports/<loop>.md`, emits it through the console log
 pane when the worker exits, and stores it in `loop_results.report`.
+
+Loop log lines are tagged and colored by category: model thinking is dimmed,
+model text uses the terminal default, tool calls, tool results, builds, edits,
+cycles, warnings, and errors each get their own tag color. The final report is
+rendered from Markdown for the terminal before it is logged; the on-disk report
+stays Markdown. `NO_COLOR=1` or `TERM=dumb` disables colors.
 
 Model credentials can be exported in the shell, or put in the operator
 environment file at `<workspace>/operator.env` (mode `0600`):
@@ -171,10 +251,13 @@ ETW-TI writes/protects/suspends, self-modifying memory, kernel and ntdll hooks,
 audit API calls, child processes, user-writable images and modules, file
 writes, network flows, Defender verdicts, and sandbox analyzers that report
 high or medium findings (`rule = analyzer/<analyzer>`). The findings are materialized in
-the `findings` table and the autonomous loop minimizes the full finding count
-and score. A zero verdict count is not treated as safe; high
-static findings and high/medium telemetry findings remain actionable until the
-iteration limit, with inherent items recorded as residuals.
+the `findings` table. The loop treats a finding as actionable only when it maps
+to module source or is a real verdict; unmatched findings are reported as
+residuals instead of driving another cycle. Analyzer status and errors are
+recorded in `traces.coverage.analyzers` and surface as `coverage.missing`
+entries, so a failed scan is never reported as a clean cycle. A zero verdict
+count is not treated as safe; actionable high/medium findings remain until the
+cycle budget is exhausted, with inherent items recorded as residuals.
 
 Schema:
 
@@ -187,7 +270,8 @@ Schema:
 | `loop_cycles` | `loop_id`, `iteration`, `payload_id`, `run_id`, `score`, `level`, `findings`, `verdicts`, `trace_id`, `summary` |
 | `loop_feedback` | full feedback JSON per cycle |
 | `loop_builds` | full build log per cycle |
-| `loop_edits` | `payload_id` before the edit, `next_payload_id` it produced, `file`, `old`, `new`, `reason` |
+| `loop_edits` | `payload_id` before the edit, `next_payload_id` it produced, `module`, `file`, `old`, `new`, `reason` |
+| `loop_shellcodes` | producer, path, SHA-256, size, options, and iteration for every generated shellcode |
 
 Every payload gets its own SQLite view named `payload_<hash>`; the name is in
 `payloads.table_name`. This is the one-payload-per-table query surface: query
