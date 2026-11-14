@@ -229,7 +229,7 @@ func (e *evolver) recover(ctx context.Context, attempt int, what string, err err
 	if delay > 30*time.Second {
 		delay = 30 * time.Second
 	}
-	e.log("%s failed (attempt %d): %v; retrying in %s", what, attempt+1, err, delay)
+	e.logClass(logging.ClassWarning, "%s failed (attempt %d): %v; retrying in %s", what, attempt+1, err, delay)
 	select {
 	case <-ctx.Done():
 		return false
@@ -268,11 +268,20 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 		return nil, fmt.Errorf("telemetry database is not configured")
 	}
 	defer loop.Telemetry.Close()
-	e := &evolver{cfg: cfg, loop: loop, db: loop.Telemetry, logf: cfg.Logf}
+	e := &evolver{cfg: cfg, loop: loop, db: loop.Telemetry, logf: cfg.Logf, shellcode: cfg.Shellcode}
 	if e.logf == nil {
-		e.logf = func(string) {}
+		e.logf = func(logging.Class, string, ...any) {}
 	}
+	e.roots = e.sourceRoots()
 	e.log("detection loop %s: module=%s model=%s shellcode=%s", cfg.LoopID, cfg.Module, model, cfg.Shellcode)
+	e.logClass(logging.ClassWarning, "the loop executes model-chosen builds on this host; run it in a dedicated, disposable VM with no host credentials")
+	if roots := e.roots.describe(); roots != "" {
+		e.log("source roots: %s", roots)
+	}
+	e.openKnowledge()
+	if e.knowledge != nil {
+		defer func() { _ = e.knowledge.Close() }()
+	}
 	provider = &loggingProvider{next: provider, logf: e.logf}
 
 	var baseline Cycle
@@ -372,10 +381,10 @@ every residual is explained with evidence. Return the final JSON object.`,
 			Hooks:                  e.hooks(),
 			WorkingDir:             cfg.ModuleDir,
 			MaxTurns:               cfg.Turns,
-			MaxTokens:              4096,
+			MaxTokens:              maxTokens,
 			DisableBackgroundTasks: true,
-			Compaction:             &compaction.Config{ContextWindow: 200000, MaxOutputTokens: 4096, KeepRecent: 8},
-			OnWarn:                 e.logf,
+			Compaction:             &compaction.Config{ContextWindow: 200000, MaxOutputTokens: maxTokens, KeepRecent: 8},
+			OnWarn:                 func(line string) { e.logf(logging.ClassWarning, "%s", line) },
 		}, prompt)
 		if err != nil {
 			if ctx.Err() != nil {
@@ -387,18 +396,19 @@ every residual is explained with evidence. Return the final JSON object.`,
 			prompt = e.resumePrompt(cfg, "the previous agent session failed")
 			continue
 		}
-		e.log("agent final text: %s", clip(text, 8000))
+		e.logClass(logging.ClassAnswer, "%s", clip(text, 8000))
 		answer, parseErr = parseAnalystAnswer(text)
 		if parseErr == nil {
+			e.lastAnswer = answer
 			if e.iter < cfg.Iterations && e.needsMoreWork(ctx) {
-				e.log("agent stopped with work remaining; resuming")
-				prompt = e.resumePrompt(cfg, "real verdicts or high telemetry findings remain")
+				e.logClass(logging.ClassWarning, "agent stopped with work remaining; resuming")
+				prompt = e.resumePrompt(cfg, "real verdicts or actionable high/medium findings remain")
 				continue
 			}
 			break
 		}
 		if e.iter < cfg.Iterations {
-			e.log("agent stopped without the required JSON; resuming")
+			e.logClass(logging.ClassWarning, "agent stopped without the required JSON; resuming")
 			prompt = e.resumePrompt(cfg, "the previous turn ended without the final JSON object")
 			continue
 		}
@@ -422,15 +432,15 @@ every residual is explained with evidence. Return the final JSON object.`,
 	if err != nil {
 		return nil, fmt.Errorf("encode loop answer: %w", err)
 	}
-	edits := e.loopEdits(ctx, cfg.LoopID)
+	edits, _ := e.db.LoopEdits(ctx, cfg.LoopID)
 	report := RenderLoopReport(answer, e.cycles, edits)
 	reportPath, reportErr := writeLoopReport(cfg.StoreRoot, cfg.LoopID, report)
 	if reportErr != nil {
-		e.log("write report: %v", reportErr)
+		e.logClass(logging.ClassError, "write report: %v", reportErr)
 	} else {
-		e.log("final report: %s", reportPath)
+		e.logClass(logging.ClassAnswer, "final report: %s", reportPath)
 	}
-	e.log("%s", report)
+	e.logClass(logging.ClassReport, "%s", report)
 	if _, err := e.db.db.ExecContext(ctx, `
 		INSERT INTO loop_results(loop_id, answer, report, created_at) VALUES(?, ?, ?, ?)
 		ON CONFLICT(loop_id) DO UPDATE SET answer = excluded.answer, report = excluded.report, created_at = excluded.created_at`,
@@ -566,28 +576,34 @@ type cycleSummary struct {
 	TopFindings  []string        `json:"top_findings,omitempty"`
 	BuildTail    []string        `json:"build_tail,omitempty"`
 	Edits        []EditRecord    `json:"edits,omitempty"`
+	Shellcode    string          `json:"shellcode,omitempty"`
 	Note         string          `json:"note,omitempty"`
 }
 
 func (e *evolver) runCycle(ctx context.Context, note string) (Cycle, error) {
 	iteration := e.iter + 1
-	e.edits = 0
 
 	if _, err := e.waitSandbox(ctx); err != nil {
 		return Cycle{}, err
 	}
 
+	shellcode := e.shellcode
+	if strings.TrimSpace(shellcode) == "" {
+		shellcode = e.cfg.Shellcode
+	}
 	flags := map[string]string{
-		"shellcode": e.cfg.Shellcode,
+		"shellcode": shellcode,
 		"format":    e.cfg.Format,
 		"arch":      "x64",
-		"inject":    e.cfg.Inject,
 		"smw":       e.cfg.SMW,
+	}
+	if e.cfg.Inject != "" {
+		flags["inject"] = e.cfg.Inject
 	}
 	if e.cfg.Process != "" {
 		flags["process"] = e.cfg.Process
 	}
-	e.log("cycle %d: building %s", iteration, e.cfg.Module)
+	e.logClass(logging.ClassCycle, "cycle %d: building %s (shellcode %s)", iteration, e.cfg.Module, shellcode)
 	build := e.cfg.Build
 	if build == nil {
 		build = func(dir string, values map[string]string) (string, error) {
@@ -598,7 +614,7 @@ func (e *evolver) runCycle(ctx context.Context, note string) (Cycle, error) {
 	if len(buildLog) > maxEvolveBuildLog {
 		buildLog = buildLog[:maxEvolveBuildLog] + "\n[build log truncated]\n"
 	}
-	e.log("%s", buildLog)
+	e.logClass(logging.ClassBuild, "%s", buildLog)
 	if buildErr != nil {
 		return Cycle{}, fmt.Errorf("build %s: %w", e.cfg.Module, buildErr)
 	}
@@ -665,10 +681,10 @@ func (e *evolver) runCycle(ctx context.Context, note string) (Cycle, error) {
 	}
 	feedback := BuildFeedback(run)
 	if err := e.linkEdits(ctx, iteration, run.Telemetry.PayloadID); err != nil {
-		e.log("link edits: %v", err)
+		e.logClass(logging.ClassError, "link edits: %v", err)
 	}
 	e.iter = iteration
-	summary := summarizeCycle(e.cfg.LoopID, iteration, run, feedback, buildLog, note)
+	summary := summarizeCycle(e.cfg.LoopID, iteration, run, feedback, buildLog, note, shellcode)
 	summaryJSON, _ := json.Marshal(summary)
 	cycle := Cycle{
 		LoopID: e.cfg.LoopID, Iteration: iteration, PayloadID: run.Telemetry.PayloadID,
@@ -685,28 +701,31 @@ func (e *evolver) runCycle(ctx context.Context, note string) (Cycle, error) {
 			LoopID: e.cfg.LoopID, Iteration: iteration, PayloadID: run.Telemetry.PayloadID,
 			RunID: run.ID, Body: body,
 		}); err != nil {
-			e.log("save feedback: %v", err)
+			e.logClass(logging.ClassError, "save feedback: %v", err)
 		}
 	}
 	if err := e.db.SaveBuild(ctx, BuildRecord{
 		LoopID: e.cfg.LoopID, Iteration: iteration, PayloadID: run.Telemetry.PayloadID,
 		Artifact: artifact.Path, SHA256: artifact.SHA256, Log: buildLog,
 	}); err != nil {
-		e.log("save build: %v", err)
+		e.logClass(logging.ClassError, "save build: %v", err)
 	}
 	e.last = &cycle
 	e.cycles = append(e.cycles, cycle)
-	e.log("cycle %d: payload=%s sha=%s score=%.2f verdicts=%v findings=%d",
+	// A failed build or run keeps the edit budget consumed; only a completed
+	// cycle opens a fresh per-cycle budget.
+	e.edits = 0
+	e.logClass(logging.ClassCycle, "cycle %d: payload=%s sha=%s score=%.2f verdicts=%v findings=%d",
 		iteration, cycle.PayloadKey, shortSHA(artifact.SHA256), cycle.Score, summary.Verdicts, cycle.Findings)
 	return cycle, nil
 }
 
-func summarizeCycle(loopID string, iteration int, run Run, feedback Feedback, buildLog, note string) cycleSummary {
+func summarizeCycle(loopID string, iteration int, run Run, feedback Feedback, buildLog, note, shellcode string) cycleSummary {
 	summary := cycleSummary{
 		LoopID: loopID, Iteration: iteration, RunID: run.ID,
 		SHA256: run.Plan.Artifact.SHA256, Score: feedback.Score, Level: sanitizeLine(feedback.Level),
 		Findings: len(feedback.Findings), SourceEdits: len(feedback.SourceEdits),
-		Note: note,
+		Shellcode: shellcode, Note: note,
 	}
 	if run.Telemetry != nil {
 		summary.PayloadKey = run.Telemetry.PayloadKey
@@ -1559,7 +1578,7 @@ The host will store your answer. Be concise.`
 // shows tools' side effects but no model output.
 type loggingProvider struct {
 	next     llm.Provider
-	logf     func(string)
+	logf     func(logging.Class, string, ...any)
 	text     strings.Builder
 	think    strings.Builder
 	tool     strings.Builder
@@ -1613,17 +1632,22 @@ func (p *loggingProvider) flush() {
 }
 
 func (p *loggingProvider) flushText() {
-	if text := strings.TrimSpace(p.text.String()); text != "" {
-		p.logf("[model] " + text)
-	}
-	p.text.Reset()
+	p.flushBlock(&p.text, logging.ClassModel)
 }
 
 func (p *loggingProvider) flushThinking() {
-	if text := strings.TrimSpace(p.think.String()); text != "" {
-		p.logf("[thinking] " + text)
+	p.flushBlock(&p.think, logging.ClassThinking)
+}
+
+// flushBlock hands the buffered text to the class logger as one block. The
+// logger splits it into tagged lines, so indentation and code blocks survive.
+func (p *loggingProvider) flushBlock(b *strings.Builder, class logging.Class) {
+	text := strings.TrimRight(b.String(), "\r\n")
+	b.Reset()
+	if strings.TrimSpace(text) == "" {
+		return
 	}
-	p.think.Reset()
+	p.logf(class, "%s", text)
 }
 
 func (p *loggingProvider) flushTool() {
@@ -1633,9 +1657,9 @@ func (p *loggingProvider) flushTool() {
 	}
 	args := strings.TrimSpace(p.tool.String())
 	if args == "" {
-		p.logf("[tool] " + p.toolName)
+		p.logf(logging.ClassTool, "%s", p.toolName)
 	} else {
-		p.logf("[tool] " + p.toolName + " " + args)
+		p.logf(logging.ClassTool, "%s %s", p.toolName, args)
 	}
 	p.toolName = ""
 	p.tool.Reset()

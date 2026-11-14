@@ -586,7 +586,10 @@ func runDetectLoopWorkerCmd(cmd *cobra.Command, _ []string) {
 	}
 	// Keep the worker log separate from emp3r0r.log: the parent redirects
 	// stdout/stderr to the loop log.
-	logging.SetOutput(logging.PlainFileWriter(os.Stdout))
+	// The loop log is tailed in a terminal, so keep ANSI colors: the class
+	// logger tags thinking, model text, tool calls, results, builds, and cycles.
+	logging.EnableColor()
+	logging.SetOutput(os.Stdout)
 	if loaded, envErr := live.LoadOperatorEnv(); envErr != nil {
 		fmt.Fprintf(os.Stdout, "operator env: %v\n", envErr)
 	} else if loaded > 0 {

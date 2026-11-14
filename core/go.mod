@@ -7,6 +7,7 @@ require (
 	github.com/Code-Hex/Neo-cowsay/v2 v2.0.4
 	github.com/alecthomas/chroma v0.10.0
 	github.com/carapace-sh/carapace v1.13.3
+	github.com/charmbracelet/glamour v0.10.0
 	github.com/coder/websocket v1.8.15
 	github.com/fatih/color v1.19.0
 	github.com/fsnotify/fsnotify v1.9.0
@@ -17,6 +18,7 @@ require (
 	github.com/hashicorp/memberlist v0.6.0
 	github.com/lithammer/fuzzysearch v1.1.8
 	github.com/miekg/dns v1.1.72
+	github.com/muesli/termenv v0.16.0
 	github.com/ncruces/go-dns v1.3.3
 	github.com/posener/h2conn v0.0.0-20231204025407-3997deeca0f0
 	github.com/quic-go/quic-go v0.63.0
@@ -50,9 +52,18 @@ require (
 
 require (
 	github.com/Code-Hex/go-wordwrap v1.0.0 // indirect
+	github.com/alecthomas/chroma/v2 v2.14.0 // indirect
 	github.com/andybalholm/brotli v1.2.2 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
+	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
+	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/carapace-sh/carapace-shlex v1.1.1 // indirect
+	github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc // indirect
+	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834 // indirect
+	github.com/charmbracelet/x/ansi v0.8.0 // indirect
+	github.com/charmbracelet/x/cellbuf v0.0.13 // indirect
+	github.com/charmbracelet/x/exp/slice v0.0.0-20250327172914-2fdc97757edf // indirect
+	github.com/charmbracelet/x/term v0.2.1 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/creack/pty v1.1.24 // indirect
 	github.com/dlclark/regexp2 v1.12.0 // indirect
@@ -60,6 +71,7 @@ require (
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
+	github.com/gorilla/css v1.0.1 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.1 // indirect
 	github.com/hashicorp/go-metrics v0.6.0 // indirect
@@ -73,13 +85,16 @@ require (
 	github.com/klauspost/compress v1.19.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/klauspost/reedsolomon v1.14.1 // indirect
+	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.23 // indirect
 	github.com/mattn/go-runewidth v0.0.24 // indirect
 	github.com/mdlayher/netlink v1.11.2 // indirect
 	github.com/mdlayher/socket v0.6.1 // indirect
+	github.com/microcosm-cc/bluemonday v1.0.27 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
 	github.com/moloch--/go-keystone v0.0.2 // indirect
+	github.com/muesli/reflow v0.3.0 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/reeflective/readline v1.3.0 // indirect
@@ -92,6 +107,9 @@ require (
 	github.com/tjfoc/gmsm v1.4.1 // indirect
 	github.com/vishvananda/netns v0.0.5 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
+	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
+	github.com/yuin/goldmark v1.7.8 // indirect
+	github.com/yuin/goldmark-emoji v1.0.5 // indirect
 	golang.org/x/exp v0.0.0-20260718201538-764159d718ef // indirect
 	golang.org/x/mod v0.38.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect

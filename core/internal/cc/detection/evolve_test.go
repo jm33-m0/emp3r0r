@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/Autumn-27/norma/llm"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
 func TestEvolveAgentEditsBuildsAndComparesPayloads(t *testing.T) {
@@ -57,7 +58,7 @@ func TestEvolveAgentEditsBuildsAndComparesPayloads(t *testing.T) {
 		Shellcode: shellcode, SandboxURL: server.URL,
 		StoreRoot: storeRoot, Stages: []string{"dynamic"},
 		Iterations: 2, Turns: 8, Build: build,
-		Logf: func(string) {},
+		Logf: nil,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -181,10 +182,16 @@ func fakeEvolveSandbox(t *testing.T) (*httptest.Server, *atomic.Int32) {
 }
 
 func TestLoggingProviderStreamsModelOutput(t *testing.T) {
-	var lines []string
+	type entry struct {
+		class logging.Class
+		text  string
+	}
+	var lines []entry
 	provider := &loggingProvider{
 		next: scriptedProvider{answer: "hello model"},
-		logf: func(line string) { lines = append(lines, line) },
+		logf: func(class logging.Class, format string, a ...any) {
+			lines = append(lines, entry{class: class, text: fmt.Sprintf(format, a...)})
+		},
 	}
 	for event, err := range provider.Stream(context.Background(), llm.CompletionRequest{}) {
 		if err != nil {
@@ -192,7 +199,7 @@ func TestLoggingProviderStreamsModelOutput(t *testing.T) {
 		}
 		_ = event
 	}
-	if len(lines) != 1 || lines[0] != "[model] hello model" {
+	if len(lines) != 1 || lines[0].class != logging.ClassModel || lines[0].text != "hello model" {
 		t.Fatalf("lines = %+v", lines)
 	}
 }
@@ -215,7 +222,7 @@ func TestEvolveDoesNotBuildWhenSandboxIsDown(t *testing.T) {
 			builds++
 			return "", nil
 		},
-		Logf: func(string) {},
+		Logf: nil,
 	})
 	if err == nil {
 		t.Fatal("expected the context deadline")
@@ -244,7 +251,7 @@ func TestEvolveFallsBackWhenAgentTextIsNotJSON(t *testing.T) {
 		Model:    "scripted", Module: "loader_windows", ModuleDir: moduleDir,
 		Shellcode: shellcode, SandboxURL: server.URL, StoreRoot: t.TempDir(),
 		Stages: []string{"dynamic"}, Iterations: 1, Turns: 2, Build: build,
-		Logf: func(string) {},
+		Logf: nil,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -295,7 +302,7 @@ func TestEvolveRecoversFromAgentSessionFailure(t *testing.T) {
 		Module: "loader_windows", ModuleDir: moduleDir, Shellcode: shellcode,
 		SandboxURL: server.URL, StoreRoot: t.TempDir(), RetryBase: time.Millisecond,
 		Stages: []string{"dynamic"}, Iterations: 1, Turns: 2, Build: build,
-		Logf: func(string) {},
+		Logf: nil,
 	})
 	if err != nil {
 		t.Fatal(err)
