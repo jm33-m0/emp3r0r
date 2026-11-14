@@ -784,3 +784,81 @@ func TestFetchResultsCapsEDRProfiles(t *testing.T) {
 		}
 	}
 	if !foundTruncated {
+		t.Fatalf("warnings = %v, want a truncation warning", results.Warnings)
+	}
+}
+
+func TestImportSandboxIgnoresCleanAnalyzerOutput(t *testing.T) {
+	db := openTestTelemetry(t)
+	results := SandboxResults{
+		Static: json.RawMessage(`{
+			"yara":{"matches":[],"rules":500,"level":"info","status":"completed"},
+			"clamav":{"signatures":120000,"threats":"none","findings":{}},
+			"checkplz":{"findings":{"initial_threat":false,"status":"clean"}}
+		}`),
+		Dynamic: json.RawMessage(`{
+			"moneta":{"findings":{"scanned_files":100,"suspicious":0}},
+			"pe_sieve":{"level":"info","severity":"low","findings":{"total_suspicious":2}}
+		}`),
+	}
+	trace, err := db.ImportSandbox(context.Background(), results, ImportOptions{
+		RunID: "clean-scan", Module: "loader_windows", ArtifactSHA256: "deadbeef",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	findings, err := db.Findings(context.Background(), trace.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rules := findingRules(findings)
+	for _, rule := range []string{
+		"analyzer/static/yara", "analyzer/static/clamav",
+		"analyzer/static/checkplz", "analyzer/dynamic/moneta",
+	} {
+		if _, ok := rules[rule]; ok {
+			t.Fatalf("clean analyzer produced %q: %+v", rule, rules)
+		}
+	}
+	finding, ok := rules["analyzer/dynamic/pe_sieve"]
+	if !ok {
+		t.Fatalf("pe_sieve finding missing: %+v", rules)
+	}
+	if finding.Severity != "medium" {
+		t.Fatalf("pe_sieve severity = %q, want medium; a log level must not rank a detection", finding.Severity)
+	}
+}
+
+func TestImportSandboxKeepsAnalyzerAttrsValid(t *testing.T) {
+	db := openTestTelemetry(t)
+	large := strings.Repeat("A", 70<<10)
+	block, err := json.Marshal(map[string]any{
+		"yara": map[string]any{
+			"matches": []any{map[string]any{
+				"rule":    "large_rule",
+				"strings": []any{map[string]any{"data": large}},
+			}},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	trace, err := db.ImportSandbox(context.Background(), SandboxResults{Static: block}, ImportOptions{
+		RunID: "large-analyzer", Module: "loader_windows", ArtifactSHA256: "deadbeef",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var attrs string
+	if err := db.db.QueryRow(
+		`SELECT attrs FROM events WHERE trace_pk = ? AND category = 'analysis'`, trace.ID,
+	).Scan(&attrs); err != nil {
+		t.Fatal(err)
+	}
+	if !json.Valid([]byte(attrs)) {
+		t.Fatalf("analysis attrs is not valid JSON (%d bytes)", len(attrs))
+	}
+	if !strings.Contains(attrs, large) {
+		t.Fatal("analysis attrs was truncated")
+	}
+}

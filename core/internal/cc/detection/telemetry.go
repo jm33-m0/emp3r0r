@@ -623,6 +623,321 @@ func (t *TelemetryDB) ImportFile(ctx context.Context, path string, opts ImportOp
 	return t.Import(ctx, data, opts)
 }
 
+// ImportSandbox stores one saved LitterBox result bundle as a single telemetry
+// trace. RedEdr output keeps its normalized events; the file info, every other
+// analyzer block, HolyGrail, and each EDR profile become one type='analysis'
+// event that carries the block JSON in attrs. A block with nothing flagged
+// stays at low severity, so a clean scan never becomes a finding.
+func (t *TelemetryDB) ImportSandbox(ctx context.Context, results SandboxResults, opts ImportOptions) (TelemetryTrace, error) {
+	if results.Empty() {
+		return TelemetryTrace{}, fmt.Errorf("sandbox results are empty")
+	}
+	if strings.TrimSpace(opts.Source) == "" {
+		opts.Source = "sandbox"
+	}
+	var (
+		parsed   parsedTelemetry
+		warnings []string
+	)
+	if len(results.Dynamic) > 0 {
+		fromDynamic, err := parseTelemetry(results.Dynamic, opts.Source)
+		switch {
+		case err == nil:
+			parsed = fromDynamic
+		case !json.Valid(results.Dynamic):
+			// Valid JSON without RedEdr events is a normal analyzer-only
+			// result. Malformed JSON is not, and would otherwise drop the
+			// dynamic block without a trace.
+			warnings = append(warnings, "dynamic results: "+err.Error())
+		}
+	}
+	parsed.Source = opts.Source
+	parsed.Events = append(parsed.Events, sandboxAnalysisEvents(results, opts.Source)...)
+	if len(parsed.Events) == 0 {
+		return TelemetryTrace{}, fmt.Errorf("sandbox results carry no telemetry events")
+	}
+	if parsed.Meta == nil {
+		parsed.Meta = map[string]any{}
+	}
+	if len(results.Info) > 0 {
+		if info, err := decodeJSON(results.Info); err == nil {
+			parsed.Meta["info"] = info
+		}
+	}
+	if len(warnings) > 0 {
+		parsed.Meta["warnings"] = warnings
+	}
+	seed, err := json.Marshal(results)
+	if err != nil {
+		return TelemetryTrace{}, fmt.Errorf("encode sandbox results: %w", err)
+	}
+	return t.importParsed(ctx, parsed, opts, seed)
+}
+
+// sandboxAnalysisEvents turns every analyzer block into one analysis event.
+// Static and dynamic analyzers are group-qualified ("static/yara") so the
+// finding rule names the stage that produced them; HolyGrail and EDR profiles
+// are unambiguous on their own.
+func sandboxAnalysisEvents(results SandboxResults, source string) []telemetryEvent {
+	var events []telemetryEvent
+	add := func(name string, raw json.RawMessage) {
+		if len(raw) == 0 {
+			return
+		}
+		severity, reported := analyzerReport(raw)
+		if !reported {
+			severity = "low"
+		}
+		events = append(events, telemetryEvent{
+			Type:     "analysis",
+			Source:   source,
+			Event:    name,
+			Category: "analysis",
+			Severity: severity,
+			Attrs:    string(raw),
+			EventKey: "analysis:" + name,
+		})
+	}
+	add("info", results.Info)
+	forEachAnalyzer(results.Static, func(name string, raw json.RawMessage) {
+		add("static/"+name, raw)
+	})
+	forEachAnalyzer(results.Dynamic, func(name string, raw json.RawMessage) {
+		// RedEdr output is imported as its own event stream, not as an
+		// analyzer blob.
+		if strings.EqualFold(name, "rededr") {
+			return
+		}
+		add("dynamic/"+name, raw)
+	})
+	add("holygrail", results.HolyGrail)
+	profiles := make([]string, 0, len(results.EDR))
+	for profile := range results.EDR {
+		profiles = append(profiles, profile)
+	}
+	sort.Strings(profiles)
+	for _, profile := range profiles {
+		add("edr/"+profile, results.EDR[profile])
+	}
+	return events
+}
+
+// analyzerMetadataKeys are result-block keys that carry run status rather than
+// analyzer output.
+var analyzerMetadataKeys = map[string]bool{
+	"status":   true,
+	"error":    true,
+	"errors":   true,
+	"message":  true,
+	"warning":  true,
+	"warnings": true,
+}
+
+// forEachAnalyzer calls fn for every analyzer block in one static or dynamic
+// result. Scalar entries (status, counts) are skipped, and a "results"
+// envelope is unwrapped without hiding any sibling analyzer.
+func forEachAnalyzer(raw json.RawMessage, fn func(name string, block json.RawMessage)) {
+	if len(raw) == 0 {
+		return
+	}
+	var top map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &top); err != nil {
+		return
+	}
+	names := make([]string, 0, len(top))
+	for name := range top {
+		if name == "results" {
+			continue
+		}
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		if analyzerMetadataKeys[strings.ToLower(name)] {
+			continue
+		}
+		block := bytes.TrimSpace(top[name])
+		if len(block) == 0 || (block[0] != '{' && block[0] != '[') {
+			continue
+		}
+		fn(name, top[name])
+	}
+	if wrapped, ok := top["results"]; ok {
+		forEachAnalyzer(wrapped, fn)
+	}
+}
+
+// analyzerFindingKeys are the containers an analyzer uses to report what it
+// found.
+var analyzerFindingKeys = map[string]bool{
+	"findings":   true,
+	"alerts":     true,
+	"detections": true,
+	"anomalies":  true,
+	"suspicious": true,
+	"matches":    true,
+	"hits":       true,
+	"threats":    true,
+	"indicators": true,
+	"iocs":       true,
+	"signatures": true,
+	"rules":      true,
+}
+
+// analyzerReport returns the strongest explicit severity in one analyzer block
+// and whether the block reports anything at all. Empty collections, zero
+// counters, scan statistics, and false booleans do not count, so a clean scan
+// never becomes a finding.
+func analyzerReport(raw json.RawMessage) (string, bool) {
+	value, err := decodeJSON(raw)
+	if err != nil {
+		return "", false
+	}
+	var (
+		findingSeverity string
+		hintSeverity    string
+		reported        bool
+	)
+	var walk func(node any, inFinding bool, depth int)
+	walk = func(node any, inFinding bool, depth int) {
+		if depth > 12 {
+			return
+		}
+		switch typed := node.(type) {
+		case map[string]any:
+			for key, child := range typed {
+				lower := strings.ToLower(strings.TrimSpace(key))
+				// Only an explicit severity ranks a detection. A logging
+				// level such as "level": "info" must not silence an
+				// analyzer that reported findings, and a severity outside a
+				// finding container may raise the result but not lower it:
+				// analyzer output can echo the sample's own text.
+				if lower == "severity" {
+					if level := analyzerSeverity(child); level != "" {
+						if inFinding {
+							findingSeverity = strongerSeverity(findingSeverity, level)
+						} else {
+							hintSeverity = strongerSeverity(hintSeverity, level)
+						}
+					}
+					continue
+				}
+				childInFinding := inFinding || analyzerFindingKeys[lower]
+				if (childInFinding || analyzerDetectionKey(lower)) && analyzerSignal(child, lower) {
+					reported = true
+				}
+				walk(child, childInFinding, depth+1)
+			}
+		case []any:
+			for _, child := range typed {
+				walk(child, inFinding, depth+1)
+			}
+		}
+	}
+	walk(value, false, 0)
+	switch {
+	case !reported:
+		return "", false
+	case findingSeverity != "":
+		return findingSeverity, true
+	case severityRank(hintSeverity) < severityRank("medium"):
+		return hintSeverity, true
+	default:
+		return "medium", true
+	}
+}
+
+// analyzerDetectionKey matches keys that name a detection or its count rather
+// than a scan statistic such as scanned files, bytes, or elapsed time. A
+// signature-database size is a configuration value, not a hit.
+func analyzerDetectionKey(key string) bool {
+	for _, token := range []string{"time", "duration", "elapsed", "bytes", "scanned", "size"} {
+		if strings.Contains(key, token) {
+			return false
+		}
+	}
+	for _, token := range []string{
+		"find", "threat", "susp", "malic", "detect", "anomal", "vulnerab",
+		"inject", "hollow", "rwx", "hook", "ioc", "indicator", "match", "alert", "hit",
+	} {
+		if strings.Contains(key, token) {
+			return true
+		}
+	}
+	return false
+}
+
+// analyzerSignal reports whether one value under a finding container or a
+// detection-named key is an actual detection. Negative text such as "none" or
+// "clean" is not a detection, and an array of matches counts while an empty
+// one does not.
+func analyzerSignal(node any, key string) bool {
+	switch typed := node.(type) {
+	case bool:
+		return typed
+	case string:
+		return analyzerMeaningfulString(typed)
+	case json.Number:
+		if !analyzerDetectionKey(key) {
+			return false
+		}
+		value, err := typed.Float64()
+		return err == nil && value > 0
+	case []any:
+		return len(typed) > 0
+	case map[string]any:
+		for childKey, child := range typed {
+			if analyzerSignal(child, strings.ToLower(strings.TrimSpace(childKey))) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// analyzerMeaningfulString reports whether a text value asserts a detection
+// rather than naming its absence.
+func analyzerMeaningfulString(text string) bool {
+	text = strings.ToLower(strings.TrimSpace(text))
+	switch text {
+	case "", "-", "0", "no", "none", "false", "nil", "null", "n/a", "na",
+		"clean", "ok", "nothing", "benign", "not found", "not detected",
+		"no findings", "no threats", "no detections", "no anomalies":
+		return false
+	}
+	if value, err := strconv.ParseFloat(text, 64); err == nil && value <= 0 {
+		return false
+	}
+	return true
+}
+
+// analyzerSeverity reads an explicit severity from an analyzer block, ignoring
+// labels that are not severities.
+func analyzerSeverity(value any) string {
+	text := ""
+	switch typed := value.(type) {
+	case string:
+		text = typed
+	case json.Number:
+		text = typed.String()
+	}
+	text = strings.ToLower(strings.TrimSpace(text))
+	switch text {
+	case "critical", "high", "medium", "low", "info":
+		return text
+	case "100", "80", "50", "20", "5":
+		return normalizeSeverity(text)
+	}
+	return ""
+}
+
+func strongerSeverity(current, candidate string) string {
+	if current == "" || severityRank(candidate) < severityRank(current) {
+		return candidate
+	}
+	return current
+}
+
 // FetchTelemetry downloads one telemetry URL from the configured sandbox
 // origin. Redirects may not leave that origin: telemetry import is reachable
 // from an injected model turn, so it must not become an SSRF pivot.
