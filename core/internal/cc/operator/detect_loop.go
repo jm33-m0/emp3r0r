@@ -47,6 +47,12 @@ every EDR profile. Full feedback, builds, and per-payload telemetry stay in
 SQLite. The worker writes only its instructions and bounded tool results to the
 model context.
 
+The model can edit module and producer source, and the build scripts and
+generators it edits run on this host with your privileges. Treat the loop as a
+code-execution feature controlled by an untrusted model, not as a sandbox: run
+it in a dedicated, disposable VM or container with no host credentials, no
+production C2 keys, and restricted network egress.
+
 Set the model through the environment:
   EMP3R0R_DETECTION_PROVIDER=openai-responses
   EMP3R0R_DETECTION_MODEL=<model>
@@ -91,6 +97,9 @@ type detectLoopOptions struct {
 	Format     string
 	Inject     string
 	SMW        string
+	Producers  []string
+	ReadRoots  []string
+	Knowledge  string
 	Turns      int
 	Timeout    time.Duration
 	Tmux       bool
@@ -110,6 +119,9 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 	opts.Format, _ = cmd.Flags().GetString("format")
 	opts.Inject, _ = cmd.Flags().GetString("inject")
 	opts.SMW, _ = cmd.Flags().GetString("smw")
+	opts.Producers, _ = cmd.Flags().GetStringSlice("producer")
+	opts.ReadRoots, _ = cmd.Flags().GetStringSlice("read-root")
+	opts.Knowledge, _ = cmd.Flags().GetString("knowledge")
 	opts.Turns, _ = cmd.Flags().GetInt("turns")
 	opts.Timeout, _ = cmd.Flags().GetDuration("timeout")
 	opts.Tmux, _ = cmd.Flags().GetBool("tmux")
@@ -134,6 +146,18 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 	if info, err := os.Stat(opts.ModuleDir); err != nil || !info.IsDir() {
 		logging.Errorf("detect_loop: module directory %q is not readable", opts.ModuleDir)
 		return
+	}
+	// Expose the installed shellcode producers by default. The model may tune
+	// them and rebuild the shellcode through BuildShellcode.
+	if len(opts.Producers) == 0 {
+		for name, dir := range detection.DefaultProducerDirs() {
+			opts.Producers = append(opts.Producers, name+"="+dir)
+		}
+	}
+	// The loader links shared sources outside its own directory; make them
+	// readable (not writable) so the model can trace those call paths.
+	if len(opts.ReadRoots) == 0 {
+		opts.ReadRoots = detection.DefaultReadRoots(opts.ModuleDir)
 	}
 
 	logDir := filepath.Join(live.EmpWorkSpace, "detection")
@@ -224,13 +248,26 @@ func startDetectLoopWorker(opts detectLoopOptions, shellcode, loopID string, log
 		"--sandbox", opts.Sandbox,
 		"--iterations", strconv.Itoa(opts.Iterations),
 		"--stages", strings.Join(opts.Stages, ","),
-		"--process", opts.Process,
 		"--format", opts.Format,
-		"--inject", opts.Inject,
 		"--smw", opts.SMW,
 		"--turns", strconv.Itoa(opts.Turns),
 		"--timeout", opts.Timeout.String(),
 		"--loop-id", loopID,
+	}
+	if strings.TrimSpace(opts.Process) != "" {
+		args = append(args, "--process", opts.Process)
+	}
+	if strings.TrimSpace(opts.Inject) != "" {
+		args = append(args, "--inject", opts.Inject)
+	}
+	for _, producer := range opts.Producers {
+		args = append(args, "--producer", producer)
+	}
+	for _, root := range opts.ReadRoots {
+		args = append(args, "--read-root", root)
+	}
+	if strings.TrimSpace(opts.Knowledge) != "" {
+		args = append(args, "--knowledge", opts.Knowledge)
 	}
 	worker := exec.Command(exe, args...)
 	worker.Stdout = logFile

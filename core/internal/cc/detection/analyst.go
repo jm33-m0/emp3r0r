@@ -290,156 +290,15 @@ var analystSchemaPath = map[string]any{
 }
 
 func analystListTool(root string) tool.CoreTool {
-	return tool.Build(tool.Spec{
-		Name:        "SourceList",
-		Description: "List the module source files. Takes no arguments.",
-		Prompt:      "List module source files.",
-		Schema:      map[string]any{"type": "object", "properties": map[string]any{}},
-		ReadOnly:    func(json.RawMessage) bool { return true },
-		Concurrent:  func(json.RawMessage) bool { return true },
-		Permissions: func(context.Context, json.RawMessage, permission.Context) permission.Decision {
-			return permission.Allowed()
-		},
-		Run: func(context.Context, json.RawMessage, *tool.ToolContext) (tool.Result, error) {
-			index := newSourceIndex(root)
-			names := make([]string, 0, len(index.files))
-			for _, file := range index.files {
-				names = append(names, file.rel)
-			}
-			return tool.Text(strings.Join(names, "\n")), nil
-		},
-	})
+	return moduleListTool(newSingleRoot(root))
 }
 
 func analystReadTool(root string) tool.CoreTool {
-	return tool.Build(tool.Spec{
-		Name:        "SourceRead",
-		Description: "Read one module source file, optionally a line range.",
-		Prompt:      "Read a module source file.",
-		Schema: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"path":       analystSchemaPath,
-				"start_line": map[string]any{"type": "integer", "description": "First line, 1-based."},
-				"end_line":   map[string]any{"type": "integer", "description": "Last line, inclusive."},
-			},
-			"required": []string{"path"},
-		},
-		ReadOnly:   func(json.RawMessage) bool { return true },
-		Concurrent: func(json.RawMessage) bool { return true },
-		Permissions: func(context.Context, json.RawMessage, permission.Context) permission.Decision {
-			return permission.Allowed()
-		},
-		Run: func(_ context.Context, raw json.RawMessage, _ *tool.ToolContext) (tool.Result, error) {
-			var args struct {
-				Path      string `json:"path"`
-				StartLine int    `json:"start_line"`
-				EndLine   int    `json:"end_line"`
-			}
-			if err := json.Unmarshal(raw, &args); err != nil {
-				return tool.Errorf("invalid arguments"), nil
-			}
-			path, err := analystPath(root, args.Path)
-			if err != nil {
-				return tool.Errorf(fmt.Sprintf("%v", err)), nil
-			}
-			data, err := os.ReadFile(path)
-			if err != nil {
-				return tool.Errorf(fmt.Sprintf("read %s: %v", args.Path, err)), nil
-			}
-			if len(data) > maxSourceFileBytes {
-				return tool.Errorf(fmt.Sprintf("%s exceeds the read bound", args.Path)), nil
-			}
-			lines := strings.Split(string(data), "\n")
-			start := args.StartLine
-			if start <= 0 {
-				start = 1
-			}
-			end := args.EndLine
-			if end <= 0 || end > len(lines) {
-				end = len(lines)
-			}
-			if end < start {
-				return tool.Errorf("end_line is before start_line"), nil
-			}
-			if end-start+1 > maxAnalystReadLines {
-				end = start + maxAnalystReadLines - 1
-			}
-			var b strings.Builder
-			for lineNo := start; lineNo <= end && lineNo <= len(lines); lineNo++ {
-				fmt.Fprintf(&b, "%d: %s\n", lineNo, clipUTF8(lines[lineNo-1], 400))
-			}
-			return tool.Text(b.String()), nil
-		},
-	})
+	return moduleReadTool(newSingleRoot(root))
 }
 
 func analystSearchTool(root string) tool.CoreTool {
-	return tool.Build(tool.Spec{
-		Name:        "SourceSearch",
-		Description: "Search module source with a regular expression.",
-		Prompt:      "Search module source.",
-		Schema: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"pattern": map[string]any{"type": "string", "description": "Go regular expression."},
-				"path":    map[string]any{"type": "string", "description": "Optional file to search; default all source files."},
-			},
-			"required": []string{"pattern"},
-		},
-		ReadOnly:   func(json.RawMessage) bool { return true },
-		Concurrent: func(json.RawMessage) bool { return true },
-		Permissions: func(context.Context, json.RawMessage, permission.Context) permission.Decision {
-			return permission.Allowed()
-		},
-		Run: func(_ context.Context, raw json.RawMessage, _ *tool.ToolContext) (tool.Result, error) {
-			var args struct {
-				Pattern string `json:"pattern"`
-				Path    string `json:"path"`
-			}
-			if err := json.Unmarshal(raw, &args); err != nil {
-				return tool.Errorf("invalid arguments"), nil
-			}
-			if len(args.Pattern) > 200 {
-				return tool.Errorf("pattern is too long"), nil
-			}
-			re, err := regexp.Compile(args.Pattern)
-			if err != nil {
-				return tool.Errorf(fmt.Sprintf("invalid pattern: %v", err)), nil
-			}
-			files := newSourceIndex(root).files
-			if args.Path != "" {
-				path, err := analystPath(root, args.Path)
-				if err != nil {
-					return tool.Errorf(fmt.Sprintf("%v", err)), nil
-				}
-				data, err := os.ReadFile(path)
-				if err != nil {
-					return tool.Errorf(fmt.Sprintf("read %s: %v", args.Path, err)), nil
-				}
-				rel, _ := filepath.Rel(root, path)
-				files = []sourceFile{{rel: filepath.ToSlash(rel), lines: strings.Split(string(data), "\n")}}
-			}
-			var b strings.Builder
-			hits := 0
-			for _, file := range files {
-				for lineNo, line := range file.lines {
-					if !re.MatchString(line) {
-						continue
-					}
-					hits++
-					fmt.Fprintf(&b, "%s:%d: %s\n", file.rel, lineNo+1, clipUTF8(strings.TrimSpace(line), 300))
-					if hits >= maxAnalystHits {
-						return tool.Text(b.String()), nil
-					}
-				}
-			}
-			if hits == 0 {
-				return tool.Text("no match"), nil
-			}
-			return tool.Text(b.String()), nil
-		},
-	})
+	return moduleSearchTool(newSingleRoot(root))
 }
 
 func analystPath(root, supplied string) (string, error) {

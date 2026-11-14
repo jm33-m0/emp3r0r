@@ -602,9 +602,17 @@ func runDetectLoopWorkerCmd(cmd *cobra.Command, _ []string) {
 	format, _ := cmd.Flags().GetString("format")
 	inject, _ := cmd.Flags().GetString("inject")
 	smw, _ := cmd.Flags().GetString("smw")
+	producerFlags, _ := cmd.Flags().GetStringSlice("producer")
+	readRoots, _ := cmd.Flags().GetStringSlice("read-root")
+	knowledge, _ := cmd.Flags().GetString("knowledge")
 	turns, _ := cmd.Flags().GetInt("turns")
 	timeout, _ := cmd.Flags().GetDuration("timeout")
 	loopID, _ := cmd.Flags().GetString("loop-id")
+	producers, err := detection.ParseProducerDirs(producerFlags)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "detect-loop-worker: %v\n", err)
+		os.Exit(1)
+	}
 	if sandbox == "" {
 		sandbox = os.Getenv("EMP3R0R_DETECTION_SANDBOX")
 	}
@@ -618,11 +626,12 @@ func runDetectLoopWorkerCmd(cmd *cobra.Command, _ []string) {
 	} else {
 		ctx = context.Background()
 	}
-	err := operator.RunDetectLoopWorker(ctx, detection.EvolveConfig{
+	err = operator.RunDetectLoopWorker(ctx, detection.EvolveConfig{
 		LoopID: loopID, Module: module, ModuleDir: moduleDir,
 		Shellcode: shellcode, SandboxURL: sandbox,
 		StoreRoot: filepath.Join(live.EmpWorkSpace, "detection"),
 		Process:   process, Format: format, Inject: inject, SMW: smw,
+		ProducerDirs: producers, ReadRoots: readRoots, KnowledgePath: knowledge,
 		Stages: stages, Iterations: iterations, Turns: turns,
 	})
 	if err != nil {

@@ -1,0 +1,91 @@
+[
+  {
+    "name": "donut",
+    "build": "bash ./build.sh",
+    "author": "TheWover, jm33-ng",
+    "date": "2026-11-14",
+    "comment": "Convert a Windows PE into position-independent Donut shellcode",
+    "is_local": true,
+    "platform": "generic",
+    "path": "",
+    "parameters": [
+      {
+        "name": "input",
+        "description": "Windows PE (EXE/DLL) to convert (C2 local path)",
+        "default": "",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "output",
+        "description": "Output .bin shellcode (default: <input>.donut.bin)",
+        "default": "",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "arch",
+        "description": "Target architecture",
+        "default": "2",
+        "type": "string",
+        "choices": ["1", "2", "3"]
+      },
+      {
+        "name": "entropy",
+        "description": "Entropy: 1 none, 2 random names, 3 random names and encryption",
+        "default": "3",
+        "type": "string",
+        "choices": ["1", "2", "3"]
+      },
+      {
+        "name": "compression",
+        "description": "Compression: 1 none, 2 aPLib, 3 LZNT1",
+        "default": "2",
+        "type": "string",
+        "choices": ["1", "2", "3"]
+      },
+      {
+        "name": "bypass",
+        "description": "AMSI/WLDP: 1 none, 2 abort on failure, 3 continue",
+        "default": "3",
+        "type": "string",
+        "choices": ["1", "2", "3"]
+      },
+      {
+        "name": "decoy",
+        "description": "Decoy module for module overloading (optional, C2 local path)",
+        "default": "",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "method",
+        "description": "Entrypoint method for a DLL (optional)",
+        "default": "",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "params",
+        "description": "Command-line parameters passed to the payload (optional)",
+        "default": "",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "run-thread",
+        "description": "Run the entrypoint in a new thread",
+        "default": "1",
+        "type": "string",
+        "choices": ["0", "1"]
+      },
+      {
+        "name": "exit",
+        "description": "Loader exit behaviour: 1 thread, 2 process, 3 block",
+        "default": "1",
+        "type": "string",
+        "choices": ["1", "2", "3"]
+      }
+    ]
+  }
+]

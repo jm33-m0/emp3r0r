@@ -136,17 +136,19 @@ func (a *Actions) detectionTools() map[string]Tool {
 				Type: "function",
 				Function: FunctionDef{
 					Name:        "detection_loop",
-					Description: "Run the autonomous Norma detection loop: build loader_windows from a source directory, detonate it in LitterBox, import every saved analyzer result (RedEdr, Moneta, pe-sieve, HollowsHunter, HSB, Patriot, Blender, YARA, CheckPlz, HolyGrail, and EDR profiles) into SQLite, edit module source, rebuild, and compare payloads. When telemetry shows the loader, shellcode producer, wrapper, or injection path is detected, Norma may choose another mechanism. Full feedback, build logs, and per-payload telemetry stay in SQLite. Requires approve_execution=true. This edits module source on the operator host.",
+					Description: "Run the autonomous Norma detection loop: build loader_windows from a source directory, detonate it in LitterBox, import every saved analyzer result (RedEdr, Moneta, pe-sieve, HollowsHunter, HSB, Patriot, Blender, YARA, CheckPlz, HolyGrail, and EDR profiles) into SQLite, edit module source, rebuild, and compare payloads. When telemetry shows the loader, shellcode producer, wrapper, or injection path is detected, Norma may choose another mechanism. Full feedback, build logs, and per-payload telemetry stay in SQLite. Requires approve_execution=true. This edits module source and runs model-chosen builds with operator privileges; run it on a dedicated, disposable VM.",
 					Parameters: ObjectSchema(map[string]any{
 						"module_dir":        StringProp("loader_windows source directory."),
 						"shellcode":         StringProp("Go agent shellcode path. Generate it first with generate --type windows_executable."),
-						"iterations":        IntegerProp("Maximum cycles including baseline. Default 3, at most 10."),
+						"iterations":        IntegerProp("Maximum cycles including baseline. Default 3, at most 50."),
 						"stages":            map[string]any{"type": "array", "items": map[string]any{"type": "string", "enum": []string{"static", "dynamic"}}, "description": "Stages; dynamic is required."},
 						"process":           StringProp("Sacrificial process override; omit to let the source default control it."),
 						"format":            StringProp("Loader host format: exe, service, or dll."),
-						"inject":            StringProp("apc or ct."),
+						"inject":            StringProp("Injection override; omit to let the module default control it."),
 						"smw":               StringProp("on or off."),
-						"turns":             IntegerProp("Maximum Norma turns. Default 30, at most 60."),
+						"producers":         map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Shellcode producer modules as name=dir; defaults to the installed donut and crystal_pack."},
+						"read_roots":        map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Read-only source roots; defaults to the loader's shared build inputs."},
+						"turns":             IntegerProp("Maximum Norma turns per session. Default 60, at most 240."),
 						"approve_execution": BooleanProp("Allow the loop to detonate the payload and edit module source."),
 					}, "module_dir", "shellcode", "approve_execution"),
 				},
@@ -221,6 +223,8 @@ type detectionArgs struct {
 	Format           string   `json:"format"`
 	Inject           string   `json:"inject"`
 	SMW              string   `json:"smw"`
+	Producers        []string `json:"producers"`
+	ReadRoots        []string `json:"read_roots"`
 	Turns            int      `json:"turns"`
 	From             string   `json:"from"`
 	To               string   `json:"to"`
@@ -775,12 +779,24 @@ func (a *Actions) detectionLoop(ctx context.Context, raw json.RawMessage) (any, 
 	}
 	loopCtx, cancel := context.WithTimeout(ctx, 60*time.Minute)
 	defer cancel()
+	producers, err := detection.ParseProducerDirs(args.Producers)
+	if err != nil {
+		return nil, err
+	}
+	if len(producers) == 0 {
+		producers = detection.DefaultProducerDirs()
+	}
+	readRoots := args.ReadRoots
+	if len(readRoots) == 0 {
+		readRoots = detection.DefaultReadRoots(moduleDir)
+	}
 	result, err := detection.RunEvolve(loopCtx, detection.EvolveConfig{
 		Module: module, ModuleDir: moduleDir, Shellcode: shellcode,
 		SandboxURL: a.Detection.Client.URL(), StoreRoot: a.Detection.Store.Root,
 		Process: args.Process, Format: args.Format, Inject: args.Inject, SMW: args.SMW,
+		ProducerDirs: producers, ReadRoots: readRoots,
 		Stages: args.Stages, Iterations: args.Iterations, Turns: args.Turns,
-		Logf: func(line string) {},
+		Logf: nil,
 	})
 	if err != nil {
 		return a.actionResultWithFlags("detection_loop", command, module, nil, nil, review, decision, auditErr, "", err, true), nil

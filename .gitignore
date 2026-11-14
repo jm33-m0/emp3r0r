@@ -53,6 +53,8 @@ peda*
 *.a
 *.la
 *.lo
+# Donut's vendored aPLib archive is a build input, not a build artifact.
+!core/modules/donut/src/lib/aplib64.a
 
 # Shared objects (inc. Windows DLLs)
 *.dll
