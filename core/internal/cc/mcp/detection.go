@@ -136,7 +136,7 @@ func (a *Actions) detectionTools() map[string]Tool {
 				Type: "function",
 				Function: FunctionDef{
 					Name:        "detection_loop",
-					Description: "Run the autonomous Norma detection loop: build loader_windows from a source directory, detonate it in LitterBox, let the configured model inspect SQLite telemetry, edit module source, rebuild, and compare payloads. Full feedback, build logs, and per-payload telemetry stay in SQLite. Requires approve_execution=true. This edits module source on the operator host.",
+					Description: "Run the autonomous Norma detection loop: build loader_windows from a source directory, detonate it in LitterBox, import every saved analyzer result (RedEdr, Moneta, pe-sieve, HollowsHunter, HSB, Patriot, Blender, YARA, CheckPlz, HolyGrail, and EDR profiles) into SQLite, edit module source, rebuild, and compare payloads. When telemetry shows the loader, shellcode producer, wrapper, or injection path is detected, Norma may choose another mechanism. Full feedback, build logs, and per-payload telemetry stay in SQLite. Requires approve_execution=true. This edits module source on the operator host.",
 					Parameters: ObjectSchema(map[string]any{
 						"module_dir":        StringProp("loader_windows source directory."),
 						"shellcode":         StringProp("Go agent shellcode path. Generate it first with generate --type windows_executable."),

@@ -35,8 +35,17 @@ omitted, then starts a detached worker. The worker builds the loader from
 --module-dir, detonates it in LitterBox, and lets a Norma agent inspect the
 SQLite telemetry, edit module source, rebuild, and compare payloads.
 
-Full feedback, builds, and per-payload telemetry stay in SQLite. The worker
-writes only its instructions and bounded tool results to the model context.
+--shellcode accepts any x64 position-independent shellcode, so a Crystal
+Palace/Crystal-Kit PICO produced by crystal_pack can replace the generated
+Donut shellcode without changing the loader. Norma can change the loader,
+wrapper, injection path, or shellcode producer when telemetry points at that
+design.
+
+The worker imports every saved LitterBox analyzer result: RedEdr, Moneta,
+pe-sieve, HollowsHunter, HSB, Patriot, Blender, YARA, CheckPlz, HolyGrail, and
+every EDR profile. Full feedback, builds, and per-payload telemetry stay in
+SQLite. The worker writes only its instructions and bounded tool results to the
+model context.
 
 Set the model through the environment:
   EMP3R0R_DETECTION_PROVIDER=openai-responses
@@ -48,7 +57,7 @@ Set the model through the environment:
 		Run:     runDetectLoopCommand,
 	}
 	cmd.Flags().String("module-dir", "", "Module source directory (default: the installed loader_windows path)")
-	cmd.Flags().String("shellcode", "", "Go agent Donut shellcode; generated when omitted")
+	cmd.Flags().String("shellcode", "", "x64 PIC shellcode (Donut, Crystal Palace PICO, ...); generated when omitted")
 	cmd.Flags().String("agent-type", builder.PayloadTypeWindowsExecutable, "Agent payload type to generate")
 	cmd.Flags().String("arch", "amd64", "Agent architecture")
 	cmd.Flags().String("cc", "", "C2 address for the generated agent; defaults to the current config")

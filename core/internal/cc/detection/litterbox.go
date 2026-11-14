@@ -353,6 +353,90 @@ func (c *Client) Results(ctx context.Context, kind StageKind, md5 string) (json.
 	return json.RawMessage(data), nil
 }
 
+const maxFetchedEDRProfiles = 32
+
+// SandboxResults is every saved result block for one upload: file info,
+// static and dynamic analyzers, BYOVD output, and EDR profiles. The detection
+// loop stores all of them with the run.
+type SandboxResults struct {
+	Info      json.RawMessage
+	Static    json.RawMessage
+	Dynamic   json.RawMessage
+	HolyGrail json.RawMessage
+	EDR       map[string]json.RawMessage
+	Warnings  []string
+}
+
+// Empty reports whether the sandbox produced no saved result block.
+func (r SandboxResults) Empty() bool {
+	return len(r.Info) == 0 && len(r.Static) == 0 && len(r.Dynamic) == 0 &&
+		len(r.HolyGrail) == 0 && len(r.EDR) == 0
+}
+
+// FetchResults fetches every saved result block for an upload. The caller may
+// pass already-fetched static and dynamic blocks so a run does not request the
+// same large result twice. Missing optional blocks are recorded as warnings; a
+// single unavailable analyzer must not hide the blocks that did complete.
+func (c *Client) FetchResults(ctx context.Context, md5 string, static, dynamic json.RawMessage) SandboxResults {
+	out := SandboxResults{EDR: map[string]json.RawMessage{}}
+	fetch := func(kind string) json.RawMessage {
+		data, status, err := c.do(ctx, http.MethodGet,
+			fmt.Sprintf("/api/results/%s/%s", kind, url.PathEscape(md5)), "", nil)
+		if err != nil {
+			if status != http.StatusNotFound {
+				out.Warnings = append(out.Warnings, kind+" results: "+err.Error())
+			}
+			return nil
+		}
+		return data
+	}
+	out.Info = fetch("info")
+	out.Static = static
+	if len(out.Static) == 0 {
+		out.Static = fetch("static")
+	}
+	out.Dynamic = dynamic
+	if len(out.Dynamic) == 0 {
+		out.Dynamic = fetch("dynamic")
+	}
+	out.HolyGrail = fetch("holygrail")
+
+	data, status, err := c.do(ctx, http.MethodGet, "/api/results/edr/"+url.PathEscape(md5), "", nil)
+	if err != nil {
+		if status != http.StatusNotFound {
+			out.Warnings = append(out.Warnings, "EDR index: "+err.Error())
+		}
+		return out
+	}
+	var index struct {
+		Profiles []string `json:"profiles"`
+	}
+	if err := json.Unmarshal(data, &index); err != nil {
+		out.Warnings = append(out.Warnings, "EDR index: "+err.Error())
+		return out
+	}
+	if len(index.Profiles) > maxFetchedEDRProfiles {
+		out.Warnings = append(out.Warnings, fmt.Sprintf("EDR profiles truncated from %d to %d", len(index.Profiles), maxFetchedEDRProfiles))
+		index.Profiles = index.Profiles[:maxFetchedEDRProfiles]
+	}
+	for _, profile := range index.Profiles {
+		profile = strings.TrimSpace(profile)
+		if profile == "" {
+			continue
+		}
+		edr, edrStatus, edrErr := c.do(ctx, http.MethodGet,
+			fmt.Sprintf("/api/results/edr/%s/%s", url.PathEscape(profile), url.PathEscape(md5)), "", nil)
+		if edrErr != nil {
+			if edrStatus != http.StatusNotFound {
+				out.Warnings = append(out.Warnings, "EDR "+profile+": "+edrErr.Error())
+			}
+			continue
+		}
+		out.EDR[profile] = edr
+	}
+	return out
+}
+
 // Risk returns the aggregate detection assessment.
 func (c *Client) Risk(ctx context.Context, md5 string) (Risk, error) {
 	data, _, err := c.do(ctx, http.MethodGet, "/api/results/risk/"+url.PathEscape(md5), "", nil)

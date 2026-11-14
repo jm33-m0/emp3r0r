@@ -251,6 +251,9 @@ func classifyTelemetryEvent(event *telemetryEvent, payloadPID int64, payloadImag
 }
 
 func telemetryRole(event *telemetryEvent, payloadPID int64, payloadImage string, children map[int64]bool) string {
+	if event.Category == "analysis" {
+		return "payload"
+	}
 	if payloadPID == 0 {
 		return "unknown"
 	}
@@ -292,6 +295,11 @@ func telemetrySignal(event *telemetryEvent, payloadPID int64, payloadImage strin
 		}
 		return defenderEventSignal(event.Event)
 	case "query":
+		return "info"
+	case "analysis":
+		if event.Severity == "critical" || event.Severity == "high" || event.Severity == "medium" {
+			return "signal"
+		}
 		return "info"
 	case "image", "module":
 		if event.Image == "" || isSystemImage(event.Image) || sameWindowsPath(event.Image, payloadImage) {

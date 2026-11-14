@@ -105,21 +105,26 @@ Targets and jobs
   plan, run_id, score, findings count, and source-edit pointers. If the block
   says sandbox-unavailable, it still carries the plan; call detection_plan once
   the sandbox is reachable.
-- detection_run with dynamic stages imports every RedEdr event into the
-  detection SQLite database and reports a telemetry trace. The events include
-  ETW, ETW-TI memory operations, kernel callbacks, ntdll hooks, PEB/loaded-DLL
-  queries, and Defender behavior, with actor/target PIDs, operation, signal,
-  payload_role, protection, endpoints, and stack frames. Every artifact also
-  gets a payload row and a payload_<hash> view containing only that build;
+- detection_run imports every saved sandbox result: file info, static
+  YARA/CheckPlz/Stringnalyzer, dynamic RedEdr/Moneta/pe-sieve/
+  HollowsHunter/HSB/Patriot/Blender/YARA/CheckPlz, HolyGrail, and every EDR
+  profile. RedEdr rows keep ETW, ETW-TI, kernel, hook, PEB, and Defender
+  columns; other analyzers become type='analysis' events with raw JSON in
+  attrs and findings named analyzer/<analyzer>. Every artifact also gets a
+  payload row and a payload_<hash> view containing only that build;
   detection_payloads lists them and detection_compare shows what an edit
   changed. detection_query runs one read-only SELECT; filter with trace_pk or
   a payload view, read the findings table, and use json_extract(attrs,'$.field')
-  for raw fields. detection_telemetry_import ingests offline RedEdr or
-  DefenderObserver data. detection_feedback reports the delta against the
+  for raw fields. detection_telemetry_import ingests offline sandbox, RedEdr,
+  or DefenderObserver data. detection_feedback reports the delta against the
   previous artifact.
 - detection_loop runs the autonomous Norma loop for loader_windows: build,
   detonate, query SQLite, edit source, rebuild, and compare. It requires
-  approve_execution=true and edits module source on the operator host.
+  approve_execution=true and edits module source on the operator host. Do not
+  treat the loader or its Donut shellcode as fixed: when the signal is in the
+  shellcode producer, wrapper, injection path, or packaging, test another
+  mechanism such as Crystal Palace/Crystal-Kit PICO, a different loader, or a
+  different shellcode producer. Report an out-of-tree change explicitly.
 - A real Defender verdict is a critical telemetry finding naming the detection
   (for example Behavior:Win32/SvchostInject.A). Treat the sandbox risk score as
   a summary, not a verdict; read the SQL findings.
@@ -289,6 +294,8 @@ Workspace source edits and detection integration
   module file and line it came from. Prefer the smallest source change that
   removes the indicator, but change the design when telemetry shows the design
   itself is detected; renaming or hiding the same behavior is not a fix.
+  Check RedEdr and the type='analysis' analyzers before concluding a run is
+  clean.
   Rebuild and compare the new score and findings. Do not detonate dynamic or
   EDR stages unless the operator asked for it and approve_execution is set.
 - detection_feedback analyze=true asks the configured detection analyst for

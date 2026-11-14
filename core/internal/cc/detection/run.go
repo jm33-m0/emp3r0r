@@ -224,41 +224,64 @@ func (l *Loop) RunPlan(ctx context.Context, plan Plan, opts RunOptions) (Run, er
 	if risk, err := l.Client.Risk(ctx, upload.MD5); err == nil {
 		run.Risk = risk
 	}
-	if dynamicDone && dynamicErr == nil && len(dynamicRaw) > 0 && l.Telemetry != nil {
-		trace, importErr := l.Telemetry.Import(ctx, dynamicRaw, ImportOptions{
-			RunID:          run.ID,
-			Module:         plan.Module,
-			ArtifactSHA256: plan.Artifact.SHA256,
-			Source:         "litterbox-rededr",
-			ParentKey:      opts.ParentKey,
-		})
-		if importErr != nil {
-			run.Notes = append(run.Notes, "telemetry: "+importErr.Error())
+	if l.Telemetry != nil && len(selected) > 0 {
+		results := l.Client.FetchResults(ctx, upload.MD5, staticRaw, dynamicRaw)
+		if !opts.Dynamic || !dynamicDone || dynamicErr != nil {
+			results.Dynamic = nil
+		}
+		if !opts.Static || !staticDone || staticErr != nil {
+			results.Static = nil
+		}
+		if !opts.EDR {
+			results.EDR = nil
+		} else if profile := strings.TrimSpace(opts.EDRProfile); profile != "" {
+			for name := range results.EDR {
+				if !strings.EqualFold(name, profile) {
+					delete(results.EDR, name)
+				}
+			}
+		}
+		for _, warning := range results.Warnings {
+			run.Notes = append(run.Notes, "sandbox: "+warning)
+		}
+		if results.Empty() {
+			run.Notes = append(run.Notes, "telemetry: sandbox returned no saved results")
 		} else {
-			run.Telemetry = &TelemetryRun{
-				TraceID: trace.ID, PayloadID: trace.PayloadID,
-				PayloadKey: trace.PayloadKey, PayloadTable: trace.PayloadTable,
-				Source: trace.Source, Events: trace.Events,
-				First: trace.First, Last: trace.Last,
-				PayloadPID: trace.PayloadPID, PayloadImage: trace.PayloadImage,
-				Attribution: trace.Attribution, Coverage: trace.Coverage,
-			}
-			if findings, findErr := l.Telemetry.Findings(ctx, trace.ID); findErr != nil {
-				run.Notes = append(run.Notes, "telemetry findings: "+findErr.Error())
+			trace, importErr := l.Telemetry.ImportSandbox(ctx, results, ImportOptions{
+				RunID:          run.ID,
+				Module:         plan.Module,
+				ArtifactSHA256: plan.Artifact.SHA256,
+				Source:         "sandbox",
+				ParentKey:      opts.ParentKey,
+			})
+			if importErr != nil {
+				run.Notes = append(run.Notes, "telemetry: "+importErr.Error())
 			} else {
-				run.Telemetry.Findings = findings
-			}
-			if stats, statErr := l.Telemetry.Stats(ctx, trace.ID); statErr != nil {
-				run.Notes = append(run.Notes, "telemetry stats: "+statErr.Error())
-			} else {
-				run.Telemetry.Stats = &stats
-			}
-			if trace.Attribution == "unknown" {
-				run.Notes = append(run.Notes, "telemetry: no payload PEB was captured; the trace cannot be attributed to the sample")
-			}
-			if len(trace.Coverage.Missing) > 0 {
-				run.Notes = append(run.Notes,
-					"telemetry coverage missing: "+strings.Join(trace.Coverage.Missing, ", "))
+				run.Telemetry = &TelemetryRun{
+					TraceID: trace.ID, PayloadID: trace.PayloadID,
+					PayloadKey: trace.PayloadKey, PayloadTable: trace.PayloadTable,
+					Source: trace.Source, Events: trace.Events,
+					First: trace.First, Last: trace.Last,
+					PayloadPID: trace.PayloadPID, PayloadImage: trace.PayloadImage,
+					Attribution: trace.Attribution, Coverage: trace.Coverage,
+				}
+				if findings, findErr := l.Telemetry.Findings(ctx, trace.ID); findErr != nil {
+					run.Notes = append(run.Notes, "telemetry findings: "+findErr.Error())
+				} else {
+					run.Telemetry.Findings = findings
+				}
+				if stats, statErr := l.Telemetry.Stats(ctx, trace.ID); statErr != nil {
+					run.Notes = append(run.Notes, "telemetry stats: "+statErr.Error())
+				} else {
+					run.Telemetry.Stats = &stats
+				}
+				if trace.Attribution == "unknown" {
+					run.Notes = append(run.Notes, "telemetry: no payload PEB was captured; the trace cannot be attributed to the sample")
+				}
+				if len(trace.Coverage.Missing) > 0 {
+					run.Notes = append(run.Notes,
+						"telemetry coverage missing: "+strings.Join(trace.Coverage.Missing, ", "))
+				}
 			}
 		}
 	}

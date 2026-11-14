@@ -171,7 +171,7 @@ job ownership, and operator locks.`,
 	}
 	detectLoopWorkerCmd.Flags().String("module", "loader_windows", "Module name")
 	detectLoopWorkerCmd.Flags().String("module-dir", "", "Module source directory")
-	detectLoopWorkerCmd.Flags().String("shellcode", "", "Go agent shellcode")
+	detectLoopWorkerCmd.Flags().String("shellcode", "", "x64 PIC shellcode")
 	detectLoopWorkerCmd.Flags().String("sandbox", "", "LitterBox URL")
 	detectLoopWorkerCmd.Flags().Int("iterations", 3, "Maximum detection cycles")
 	detectLoopWorkerCmd.Flags().StringSlice("stages", []string{"static", "dynamic"}, "Stages")

@@ -183,14 +183,16 @@ Baseline cycle: %s
 
 Continue the loop. The full feedback, builds, and telemetry are in SQLite.
 Use InspectFeedback, Payloads, ComparePayloads, TelemetryQuery, and the source
-tools. Apply minimal source edits with EditSource, then call DetectionCycle.
+tools. Apply grounded source edits with EditSource: start minimal when that
+removes the detection, but change the design when the design itself is what the
+sandbox detects. Then call DetectionCycle.
 A zero Defender verdict count is not success. Minimize the remaining finding
 count and risk score as far as possible. High static findings (for example
 .rdata entropy), medium telemetry findings (child process, network, unbacked
 execute), and import findings all count. Do not stop just because verdicts are
 zero, and do not game static checks with size-inflating encoding or padding.
 
-Use every telemetry source, not only Defender verdicts. The events table now
+Use every telemetry source. Defender verdicts are one input; the events table
 carries ETW, ETW-TI memory operations, kernel callbacks, ntdll hooks, PEB and
 loaded-DLL queries, and Defender behavior. Each row has actor_pid, target_pid,
 operation, category, signal, payload_role, src/dst endpoints, protection,
@@ -686,7 +688,7 @@ func (e *evolver) tools() []tool.CoreTool {
 func (e *evolver) detectionCycleTool() tool.CoreTool {
 	return tool.Build(tool.Spec{
 		Name: "DetectionCycle",
-		Description: "Rebuild the module from its current source and detonate the artifact in LitterBox. " +
+		Description: "Rebuild the module from its current source and detonate the artifact in the sandbox. " +
 			"The full feedback, build log, and telemetry are stored in SQLite; this returns a bounded summary. " +
 			"Call it after applying source edits.",
 		Prompt: "Build and run one detection cycle.",
@@ -1111,19 +1113,26 @@ Data policy:
 - The findings table holds the deterministic telemetry findings for a trace;
   the events table holds every raw event. Query trace_pk-scoped events or the
   per-payload view.
+- The sandbox result bundle contains file info, static YARA/CheckPlz/Stringnalyzer, dynamic
+  RedEdr/Moneta/pe-sieve/HollowsHunter/HSB/Patriot/Blender/YARA/CheckPlz,
+  HolyGrail, and every EDR profile. Analyzer output is a type='analysis' event
+  with the analyzer JSON in attrs; its finding rule is analyzer/<analyzer>.
+  Query the findings table and these events together.
 - Attribution columns matter: actor_pid performed the operation, pid is the
   subject, target_pid is the target or child, payload_role says whether the
   event belongs to the payload, a child, the payload as a target, a Defender
   scan, or ambient traffic. signal is signal/verdict/scan/info/baseline/noise.
 - Categories include process, image, file, network, audit, thread, defender,
-  query, module, hook, and memory (ETW-TI). ETW-TI rows carry operation,
-  protection, size, bytes, status, and stack. Hook rows carry the intercepted
-  Nt* API. Ambient MsMpEng events are stored but are not payload actions.
+  query, module, hook, memory (ETW-TI), and analysis. ETW-TI rows carry
+  operation, protection, size, bytes, status, and stack. Hook rows carry the
+  intercepted Nt* API. Ambient MsMpEng events are stored but are not payload
+  actions.
 
 Work loop:
 1. Inspect the baseline and identify a real defender verdict or a high/medium
    telemetry finding that maps to module source. Use the findings table first,
-   then the payload view for the events behind a finding.
+   then the payload view for the events behind a finding. Check RedEdr and the
+   type='analysis' analyzers before deciding a finding is resolved.
 2. Read the relevant source and trace the detection to its cause. Prefer a
    minimal, grounded EditSource call when that removes the detection. A design
    change is allowed and expected when the current design is what the sandbox
@@ -1133,6 +1142,11 @@ Work loop:
    exists, and do not settle for renaming, reordering, or hiding the same
    behavior. Update every default that controls the behavior, not a dead copy.
    Use multiple EditSource calls when a redesign needs them.
+   When the signal is in the shellcode producer, wrapper, injection path, or
+   packaging, choose a different mechanism: another loader, Crystal Palace/
+   Crystal-Kit PICO, a different shellcode producer, or a different injection
+   path. If the change is outside this module, name the exact out-of-tree change
+   and test the best in-module alternative; claim only what was tested.
 3. Call DetectionCycle. It rebuilds from the current source and returns a
    bounded summary plus the new payload key.
 4. ComparePayloads the previous and new payloads. If the real verdict is gone,

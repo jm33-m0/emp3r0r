@@ -656,3 +656,131 @@ func TestFetchTelemetryStaysOnSandboxOrigin(t *testing.T) {
 		t.Fatalf("same-origin telemetry failed: %v", err)
 	}
 }
+
+func TestImportSandboxStoresEveryAnalyzer(t *testing.T) {
+	db := openTestTelemetry(t)
+	results := SandboxResults{
+		Info: json.RawMessage(`{"original_name":"sample.exe","md5":"deadbeef"}`),
+		Static: json.RawMessage(`{
+			"yara":{"matches":[{"rule":"test_rule"}]},
+			"checkplz":{"findings":{"initial_threat":true}}
+		}`),
+		Dynamic: json.RawMessage(`{
+			"rededr":{"findings":{"events":[
+				{"type":"process_query","func":"peb","id":2,"pid":8216,
+				 "parent_pid":42,"image_path":"C:\\Users\\Public\\sample.exe",
+				 "trace_id":41,"event_time":134382680109164370}
+			]}},
+			"moneta":{"findings":{"total_private_rwx":1}},
+			"pe_sieve":{"findings":{"total_suspicious":2}},
+			"hsb":{"findings":{"total_findings":1}},
+			"patriot":{"findings":[{"description":"test"}]},
+			"blender":{"findings":{"test":true}}
+		}`),
+		HolyGrail: json.RawMessage(`{"findings":{"vulnerable":true}}`),
+		EDR: map[string]json.RawMessage{
+			"elastic": json.RawMessage(`{"alerts":[{"rule":"test"}]}`),
+		},
+	}
+	trace, err := db.ImportSandbox(context.Background(), results, ImportOptions{
+		RunID: "loader_windows-all-analyzers", Module: "loader_windows", ArtifactSHA256: "deadbeef",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if trace.Source != "sandbox" {
+		t.Fatalf("source = %q", trace.Source)
+	}
+	if trace.Events < 11 {
+		t.Fatalf("events = %d, want at least 11", trace.Events)
+	}
+	if trace.Coverage.Categories["analysis"] == 0 {
+		t.Fatalf("analysis coverage = %+v", trace.Coverage)
+	}
+	findings, err := db.Findings(context.Background(), trace.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rules := findingRules(findings)
+	for _, rule := range []string{
+		"analyzer/static/yara", "analyzer/static/checkplz",
+		"analyzer/dynamic/moneta", "analyzer/dynamic/pe_sieve",
+		"analyzer/dynamic/hsb", "analyzer/dynamic/patriot",
+		"analyzer/dynamic/blender", "analyzer/holygrail",
+		"analyzer/edr/elastic",
+	} {
+		if _, ok := rules[rule]; !ok {
+			t.Fatalf("missing finding %q in %+v", rule, rules)
+		}
+	}
+}
+
+func TestFetchResultsFetchesEveryBlock(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/results/info/hash":
+			fmt.Fprint(w, `{"name":"sample.exe"}`)
+		case "/api/results/static/hash":
+			fmt.Fprint(w, `{"yara":{"matches":[]}}`)
+		case "/api/results/dynamic/hash":
+			fmt.Fprint(w, `{"rededr":{"findings":{"events":[]}}}`)
+		case "/api/results/holygrail/hash":
+			fmt.Fprint(w, `{"findings":{}}`)
+		case "/api/results/edr/hash":
+			fmt.Fprint(w, `{"profiles":["elastic"]}`)
+		case "/api/results/edr/elastic/hash":
+			fmt.Fprint(w, `{"alerts":[]}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	results := client.FetchResults(context.Background(), "hash", nil, nil)
+	if len(results.Info) == 0 || len(results.Static) == 0 || len(results.Dynamic) == 0 || len(results.HolyGrail) == 0 {
+		t.Fatalf("missing result block: %+v", results)
+	}
+	if len(results.EDR["elastic"]) == 0 {
+		t.Fatalf("missing EDR result: %+v", results)
+	}
+	if len(results.Warnings) != 0 {
+		t.Fatalf("warnings = %v", results.Warnings)
+	}
+}
+
+func TestFetchResultsCapsEDRProfiles(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/api/results/edr/hash":
+			profiles := make([]string, 50)
+			for i := range profiles {
+				profiles[i] = fmt.Sprintf("profile%d", i)
+			}
+			data, _ := json.Marshal(map[string]any{"profiles": profiles})
+			w.Write(data)
+		case strings.HasPrefix(r.URL.Path, "/api/results/edr/"):
+			fmt.Fprint(w, `{"alerts":[]}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	client, err := NewClient(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	results := client.FetchResults(context.Background(), "hash", json.RawMessage(`{}`), json.RawMessage(`{}`))
+	if len(results.EDR) != maxFetchedEDRProfiles {
+		t.Fatalf("got %d EDR profiles, want %d", len(results.EDR), maxFetchedEDRProfiles)
+	}
+	foundTruncated := false
+	for _, warning := range results.Warnings {
+		if strings.Contains(warning, "truncated") {
+			foundTruncated = true
+			break
+		}
+	}
+	if !foundTruncated {

@@ -478,6 +478,10 @@ func (t *TelemetryDB) Import(ctx context.Context, data []byte, opts ImportOption
 	if err != nil {
 		return TelemetryTrace{}, err
 	}
+	return t.importParsed(ctx, parsed, opts, data)
+}
+
+func (t *TelemetryDB) importParsed(ctx context.Context, parsed parsedTelemetry, opts ImportOptions, seed []byte) (TelemetryTrace, error) {
 	if len(parsed.Events) > maxTelemetryEvents {
 		return TelemetryTrace{}, fmt.Errorf("telemetry has %d events, limit is %d", len(parsed.Events), maxTelemetryEvents)
 	}
@@ -508,7 +512,7 @@ func (t *TelemetryDB) Import(ctx context.Context, data []byte, opts ImportOption
 	}
 	externalID := parsed.ExternalID
 	if externalID == "" {
-		sum := sha256.Sum256(data)
+		sum := sha256.Sum256(seed)
 		externalID = "sha256:" + hex.EncodeToString(sum[:12])
 	}
 
@@ -839,6 +843,27 @@ func (t *TelemetryDB) Findings(ctx context.Context, traceID int64) ([]Finding, e
 	if scans > 0 {
 		add("low", "defender/scan", "Defender scan activity",
 			fmt.Sprintf("Defender behavior monitoring engaged the payload %d times", scans))
+	}
+
+	// LitterBox analyzer events: Moneta, pe-sieve, HollowsHunter, HSB, Patriot,
+	// Blender, YARA, CheckPlz, HolyGrail, and EDR profiles.
+	analyzers, err := t.rows(ctx, `SELECT event, severity FROM events
+		WHERE trace_pk = ? AND category = 'analysis'
+		AND severity IN ('critical', 'high', 'medium') ORDER BY id LIMIT 200`, traceID)
+	if err != nil {
+		return nil, err
+	}
+	seenAnalyzer := map[string]bool{}
+	for _, row := range analyzers {
+		name := row.string("event")
+		severity := row.string("severity")
+		key := name + "|" + severity
+		if name == "" || seenAnalyzer[key] {
+			continue
+		}
+		seenAnalyzer[key] = true
+		add(severity, "analyzer/"+name, name,
+			"LitterBox analyzer "+name+" reported "+severity+" findings")
 	}
 
 	// Child process creation and its image path.

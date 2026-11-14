@@ -75,10 +75,17 @@ indicators. Keep the module contract described in
 Windows agent shellcode when `--shellcode` is omitted, then runs:
 
 1. build `loader_windows` from `--module-dir`;
-2. detonate it in LitterBox and import RedEdr telemetry;
+2. detonate it in LitterBox and import every saved analyzer result: RedEdr,
+   Moneta, pe-sieve, HollowsHunter, HSB, Patriot, Blender, YARA, CheckPlz,
+   HolyGrail, and every EDR profile;
 3. let a Norma agent query SQLite, edit module source, rebuild, and compare
    payloads;
 4. write the final JSON and all cycles to the loop tables.
+
+`--shellcode` accepts any x64 position-independent shellcode, so a Crystal
+Palace/Crystal-Kit PICO from `crystal_pack` can replace the generated Donut
+shellcode. Norma can change the loader, wrapper, injection path, or shellcode
+producer when telemetry points at that design.
 
 The worker writes one log file under `<workspace>/detection/` and opens a
 separate tmux window tailing it; `emp3r0r.log` is untouched. It does not need
@@ -119,20 +126,28 @@ them by payload view or `trace_pk`.
 
 ## Telemetry database
 
-Dynamic analysis returns RedEdr ETW events. The loop normalizes them into
-SQLite at `<workspace>/detection/telemetry.db` and attaches the trace ID and
-deterministic findings to the run. Offline data is imported the same way:
+`detection_run` imports every saved sandbox result into SQLite at
+`<workspace>/detection/telemetry.db` and attaches the trace ID and
+deterministic findings to the run. RedEdr events keep their normalized rows;
+the other analyzers become `type='analysis'` events with the analyzer JSON in
+`attrs`, so a model can query them without a second sandbox run. The import
+covers:
 
-- RedEdr JSON arrays or JSONL, including the `raw_output` embedded in a
-  LitterBox dynamic result;
-- DefenderObserver JSONL (`timestamp`, `providerName`, `id`, `payload`);
-- a LitterBox result that nests `rededr.findings`.
+- file info and static YARA, CheckPlz, and Stringnalyzer output;
+- dynamic RedEdr, Moneta, pe-sieve, HollowsHunter, HSB, Patriot, Blender,
+  YARA, and CheckPlz output;
+- HolyGrail BYOVD output and every saved EDR profile result.
+
+`detection_telemetry_import` additionally accepts offline RedEdr JSON arrays or
+JSONL, including the `raw_output` embedded in a LitterBox dynamic result,
+DefenderObserver JSONL (`timestamp`, `providerName`, `id`, `payload`), and a
+LitterBox result that nests `rededr.findings`.
 
 `detection_telemetry_import` accepts `path` or `url` plus optional `module`,
 `artifact`, `run_id`, and `source`. A `url` must use the configured LitterBox
 origin, and redirects may not leave it; save remote telemetry locally and pass
-`path` instead. `detection_run` imports the RedEdr trace automatically when a
-dynamic stage completes.
+`path` instead. `detection_run` imports every saved sandbox result
+automatically when a selected stage completes.
 
 Every JSON event from RedEdr is stored, including `findings.events`,
 `raw_output`, kernel callbacks, ntdll hooks, PEB and loaded-DLL queries, ETW-TI
@@ -144,7 +159,7 @@ operation, source coverage, payload attribution, and a signal class:
   `ambient`, or `unknown`.
 - `signal`: `signal`, `verdict`, `scan`, `info`, `baseline`, or `noise`.
 - `category`: `process`, `image`, `module`, `file`, `network`, `audit`, `thread`,
-  `defender`, `query`, `hook`, `memory` (ETW-TI), or `other`.
+  `defender`, `query`, `hook`, `memory` (ETW-TI), `analysis`, or `other`.
 
 Payload attribution comes from the PEB query. A trace that never observed the
 payload PEB is marked `unknown` instead of attributing Defender traffic to the
@@ -154,9 +169,10 @@ enabled sources produced none.
 The deterministic findings cover every category, including cross-process
 ETW-TI writes/protects/suspends, self-modifying memory, kernel and ntdll hooks,
 audit API calls, child processes, user-writable images and modules, file
-writes, network flows, and Defender verdicts. The findings are materialized in
-the `findings` table and the autonomous loop is instructed to minimize the full
-finding count and score. A zero verdict count is not treated as safe; high
+writes, network flows, Defender verdicts, and sandbox analyzers that report
+high or medium findings (`rule = analyzer/<analyzer>`). The findings are materialized in
+the `findings` table and the autonomous loop minimizes the full finding count
+and score. A zero verdict count is not treated as safe; high
 static findings and high/medium telemetry findings remain actionable until the
 iteration limit, with inherent items recorded as residuals.
 
