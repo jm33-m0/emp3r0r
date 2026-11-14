@@ -34,6 +34,7 @@ Ranked by impact, from highest to lowest:
 
 - An operator attacking the server in single-operator mode: the operator owns the server there.
 - Sandboxing the MCP client process or the AI harness against the local operator filesystem: both run as the operator user and already own its local file and shell tools. A compromised harness is an operator-host compromise, not an MCP vulnerability.
+- Isolating the autonomous detection loop from the operator host. The loop deliberately lets the model edit module and producer source and run the resulting build scripts with operator privileges. Its boundary is the host or VM it runs in, not a permission check inside emp3r0r.
 - Anything that requires the C2 host to already be compromised.
 - Denial of service that only affects the attacker's own connection.
 
@@ -60,6 +61,14 @@ and on host isolation: run the operator in a dedicated VM or container, keep
 host and cloud credentials out of it, restrict its network egress, and review
 what the harness can read and execute. The MCP screen and audit log bound calls
 made through this server; they are not a sandbox for the harness.
+
+The autonomous detection loop raises the same requirement: the model edits
+module and producer source, and the build scripts and generators it changes run
+on the operator host with the operator's privileges. Treat any model-driven
+source edit as code execution. Run the loop in a dedicated, disposable VM with
+no host credentials or production C2 keys and with egress limited to the model
+provider and the sandbox. Running the worker in a VM managed next to the
+sandbox is the intended next step.
 
 The only AI-specific attack path emp3r0r can influence is the chain from the
 agent: target-controlled output enters the model's context as a prompt

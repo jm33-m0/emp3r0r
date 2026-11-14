@@ -13,13 +13,14 @@ import (
 )
 
 const (
-	maxFeedbackFindings = 100
-	maxSourceFiles      = 500
-	maxSourceFileBytes  = 2 << 20
-	maxSourceTotalBytes = 16 << 20
-	maxSourceLocations  = 3
-	maxGenericNodes     = 20000
-	maxGenericFindings  = 200
+	maxFeedbackFindings    = 100
+	maxSourceFiles         = 500
+	maxSourceFileBytes     = 2 << 20
+	maxSourceTotalBytes    = 16 << 20
+	maxSourceLocations     = 3
+	maxGenericNodes        = 20000
+	maxGenericFindings     = 200
+	maxStringAnalyzerItems = 8
 )
 
 // SourceLocation is one place in the module source a detection maps to.
@@ -307,7 +308,10 @@ func parseStatic(raw json.RawMessage) []Finding {
 				{report.Findings.Emails, "low"},
 				{report.Findings.ErrorMessages, "low"},
 			} {
-				for _, item := range group.items {
+				for i, item := range group.items {
+					if i >= maxStringAnalyzerItems {
+						break
+					}
 					findings = append(findings, Finding{Tool: "stringnalyzer", Severity: group.severity, Indicator: item})
 				}
 			}
@@ -515,7 +519,12 @@ func (c *genericCollector) walk(value any, severity, rule, tool string, depth in
 			tool = text
 		}
 		for key, child := range v {
-			if collectionKeys[strings.ToLower(key)] || indicatorKeys[strings.ToLower(key)] {
+			lower := strings.ToLower(key)
+			if lower == "timeline" || lower == "loaded_images" || lower == "modules" {
+				// Process/module timelines are context, not detections.
+				continue
+			}
+			if collectionKeys[lower] || indicatorKeys[lower] {
 				c.collectStrings(child, severity, rule, tool, depth+1)
 			}
 			c.walk(child, severity, rule, tool, depth+1)
@@ -553,6 +562,11 @@ func (c *genericCollector) add(text, severity, rule, tool string) {
 	text = strings.TrimSpace(text)
 	if len(text) < 4 {
 		return
+	}
+	for _, prefix := range []string{"Loaded image:", "Process started:", "Process stopped:", "Thread started:", "Thread stopped:"} {
+		if strings.HasPrefix(text, prefix) {
+			return
+		}
 	}
 	key := strings.ToLower(text)
 	if _, ok := c.seen[key]; ok {

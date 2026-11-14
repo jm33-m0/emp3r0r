@@ -188,12 +188,25 @@ CREATE TABLE IF NOT EXISTS loop_edits (
 	iteration INTEGER NOT NULL,
 	payload_id INTEGER REFERENCES payloads(id),
 	next_payload_id INTEGER REFERENCES payloads(id),
+	module TEXT NOT NULL DEFAULT '',
 	file TEXT NOT NULL,
 	old TEXT NOT NULL DEFAULT '',
 	new TEXT NOT NULL DEFAULT '',
 	reason TEXT NOT NULL DEFAULT '',
 	created_at INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS loop_shellcodes (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	loop_id TEXT NOT NULL,
+	iteration INTEGER NOT NULL DEFAULT 0,
+	producer TEXT NOT NULL DEFAULT '',
+	path TEXT NOT NULL DEFAULT '',
+	sha256 TEXT NOT NULL DEFAULT '',
+	size INTEGER NOT NULL DEFAULT 0,
+	options TEXT NOT NULL DEFAULT '{}',
+	created_at INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS loop_shellcodes_loop ON loop_shellcodes(loop_id, id);
 `
 
 // telemetryIndexesV2 is applied after ensureColumn because older databases do
@@ -285,6 +298,7 @@ func OpenTelemetryDB(path string) (*TelemetryDB, error) {
 		{"events", "signal", "TEXT NOT NULL DEFAULT ''"},
 		{"events", "payload_role", "TEXT NOT NULL DEFAULT ''"},
 		{"loop_edits", "next_payload_id", "INTEGER REFERENCES payloads(id)"},
+		{"loop_edits", "module", "TEXT NOT NULL DEFAULT ''"},
 		{"loop_results", "report", "TEXT NOT NULL DEFAULT ''"},
 	} {
 		if err := ensureColumn(db, column.table, column.name, column.typ); err != nil {
@@ -345,13 +359,14 @@ type ImportOptions struct {
 // were expected from the run metadata. It makes a silently degraded capture
 // visible to the loop instead of looking like a clean run.
 type TelemetryCoverage struct {
-	Delivered  []string       `json:"delivered,omitempty"`
-	Expected   []string       `json:"expected,omitempty"`
-	Missing    []string       `json:"missing,omitempty"`
-	Providers  map[string]int `json:"providers,omitempty"`
-	Categories map[string]int `json:"categories,omitempty"`
-	Roles      map[string]int `json:"roles,omitempty"`
-	Signals    map[string]int `json:"signals,omitempty"`
+	Delivered  []string          `json:"delivered,omitempty"`
+	Expected   []string          `json:"expected,omitempty"`
+	Missing    []string          `json:"missing,omitempty"`
+	Analyzers  map[string]string `json:"analyzers,omitempty"`
+	Providers  map[string]int    `json:"providers,omitempty"`
+	Categories map[string]int    `json:"categories,omitempty"`
+	Roles      map[string]int    `json:"roles,omitempty"`
+	Signals    map[string]int    `json:"signals,omitempty"`
 }
 
 // TelemetryStats is the bounded per-trace summary attached to a run and shown

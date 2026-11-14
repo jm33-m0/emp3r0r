@@ -80,6 +80,12 @@ func TestValidateLocalBuildPathRejectsProtectedPaths(t *testing.T) {
 	if err := validateLocalBuildPath("payload-path", "/"); err != nil {
 		t.Fatalf("remote payload path rejected: %v", err)
 	}
+	if !isLocalFilePathFlag("decoy") {
+		t.Fatal("decoy must be treated as a local file path")
+	}
+	if err := validateLocalBuildPath("decoy", subdir); err == nil {
+		t.Fatal("directory decoy should be rejected")
+	}
 
 	secret := filepath.Join(dir, "wg_config.json")
 	if err := os.WriteFile(secret, []byte("{}"), 0o600); err != nil {

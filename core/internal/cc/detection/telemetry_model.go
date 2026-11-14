@@ -368,6 +368,7 @@ func buildTelemetryCoverage(events []telemetryEvent, meta map[string]any) Teleme
 		Categories: map[string]int{},
 		Roles:      map[string]int{},
 		Signals:    map[string]int{},
+		Analyzers:  map[string]string{},
 	}
 	delivered := map[string]bool{}
 	for _, event := range events {
@@ -400,6 +401,9 @@ func buildTelemetryCoverage(events []telemetryEvent, meta map[string]any) Teleme
 		coverage.Categories[event.Category]++
 		coverage.Roles[event.Role]++
 		coverage.Signals[event.Signal]++
+		if event.Category == "analysis" {
+			recordAnalyzerCoverage(&coverage, event)
+		}
 	}
 	expected := map[string]bool{}
 	for name, key := range map[string]string{
@@ -419,6 +423,39 @@ func buildTelemetryCoverage(events []telemetryEvent, meta map[string]any) Teleme
 	}
 	sort.Strings(coverage.Missing)
 	return sanitizeTelemetryCoverage(coverage)
+}
+
+// recordAnalyzerCoverage turns analyzer status and errors into a visible
+// coverage gap. A failed scan is not evidence that the artifact is clean.
+func recordAnalyzerCoverage(coverage *TelemetryCoverage, event telemetryEvent) {
+	name := strings.TrimSpace(event.Event)
+	if name == "" {
+		return
+	}
+	var attrs map[string]any
+	_ = json.Unmarshal([]byte(event.Attrs), &attrs)
+	status := "ok"
+	if value, ok := attrs["errors"]; ok && value != nil {
+		text := strings.TrimSpace(fmt.Sprintf("%v", value))
+		if text != "" && text != "<nil>" {
+			status = "failed: " + clip(text, 160)
+		}
+	}
+	if value, ok := attrs["status"].(string); ok && strings.EqualFold(value, "failed") && status == "ok" {
+		status = "failed"
+	}
+	if name == "dynamic/analysis_metadata" {
+		if started, ok := attrs["analysis_started"].(bool); ok && !started {
+			status = "not started"
+		}
+		if early, ok := attrs["early_termination"].(bool); ok && early {
+			status = "early termination"
+		}
+	}
+	coverage.Analyzers[name] = status
+	if status != "ok" {
+		coverage.Missing = append(coverage.Missing, name+": "+status)
+	}
 }
 
 func metaBool(meta map[string]any, key string) bool {
@@ -933,6 +970,15 @@ func telemetryObjectKey(attrs, suffix string) string {
 
 func isSystemImage(path string) bool {
 	normalized := normalizeWindowsPath(path)
+	if normalized == "" {
+		return true
+	}
+	// Module-load events carry the bare image name (KERNEL32.DLL), not a path.
+	// A name without a directory component is resolved by the loader search
+	// order, which only searches system directories, so it is a system image.
+	if !strings.Contains(normalized, `\`) {
+		return true
+	}
 	return strings.Contains(normalized, `\windows\`) ||
 		strings.Contains(normalized, `\program files\`) ||
 		strings.Contains(normalized, `\programdata\microsoft\windows defender\`) ||

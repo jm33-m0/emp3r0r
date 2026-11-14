@@ -44,6 +44,17 @@ func sanitizeTelemetryCoverage(coverage TelemetryCoverage) TelemetryCoverage {
 	coverage.Delivered = sanitizeStrings(coverage.Delivered)
 	coverage.Expected = sanitizeStrings(coverage.Expected)
 	coverage.Missing = sanitizeStrings(coverage.Missing)
+	if coverage.Analyzers != nil {
+		analyzers := make(map[string]string, len(coverage.Analyzers))
+		for name, status := range coverage.Analyzers {
+			key := sanitizeLine(name)
+			if key == "" {
+				continue
+			}
+			analyzers[key] = sanitizeLine(status)
+		}
+		coverage.Analyzers = analyzers
+	}
 	coverage.Providers = sanitizeCounts(coverage.Providers)
 	coverage.Categories = sanitizeCounts(coverage.Categories)
 	coverage.Roles = sanitizeCounts(coverage.Roles)

@@ -50,6 +50,7 @@ type EditRecord struct {
 	LoopID    string    `json:"loop_id"`
 	Iteration int       `json:"iteration"`
 	PayloadID int64     `json:"payload_id"`
+	Module    string    `json:"module,omitempty"`
 	File      string    `json:"file"`
 	Old       string    `json:"old"`
 	New       string    `json:"new"`
@@ -138,14 +139,32 @@ func (t *TelemetryDB) SaveEdit(ctx context.Context, record EditRecord) error {
 		record.CreatedAt = time.Now().UTC()
 	}
 	if _, err := t.db.ExecContext(ctx, `
-		INSERT INTO loop_edits(loop_id, iteration, payload_id, file, old, new, reason, created_at)
-		VALUES(?, ?, ?, ?, ?, ?, ?, ?)`,
-		record.LoopID, record.Iteration, record.PayloadID, record.File,
+		INSERT INTO loop_edits(loop_id, iteration, payload_id, module, file, old, new, reason, created_at)
+		VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		record.LoopID, record.Iteration, record.PayloadID, record.Module, record.File,
 		record.Old, record.New, clip(record.Reason, 1000),
 		record.CreatedAt.UnixMilli()); err != nil {
 		return fmt.Errorf("save edit: %w", err)
 	}
 	return nil
+}
+
+const editColumns = `loop_id, iteration, COALESCE(payload_id, 0), module, file, old, new, reason, created_at`
+
+func scanEdits(rows *sql.Rows) ([]EditRecord, error) {
+	defer rows.Close()
+	var out []EditRecord
+	for rows.Next() {
+		var record EditRecord
+		var created int64
+		if err := rows.Scan(&record.LoopID, &record.Iteration, &record.PayloadID,
+			&record.Module, &record.File, &record.Old, &record.New, &record.Reason, &created); err != nil {
+			return nil, fmt.Errorf("scan edit: %w", err)
+		}
+		record.CreatedAt = time.UnixMilli(created).UTC()
+		out = append(out, record)
+	}
+	return out, rows.Err()
 }
 
 // EditsForPayload returns the edits that produced one payload.
@@ -154,25 +173,22 @@ func (t *TelemetryDB) EditsForPayload(ctx context.Context, payloadKey string) ([
 	if err != nil || id == 0 {
 		return nil, err
 	}
-	rows, err := t.db.QueryContext(ctx, `
-		SELECT loop_id, iteration, payload_id, file, old, new, reason, created_at
+	rows, err := t.db.QueryContext(ctx, `SELECT `+editColumns+`
 		FROM loop_edits WHERE next_payload_id = ? ORDER BY id`, id)
 	if err != nil {
 		return nil, fmt.Errorf("read edits: %w", err)
 	}
-	defer rows.Close()
-	var out []EditRecord
-	for rows.Next() {
-		var record EditRecord
-		var created int64
-		if err := rows.Scan(&record.LoopID, &record.Iteration, &record.PayloadID,
-			&record.File, &record.Old, &record.New, &record.Reason, &created); err != nil {
-			return nil, fmt.Errorf("scan edit: %w", err)
-		}
-		record.CreatedAt = time.UnixMilli(created).UTC()
-		out = append(out, record)
+	return scanEdits(rows)
+}
+
+// LoopEdits returns every edit recorded for one loop, oldest first.
+func (t *TelemetryDB) LoopEdits(ctx context.Context, loopID string) ([]EditRecord, error) {
+	rows, err := t.db.QueryContext(ctx, `SELECT `+editColumns+`
+		FROM loop_edits WHERE loop_id = ? ORDER BY id`, loopID)
+	if err != nil {
+		return nil, fmt.Errorf("read loop edits: %w", err)
 	}
-	return out, rows.Err()
+	return scanEdits(rows)
 }
 
 // CyclesForPayload returns the detection cycles for one payload.

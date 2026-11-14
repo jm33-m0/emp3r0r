@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"iter"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -17,13 +19,19 @@ import (
 	"github.com/Autumn-27/norma/permission"
 	"github.com/Autumn-27/norma/tool"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
 const (
 	defaultEvolveIterations = 3
 	defaultEvolveTurns      = 60
-	maxEvolveEdits          = 12
-	maxEvolveBuildLog       = 8 << 20
+	// maxEvolveIterations and maxEvolveTurns bound one loop even when the
+	// caller supplies its own values; an MCP caller must not start an
+	// unbounded model/build/detonation run.
+	maxEvolveIterations = 50
+	maxEvolveTurns      = 240
+	maxEvolveEdits      = 12
+	maxEvolveBuildLog   = 8 << 20
 )
 
 // EvolveConfig drives an autonomous detection -> feedback -> edit -> rebuild
@@ -513,14 +521,14 @@ func normalizeEvolveConfig(cfg *EvolveConfig) error {
 	if cfg.Iterations <= 0 {
 		cfg.Iterations = defaultEvolveIterations
 	}
-	if cfg.Iterations > 10 {
-		cfg.Iterations = 10
+	if cfg.Iterations > maxEvolveIterations {
+		return fmt.Errorf("iterations must be at most %d", maxEvolveIterations)
 	}
 	if cfg.Turns <= 0 {
 		cfg.Turns = defaultEvolveTurns
 	}
-	if cfg.Turns > 120 {
-		cfg.Turns = 120
+	if cfg.Turns > maxEvolveTurns {
+		return fmt.Errorf("turns must be at most %d", maxEvolveTurns)
 	}
 	return nil
 }
@@ -749,28 +757,6 @@ func (e *evolver) linkEdits(ctx context.Context, iteration int, payloadID int64)
 	return err
 }
 
-func (e *evolver) loopEdits(ctx context.Context, loopID string) []EditRecord {
-	rows, err := e.db.db.QueryContext(ctx, `
-		SELECT loop_id, iteration, COALESCE(payload_id, 0), file, old, new, reason, created_at
-		FROM loop_edits WHERE loop_id = ? ORDER BY id`, loopID)
-	if err != nil {
-		return nil
-	}
-	defer rows.Close()
-	var out []EditRecord
-	for rows.Next() {
-		var record EditRecord
-		var created int64
-		if err := rows.Scan(&record.LoopID, &record.Iteration, &record.PayloadID,
-			&record.File, &record.Old, &record.New, &record.Reason, &created); err != nil {
-			return out
-		}
-		record.CreatedAt = time.UnixMilli(created).UTC()
-		out = append(out, record)
-	}
-	return out
-}
-
 func writeLoopReport(storeRoot, loopID, report string) (string, error) {
 	if strings.TrimSpace(storeRoot) == "" {
 		return "", fmt.Errorf("store root is empty")
@@ -796,11 +782,75 @@ func (e *evolver) resumePrompt(cfg EvolveConfig, reason string) string {
 Loop ID: %s
 Reason: %s
 Latest cycle: %s
-Full feedback, builds, and telemetry are in SQLite. Inspect the latest payload,
-apply any remaining source edit, and call DetectionCycle. Do not repeat work
-that is already done. Keep reducing actionable findings; zero verdicts alone is
-not completion. Return the required JSON object when the loop is complete.`,
-		cfg.LoopID, reason, latest)
+
+Dossier (already established; do not re-derive it):
+%s
+Full feedback, builds, and telemetry are in SQLite. Continue from the current
+source state: inspect only what the dossier does not answer, apply any remaining
+source edit, and call DetectionCycle. Do not repeat a hypothesis listed as
+tried. Return the required JSON object when the loop is complete.`,
+		cfg.LoopID, reason, latest, e.dossier())
+}
+
+// dossier is the compact state carried into a fresh agent session. It replaces
+// the old behaviour of restarting from the baseline with no memory of earlier
+// decisions, which made every resume rediscover the same telemetry.
+func (e *evolver) dossier() string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "- cycles used: %d of %d\n", e.iter, e.cfg.Iterations)
+	fmt.Fprintf(&b, "- active shellcode: %s\n", e.shellcode)
+	if names := e.producerNames(); len(names) > 0 {
+		fmt.Fprintf(&b, "- producers: %s\n", strings.Join(names, ", "))
+	}
+	fmt.Fprintf(&b, "- editable roots: %s\n", e.roots.describe())
+	start := 0
+	if len(e.cycles) > 8 {
+		start = len(e.cycles) - 8
+	}
+	for _, cycle := range e.cycles[start:] {
+		var summary cycleSummary
+		_ = json.Unmarshal([]byte(cycle.Summary), &summary)
+		files := make([]string, 0, len(summary.Edits))
+		for _, edit := range summary.Edits {
+			files = append(files, edit.Module+"/"+edit.File)
+		}
+		fmt.Fprintf(&b, "- cycle %d: score=%.2f level=%s findings=%d verdicts=%d shellcode=%s files=%s\n",
+			cycle.Iteration, cycle.Score, cycle.Level, cycle.Findings, cycle.Verdicts,
+			headerOrNone(filepath.Base(summary.Shellcode)), joinOrNone(files))
+		if len(summary.TopFindings) > 0 {
+			fmt.Fprintf(&b, "  top: %s\n", strings.Join(limitStrings(summary.TopFindings, 4), " | "))
+		}
+	}
+	if len(e.lastAnswer) > 0 {
+		if summary, ok := e.lastAnswer["summary"]; ok {
+			fmt.Fprintf(&b, "- last answer summary: %s\n", clip(fmt.Sprintf("%v", summary), 600))
+		}
+		if residual, ok := e.lastAnswer["residual"]; ok {
+			fmt.Fprintf(&b, "- decided residuals: %s\n", clip(fmt.Sprintf("%v", residual), 600))
+		}
+	}
+	return b.String()
+}
+
+func headerOrNone(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return "none"
+	}
+	return value
+}
+
+func joinOrNone(values []string) string {
+	if len(values) == 0 {
+		return "none"
+	}
+	return strings.Join(values, ",")
+}
+
+func limitStrings(values []string, n int) []string {
+	if len(values) <= n {
+		return values
+	}
+	return values[:n]
 }
 
 func (e *evolver) needsMoreWork(ctx context.Context) bool {
@@ -820,11 +870,18 @@ func (e *evolver) needsMoreWork(ctx context.Context) bool {
 	if json.Unmarshal([]byte(body), &feedback) != nil {
 		return false
 	}
-	for _, finding := range feedback.Findings {
+	return hasActionableFindings(feedback.Findings)
+}
+
+// hasActionableFindings reports whether another source edit could plausibly
+// remove a remaining finding. Unmatched medium findings have no source
+// location, so they are residuals rather than work.
+func hasActionableFindings(findings []Finding) bool {
+	for _, finding := range findings {
 		if finding.Severity == "high" || finding.Severity == "critical" {
 			return true
 		}
-		if finding.Stage == StageTelemetry && finding.Severity == "medium" {
+		if finding.Stage == StageTelemetry && finding.Severity == "medium" && len(finding.Sources) > 0 {
 			return true
 		}
 	}
@@ -911,11 +968,14 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 			var summary any
 			_ = json.Unmarshal([]byte(cycle.Summary), &summary)
 			out := map[string]any{
-				"cycle":   cycle,
-				"summary": summary,
-				"payload": payload,
-				"edits":   edits,
-				"message": "full feedback and build log are in SQLite; use InspectFeedback or TelemetryQuery",
+				"cycle":            cycle,
+				"summary":          summary,
+				"payload":          payload,
+				"edits":            edits,
+				"iterations":       e.cfg.Iterations,
+				"remaining_cycles": max(0, e.cfg.Iterations-e.iter),
+				"active_shellcode": e.shellcode,
+				"message":          "full feedback and build log are in SQLite; use InspectFeedback or TelemetryQuery",
 			}
 			data, _ := json.Marshal(out)
 			return tool.Text(string(data)), nil
@@ -1072,6 +1132,7 @@ func (e *evolver) editSourceTool() tool.CoreTool {
 		},
 		Run: func(ctx context.Context, raw json.RawMessage, _ *tool.ToolContext) (tool.Result, error) {
 			var args struct {
+				Module    string `json:"module"`
 				File      string `json:"file"`
 				OldString string `json:"old_string"`
 				NewString string `json:"new_string"`
@@ -1084,9 +1145,16 @@ func (e *evolver) editSourceTool() tool.CoreTool {
 				return tool.Errorf("iteration limit reached; the edit could not be built or tested"), nil
 			}
 			if e.edits >= maxEvolveEdits {
-				return tool.Errorf("edit limit reached for this cycle"), nil
+				return tool.Errorf(fmt.Sprintf("edit limit reached for this cycle (%d); call DetectionCycle to unlock the next budget", maxEvolveEdits)), nil
 			}
-			result, err := e.applyEdit(ctx, args.File, args.OldString, args.NewString, args.Reason)
+			root, err := e.root(args.Module)
+			if err != nil {
+				return tool.Errorf(fmt.Sprintf("%v", err)), nil
+			}
+			if !root.Writable {
+				return tool.Errorf(fmt.Sprintf("source root %s is read-only", root.Name)), nil
+			}
+			result, err := e.applyEdit(ctx, root, args.File, args.OldString, args.NewString, args.Reason)
 			if err != nil {
 				return tool.Errorf(fmt.Sprintf("%v", err)), nil
 			}
@@ -1097,6 +1165,7 @@ func (e *evolver) editSourceTool() tool.CoreTool {
 }
 
 type editResult struct {
+	Module  string `json:"module"`
 	File    string `json:"file"`
 	Line    int    `json:"line"`
 	Bytes   int    `json:"bytes"`
@@ -1114,47 +1183,9 @@ func (e *evolver) applyEdit(ctx context.Context, root sourceRoot, file, oldText,
 	if len(oldText) > 16<<10 || len(newText) > 16<<10 {
 		return editResult{}, fmt.Errorf("edit text exceeds 16 KiB")
 	}
-	path, err := analystPath(e.cfg.ModuleDir, file)
+	updated, err := writeSourceFile(root, file, oldText, newText)
 	if err != nil {
 		return editResult{}, err
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return editResult{}, fmt.Errorf("read %s: %w", file, err)
-	}
-	if strings.Count(string(data), oldText) != 1 {
-		return editResult{}, fmt.Errorf("%s: old_string must occur exactly once", file)
-	}
-	index := strings.Index(string(data), oldText)
-	line := strings.Count(string(data[:index]), "\n") + 1
-	updated := strings.Replace(string(data), oldText, newText, 1)
-	info, err := os.Stat(path)
-	if err != nil {
-		return editResult{}, fmt.Errorf("stat %s: %w", file, err)
-	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".detect-edit-*")
-	if err != nil {
-		return editResult{}, fmt.Errorf("create edit file: %w", err)
-	}
-	tmpName := tmp.Name()
-	defer os.Remove(tmpName)
-	if err := tmp.Chmod(info.Mode().Perm()); err != nil {
-		tmp.Close()
-		return editResult{}, fmt.Errorf("chmod edit file: %w", err)
-	}
-	if _, err := tmp.WriteString(updated); err != nil {
-		tmp.Close()
-		return editResult{}, fmt.Errorf("write edit file: %w", err)
-	}
-	if err := tmp.Sync(); err != nil {
-		tmp.Close()
-		return editResult{}, fmt.Errorf("sync edit file: %w", err)
-	}
-	if err := tmp.Close(); err != nil {
-		return editResult{}, fmt.Errorf("close edit file: %w", err)
-	}
-	if err := os.Rename(tmpName, path); err != nil {
-		return editResult{}, fmt.Errorf("replace %s: %w", file, err)
 	}
 	payloadID := int64(0)
 	if e.last != nil {
@@ -1163,16 +1194,163 @@ func (e *evolver) applyEdit(ctx context.Context, root sourceRoot, file, oldText,
 	iteration := e.iter + 1
 	if err := e.db.SaveEdit(ctx, EditRecord{
 		LoopID: e.cfg.LoopID, Iteration: iteration, PayloadID: payloadID,
-		File: file, Old: oldText, New: newText, Reason: reason,
+		Module: root.Name, File: file, Old: oldText, New: newText, Reason: reason,
 	}); err != nil {
-		e.log("save edit: %v", err)
+		if restoreErr := restoreSourceFile(updated.Path, updated.Original); restoreErr != nil {
+			return editResult{}, fmt.Errorf("save edit: %w (restore %s failed: %v)", err, file, restoreErr)
+		}
+		return editResult{}, fmt.Errorf("save edit: %w", err)
 	}
 	e.edits++
-	e.log("edit %s:%d (%s): %s", file, line, reason, clip(newText, 160))
+	e.logClass(logging.ClassEdit, "%s/%s:%d (%s): %s", root.Name, file, updated.Line, reason, clip(newText, 160))
 	return editResult{
-		File: file, Line: line, Bytes: len(updated), Reason: reason,
+		Module: root.Name, File: file, Line: updated.Line, Bytes: len(updated.Updated), Reason: reason,
 		Message: "edit applied; call DetectionCycle to rebuild and detonate",
 	}, nil
+}
+
+// sourceWrite records one atomic source replacement and the file state it
+// replaced, so a failed database record can be rolled back.
+type sourceWrite struct {
+	Updated  string
+	Line     int
+	Path     string
+	Original []byte
+}
+
+// writeSourceFile replaces one exact string in a writable module file and
+// rejects edits that remove a documented module or option from config.json.
+func writeSourceFile(root sourceRoot, file, oldText, newText string) (sourceWrite, error) {
+	if !root.Writable {
+		return sourceWrite{}, fmt.Errorf("source root %s is read-only", root.Name)
+	}
+	path, err := analystPath(root.Dir, file)
+	if err != nil {
+		return sourceWrite{}, err
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return sourceWrite{}, fmt.Errorf("read %s: %w", file, err)
+	}
+	if strings.Count(string(data), oldText) != 1 {
+		return sourceWrite{}, fmt.Errorf("%s: old_string must occur exactly once", file)
+	}
+	index := strings.Index(string(data), oldText)
+	line := strings.Count(string(data[:index]), "\n") + 1
+	updated := strings.Replace(string(data), oldText, newText, 1)
+	if strings.EqualFold(filepath.Base(path), "config.json") {
+		if err := guardModuleConfig(string(data), updated); err != nil {
+			return sourceWrite{}, err
+		}
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return sourceWrite{}, fmt.Errorf("stat %s: %w", file, err)
+	}
+	if err := writeFileAtomic(path, []byte(updated), info.Mode().Perm()); err != nil {
+		return sourceWrite{}, fmt.Errorf("replace %s: %w", file, err)
+	}
+	return sourceWrite{Updated: updated, Line: line, Path: path, Original: data}, nil
+}
+
+// restoreSourceFile puts back the bytes a failed edit replaced.
+func restoreSourceFile(path string, data []byte) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	return writeFileAtomic(path, data, info.Mode().Perm())
+}
+
+func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".detect-edit-*")
+	if err != nil {
+		return fmt.Errorf("create edit file: %w", err)
+	}
+	tmpName := tmp.Name()
+	defer func() { _ = os.Remove(tmpName) }()
+	if err := tmp.Chmod(perm); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("chmod edit file: %w", err)
+	}
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("write edit file: %w", err)
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("sync edit file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("close edit file: %w", err)
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		return fmt.Errorf("replace %s: %w", filepath.Base(path), err)
+	}
+	return nil
+}
+
+// guardModuleConfig keeps the documented module and option surface intact. It
+// allows adding options and changing defaults, but not renaming or removing a
+// module, a parameter, or one of its declared choices.
+func guardModuleConfig(before, after string) error {
+	type parameter struct {
+		Name    string   `json:"name"`
+		Choices []string `json:"choices"`
+	}
+	type module struct {
+		Name       string      `json:"name"`
+		Build      string      `json:"build"`
+		Parameters []parameter `json:"parameters"`
+	}
+	var oldModules, newModules []module
+	if err := json.Unmarshal([]byte(before), &oldModules); err != nil {
+		return fmt.Errorf("config.json is not valid JSON before the edit: %w", err)
+	}
+	if err := json.Unmarshal([]byte(after), &newModules); err != nil {
+		return fmt.Errorf("config.json is not valid JSON after the edit: %w", err)
+	}
+	byName := make(map[string]module, len(newModules))
+	for _, mod := range newModules {
+		if _, exists := byName[mod.Name]; exists {
+			return fmt.Errorf("config.json would define module %q twice", mod.Name)
+		}
+		byName[mod.Name] = mod
+	}
+	for _, old := range oldModules {
+		next, ok := byName[old.Name]
+		if !ok {
+			return fmt.Errorf("edit removes documented module %q", old.Name)
+		}
+		if next.Build != old.Build {
+			return fmt.Errorf("edit changes the build entrypoint of module %q", old.Name)
+		}
+		params := make(map[string]parameter, len(next.Parameters))
+		for _, param := range next.Parameters {
+			params[param.Name] = param
+		}
+		for _, oldParam := range old.Parameters {
+			param, ok := params[oldParam.Name]
+			if !ok {
+				return fmt.Errorf("edit removes documented option %q from module %q", oldParam.Name, old.Name)
+			}
+			if len(oldParam.Choices) > 0 {
+				for _, choice := range oldParam.Choices {
+					found := false
+					for _, candidate := range param.Choices {
+						if candidate == choice {
+							found = true
+							break
+						}
+					}
+					if !found {
+						return fmt.Errorf("edit removes choice %q from option %q", choice, oldParam.Name)
+					}
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // --- feedback helpers ------------------------------------------------------

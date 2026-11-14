@@ -683,7 +683,7 @@ func validateLocalBuildPath(flag, value string) error {
 // payload-path out of the regular-file check.
 func isLocalFilePathFlag(flag string) bool {
 	switch strings.ToLower(strings.TrimSpace(flag)) {
-	case "src", "dst", "output", "out", "outfile", "output-path", "input", "file", "shellcode", "agent-pic", "dll":
+	case "src", "dst", "output", "out", "outfile", "output-path", "input", "file", "shellcode", "agent-pic", "dll", "decoy":
 		return true
 	default:
 		return false

@@ -45,7 +45,7 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 	}
 	if len(edits) > 0 {
 		for _, edit := range edits {
-			fmt.Fprintf(&b, "- `%s`: %s\n", sanitizeLine(edit.File), sanitizeLine(edit.Reason))
+			fmt.Fprintf(&b, "- `%s`: %s\n", sanitizeLine(editPath(edit)), sanitizeLine(edit.Reason))
 		}
 		achieved = true
 	}
@@ -104,7 +104,7 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 	if len(edits) > 0 {
 		fmt.Fprintf(&b, "## Source edits\n\n")
 		for _, edit := range edits {
-			fmt.Fprintf(&b, "### `%s`\n\n%s\n\n", sanitizeLine(edit.File), sanitizeMultiline(edit.Reason))
+			fmt.Fprintf(&b, "### `%s`\n\n%s\n\n", sanitizeLine(editPath(edit)), sanitizeMultiline(edit.Reason))
 		}
 	}
 
@@ -209,20 +209,9 @@ func (t *TelemetryDB) LoopReport(ctx context.Context, loopID string) (string, er
 	if err != nil {
 		return "", err
 	}
-	edits := make([]EditRecord, 0)
-	rows, err := t.db.QueryContext(ctx, `
-		SELECT loop_id, iteration, COALESCE(payload_id, 0), file, old, new, reason, created_at
-		FROM loop_edits WHERE loop_id = ? ORDER BY id`, loopID)
-	if err == nil {
-		defer rows.Close()
-		for rows.Next() {
-			var record EditRecord
-			var created int64
-			if rows.Scan(&record.LoopID, &record.Iteration, &record.PayloadID,
-				&record.File, &record.Old, &record.New, &record.Reason, &created) == nil {
-				edits = append(edits, record)
-			}
-		}
+	edits, err := t.LoopEdits(ctx, loopID)
+	if err != nil {
+		return "", err
 	}
 	report = RenderLoopReport(answer, cycles, edits)
 	if _, err := t.db.ExecContext(ctx,
@@ -257,4 +246,13 @@ func (t *TelemetryDB) CyclesForLoop(ctx context.Context, loopID string) ([]Cycle
 		out = append(out, cycle)
 	}
 	return out, rows.Err()
+}
+
+// editPath names the edited file with its source root when it is a producer or
+// dependency module rather than the payload module.
+func editPath(edit EditRecord) string {
+	if strings.TrimSpace(edit.Module) == "" {
+		return edit.File
+	}
+	return edit.Module + "/" + edit.File
 }
