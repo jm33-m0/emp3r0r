@@ -1,5 +1,24 @@
 # Changelog
 
+## [5.9.0](https://github.com/jm33-m0/emp3r0r/compare/v5.8.2...v5.9.0) (2026-11-14)
+
+
+### Features
+
+* enhance detect feedback loop ([909ec7e](https://github.com/jm33-m0/emp3r0r/commit/909ec7e6d10e917d35df768ed695d743af1a47fc))
+* **evasion:** add knowledge base to `detect_loop` ([23a5190](https://github.com/jm33-m0/emp3r0r/commit/23a5190a05574eb6cae2db40f59e115a397b0b16))
+* initial implementation of a detection feedback loop for AI-powered evasion ([378de80](https://github.com/jm33-m0/emp3r0r/commit/378de80abd34475ac0aab9781b2cd9a97b89e4aa))
+* **module:** add donut source for `detect_loop` ([47041ca](https://github.com/jm33-m0/emp3r0r/commit/47041ca997f56264a724f7a64c490a03af498788))
+
+
+### Bug Fixes
+
+* **evasion:** expose more telemetry to AI ([030dac3](https://github.com/jm33-m0/emp3r0r/commit/030dac3b09ddc994711c194ac2fb89c7a1f7a854))
+* **evasion:** improve detection feedback loop ([0fcb196](https://github.com/jm33-m0/emp3r0r/commit/0fcb1968c1142cba466a73438434b1e2541a5a2f))
+* **loader:** default to `dllhost.exe` ([670ae96](https://github.com/jm33-m0/emp3r0r/commit/670ae9664e3e498f716e4ae77411464570622eda))
+* **loader:** no need to resolve `Sleep` ([8da3ca2](https://github.com/jm33-m0/emp3r0r/commit/8da3ca2a6653b29ea04f7b76d3e8df99db8d8fca))
+* **logging:** beautify model output and reporting ([700b8ab](https://github.com/jm33-m0/emp3r0r/commit/700b8ab99bc46514c874e765bb0685ddba40a1c5))
+
 ## [5.8.2](https://github.com/jm33-m0/emp3r0r/compare/v5.8.1...v5.8.2) (2026-11-12)
 
 
