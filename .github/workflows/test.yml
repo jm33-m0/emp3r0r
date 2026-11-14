@@ -194,14 +194,20 @@ jobs:
         run: |
           make -C lib/syscall/smw
 
-      - name: Run tests (Windows, with race)
+      - name: Run tests (Windows, agent packages only)
         if: runner.os == 'Windows'
         working-directory: ./core
         env:
           CGO_ENABLED: "1"
           EMP3R0R_RACE_ON: "1"
         run: |
-          go test -v -race -tags "$BUILD_TAGS" ./...
+          # Operator and C2 code runs only on Linux. Windows exercises the
+          # agent and its shared dependencies so those Linux-only suites do
+          # not burn a Windows runner.
+          $exclude = '/(internal/cc|lib/cli|cmd/cc|cmd/listener|pkg/transportbridge|transports/tor/bridge)(/|$)'
+          $packages = go list -tags "$env:BUILD_TAGS" ./... | Where-Object { $_ -notmatch $exclude }
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go test -v -race -tags "$env:BUILD_TAGS" $packages
 
       - name: Build COFFLoader and BOF fixtures (Windows)
         if: runner.os == 'Windows'
@@ -224,7 +230,6 @@ jobs:
           go test -v -tags "$BUILD_TAGS" -gcflags="all=-d=checkptr=0" ./lib/coffloader -count=1
           go test -v -tags "$BUILD_TAGS" -gcflags="all=-d=checkptr=0" ./lib/memmod -count=1
           go test -v -tags "$BUILD_TAGS" -gcflags="all=-d=checkptr=0" ./internal/agent/modules/...
-          go test -v -tags "$BUILD_TAGS" -gcflags="all=-d=checkptr=0" ./internal/cc/modules/...
 
       - name: Display coverage summary
         if: runner.os == 'Linux'
