@@ -1,5 +1,34 @@
 # Changelog
 
+## [5.9.0](https://github.com/jm33-m0/emp3r0r/compare/v5.8.2...v5.9.0) (2026-11-15)
+
+
+### Features
+
+* enhance detect feedback loop ([909ec7e](https://github.com/jm33-m0/emp3r0r/commit/909ec7e6d10e917d35df768ed695d743af1a47fc))
+* **evasion:** add knowledge base to `detect_loop` ([23a5190](https://github.com/jm33-m0/emp3r0r/commit/23a5190a05574eb6cae2db40f59e115a397b0b16))
+* initial implementation of a detection feedback loop for AI-powered evasion ([378de80](https://github.com/jm33-m0/emp3r0r/commit/378de80abd34475ac0aab9781b2cd9a97b89e4aa))
+* **module:** add donut source for `detect_loop` ([47041ca](https://github.com/jm33-m0/emp3r0r/commit/47041ca997f56264a724f7a64c490a03af498788))
+
+
+### Bug Fixes
+
+* **evasion,loader_windows:** add scoped worker IPC verification, harden stager/loader bounds, and gate C2 verification tools ([9cb4d3d](https://github.com/jm33-m0/emp3r0r/commit/9cb4d3dd4266cc42ec07fb5b270f8aeaf199b219))
+* **evasion:** expose agent generation and producer controls while fixing hanging build commands ([8159dfb](https://github.com/jm33-m0/emp3r0r/commit/8159dfb11fb621dd63710d849ad7d89ada31acc9))
+* **evasion:** expose more telemetry to AI ([030dac3](https://github.com/jm33-m0/emp3r0r/commit/030dac3b09ddc994711c194ac2fb89c7a1f7a854))
+* **evasion:** improve detection feedback loop ([0fcb196](https://github.com/jm33-m0/emp3r0r/commit/0fcb1968c1142cba466a73438434b1e2541a5a2f))
+* **evasion:** knowledge base usage ([bb3691f](https://github.com/jm33-m0/emp3r0r/commit/bb3691f8010c8d219ba6e99c3a06637b2bb09af9))
+* **evasion:** tune detect loop to enable broader exploration and higher efficiency ([fc42424](https://github.com/jm33-m0/emp3r0r/commit/fc4242430807acf7dde89acd198020e3627afa99))
+* **evasion:** wire Crystal Palace PICO producer detection and read-only source roots into detect_loop ([518b446](https://github.com/jm33-m0/emp3r0r/commit/518b4461fcd6ce9d9215d4784258b21688e9643e))
+* improve telemetry, knowledge cache, and agent producer selection robustness in detect_loop ([badd254](https://github.com/jm33-m0/emp3r0r/commit/badd2540401793418d4f6c3e7d24244537f3d996))
+* **loader:** default to `dllhost.exe` ([670ae96](https://github.com/jm33-m0/emp3r0r/commit/670ae9664e3e498f716e4ae77411464570622eda))
+* **loader:** no need to resolve `Sleep` ([8da3ca2](https://github.com/jm33-m0/emp3r0r/commit/8da3ca2a6653b29ea04f7b76d3e8df99db8d8fca))
+* **logging:** beautify model output and reporting ([700b8ab](https://github.com/jm33-m0/emp3r0r/commit/700b8ab99bc46514c874e765bb0685ddba40a1c5))
+* optimize model output rendering and terminal log formatting ([4080e41](https://github.com/jm33-m0/emp3r0r/commit/4080e419deb426d4eae51895193b553129d5fa2b))
+* remove artificial per-mechanism edit cap in detection loop ([b974ecc](https://github.com/jm33-m0/emp3r0r/commit/b974ecc24e56b87665326990cd5a5298365a1691))
+* remove stale Crystal-Kit loader tree and harden postex-loader entry and hook handling ([f66b8f9](https://github.com/jm33-m0/emp3r0r/commit/f66b8f9ea5a021f8da8a5180068756634ab15145))
+* **rvvm:** fix out of bound read and harden rvvm ([49f9ef2](https://github.com/jm33-m0/emp3r0r/commit/49f9ef24e2eac82b05267d754b89317d0a7e8a73))
+
 ## [5.8.2](https://github.com/jm33-m0/emp3r0r/compare/v5.8.1...v5.8.2) (2026-11-12)
 
 
