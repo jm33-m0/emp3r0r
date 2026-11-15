@@ -245,7 +245,7 @@ func MsgTunneler(conn io.ReadWriteCloser, config *def.Config, callback func(*def
 			}
 			util.TakeABlink()
 		}
-		logging.Warningf("Hello (%s) timeout. Please check your network connection.", hello_id)
+		logging.Warningf("Hello (%s) timeout", hello_id)
 		return false
 	}
 

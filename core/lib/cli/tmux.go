@@ -22,8 +22,8 @@ type TmuxPane struct {
 	ID       string // tmux pane unique ID
 	WindowID string // tmux window unique ID, indicates the window that the pane lives in
 	Title    string // title of pane
-	Name     string // intial title of pane, doesn't change even if pane is dead
-	TTY      string // eg. /dev/pts/1, write to this file to get your message displayed on this pane
+	Name     string // initial title of pane, doesn't change even if pane is dead
+	TTY      string // eg. /dev/pts/1, write to this file to display messages on this pane
 	PID      int    // PID of the process running in tmux pane
 	Cmd      string // cmdline of the process
 	Width    int    // width of pane, number of chars
@@ -426,7 +426,7 @@ func TmuxNewPane(title, hV, target_pane_id string, size int, cmd string) (pane *
 	if os.Getenv("TMUX") == "" ||
 		!util.IsCommandExist("tmux") {
 
-		err = errors.New("you need to run emp3r0r under `tmux`")
+		err = errors.New("emp3r0r must run under `tmux`")
 		return pane, err
 	}
 	is_new_window := hV == "" && size == 0

@@ -54,10 +54,10 @@ SQLite. The worker writes only its instructions and bounded tool results to the
 model context.
 
 The model can edit module and producer source, and the build scripts and
-generators it edits run on this host with your privileges. Treat the loop as a
-code-execution feature controlled by an untrusted model, not as a sandbox: run
-it in a dedicated, disposable VM or container with no host credentials, no
-production C2 keys, and restricted network egress.
+generators it edits run on this host with operator privileges. Treat the loop
+as a code-execution feature controlled by an untrusted model, not as a
+sandbox: run it in a dedicated, disposable VM or container with no host
+credentials, no production C2 keys, and restricted network egress.
 
 Set the model through the environment:
   EMP3R0R_DETECTION_PROVIDER=openai-responses
@@ -369,9 +369,7 @@ func startDetectLoopWorker(opts detectLoopOptions, shellcode, loopID string, log
 	return nil
 }
 
-// readLoopSummary returns the compact summary written next to the full report.
-// Reports from before the summary file existed are cut before the cycle table so
-// the console still gets the outcome and changes instead of the full Markdown.
+// readLoopSummary returns the compact summary next to the full report.
 func readLoopSummary(reportPath string) (string, string) {
 	summaryPath := strings.TrimSuffix(reportPath, ".md") + "-summary.md"
 	if summary, err := os.ReadFile(summaryPath); err == nil && strings.TrimSpace(string(summary)) != "" {
@@ -411,10 +409,7 @@ access. Add --content to cache full document text as well.`,
 	return cmd
 }
 
-// runKnowledgeSyncCommand keeps the console responsive. A direct CLI
-// invocation still runs in-process and blocks until the cache is refreshed;
-// the console re-executes the binary and streams the child's output into the
-// output pane.
+// runKnowledgeSyncCommand keeps console input responsive by syncing in a child process.
 func runKnowledgeSyncCommand(cmd *cobra.Command, _ []string) {
 	if cli.OutputPane == nil {
 		runKnowledgeSync(cmd)
@@ -478,9 +473,7 @@ func knowledgeSyncArgs(cmd *cobra.Command) []string {
 	return args
 }
 
-// startOutputPaneSubprocess runs this executable in the background and copies
-// both of its output streams into the logging output pane. The console command
-// returns as soon as the child starts.
+// startOutputPaneSubprocess mirrors this executable's output to the pane.
 func startOutputPaneSubprocess(label string, args ...string) error {
 	exe, err := os.Executable()
 	if err != nil {
@@ -530,9 +523,7 @@ func startOutputPaneSubprocess(label string, args ...string) error {
 		readers.Wait()
 		if waitErr := child.Wait(); waitErr != nil {
 			logging.Errorf("%s exited: %v", label, waitErr)
-			return
 		}
-		logging.Successf("%s finished", label)
 	}()
 	return nil
 }

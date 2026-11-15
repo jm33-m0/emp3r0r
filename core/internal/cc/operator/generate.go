@@ -18,9 +18,8 @@ import (
 // the shared runtime config and module state concurrently.
 var generationMu sync.Mutex
 
-// CmdGenerateAgent generates agent binary (UI command layer)
+// CmdGenerateAgent builds a Go agent from console flags.
 func CmdGenerateAgent(cmd *cobra.Command, args []string) {
-	// Parse flags (UI layer)
 	payloadType, _ := cmd.Flags().GetString("type")
 	archChoice, _ := cmd.Flags().GetString("arch")
 
@@ -29,7 +28,6 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	// Gather config from flags. Bool flags default to false when omitted.
 	p2p, _ := cmd.Flags().GetBool("p2p")
 	directC2, _ := cmd.Flags().GetBool("direct-c2")
 	persistentRouter, _ := cmd.Flags().GetBool("persistent-router")
@@ -73,12 +71,10 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 		generationMu.Lock()
 		defer generationMu.Unlock()
 
-		// Push operator-idle policy to the C2 server (remote or local).
 		if err := client.UpdateOperatorIdleConfig(operatorIdleTimeout); err != nil {
 			logging.Warningf("Failed to update operator idle timeout on C2: %v", err)
 		}
 
-		// Invoke core agent generation business logic outside operator package and controller package
 		res, err := builder.GenerateAgentWorkflow(opts, payloadType, archChoice, client.SignAgent)
 		if err != nil {
 			logging.Errorf("Failed to generate agent: %v", err)

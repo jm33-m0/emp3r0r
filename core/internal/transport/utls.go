@@ -294,7 +294,7 @@ func makeTransport(url *url.URL, clientHelloID *utls.ClientHelloID, cfg *utls.Co
 	}, nil
 }
 
-// When you update this map, also update the man page in doc/meek-client.1.txt.
+// Keep this map in sync with doc/meek-client.1.txt.
 // https://github.com/refraction-networking/utls/blob/master/u_common.go
 var clientHelloIDMap = map[string]*utls.ClientHelloID{
 	// No HelloCustom: not useful for external configuration.

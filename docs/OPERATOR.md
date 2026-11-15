@@ -79,9 +79,9 @@ Names must be unique and free of control characters; they appear in the console
 and the audit log.
 
 > [!WARNING]
-> Your local services are reachable by all operators and the server over the
-> WireGuard subnet. Firewall the ones you do not want exposed. The server prints
-> this warning on startup.
+> Local services are reachable by all operators and the server over the
+> WireGuard subnet. Firewall services that should not be exposed. The server
+> prints this warning on startup.
 
 ### Multiple operators
 

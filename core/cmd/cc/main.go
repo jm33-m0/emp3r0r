@@ -105,7 +105,7 @@ func main() {
 	clientCmd.Flags().StringVar(&opts.wg_server_ip, "server-wg-ip", "", "WireGuard server IP provided by the C2 server")
 	clientCmd.Flags().StringVar(&opts.wg_operator_ip, "operator-wg-ip", "", "Operator's wireguard IP")
 	clientCmd.Flags().StringVar(&opts.wg_operator_key, "operator-wg-key", "", "Operator's WireGuard private key") // Added flag
-	clientCmd.Flags().BoolVar(&opts.debug, "debug", false, "Do not kill tmux session when crashing, so you can see the crash log")
+	clientCmd.Flags().BoolVar(&opts.debug, "debug", false, "Keep the tmux session open on crash to preserve the crash log")
 
 	// Server subcommand
 	serverCmd := &cobra.Command{

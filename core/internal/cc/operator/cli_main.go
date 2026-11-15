@@ -404,7 +404,7 @@ func CliBanner(console *console.Console) {
 	name_list := strings.Join(c2_names, ", ")
 
 	say, encodingErr := cow.Say(fmt.Sprintf(
-		"Welcome! You are using emp3r0r %s\n"+
+		"emp3r0r %s\n"+
 			"C2 Names: %s\n"+
 			"%s",
 		def.BuildVersion,

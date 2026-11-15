@@ -342,8 +342,8 @@ func wg(wg_port int, operatorNames, addOperators []string, operatorsSet bool) {
 
 	// The WireGuard subnet exposes local services to every peer; warn operators
 	// to firewall the ones they do not want reachable.
-	logging.Warningf("Your local services are reachable by all operators and the server over the WireGuard " +
-		"subnet. Firewall the ones you do not want exposed.")
+	logging.Warningf("Local services are reachable by all operators and the server over the WireGuard " +
+		"subnet. Firewall services that should not be exposed.")
 }
 
 // operatorConfigFileNames lists the files copied into the operator config

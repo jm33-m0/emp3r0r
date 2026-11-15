@@ -115,7 +115,7 @@ func ExecuteDonut(input string, opts DonutOptions) (string, error) {
 	// check if donut is available
 	_, err := exec.LookPath("donut")
 	if err != nil {
-		return "", errors.New("donut binary not found in PATH, download it from https://github.com/TheWover/donut/releases and put it in your PATH")
+		return "", errors.New("donut binary not found in PATH (https://github.com/TheWover/donut/releases)")
 	}
 
 	cmdArgs, err := opts.GenerateCommand(input)

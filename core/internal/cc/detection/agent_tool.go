@@ -13,9 +13,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
-// generateAgentTool rebuilds the Go agent itself. The loader is only one layer:
-// changing the agent EXE/DLL and its producer is how the model explores a
-// different payload layer without dropping the payload.
+// generateAgentTool rebuilds the Go agent without wrapping it.
 func (e *evolver) generateAgentTool() tool.CoreTool {
 	return tool.Build(tool.Spec{
 		Name: "GenerateAgent",

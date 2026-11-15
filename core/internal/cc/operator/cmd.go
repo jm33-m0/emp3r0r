@@ -570,7 +570,7 @@ func execCmd(cmd *cobra.Command, args []string) {
 func exitEmp3r0r(_ *console.Console) {
 	logging.Warningf("Exiting emp3r0r... Goodbye!")
 	if common.RuntimeConfig.PreflightEnabled {
-		logging.Warningf("Remember to remove the conditional C2 preflight URL from your server or agents will make too much noise: %s",
+		logging.Warningf("Conditional C2 preflight URL is still configured; remove it from the server: %s",
 			common.RuntimeConfig.PreflightURL)
 	}
 	// live.Exit runs the registered tmux-cleanup shutdown hook, so no separate

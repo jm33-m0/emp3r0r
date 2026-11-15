@@ -110,7 +110,7 @@ type IPWithMask struct {
 	Mask net.IPMask
 }
 
-// IPa works like `ip addr`, you get a list of IP strings
+// IPa returns the host's IP strings, like `ip addr`.
 func IPa() (ips []string) {
 	netips := IPaddr()
 	if netips == nil {

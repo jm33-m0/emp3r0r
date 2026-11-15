@@ -22,7 +22,7 @@ func gen_c_cmd() *cobra.Command {
 		Use:     "generate_c",
 		GroupID: "agent",
 		Short:   "Generate the native C agent",
-		Example: "generate_c --type glibc --arch amd64 --cc your.domain.com",
+		Example: "generate_c --type glibc --arch amd64 --cc c2.example.com",
 		Long: `Generate the native C agent.
 
 The default http_poll transport dials the plain HTTP listener on --cc-http-port

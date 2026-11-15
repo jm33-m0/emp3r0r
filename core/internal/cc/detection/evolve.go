@@ -935,9 +935,7 @@ func (e *evolver) directionHint() string {
 	return fmt.Sprintf("The last two cycles both used mechanism %q. Do not spend another cycle on the same mechanism unless you are changing a different component of it; test a different mechanism or record the concrete constraint that rules the alternatives out.", last.Mechanism)
 }
 
-// dossier is the compact state carried into a fresh agent session. It replaces
-// the old behaviour of restarting from the baseline with no memory of earlier
-// decisions, which made every resume rediscover the same telemetry.
+// dossier is the compact state carried into a fresh agent session.
 func (e *evolver) dossier() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "- cycles used: %d of %d\n", e.iter, e.cfg.Iterations)

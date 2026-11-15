@@ -184,15 +184,15 @@ type AgentModuleConfig struct {
 
 // ModuleConfig stores the complete module config data
 type ModuleConfig struct {
-	Name         string            `cbor:"1,keyasint"`  // Display as this name
-	Build        string            `cbor:"2,keyasint"`  // Command to run on C2, you can use it to build module
-	Author       string            `cbor:"3,keyasint"`  // by whom
-	Date         string            `cbor:"4,keyasint"`  // when did you write it
-	Comment      string            `cbor:"5,keyasint"`  // describe your module in one line
-	IsLocal      bool              `cbor:"6,keyasint"`  // If true, this module is a C2 plugin and doesn't run on agent, use `Build` to specify the command to run
-	Platform     string            `cbor:"7,keyasint"`  // targeting which OS? Linux/Windows/Generic
-	Path         string            `cbor:"8,keyasint"`  // Path to the module directory
-	Options      ModOptions        `cbor:"10,keyasint"` // module options (console flags)
+	Name         string            `cbor:"1,keyasint"`  // Display name
+	Build        string            `cbor:"2,keyasint"`  // C2 build command
+	Author       string            `cbor:"3,keyasint"`  // Author
+	Date         string            `cbor:"4,keyasint"`  // Module date
+	Comment      string            `cbor:"5,keyasint"`  // One-line description
+	IsLocal      bool              `cbor:"6,keyasint"`  // C2-only module; Build names its command
+	Platform     string            `cbor:"7,keyasint"`  // Target OS: linux, windows, or generic
+	Path         string            `cbor:"8,keyasint"`  // Module directory
+	Options      ModOptions        `cbor:"10,keyasint"` // Console flags
 	AgentConfig  AgentModuleConfig `cbor:"11,keyasint"` // Configuration for agent side
 	Invocation   InvocationSpec    `cbor:"12,keyasint"` // how to turn options into argv/BOF/DLL arguments
 	Dependencies []string          `cbor:"13,keyasint"` // module names that must be loaded before this one (e.g. "coffloader")
