@@ -133,8 +133,11 @@ read-only, so the model can trace linked code without being able to edit it.
 
 If a cycle regresses, `RevertToPayload` replays the inverse of every recorded
 edit made after the chosen payload and restores the module and producer source.
-The cycle budget and the active shellcode are shown in the prompt and in every
-`DetectionCycle` result; `--iterations` is capped at 50 and `--turns` at 240.
+`DetectionCycle` records a mechanism label with each cycle; the resume dossier
+carries the recent mechanism, tested note, and edit reasons so a fresh agent
+session does not lose the direction it already tried. The cycle budget and the
+active shellcode are shown in the prompt and in every `DetectionCycle` result;
+`--iterations` is capped at 50 and `--turns` at 240.
 
 ### Reference cache
 
@@ -157,9 +160,9 @@ The console exposes the same command as `detect_loop knowledge-sync`.
 
 `--inject` and `--process` are overrides. When they are omitted, the module's
 own default controls the load path, so the model can change that default in
-source and have the next cycle use it. `--iterations` and `--turns` are not
-capped by the loop; the values you pass are the values it uses, and the cycle
-budget is shown in the prompt and in every `DetectionCycle` result.
+source and have the next cycle use it. `--iterations` and `--turns` are capped at
+50 and 240; values above the cap are rejected, and the cycle budget is shown in
+the prompt and in every `DetectionCycle` result.
 
 The worker writes one log file under `<workspace>/detection/` and opens a
 separate tmux window tailing it; `emp3r0r.log` is untouched. It does not need

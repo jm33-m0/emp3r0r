@@ -46,7 +46,8 @@ usage: build.sh --shellcode <agent.bin> [options]
 options:
   --shellcode <path>   Donut sRDI shellcode .bin to embed (required)
   --output <path>      output file (default: <shellcode dir>/<name>_svc.exe
-                       for service, <name>.exe for exe, <name>.dll for dll)
+                       for service, <name>_loader.exe for exe,
+                       <name>_loader.dll for dll)
   --format <service|exe|dll>
                        host container to build (default: service)
                          service = resident Windows service (injects once,
@@ -296,8 +297,8 @@ if [[ -z "$OUTPUT" ]]; then
   esac
   case "$FORMAT" in
   service) OUTPUT="$(dirname "$SHELLCODE_ABS")/${base}_svc.exe" ;;
-  exe) OUTPUT="$(dirname "$SHELLCODE_ABS")/${base}.exe" ;;
-  dll) OUTPUT="$(dirname "$SHELLCODE_ABS")/${base}.dll" ;;
+  exe) OUTPUT="$(dirname "$SHELLCODE_ABS")/${base}_loader.exe" ;;
+  dll) OUTPUT="$(dirname "$SHELLCODE_ABS")/${base}_loader.dll" ;;
   esac
 fi
 OUTPUT_ABS="$(abspath "$OUTPUT")"

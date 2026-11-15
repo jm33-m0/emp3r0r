@@ -45,8 +45,17 @@ func TestHasActionableFindingsIgnoresUnmatchedMediums(t *testing.T) {
 	if !hasActionableFindings(matched) {
 		t.Fatal("medium finding with a source location is actionable")
 	}
-	if !hasActionableFindings([]Finding{{Stage: StageTelemetry, Severity: "high"}}) {
-		t.Fatal("high finding is always actionable")
+	if hasActionableFindings([]Finding{{Stage: StageTelemetry, Severity: "high"}}) {
+		t.Fatal("high finding without a source location must be a residual")
+	}
+	if !hasActionableFindings([]Finding{{
+		Stage: StageTelemetry, Severity: "high",
+		Sources: []SourceLocation{{File: "loader.c", Line: 10}},
+	}}) {
+		t.Fatal("high finding with a source location is actionable")
+	}
+	if !hasActionableFindings([]Finding{{Rule: "defender/verdict", Severity: "high"}}) {
+		t.Fatal("a real Defender verdict is actionable without a source location")
 	}
 }
 
@@ -584,5 +593,50 @@ func TestRestoreSourceFileRollsBackEdit(t *testing.T) {
 	}
 	if string(data) != string(original) {
 		t.Fatalf("rollback left %q", data)
+	}
+}
+
+func TestDossierCarriesMechanismAndEditReasons(t *testing.T) {
+	dir := t.TempDir()
+	roots, err := newSourceRoots("loader_windows", sourceRoot{Name: "loader_windows", Dir: dir, Writable: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := &evolver{
+		cfg:       EvolveConfig{LoopID: "loop-test", Iterations: 12, ModuleDir: dir},
+		roots:     roots,
+		shellcode: "agent.exe.bin",
+		cycles: []Cycle{{
+			LoopID: "loop-test", Iteration: 1, Score: 40, Level: "Medium", Findings: 5,
+			Summary: `{"mechanism":"self-load","note":"load the blob in-process",` +
+				`"edits":[{"module":"loader_windows","file":"loader.c","reason":"replace remote injection with self-load"}]}`,
+		}},
+	}
+	dossier := e.dossier()
+	for _, want := range []string{"mechanism=self-load", "tested: load the blob in-process", "replace remote injection with self-load"} {
+		if !strings.Contains(dossier, want) {
+			t.Fatalf("dossier missing %q:\n%s", want, dossier)
+		}
+	}
+}
+
+func TestSummarizeCycleRecordsMechanism(t *testing.T) {
+	summary := summarizeCycle("loop-test", 2, Run{ID: "run-2"}, Feedback{}, "", "switch paths", "module-stomp", "agent.bin")
+	if summary.Mechanism != "module-stomp" || summary.Note != "switch paths" {
+		t.Fatalf("mechanism or note lost: %+v", summary)
+	}
+}
+
+func TestDirectionHintCallsOutRepeatedMechanism(t *testing.T) {
+	e := &evolver{cycles: []Cycle{
+		{Summary: `{"mechanism":"self-load"}`},
+		{Summary: `{"mechanism":"self-load"}`},
+	}}
+	if hint := e.directionHint(); !strings.Contains(hint, `"self-load"`) {
+		t.Fatalf("repeated mechanism not reported: %q", hint)
+	}
+	e.cycles[1].Summary = `{"mechanism":"module-stomp"}`
+	if hint := e.directionHint(); hint != "" {
+		t.Fatalf("different mechanisms should not produce a hint: %q", hint)
 	}
 }
