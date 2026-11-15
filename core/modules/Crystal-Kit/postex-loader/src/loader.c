@@ -11,6 +11,8 @@ DECLSPEC_IMPORT LPVOID WINAPI KERNEL32$VirtualAlloc(LPVOID, SIZE_T, DWORD,
 DECLSPEC_IMPORT BOOL WINAPI KERNEL32$VirtualProtect(LPVOID, SIZE_T, DWORD,
                                                     PDWORD);
 DECLSPEC_IMPORT BOOL WINAPI KERNEL32$VirtualFree(LPVOID, SIZE_T, DWORD);
+DECLSPEC_IMPORT HMODULE WINAPI KERNEL32$GetModuleHandleA(LPCSTR);
+DECLSPEC_IMPORT FARPROC WINAPI KERNEL32$GetProcAddress(HMODULE, LPCSTR);
 
 char _PICO_[0] __attribute__((section("pico")));
 char _MASK_[0] __attribute__((section("mask")));
@@ -125,6 +127,125 @@ BOOL fix_section_permissions(DLLDATA *dll, char *src, char *dst,
   return TRUE;
 }
 
+/* in_image checks that a pointer derived from the mapped DLL lies within the
+ * image. TLS directory fields are absolute addresses and can be corrupt. */
+static BOOL in_image(char *base, DWORD size, const void *ptr, SIZE_T len) {
+  uintptr_t start = (uintptr_t)base;
+  uintptr_t p = (uintptr_t)ptr;
+
+  if (p < start) {
+    return FALSE;
+  }
+  return (p - start) <= size && len <= size - (p - start);
+}
+
+/* run_tls_callbacks performs the part of the Windows loader that libtcg's
+ * LoadDLL does not implement. A Go c-shared DLL uses TLS for its runtime
+ * (the image carries a TLS directory with callbacks), so mapping it without
+ * an index and without calling those callbacks leaves the Go runtime without
+ * its TLS block and the packed agent dies before main. */
+static BOOL run_tls_callbacks(IMPORTFUNCS *funcs, DLLDATA *dll, char *dll_dst,
+                              DWORD dll_size) {
+  IMAGE_DATA_DIRECTORY *dir;
+  IMAGE_TLS_DIRECTORY *tls;
+  DWORD index;
+  char *block;
+  SIZE_T raw_size;
+  SIZE_T total;
+  PIMAGE_TLS_CALLBACK *callback;
+  DWORD i;
+  typedef DWORD(WINAPI * TLS_ALLOC_FN)(VOID);
+  typedef BOOL(WINAPI * TLS_SET_VALUE_FN)(DWORD, LPVOID);
+  TLS_ALLOC_FN tls_alloc;
+  TLS_SET_VALUE_FN tls_set_value;
+  HMODULE kernel32;
+
+  if (funcs == NULL || dll == NULL || dll->OptionalHeader == NULL) {
+    return FALSE;
+  }
+
+  dir = &dll->OptionalHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_TLS];
+  if (dir->VirtualAddress == 0) {
+    return TRUE;
+  }
+  if (dir->VirtualAddress > dll_size ||
+      dir->Size < sizeof(IMAGE_TLS_DIRECTORY) ||
+      dir->Size > dll_size - dir->VirtualAddress) {
+    return FALSE;
+  }
+
+  tls = (IMAGE_TLS_DIRECTORY *)(dll_dst + dir->VirtualAddress);
+  if (!in_image(dll_dst, dll_size, tls, sizeof(*tls))) {
+    return FALSE;
+  }
+  if (tls->AddressOfIndex != 0 &&
+      !in_image(dll_dst, dll_size, (void *)tls->AddressOfIndex,
+                sizeof(DWORD))) {
+    return FALSE;
+  }
+
+  kernel32 = KERNEL32$GetModuleHandleA("kernel32.dll");
+  if (kernel32 == NULL) {
+    return FALSE;
+  }
+  tls_alloc =
+      (TLS_ALLOC_FN)(void *)KERNEL32$GetProcAddress(kernel32, "TlsAlloc");
+  tls_set_value = (TLS_SET_VALUE_FN)(void *)KERNEL32$GetProcAddress(
+      kernel32, "TlsSetValue");
+  if (tls_alloc == NULL || tls_set_value == NULL) {
+    return FALSE;
+  }
+
+  index = tls_alloc();
+  if (index == TLS_OUT_OF_INDEXES) {
+    return FALSE;
+  }
+  if (tls->AddressOfIndex != 0) {
+    *(DWORD *)tls->AddressOfIndex = index;
+  }
+
+  raw_size = (SIZE_T)(tls->EndAddressOfRawData - tls->StartAddressOfRawData);
+  if (tls->EndAddressOfRawData < tls->StartAddressOfRawData ||
+      (raw_size != 0 &&
+       !in_image(dll_dst, dll_size, (void *)tls->StartAddressOfRawData,
+                 raw_size))) {
+    return FALSE;
+  }
+  total = raw_size + tls->SizeOfZeroFill;
+  if (total < raw_size || total > (256u << 20)) {
+    return FALSE;
+  }
+  block = KERNEL32$VirtualAlloc(NULL, total ? total : 1,
+                                MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+  if (block == NULL) {
+    return FALSE;
+  }
+  for (SIZE_T n = 0; n < raw_size; n++) {
+    block[n] = ((char *)tls->StartAddressOfRawData)[n];
+  }
+  if (!tls_set_value(index, block)) {
+    KERNEL32$VirtualFree(block, 0, MEM_RELEASE);
+    return FALSE;
+  }
+
+  if (tls->AddressOfCallBacks == 0) {
+    return TRUE;
+  }
+  callback = (PIMAGE_TLS_CALLBACK *)tls->AddressOfCallBacks;
+  if (!in_image(dll_dst, dll_size, callback, sizeof(*callback))) {
+    return FALSE;
+  }
+  for (i = 0; i < 64 && *callback != NULL; i++) {
+    if (!in_image(dll_dst, dll_size, callback, sizeof(*callback)) ||
+        !in_image(dll_dst, dll_size, (void *)*callback, 1)) {
+      return FALSE;
+    }
+    (*callback)((PVOID)dll_dst, DLL_PROCESS_ATTACH, NULL);
+    callback++;
+  }
+  return TRUE;
+}
+
 void go(void *loader_arguments) {
   IMPORTFUNCS funcs;
   char *pico_src;
@@ -145,9 +266,16 @@ void go(void *loader_arguments) {
   int pico_data_size;
   int pico_code_size;
 
-  /* populate funcs */
-  funcs.LoadLibraryA = LoadLibraryA;
-  funcs.GetProcAddress = GetProcAddress;
+  /* Resolve the PICO import helpers directly. LoadLibraryA is attached to the
+   * spoofing hook in loader.spec; PicoLoad runs before setup_hooks and must not
+   * call that hook while it is resolving the inner PICO. */
+  {
+    HMODULE kernel32 = KERNEL32$GetModuleHandleA("kernel32.dll");
+    funcs.LoadLibraryA =
+        (__typeof__(funcs.LoadLibraryA))KERNEL32$GetProcAddress(kernel32,
+                                                                "LoadLibraryA");
+    funcs.GetProcAddress = KERNEL32$GetProcAddress;
+  }
 
   pico_src = GETRESOURCE(_PICO_);
   if (pico_src == NULL) {
@@ -250,6 +378,9 @@ void go(void *loader_arguments) {
 
   ProcessImports(&funcs, &dll_data, dll_dst);
   if (!fix_section_permissions(&dll_data, dll_src, dll_dst, &memory.Dll)) {
+    goto fail;
+  }
+  if (!run_tls_callbacks(&funcs, &dll_data, dll_dst, dll_size)) {
     goto fail;
   }
 

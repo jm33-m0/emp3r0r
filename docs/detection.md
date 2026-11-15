@@ -125,8 +125,7 @@ generator from `core/modules/donut/src` on every build, so loader edits take
 effect in the generated shellcode. `crystal_pack` rebuilds the runtime loader
 objects from `core/modules/Crystal-Kit/postex-loader/src` on every build, using
 `x86_64-w64-mingw32-gcc` when present and Zig's `x86_64-windows-gnu` target
-otherwise; its `loader/` tree is a separate use-case loader that
-`crystal_pack` does not link. `BuildShellcode`:
+otherwise. `BuildShellcode`:
 
 - validates options against the module's `config.json` (unknown, internal, and
   out-of-choice values are rejected);

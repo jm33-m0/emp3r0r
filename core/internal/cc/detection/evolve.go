@@ -400,8 +400,7 @@ cycle; the cycle summary records its path. BuildShellcode validates options,
 forces the output under the detection store, and refuses files outside the
 operator payload directory. crystal_pack's runtime loader is
 postex-loader/src; build.sh rebuilds those objects from the edited source
-before linking the PICO, so loader edits take effect. The loader/ tree is a
-separate use-case loader that crystal_pack does not link. donut rebuilds its
+before linking the PICO, so loader edits take effect. donut rebuilds its
 stubs and generator from src/ on every build.
 
 GenerateAgent rebuilds the Go agent, not just the wrapper. agent_type may be
