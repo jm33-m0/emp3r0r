@@ -177,6 +177,9 @@ job ownership, and operator locks.`,
 	detectLoopWorkerCmd.Flags().StringSlice("stages", []string{"static", "dynamic"}, "Stages")
 	detectLoopWorkerCmd.Flags().String("process", "", "Sacrificial process override")
 	detectLoopWorkerCmd.Flags().String("format", "exe", "Loader host format")
+	detectLoopWorkerCmd.Flags().String("agent-type", "windows_executable", "Agent payload type for GenerateAgent")
+	detectLoopWorkerCmd.Flags().String("arch", "amd64", "Agent architecture")
+	detectLoopWorkerCmd.Flags().String("agent-cc", "", "C2 address override for GenerateAgent")
 	detectLoopWorkerCmd.Flags().String("inject", "", "Injection method override; empty uses the module default")
 	detectLoopWorkerCmd.Flags().String("smw", "on", "SilentMoonwalk")
 	detectLoopWorkerCmd.Flags().StringSlice("producer", nil, "Shellcode producer module as name=path")
@@ -604,6 +607,9 @@ func runDetectLoopWorkerCmd(cmd *cobra.Command, _ []string) {
 	stages, _ := cmd.Flags().GetStringSlice("stages")
 	process, _ := cmd.Flags().GetString("process")
 	format, _ := cmd.Flags().GetString("format")
+	agentType, _ := cmd.Flags().GetString("agent-type")
+	arch, _ := cmd.Flags().GetString("arch")
+	agentCC, _ := cmd.Flags().GetString("agent-cc")
 	inject, _ := cmd.Flags().GetString("inject")
 	smw, _ := cmd.Flags().GetString("smw")
 	producerFlags, _ := cmd.Flags().GetStringSlice("producer")
@@ -637,6 +643,7 @@ func runDetectLoopWorkerCmd(cmd *cobra.Command, _ []string) {
 		Shellcode: shellcode, SandboxURL: sandbox,
 		StoreRoot: filepath.Join(live.EmpWorkSpace, "detection"),
 		Process:   process, Format: format, Inject: inject, SMW: smw,
+		AgentType: agentType, AgentArch: arch, AgentCC: agentCC,
 		ProducerDirs: producers, ReadRoots: readRoots, KnowledgePath: knowledge,
 		Stages: stages, Iterations: iterations, Turns: turns,
 	})

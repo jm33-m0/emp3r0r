@@ -15,7 +15,6 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
 	"github.com/jm33-m0/emp3r0r/core/lib/crypto"
-	"github.com/jm33-m0/emp3r0r/core/lib/donut"
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 )
 
@@ -217,8 +216,10 @@ type GenerateAgentWorkflowResult struct {
 	ShellcodeErr  error
 }
 
-// GenerateAgentWorkflow extracts the core agent generation business logic (configuration, UUID signing, binary patching, and shellcode conversion)
-func GenerateAgentWorkflow(opts AgentConfig, payloadType, archChoice string, signAgentFn func(uuid string) (string, error)) (*GenerateAgentWorkflowResult, error) {
+// GenerateAgentArtifact builds the agent PE/DLL/SO and stops there. Shellcode
+// conversion belongs to the donut and malasada producer modules so callers can
+// choose the wrapper explicitly.
+func GenerateAgentArtifact(opts AgentConfig, payloadType, archChoice string, signAgentFn func(uuid string) (string, error)) (*BuildAgentResult, error) {
 	if !IsArchValid(payloadType, archChoice) {
 		return nil, fmt.Errorf("invalid arch choice '%s' for payload type '%s'", archChoice, payloadType)
 	}
@@ -262,22 +263,24 @@ func GenerateAgentWorkflow(opts AgentConfig, payloadType, archChoice string, sig
 	if err != nil {
 		return nil, fmt.Errorf("build agent: %w", err)
 	}
+	return result, nil
+}
+
+// GenerateAgentWorkflow builds an agent and wraps Linux SO payloads with
+// malasada. Windows callers use GenerateAgentArtifact and choose the donut or
+// crystal_pack producer module explicitly.
+func GenerateAgentWorkflow(opts AgentConfig, payloadType, archChoice string, signAgentFn func(uuid string) (string, error)) (*GenerateAgentWorkflowResult, error) {
+	result, err := GenerateAgentArtifact(opts, payloadType, archChoice, signAgentFn)
+	if err != nil {
+		return nil, err
+	}
 
 	workflowResult := &GenerateAgentWorkflowResult{
 		BuildResult: result,
 	}
 
-	// 4. Generate shellcode for Windows
-	if payloadType == PayloadTypeWindowsExecutable || payloadType == PayloadTypeWindowsDLL {
-		err = donut.DonoutPE2Shellcode(result.OutputFile, archChoice, "main")
-		if err != nil {
-			workflowResult.ShellcodeErr = fmt.Errorf("donut failed: %w", err)
-		} else {
-			workflowResult.ShellcodeFile = result.OutputFile + ".bin"
-		}
-	}
-
-	// 5. Generate shellcode for Linux SO
+	// 4. Generate shellcode for Linux SO. Windows callers choose the
+	// donut/crystal_pack producer module explicitly.
 	if payloadType == PayloadTypeLinuxSO {
 		err = tools.MalasadaConvert2Shellcode(result.OutputFile, "main", true)
 		if err != nil {

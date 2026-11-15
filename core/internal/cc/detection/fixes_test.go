@@ -312,7 +312,7 @@ func TestBuildShellcodeRunsProducerAndSwapsShellcode(t *testing.T) {
 					return "", fmt.Errorf("unexpected module %q", module)
 				}
 				out := flags["output"]
-				body := "SHELL:" + flags["input"]
+				body := "SHELL:" + flags["input"] + strings.Repeat("X", 40000)
 				if err := os.WriteFile(out, []byte(body), 0o600); err != nil {
 					return "", err
 				}
@@ -664,5 +664,86 @@ func TestRenderLoopSummaryIsCompact(t *testing.T) {
 	}
 	if len(out) > 2500 {
 		t.Fatalf("executive summary is not compact: %d bytes", len(out))
+	}
+}
+
+func TestGenerateAgentBuildsArtifactWithoutShellcode(t *testing.T) {
+	dir := t.TempDir()
+	shellcode := filepath.Join(dir, "agent.exe.bin")
+	if err := os.WriteFile(shellcode, []byte(strings.Repeat("S", 40000)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	artifact := filepath.Join(dir, "agent.dll")
+	e := &evolver{
+		shellcode: shellcode,
+		cfg: EvolveConfig{
+			LoopID: "loop-test", Module: "loader_windows", ModuleDir: dir,
+			Shellcode: shellcode, StoreRoot: t.TempDir(),
+			BuildAgent: func(opts AgentBuildOptions) (*AgentBuildResult, error) {
+				if opts.Type != "windows_dll" || opts.Arch != "amd64" {
+					return nil, fmt.Errorf("unexpected options: %+v", opts)
+				}
+				if err := os.WriteFile(artifact, []byte(strings.Repeat("M", 40000)), 0o600); err != nil {
+					return nil, err
+				}
+				return &AgentBuildResult{ArtifactPath: artifact, Type: opts.Type, Arch: opts.Arch}, nil
+			},
+		},
+		logf: func(logging.Class, string, ...any) {},
+	}
+	e.roots = e.sourceRoots()
+
+	result, err := e.generateAgentTool().Call(context.Background(),
+		json.RawMessage(`{"agent_type":"windows_dll","note":"crystal input"}`), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.IsError {
+		t.Fatalf("tool error: %+v", result)
+	}
+	if e.agentArtifact != artifact {
+		t.Fatalf("agent artifact = %q, want %q", e.agentArtifact, artifact)
+	}
+	if e.shellcode != shellcode {
+		t.Fatalf("GenerateAgent must not swap shellcode; got %q", e.shellcode)
+	}
+	if !strings.Contains(result.Flatten(), artifact) {
+		t.Fatalf("result does not expose artifact_path: %+v", result)
+	}
+}
+
+func TestEnsurePayloadPreservedRejectsDroppedPayload(t *testing.T) {
+	dir := t.TempDir()
+	shellcode := filepath.Join(dir, "agent.bin")
+	if err := os.WriteFile(shellcode, []byte(strings.Repeat("S", 40000)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := ensurePayloadPreserved(shellcode, Artifact{Size: 100}); err == nil {
+		t.Fatal("a loader far smaller than the shellcode was accepted")
+	}
+	if err := ensurePayloadPreserved(shellcode, Artifact{Size: 40000}); err != nil {
+		t.Fatalf("a loader containing the shellcode was rejected: %v", err)
+	}
+	if err := os.WriteFile(shellcode, []byte("tiny"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := ensurePayloadPreserved(shellcode, Artifact{Size: 40000}); err == nil {
+		t.Fatal("a tiny active shellcode was accepted")
+	}
+}
+
+func TestProducerArtifactAcceptsCrystalOutputLine(t *testing.T) {
+	dir := t.TempDir()
+	out := filepath.Join(dir, "payload.pico.bin")
+	if err := os.WriteFile(out, []byte(strings.Repeat("P", 9000)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	log := "[+] PICO shellcode written to " + out + "\n    size: 9000 bytes\n"
+	artifact, err := producerArtifact(log, out)
+	if err != nil {
+		t.Fatalf("Crystal output line was not accepted: %v", err)
+	}
+	if artifact.Size != 9000 {
+		t.Fatalf("artifact size = %d", artifact.Size)
 	}
 }

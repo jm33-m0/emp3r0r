@@ -168,6 +168,7 @@ echo "    Output:  $OUTPUT_ABS"
 if [ -f "$OUTPUT_ABS" ]; then
   SIZE="$(wc -c < "$OUTPUT_ABS" | tr -d '[:space:]')"
   echo "[+] PICO shellcode written to $OUTPUT_ABS"
+  echo "[+] generated payload: $OUTPUT_ABS ($SIZE bytes)"
   echo "    size: $SIZE bytes"
   if command -v sha256sum >/dev/null 2>&1; then
     echo "    sha256: $(sha256sum "$OUTPUT_ABS" | awk '{print $1}')"

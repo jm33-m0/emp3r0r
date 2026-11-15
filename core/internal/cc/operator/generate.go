@@ -3,6 +3,7 @@ package operator
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/builder"
@@ -12,6 +13,10 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/util"
 	"github.com/spf13/cobra"
 )
+
+// generationMu serializes background builds so two generators cannot mutate
+// the shared runtime config and module state concurrently.
+var generationMu sync.Mutex
 
 // CmdGenerateAgent generates agent binary (UI command layer)
 func CmdGenerateAgent(cmd *cobra.Command, args []string) {
@@ -63,48 +68,56 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 		IsStager:             isStager,
 	}
 
-	// Push operator-idle policy to the C2 server (remote or local).
-	if err := client.UpdateOperatorIdleConfig(operatorIdleTimeout); err != nil {
-		logging.Warningf("Failed to update operator idle timeout on C2: %v", err)
-	}
+	logging.Infof("Generating agent in the background; output follows")
+	go func() {
+		generationMu.Lock()
+		defer generationMu.Unlock()
 
-	// Invoke core agent generation business logic outside operator package and controller package
-	res, err := builder.GenerateAgentWorkflow(opts, payloadType, archChoice, client.SignAgent)
-	if err != nil {
-		logging.Errorf("Failed to generate agent: %v", err)
-		return
-	}
-
-	result := res.BuildResult
-	logging.Infof("Generated agent UUID: %s", util.AgentRef(result.AgentUUID))
-	logging.Debugf("Config payload: %d bytes", result.ConfigSize)
-	logging.Successf("Generated %s (%d bytes) from %s and %s",
-		result.OutputFile, util.FileSize(result.OutputFile), result.StubFile, live.EmpConfigFile)
-	logging.Infof("Agent transport: %s", builder.DescribeGoAgentTransport())
-
-	if live.RuntimeConfig.IsP2PEnabled {
-		logging.Successf("P2P Mesh Configured for Agent:")
-		logging.Infof("  P2P Transport:    %s", live.RuntimeConfig.P2PTransport)
-		if transport.TransportUsesNetworkPort(live.RuntimeConfig.P2PTransport) {
-			logging.Infof("  P2P Relay Port:   %s", live.RuntimeConfig.P2PRelayPort)
-		} else {
-			// SMB named pipes open no port: the value only salts the pipe name,
-			// which every peer derives from the shared password and its value.
-			logging.Infof("  P2P Relay ID:     %s (no network port; derives the pipe name)", live.RuntimeConfig.P2PRelayPort)
+		// Push operator-idle policy to the C2 server (remote or local).
+		if err := client.UpdateOperatorIdleConfig(operatorIdleTimeout); err != nil {
+			logging.Warningf("Failed to update operator idle timeout on C2: %v", err)
 		}
-		logging.Infof("  Mesh Gossip Port: %s", live.RuntimeConfig.MeshGossipPort)
-		logging.Infof("  Bootstrap peers:  --peers <agent_ip>:%s", live.RuntimeConfig.MeshGossipPort)
-		logging.Infof("  Routing uses each peer's advertised transport when this agent can dial it")
-	}
 
-	if res.ShellcodeErr != nil {
-		logging.Warningf("%v", res.ShellcodeErr)
-	} else if res.ShellcodeFile != "" {
-		logging.Successf("Generated shellcode: %s (%d bytes)", res.ShellcodeFile, util.FileSize(res.ShellcodeFile))
-		if payloadType == builder.PayloadTypeLinuxSO {
-			logging.Infof("Look into stager module to deliver this shellcode")
+		// Invoke core agent generation business logic outside operator package and controller package
+		res, err := builder.GenerateAgentWorkflow(opts, payloadType, archChoice, client.SignAgent)
+		if err != nil {
+			logging.Errorf("Failed to generate agent: %v", err)
+			return
 		}
-	}
+
+		result := res.BuildResult
+		logging.Infof("Generated agent UUID: %s", util.AgentRef(result.AgentUUID))
+		logging.Debugf("Config payload: %d bytes", result.ConfigSize)
+		logging.Successf("Generated %s (%d bytes) from %s and %s",
+			result.OutputFile, util.FileSize(result.OutputFile), result.StubFile, live.EmpConfigFile)
+		logging.Infof("Agent transport: %s", builder.DescribeGoAgentTransport())
+
+		if live.RuntimeConfig.IsP2PEnabled {
+			logging.Successf("P2P Mesh Configured for Agent:")
+			logging.Infof("  P2P Transport:    %s", live.RuntimeConfig.P2PTransport)
+			if transport.TransportUsesNetworkPort(live.RuntimeConfig.P2PTransport) {
+				logging.Infof("  P2P Relay Port:   %s", live.RuntimeConfig.P2PRelayPort)
+			} else {
+				// SMB named pipes open no port: the value only salts the pipe name,
+				// which every peer derives from the shared password and its value.
+				logging.Infof("  P2P Relay ID:     %s (no network port; derives the pipe name)", live.RuntimeConfig.P2PRelayPort)
+			}
+			logging.Infof("  Mesh Gossip Port: %s", live.RuntimeConfig.MeshGossipPort)
+			logging.Infof("  Bootstrap peers:  --peers <agent_ip>:%s", live.RuntimeConfig.MeshGossipPort)
+			logging.Infof("  Routing uses each peer's advertised transport when this agent can dial it")
+		}
+
+		if res.ShellcodeErr != nil {
+			logging.Warningf("%v", res.ShellcodeErr)
+		} else if res.ShellcodeFile != "" {
+			logging.Successf("Generated shellcode: %s (%d bytes)", res.ShellcodeFile, util.FileSize(res.ShellcodeFile))
+			if payloadType == builder.PayloadTypeLinuxSO {
+				logging.Infof("Look into stager module to deliver this shellcode")
+			}
+		} else if payloadType == builder.PayloadTypeWindowsExecutable || payloadType == builder.PayloadTypeWindowsDLL {
+			logging.Infof("Windows shellcode is not generated automatically; run the donut module with %s as input", result.OutputFile)
+		}
+	}()
 }
 
 // parseTransportOptions converts repeated --transport-option key=value flags

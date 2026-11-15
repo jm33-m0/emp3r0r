@@ -32,7 +32,8 @@ func (e *evolver) buildShellcodeTool() tool.CoreTool {
 		Name: "BuildShellcode",
 		Description: "Run a configured shellcode producer module (donut or crystal_pack) with validated options. " +
 			"The output is written under the detection store and becomes the shellcode every later DetectionCycle loads. " +
-			"Editing the producer module first (module=\"donut\") changes how the generator itself behaves.",
+			"Editing the producer module first (module=\"donut\") changes how the generator itself behaves. " +
+			"crystal_pack requires a DLL: call GenerateAgent with agent_type=windows_dll and pass its artifact_path as the dll option.",
 		Prompt: "Build shellcode with a producer module.",
 		Schema: map[string]any{
 			"type": "object",
@@ -88,7 +89,7 @@ func (e *evolver) buildShellcodeTool() tool.CoreTool {
 			if err != nil {
 				return tool.Errorf(fmt.Sprintf("%v", err)), nil
 			}
-			payloadDir, err := filepath.Abs(filepath.Dir(e.cfg.Shellcode))
+			payloadDir, err := filepath.Abs(e.payloadDir())
 			if err != nil {
 				return tool.Errorf(fmt.Sprintf("resolve payload directory: %v", err)), nil
 			}
@@ -125,6 +126,9 @@ func (e *evolver) buildShellcodeTool() tool.CoreTool {
 			artifact, err := producerArtifact(buildLog, output)
 			if err != nil {
 				return tool.Errorf(fmt.Sprintf("%v", err)), nil
+			}
+			if artifact.Size < minAgentShellcodeBytes {
+				return tool.Errorf(fmt.Sprintf("producer output is only %d bytes; a real agent shellcode is larger", artifact.Size)), nil
 			}
 			if err := ensureWithin(filepath.Join(e.cfg.StoreRoot, "shellcode"), artifact.Path); err != nil {
 				return tool.Errorf("producer output escapes the detection store"), nil
@@ -248,7 +252,10 @@ func validateProducerPathOption(name, value, baseDir string) error {
 func (e *evolver) producerInput(producer, inputName, value string) (string, error) {
 	input := strings.TrimSpace(value)
 	if input == "" && producer == "donut" {
-		input = strings.TrimSuffix(e.cfg.Shellcode, ".bin")
+		input = e.agentArtifact
+		if input == "" {
+			input = strings.TrimSuffix(e.activeShellcode(), ".bin")
+		}
 	}
 	if input == "" {
 		return "", fmt.Errorf("%s requires %q", producer, inputName)
@@ -266,7 +273,7 @@ func (e *evolver) producerInput(producer, inputName, value string) (string, erro
 	default:
 		return "", fmt.Errorf("input %q must be a PE or shellcode file", input)
 	}
-	base, err := filepath.Abs(filepath.Dir(e.cfg.Shellcode))
+	base, err := filepath.Abs(e.payloadDir())
 	if err != nil {
 		return "", fmt.Errorf("resolve payload directory: %w", err)
 	}
@@ -301,6 +308,12 @@ func producerArtifact(buildLog, want string) (Artifact, error) {
 			reported = true
 			break
 		}
+	}
+	if !reported {
+		// Some producers print their own output line, for example
+		// "[+] PICO shellcode written to ...", instead of the generated-payload
+		// marker. The requested path still has to appear in the build log.
+		reported = strings.Contains(buildLog, wantAbs)
 	}
 	if !reported {
 		return Artifact{}, fmt.Errorf("producer did not report %s as its generated payload", want)

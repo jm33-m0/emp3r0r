@@ -3,8 +3,11 @@ package operator
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
 )
 
 func TestReadLoopSummaryPrefersSummaryFile(t *testing.T) {
@@ -35,5 +38,30 @@ func TestReadLoopSummaryFallsBackBeforeCycleTable(t *testing.T) {
 	}
 	if strings.Contains(got, "## Cycles") || !strings.Contains(got, "## Outcome") {
 		t.Fatalf("fallback kept the cycle table or lost the outcome:\n%s", got)
+	}
+}
+
+func TestKnowledgeSyncArgsUsesResolvedCachePath(t *testing.T) {
+	oldWorkspace := live.EmpWorkSpace
+	live.EmpWorkSpace = t.TempDir()
+	t.Cleanup(func() { live.EmpWorkSpace = oldWorkspace })
+
+	cmd := KnowledgeSyncCmd()
+	if err := cmd.Flags().Set("notebook", "maldev"); err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Flags().Set("content", "true"); err != nil {
+		t.Fatal(err)
+	}
+	got := knowledgeSyncArgs(cmd)
+	want := []string{
+		"knowledge-sync",
+		"--url", "https://archeotech.r00ted.ch/mcp",
+		"--db", filepath.Join(live.EmpWorkSpace, "detection", "knowledge.db"),
+		"--notebook", "maldev",
+		"--content",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("args = %#v, want %#v", got, want)
 	}
 }

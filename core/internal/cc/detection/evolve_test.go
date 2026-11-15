@@ -29,7 +29,7 @@ func TestEvolveAgentEditsBuildsAndComparesPayloads(t *testing.T) {
 	build := func(_ string, _ map[string]string) (string, error) {
 		n := buildCount.Add(1)
 		path := filepath.Join(t.TempDir(), fmt.Sprintf("loader%d.exe", n))
-		if err := os.WriteFile(path, append([]byte("MZpayload"), byte(n)), 0o600); err != nil {
+		if err := os.WriteFile(path, append([]byte("MZ"+strings.Repeat("M", 40000)), byte(n)), 0o600); err != nil {
 			return "", err
 		}
 		return fmt.Sprintf("[+] generated payload: %s (10 bytes)\n", path), nil
@@ -47,7 +47,7 @@ func TestEvolveAgentEditsBuildsAndComparesPayloads(t *testing.T) {
 	}}
 	storeRoot := t.TempDir()
 	shellcode := filepath.Join(t.TempDir(), "agent.bin")
-	if err := os.WriteFile(shellcode, []byte("shellcode"), 0o600); err != nil {
+	if err := os.WriteFile(shellcode, []byte(strings.Repeat("S", 40000)), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
@@ -207,7 +207,7 @@ func TestLoggingProviderStreamsModelOutput(t *testing.T) {
 func TestEvolveDoesNotBuildWhenSandboxIsDown(t *testing.T) {
 	dir := t.TempDir()
 	shellcode := filepath.Join(dir, "agent.bin")
-	if err := os.WriteFile(shellcode, []byte("x"), 0o600); err != nil {
+	if err := os.WriteFile(shellcode, []byte(strings.Repeat("X", 40000)), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	builds := 0
@@ -235,12 +235,12 @@ func TestEvolveDoesNotBuildWhenSandboxIsDown(t *testing.T) {
 func TestEvolveFallsBackWhenAgentTextIsNotJSON(t *testing.T) {
 	moduleDir := t.TempDir()
 	shellcode := filepath.Join(t.TempDir(), "agent.bin")
-	if err := os.WriteFile(shellcode, []byte("x"), 0o600); err != nil {
+	if err := os.WriteFile(shellcode, []byte(strings.Repeat("X", 40000)), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	build := func(_ string, _ map[string]string) (string, error) {
 		path := filepath.Join(t.TempDir(), "loader.exe")
-		if err := os.WriteFile(path, []byte("MZpayload"), 0o600); err != nil {
+		if err := os.WriteFile(path, []byte("MZ"+strings.Repeat("M", 40000)), 0o600); err != nil {
 			return "", err
 		}
 		return fmt.Sprintf("[+] generated payload: %s (9 bytes)\n", path), nil
@@ -285,12 +285,12 @@ func (p *failOnceProvider) Complete(ctx context.Context, req llm.CompletionReque
 func TestEvolveRecoversFromAgentSessionFailure(t *testing.T) {
 	moduleDir := t.TempDir()
 	shellcode := filepath.Join(t.TempDir(), "agent.bin")
-	if err := os.WriteFile(shellcode, []byte("x"), 0o600); err != nil {
+	if err := os.WriteFile(shellcode, []byte(strings.Repeat("X", 40000)), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	build := func(_ string, _ map[string]string) (string, error) {
 		path := filepath.Join(t.TempDir(), "loader.exe")
-		if err := os.WriteFile(path, []byte("MZpayload"), 0o600); err != nil {
+		if err := os.WriteFile(path, []byte("MZ"+strings.Repeat("M", 40000)), 0o600); err != nil {
 			return "", err
 		}
 		return fmt.Sprintf("[+] generated payload: %s (9 bytes)\n", path), nil

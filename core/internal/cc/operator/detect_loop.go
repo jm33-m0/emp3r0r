@@ -1,24 +1,30 @@
 package operator
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/builder"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/detection"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/cli"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/spf13/cobra"
 )
+
+const operatorSubprocessEnv = "EMP3R0R_OPERATOR_SUBPROCESS"
 
 // detectLoopCmd starts the autonomous Norma detection loop as a detached child
 // process. The console returns immediately; the child writes one log file and a
@@ -218,23 +224,78 @@ func generateAgentShellcode(opts detectLoopOptions, logf func(string, ...any)) (
 		cc := strings.TrimSpace(opts.CC)
 		agentCfg.CCAddress = &cc
 	}
-	// Try a C2-signed agent first; the sandbox does not check in, so a local
-	// build without a signature is still a real Go agent for detection.
-	res, err := builder.GenerateAgentWorkflow(agentCfg, opts.AgentType, opts.Arch, client.SignAgent)
+	result, err := builder.GenerateAgentArtifact(agentCfg, opts.AgentType, opts.Arch, client.SignAgent)
 	if err != nil {
 		logf("signed generation failed (%v); building without a C2 signature", err)
-		res, err = builder.GenerateAgentWorkflow(agentCfg, opts.AgentType, opts.Arch, nil)
+		result, err = builder.GenerateAgentArtifact(agentCfg, opts.AgentType, opts.Arch, nil)
 	}
 	if err != nil {
 		return "", err
 	}
-	if res.ShellcodeErr != nil {
-		return "", res.ShellcodeErr
+	if result == nil || strings.TrimSpace(result.OutputFile) == "" {
+		return "", fmt.Errorf("agent build produced no artifact")
 	}
-	if strings.TrimSpace(res.ShellcodeFile) == "" {
-		return "", fmt.Errorf("agent build produced no shellcode")
+
+	producers, err := detection.ParseProducerDirs(opts.Producers)
+	if err != nil {
+		return "", err
 	}
-	return res.ShellcodeFile, nil
+	donutDir := strings.TrimSpace(producers["donut"])
+	if donutDir == "" {
+		return "", fmt.Errorf("no donut producer configured; pass --shellcode or --producer donut=/path/to/donut")
+	}
+	shellcode := result.OutputFile + ".bin"
+	flags := map[string]string{"input": result.OutputFile, "output": shellcode}
+	buildLog, err := modules.BuildLocalModuleAt(donutDir, "donut", flags)
+	if err != nil {
+		return "", fmt.Errorf("donut producer: %w\n%s", err, lastLogLines(buildLog, 20))
+	}
+	payloads := detection.ParseGeneratedPayloads(buildLog)
+	if len(payloads) == 0 {
+		return "", fmt.Errorf("donut producer did not report a generated payload")
+	}
+	return payloads[len(payloads)-1].Path, nil
+}
+
+func lastLogLines(log string, n int) string {
+	lines := strings.Split(strings.TrimSpace(log), "\n")
+	if len(lines) > n {
+		lines = lines[len(lines)-n:]
+	}
+	return strings.Join(lines, "\n")
+}
+
+// generateDetectionAgent rebuilds the Go agent for the loop's GenerateAgent
+// tool and stops before shellcode conversion. The model chooses donut,
+// crystal_pack, or another module through BuildShellcode.
+func generateDetectionAgent(opts detection.AgentBuildOptions) (*detection.AgentBuildResult, error) {
+	agentCfg := builder.AgentConfig{}
+	if strings.TrimSpace(opts.CCAddress) != "" {
+		cc := strings.TrimSpace(opts.CCAddress)
+		agentCfg.CCAddress = &cc
+	}
+	res, err := builder.GenerateAgentArtifact(agentCfg, opts.Type, opts.Arch, client.SignAgent)
+	if err != nil {
+		logging.Warningf("detect_loop: signed agent generation failed (%v); building without a C2 signature", err)
+		res, err = builder.GenerateAgentArtifact(agentCfg, opts.Type, opts.Arch, nil)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if res == nil || strings.TrimSpace(res.OutputFile) == "" {
+		return nil, fmt.Errorf("agent build produced no artifact")
+	}
+	artifact, err := detection.InspectArtifact(res.OutputFile)
+	if err != nil {
+		return nil, err
+	}
+	return &detection.AgentBuildResult{
+		ArtifactPath: res.OutputFile,
+		Type:         opts.Type,
+		Arch:         opts.Arch,
+		SHA256:       artifact.SHA256,
+		Size:         artifact.Size,
+	}, nil
 }
 
 func startDetectLoopWorker(opts detectLoopOptions, shellcode, loopID string, logFile *os.File, logf func(string, ...any)) error {
@@ -252,12 +313,17 @@ func startDetectLoopWorker(opts detectLoopOptions, shellcode, loopID string, log
 		"--stages", strings.Join(opts.Stages, ","),
 		"--format", opts.Format,
 		"--smw", opts.SMW,
+		"--agent-type", opts.AgentType,
+		"--arch", opts.Arch,
 		"--turns", strconv.Itoa(opts.Turns),
 		"--timeout", opts.Timeout.String(),
 		"--loop-id", loopID,
 	}
 	if strings.TrimSpace(opts.Process) != "" {
 		args = append(args, "--process", opts.Process)
+	}
+	if strings.TrimSpace(opts.CC) != "" {
+		args = append(args, "--agent-cc", opts.CC)
 	}
 	if strings.TrimSpace(opts.Inject) != "" {
 		args = append(args, "--inject", opts.Inject)
@@ -336,37 +402,139 @@ func KnowledgeSyncCmd() *cobra.Command {
 store's SQLite FTS cache. The loop reads this cache; it does not have network
 access. Add --content to cache full document text as well.`,
 		Args: cobra.NoArgs,
-		Run: func(cmd *cobra.Command, _ []string) {
-			urlFlag, _ := cmd.Flags().GetString("url")
-			dbPath, _ := cmd.Flags().GetString("db")
-			notebook, _ := cmd.Flags().GetString("notebook")
-			content, _ := cmd.Flags().GetBool("content")
-			if dbPath == "" {
-				dbPath = defaultKnowledgePath()
-			}
-			db, err := detection.OpenKnowledgeDB(dbPath, true)
-			if err != nil {
-				logging.Errorf("knowledge-sync: %v", err)
-				return
-			}
-			defer func() { _ = db.Close() }()
-			stats, err := detection.SyncKnowledge(context.Background(), db, detection.KnowledgeSyncOptions{
-				URL: urlFlag, Notebook: notebook, Content: content,
-				Logf: func(line string) { fmt.Println(line) },
-			})
-			if err != nil {
-				logging.Errorf("knowledge-sync: %v", err)
-				return
-			}
-			logging.Successf("Knowledge cache %s: %d summaries, %d contents from %d notebooks",
-				dbPath, stats.Summaries, stats.Contents, stats.Notebooks)
-		},
+		Run:  runKnowledgeSyncCommand,
 	}
 	cmd.Flags().String("url", "https://archeotech.r00ted.ch/mcp", "Notebook MCP endpoint")
 	cmd.Flags().String("db", "", "Cache path; defaults to <detection store>/knowledge.db")
 	cmd.Flags().String("notebook", "", "Only sync one notebook")
 	cmd.Flags().Bool("content", false, "Also cache full document content")
 	return cmd
+}
+
+// runKnowledgeSyncCommand keeps the console responsive. A direct CLI
+// invocation still runs in-process and blocks until the cache is refreshed;
+// the console re-executes the binary and streams the child's output into the
+// output pane.
+func runKnowledgeSyncCommand(cmd *cobra.Command, _ []string) {
+	if cli.OutputPane == nil {
+		runKnowledgeSync(cmd)
+		return
+	}
+	if err := startOutputPaneSubprocess("knowledge-sync", knowledgeSyncArgs(cmd)...); err != nil {
+		logging.Errorf("knowledge-sync: %v", err)
+		return
+	}
+	logging.Infof("knowledge-sync started in the background; output follows in this pane")
+}
+
+func runKnowledgeSync(cmd *cobra.Command) {
+	if os.Getenv(operatorSubprocessEnv) == "1" {
+		// The console parent captures this process's stdout and mirrors it to
+		// the output pane. Send logger messages there as well as to the file.
+		logging.AddWriter(os.Stdout)
+	}
+	urlFlag, _ := cmd.Flags().GetString("url")
+	dbPath, _ := cmd.Flags().GetString("db")
+	notebook, _ := cmd.Flags().GetString("notebook")
+	content, _ := cmd.Flags().GetBool("content")
+	if dbPath == "" {
+		dbPath = defaultKnowledgePath()
+	}
+	db, err := detection.OpenKnowledgeDB(dbPath, true)
+	if err != nil {
+		logging.Errorf("knowledge-sync: %v", err)
+		return
+	}
+	defer func() { _ = db.Close() }()
+	stats, err := detection.SyncKnowledge(context.Background(), db, detection.KnowledgeSyncOptions{
+		URL: urlFlag, Notebook: notebook, Content: content,
+		Logf: func(line string) { fmt.Println(line) },
+	})
+	if err != nil {
+		logging.Errorf("knowledge-sync: %v", err)
+		return
+	}
+	logging.Successf("Knowledge cache %s: %d summaries, %d contents from %d notebooks",
+		dbPath, stats.Summaries, stats.Contents, stats.Notebooks)
+}
+
+// knowledgeSyncArgs rebuilds the child's argv from the parsed command. The
+// database path is resolved here so the child writes the same cache.
+func knowledgeSyncArgs(cmd *cobra.Command) []string {
+	urlFlag, _ := cmd.Flags().GetString("url")
+	dbPath, _ := cmd.Flags().GetString("db")
+	notebook, _ := cmd.Flags().GetString("notebook")
+	content, _ := cmd.Flags().GetBool("content")
+	if dbPath == "" {
+		dbPath = defaultKnowledgePath()
+	}
+	args := []string{"knowledge-sync", "--url", urlFlag, "--db", dbPath}
+	if notebook != "" {
+		args = append(args, "--notebook", notebook)
+	}
+	if content {
+		args = append(args, "--content")
+	}
+	return args
+}
+
+// startOutputPaneSubprocess runs this executable in the background and copies
+// both of its output streams into the logging output pane. The console command
+// returns as soon as the child starts.
+func startOutputPaneSubprocess(label string, args ...string) error {
+	exe, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("resolve executable: %w", err)
+	}
+	child := exec.Command(exe, args...)
+	child.Env = append(os.Environ(), operatorSubprocessEnv+"=1")
+	stdout, err := child.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("open %s stdout: %w", label, err)
+	}
+	stderr, err := child.StderrPipe()
+	if err != nil {
+		return fmt.Errorf("open %s stderr: %w", label, err)
+	}
+	if err := child.Start(); err != nil {
+		return fmt.Errorf("start %s: %w", label, err)
+	}
+
+	stream := func(r io.Reader) {
+		reader := bufio.NewReader(r)
+		for {
+			line, readErr := reader.ReadString('\n')
+			if line = strings.TrimRight(line, "\r\n"); line != "" {
+				logging.Infof("%s", line)
+			}
+			if readErr != nil {
+				if readErr != io.EOF {
+					logging.Errorf("%s: read output: %v", label, readErr)
+				}
+				return
+			}
+		}
+	}
+
+	var readers sync.WaitGroup
+	readers.Add(2)
+	go func() {
+		defer readers.Done()
+		stream(stdout)
+	}()
+	go func() {
+		defer readers.Done()
+		stream(stderr)
+	}()
+	go func() {
+		readers.Wait()
+		if waitErr := child.Wait(); waitErr != nil {
+			logging.Errorf("%s exited: %v", label, waitErr)
+			return
+		}
+		logging.Successf("%s finished", label)
+	}()
+	return nil
 }
 
 // defaultKnowledgePath resolves the cache location outside an initialized
@@ -385,6 +553,7 @@ func defaultKnowledgePath() string {
 // C2 client, MCP, or tmux; it only builds, detonates, and edits.
 func RunDetectLoopWorker(ctx context.Context, cfg detection.EvolveConfig) error {
 	cfg.Logf = logging.Classf
+	cfg.BuildAgent = generateDetectionAgent
 	_, err := detection.RunEvolve(ctx, cfg)
 	return err
 }

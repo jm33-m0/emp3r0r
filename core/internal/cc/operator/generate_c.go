@@ -161,21 +161,27 @@ func CmdGenerateCAgent(cmd *cobra.Command, _ []string) {
 		IsStager: builder.CAgentStagerMode(providers.Format),
 	}
 
-	res, err := builder.GenerateCAgentWorkflow(opts, providers, client.SignAgent)
-	if err != nil {
-		logging.Errorf("Failed to generate C agent: %v", err)
-		return
-	}
+	logging.Infof("Generating C agent in the background; output follows")
+	go func() {
+		generationMu.Lock()
+		defer generationMu.Unlock()
 
-	logging.Successf("Generated C agent: %s (%d bytes)", res.OutputFile, util.FileSize(res.OutputFile))
-	logging.Infof("C agent UUID: %s", util.AgentRef(res.AgentUUID))
-	logging.Infof("Config payload: %d bytes, encrypted with the C2 MagicString", res.ConfigSize)
-	endpoint := builder.CAgentEndpoint(live.RuntimeConfig.CCAddress, live.RuntimeConfig.CCHTTPPort, channelMode)
-	logging.Infof("C agent transport: channel=%s transport=%s endpoint=%s",
-		channelMode, providers.Transport, endpoint)
-	if strings.HasPrefix(endpoint, "https://") && providers.Transport == "http_raw" {
-		logging.Warningf("http_raw does not support TLS; use --transport libcurl or --transport libssl")
-	}
+		res, err := builder.GenerateCAgentWorkflow(opts, providers, client.SignAgent)
+		if err != nil {
+			logging.Errorf("Failed to generate C agent: %v", err)
+			return
+		}
+
+		logging.Successf("Generated C agent: %s (%d bytes)", res.OutputFile, util.FileSize(res.OutputFile))
+		logging.Infof("C agent UUID: %s", util.AgentRef(res.AgentUUID))
+		logging.Infof("Config payload: %d bytes, encrypted with the C2 MagicString", res.ConfigSize)
+		endpoint := builder.CAgentEndpoint(live.RuntimeConfig.CCAddress, live.RuntimeConfig.CCHTTPPort, channelMode)
+		logging.Infof("C agent transport: channel=%s transport=%s endpoint=%s",
+			channelMode, providers.Transport, endpoint)
+		if strings.HasPrefix(endpoint, "https://") && providers.Transport == "http_raw" {
+			logging.Warningf("http_raw does not support TLS; use --transport libcurl or --transport libssl")
+		}
+	}()
 }
 
 func flagString(cmd *cobra.Command, name string) string {

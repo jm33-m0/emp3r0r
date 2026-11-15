@@ -71,8 +71,9 @@ indicators. Keep the module contract described in
 
 ## Autonomous loop
 
-`detect_loop` in the console starts a detached worker. It generates a real Go
-Windows agent shellcode when `--shellcode` is omitted, then runs:
+`detect_loop` in the console starts a detached worker. It builds a real Go
+Windows agent artifact and, when `--shellcode` is omitted, wraps it through the
+`donut` producer module. It then runs:
 
 1. build `loader_windows` from `--module-dir`;
 2. detonate it in LitterBox and import every saved analyzer result: RedEdr,
@@ -127,6 +128,18 @@ effect in the generated shellcode. `BuildShellcode`:
 - rejects non-regular or oversized output and hashes the result;
 - makes the artifact the shellcode for every later cycle.
 
+`GenerateAgent` rebuilds the Go agent itself without wrapping it. It accepts
+`agent_type=windows_executable` or `windows_dll`, `arch=amd64`, and an optional
+C2 address. The result is the agent EXE/DLL as `artifact_path`. Call
+`BuildShellcode` with `producer=donut input=<artifact_path>`, or with
+`producer=crystal_pack dll=<artifact_path>` for Crystal Palace PICO shellcode;
+the producer output becomes active.
+
+For `loader_windows`, the loop rejects a cycle whose artifact is too small to
+contain the active shellcode, and rejects a dynamic cycle the sandbox never
+executed. This prevents a loader that drops the agent payload just to reduce
+detections.
+
 `--read-root dir` adds a read-only source root (repeatable). By default the
 loader's shared build inputs (`modules/common`, `c_agent/*/util`) are exposed
 read-only, so the model can trace linked code without being able to edit it.
@@ -156,7 +169,10 @@ emp3r0r knowledge-sync --content          # also cache full document text
 emp3r0r knowledge-sync --notebook maldev  # one notebook only
 ```
 
-The console exposes the same command as `detect_loop knowledge-sync`.
+The console exposes the same command as `detect_loop knowledge-sync`. In the
+console it runs as a child process and streams its output to the output pane,
+so the prompt stays responsive; the direct CLI form still waits for the refresh
+to finish.
 
 `--inject` and `--process` are overrides. When they are omitted, the module's
 own default controls the load path, so the model can change that default in
