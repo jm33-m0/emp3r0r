@@ -255,6 +255,13 @@ func TestKnowledgeSyncCachesAndSearchesOffline(t *testing.T) {
 	if stats.Summaries != 1 || stats.Skipped != 1 {
 		t.Fatalf("stats = %+v", stats)
 	}
+	// A completed sync can leave the database in WAL mode without sidecars.
+	// The loop must still open the existing cache for query-only reads.
+	for _, suffix := range []string{"-wal", "-shm"} {
+		if err := os.Remove(path + suffix); err != nil && !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+	}
 
 	readOnly, err := OpenKnowledgeDB(path, false)
 	if err != nil {

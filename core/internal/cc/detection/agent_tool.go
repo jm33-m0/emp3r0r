@@ -18,6 +18,8 @@ func (e *evolver) generateAgentTool() tool.CoreTool {
 	return tool.Build(tool.Spec{
 		Name: "GenerateAgent",
 		Description: "Build a fresh real Go agent with generator flags, without wrapping it in shellcode. " +
+			"Every dynamic cycle needs this fresh UUID: the C2 rejects a repeated UUID with a new key as a TOFU key rotation. " +
+			"The previous test agent is forgotten automatically. " +
 			"agent_type selects windows_executable or windows_dll; arch is amd64. " +
 			"The result includes artifact_path (the EXE/DLL). " +
 			"Call BuildShellcode with producer=donut input=artifact_path, " +
@@ -36,10 +38,6 @@ func (e *evolver) generateAgentTool() tool.CoreTool {
 					"enum":        []string{"amd64"},
 					"description": "Agent architecture; loader_windows is x64.",
 				},
-				"cc": map[string]any{
-					"type":        "string",
-					"description": "Optional C2 address override; empty uses the current operator config.",
-				},
 				"note": map[string]any{"type": "string", "description": "What this agent build is testing."},
 			},
 		},
@@ -50,7 +48,6 @@ func (e *evolver) generateAgentTool() tool.CoreTool {
 			var args struct {
 				AgentType string `json:"agent_type"`
 				Arch      string `json:"arch"`
-				CC        string `json:"cc"`
 				Note      string `json:"note"`
 			}
 			if err := json.Unmarshal(raw, &args); err != nil {
@@ -76,15 +73,11 @@ func (e *evolver) generateAgentTool() tool.CoreTool {
 			if arch != "amd64" {
 				return tool.Errorf("loader_windows is x64; arch must be amd64"), nil
 			}
-			cc := strings.TrimSpace(args.CC)
-			if cc == "" {
-				cc = strings.TrimSpace(e.cfg.AgentCC)
-			}
 			if e.cfg.BuildAgent == nil {
 				return tool.Errorf("agent generation is not configured for this loop"), nil
 			}
 			e.logClass(logging.ClassBuild, "GenerateAgent: %s/%s", agentType, arch)
-			result, err := e.cfg.BuildAgent(AgentBuildOptions{Type: agentType, Arch: arch, CCAddress: cc})
+			result, err := e.cfg.BuildAgent(AgentBuildOptions{Type: agentType, Arch: arch})
 			if err != nil {
 				return tool.Errorf(fmt.Sprintf("generate agent: %v", err)), nil
 			}
@@ -112,9 +105,22 @@ func (e *evolver) generateAgentTool() tool.CoreTool {
 			e.agentArtifact = artifact
 			e.cfg.AgentType = agentType
 			e.cfg.AgentArch = arch
+			// A repeated UUID with a new runtime key is rejected by TOFU. Forget
+			// the previous test agent before switching the loop to this build.
+			if old := e.expectedAgentUUID; old != "" && old != result.AgentUUID {
+				if forgetErr := e.forgetAgent(ctx, old); forgetErr != nil {
+					e.logClass(logging.ClassWarning, "forget previous agent %s: %v", old, forgetErr)
+				}
+			}
+			if result.AgentUUID != "" {
+				e.expectedAgentUUID = result.AgentUUID
+			}
+			e.audit("generate_agent", result.AgentUUID,
+				fmt.Sprintf("type=%s arch=%s artifact=%s", agentType, arch, artifact))
 			out := map[string]any{
 				"agent_type":    agentType,
 				"arch":          arch,
+				"agent_uuid":    result.AgentUUID,
 				"artifact_path": artifact,
 				"sha256":        inspect.SHA256,
 				"size":          inspect.Size,

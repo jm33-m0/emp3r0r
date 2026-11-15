@@ -7,8 +7,8 @@ import (
 	"syscall"
 )
 
-// detachWorker puts the loop worker in its own session so it survives the
-// operator console and its tmux session.
+// detachWorker puts the loop worker in its own session so it does not share a
+// controlling terminal or session signals with the operator console.
 func detachWorker(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 }

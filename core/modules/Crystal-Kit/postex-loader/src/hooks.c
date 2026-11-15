@@ -19,6 +19,9 @@ DECLSPEC_IMPORT HMODULE WINAPI KERNEL32$LoadLibraryExW(LPCWSTR, HANDLE, DWORD);
  * two wide-string helpers local so the PICO never imports MSVCRT. */
 static wchar_t *wcs_rchr(const wchar_t *s, wchar_t c) {
   const wchar_t *last = NULL;
+  if (s == NULL) {
+    return NULL;
+  }
   for (; *s; s++) {
     if (*s == c) {
       last = s;
@@ -32,6 +35,9 @@ static wchar_t wcs_lower(wchar_t c) {
 }
 
 static int wcs_icmp(const wchar_t *a, const wchar_t *b) {
+  if (a == NULL || b == NULL) {
+    return a == b ? 0 : (a == NULL ? -1 : 1);
+  }
   while (*a && *b) {
     wchar_t ca = wcs_lower(*a);
     wchar_t cb = wcs_lower(*b);
@@ -47,6 +53,10 @@ static int wcs_icmp(const wchar_t *a, const wchar_t *b) {
 HMODULE WINAPI _LoadLibraryA(LPCSTR lpLibFileName) {
   FUNCTION_CALL call = {0};
 
+  if (lpLibFileName == NULL) {
+    return NULL;
+  }
+
   call.ptr = (PVOID)(LoadLibraryA);
   call.argc = 1;
 
@@ -57,6 +67,9 @@ HMODULE WINAPI _LoadLibraryA(LPCSTR lpLibFileName) {
 
 HMODULE WINAPI _LoadLibraryExW(LPCWSTR lpLibFileName, HANDLE hFile,
                                DWORD dwFlags) {
+  if (lpLibFileName == NULL) {
+    return NULL;
+  }
   /* get the filename from path */
   LPCWSTR back = wcs_rchr(lpLibFileName, L'\\');
   LPCWSTR fwd = wcs_rchr(lpLibFileName, L'/');
@@ -170,6 +183,10 @@ HMODULE WINAPI _LoadLibraryExW(LPCWSTR lpLibFileName, HANDLE hFile,
 
 HMODULE WINAPI _LoadLibraryW(LPCWSTR lpLibFileName) {
   FUNCTION_CALL call = {0};
+
+  if (lpLibFileName == NULL) {
+    return NULL;
+  }
 
   call.ptr = (PVOID)(KERNEL32$LoadLibraryW);
   call.argc = 1;

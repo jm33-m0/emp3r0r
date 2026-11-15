@@ -16,7 +16,7 @@ var logger *Logger
 // DisplayMarkdown writes rendered Markdown to the console without adding a
 // log prefix or a timestamp, so an executive summary stays a standalone block.
 func DisplayMarkdown(text string) {
-	if strings.TrimSpace(text) == "" {
+	if logger == nil || strings.TrimSpace(text) == "" {
 		return
 	}
 	terminal := safeTerminalText(RenderMarkdown(text, 0)) + "\n"
@@ -37,7 +37,10 @@ func RawPrintf(textColor *color.Color, format string, a ...any) {
 }
 
 func Writer() io.Writer {
-	return logger.writer
+	if logger == nil {
+		return io.Discard
+	}
+	return logger.writerSnapshot()
 }
 
 func Sprintf(format string, a ...any) string {

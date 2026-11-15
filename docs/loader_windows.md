@@ -50,3 +50,14 @@ The build result is the deliverable. Do not execute it on the operator host.
 Verify by inspecting the returned path and size, and by running the artifact on
 a disposable Windows target. `--verify-ms` controls the loader's own post-
 injection check.
+
+`--inject self` selects the in-process path. The loader allocates the decrypted
+blob in its own process, calls the PICO entry, and stays resident for the life
+of the payload; it spawns no sacrificial process. If the entry returns, the
+mapping is released. This is the only in-process mode, and it is selected at
+build time.
+
+A `format=exe` build without `--inject self` uses remote injection. If the
+sacrificial process exits before the injected blob survives the post-injection
+check, the loader reports the failure and exits; it does not fall back to
+in-process execution.

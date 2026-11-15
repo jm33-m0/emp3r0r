@@ -67,12 +67,21 @@ func TestKnowledgeSyncArgsUsesResolvedCachePath(t *testing.T) {
 	}
 }
 
-func TestChooseShellcodeProducerUsesCrystalPalaceForAuto(t *testing.T) {
-	dir := crystalPackFixture(t)
+func TestChooseShellcodeProducerUsesDonutForAuto(t *testing.T) {
+	donutDir := t.TempDir()
 	producers := map[string]string{
-		"crystal_pack": dir,
-		"donut":        t.TempDir(),
+		"crystal_pack": crystalPackFixture(t),
+		"donut":        donutDir,
 	}
+	producer, gotDir, agentType := chooseShellcodeProducer(producers, "auto")
+	if producer != "donut" || gotDir != donutDir || agentType != builder.PayloadTypeWindowsExecutable {
+		t.Fatalf("auto = %q %q %q, want donut with an EXE", producer, gotDir, agentType)
+	}
+}
+
+func TestChooseShellcodeProducerUsesCrystalPalaceWhenDonutIsMissing(t *testing.T) {
+	dir := crystalPackFixture(t)
+	producers := map[string]string{"crystal_pack": dir}
 	producer, gotDir, agentType := chooseShellcodeProducer(producers, "auto")
 	if producer != "crystal_pack" || gotDir != dir || agentType != builder.PayloadTypeWindowsDLL {
 		t.Fatalf("auto = %q %q %q, want crystal_pack with a DLL", producer, gotDir, agentType)

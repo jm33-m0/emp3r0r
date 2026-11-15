@@ -5,9 +5,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "util/rc4.h"
 #include "reflect.h"
 #include "stage_abi.h"
+#include "util/rc4.h"
 
 #ifdef DEBUG
 #define BOOTSTRAP_LOG(...) fprintf(stderr, __VA_ARGS__)
@@ -15,11 +15,13 @@
 #define BOOTSTRAP_LOG(...) ((void)0)
 #endif
 
-int staged_loader_bootstrap(const unsigned char *enc_stage, size_t enc_stage_len,
-                        const unsigned char *stage_key, size_t stage_key_len,
-                        const unsigned char *enc_payload,
-                        size_t enc_payload_len, const unsigned char *key,
-                        size_t key_len, int argc, wchar_t **argv) {
+int staged_loader_bootstrap(const unsigned char *enc_stage,
+                            size_t enc_stage_len,
+                            const unsigned char *stage_key,
+                            size_t stage_key_len,
+                            const unsigned char *enc_payload,
+                            size_t enc_payload_len, const unsigned char *key,
+                            size_t key_len, int argc, wchar_t **argv) {
   unsigned char *stage = NULL;
   size_t stage_len = 0;
   void *base;

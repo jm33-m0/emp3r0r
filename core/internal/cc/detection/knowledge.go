@@ -152,20 +152,31 @@ func OpenKnowledgeDB(path string, writable bool) (*KnowledgeDB, error) {
 		}
 		return &KnowledgeDB{path: path, db: db}, nil
 	}
-	ro, err := sql.Open("sqlite", dsn+"?mode=ro")
+	// Open the existing file read/write so SQLite can create the WAL index
+	// when knowledge-sync left the database in WAL mode but removed the
+	// -wal/-shm sidecars. query_only still prevents this connection from
+	// changing the cache. mode=ro cannot create that index and fails with
+	// SQLITE_CANTOPEN (14) after a completed sync.
+	ro, err := sql.Open("sqlite", dsn+"?mode=rw")
 	if err != nil {
 		return nil, fmt.Errorf("open knowledge database: %w", err)
 	}
 	ro.SetMaxOpenConns(1)
 	ro.SetMaxIdleConns(1)
-	if _, err := ro.Exec("PRAGMA query_only=ON"); err != nil {
-		_ = ro.Close()
-		return nil, fmt.Errorf("set knowledge query connection read-only: %w", err)
+	for _, pragma := range []string{"PRAGMA busy_timeout=5000", "PRAGMA query_only=ON"} {
+		if _, err := ro.Exec(pragma); err != nil {
+			_ = ro.Close()
+			return nil, fmt.Errorf("set knowledge query connection read-only: %w", err)
+		}
 	}
 	var name string
 	if err := ro.QueryRow(`SELECT name FROM sqlite_master WHERE type='table' AND name='knowledge_fts'`).Scan(&name); err != nil {
 		_ = ro.Close()
 		return nil, fmt.Errorf("knowledge cache is empty; run detect_loop knowledge-sync")
+	}
+	if err := restrictKnowledgeFiles(path); err != nil {
+		_ = ro.Close()
+		return nil, fmt.Errorf("restrict knowledge database: %w", err)
 	}
 	return &KnowledgeDB{path: path, ro: ro}, nil
 }

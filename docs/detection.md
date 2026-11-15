@@ -31,18 +31,18 @@ unreachable, the block says `sandbox-unavailable` and carries the plan;
 
 ## MCP tools
 
-| Tool                 | Purpose                                                                                        |
-| -------------------- | ---------------------------------------------------------------------------------------------- |
-| `detection_plan`     | Show the artifact, sandbox capabilities, stages, approvals, and source files a run can map to. |
-| `detection_run`      | Upload the artifact and run selected stages: `static`, `dynamic`, `edr`. Default `static`.     |
-| `detection_feedback` | Return score, findings, source locations, pending stages, prior-run comparison, and optional analyst edits. |
-| `detection_runs`     | List recorded runs, newest first, with telemetry trace and event counts.                       |
-| `detection_telemetry_import` | Import RedEdr or DefenderObserver telemetry from a local file or the configured sandbox origin. |
-| `detection_query`    | Run one read-only SELECT over the telemetry database (500 rows maximum).                      |
-| `detection_loop`     | Run the autonomous Norma loop: build, detonate, edit source, rebuild, compare. Needs approval. |
-| `detection_payloads` | List payloads with their per-payload SQLite view, parent, score, and verdict count.           |
-| `detection_compare`  | Diff two payloads' telemetry views to show what an edit changed.                               |
-| `detection_report`   | Return the Markdown final report for one loop, including achieved objectives and edits.        |
+| Tool                         | Purpose                                                                                                     |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `detection_plan`             | Show the artifact, sandbox capabilities, stages, approvals, and source files a run can map to.              |
+| `detection_run`              | Upload the artifact and run selected stages: `static`, `dynamic`, `edr`. Default `static`.                  |
+| `detection_feedback`         | Return score, findings, source locations, pending stages, prior-run comparison, and optional analyst edits. |
+| `detection_runs`             | List recorded runs, newest first, with telemetry trace and event counts.                                    |
+| `detection_telemetry_import` | Import RedEdr or DefenderObserver telemetry from a local file or the configured sandbox origin.             |
+| `detection_query`            | Run one read-only SELECT over the telemetry database (500 rows maximum).                                    |
+| `detection_loop`             | Run the autonomous Norma loop: build, detonate, edit source, rebuild, compare. Needs approval.              |
+| `detection_payloads`         | List payloads with their per-payload SQLite view, parent, score, and verdict count.                         |
+| `detection_compare`          | Diff two payloads' telemetry views to show what an edit changed.                                            |
+| `detection_report`           | Return the Markdown final report for one loop, including achieved objectives and edits.                     |
 
 Only artifacts recorded from a build of the named module can be uploaded.
 Pass `artifact` to select an older build; omit it to use the newest.
@@ -72,13 +72,15 @@ indicators. Keep the module contract described in
 
 ## Autonomous loop
 
-`detect_loop` in the console starts a detached worker. It builds a real Go
-Windows agent artifact and, when `--shellcode` is omitted, wraps it through the
-`crystal_pack` producer module (a `windows_dll` agent packed as Crystal Palace
-PICO) when the Crystal Palace distribution, Java, and the module's build
-toolchain are installed. Otherwise it wraps a `windows_executable` agent
-through `donut`. Pass `--agent-type` to force a payload type; `auto` is the
-default. The worker then runs:
+`detect_loop` in the console starts a detached worker (`detect-loop-worker`). It
+builds a real Go Windows agent artifact and, when `--shellcode` is omitted,
+wraps it with one of the installed producer modules. `auto` builds a
+`windows_executable` agent and wraps it with `donut`; `--agent-type windows_dll`
+builds a DLL agent, wrapped with `crystal_pack` (Crystal Palace PICO) when that
+module can link on this host, otherwise with `donut`. The worker does not hold
+C2 keys or WireGuard credentials; when started from the console, it reaches
+scoped agent-generation and single-UUID verification endpoints through a private
+Unix IPC socket in the parent operator process. The loop then runs:
 
 1. build `loader_windows` from `--module-dir`;
 2. detonate it in LitterBox and import every saved analyzer result: RedEdr,
@@ -86,7 +88,22 @@ default. The worker then runs:
    HolyGrail, and every EDR profile;
 3. let a Norma agent query SQLite, edit module source, rebuild, and compare
    payloads;
-4. write the final JSON and all cycles to the loop tables.
+4. after the model loop finishes, run verification exactly once. The host
+   polls once per second for the last generated agent UUID, runs a small BOF
+   such as `whoami`, and records the output. Only a non-empty BOF result proves
+   the loader reached the agent runtime. If the payload never comes online, the
+   loop restarts with a fresh agent and shellcode, up to three attempts;
+5. for every dynamic cycle, call `GenerateAgent` and then `BuildShellcode` to
+   create a fresh agent UUID and shellcode. The C2 pins the first key for each
+   UUID (TOFU), so reusing a UUID is rejected as key rotation. `GenerateAgent`
+   forgets the previous test agent, and `BuildShellcode` removes the
+   superseded generated shellcode. `CleanupAgent` is the explicit cleanup
+   tool;
+6. scope every C2 tool to the loop's own agent. `AgentStatus` checks only the
+   expected UUID, `CleanupAgent` forgets only that UUID, and `RunModule` runs
+   only the `whoami` verification BOF with no options. Denials and dispatches
+   are written to the operator audit log;
+7. write the final JSON and all cycles to the loop tables.
 
 `--shellcode` accepts any x64 position-independent shellcode, so a Crystal
 Palace/Crystal-Kit PICO from `crystal_pack` can replace the generated Donut
@@ -137,8 +154,9 @@ otherwise. `BuildShellcode`:
 - makes the artifact the shellcode for every later cycle.
 
 `GenerateAgent` rebuilds the Go agent itself without wrapping it. It accepts
-`agent_type=windows_executable` or `windows_dll`, `arch=amd64`, and an optional
-C2 address. The result is the agent EXE/DLL as `artifact_path`. Call
+`agent_type=windows_executable` or `windows_dll` and `arch=amd64`; the C2
+address always comes from the operator configuration. The result is the agent
+EXE/DLL as `artifact_path`. Call
 `BuildShellcode` with `producer=donut input=<artifact_path>`, or with
 `producer=crystal_pack dll=<artifact_path>` for Crystal Palace PICO shellcode;
 the producer output becomes active.
@@ -191,10 +209,14 @@ source and have the next cycle use it. `--iterations` and `--turns` are capped a
 the prompt and in every `DetectionCycle` result.
 
 The worker writes one log file under `<workspace>/detection/` and opens a
-separate tmux window tailing it; `emp3r0r.log` is untouched. It does not need
-MCP or a C2 connection. Transient sandbox, build, detection, and agent-session
-failures are retried with exponential backoff; the worker does not exit on
-them. `--timeout 0` (the default) means no deadline. A final answer that is not
+separate tmux window tailing it; `emp3r0r.log` is untouched. When verification
+is enabled, agent checks and rebuilds go through the parent operator's scoped
+IPC bridge (`detect_loop` must therefore run from a connected operator console
+for live verification). `AgentStatus`, `RunModule`, and `CleanupAgent` are only
+registered when verification is configured (MCP `detection_loop` omits them).
+Transient sandbox, build, detection, and
+agent-session failures are retried with exponential backoff; the worker does not
+exit on them. `--timeout 0` (the default) means no deadline. A final answer that is not
 the requested JSON object is stored as the summary with `parse_error` instead
 of ending the run. The worker writes the full Markdown report to
 `<workspace>/detection/reports/<loop>.md` and a compact executive summary to
@@ -297,17 +319,17 @@ cycle budget is exhausted, with inherent items recorded as residuals.
 
 Schema:
 
-| Table | Columns |
-| --- | --- |
-| `payloads` | one row per artifact: `payload_key`, `sha256`, `module`, `label`, `table_name`, `parent_id` |
-| `traces` | `id`, `payload_id`, `run_id`, `external_id`, `module`, `artifact_sha256`, `source`, `captured_at`, `path`, `meta`, `payload_pid`, `payload_image`, `attribution`, `coverage`, `event_count`, `findings_count` |
-| `events` | `id`, `payload_id`, `trace_pk`, `event_key`, `ts_ns`, `type`, `source`, `event`, `provider`, `event_id`, `pid`, `tid`, `actor_pid`, `target_pid`, `target_tid`, `parent_pid`, `operation`, `process`, `target_image`, `path`, `image`, `address`, `size`, `protection`, `access`, `status`, `command`, `proto`, `src_addr`, `src_port`, `dst_addr`, `dst_port`, `bytes`, `stack`, `category`, `severity`, `signal`, `payload_role`, `attrs` |
-| `findings` | `trace_pk`, `payload_id`, `stage`, `tool`, `severity`, `rule`, `indicator`, `detail`, `signal` |
-| `loop_cycles` | `loop_id`, `iteration`, `payload_id`, `run_id`, `score`, `level`, `findings`, `verdicts`, `trace_id`, `summary` |
-| `loop_feedback` | full feedback JSON per cycle |
-| `loop_builds` | full build log per cycle |
-| `loop_edits` | `payload_id` before the edit, `next_payload_id` it produced, `module`, `file`, `old`, `new`, `reason` |
-| `loop_shellcodes` | producer, path, SHA-256, size, options, and iteration for every generated shellcode |
+| Table             | Columns                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `payloads`        | one row per artifact: `payload_key`, `sha256`, `module`, `label`, `table_name`, `parent_id`                                                                                                                                                                                                                                                                                                                                                 |
+| `traces`          | `id`, `payload_id`, `run_id`, `external_id`, `module`, `artifact_sha256`, `source`, `captured_at`, `path`, `meta`, `payload_pid`, `payload_image`, `attribution`, `coverage`, `event_count`, `findings_count`                                                                                                                                                                                                                               |
+| `events`          | `id`, `payload_id`, `trace_pk`, `event_key`, `ts_ns`, `type`, `source`, `event`, `provider`, `event_id`, `pid`, `tid`, `actor_pid`, `target_pid`, `target_tid`, `parent_pid`, `operation`, `process`, `target_image`, `path`, `image`, `address`, `size`, `protection`, `access`, `status`, `command`, `proto`, `src_addr`, `src_port`, `dst_addr`, `dst_port`, `bytes`, `stack`, `category`, `severity`, `signal`, `payload_role`, `attrs` |
+| `findings`        | `trace_pk`, `payload_id`, `stage`, `tool`, `severity`, `rule`, `indicator`, `detail`, `signal`                                                                                                                                                                                                                                                                                                                                              |
+| `loop_cycles`     | `loop_id`, `iteration`, `payload_id`, `run_id`, `score`, `level`, `findings`, `verdicts`, `trace_id`, `summary`                                                                                                                                                                                                                                                                                                                             |
+| `loop_feedback`   | full feedback JSON per cycle                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `loop_builds`     | full build log per cycle                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `loop_edits`      | `payload_id` before the edit, `next_payload_id` it produced, `module`, `file`, `old`, `new`, `reason`                                                                                                                                                                                                                                                                                                                                       |
+| `loop_shellcodes` | producer, path, SHA-256, size, options, and iteration for every generated shellcode                                                                                                                                                                                                                                                                                                                                                         |
 
 Every payload gets its own SQLite view named `payload_<hash>`; the name is in
 `payloads.table_name`. This is the one-payload-per-table query surface: query

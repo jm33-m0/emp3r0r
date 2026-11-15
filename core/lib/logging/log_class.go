@@ -4,6 +4,7 @@ package logging
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"sync"
@@ -122,6 +123,27 @@ func classPrefix(class Class) string {
 		return prefix + " " + c.Sprint("["+tag+"]")
 	}
 	return prefix + " [" + tag + "]"
+}
+
+// ClassfTo writes one class-rendered line group to w. It is the writer-scoped
+// form of Classf, used by the in-process detection loop so its log keeps the
+// same colored tags and Markdown rendering as the old detached worker.
+func ClassfTo(w io.Writer, class Class, format string, a ...any) {
+	if w == nil {
+		return
+	}
+	raw := sanitize.SanitizeText(fmt.Sprintf(format, sanitizeLogArgs(a)...))
+	prefix := classPrefix(class)
+	if class == ClassReport {
+		fmt.Fprintf(w, "%s\n%s\n", prefix, safeTerminalText(RenderMarkdown(raw, 0)))
+		return
+	}
+	if class.rendersMarkdown() {
+		width := bodyRenderWidth(prefix)
+		fmt.Fprint(w, formatClassLines(class, prefix, safeTerminalText(RenderMarkdown(raw, width))))
+		return
+	}
+	fmt.Fprint(w, formatClassLines(class, prefix, raw))
 }
 
 func Classf(class Class, format string, a ...any) {

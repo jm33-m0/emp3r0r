@@ -797,6 +797,19 @@ func (a *Actions) detectionLoop(ctx context.Context, raw json.RawMessage) (any, 
 		ProducerDirs: producers, ReadRoots: readRoots,
 		Stages: args.Stages, Iterations: args.Iterations, Turns: args.Turns,
 		Logf: nil,
+		Audit: func(action, target, detail string) {
+			if a.Audit == nil {
+				return
+			}
+			_ = a.Audit.Log(AuditRecord{
+				Operator: a.Operator,
+				Tool:     "detection_loop:" + sanitize.SanitizeOneLine(action),
+				Target:   sanitize.SanitizeOneLine(target),
+				Reason:   detail,
+				Allowed:  !strings.HasSuffix(action, "_denied"),
+				Phase:    "evolve",
+			})
+		},
 	})
 	if err != nil {
 		return a.actionResultWithFlags("detection_loop", command, module, nil, nil, review, decision, auditErr, "", err, true), nil

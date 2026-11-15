@@ -5,6 +5,7 @@ package logging
 import (
 	"bytes"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/fatih/color"
@@ -109,4 +110,75 @@ func TestLoggerWritesToEverySink(t *testing.T) {
 			t.Fatalf("%s sink missed the log line: %q", name, got)
 		}
 	}
+}
+
+func TestClassfToRendersTerminalTagsAndMarkdown(t *testing.T) {
+	old := color.NoColor
+	color.NoColor = false
+	defer func() { color.NoColor = old }()
+
+	var buf bytes.Buffer
+	ClassfTo(&buf, ClassCycle, "cycle %d", 3)
+	if !strings.Contains(buf.String(), "\x1b[") || !strings.Contains(buf.String(), "[cycle]") || !strings.Contains(buf.String(), "cycle 3") {
+		t.Fatalf("ClassfTo lost color or content: %q", buf.String())
+	}
+
+	buf.Reset()
+	ClassfTo(&buf, ClassModel, "## Heading\n\n- one")
+	if strings.Contains(buf.String(), "## Heading") {
+		t.Fatalf("ClassfTo did not render Markdown: %q", buf.String())
+	}
+	for _, want := range []string{"Heading", "one"} {
+		if !strings.Contains(buf.String(), want) {
+			t.Fatalf("ClassfTo lost %q: %q", want, buf.String())
+		}
+	}
+}
+
+type lockedBuffer struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (l *lockedBuffer) Write(p []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.Write(p)
+}
+
+func (l *lockedBuffer) String() string {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return l.b.String()
+}
+
+func TestLoggerSinkUpdatesAreConcurrentSafe(t *testing.T) {
+	var terminal lockedBuffer
+	l := &Logger{sinks: []logSink{{w: &terminal}}}
+	l.rebuildWriterLocked()
+
+	var wg sync.WaitGroup
+	for range 20 {
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			l.PrintfClass("terminal\n", "plain\n")
+		}()
+		go func() {
+			defer wg.Done()
+			l.AddWriter(&terminal)
+		}()
+	}
+	wg.Wait()
+	if !strings.Contains(terminal.String(), "terminal") {
+		t.Fatalf("writer lost output during sink updates: %q", terminal.String())
+	}
+}
+
+func TestDisplayMarkdownWithoutLogger(t *testing.T) {
+	old := logger
+	logger = nil
+	defer func() { logger = old }()
+
+	DisplayMarkdown("# report")
 }

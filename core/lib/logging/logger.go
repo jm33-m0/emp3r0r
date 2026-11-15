@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/fatih/color"
@@ -38,10 +39,13 @@ type logSink struct {
 type Logger struct {
 	Level   int
 	logChan chan string
-	writer  io.Writer
-	sinks   []logSink
-	ctx     context.Context
-	cancel  context.CancelFunc
+	// mu guards sinks and writer: console startup, the output pane, and the
+	// detection loop add or replace writers while other goroutines log.
+	mu     sync.RWMutex
+	writer io.Writer
+	sinks  []logSink
+	ctx    context.Context
+	cancel context.CancelFunc
 
 	// BroadcastHandler is called whenever Notify is called.
 	// Used to send important logs to the operator console.
@@ -79,7 +83,7 @@ func NewLogger(logFilePath string, level int) (*Logger, error) {
 		Level: level,
 		sinks: sinks,
 	}
-	logger.rebuildWriter()
+	logger.rebuildWriterLocked()
 	logger.SetDebugLevel(level)
 	logger.logChan = make(chan string, 4096)
 	logger.ctx, logger.cancel = context.WithCancel(context.Background())
@@ -87,8 +91,9 @@ func NewLogger(logFilePath string, level int) (*Logger, error) {
 	return logger, nil
 }
 
-// rebuildWriter keeps the aggregate writer in sync with the typed sinks.
-func (l *Logger) rebuildWriter() {
+// rebuildWriterLocked keeps the aggregate writer in sync with the typed
+// sinks. The caller holds l.mu for writing.
+func (l *Logger) rebuildWriterLocked() {
 	switch len(l.sinks) {
 	case 0:
 		l.writer = nil
@@ -105,21 +110,42 @@ func (l *Logger) rebuildWriter() {
 
 // AddWriter adds a new terminal writer to logger, for example os.Stdout.
 func (l *Logger) AddWriter(w io.Writer) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	l.sinks = append(l.sinks, logSink{w: w})
-	l.rebuildWriter()
+	l.rebuildWriterLocked()
 }
 
 // SetFileOutput makes w the plain-text file sink. It is used for the on-disk
 // log; terminal sinks are added later with AddWriter.
 func (l *Logger) SetFileOutput(w io.Writer) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	l.sinks = []logSink{{w: PlainFileWriter(w), plain: true}}
-	l.rebuildWriter()
+	l.rebuildWriterLocked()
 }
 
 // SetOutput set logger writer, for example os.Stdout. It replaces the sinks.
 func (l *Logger) SetOutput(w io.Writer) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	l.sinks = []logSink{{w: w}}
-	l.rebuildWriter()
+	l.rebuildWriterLocked()
+}
+
+// snapshotSinks copies the sink list so I/O runs without holding the lock.
+func (l *Logger) snapshotSinks() []logSink {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return append([]logSink(nil), l.sinks...)
+}
+
+// writerSnapshot returns the aggregate writer without holding the lock during
+// writes.
+func (l *Logger) writerSnapshot() io.Writer {
+	l.mu.RLock()
+	defer l.mu.RUnlock()
+	return l.writer
 }
 
 // Start starts the logger, it listens for log messages and writes to the writer
@@ -129,16 +155,25 @@ func (l *Logger) Start() {
 		l.cancel()
 	}
 
-	// Create a new logger
+	// Keep the current sinks across the restart.
+	sinks := l.snapshotSinks()
+
+	// Create a new logger outside the lock: NewLogger initializes its own
+	// state and can fail.
 	newLogger, err := NewLogger("", 2)
 	if err != nil {
 		panic(err)
 	}
-	newLogger.sinks = append([]logSink(nil), l.sinks...)
-	newLogger.rebuildWriter()
+	newLogger.sinks = sinks
+	newLogger.rebuildWriterLocked()
 
-	// Ensure the new logger is properly referenced
-	*l = *newLogger
+	l.mu.Lock()
+	l.sinks = newLogger.sinks
+	l.writer = newLogger.writer
+	l.logChan = newLogger.logChan
+	l.ctx = newLogger.ctx
+	l.cancel = newLogger.cancel
+	l.mu.Unlock()
 
 	// Start logging
 	log.SetOutput(l)
@@ -239,13 +274,14 @@ func (l *Logger) Write(p []byte) (int, error) {
 }
 
 func (l *Logger) writeRaw(p []byte) {
-	if len(l.sinks) == 0 {
-		if l.writer != nil {
-			_, _ = l.writer.Write(p)
+	sinks := l.snapshotSinks()
+	if len(sinks) == 0 {
+		if w := l.writerSnapshot(); w != nil {
+			_, _ = w.Write(p)
 		}
 		return
 	}
-	for _, sink := range l.sinks {
+	for _, sink := range sinks {
 		if sink.plain {
 			if _, err := sink.w.Write(stripANSICodes(p)); err != nil {
 				continue
@@ -260,13 +296,14 @@ func (l *Logger) writeRaw(p []byte) {
 // receive the ANSI-rendered version; plain file sinks receive the version
 // without ANSI or Markdown heading markers.
 func (l *Logger) PrintfClass(terminal, plain string) {
-	if len(l.sinks) == 0 {
-		if l.writer != nil {
-			_, _ = io.WriteString(l.writer, terminal)
+	sinks := l.snapshotSinks()
+	if len(sinks) == 0 {
+		if w := l.writerSnapshot(); w != nil {
+			_, _ = io.WriteString(w, terminal)
 		}
 		return
 	}
-	for _, sink := range l.sinks {
+	for _, sink := range sinks {
 		if sink.plain {
 			_, _ = sink.w.Write(stripANSICodes([]byte(plain)))
 			continue
