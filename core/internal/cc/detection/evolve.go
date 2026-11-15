@@ -30,7 +30,6 @@ const (
 	// unbounded model/build/detonation run.
 	maxEvolveIterations = 50
 	maxEvolveTurns      = 240
-	maxEvolveEdits      = 12
 	maxEvolveBuildLog   = 8 << 20
 	// minAgentShellcodeBytes rejects a tiny blob that no real Go agent could
 	// have produced. It catches a loader that drops the payload to reduce
@@ -130,7 +129,6 @@ type evolver struct {
 	db            *TelemetryDB
 	logf          func(logging.Class, string, ...any)
 	iter          int
-	edits         int
 	last          *Cycle
 	cycles        []Cycle
 	roots         *sourceRoots
@@ -811,9 +809,6 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, 
 	}
 	e.last = &cycle
 	e.cycles = append(e.cycles, cycle)
-	// A failed build or run keeps the edit budget consumed; only a completed
-	// cycle opens a fresh per-cycle budget.
-	e.edits = 0
 	e.logClass(logging.ClassCycle, "cycle %d: payload=%s sha=%s score=%.2f verdicts=%v findings=%d",
 		iteration, cycle.PayloadKey, shortSHA(artifact.SHA256), cycle.Score, summary.Verdicts, cycle.Findings)
 	return cycle, nil
@@ -1327,9 +1322,6 @@ func (e *evolver) editSourceTool() tool.CoreTool {
 			if e.iter >= e.cfg.Iterations {
 				return tool.Errorf("iteration limit reached; the edit could not be built or tested"), nil
 			}
-			if e.edits >= maxEvolveEdits {
-				return tool.Errorf(fmt.Sprintf("edit limit reached for this cycle (%d); call DetectionCycle to unlock the next budget", maxEvolveEdits)), nil
-			}
 			root, err := e.root(args.Module)
 			if err != nil {
 				return tool.Errorf(fmt.Sprintf("%v", err)), nil
@@ -1384,7 +1376,6 @@ func (e *evolver) applyEdit(ctx context.Context, root sourceRoot, file, oldText,
 		}
 		return editResult{}, fmt.Errorf("save edit: %w", err)
 	}
-	e.edits++
 	e.logClass(logging.ClassEdit, "%s/%s:%d (%s): %s", root.Name, file, updated.Line, reason, clip(newText, 160))
 	return editResult{
 		Module: root.Name, File: file, Line: updated.Line, Bytes: len(updated.Updated), Reason: reason,

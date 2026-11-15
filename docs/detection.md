@@ -150,7 +150,9 @@ edit made after the chosen payload and restores the module and producer source.
 carries the recent mechanism, tested note, and edit reasons so a fresh agent
 session does not lose the direction it already tried. The cycle budget and the
 active shellcode are shown in the prompt and in every `DetectionCycle` result;
-`--iterations` is capped at 50 and `--turns` at 240.
+`--iterations` is capped at 50 and `--turns` at 240. `EditSource` has no
+separate per-cycle edit cap; a redesign may use as many edits as the turn
+budget allows.
 
 ### Reference cache
 

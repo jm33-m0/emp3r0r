@@ -747,3 +747,56 @@ func TestProducerArtifactAcceptsCrystalOutputLine(t *testing.T) {
 		t.Fatalf("artifact size = %d", artifact.Size)
 	}
 }
+
+func TestEditSourceHasNoPerCycleCap(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "loader.c")
+	if err := os.WriteFile(path, []byte("v0\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	db, err := OpenTelemetryDB(filepath.Join(t.TempDir(), "telemetry.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.db.Exec(`INSERT INTO payloads(payload_key, sha256, module, table_name)
+		VALUES('sha256:test', 'test', 'loader_windows', 'payload_test')`); err != nil {
+		t.Fatal(err)
+	}
+	roots, err := newSourceRoots("loader_windows",
+		sourceRoot{Name: "loader_windows", Dir: dir, Writable: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := &evolver{
+		cfg:   EvolveConfig{LoopID: "loop", Module: "loader_windows", ModuleDir: dir, Iterations: 20},
+		db:    db,
+		roots: roots,
+		last:  &Cycle{PayloadID: 1},
+		logf:  func(logging.Class, string, ...any) {},
+	}
+	for i := 0; i < 13; i++ {
+		raw, err := json.Marshal(map[string]any{
+			"file":       "loader.c",
+			"old_string": fmt.Sprintf("v%d", i),
+			"new_string": fmt.Sprintf("v%d", i+1),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		result, err := e.editSourceTool().Call(context.Background(), raw, nil)
+		if err != nil {
+			t.Fatalf("edit %d: %v", i+1, err)
+		}
+		if result.IsError {
+			t.Fatalf("edit %d: %s", i+1, result.Flatten())
+		}
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "v13") {
+		t.Fatalf("13 edits were not all applied: %q", data)
+	}
+}
