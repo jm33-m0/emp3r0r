@@ -511,6 +511,8 @@ static void rv_wr32(uint32_t off, uint32_t v) {
 }
 
 static void rv_mmio_store(uint32_t addr, uint32_t val) {
+  if (rv_stopped)
+    return;
   switch (addr) {
   case RV_UART_MMIO: {
     uint8_t ch = (uint8_t)val;
@@ -809,11 +811,13 @@ static int64_t rv_guest_ppoll(uint32_t fds_addr, uint32_t nfds,
   /* Translate guest descriptors. An unowned one reports POLLNVAL, like poll()
    * on a closed descriptor, instead of reaching an agent descriptor. */
   uint8_t invalid[RV_POLL_MAX_FDS];
+  int has_invalid = 0;
   rv_memzero(invalid, sizeof(invalid));
   for (uint32_t i = 0; i < nfds; i++) {
     int host_fd = rv_guest_fd_host_of(fds[i].fd);
     if (host_fd < 0) {
       invalid[i] = 1;
+      has_invalid = 1;
       fds[i].fd = -1;
     } else {
       fds[i].fd = host_fd;
@@ -821,27 +825,33 @@ static int64_t rv_guest_ppoll(uint32_t fds_addr, uint32_t nfds,
   }
   int timeout_ms = -1;
   if (tsp_addr != 0) {
-    const uint8_t *g = rv_gptr(tsp_addr, time64 ? 16u : 12u);
+    const uint8_t *g = rv_gptr(tsp_addr, time64 ? 16u : 8u);
     if (g == NULL) {
       free(fds);
       return -EINVAL;
     }
     int64_t sec = 0;
     int64_t nsec = 0;
-    rv_memcpy(&sec, g, 8);
     if (time64) {
+      rv_memcpy(&sec, g, 8);
       rv_memcpy(&nsec, g + 8, 8);
     } else {
+      int32_t sec32 = 0;
       int32_t nsec32 = 0;
-      rv_memcpy(&nsec32, g + 8, 4);
+      rv_memcpy(&sec32, g, 4);
+      rv_memcpy(&nsec32, g + 4, 4);
+      sec = sec32;
       nsec = nsec32;
     }
-    if (sec < 0 || nsec < 0 || nsec >= 1000000000 || sec > INT32_MAX / 1000) {
+    if (sec < 0 || nsec < 0 || nsec >= 1000000000 ||
+        sec > (INT32_MAX - 1000) / 1000) {
       free(fds);
       return -EINVAL;
     }
     timeout_ms = (int)(sec * 1000 + (nsec + 999999) / 1000000);
   }
+  if (has_invalid)
+    timeout_ms = 0;
   int r = poll(fds, (nfds_t)nfds, timeout_ms);
   int saved = errno;
   if (r >= 0) {
@@ -1504,6 +1514,8 @@ static void rv_host_postexec(struct MiniRV32IMAState *state, uint32_t *pc,
 #ifdef RV_TRACE
   rv_trace_insns++;
 #endif
+  if (rv_stopped)
+    return;
   if (*trap != 12)
     return; /* M-mode ECALL is trap 12 here; everything else is a real trap. */
   int64_t result = rv_guest_syscall(
@@ -1719,6 +1731,8 @@ static int rv_run_exec(const uint8_t *image, size_t len,
       image_end = vaddr + memsz;
   }
   rv_brk_min = (image_end + 4095u) & ~4095u;
+  if (rv_brk_min < RV_RAM_BASE)
+    rv_brk_min = RV_RAM_BASE;
   if (rv_brk_min > RV_MAP_BASE) {
     rv_set_err("image does not fit in guest RAM");
     return -1;
@@ -1764,6 +1778,8 @@ static int rv_run_exec(const uint8_t *image, size_t len,
         return -1;
       }
       envc++;
+      if (off + elen >= env_block_len)
+        break;
       off += elen + 1;
     }
   }
@@ -1784,15 +1800,20 @@ static int rv_run_exec(const uint8_t *image, size_t len,
   p += sizeof(execfn);
   uint32_t written = 0;
   size_t env_off = 0;
-  for (; written < envc; written++) {
+  for (; written < envc && env_off < env_block_len; written++) {
     size_t elen = 0;
     while (env_off + elen < env_block_len && env_block[env_off + elen] != '\0')
       elen++;
     if (elen == 0 || elen + 1u > RV_EXEC_ARGS_BASE - p)
       break;
-    rv_memcpy(rv_ram + (p - RV_RAM_BASE), env_block + env_off, elen + 1u);
+    rv_memcpy(rv_ram + (p - RV_RAM_BASE), env_block + env_off, elen);
+    rv_wr8((p - RV_RAM_BASE) + (uint32_t)elen, 0);
     rv_wr32(envp - RV_RAM_BASE + written * 4u, p);
     p += (uint32_t)(elen + 1u);
+    if (env_off + elen >= env_block_len) {
+      written++;
+      break;
+    }
     env_off += elen + 1u;
   }
   if (p > RV_EXEC_ARGS_BASE - 16u) {
@@ -1879,9 +1900,13 @@ RV_EXPORT char *Run(const uint8_t *image, size_t len,
   return rv_out;
 }
 
-RV_EXPORT const char *LastError(void) { return rv_err; }
+RV_EXPORT const char *LastError(void) {
+  return rv_err;
+}
 
-RV_EXPORT int ExitCode(void) { return rv_guest_status; }
+RV_EXPORT int ExitCode(void) {
+  return rv_guest_status;
+}
 
 #ifdef RV_TRACE
 RV_EXPORT void SetTrace(FILE *out) {

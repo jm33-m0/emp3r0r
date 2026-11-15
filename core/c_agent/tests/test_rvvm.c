@@ -156,6 +156,37 @@ int main(void) {
   CHECK(out != NULL && strcmp(out, "bof none\n") == 0);
   g_release(out);
 
+  /* Unterminated environment blocks must not read past env_len. */
+  {
+    uint8_t *one = (uint8_t *)malloc(1);
+    CHECK(one != NULL);
+    if (one != NULL) {
+      one[0] = '\n';
+      struct rv_bof_args a = {NULL, 0, one, 1};
+      out = g_run(exec_img, exec_len, &a);
+      CHECK(out != NULL);
+      CHECK(out != NULL && strcmp(out, "bof none\n") == 0);
+      CHECK_EQ_LONG(g_code(), 0);
+      g_release(out);
+      free(one);
+    }
+
+    static const char multi_src[] = "FOO=1\0BAR=2";
+    size_t multi_len = sizeof(multi_src) - 1;
+    uint8_t *multi = (uint8_t *)malloc(multi_len);
+    CHECK(multi != NULL);
+    if (multi != NULL) {
+      memcpy(multi, multi_src, multi_len);
+      struct rv_bof_args a = {NULL, 0, multi, multi_len};
+      out = g_run(exec_img, exec_len, &a);
+      CHECK(out != NULL);
+      CHECK(out != NULL && strcmp(out, "bof none\n") == 0);
+      CHECK_EQ_LONG(g_code(), 0);
+      g_release(out);
+      free(multi);
+    }
+  }
+
   /* Malformed executables are rejected before any guest instruction runs. */
   uint8_t *bad = (uint8_t *)malloc(exec_len);
   CHECK(bad != NULL);
