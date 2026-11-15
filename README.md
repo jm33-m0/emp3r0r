@@ -2,7 +2,7 @@
 
 <img align="left" width="130" height="130" alt="emp3r0r" src="img/emp3r0r.svg" />
 
-Linux-first multi-operator C2 built to stay quiet and keep working. Self-healing mesh with assisted discovery, in-memory execution with encrypted storage, scriptable agents, cross-platform BOFs, SOCKS5 pivoting, an AI-driven OPSEC-screened MCP server, and a modular C agent delivered by a sleep-masking stager.<br clear="all" />
+Linux-first multi-operator C2 built to stay quiet and keep working. Self-healing mesh with assisted discovery, in-memory execution with encrypted storage, scriptable agents, cross-platform BOFs, SOCKS5 pivoting, an AI-driven OPSEC-screened MCP server, an autonomous evasion lab that detonates and hardens payloads against local EDR telemetry, and a modular C agent delivered by a sleep-masking stager.<br clear="all" />
 
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-7289da?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/vU98aQtk9f)
 [![GitHub Sponsors](https://img.shields.io/badge/GitHub-Sponsor-ff69b4?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sponsors/jm33-m0)
@@ -142,6 +142,14 @@ Read-only tools expose the module registry, target detail, job output, and the o
 
 MCP trusts the operator harness and treats target output as hostile data. emp3r0r does not control the harness and cannot mitigate all AI-related threats; isolation and the harness's own security controls remain the operator's responsibility. See [AI security](./docs/SECURITY.md#ai-security) for prompt-injection guidance, data-egress rules, and the policy controls to apply before letting a model act autonomously.
 
+#### Autonomous evasion loop
+
+`detect_loop` builds `loader_windows`, detonates it in a local [LitterBox](https://github.com/BlackSnufkin/LitterBox) sandbox, and lets a model inspect the resulting telemetry, edit module or producer source, rebuild, and compare payloads. RedEdr, Moneta, pe-sieve, HollowsHunter, HSB, Patriot, Blender, YARA, CheckPlz, HolyGrail, and every configured EDR profile are imported into SQLite, so each verdict maps back to a module file, line, and column. The loop labels the mechanism under test in every cycle, reverts a regression to the best earlier payload, and stops when the cycle budget is spent or only explained residuals remain.
+
+Before choosing a mechanism, the model reads a cached reference notebook through `KnowledgeSearch` and `KnowledgeRead`. `knowledge-sync` refreshes that offline cache from an MCP notebook server, so the loop itself makes no network calls. The prompt classifies findings by detection surface, asks for a falsifiable telemetry prediction per cycle, and requires source evidence before an edit.
+
+A final host-side check polls for the generated agent UUID and runs a small BOF before the loop reports success. When started from the operator console, the worker reaches agent generation and single-UUID verification through a scoped Unix IPC bridge, so C2 credentials and WireGuard keys stay in the operator process. Every dispatch and denial is written to the operator audit log. See the [detection testing guide](./docs/detection.md) for stages, approvals, and the MCP equivalents.
+
 ### Build profiles
 
 #### Modular agent builds
@@ -154,7 +162,7 @@ C2 server binaries keep the full feature set, so one server can handle every age
 
 - [Operator guide](./docs/OPERATOR.md): installation, quick start, operator setup, container notes, tmux keybindings, and agent generation.
 - [MCP server development](./docs/MCP.md): tool registration, the OPSEC screen, audit path, and tests.
-- [Detection testing](./docs/detection.md): sandbox plans, build-time feedback, source mapping, and the analyst.
+- [Detection testing](./docs/detection.md): sandbox plans, build-time feedback, source mapping, the autonomous loop, and the reference cache.
 - [Custom transport guide](./docs/CUSTOM_C2.md): Tor hidden-service quick start, Go and C agent dialers, C2 bridge socket protocol, and running multiple custom transports.
 - [RISC-V BOF modules](./docs/rvvm.md): running portable BOFs with `--riscv`, linking static libraries, and the RV32IMA interpreter.
 - [Module development guide](./docs/module_development_guide.md)

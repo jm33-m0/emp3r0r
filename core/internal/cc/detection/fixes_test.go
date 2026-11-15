@@ -180,6 +180,101 @@ func TestFTSTermsNeutraliseOperators(t *testing.T) {
 	}
 }
 
+func TestKnowledgeSyncRefetchesTruncatedPages(t *testing.T) {
+	var singleFetches int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			ID     int             `json:"id"`
+			Method string          `json:"method"`
+			Params json.RawMessage `json:"params"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Errorf("decode request: %v", err)
+			return
+		}
+		var result any
+		switch request.Method {
+		case "initialize":
+			result = map[string]any{"protocolVersion": "2025-03-26"}
+		case "tools/call":
+			var call struct {
+				Name      string          `json:"name"`
+				Arguments json.RawMessage `json:"arguments"`
+			}
+			if err := json.Unmarshal(request.Params, &call); err != nil {
+				t.Errorf("decode call: %v", err)
+				return
+			}
+			switch call.Name {
+			case "list_bookmarks":
+				result = mcpText(t, knowledgeCatalog{
+					Notebooks: []string{"maldev"},
+					Bookmarks: []knowledgeBookmark{
+						{Notebook: "maldev", Filename: "one.md", Title: "One", Summarized: true},
+						{Notebook: "maldev", Filename: "two.md", Title: "Two", Summarized: true},
+					},
+				})
+			case "get_documents":
+				var args struct {
+					DocumentRefs []string `json:"document_refs"`
+					Artifact     string   `json:"artifact"`
+				}
+				if err := json.Unmarshal(call.Arguments, &args); err != nil {
+					t.Errorf("decode arguments: %v", err)
+					return
+				}
+				truncated := len(args.DocumentRefs) > 1
+				var docs []knowledgeDocument
+				for _, ref := range args.DocumentRefs {
+					content := "complete content for " + ref
+					if truncated {
+						content = "clipped"
+					}
+					docs = append(docs, knowledgeDocument{DocumentRef: ref, Artifact: args.Artifact, Content: content})
+				}
+				if !truncated && args.Artifact == "content" {
+					singleFetches++
+				}
+				result = mcpText(t, knowledgeDocuments{Documents: docs, Truncated: truncated})
+			default:
+				t.Errorf("unexpected tool %q", call.Name)
+			}
+		default:
+			t.Errorf("unexpected method %q", request.Method)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		payload, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": request.ID, "result": result})
+		_, _ = fmt.Fprintf(w, "event: message\ndata: %s\n\n", payload)
+	}))
+	defer server.Close()
+
+	path := filepath.Join(t.TempDir(), "knowledge.db")
+	db, err := OpenKnowledgeDB(path, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stats, err := SyncKnowledge(context.Background(), db, KnowledgeSyncOptions{URL: server.URL, Content: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats.Contents != 2 {
+		t.Fatalf("stats = %+v", stats)
+	}
+	if singleFetches != 2 {
+		t.Fatalf("truncated pages fetched individually %d times, want 2", singleFetches)
+	}
+	for _, ref := range []string{"maldev/one", "maldev/two"} {
+		doc, err := db.Read(context.Background(), ref, "content", 0, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(doc.Content, "complete content for "+ref) {
+			t.Fatalf("%s cached truncated content: %q", ref, doc.Content)
+		}
+	}
+	_ = db.Close()
+}
+
 func TestKnowledgeSyncCachesAndSearchesOffline(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var request struct {

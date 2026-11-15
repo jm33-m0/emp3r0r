@@ -473,23 +473,46 @@ func SyncKnowledge(ctx context.Context, db *KnowledgeDB, opts KnowledgeSyncOptio
 		byRef[ref] = bookmark
 		refIDs = append(refIDs, ref)
 	}
-	// fetchPages retrieves an artifact for a set of refs, then retries any
-	// missing ref alone so one oversized document cannot hide the rest.
+	// fetchPages retrieves an artifact for a set of refs. The server clips a
+	// response that exceeds its byte budget, so a truncated page is split
+	// until the documents are complete; a single oversized document is kept
+	// with whatever the server returned.
 	fetchPages := func(artifact string) (map[string]knowledgeDocument, error) {
 		out := make(map[string]knowledgeDocument, len(refIDs))
+		partial := 0
+		var fetch func(refs []string) error
+		fetch = func(refs []string) error {
+			var documents knowledgeDocuments
+			if err := client.tool(ctx, "get_documents", map[string]any{
+				"document_refs": refs, "artifact": artifact,
+			}, &documents); err != nil {
+				return err
+			}
+			if documents.Truncated && len(refs) > 1 {
+				mid := len(refs) / 2
+				if err := fetch(refs[:mid]); err != nil {
+					return err
+				}
+				return fetch(refs[mid:])
+			}
+			if documents.Truncated {
+				partial++
+			}
+			for _, document := range documents.Documents {
+				out[document.DocumentRef] = document
+			}
+			return nil
+		}
 		for start := 0; start < len(refIDs); start += batch {
 			end := start + batch
 			if end > len(refIDs) {
 				end = len(refIDs)
 			}
-			var documents knowledgeDocuments
-			if err := client.tool(ctx, "get_documents", map[string]any{
-				"document_refs": refIDs[start:end], "artifact": artifact,
-			}, &documents); err != nil {
+			if err := fetch(refIDs[start:end]); err != nil {
 				return nil, err
 			}
-			for _, document := range documents.Documents {
-				out[document.DocumentRef] = document
+			if end == len(refIDs) || end%100 == 0 {
+				logf(fmt.Sprintf("knowledge: fetched %s for %d/%d documents", artifact, end, len(refIDs)))
 			}
 		}
 		for _, ref := range refIDs {
@@ -502,9 +525,15 @@ func SyncKnowledge(ctx context.Context, db *KnowledgeDB, opts KnowledgeSyncOptio
 			}, &single); err != nil {
 				return nil, err
 			}
+			if single.Truncated {
+				partial++
+			}
 			for _, document := range single.Documents {
 				out[document.DocumentRef] = document
 			}
+		}
+		if partial > 0 {
+			logf(fmt.Sprintf("knowledge: %d %s artifacts exceed the server response limit and are cached partially", partial, artifact))
 		}
 		return out, nil
 	}
