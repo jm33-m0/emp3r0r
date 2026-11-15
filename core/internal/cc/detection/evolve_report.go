@@ -10,6 +10,66 @@ import (
 	"time"
 )
 
+// RenderLoopSummary returns a compact Markdown summary for the operator
+// console. The full report remains next to it for the log pane and the report
+// file.
+func RenderLoopSummary(answer map[string]any, cycles []Cycle, edits []EditRecord) string {
+	var b strings.Builder
+	loopID := answerString(answer, "loop_id")
+	if loopID == "" && len(cycles) > 0 {
+		loopID = cycles[0].LoopID
+	}
+	fmt.Fprintf(&b, "# Detection loop `%s`\n\n", loopID)
+
+	summary := answerString(answer, "summary")
+	if summary == "" {
+		summary = "The agent did not return a final summary."
+	}
+	fmt.Fprintf(&b, "**Outcome:** %s\n\n", clipUTF8(summary, 700))
+
+	mechanism := answerString(answer, "mechanism")
+	if mechanism == "" && len(cycles) > 0 {
+		var last cycleSummary
+		if json.Unmarshal([]byte(cycles[len(cycles)-1].Summary), &last) == nil {
+			mechanism = last.Mechanism
+		}
+	}
+	if mechanism != "" {
+		fmt.Fprintf(&b, "**Mechanism:** `%s`\n", sanitizeLine(mechanism))
+	}
+	if len(cycles) > 0 {
+		first, last := cycles[0], cycles[len(cycles)-1]
+		fmt.Fprintf(&b, "**Cycles:** %d | **Score:** %.2f → %.2f | **Final findings:** %d | **Verdicts:** %d\n",
+			len(cycles), first.Score, last.Score, last.Findings, last.Verdicts)
+	}
+
+	fmt.Fprintf(&b, "\n## Changes\n\n")
+	if len(edits) == 0 {
+		fmt.Fprintf(&b, "- No source edits were recorded.\n")
+	} else {
+		for i, edit := range edits {
+			if i >= 6 {
+				fmt.Fprintf(&b, "- and %d more\n", len(edits)-i)
+				break
+			}
+			fmt.Fprintf(&b, "- `%s`: %s\n", sanitizeLine(editPath(edit)), clipUTF8(sanitizeLine(edit.Reason), 180))
+		}
+	}
+
+	residual := answerStrings(answer, "residual")
+	if len(residual) > 0 {
+		fmt.Fprintf(&b, "\n## Residuals\n\n")
+		for i, item := range residual {
+			if i >= 5 {
+				fmt.Fprintf(&b, "- and %d more\n", len(residual)-i)
+				break
+			}
+			fmt.Fprintf(&b, "- %s\n", clipUTF8(item, 180))
+		}
+	}
+	return b.String()
+}
+
 // RenderLoopReport turns the agent's JSON answer and the persisted cycles into
 // a human-readable Markdown report. The raw JSON remains in loop_results.
 func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord) string {

@@ -5,12 +5,24 @@ package logging
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
 var logger *Logger
+
+// DisplayMarkdown writes rendered Markdown to the console without adding a
+// log prefix or a timestamp, so an executive summary stays a standalone block.
+func DisplayMarkdown(text string) {
+	if strings.TrimSpace(text) == "" {
+		return
+	}
+	terminal := safeTerminalText(RenderMarkdown(text, 0)) + "\n"
+	plain := RenderMarkdownPlain(text, 0) + "\n"
+	logger.PrintfClass(terminal, plain)
+}
 
 func Print(a ...any) {
 	logger.Msg("%v", fmt.Sprint(a...))
@@ -89,6 +101,13 @@ func CmdSetDebugLevel(cmd *cobra.Command, args []string) {
 // SetOutput set a new writer to logging package, for example os.Stdout
 func SetOutput(w io.Writer) {
 	logger.SetOutput(w)
+	logger.Start()
+}
+
+// SetFileOutput sets the plain-text on-disk sink. Terminal sinks added later
+// with AddWriter receive the ANSI-rendered form.
+func SetFileOutput(w io.Writer) {
+	logger.SetFileOutput(w)
 	logger.Start()
 }
 

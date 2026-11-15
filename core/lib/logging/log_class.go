@@ -81,7 +81,7 @@ func (c Class) tagColor() *color.Color {
 	case ClassBuild:
 		return color.New(color.FgHiBlue)
 	case ClassCycle:
-		return color.New(color.FgHiWhite, color.Bold)
+		return color.New(color.FgHiMagenta, color.Bold)
 	case ClassEdit:
 		return color.New(color.FgHiCyan)
 	case ClassAnswer:
@@ -125,29 +125,68 @@ func classPrefix(class Class) string {
 }
 
 func Classf(class Class, format string, a ...any) {
-	text := sanitize.SanitizeText(fmt.Sprintf(format, sanitizeLogArgs(a)...))
+	raw := sanitize.SanitizeText(fmt.Sprintf(format, sanitizeLogArgs(a)...))
 	classMu.Lock()
 	defer classMu.Unlock()
+	prefix := classPrefix(class)
+	plainPrefix := string(stripANSICodes([]byte(prefix)))
 	if class == ClassReport {
 		// The renderer emits SGR styling itself; sanitising it would strip the
 		// styling, and per-line prefixes would break headings and tables. Keep
 		// only SGR so a model-supplied link or title sequence cannot reach the
 		// terminal.
-		logger.Printf(nil, "%s\n%s\n", classPrefix(class), safeTerminalText(RenderMarkdown(text, 0)))
+		terminal := prefix + "\n" + safeTerminalText(RenderMarkdown(raw, 0)) + "\n"
+		plain := plainPrefix + "\n" + RenderMarkdownPlain(raw, 0) + "\n"
+		logger.PrintfClass(terminal, plain)
 		return
 	}
-	lines := strings.Split(text, "\n")
-	if len(lines) == 0 {
-		lines = []string{""}
+	if class.rendersMarkdown() {
+		width := bodyRenderWidth(prefix)
+		terminal := formatClassLines(class, prefix, safeTerminalText(RenderMarkdown(raw, width)))
+		plain := formatClassLines(class, plainPrefix, RenderMarkdownPlain(raw, width))
+		logger.PrintfClass(terminal, plain)
+		return
 	}
-	prefix := classPrefix(class)
-	for _, line := range lines {
+	logger.PrintfClass(
+		formatClassLines(class, prefix, raw),
+		formatClassLines(class, plainPrefix, raw),
+	)
+}
+
+func formatClassLines(class Class, prefix, text string) string {
+	var b strings.Builder
+	for _, line := range strings.Split(text, "\n") {
 		line = strings.TrimSuffix(line, "\r")
 		if c := class.bodyColor(); c != nil && line != "" {
 			line = c.Sprint(line)
 		}
-		logger.Printf(nil, "%s %s\n", prefix, line)
+		b.WriteString(prefix)
+		b.WriteByte(' ')
+		b.WriteString(line)
+		b.WriteByte('\n')
 	}
+	return b.String()
+}
+
+// rendersMarkdown reports whether the class carries model prose. Tool calls
+// and results are structured data and stay in their raw, greppable form.
+func (c Class) rendersMarkdown() bool {
+	switch c {
+	case ClassThinking, ClassModel, ClassAnswer:
+		return true
+	default:
+		return false
+	}
+}
+
+// bodyRenderWidth leaves room for the per-line timestamp and tag that Classf
+// puts in front of every prose line.
+func bodyRenderWidth(prefix string) int {
+	width := TerminalWidth() - utf8.RuneCountInString(prefix) - 1
+	if width < 20 {
+		return 20
+	}
+	return width
 }
 
 // safeTerminalText removes terminal control sequences except SGR (color and

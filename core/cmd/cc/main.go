@@ -61,8 +61,8 @@ func setupLogging() {
 		logging.Fatalf("Failed to open log file: %v", err)
 	}
 	// Plain text on disk (no ANSI colors): module output in emp3r0r.log must
-	// stay machine-parseable (e.g. bofhound ingesting ldapsearch results).
-	logging.SetOutput(logging.PlainFileWriter(logf))
+	// stay machine-parseable (e.g. bofhound ingesting ldapsearch output).
+	logging.SetFileOutput(logf)
 }
 
 func init() {
@@ -185,6 +185,7 @@ job ownership, and operator locks.`,
 	detectLoopWorkerCmd.Flags().Int("turns", 60, "Maximum Norma turns")
 	detectLoopWorkerCmd.Flags().Duration("timeout", 0, "Worker deadline; 0 means no deadline")
 	detectLoopWorkerCmd.Flags().String("loop-id", "", "Loop ID")
+	detectLoopWorkerCmd.Flags().Int("render-width", 0, "Width of the log pane for Markdown rendering")
 
 	// Completion command
 	completionCmd := &cobra.Command{
@@ -611,6 +612,8 @@ func runDetectLoopWorkerCmd(cmd *cobra.Command, _ []string) {
 	turns, _ := cmd.Flags().GetInt("turns")
 	timeout, _ := cmd.Flags().GetDuration("timeout")
 	loopID, _ := cmd.Flags().GetString("loop-id")
+	renderWidth, _ := cmd.Flags().GetInt("render-width")
+	logging.SetRenderWidth(renderWidth)
 	producers, err := detection.ParseProducerDirs(producerFlags)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "detect-loop-worker: %v\n", err)

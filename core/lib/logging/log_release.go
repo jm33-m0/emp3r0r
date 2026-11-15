@@ -13,6 +13,9 @@ import (
 // Keep every exported symbol the rest of the codebase uses, but accept opaque
 // types so no third-party import leaks into the agent's binary.
 
+// DisplayMarkdown is a no-op in release builds.
+func DisplayMarkdown(string) {}
+
 func Print(a ...any) {
 }
 
@@ -68,6 +71,10 @@ func CmdSetDebugLevel(_ any, _ []string) {
 }
 
 func SetOutput(w io.Writer) {
+}
+
+// SetFileOutput is a no-op in release builds.
+func SetFileOutput(w io.Writer) {
 }
 
 func AddWriter(w io.Writer) {

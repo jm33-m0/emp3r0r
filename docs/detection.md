@@ -170,14 +170,21 @@ MCP or a C2 connection. Transient sandbox, build, detection, and agent-session
 failures are retried with exponential backoff; the worker does not exit on
 them. `--timeout 0` (the default) means no deadline. A final answer that is not
 the requested JSON object is stored as the summary with `parse_error` instead
-of ending the run. The worker writes the human-readable Markdown report to
-`<workspace>/detection/reports/<loop>.md`, emits it through the console log
-pane when the worker exits, and stores it in `loop_results.report`.
+of ending the run. The worker writes the full Markdown report to
+`<workspace>/detection/reports/<loop>.md` and a compact executive summary to
+`<loop>-summary.md`, emits the full report through the tmux log pane when the
+worker exits, and stores the report in `loop_results.report`. The operator
+console prints the rendered executive summary, not the raw report.
 
 Loop log lines are tagged and colored by category: model thinking is dimmed,
-model text uses the terminal default, tool calls, tool results, builds, edits,
-cycles, warnings, and errors each get their own tag color. The final report is
-rendered from Markdown for the terminal before it is logged; the on-disk report
+model text, thinking, and final answers are rendered as Markdown, tool calls and
+results stay raw for grepping, and builds, edits, cycles, warnings, and errors
+each get their own tag color. Terminal sinks receive the ANSI-styled rendering;
+the on-disk log receives the same structure as plain text without ANSI or
+heading markers. Markdown width follows the tmux log pane or the terminal
+running the console; `COLUMNS` is honored when no terminal size is available,
+with a 120-column fallback. The final report is rendered from Markdown for the
+terminal before it is logged; the on-disk report
 stays Markdown. `NO_COLOR=1` or `TERM=dumb` disables colors.
 
 Model credentials can be exported in the shell, or put in the operator

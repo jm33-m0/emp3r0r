@@ -440,6 +440,11 @@ every residual is explained with evidence. Return the final JSON object.`,
 	} else {
 		e.logClass(logging.ClassAnswer, "final report: %s", reportPath)
 	}
+	if summaryPath, summaryErr := writeLoopSummary(cfg.StoreRoot, cfg.LoopID, RenderLoopSummary(answer, e.cycles, edits)); summaryErr != nil {
+		e.logClass(logging.ClassError, "write executive summary: %v", summaryErr)
+	} else {
+		e.logClass(logging.ClassAnswer, "executive summary: %s", summaryPath)
+	}
 	e.logClass(logging.ClassReport, "%s", report)
 	if _, err := e.db.db.ExecContext(ctx, `
 		INSERT INTO loop_results(loop_id, answer, report, created_at) VALUES(?, ?, ?, ?)
@@ -791,6 +796,14 @@ func (e *evolver) linkEdits(ctx context.Context, iteration int, payloadID int64)
 }
 
 func writeLoopReport(storeRoot, loopID, report string) (string, error) {
+	return writeLoopText(storeRoot, loopID, report)
+}
+
+func writeLoopSummary(storeRoot, loopID, summary string) (string, error) {
+	return writeLoopText(storeRoot, loopID+"-summary", summary)
+}
+
+func writeLoopText(storeRoot, name, text string) (string, error) {
 	if strings.TrimSpace(storeRoot) == "" {
 		return "", fmt.Errorf("store root is empty")
 	}
@@ -798,12 +811,12 @@ func writeLoopReport(storeRoot, loopID, report string) (string, error) {
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return "", err
 	}
-	name := sanitizeName(loopID)
+	name = sanitizeName(name)
 	if name == "" {
 		name = "loop"
 	}
 	path := filepath.Join(dir, name+".md")
-	if err := os.WriteFile(path, []byte(report), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
 		return "", err
 	}
 	return path, nil

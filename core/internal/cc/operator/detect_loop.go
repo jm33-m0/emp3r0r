@@ -85,24 +85,25 @@ Set the model through the environment:
 }
 
 type detectLoopOptions struct {
-	ModuleDir  string
-	Shellcode  string
-	AgentType  string
-	Arch       string
-	CC         string
-	Sandbox    string
-	Iterations int
-	Stages     []string
-	Process    string
-	Format     string
-	Inject     string
-	SMW        string
-	Producers  []string
-	ReadRoots  []string
-	Knowledge  string
-	Turns      int
-	Timeout    time.Duration
-	Tmux       bool
+	ModuleDir   string
+	Shellcode   string
+	AgentType   string
+	Arch        string
+	CC          string
+	Sandbox     string
+	Iterations  int
+	Stages      []string
+	Process     string
+	Format      string
+	Inject      string
+	SMW         string
+	Producers   []string
+	ReadRoots   []string
+	Knowledge   string
+	Turns       int
+	Timeout     time.Duration
+	Tmux        bool
+	RenderWidth int
 }
 
 func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
@@ -181,6 +182,7 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 		if tmuxErr != nil {
 			logging.Warningf("detect_loop: tmux window: %v", tmuxErr)
 		} else {
+			opts.RenderWidth = window.Width
 			logging.Infof("Detection loop log: %s (tmux %s)", logPath, window.ID)
 		}
 	}
@@ -269,6 +271,9 @@ func startDetectLoopWorker(opts detectLoopOptions, shellcode, loopID string, log
 	if strings.TrimSpace(opts.Knowledge) != "" {
 		args = append(args, "--knowledge", opts.Knowledge)
 	}
+	if opts.RenderWidth > 0 {
+		args = append(args, "--render-width", strconv.Itoa(opts.RenderWidth))
+	}
 	worker := exec.Command(exe, args...)
 	worker.Stdout = logFile
 	worker.Stderr = logFile
@@ -281,10 +286,10 @@ func startDetectLoopWorker(opts detectLoopOptions, shellcode, loopID string, log
 		defer logFile.Close()
 		waitErr := worker.Wait()
 		reportPath := filepath.Join(live.EmpWorkSpace, "detection", "reports", loopID+".md")
-		if report, readErr := os.ReadFile(reportPath); readErr == nil {
+		if summary, source := readLoopSummary(reportPath); summary != "" {
 			logging.Successf("Detection loop report: %s", reportPath)
-			logging.Infof("%s", report)
-			logf("final report printed from %s", reportPath)
+			logging.DisplayMarkdown(summary)
+			logf("executive summary printed from %s", source)
 			return
 		}
 		if waitErr != nil {
@@ -296,6 +301,25 @@ func startDetectLoopWorker(opts detectLoopOptions, shellcode, loopID string, log
 		}
 	}()
 	return nil
+}
+
+// readLoopSummary returns the compact summary written next to the full report.
+// Reports from before the summary file existed are cut before the cycle table so
+// the console still gets the outcome and changes instead of the full Markdown.
+func readLoopSummary(reportPath string) (string, string) {
+	summaryPath := strings.TrimSuffix(reportPath, ".md") + "-summary.md"
+	if summary, err := os.ReadFile(summaryPath); err == nil && strings.TrimSpace(string(summary)) != "" {
+		return string(summary), summaryPath
+	}
+	report, err := os.ReadFile(reportPath)
+	if err != nil {
+		return "", ""
+	}
+	text := string(report)
+	if cut := strings.Index(text, "\n## Cycles"); cut > 0 {
+		text = text[:cut]
+	}
+	return strings.TrimSpace(text), reportPath
 }
 
 func shellQuotePath(path string) string {

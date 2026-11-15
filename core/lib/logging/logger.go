@@ -30,10 +30,16 @@ const (
 	FATAL   = "FATAL"
 )
 
+type logSink struct {
+	w     io.Writer
+	plain bool // file sink: receive rendered text without ANSI or Markdown markers
+}
+
 type Logger struct {
 	Level   int
 	logChan chan string
 	writer  io.Writer
+	sinks   []logSink
 	ctx     context.Context
 	cancel  context.CancelFunc
 
@@ -49,7 +55,7 @@ var (
 
 // NewLogger creates a new logger with log level, by default it writes to stderr, if logFilePath is not empty, it will write to log file instead
 func NewLogger(logFilePath string, level int) (*Logger, error) {
-	writer := io.MultiWriter(os.Stderr)
+	sinks := []logSink{{w: os.Stderr}}
 	if logFilePath != "" {
 		if _, err := os.Stat(logFilePath); os.IsNotExist(err) {
 			err = os.MkdirAll(filepath.Dir(logFilePath), 0o755)
@@ -60,19 +66,20 @@ func NewLogger(logFilePath string, level int) (*Logger, error) {
 		// open log file
 		logf, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0o600)
 		if err != nil {
-			return nil, fmt.Errorf("error opening file: %v", err)
+			return nil, fmt.Errorf("error opening file: %w", err)
 		}
 		// The file receives plain text only: the console writer in the same
 		// MultiWriter keeps ANSI colors, but the on-disk log is stripped so
 		// module output in it stays machine-parseable (e.g. bofhound reading
 		// ldapsearch results from emp3r0r.log).
-		writer = io.MultiWriter(PlainFileWriter(logf))
+		sinks = []logSink{{w: PlainFileWriter(logf), plain: true}}
 	}
 
 	logger := &Logger{
-		Level:  level,
-		writer: writer,
+		Level: level,
+		sinks: sinks,
 	}
+	logger.rebuildWriter()
 	logger.SetDebugLevel(level)
 	logger.logChan = make(chan string, 4096)
 	logger.ctx, logger.cancel = context.WithCancel(context.Background())
@@ -80,18 +87,39 @@ func NewLogger(logFilePath string, level int) (*Logger, error) {
 	return logger, nil
 }
 
-// AddWriter adds a new writer to logger, for example os.Stdout
-func (l *Logger) AddWriter(w io.Writer) {
-	if l.writer == nil {
-		l.writer = w
-	} else {
-		l.writer = io.MultiWriter(l.writer, w)
+// rebuildWriter keeps the aggregate writer in sync with the typed sinks.
+func (l *Logger) rebuildWriter() {
+	switch len(l.sinks) {
+	case 0:
+		l.writer = nil
+	case 1:
+		l.writer = l.sinks[0].w
+	default:
+		writers := make([]io.Writer, 0, len(l.sinks))
+		for _, sink := range l.sinks {
+			writers = append(writers, sink.w)
+		}
+		l.writer = io.MultiWriter(writers...)
 	}
 }
 
-// SetOutput set logger writer, for example os.Stdout
+// AddWriter adds a new terminal writer to logger, for example os.Stdout.
+func (l *Logger) AddWriter(w io.Writer) {
+	l.sinks = append(l.sinks, logSink{w: w})
+	l.rebuildWriter()
+}
+
+// SetFileOutput makes w the plain-text file sink. It is used for the on-disk
+// log; terminal sinks are added later with AddWriter.
+func (l *Logger) SetFileOutput(w io.Writer) {
+	l.sinks = []logSink{{w: PlainFileWriter(w), plain: true}}
+	l.rebuildWriter()
+}
+
+// SetOutput set logger writer, for example os.Stdout. It replaces the sinks.
 func (l *Logger) SetOutput(w io.Writer) {
-	l.writer = w
+	l.sinks = []logSink{{w: w}}
+	l.rebuildWriter()
 }
 
 // Start starts the logger, it listens for log messages and writes to the writer
@@ -106,13 +134,14 @@ func (l *Logger) Start() {
 	if err != nil {
 		panic(err)
 	}
-	newLogger.SetOutput(l.writer)
+	newLogger.sinks = append([]logSink(nil), l.sinks...)
+	newLogger.rebuildWriter()
 
 	// Ensure the new logger is properly referenced
 	*l = *newLogger
 
 	// Start logging
-	log.SetOutput(l.writer)
+	log.SetOutput(l)
 
 	// Listen for log messages without blocking
 	go func() {
@@ -200,8 +229,49 @@ func (l *Logger) Printf(textColor *color.Color, format string, a ...any) {
 	if textColor != nil {
 		logMsg = textColor.Sprint(logMsg)
 	}
-	if l.writer != nil {
-		fmt.Fprint(l.writer, logMsg)
+	l.writeRaw([]byte(logMsg))
+}
+
+// Write lets the standard library logger broadcast through the typed sinks.
+func (l *Logger) Write(p []byte) (int, error) {
+	l.writeRaw(p)
+	return len(p), nil
+}
+
+func (l *Logger) writeRaw(p []byte) {
+	if len(l.sinks) == 0 {
+		if l.writer != nil {
+			_, _ = l.writer.Write(p)
+		}
+		return
+	}
+	for _, sink := range l.sinks {
+		if sink.plain {
+			if _, err := sink.w.Write(stripANSICodes(p)); err != nil {
+				continue
+			}
+			continue
+		}
+		_, _ = sink.w.Write(p)
+	}
+}
+
+// PrintfClass writes one class-formatted block to every sink. Terminal sinks
+// receive the ANSI-rendered version; plain file sinks receive the version
+// without ANSI or Markdown heading markers.
+func (l *Logger) PrintfClass(terminal, plain string) {
+	if len(l.sinks) == 0 {
+		if l.writer != nil {
+			_, _ = io.WriteString(l.writer, terminal)
+		}
+		return
+	}
+	for _, sink := range l.sinks {
+		if sink.plain {
+			_, _ = sink.w.Write(stripANSICodes([]byte(plain)))
+			continue
+		}
+		_, _ = io.WriteString(sink.w, terminal)
 	}
 }
 

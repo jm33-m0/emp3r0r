@@ -640,3 +640,29 @@ func TestDirectionHintCallsOutRepeatedMechanism(t *testing.T) {
 		t.Fatalf("different mechanisms should not produce a hint: %q", hint)
 	}
 }
+
+func TestRenderLoopSummaryIsCompact(t *testing.T) {
+	answer := map[string]any{
+		"loop_id":   "loop-test",
+		"summary":   "Moved the loader to self-load and removed the cross-process findings.",
+		"mechanism": "self-load",
+		"residual":  []any{"Donutloader YARA in the embedded blob"},
+	}
+	cycles := []Cycle{
+		{Iteration: 1, Score: 87.52, Findings: 57},
+		{Iteration: 2, Score: 40.1, Findings: 50},
+	}
+	edits := []EditRecord{{Module: "loader_windows", File: "loader.c", Reason: "replace remote injection"}}
+	out := RenderLoopSummary(answer, cycles, edits)
+	for _, want := range []string{"**Mechanism:** `self-load`", "**Score:** 87.52 → 40.10", "loader_windows/loader.c", "Donutloader YARA"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("summary missing %q:\n%s", want, out)
+		}
+	}
+	if strings.Contains(out, "## Cycles") {
+		t.Fatalf("executive summary includes the full cycle table:\n%s", out)
+	}
+	if len(out) > 2500 {
+		t.Fatalf("executive summary is not compact: %d bytes", len(out))
+	}
+}

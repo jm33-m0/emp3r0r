@@ -5,6 +5,7 @@ package logging
 import (
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestRenderMarkdownRendersStructure(t *testing.T) {
@@ -28,5 +29,30 @@ func TestRenderMarkdownDoesNotExecuteHTML(t *testing.T) {
 	}
 	if !strings.Contains(out, "before") || !strings.Contains(out, "after") {
 		t.Fatalf("surrounding text lost:\n%s", out)
+	}
+}
+
+func TestRenderMarkdownUsesConfiguredWidth(t *testing.T) {
+	SetRenderWidth(40)
+	defer SetRenderWidth(0)
+
+	out := RenderMarkdown(strings.Repeat("word ", 80), 0)
+	plain := string(stripANSICodes([]byte(out)))
+	for _, line := range strings.Split(plain, "\n") {
+		if utf8.RuneCountInString(line) > 40 {
+			t.Fatalf("line exceeds configured width: %q", line)
+		}
+	}
+}
+
+func TestRenderMarkdownPlainDropsHeadingMarkers(t *testing.T) {
+	out := RenderMarkdownPlain("# Title\n\n## Section\n\n- one", 80)
+	if strings.Contains(out, "# Title") || strings.Contains(out, "## Section") {
+		t.Fatalf("plain rendering kept heading markers:\n%s", out)
+	}
+	for _, want := range []string{"Title", "Section", "one"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("plain rendering lost %q:\n%s", want, out)
+		}
 	}
 }
