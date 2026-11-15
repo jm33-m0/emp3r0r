@@ -16,11 +16,14 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/modconfig"
 )
 
-func TestIsSystemImageTreatsBareModuleNamesAsSystem(t *testing.T) {
-	for _, name := range []string{"KERNEL32.DLL", "kernelbase.dll", "ntdll.dll"} {
+func TestIsSystemImageTreatsKnownBareModuleNamesAsSystem(t *testing.T) {
+	for _, name := range []string{"KERNEL32.DLL", "kernelbase.dll", "ntdll.dll", "api-ms-win-core-file-l1-1-0.dll"} {
 		if !isSystemImage(name) {
 			t.Fatalf("%s should be a system image", name)
 		}
+	}
+	if isSystemImage("payload.dll") {
+		t.Fatal("unknown bare module name treated as system")
 	}
 	if isSystemImage(`C:\LitterBox\Uploads\agent.exe`) {
 		t.Fatal("user-writable image treated as system")
@@ -798,5 +801,91 @@ func TestEditSourceHasNoPerCycleCap(t *testing.T) {
 	}
 	if !strings.Contains(string(data), "v13") {
 		t.Fatalf("13 edits were not all applied: %q", data)
+	}
+}
+
+func TestReadBoundedSourceRejectsOversizedFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "large.c")
+	if err := os.WriteFile(path, make([]byte, maxSourceFileBytes+1), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readBoundedSource(path); err == nil {
+		t.Fatal("oversized source file was accepted")
+	}
+}
+
+func TestEditsForPayloadIncludesModule(t *testing.T) {
+	db, err := OpenTelemetryDB(filepath.Join(t.TempDir(), "telemetry.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	res, err := db.db.Exec(`INSERT INTO payloads(payload_key, sha256, module, table_name)
+		VALUES('sha256:edits', 'edits', 'loader_windows', 'payload_edits')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payloadID, err := res.LastInsertId()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.db.Exec(`INSERT INTO loop_edits(
+		loop_id, iteration, payload_id, next_payload_id, module, file, old, new, reason, created_at)
+		VALUES('loop', 1, ?, ?, 'crystal_pack', 'build.sh', 'a', 'b', 'test', 0)`, payloadID, payloadID); err != nil {
+		t.Fatal(err)
+	}
+	edits, err := db.EditsForPayload(context.Background(), "sha256:edits")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(edits) != 1 || edits[0].Module != "crystal_pack" {
+		t.Fatalf("edits = %+v, want module crystal_pack", edits)
+	}
+}
+
+func TestSaveCycleKeepsSummaryJSON(t *testing.T) {
+	db, err := OpenTelemetryDB(filepath.Join(t.TempDir(), "telemetry.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err := db.db.Exec(`INSERT INTO payloads(payload_key, sha256, module, table_name)
+		VALUES('sha256:summary', 'summary', 'loader_windows', 'payload_summary')`); err != nil {
+		t.Fatal(err)
+	}
+	summary, err := json.Marshal(map[string]any{"build_tail": []string{strings.Repeat("x", 5000)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.SaveCycle(context.Background(), Cycle{
+		LoopID: "loop", Iteration: 1, PayloadKey: "sha256:summary", Summary: string(summary),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	cycles, err := db.CyclesForLoop(context.Background(), "loop")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cycles) != 1 {
+		t.Fatalf("cycles = %d", len(cycles))
+	}
+	var got map[string]any
+	if err := json.Unmarshal([]byte(cycles[0].Summary), &got); err != nil {
+		t.Fatalf("stored summary is not JSON: %v", err)
+	}
+}
+
+func TestNormalizeEvolveConfigRejectsStagerLinux(t *testing.T) {
+	moduleDir := t.TempDir()
+	shellcode := filepath.Join(t.TempDir(), "agent.bin")
+	if err := os.WriteFile(shellcode, []byte("shellcode"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := EvolveConfig{
+		Module: "stager_linux", ModuleDir: moduleDir, Shellcode: shellcode,
+		StoreRoot: t.TempDir(), Stages: []string{"dynamic"},
+	}
+	if err := normalizeEvolveConfig(&cfg); err == nil {
+		t.Fatal("stager_linux was accepted by the autonomous loop")
 	}
 }

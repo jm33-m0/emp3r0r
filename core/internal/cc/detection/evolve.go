@@ -31,6 +31,10 @@ const (
 	maxEvolveIterations = 50
 	maxEvolveTurns      = 240
 	maxEvolveBuildLog   = 8 << 20
+	// A model can return valid JSON without ever calling DetectionCycle. Stop
+	// after this many consecutive resumes that make no cycle progress instead
+	// of restarting a fresh 240-turn agent session forever.
+	maxEvolveStalledResumes = 4
 	// minAgentShellcodeBytes rejects a tiny blob that no real Go agent could
 	// have produced. It catches a loader that drops the payload to reduce
 	// detections.
@@ -445,6 +449,20 @@ every residual is explained with evidence. Return the final JSON object.`,
 		parseErr error
 	)
 	maxTokens := 16384
+	progress := e.iter
+	stalled := 0
+	canResume := func() bool {
+		if e.iter != progress {
+			progress = e.iter
+			stalled = 0
+		}
+		stalled++
+		if stalled > maxEvolveStalledResumes {
+			e.logClass(logging.ClassWarning, "stopping after %d agent restarts without a new cycle", stalled-1)
+			return false
+		}
+		return true
+	}
 	for attempt := 0; ; attempt++ {
 		text, err = agentcore.Run(ctx, agentcore.Options{
 			Provider:               provider,
@@ -463,6 +481,9 @@ every residual is explained with evidence. Return the final JSON object.`,
 			if ctx.Err() != nil {
 				return nil, ctx.Err()
 			}
+			if !canResume() {
+				return nil, fmt.Errorf("agent session failed after repeated restarts: %w", err)
+			}
 			if !e.recover(ctx, attempt, "agent session", err) {
 				return nil, ctx.Err()
 			}
@@ -474,6 +495,9 @@ every residual is explained with evidence. Return the final JSON object.`,
 		if parseErr == nil {
 			e.lastAnswer = answer
 			if e.iter < cfg.Iterations && e.needsMoreWork(ctx) {
+				if !canResume() {
+					break
+				}
 				e.logClass(logging.ClassWarning, "agent stopped with work remaining; resuming")
 				prompt = e.resumePrompt(cfg, "real verdicts or actionable high/medium findings remain")
 				continue
@@ -481,6 +505,9 @@ every residual is explained with evidence. Return the final JSON object.`,
 			break
 		}
 		if e.iter < cfg.Iterations {
+			if !canResume() {
+				break
+			}
 			e.logClass(logging.ClassWarning, "agent stopped without the required JSON; resuming")
 			prompt = e.resumePrompt(cfg, "the previous turn ended without the final JSON object")
 			continue
@@ -535,6 +562,12 @@ func normalizeEvolveConfig(cfg *EvolveConfig) error {
 	}
 	if !Covered(cfg.Module) {
 		return fmt.Errorf("module %q is not covered by the detection loop", cfg.Module)
+	}
+	// The autonomous loop passes loader_windows flags (shellcode, format, smw)
+	// and requires the sandbox to execute a Windows PE. stager_linux has a
+	// different flag set and no runnable dynamic stage here.
+	if cfg.Module != "loader_windows" {
+		return fmt.Errorf("the autonomous detection loop currently supports loader_windows only")
 	}
 	cfg.ModuleDir = strings.TrimSpace(cfg.ModuleDir)
 	if cfg.ModuleDir == "" {
@@ -802,6 +835,9 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, 
 			if edit.Iteration != iteration {
 				continue
 			}
+			if len(summary.Edits) >= 24 {
+				break
+			}
 			summary.Edits = append(summary.Edits, EditRecord{
 				Module: edit.Module, File: edit.File, Reason: sanitizeLine(edit.Reason),
 			})
@@ -862,13 +898,16 @@ func summarizeCycle(loopID string, iteration int, run Run, feedback Feedback, bu
 		for _, finding := range run.Telemetry.Findings {
 			if finding.Rule == "defender/verdict" {
 				summary.Verdicts = appendUnique(summary.Verdicts, sanitizeLine(finding.Indicator))
+				if len(summary.Verdicts) >= 8 {
+					break
+				}
 			}
 		}
 	}
 	for _, finding := range feedback.Findings {
 		summary.TopFindings = append(summary.TopFindings,
-			fmt.Sprintf("%s %s %s", sanitizeLine(finding.Severity), sanitizeLine(finding.Rule),
-				sanitizeLine(finding.Indicator)))
+			clipUTF8(fmt.Sprintf("%s %s %s", sanitizeLine(finding.Severity), sanitizeLine(finding.Rule),
+				sanitizeLine(finding.Indicator)), 500))
 		if len(summary.TopFindings) >= 8 {
 			break
 		}
@@ -877,7 +916,9 @@ func summarizeCycle(loopID string, iteration int, run Run, feedback Feedback, bu
 	if len(lines) > 15 {
 		lines = lines[len(lines)-15:]
 	}
-	summary.BuildTail = lines
+	for _, line := range lines {
+		summary.BuildTail = append(summary.BuildTail, clipUTF8(line, 500))
+	}
 	return summary
 }
 
@@ -1165,7 +1206,7 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 			if err != nil {
 				return tool.Errorf(fmt.Sprintf("%v", err)), nil
 			}
-			edits, _ := e.editsForPayload(ctx, cycle.PayloadKey)
+			edits, _ := e.db.EditsForPayload(ctx, cycle.PayloadKey)
 			payload, _ := e.db.PayloadByKey(ctx, cycle.PayloadKey)
 			var summary any
 			_ = json.Unmarshal([]byte(cycle.Summary), &summary)
@@ -1217,7 +1258,7 @@ func (e *evolver) inspectFeedbackTool() tool.CoreTool {
 			if err := json.Unmarshal(body, &feedback); err != nil {
 				return tool.Errorf("decode feedback"), nil
 			}
-			edits, _ := e.editsForPayload(ctx, payloadKey)
+			edits, _ := e.db.EditsForPayload(ctx, payloadKey)
 			out := feedbackSummary(feedback, runID, payloadKey, edits)
 			data, _ := json.Marshal(out)
 			return tool.Text(string(data)), nil
@@ -1584,35 +1625,6 @@ func (e *evolver) loadFeedback(ctx context.Context, runID, payloadKey string) (j
 		payloadKey = payload.Key
 	}
 	return json.RawMessage(body), foundRun, payloadKey, nil
-}
-
-func (e *evolver) editsForPayload(ctx context.Context, payloadKey string) ([]EditRecord, error) {
-	if payloadKey == "" {
-		return nil, nil
-	}
-	id, err := payloadIDByKey(ctx, e.db.db, payloadKey)
-	if err != nil || id == 0 {
-		return nil, err
-	}
-	rows, err := e.db.db.QueryContext(ctx, `
-		SELECT loop_id, iteration, COALESCE(payload_id, 0), file, old, new, reason, created_at
-		FROM loop_edits WHERE next_payload_id = ? ORDER BY id`, id)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []EditRecord
-	for rows.Next() {
-		var record EditRecord
-		var created int64
-		if err := rows.Scan(&record.LoopID, &record.Iteration, &record.PayloadID,
-			&record.File, &record.Old, &record.New, &record.Reason, &created); err != nil {
-			return nil, err
-		}
-		record.CreatedAt = time.UnixMilli(created).UTC()
-		out = append(out, record)
-	}
-	return out, rows.Err()
 }
 
 func feedbackSummary(feedback Feedback, runID, payloadKey string, edits []EditRecord) map[string]any {

@@ -618,7 +618,7 @@ func newSourceIndex(dir string) *sourceIndex {
 		if info.Size() > maxSourceFileBytes || len(index.files) >= maxSourceFiles || total > maxSourceTotalBytes {
 			return nil
 		}
-		data, err := os.ReadFile(path)
+		data, err := readBoundedSource(path)
 		if err != nil {
 			return nil
 		}

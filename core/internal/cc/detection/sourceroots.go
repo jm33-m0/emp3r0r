@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -149,6 +150,25 @@ func (s *sourceRoots) resolve(name, supplied string) (sourceRoot, string, error)
 	return root, path, nil
 }
 
+// readBoundedSource reads one source file without loading more than the
+// per-file budget. The stat check in newSourceIndex is advisory: a model can
+// point SourceRead/SourceSearch at a path that exists but is much larger.
+func readBoundedSource(path string) ([]byte, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = file.Close() }()
+	data, err := io.ReadAll(io.LimitReader(file, maxSourceFileBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(data) > maxSourceFileBytes {
+		return nil, fmt.Errorf("%s exceeds the read bound", filepath.Base(path))
+	}
+	return data, nil
+}
+
 func (s *sourceRoots) describe() string {
 	if s == nil {
 		return ""
@@ -238,12 +258,9 @@ func moduleReadTool(trees *sourceRoots) tool.CoreTool {
 			if err != nil {
 				return tool.Errorf(fmt.Sprintf("%v", err)), nil
 			}
-			data, err := os.ReadFile(path)
+			data, err := readBoundedSource(path)
 			if err != nil {
 				return tool.Errorf(fmt.Sprintf("read %s: %v", args.Path, err)), nil
-			}
-			if len(data) > maxSourceFileBytes {
-				return tool.Errorf(fmt.Sprintf("%s exceeds the read bound", args.Path)), nil
 			}
 			lines := strings.Split(string(data), "\n")
 			start := args.StartLine
@@ -318,7 +335,7 @@ func moduleSearchTool(trees *sourceRoots) tool.CoreTool {
 				if err != nil {
 					return tool.Errorf(fmt.Sprintf("%v", err)), nil
 				}
-				data, err := os.ReadFile(path)
+				data, err := readBoundedSource(path)
 				if err != nil {
 					return tool.Errorf(fmt.Sprintf("read %s: %v", args.Path, err)), nil
 				}

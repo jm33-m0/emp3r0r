@@ -2,9 +2,10 @@
 
 The detection loop tests a built payload against a local
 [LitterBox](https://github.com/BlackSnufkin/LitterBox) sandbox and maps every
-detector hit back to the module source that produced it. It covers
-`loader_windows` and `stager_linux` artifacts; the tests run on the operator
-host and never touch a target.
+detector hit back to the module source that produced it. The plan and run tools
+cover `loader_windows` and `stager_linux` artifacts; the autonomous loop builds
+`loader_windows` only. The tests run on the operator host and never touch a
+target.
 
 ## Prerequisites
 
@@ -74,9 +75,10 @@ indicators. Keep the module contract described in
 `detect_loop` in the console starts a detached worker. It builds a real Go
 Windows agent artifact and, when `--shellcode` is omitted, wraps it through the
 `crystal_pack` producer module (a `windows_dll` agent packed as Crystal Palace
-PICO) when the Crystal Palace distribution and Java are installed. Otherwise it
-wraps a `windows_executable` agent through `donut`. Pass `--agent-type` to force
-a payload type; `auto` is the default. The worker then runs:
+PICO) when the Crystal Palace distribution, Java, and the module's build
+toolchain are installed. Otherwise it wraps a `windows_executable` agent
+through `donut`. Pass `--agent-type` to force a payload type; `auto` is the
+default. The worker then runs:
 
 1. build `loader_windows` from `--module-dir`;
 2. detonate it in LitterBox and import every saved analyzer result: RedEdr,

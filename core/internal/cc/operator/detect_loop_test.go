@@ -129,12 +129,16 @@ func crystalPackFixture(t *testing.T) string {
 	if err := os.WriteFile(spec, []byte("spec"), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	libtcg := filepath.Join(dir, "libtcg.x64.zip")
+	if err := os.WriteFile(libtcg, []byte("zip"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	java := filepath.Join(dir, "java")
 	if err := os.WriteFile(java, []byte("#!/bin/sh\n"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("JAVA", java)
-	t.Setenv("CC_64", "zig cc")
+	t.Setenv("CC_64", "sh -c")
 	t.Setenv("NASM", "/bin/sh")
 	return dir
 }

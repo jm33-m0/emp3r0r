@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -90,7 +91,7 @@ func (t *TelemetryDB) SaveCycle(ctx context.Context, cycle Cycle) (int64, error)
 		VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		cycle.LoopID, cycle.Iteration, cycle.PayloadID, cycle.RunID, cycle.Score,
 		cycle.Level, cycle.Findings, cycle.Verdicts, nullableInt(cycle.TraceID),
-		clip(cycle.Summary, 4000), cycle.CreatedAt.UnixMilli())
+		cycle.Summary, cycle.CreatedAt.UnixMilli())
 	if err != nil {
 		return 0, fmt.Errorf("save cycle: %w", err)
 	}
@@ -169,6 +170,9 @@ func scanEdits(rows *sql.Rows) ([]EditRecord, error) {
 
 // EditsForPayload returns the edits that produced one payload.
 func (t *TelemetryDB) EditsForPayload(ctx context.Context, payloadKey string) ([]EditRecord, error) {
+	if strings.TrimSpace(payloadKey) == "" {
+		return nil, nil
+	}
 	id, err := payloadIDByKey(ctx, t.db, payloadKey)
 	if err != nil || id == 0 {
 		return nil, err

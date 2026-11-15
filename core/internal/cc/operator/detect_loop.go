@@ -43,9 +43,10 @@ SQLite telemetry, edit module source, rebuild, and compare payloads.
 
 --shellcode accepts any x64 position-independent shellcode. Without it, the
 worker generates a Windows DLL agent and wraps it with crystal_pack when the
-Crystal Palace distribution and Java are installed, and otherwise falls back to
-a Windows EXE agent wrapped with donut. Norma can change the loader, wrapper,
-injection path, or shellcode producer when telemetry points at that design.
+Crystal Palace distribution, Java, and its build toolchain are installed, and
+otherwise falls back to a Windows EXE agent wrapped with donut. Norma can
+change the loader, wrapper, injection path, or shellcode producer when telemetry
+points at that design.
 
 The worker imports every saved LitterBox analyzer result: RedEdr, Moneta,
 pe-sieve, HollowsHunter, HSB, Patriot, Blender, YARA, CheckPlz, HolyGrail, and
@@ -326,40 +327,54 @@ func crystalPackAvailable(dir string) bool {
 	if info, err := os.Stat(spec); err != nil || !info.Mode().IsRegular() {
 		return false
 	}
+	libtcg := filepath.Join(dir, "libtcg.x64.zip")
+	if info, err := os.Stat(libtcg); err != nil || !info.Mode().IsRegular() {
+		return false
+	}
 	if !crystalPackToolchain() {
 		return false
 	}
 	java := strings.TrimSpace(os.Getenv("JAVA"))
 	if java == "" {
-		_, err := exec.LookPath("java")
-		return err == nil
+		java = "java"
 	}
-	if _, err := exec.LookPath(java); err == nil {
-		return true
-	}
-	info, err := os.Stat(java)
-	return err == nil && info.Mode().IsRegular()
+	return commandExists(java)
 }
 
 // crystalPackToolchain mirrors build.sh: postex-loader objects are rebuilt on
-// every link, so a Windows C compiler and nasm must be resolvable.
+// every link, so a Windows C compiler and nasm must be resolvable. CC_64 and
+// ZIG may contain arguments (for example "zig cc -target ..."), so only the
+// command word is resolved.
 func crystalPackToolchain() bool {
-	if strings.TrimSpace(os.Getenv("CC_64")) == "" {
-		if _, err := exec.LookPath("x86_64-w64-mingw32-gcc"); err != nil {
-			zig := strings.TrimSpace(os.Getenv("ZIG"))
-			if zig == "" {
-				zig = "zig"
-			}
-			if _, err := exec.LookPath(zig); err != nil {
-				return false
+	compiler := strings.TrimSpace(os.Getenv("CC_64"))
+	if compiler == "" {
+		if commandExists("x86_64-w64-mingw32-gcc") {
+			compiler = "x86_64-w64-mingw32-gcc"
+		} else {
+			compiler = strings.TrimSpace(os.Getenv("ZIG"))
+			if compiler == "" {
+				compiler = "zig"
 			}
 		}
+	}
+	if !commandExists(compiler) {
+		return false
 	}
 	nasm := strings.TrimSpace(os.Getenv("NASM"))
 	if nasm == "" {
 		nasm = "nasm"
 	}
-	_, err := exec.LookPath(nasm)
+	return commandExists(nasm)
+}
+
+// commandExists reports whether the first word of a shell command is an
+// executable. Environment overrides such as CC_64 can carry target flags.
+func commandExists(command string) bool {
+	fields := strings.Fields(command)
+	if len(fields) == 0 {
+		return false
+	}
+	_, err := exec.LookPath(fields[0])
 	return err == nil
 }
 
@@ -458,6 +473,7 @@ func startDetectLoopWorker(opts detectLoopOptions, shellcode, loopID string, log
 	worker.Stderr = logFile
 	detachWorker(worker)
 	if err := worker.Start(); err != nil {
+		_ = logFile.Close()
 		return fmt.Errorf("start worker: %w", err)
 	}
 	logf("worker pid=%d; log=%s", worker.Process.Pid, logFile.Name())

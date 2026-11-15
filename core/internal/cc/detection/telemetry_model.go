@@ -974,15 +974,40 @@ func isSystemImage(path string) bool {
 		return true
 	}
 	// Module-load events carry the bare image name (KERNEL32.DLL), not a path.
-	// A name without a directory component is resolved by the loader search
-	// order, which only searches system directories, so it is a system image.
+	// A bare name is not inherently system: LoadLibrary("payload.dll") also
+	// searches the application and current directories. Only known Windows
+	// system modules are baseline; a new bare name is a signal.
 	if !strings.Contains(normalized, `\`) {
-		return true
+		return isWindowsSystemModule(normalized)
 	}
 	return strings.Contains(normalized, `\windows\`) ||
 		strings.Contains(normalized, `\program files\`) ||
 		strings.Contains(normalized, `\programdata\microsoft\windows defender\`) ||
 		strings.Contains(normalized, `\systemroot\`)
+}
+
+func isWindowsSystemModule(name string) bool {
+	name = strings.ToLower(strings.TrimSpace(name))
+	if strings.HasPrefix(name, "api-ms-win-") || strings.HasPrefix(name, "ext-ms-") {
+		return true
+	}
+	_, ok := windowsSystemModules[name]
+	return ok
+}
+
+var windowsSystemModules = map[string]struct{}{
+	"advapi32.dll": {}, "bcrypt.dll": {}, "cfgmgr32.dll": {}, "combase.dll": {},
+	"comctl32.dll": {}, "comdlg32.dll": {}, "crypt32.dll": {}, "cryptbase.dll": {},
+	"dbghelp.dll": {}, "dwmapi.dll": {}, "gdi32.dll": {}, "gdi32full.dll": {},
+	"imm32.dll": {}, "iphlpapi.dll": {}, "kernel32.dll": {}, "kernelbase.dll": {},
+	"msvcp_win.dll": {}, "msvcrt.dll": {}, "ntdll.dll": {}, "ntmarta.dll": {},
+	"ole32.dll": {}, "oleacc.dll": {}, "oleaut32.dll": {}, "powrprof.dll": {},
+	"profapi.dll": {}, "propsys.dll": {}, "psapi.dll": {}, "rpcrt4.dll": {},
+	"sechost.dll": {}, "secur32.dll": {}, "setupapi.dll": {}, "shcore.dll": {},
+	"shell32.dll": {}, "shlwapi.dll": {}, "sspicli.dll": {}, "ucrtbase.dll": {},
+	"user32.dll": {}, "userenv.dll": {}, "usp10.dll": {}, "uxtheme.dll": {},
+	"version.dll": {}, "win32u.dll": {}, "windows.storage.dll": {},
+	"winmm.dll": {}, "wintrust.dll": {}, "ws2_32.dll": {}, "wtsapi32.dll": {},
 }
 
 func looksLikeScanner(name string) bool {
