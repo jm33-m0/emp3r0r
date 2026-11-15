@@ -62,6 +62,9 @@ type EvolveConfig struct {
 	// to its source directory. The loop may read and edit these modules and run
 	// their build to replace the shellcode a later cycle loads.
 	ProducerDirs map[string]string
+	// InitialProducer names the module that generated Shellcode. It tells the
+	// model which producer to inspect when the blob itself is the signal.
+	InitialProducer string
 	// ReadRoots are extra directories the source tools may read but not edit,
 	// such as modules/common or c_agent util sources a module links.
 	ReadRoots []string
@@ -124,19 +127,20 @@ type EvolveResult struct {
 }
 
 type evolver struct {
-	cfg           EvolveConfig
-	loop          *Loop
-	db            *TelemetryDB
-	logf          func(logging.Class, string, ...any)
-	iter          int
-	last          *Cycle
-	cycles        []Cycle
-	roots         *sourceRoots
-	shellcode     string
-	agentArtifact string
-	shellSeq      int
-	knowledge     *KnowledgeDB
-	lastAnswer    map[string]any
+	cfg            EvolveConfig
+	loop           *Loop
+	db             *TelemetryDB
+	logf           func(logging.Class, string, ...any)
+	iter           int
+	last           *Cycle
+	cycles         []Cycle
+	roots          *sourceRoots
+	shellcode      string
+	agentArtifact  string
+	activeProducer string
+	shellSeq       int
+	knowledge      *KnowledgeDB
+	lastAnswer     map[string]any
 }
 
 func (e *evolver) activeShellcode() string {
@@ -319,7 +323,10 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 		return nil, fmt.Errorf("telemetry database is not configured")
 	}
 	defer loop.Telemetry.Close()
-	e := &evolver{cfg: cfg, loop: loop, db: loop.Telemetry, logf: cfg.Logf, shellcode: cfg.Shellcode}
+	e := &evolver{
+		cfg: cfg, loop: loop, db: loop.Telemetry, logf: cfg.Logf, shellcode: cfg.Shellcode,
+		activeProducer: strings.ToLower(strings.TrimSpace(cfg.InitialProducer)),
+	}
 	if e.logf == nil {
 		e.logf = func(logging.Class, string, ...any) {}
 	}
@@ -365,6 +372,7 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 Module: %s
 Module source: %s
 Active shellcode: %s
+Active shellcode producer: %s
 Producer modules: %s
 Source roots: %s
 Knowledge cache: %s
@@ -386,15 +394,21 @@ Changing the shellcode producer is a first-class move. Edit the producer module
 declared options. The produced artifact becomes the shellcode for every later
 cycle; the cycle summary records its path. BuildShellcode validates options,
 forces the output under the detection store, and refuses files outside the
-operator payload directory.
+operator payload directory. crystal_pack's runtime loader is
+postex-loader/src; build.sh rebuilds those objects from the edited source
+before linking the PICO, so loader edits take effect. The loader/ tree is a
+separate use-case loader that crystal_pack does not link. donut rebuilds its
+stubs and generator from src/ on every build.
 
 GenerateAgent rebuilds the Go agent, not just the wrapper. agent_type may be
 windows_executable or windows_dll; the result returns artifact_path without
 wrapping it. Use BuildShellcode producer=donut with input=artifact_path, or
 producer=crystal_pack with dll=artifact_path, to choose the shellcode wrapper.
-Java is installed for crystal_pack. The agent payload itself must remain: do
-not replace the shellcode with a smaller blob or build a loader that does not
-execute it.
+Java is required for crystal_pack. Switching from a donut EXE agent to a
+crystal_pack DLL agent is a design change, not a replacement of the agent
+payload: the new artifact is a freshly built agent with the same configuration.
+The agent payload itself must remain: do not replace the shellcode with a
+smaller blob or build a loader that does not execute it.
 
 Use all telemetry. Defender verdicts are one input; the events table carries
 ETW, ETW-TI memory operations, kernel callbacks, ntdll hooks, PEB and loaded-DLL
@@ -422,7 +436,7 @@ If coverage.missing is not empty, or an analyzer reports a scan error or early
 termination, name the gap and do not treat the cycle as clean. Stop when the
 cycle budget is exhausted, or when no actionable high/medium finding remains and
 every residual is explained with evidence. Return the final JSON object.`,
-		cfg.LoopID, cfg.Module, cfg.ModuleDir, e.shellcode, producerList, rootList,
+		cfg.LoopID, cfg.Module, cfg.ModuleDir, e.shellcode, headerOrNone(e.activeProducer), producerList, rootList,
 		knowledgeState, cfg.Iterations, max(0, cfg.Iterations-e.iter), cfg.Module, baselineJSON)
 
 	var (
@@ -564,6 +578,17 @@ func normalizeEvolveConfig(cfg *EvolveConfig) error {
 			return fmt.Errorf("producer %s directory %q is not readable", name, dir)
 		}
 		producers[name] = dir
+	}
+	cfg.AgentType = strings.ToLower(strings.TrimSpace(cfg.AgentType))
+	if cfg.AgentType == "" || cfg.AgentType == "auto" {
+		cfg.AgentType = "windows_executable"
+	}
+	if cfg.AgentType != "windows_executable" && cfg.AgentType != "windows_dll" {
+		return fmt.Errorf("agent type must be windows_executable or windows_dll")
+	}
+	cfg.AgentArch = strings.ToLower(strings.TrimSpace(cfg.AgentArch))
+	if cfg.AgentArch == "" {
+		cfg.AgentArch = "amd64"
 	}
 	cfg.ProducerDirs = producers
 	roots := make([]string, 0, len(cfg.ReadRoots))
@@ -940,6 +965,7 @@ func (e *evolver) dossier() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "- cycles used: %d of %d\n", e.iter, e.cfg.Iterations)
 	fmt.Fprintf(&b, "- active shellcode: %s\n", e.shellcode)
+	fmt.Fprintf(&b, "- active shellcode producer: %s\n", headerOrNone(e.activeProducer))
 	if names := e.producerNames(); len(names) > 0 {
 		fmt.Fprintf(&b, "- producers: %s\n", strings.Join(names, ", "))
 	}
@@ -1290,6 +1316,7 @@ func (e *evolver) editSourceTool() tool.CoreTool {
 		Name: "EditSource",
 		Description: "Replace one exact string in a module source file. The old string must occur once. " +
 			"module selects the payload module (default) or a producer module (donut, crystal_pack). " +
+			"crystal_pack links postex-loader/src and rebuilds it on the next BuildShellcode; donut rebuilds src/. " +
 			"The edit is atomic, stored in SQLite with before/after text, and takes effect on the next DetectionCycle.",
 		Prompt: "Apply one source edit.",
 		Schema: map[string]any{
@@ -1694,14 +1721,20 @@ Work loop:
    result replaces the shellcode every later cycle loads. Producer options are
    validated against the module's config.json; the output path is chosen by the
    host. A producer change is the right move when the signal is a signature or
-   layout in the generated blob; a loader-only edit cannot remove it.
+   layout in the generated blob; a loader-only edit cannot remove it. The
+   active producer is recorded in the prompt and dossier: crystal_pack PICO
+   uses the runtime loader in postex-loader/src, while donut rebuilds
+   src/loader and src/donut.c.
    GenerateAgent rebuilds the Go agent itself with agent_type
    windows_executable or windows_dll. Its artifact_path can be passed as the
    dll option to BuildShellcode producer=crystal_pack; crystal_pack uses the
-   installed Java runtime and writes PICO shellcode. Changing the agent type or
-   producer must still execute the agent: do not shrink the active shellcode or
-   build a loader that skips the payload. The host rejects a cycle whose
-   artifact is too small to contain the active shellcode.
+   installed Java runtime and writes PICO shellcode. Switching from a donut EXE
+   agent to a crystal_pack DLL agent is a design change, not a replacement of
+   the agent payload: the new artifact is a freshly built agent with the same
+   configuration. Changing the agent type or producer must still execute the
+   agent: do not shrink the active shellcode or build a loader that skips the
+   payload. The host rejects a cycle whose artifact is too small to contain the
+   active shellcode.
 4. Call DetectionCycle with the mechanism under test. It rebuilds from the
    current source and returns a bounded summary, the new payload key, the active
    shellcode, and the remaining cycle budget. Do not exceed the budget.

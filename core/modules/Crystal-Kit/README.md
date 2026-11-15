@@ -86,8 +86,11 @@ bash make_all.sh
   Handler used by the COFFLoader DLL path (`RunWindowsCOFFViaDLL`); a fault is
   converted into an operator-visible error instead of killing the agent.
 - The `loader/` directory is the upstream Crystal-Kit use-case-A loader and is
-  reserved for a future agent-delivery stager; it is not used by these two
-  modules yet.
+  reserved for a future agent-delivery stager; `crystal_pack` does not link it.
+- `crystal_pack` rebuilds `postex-loader/src` into `postex-loader/bin` on every
+  run, so edits to that loader reach the PICO. It uses
+  `x86_64-w64-mingw32-gcc` when present and Zig's `x86_64-windows-gnu` target
+  otherwise, and needs `nasm` for the stack-spoofing stub.
 
 ## Testing
 

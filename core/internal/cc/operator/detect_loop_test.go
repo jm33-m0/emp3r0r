@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/builder"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 )
 
@@ -64,4 +65,76 @@ func TestKnowledgeSyncArgsUsesResolvedCachePath(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("args = %#v, want %#v", got, want)
 	}
+}
+
+func TestChooseShellcodeProducerUsesCrystalPalaceForAuto(t *testing.T) {
+	dir := crystalPackFixture(t)
+	producers := map[string]string{
+		"crystal_pack": dir,
+		"donut":        t.TempDir(),
+	}
+	producer, gotDir, agentType := chooseShellcodeProducer(producers, "auto")
+	if producer != "crystal_pack" || gotDir != dir || agentType != builder.PayloadTypeWindowsDLL {
+		t.Fatalf("auto = %q %q %q, want crystal_pack with a DLL", producer, gotDir, agentType)
+	}
+}
+
+func TestChooseShellcodeProducerFallsBackWhenCrystalPalaceIsMissing(t *testing.T) {
+	donutDir := t.TempDir()
+	producers := map[string]string{"donut": donutDir}
+	producer, gotDir, agentType := chooseShellcodeProducer(producers, "auto")
+	if producer != "donut" || gotDir != donutDir || agentType != builder.PayloadTypeWindowsExecutable {
+		t.Fatalf("auto = %q %q %q, want donut with an EXE", producer, gotDir, agentType)
+	}
+}
+
+func TestChooseShellcodeProducerHonorsExplicitAgentType(t *testing.T) {
+	crystalDir := crystalPackFixture(t)
+	donutDir := t.TempDir()
+	producers := map[string]string{
+		"crystal_pack": crystalDir,
+		"donut":        donutDir,
+	}
+	producer, _, agentType := chooseShellcodeProducer(producers, builder.PayloadTypeWindowsExecutable)
+	if producer != "donut" || agentType != builder.PayloadTypeWindowsExecutable {
+		t.Fatalf("explicit EXE = %q %q, want donut with an EXE", producer, agentType)
+	}
+	producer, _, agentType = chooseShellcodeProducer(producers, builder.PayloadTypeWindowsDLL)
+	if producer != "crystal_pack" || agentType != builder.PayloadTypeWindowsDLL {
+		t.Fatalf("explicit DLL = %q %q, want crystal_pack with a DLL", producer, agentType)
+	}
+}
+
+func TestChooseShellcodeProducerRejectsNoProducer(t *testing.T) {
+	producer, _, _ := chooseShellcodeProducer(nil, "auto")
+	if producer != "" {
+		t.Fatalf("producer = %q, want none", producer)
+	}
+}
+
+func crystalPackFixture(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	jar := filepath.Join(dir, "crystalpalace", "crystalpalace.jar")
+	if err := os.MkdirAll(filepath.Dir(jar), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(jar, []byte("jar"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	spec := filepath.Join(dir, "postex-loader", "loader.spec")
+	if err := os.MkdirAll(filepath.Dir(spec), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(spec, []byte("spec"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	java := filepath.Join(dir, "java")
+	if err := os.WriteFile(java, []byte("#!/bin/sh\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("JAVA", java)
+	t.Setenv("CC_64", "zig cc")
+	t.Setenv("NASM", "/bin/sh")
+	return dir
 }

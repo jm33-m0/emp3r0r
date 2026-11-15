@@ -73,7 +73,10 @@ indicators. Keep the module contract described in
 
 `detect_loop` in the console starts a detached worker. It builds a real Go
 Windows agent artifact and, when `--shellcode` is omitted, wraps it through the
-`donut` producer module. It then runs:
+`crystal_pack` producer module (a `windows_dll` agent packed as Crystal Palace
+PICO) when the Crystal Palace distribution and Java are installed. Otherwise it
+wraps a `windows_executable` agent through `donut`. Pass `--agent-type` to force
+a payload type; `auto` is the default. The worker then runs:
 
 1. build `loader_windows` from `--module-dir`;
 2. detonate it in LitterBox and import every saved analyzer result: RedEdr,
@@ -117,7 +120,11 @@ installed `donut` and `crystal_pack` modules are added automatically. The
 model may read and edit a producer's source (`EditSource module=donut`), then
 call `BuildShellcode`. The `donut` module rebuilds its x86/x64 loader stubs and
 generator from `core/modules/donut/src` on every build, so loader edits take
-effect in the generated shellcode. `BuildShellcode`:
+effect in the generated shellcode. `crystal_pack` rebuilds the runtime loader
+objects from `core/modules/Crystal-Kit/postex-loader/src` on every build, using
+`x86_64-w64-mingw32-gcc` when present and Zig's `x86_64-windows-gnu` target
+otherwise; its `loader/` tree is a separate use-case loader that
+`crystal_pack` does not link. `BuildShellcode`:
 
 - validates options against the module's `config.json` (unknown, internal, and
   out-of-choice values are rejected);

@@ -143,13 +143,29 @@ fi
 OUTPUT_ABS="$(abspath "$OUTPUT")"
 mkdir -p "$(dirname "$OUTPUT_ABS")"
 
-# ---- build the postex-loader objects (non-fatal) ----
-if command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1 && command -v nasm >/dev/null 2>&1; then
-  echo "[*] Building postex-loader objects"
-  make -C "$POSTEX_DIR" all
-else
-  echo "[*] Skipping object build; using prebuilt postex-loader objects if present"
+# ---- build the postex-loader objects ----
+# The PICO links these objects, so rebuild them from source on every run:
+# an edit to postex-loader/src must reach the generated shellcode. Zig is the
+# fallback compiler because the pinned operator toolchain ships it under that
+# name and it emits objects Crystal Palace can relocate (see common.mk).
+CC_64="${CC_64:-}"
+if [ -z "$CC_64" ]; then
+  if command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1; then
+    CC_64="x86_64-w64-mingw32-gcc"
+  elif command -v "${ZIG:-zig}" >/dev/null 2>&1; then
+    CC_64="${ZIG:-zig} cc -target x86_64-windows-gnu"
+  else
+    echo "[-] no Windows C compiler found: install x86_64-w64-mingw32-gcc or zig" >&2
+    exit 1
+  fi
 fi
+NASM="${NASM:-nasm}"
+command -v "$NASM" >/dev/null 2>&1 || {
+  echo "[-] nasm not found: install nasm or set NASM=/path/to/nasm" >&2
+  exit 1
+}
+echo "[*] Rebuilding postex-loader objects from source"
+make -C "$POSTEX_DIR" clean all CC_64="$CC_64" NASM="$NASM"
 
 # ---- bake optional args into a dll_args section ----
 ARGS_FILE="$(mktemp)"

@@ -41,11 +41,11 @@ omitted, then starts a detached worker. The worker builds the loader from
 --module-dir, detonates it in LitterBox, and lets a Norma agent inspect the
 SQLite telemetry, edit module source, rebuild, and compare payloads.
 
---shellcode accepts any x64 position-independent shellcode, so a Crystal
-Palace/Crystal-Kit PICO produced by crystal_pack can replace the generated
-Donut shellcode without changing the loader. Norma can change the loader,
-wrapper, injection path, or shellcode producer when telemetry points at that
-design.
+--shellcode accepts any x64 position-independent shellcode. Without it, the
+worker generates a Windows DLL agent and wraps it with crystal_pack when the
+Crystal Palace distribution and Java are installed, and otherwise falls back to
+a Windows EXE agent wrapped with donut. Norma can change the loader, wrapper,
+injection path, or shellcode producer when telemetry points at that design.
 
 The worker imports every saved LitterBox analyzer result: RedEdr, Moneta,
 pe-sieve, HollowsHunter, HSB, Patriot, Blender, YARA, CheckPlz, HolyGrail, and
@@ -70,7 +70,7 @@ Set the model through the environment:
 	}
 	cmd.Flags().String("module-dir", "", "Module source directory (default: the installed loader_windows path)")
 	cmd.Flags().String("shellcode", "", "x64 PIC shellcode (Donut, Crystal Palace PICO, ...); generated when omitted")
-	cmd.Flags().String("agent-type", builder.PayloadTypeWindowsExecutable, "Agent payload type to generate")
+	cmd.Flags().String("agent-type", "auto", "Agent payload type to generate: auto, windows_executable, or windows_dll")
 	cmd.Flags().String("arch", "amd64", "Agent architecture")
 	cmd.Flags().String("cc", "", "C2 address for the generated agent; defaults to the current config")
 	cmd.Flags().String("sandbox", "", "LitterBox URL; defaults to EMP3R0R_DETECTION_SANDBOX or 127.0.0.1:1337")
@@ -80,7 +80,7 @@ Set the model through the environment:
 	cmd.Flags().String("format", "exe", "Loader host format: exe, service, or dll")
 	cmd.Flags().String("inject", "", "Override the injection method; empty uses the module default")
 	cmd.Flags().String("smw", "on", "SilentMoonwalk: on or off")
-	cmd.Flags().StringSlice("producer", nil, "Shellcode producer module as name=path (donut=..., crystal_pack=...)")
+	cmd.Flags().StringSlice("producer", nil, "Shellcode producer as name=path (donut=..., crystal_pack=...); crystal_pack is preferred for the baseline")
 	cmd.Flags().StringSlice("read-root", nil, "Read-only source root the model may inspect (repeatable)")
 	cmd.Flags().String("knowledge", "", "Knowledge cache path; defaults to <detection store>/knowledge.db")
 	cmd.Flags().Int("turns", 60, "Maximum Norma agent turns (at most 240)")
@@ -91,25 +91,29 @@ Set the model through the environment:
 }
 
 type detectLoopOptions struct {
-	ModuleDir   string
-	Shellcode   string
-	AgentType   string
-	Arch        string
-	CC          string
-	Sandbox     string
-	Iterations  int
-	Stages      []string
-	Process     string
-	Format      string
-	Inject      string
-	SMW         string
-	Producers   []string
-	ReadRoots   []string
-	Knowledge   string
-	Turns       int
-	Timeout     time.Duration
-	Tmux        bool
-	RenderWidth int
+	ModuleDir string
+	Shellcode string
+	// ShellcodeProducer is the module that generated Shellcode when the
+	// parent process built it, so the worker can tell the model which
+	// producer source describes the blob.
+	ShellcodeProducer string
+	AgentType         string
+	Arch              string
+	CC                string
+	Sandbox           string
+	Iterations        int
+	Stages            []string
+	Process           string
+	Format            string
+	Inject            string
+	SMW               string
+	Producers         []string
+	ReadRoots         []string
+	Knowledge         string
+	Turns             int
+	Timeout           time.Duration
+	Tmux              bool
+	RenderWidth       int
 }
 
 func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
@@ -133,8 +137,14 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 	opts.Timeout, _ = cmd.Flags().GetDuration("timeout")
 	opts.Tmux, _ = cmd.Flags().GetBool("tmux")
 
-	if opts.AgentType != builder.PayloadTypeWindowsExecutable && opts.AgentType != builder.PayloadTypeWindowsDLL {
-		logging.Errorf("detect_loop: agent type must be %s or %s", builder.PayloadTypeWindowsExecutable, builder.PayloadTypeWindowsDLL)
+	if opts.AgentType = strings.ToLower(strings.TrimSpace(opts.AgentType)); opts.AgentType == "" {
+		opts.AgentType = "auto"
+	}
+	switch opts.AgentType {
+	case "auto", builder.PayloadTypeWindowsExecutable, builder.PayloadTypeWindowsDLL:
+	default:
+		logging.Errorf("detect_loop: agent type must be auto, %s, or %s",
+			builder.PayloadTypeWindowsExecutable, builder.PayloadTypeWindowsDLL)
 		return
 	}
 	if opts.Arch != "amd64" {
@@ -204,13 +214,15 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 		shellcode := strings.TrimSpace(opts.Shellcode)
 		if shellcode == "" {
 			logf("generating real Go agent shellcode (%s/%s)", opts.AgentType, opts.Arch)
-			generated, genErr := generateAgentShellcode(opts, logf)
+			generated, producer, agentType, genErr := generateAgentShellcode(opts, logf)
 			if genErr != nil {
 				logf("shellcode generation failed: %v", genErr)
 				return
 			}
 			shellcode = generated
-			logf("generated shellcode: %s", shellcode)
+			opts.AgentType = agentType
+			opts.ShellcodeProducer = producer
+			logf("generated %s shellcode: %s", producer, shellcode)
 		}
 		if err := startDetectLoopWorker(opts, shellcode, loopID, logFile, logf); err != nil {
 			logf("worker start failed: %v", err)
@@ -218,43 +230,137 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 	}()
 }
 
-func generateAgentShellcode(opts detectLoopOptions, logf func(string, ...any)) (string, error) {
+func generateAgentShellcode(opts detectLoopOptions, logf func(string, ...any)) (string, string, string, error) {
+	producers, err := detection.ParseProducerDirs(opts.Producers)
+	if err != nil {
+		return "", "", "", err
+	}
+	producer, producerDir, agentType := chooseShellcodeProducer(producers, opts.AgentType)
+	if producer == "" {
+		return "", "", "", fmt.Errorf("no shellcode producer configured for agent type %s; pass --shellcode or add a matching --producer entry", opts.AgentType)
+	}
 	agentCfg := builder.AgentConfig{}
 	if strings.TrimSpace(opts.CC) != "" {
 		cc := strings.TrimSpace(opts.CC)
 		agentCfg.CCAddress = &cc
 	}
-	result, err := builder.GenerateAgentArtifact(agentCfg, opts.AgentType, opts.Arch, client.SignAgent)
+	logf("agent type: %s; producer: %s", agentType, producer)
+	result, err := builder.GenerateAgentArtifact(agentCfg, agentType, opts.Arch, client.SignAgent)
 	if err != nil {
 		logf("signed generation failed (%v); building without a C2 signature", err)
-		result, err = builder.GenerateAgentArtifact(agentCfg, opts.AgentType, opts.Arch, nil)
+		result, err = builder.GenerateAgentArtifact(agentCfg, agentType, opts.Arch, nil)
 	}
 	if err != nil {
-		return "", err
+		return "", "", "", err
 	}
 	if result == nil || strings.TrimSpace(result.OutputFile) == "" {
-		return "", fmt.Errorf("agent build produced no artifact")
+		return "", "", "", fmt.Errorf("agent build produced no artifact")
 	}
 
-	producers, err := detection.ParseProducerDirs(opts.Producers)
-	if err != nil {
-		return "", err
+	flags := map[string]string{"output": result.OutputFile + "." + producerShellcodeExt(producer)}
+	switch producer {
+	case "crystal_pack":
+		flags["dll"] = result.OutputFile
+	case "donut":
+		flags["input"] = result.OutputFile
+	default:
+		return "", "", "", fmt.Errorf("producer %q has no agent wrapper", producer)
 	}
-	donutDir := strings.TrimSpace(producers["donut"])
-	if donutDir == "" {
-		return "", fmt.Errorf("no donut producer configured; pass --shellcode or --producer donut=/path/to/donut")
-	}
-	shellcode := result.OutputFile + ".bin"
-	flags := map[string]string{"input": result.OutputFile, "output": shellcode}
-	buildLog, err := modules.BuildLocalModuleAt(donutDir, "donut", flags)
+	buildLog, err := modules.BuildLocalModuleAt(producerDir, producer, flags)
 	if err != nil {
-		return "", fmt.Errorf("donut producer: %w\n%s", err, lastLogLines(buildLog, 20))
+		return "", "", "", fmt.Errorf("%s producer: %w\n%s", producer, err, lastLogLines(buildLog, 20))
 	}
 	payloads := detection.ParseGeneratedPayloads(buildLog)
 	if len(payloads) == 0 {
-		return "", fmt.Errorf("donut producer did not report a generated payload")
+		return "", "", "", fmt.Errorf("%s producer did not report a generated payload", producer)
 	}
-	return payloads[len(payloads)-1].Path, nil
+	return payloads[len(payloads)-1].Path, producer, agentType, nil
+}
+
+// chooseShellcodeProducer picks the wrapper for the baseline agent. Crystal
+// Palace PICO is preferred when crystal_pack is installed and its Java
+// distribution is usable; donut is the fallback. The producer also fixes the
+// agent type because crystal_pack only accepts a DLL.
+func chooseShellcodeProducer(producers map[string]string, requested string) (producer, dir, agentType string) {
+	requested = strings.ToLower(strings.TrimSpace(requested))
+	switch requested {
+	case builder.PayloadTypeWindowsExecutable:
+		if dir := strings.TrimSpace(producers["donut"]); dir != "" {
+			return "donut", dir, builder.PayloadTypeWindowsExecutable
+		}
+		return "", "", ""
+	case builder.PayloadTypeWindowsDLL:
+		if dir := strings.TrimSpace(producers["crystal_pack"]); dir != "" && crystalPackAvailable(dir) {
+			return "crystal_pack", dir, builder.PayloadTypeWindowsDLL
+		}
+		if dir := strings.TrimSpace(producers["donut"]); dir != "" {
+			return "donut", dir, builder.PayloadTypeWindowsDLL
+		}
+		return "", "", ""
+	}
+	if dir := strings.TrimSpace(producers["crystal_pack"]); dir != "" && crystalPackAvailable(dir) {
+		return "crystal_pack", dir, builder.PayloadTypeWindowsDLL
+	}
+	if dir := strings.TrimSpace(producers["donut"]); dir != "" {
+		return "donut", dir, builder.PayloadTypeWindowsExecutable
+	}
+	return "", "", ""
+}
+
+func producerShellcodeExt(producer string) string {
+	if producer == "crystal_pack" {
+		return "pico.bin"
+	}
+	return "bin"
+}
+
+// crystalPackAvailable reports whether crystal_pack can actually link a PICO
+// on this host: a Java runtime, the vendored Crystal Palace jar, and the loader
+// spec must all be present.
+func crystalPackAvailable(dir string) bool {
+	jar := filepath.Join(dir, "crystalpalace", "crystalpalace.jar")
+	if info, err := os.Stat(jar); err != nil || !info.Mode().IsRegular() {
+		return false
+	}
+	spec := filepath.Join(dir, "postex-loader", "loader.spec")
+	if info, err := os.Stat(spec); err != nil || !info.Mode().IsRegular() {
+		return false
+	}
+	if !crystalPackToolchain() {
+		return false
+	}
+	java := strings.TrimSpace(os.Getenv("JAVA"))
+	if java == "" {
+		_, err := exec.LookPath("java")
+		return err == nil
+	}
+	if _, err := exec.LookPath(java); err == nil {
+		return true
+	}
+	info, err := os.Stat(java)
+	return err == nil && info.Mode().IsRegular()
+}
+
+// crystalPackToolchain mirrors build.sh: postex-loader objects are rebuilt on
+// every link, so a Windows C compiler and nasm must be resolvable.
+func crystalPackToolchain() bool {
+	if strings.TrimSpace(os.Getenv("CC_64")) == "" {
+		if _, err := exec.LookPath("x86_64-w64-mingw32-gcc"); err != nil {
+			zig := strings.TrimSpace(os.Getenv("ZIG"))
+			if zig == "" {
+				zig = "zig"
+			}
+			if _, err := exec.LookPath(zig); err != nil {
+				return false
+			}
+		}
+	}
+	nasm := strings.TrimSpace(os.Getenv("NASM"))
+	if nasm == "" {
+		nasm = "nasm"
+	}
+	_, err := exec.LookPath(nasm)
+	return err == nil
 }
 
 func lastLogLines(log string, n int) string {
@@ -303,6 +409,10 @@ func startDetectLoopWorker(opts detectLoopOptions, shellcode, loopID string, log
 	if err != nil {
 		return fmt.Errorf("resolve executable: %w", err)
 	}
+	agentType := strings.ToLower(strings.TrimSpace(opts.AgentType))
+	if agentType == "" || agentType == "auto" {
+		agentType = builder.PayloadTypeWindowsExecutable
+	}
 	args := []string{
 		"detect-loop-worker",
 		"--module", "loader_windows",
@@ -313,7 +423,7 @@ func startDetectLoopWorker(opts detectLoopOptions, shellcode, loopID string, log
 		"--stages", strings.Join(opts.Stages, ","),
 		"--format", opts.Format,
 		"--smw", opts.SMW,
-		"--agent-type", opts.AgentType,
+		"--agent-type", agentType,
 		"--arch", opts.Arch,
 		"--turns", strconv.Itoa(opts.Turns),
 		"--timeout", opts.Timeout.String(),
@@ -327,6 +437,9 @@ func startDetectLoopWorker(opts detectLoopOptions, shellcode, loopID string, log
 	}
 	if strings.TrimSpace(opts.Inject) != "" {
 		args = append(args, "--inject", opts.Inject)
+	}
+	if producer := strings.TrimSpace(opts.ShellcodeProducer); producer != "" {
+		args = append(args, "--shellcode-producer", producer)
 	}
 	for _, producer := range opts.Producers {
 		args = append(args, "--producer", producer)

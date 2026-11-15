@@ -137,6 +137,7 @@ func (e *evolver) buildShellcodeTool() tool.CoreTool {
 				return tool.Errorf(fmt.Sprintf("record shellcode: %v", err)), nil
 			}
 			e.shellcode = artifact.Path
+			e.activeProducer = producer
 			out := map[string]any{
 				"producer":   producer,
 				"path":       artifact.Path,

@@ -172,6 +172,7 @@ job ownership, and operator locks.`,
 	detectLoopWorkerCmd.Flags().String("module", "loader_windows", "Module name")
 	detectLoopWorkerCmd.Flags().String("module-dir", "", "Module source directory")
 	detectLoopWorkerCmd.Flags().String("shellcode", "", "x64 PIC shellcode")
+	detectLoopWorkerCmd.Flags().String("shellcode-producer", "", "Producer module that generated the initial shellcode")
 	detectLoopWorkerCmd.Flags().String("sandbox", "", "LitterBox URL")
 	detectLoopWorkerCmd.Flags().Int("iterations", 3, "Maximum detection cycles")
 	detectLoopWorkerCmd.Flags().StringSlice("stages", []string{"static", "dynamic"}, "Stages")
@@ -602,6 +603,7 @@ func runDetectLoopWorkerCmd(cmd *cobra.Command, _ []string) {
 	module, _ := cmd.Flags().GetString("module")
 	moduleDir, _ := cmd.Flags().GetString("module-dir")
 	shellcode, _ := cmd.Flags().GetString("shellcode")
+	shellcodeProducer, _ := cmd.Flags().GetString("shellcode-producer")
 	sandbox, _ := cmd.Flags().GetString("sandbox")
 	iterations, _ := cmd.Flags().GetInt("iterations")
 	stages, _ := cmd.Flags().GetStringSlice("stages")
@@ -641,8 +643,9 @@ func runDetectLoopWorkerCmd(cmd *cobra.Command, _ []string) {
 	err = operator.RunDetectLoopWorker(ctx, detection.EvolveConfig{
 		LoopID: loopID, Module: module, ModuleDir: moduleDir,
 		Shellcode: shellcode, SandboxURL: sandbox,
-		StoreRoot: filepath.Join(live.EmpWorkSpace, "detection"),
-		Process:   process, Format: format, Inject: inject, SMW: smw,
+		StoreRoot:       filepath.Join(live.EmpWorkSpace, "detection"),
+		InitialProducer: shellcodeProducer,
+		Process:         process, Format: format, Inject: inject, SMW: smw,
 		AgentType: agentType, AgentArch: arch, AgentCC: agentCC,
 		ProducerDirs: producers, ReadRoots: readRoots, KnowledgePath: knowledge,
 		Stages: stages, Iterations: iterations, Turns: turns,
