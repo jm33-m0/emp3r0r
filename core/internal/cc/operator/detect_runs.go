@@ -346,7 +346,10 @@ func runDetectLoop(run *detectRun, opts detectLoopOptions, shellcode string) {
 			ReadRoots: currentOpts.ReadRoots, KnowledgePath: currentOpts.Knowledge,
 			ExpectedAgentUUID: currentOpts.AgentUUID,
 			Iterations:        currentOpts.Iterations, Turns: currentOpts.Turns,
-			Goal: currentOpts.Goal, AgentType: currentOpts.AgentType,
+			CycleTimeout:    currentOpts.CycleTimeout,
+			SessionTimeout:  currentOpts.SessionTimeout,
+			ToolIdleTimeout: currentOpts.ToolIdleTimeout,
+			Goal:            currentOpts.Goal, AgentType: currentOpts.AgentType,
 			AgentArch: currentOpts.Arch, AgentCC: currentOpts.CC,
 			Prompts: run.prompts,
 			BuildAgent: func(buildOpts detection.AgentBuildOptions) (*detection.AgentBuildResult, error) {

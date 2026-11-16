@@ -129,6 +129,9 @@ func addDetectLoopFlags(cmd *cobra.Command) {
 	cmd.Flags().String("knowledge", "", "Knowledge cache path; defaults to <detection store>/knowledge.db")
 	cmd.Flags().Int("turns", 60, "Maximum Norma agent turns (at most 240)")
 	cmd.Flags().Duration("timeout", 0, "Loop deadline; 0 means no deadline")
+	cmd.Flags().Duration("cycle-timeout", 60*time.Minute, "Deadline for one build, detonation, and verification cycle")
+	cmd.Flags().Duration("session-timeout", 2*time.Hour, "Wall-clock deadline for one model session")
+	cmd.Flags().Duration("tool-idle-timeout", 30*time.Minute, "Restart a model session that makes no tool call for this long")
 	cmd.Flags().Bool("tmux", true, "Open a separate tmux window tailing the loop log")
 	cmd.Flags().String("goal", "", "High-level loop goal shown to the model")
 
@@ -276,25 +279,28 @@ type detectLoopOptions struct {
 	ShellcodeProducer string
 	// AgentUUID is the identity of the generated baseline agent. The loop
 	// uses it to prove that this payload checked in and can run a module.
-	AgentUUID   string
-	AgentType   string
-	Arch        string
-	CC          string
-	Sandbox     string
-	Iterations  int
-	Stages      []string
-	Process     string
-	Format      string
-	Inject      string
-	SMW         string
-	Producers   []string
-	ReadRoots   []string
-	Knowledge   string
-	Turns       int
-	Timeout     time.Duration
-	Tmux        bool
-	Goal        string
-	RenderWidth int
+	AgentUUID       string
+	AgentType       string
+	Arch            string
+	CC              string
+	Sandbox         string
+	Iterations      int
+	Stages          []string
+	Process         string
+	Format          string
+	Inject          string
+	SMW             string
+	Producers       []string
+	ReadRoots       []string
+	Knowledge       string
+	Turns           int
+	Timeout         time.Duration
+	CycleTimeout    time.Duration
+	SessionTimeout  time.Duration
+	ToolIdleTimeout time.Duration
+	Tmux            bool
+	Goal            string
+	RenderWidth     int
 }
 
 func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
@@ -316,6 +322,9 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 	opts.Knowledge, _ = cmd.Flags().GetString("knowledge")
 	opts.Turns, _ = cmd.Flags().GetInt("turns")
 	opts.Timeout, _ = cmd.Flags().GetDuration("timeout")
+	opts.CycleTimeout, _ = cmd.Flags().GetDuration("cycle-timeout")
+	opts.SessionTimeout, _ = cmd.Flags().GetDuration("session-timeout")
+	opts.ToolIdleTimeout, _ = cmd.Flags().GetDuration("tool-idle-timeout")
 	opts.Tmux, _ = cmd.Flags().GetBool("tmux")
 	opts.Goal, _ = cmd.Flags().GetString("goal")
 	if strings.TrimSpace(opts.CC) == "" {

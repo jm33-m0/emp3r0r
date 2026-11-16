@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/Autumn-27/norma/agentcore"
@@ -32,10 +33,20 @@ const (
 	maxEvolveIterations = 50
 	maxEvolveTurns      = 240
 	maxEvolveBuildLog   = 8 << 20
-	// A model can return valid JSON without ever calling DetectionCycle. Stop
-	// after this many consecutive resumes that make no cycle progress instead
-	// of restarting a fresh 240-turn agent session forever.
+	// maxEvolveStalledResumes bounds restarts that make no cycle progress.
 	maxEvolveStalledResumes = 4
+	// maxEvolveRetries bounds transient sandbox and detection-run retries.
+	// Without it a permanently broken sandbox can retry until the operator
+	// stops the loop.
+	maxEvolveRetries = 3
+	// defaultCycleTimeout bounds one build/detonate/verify cycle.
+	defaultCycleTimeout = 60 * time.Minute
+	// defaultSessionTimeout bounds one model session even when it keeps
+	// calling tools, so a stream that never terminates cannot run forever.
+	defaultSessionTimeout = 2 * time.Hour
+	// defaultToolIdleTimeout bounds a model session that stops calling tools.
+	// An in-flight tool suspends the idle check.
+	defaultToolIdleTimeout = 30 * time.Minute
 	// minAgentShellcodeBytes rejects a tiny blob that no real Go agent could
 	// have produced. It catches a loader that drops the payload to reduce
 	// detections.
@@ -107,6 +118,14 @@ type EvolveConfig struct {
 	Model    string
 	// RetryBase is the first recovery delay; it backs off to 30 seconds.
 	RetryBase time.Duration
+	// CycleTimeout bounds one build/detonate/verify cycle. Zero uses
+	// defaultCycleTimeout.
+	CycleTimeout time.Duration
+	// SessionTimeout bounds one model session. Zero uses defaultSessionTimeout.
+	SessionTimeout time.Duration
+	// ToolIdleTimeout bounds a model session that stops calling tools. Zero
+	// uses defaultToolIdleTimeout.
+	ToolIdleTimeout time.Duration
 	// Logf receives every loop line with its category so the host can colorize
 	// model text, thinking, tool calls, builds, and cycles independently.
 	Logf func(class logging.Class, format string, args ...any)
@@ -212,6 +231,8 @@ type evolver struct {
 	priorLastGood   *Cycle
 	priorSourceHash string
 	sourceTreeHash  string
+	lastToolCall    atomic.Int64
+	activeTools     atomic.Int32
 }
 
 func (e *evolver) dynamicEnabled() bool {
@@ -353,14 +374,17 @@ func (e *evolver) waitSandbox(ctx context.Context) (Health, error) {
 		if reason == "" {
 			reason = "health probe failed"
 		}
+		if attempt >= maxEvolveRetries {
+			return Health{}, fmt.Errorf("sandbox %s unreachable after %d retries: %s", health.URL, maxEvolveRetries, reason)
+		}
 		if !e.recover(ctx, attempt, "sandbox", fmt.Errorf("%s is unreachable: %s", health.URL, reason)) {
 			return Health{}, ctx.Err()
 		}
 	}
 }
 
-// recover logs a failure and waits before the caller retries. It returns false
-// only when the context is done; the loop never exits on a transient failure.
+// recover logs a failure and waits before the caller retries. Callers bound
+// the number of attempts; recover returns false only when the context is done.
 func (e *evolver) recover(ctx context.Context, attempt int, what string, err error) bool {
 	delay := e.cfg.RetryBase
 	if delay <= 0 {
@@ -466,6 +490,9 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 		}
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
+		}
+		if attempt >= maxEvolveRetries {
+			return nil, fmt.Errorf("baseline failed after %d retries: %w", maxEvolveRetries, err)
 		}
 		if !e.recover(ctx, attempt, "baseline", err) {
 			return nil, ctx.Err()
@@ -622,7 +649,52 @@ every residual is explained with evidence. Return the final JSON object.`,
 		if prompts := e.takeOperatorPrompts(); len(prompts) > 0 {
 			prompt = appendOperatorPrompts(prompt, prompts)
 		}
-		text, err = agentcore.Run(ctx, agentcore.Options{
+		sessionTimeout := cfg.SessionTimeout
+		if sessionTimeout <= 0 {
+			sessionTimeout = defaultSessionTimeout
+		}
+		idleTimeout := cfg.ToolIdleTimeout
+		if idleTimeout <= 0 {
+			idleTimeout = defaultToolIdleTimeout
+		}
+		sessionCtx, sessionCancel := context.WithCancel(ctx)
+		var sessionExpired, idleExpired atomic.Bool
+		sessionTimer := time.AfterFunc(sessionTimeout, func() {
+			sessionExpired.Store(true)
+			sessionCancel()
+		})
+		e.lastToolCall.Store(time.Now().UnixNano())
+		watchdogDone := make(chan struct{})
+		go func() {
+			tick := idleTimeout / 4
+			if tick > time.Minute {
+				tick = time.Minute
+			}
+			if tick < time.Second {
+				tick = time.Second
+			}
+			ticker := time.NewTicker(tick)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-watchdogDone:
+					return
+				case <-sessionCtx.Done():
+					return
+				case <-ticker.C:
+					if e.activeTools.Load() > 0 {
+						continue
+					}
+					last := time.Unix(0, e.lastToolCall.Load())
+					if time.Since(last) >= idleTimeout {
+						idleExpired.Store(true)
+						sessionCancel()
+						return
+					}
+				}
+			}
+		}()
+		text, err = agentcore.Run(sessionCtx, agentcore.Options{
 			Provider:               provider,
 			SystemPrompt:           []string{system},
 			Tools:                  e.tools(),
@@ -635,9 +707,24 @@ every residual is explained with evidence. Return the final JSON object.`,
 			Compaction:             &compaction.Config{ContextWindow: 200000, MaxOutputTokens: maxTokens, KeepRecent: 8},
 			OnWarn:                 func(line string) { e.logf(logging.ClassWarning, "%s", line) },
 		}, prompt)
+		sessionTimer.Stop()
+		close(watchdogDone)
+		sessionCancel()
 		if err != nil {
 			if ctx.Err() != nil {
 				return nil, ctx.Err()
+			}
+			if sessionExpired.Load() {
+				e.logClass(logging.ClassError, "stopping the session: it exceeded the %s wall-clock limit", sessionTimeout)
+				break
+			}
+			if idleExpired.Load() {
+				if !canResume() {
+					break
+				}
+				e.logClass(logging.ClassWarning, "session made no tool call for %s; asking for a cycle or the final JSON", idleTimeout)
+				prompt = e.resumePrompt(cfg, fmt.Sprintf("the previous session made no tool call for %s; call DetectionCycle or return the final JSON now", idleTimeout))
+				continue
 			}
 			if e.executionBlocked {
 				e.logClass(logging.ClassError, "stopping the session: the baseline payload did not execute and no executing baseline exists")
@@ -927,9 +1014,15 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, 
 	if e.usedCycles() >= e.cfg.Iterations {
 		return Cycle{}, fmt.Errorf("%w: %d of %d cycles used", ErrCycleBudgetExhausted, e.usedCycles(), e.cfg.Iterations)
 	}
+	timeout := e.cfg.CycleTimeout
+	if timeout <= 0 {
+		timeout = defaultCycleTimeout
+	}
+	cycleCtx, cancelCycle := context.WithTimeout(ctx, timeout)
+	defer cancelCycle()
 	iteration := e.iter + 1
 
-	if _, err := e.waitSandbox(ctx); err != nil {
+	if _, err := e.waitSandbox(cycleCtx); err != nil {
 		return Cycle{}, err
 	}
 
@@ -979,7 +1072,7 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, 
 	if err := e.loop.Store.RecordArtifact(e.cfg.Module, artifact); err != nil {
 		return Cycle{}, err
 	}
-	plan, err := e.loop.CreatePlan(ctx, Request{
+	plan, err := e.loop.CreatePlan(cycleCtx, Request{
 		Module: e.cfg.Module, ModuleDir: e.cfg.ModuleDir,
 		ArtifactPath: artifact.Path,
 	})
@@ -996,7 +1089,7 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, 
 		runErr error
 	)
 	for attempt := 0; ; attempt++ {
-		runCtx, cancel := context.WithTimeout(ctx, 12*time.Minute)
+		runCtx, cancel := context.WithTimeout(cycleCtx, 12*time.Minute)
 		run, runErr = e.loop.RunPlan(runCtx, plan, RunOptions{
 			Static: static, Dynamic: dynamic, ApproveExecution: true,
 			Timeout: 10 * time.Minute, ParentKey: parentKey,
@@ -1005,8 +1098,8 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, 
 		if runErr == nil && run.Telemetry != nil && run.Telemetry.Attribution != "unknown" {
 			break
 		}
-		if ctx.Err() != nil {
-			return Cycle{}, ctx.Err()
+		if cycleCtx.Err() != nil {
+			return Cycle{}, fmt.Errorf("cycle exceeded %s: %w", timeout, cycleCtx.Err())
 		}
 		reason := runErr
 		if reason == nil {
@@ -1024,8 +1117,11 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, 
 					strings.Join(stageErrors, "; "), run.Notes)
 			}
 		}
-		if !e.recover(ctx, attempt, "detection run", reason) {
-			return Cycle{}, ctx.Err()
+		if attempt >= maxEvolveRetries {
+			return Cycle{}, fmt.Errorf("detection run failed after %d retries: %w", maxEvolveRetries, reason)
+		}
+		if !e.recover(cycleCtx, attempt, "detection run", reason) {
+			return Cycle{}, cycleCtx.Err()
 		}
 	}
 	feedback := BuildFeedback(run)
@@ -1036,8 +1132,8 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, 
 	if run.Telemetry != nil {
 		traceID = run.Telemetry.TraceID
 	}
-	execution, online, networkEvents := e.checkExecution(ctx, traceID, dynamic)
-	if err := e.linkEdits(ctx, iteration, run.Telemetry.PayloadID); err != nil {
+	execution, online, networkEvents := e.checkExecution(cycleCtx, traceID, dynamic)
+	if err := e.linkEdits(cycleCtx, iteration, run.Telemetry.PayloadID); err != nil {
 		e.logClass(logging.ClassError, "link edits: %v", err)
 	}
 	e.iter = iteration
@@ -1046,7 +1142,7 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, 
 	summary.GlobalIteration = e.globalUsed + iteration
 	e.sourceTreeHash = e.computeSourceTreeHash()
 	summary.SourceTreeHash = e.sourceTreeHash
-	if edits, err := e.db.LoopEdits(ctx, e.cfg.LoopID); err != nil {
+	if edits, err := e.db.LoopEdits(cycleCtx, e.cfg.LoopID); err != nil {
 		e.logClass(logging.ClassError, "read edits for cycle summary: %v", err)
 	} else {
 		for _, edit := range edits {
@@ -1072,18 +1168,18 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, 
 		AgentOnline: summary.AgentOnline, NetworkEvents: summary.NetworkEvents,
 		Summary: string(summaryJSON), CreatedAt: time.Now().UTC(),
 	}
-	if _, err := e.db.SaveCycle(ctx, cycle); err != nil {
+	if _, err := e.db.SaveCycle(cycleCtx, cycle); err != nil {
 		return Cycle{}, err
 	}
 	if body, err := json.Marshal(feedback); err == nil {
-		if err := e.db.SaveFeedback(ctx, FeedbackRecord{
+		if err := e.db.SaveFeedback(cycleCtx, FeedbackRecord{
 			LoopID: e.cfg.LoopID, Iteration: iteration, PayloadID: run.Telemetry.PayloadID,
 			RunID: run.ID, Body: body,
 		}); err != nil {
 			e.logClass(logging.ClassError, "save feedback: %v", err)
 		}
 	}
-	if err := e.db.SaveBuild(ctx, BuildRecord{
+	if err := e.db.SaveBuild(cycleCtx, BuildRecord{
 		LoopID: e.cfg.LoopID, Iteration: iteration, PayloadID: run.Telemetry.PayloadID,
 		Artifact: artifact.Path, SHA256: artifact.SHA256, Log: buildLog,
 	}); err != nil {
@@ -1093,7 +1189,7 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, 
 	e.cycles = append(e.cycles, cycle)
 	e.logClass(logging.ClassCycle, "cycle %d: payload=%s sha=%s score=%.2f verdicts=%v findings=%d execution=%s",
 		iteration, cycle.PayloadKey, shortSHA(artifact.SHA256), cycle.Score, summary.Verdicts, cycle.Findings, summary.Execution)
-	e.applyExecutionGate(ctx, &cycle, summary)
+	e.applyExecutionGate(cycleCtx, &cycle, summary)
 	return cycle, nil
 }
 
@@ -1492,20 +1588,59 @@ func (e *evolver) needsMoreWork(ctx context.Context) bool {
 	if e.last.Execution == executionOffline {
 		return true
 	}
-	if e.last.Verdicts > 0 {
-		return true
-	}
 	var body string
 	if err := e.db.db.QueryRowContext(ctx, `
 		SELECT body FROM loop_feedback WHERE loop_id = ? AND iteration = ?
 		ORDER BY id DESC LIMIT 1`, e.last.LoopID, e.last.Iteration).Scan(&body); err != nil {
-		return false
+		return e.last.Verdicts > 0
 	}
 	var feedback Feedback
 	if json.Unmarshal([]byte(body), &feedback) != nil {
+		return e.last.Verdicts > 0
+	}
+	if e.residualCovers(feedback.Findings) {
 		return false
 	}
+	if e.last.Verdicts > 0 {
+		return true
+	}
 	return hasActionableFindings(feedback.Findings)
+}
+
+// residualCovers reports whether the final answer names every actionable
+// finding, so the loop does not resume only to restate residuals.
+func (e *evolver) residualCovers(findings []Finding) bool {
+	residual := answerStrings(e.lastAnswer, "residual")
+	if len(residual) == 0 {
+		return false
+	}
+	text := strings.ToLower(strings.Join(residual, " "))
+	for _, finding := range findings {
+		if !actionableFinding(finding) {
+			continue
+		}
+		indicator := strings.ToLower(strings.TrimSpace(finding.Indicator))
+		rule := strings.ToLower(strings.TrimSpace(finding.Rule))
+		if indicator != "" && strings.Contains(text, indicator) {
+			continue
+		}
+		if rule != "" && strings.Contains(text, rule) {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func actionableFinding(finding Finding) bool {
+	if finding.Rule == "defender/verdict" {
+		return true
+	}
+	if len(finding.Sources) == 0 {
+		return false
+	}
+	return finding.Severity == "high" || finding.Severity == "critical" ||
+		(finding.Stage == StageTelemetry && finding.Severity == "medium")
 }
 
 // hasActionableFindings reports whether another source edit could plausibly
@@ -1513,16 +1648,7 @@ func (e *evolver) needsMoreWork(ctx context.Context) bool {
 // location, so they are residuals rather than work.
 func hasActionableFindings(findings []Finding) bool {
 	for _, finding := range findings {
-		if finding.Rule == "defender/verdict" {
-			return true
-		}
-		if len(finding.Sources) == 0 {
-			continue
-		}
-		if finding.Severity == "high" || finding.Severity == "critical" {
-			return true
-		}
-		if finding.Stage == StageTelemetry && finding.Severity == "medium" {
+		if actionableFinding(finding) {
 			return true
 		}
 	}
@@ -1555,9 +1681,21 @@ func (e *evolver) allowToolHook(toolName string) hook.Result {
 
 func (e *evolver) hooks() *hook.Registry {
 	hooks := hook.NewRegistry().On(hook.PreToolUse, func(_ context.Context, event hook.Event) hook.Result {
-		return e.allowToolHook(event.ToolName)
+		decision := e.allowToolHook(event.ToolName)
+		if decision.Decision != "block" {
+			e.lastToolCall.Store(time.Now().UnixNano())
+			e.activeTools.Add(1)
+		}
+		return decision
 	})
 	hooks.On(hook.PostToolUse, func(_ context.Context, event hook.Event) hook.Result {
+		e.lastToolCall.Store(time.Now().UnixNano())
+		for {
+			active := e.activeTools.Load()
+			if active <= 0 || e.activeTools.CompareAndSwap(active, active-1) {
+				break
+			}
+		}
 		status := "ok"
 		if event.IsError {
 			status = "error"

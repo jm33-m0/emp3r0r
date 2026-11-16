@@ -245,9 +245,13 @@ is enabled, agent checks and rebuilds use the console's existing C2 connection
 (`detect_loop` must therefore run from a connected operator console for live
 verification). `AgentStatus`, `RunModule`, and `CleanupAgent` are only
 registered when verification is configured (MCP `detection_loop` omits them).
-Transient sandbox, build, detection, and
-agent-session failures are retried with exponential backoff; the loop does not
-exit on them. `--timeout 0` (the default) means no deadline. A final answer that is not
+Transient sandbox and detection failures are retried with exponential backoff,
+capped at three retries; model-session failures back off and are capped by the
+stalled-restart limit. One cycle is bounded by
+`--cycle-timeout` (default 60m), one model session by `--session-timeout`
+(default 2h), and a session with no tool call by `--tool-idle-timeout`
+(default 30m). An in-flight tool suspends the idle check. `--timeout 0` (the
+default) means no loop-wide deadline. A final answer that is not
 the requested JSON object is stored as the summary with `parse_error` instead
 of ending the run. The loop writes the full Markdown report to
 `<workspace>/detection/reports/<loop>.md` and a compact executive summary to
