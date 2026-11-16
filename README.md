@@ -147,7 +147,7 @@ MCP trusts the operator harness and treats target output as hostile data. emp3r0
 
 Before choosing a mechanism, the model reads a cached reference notebook through `KnowledgeSearch` and `KnowledgeRead`. `knowledge-sync` refreshes that offline cache from an MCP notebook server, so the loop itself makes no network calls. The prompt classifies findings by detection surface, asks for a falsifiable telemetry prediction per cycle, and requires source evidence before an edit.
 
-A final host-side check polls for the generated agent UUID and runs a small BOF before the loop reports success. When started from the operator console, the worker reaches agent generation and single-UUID verification through a scoped Unix IPC bridge, so C2 credentials and WireGuard keys stay in the operator process. Every dispatch and denial is written to the operator audit log. See the [detection testing guide](./docs/detection.md) for stages, approvals, and the MCP equivalents.
+A final host-side check polls for the generated agent UUID and runs a small BOF before the loop reports success. The loop uses the console's C2 connection for agent generation and single-UUID verification. Every dispatch and denial is written to the operator audit log. See the [detection testing guide](./docs/detection.md) for stages, approvals, and the MCP equivalents.
 
 ### Build profiles
 

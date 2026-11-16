@@ -85,6 +85,10 @@ type EvolveConfig struct {
 	// KnowledgePath is the offline reference cache. When it is empty the store
 	// default is used; a missing cache only disables the knowledge tools.
 	KnowledgePath string
+	// Prompts is the operator instruction queue. The console appends
+	// instructions while the loop runs; the loop drains them before each model
+	// session and after each cycle.
+	Prompts *OperatorPromptQueue
 	// ExpectedAgentUUID is the UUID of the agent the active shellcode was
 	// built from. The verification tools use it to distinguish the payload
 	// under test from unrelated agents already connected to the C2.
@@ -105,8 +109,8 @@ type EvolveConfig struct {
 	// BuildProducer overrides a shellcode-producer build. Production uses the
 	// same local module build path as the payload module.
 	BuildProducer func(moduleDir, module string, flags map[string]string) (string, error)
-	// BuildAgent rebuilds the Go agent with new generator flags. The loop
-	// worker wires this to the operator builder; tests may stub it.
+	// BuildAgent rebuilds the Go agent with new generator flags. The console
+	// wires this to the operator builder; tests may stub it.
 	BuildAgent func(AgentBuildOptions) (*AgentBuildResult, error)
 	// Verify performs scoped C2 checks for the loop's own test agent. When
 	// nil, AgentStatus, RunModule, and CleanupAgent are neither registered nor
@@ -117,7 +121,7 @@ type EvolveConfig struct {
 	// verification marks the result and lets the caller restart the loop.
 	FinalVerify func(context.Context, string) (string, error)
 	// Audit records every C2 action the model can trigger, including denials.
-	// The operator process writes it to the operator audit log.
+	// The caller writes it to the operator audit log.
 	Audit func(action, target, detail string)
 	// Goal is the operator's high-level objective shown at the top of the
 	// model prompt. Empty uses the default evasion-and-execution goal.
@@ -152,12 +156,13 @@ type AgentBuildResult struct {
 
 // EvolveResult is the final answer plus the cycles the agent ran.
 type EvolveResult struct {
-	LoopID          string          `json:"loop_id"`
-	Answer          json.RawMessage `json:"answer"`
-	Report          string          `json:"report"`
-	Cycles          []Cycle         `json:"cycles"`
-	Last            *Cycle          `json:"last,omitempty"`
-	PayloadVerified bool            `json:"payload_verified"`
+	LoopID            string          `json:"loop_id"`
+	Answer            json.RawMessage `json:"answer"`
+	Report            string          `json:"report"`
+	Cycles            []Cycle         `json:"cycles"`
+	Last              *Cycle          `json:"last,omitempty"`
+	PayloadVerified   bool            `json:"payload_verified"`
+	ExpectedAgentUUID string          `json:"expected_agent_uuid,omitempty"`
 }
 
 type evolver struct {
@@ -178,6 +183,7 @@ type evolver struct {
 	shellSeq          int
 	knowledge         *KnowledgeDB
 	lastAnswer        map[string]any
+	operatorPrompts   *OperatorPromptQueue
 	// progress counts cycles that produced a comparable result; an offline
 	// cycle consumes the budget but does not count as progress, so the stalled
 	// session guard cannot be reset by builds whose payload never ran.
@@ -395,6 +401,7 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 	if e.logf == nil {
 		e.logf = func(logging.Class, string, ...any) {}
 	}
+	e.operatorPrompts = cfg.Prompts
 	e.roots = e.sourceRoots()
 	e.log("detection loop %s: module=%s model=%s shellcode=%s", cfg.LoopID, cfg.Module, model, cfg.Shellcode)
 	e.logClass(logging.ClassWarning, "the loop executes model-chosen builds on this host; run it in a dedicated, disposable VM with no host credentials")
@@ -559,6 +566,9 @@ every residual is explained with evidence. Return the final JSON object.`,
 		return true
 	}
 	for attempt := 0; ; attempt++ {
+		if prompts := e.takeOperatorPrompts(); len(prompts) > 0 {
+			prompt = appendOperatorPrompts(prompt, prompts)
+		}
 		text, err = agentcore.Run(ctx, agentcore.Options{
 			Provider:               provider,
 			SystemPrompt:           []string{system},
@@ -666,7 +676,7 @@ every residual is explained with evidence. Return the final JSON object.`,
 		cfg.LoopID, string(encoded), report, time.Now().UTC().UnixMilli()); err != nil {
 		return nil, fmt.Errorf("save loop result: %w", err)
 	}
-	return &EvolveResult{LoopID: cfg.LoopID, Answer: encoded, Report: report, Cycles: e.cycles, Last: e.last, PayloadVerified: verified}, nil
+	return &EvolveResult{LoopID: cfg.LoopID, Answer: encoded, Report: report, Cycles: e.cycles, Last: e.last, PayloadVerified: verified, ExpectedAgentUUID: e.expectedAgentUUID}, nil
 }
 
 func normalizeEvolveConfig(cfg *EvolveConfig) error {
@@ -1324,6 +1334,28 @@ func limitStrings(values []string, n int) []string {
 	return values[:n]
 }
 
+// takeOperatorPrompts drains queued instructions and logs them. The queue is
+// local operator input, not sandbox telemetry, so it is safe to surface as a
+// directive to the model.
+func (e *evolver) takeOperatorPrompts() []string {
+	if e.operatorPrompts == nil {
+		return nil
+	}
+	prompts := e.operatorPrompts.Drain()
+	for _, prompt := range prompts {
+		e.logClass(logging.ClassWarning, "operator prompt: %s", prompt)
+	}
+	return prompts
+}
+
+func appendOperatorPrompts(prompt string, prompts []string) string {
+	block := FormatOperatorPrompts(prompts)
+	if block == "" {
+		return prompt
+	}
+	return strings.TrimRight(prompt, "\n") + "\n\n" + block
+}
+
 func (e *evolver) needsMoreWork(ctx context.Context) bool {
 	if e.executionBlocked {
 		return false
@@ -1530,6 +1562,9 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 				"remaining_cycles": max(0, e.cfg.Iterations-e.iter),
 				"active_shellcode": e.shellcode,
 				"message":          message,
+			}
+			if prompts := e.takeOperatorPrompts(); len(prompts) > 0 {
+				out["operator_prompts"] = prompts
 			}
 			data, _ := json.Marshal(out)
 			return tool.Text(string(data)), nil
@@ -2073,7 +2108,11 @@ Work loop:
    analyses may reuse a payload, but a dynamic run must not.
 5. Call DetectionCycle with the mechanism under test. It rebuilds from the
    current source and returns a bounded summary, the new payload key, the active
-   shellcode, and the remaining cycle budget. Do not exceed the budget.
+   shellcode, and the remaining cycle budget. Do not exceed the budget. An
+   operator may append instructions while the loop runs; they arrive as
+   operator_prompts in this result or at the start of the next model session.
+   Treat them as high-priority instructions without violating the loop's safety
+   rules.
 6. The host checks the generated agent after every dynamic cycle and records
    execution=verified when it checks in, offline when it does not, and
    unverified when verification is not configured. Do not spend model turns

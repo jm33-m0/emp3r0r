@@ -72,15 +72,13 @@ indicators. Keep the module contract described in
 
 ## Autonomous loop
 
-`detect_loop` in the console starts a detached worker (`detect-loop-worker`). It
-builds a real Go Windows agent artifact and, when `--shellcode` is omitted,
-wraps it with one of the installed producer modules. `auto` builds a
-`windows_executable` agent and wraps it with `donut`; `--agent-type windows_dll`
-builds a DLL agent, wrapped with `crystal_pack` (Crystal Palace PICO) when that
-module can link on this host, otherwise with `donut`. The worker does not hold
-C2 keys or WireGuard credentials; when started from the console, it reaches
-scoped agent-generation and single-UUID verification endpoints through a private
-Unix IPC socket in the parent operator process. The loop then runs:
+`detect_loop` in the console starts the loop. It builds a
+real Go Windows agent artifact and, when `--shellcode` is omitted, wraps it with
+one of the installed producer modules. `auto` builds a `windows_executable`
+agent and wraps it with `donut`; `--agent-type windows_dll` builds a DLL agent,
+wrapped with `crystal_pack` (Crystal Palace PICO) when that module can link on
+this host, otherwise with `donut`. Agent generation and single-UUID verification
+use the console's existing C2 connection. The loop then runs:
 
 1. build `loader_windows` from `--module-dir`;
 2. detonate it in LitterBox and import every saved analyzer result: RedEdr,
@@ -119,6 +117,22 @@ Palace/Crystal-Kit PICO from `crystal_pack` can replace the generated Donut
 shellcode. Norma can change the loader, wrapper, injection path, or shellcode
 producer when telemetry points at that design.
 
+### Managing loops
+
+The operator console owns the detection loops it starts.
+
+| Command | Purpose |
+| --- | --- |
+| `detect_loop list [--json]` | List loops with attempt, status (`running`, `stopping`, `stopped`, `verified`, `done`, `failed`), start time, pending prompts, and log path. |
+| `detect_loop stop <loop-id>` | Cancel the loop and wait up to five seconds for it to finish. Accepts the base ID or the current attempt ID. |
+| `detect_loop stop --all` | Cancel every running loop. |
+| `detect_loop prompt <loop-id> <instruction...>` | Append an instruction to the loop's prompt queue. The loop reads it before its next model session and includes it in the next `DetectionCycle` result. |
+| `detect_loop start [options]` | Explicit launch form; `detect_loop [options]` remains the shorthand. |
+
+The console cancels every loop when it exits. A module build already running finishes before the loop stops.
+
+`detect_loop prompt` cannot interrupt an in-flight model turn or sandbox run. Use `detect_loop stop` to cancel the loop, or wait for the next cycle result.
+
 ### Trust model and isolation
 
 The loop is a code-execution feature driven by an untrusted model, not a
@@ -138,7 +152,7 @@ disposable VM or container:
 - keep the model provider's data handling in mind: source excerpts, build logs,
   and sandbox telemetry leave the host.
 
-The next step is to run the worker itself in a disposable VM managed alongside
+The next step is to run the operator console in a disposable VM managed alongside
 LitterBox, so a host-side build is no longer a trust boundary.
 
 ### Producers
@@ -217,20 +231,20 @@ source and have the next cycle use it. `--iterations` and `--turns` are capped a
 50 and 240; values above the cap are rejected, and the cycle budget is shown in
 the prompt and in every `DetectionCycle` result.
 
-The worker writes one log file under `<workspace>/detection/` and opens a
+The loop writes one log file under `<workspace>/detection/` and opens a
 separate tmux window tailing it; `emp3r0r.log` is untouched. When verification
-is enabled, agent checks and rebuilds go through the parent operator's scoped
-IPC bridge (`detect_loop` must therefore run from a connected operator console
-for live verification). `AgentStatus`, `RunModule`, and `CleanupAgent` are only
+is enabled, agent checks and rebuilds use the console's existing C2 connection
+(`detect_loop` must therefore run from a connected operator console for live
+verification). `AgentStatus`, `RunModule`, and `CleanupAgent` are only
 registered when verification is configured (MCP `detection_loop` omits them).
 Transient sandbox, build, detection, and
-agent-session failures are retried with exponential backoff; the worker does not
+agent-session failures are retried with exponential backoff; the loop does not
 exit on them. `--timeout 0` (the default) means no deadline. A final answer that is not
 the requested JSON object is stored as the summary with `parse_error` instead
-of ending the run. The worker writes the full Markdown report to
+of ending the run. The loop writes the full Markdown report to
 `<workspace>/detection/reports/<loop>.md` and a compact executive summary to
 `<loop>-summary.md`, emits the full report through the tmux log pane when the
-worker exits, and stores the report in `loop_results.report`. The operator
+loop finishes, and stores the report in `loop_results.report`. The operator
 console prints the rendered executive summary, not the raw report.
 
 Loop log lines are tagged and colored by category: model thinking is dimmed,
@@ -254,7 +268,7 @@ EMP3R0R_DETECTION_BASE_URL=<url>
 OPENAI_API_KEY=<key>
 ```
 
-The console client, MCP server, and detached worker load that file at startup.
+The console client and MCP server load that file at startup.
 A variable already present in the process environment wins; the file never
 overrides an explicit shell export. Set `EMP3R0R_OPERATOR_ENV` to load a
 different path. Full-line comments, `export KEY=value`, and quoted values are

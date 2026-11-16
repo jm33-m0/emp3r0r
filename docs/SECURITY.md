@@ -67,8 +67,8 @@ module and producer source, and the build scripts and generators it changes run
 on the operator host with the operator's privileges. Treat any model-driven
 source edit as code execution. Run the loop in a dedicated, disposable VM with
 no host credentials or production C2 keys and with egress limited to the model
-provider and the sandbox. Running the worker in a VM managed next to the
-sandbox is the intended next step.
+provider and the sandbox. Running the operator console in a VM managed next to
+the sandbox is the intended next step.
 
 The only AI-specific attack path emp3r0r can influence is the chain from the
 agent: target-controlled output enters the model's context as a prompt

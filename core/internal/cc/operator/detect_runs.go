@@ -1,0 +1,404 @@
+package operator
+
+import (
+	"context"
+	"fmt"
+	"path/filepath"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/detection"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+)
+
+// detectRun is one detection loop. The console owns the loop and can
+// cancel it, list it, and append operator instructions.
+type detectRun struct {
+	id      string
+	ctx     context.Context
+	cancel  context.CancelFunc
+	prompts *detection.OperatorPromptQueue
+	started time.Time
+	logPath string
+	logger  *loopLogger
+	done    chan struct{}
+
+	mu        sync.Mutex
+	current   string
+	attempt   int
+	stopped   bool
+	verified  bool
+	err       error
+	finishOne sync.Once
+}
+
+type detectRunInfo struct {
+	LoopID        string    `json:"loop_id"`
+	CurrentLoopID string    `json:"current_loop_id,omitempty"`
+	Attempt       int       `json:"attempt"`
+	Status        string    `json:"status"`
+	StartedAt     time.Time `json:"started_at"`
+	LogPath       string    `json:"log_path"`
+	Prompts       int       `json:"prompts"`
+	Verified      bool      `json:"verified,omitempty"`
+	Error         string    `json:"error,omitempty"`
+}
+
+var (
+	detectRunMu sync.Mutex
+	detectRuns  = map[string]*detectRun{}
+)
+
+func registerDetectRun(id string, prompts *detection.OperatorPromptQueue, logPath string, logger *loopLogger) (*detectRun, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+	run := &detectRun{
+		id: id, ctx: ctx, cancel: cancel, prompts: prompts,
+		started: time.Now().UTC(), logPath: logPath, logger: logger,
+		current: id, attempt: 1, done: make(chan struct{}),
+	}
+	detectRunMu.Lock()
+	defer detectRunMu.Unlock()
+	if _, exists := detectRuns[id]; exists {
+		cancel()
+		return nil, fmt.Errorf("loop %s is already registered", id)
+	}
+	detectRuns[id] = run
+	return run, nil
+}
+
+func findDetectRun(id string) *detectRun {
+	id = strings.TrimSpace(id)
+	detectRunMu.Lock()
+	defer detectRunMu.Unlock()
+	if run, ok := detectRuns[id]; ok {
+		return run
+	}
+	for _, run := range detectRuns {
+		if run.currentLoopID() == id {
+			return run
+		}
+	}
+	return nil
+}
+
+func listDetectRuns() []*detectRun {
+	detectRunMu.Lock()
+	runs := make([]*detectRun, 0, len(detectRuns))
+	for _, run := range detectRuns {
+		runs = append(runs, run)
+	}
+	detectRunMu.Unlock()
+	sort.Slice(runs, func(i, j int) bool {
+		return runs[i].started.Before(runs[j].started)
+	})
+	return runs
+}
+
+func resetDetectRunsForTest() {
+	detectRunMu.Lock()
+	detectRuns = map[string]*detectRun{}
+	detectRunMu.Unlock()
+}
+
+func (r *detectRun) currentLoopID() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.current
+}
+
+func (r *detectRun) setCurrent(current string, attempt int) {
+	r.mu.Lock()
+	r.current = current
+	r.attempt = attempt
+	r.mu.Unlock()
+}
+
+func (r *detectRun) setResult(result *detection.EvolveResult) {
+	if result == nil {
+		return
+	}
+	r.mu.Lock()
+	r.verified = result.PayloadVerified
+	if result.LoopID != "" {
+		r.current = result.LoopID
+	}
+	r.mu.Unlock()
+}
+
+func (r *detectRun) setError(err error) {
+	if err == nil {
+		return
+	}
+	r.mu.Lock()
+	r.err = err
+	r.mu.Unlock()
+}
+
+func (r *detectRun) isDone() bool {
+	select {
+	case <-r.done:
+		return true
+	default:
+		return false
+	}
+}
+
+func (r *detectRun) finish() {
+	r.finishOne.Do(func() {
+		if r.logger != nil {
+			r.logger.close()
+		}
+		close(r.done)
+	})
+}
+
+func (r *detectRun) statusLocked() string {
+	select {
+	case <-r.done:
+		switch {
+		case r.err != nil && !r.stopped:
+			return "failed"
+		case r.verified:
+			return "verified"
+		case r.stopped:
+			return "stopped"
+		default:
+			return "done"
+		}
+	default:
+		if r.stopped {
+			return "stopping"
+		}
+		return "running"
+	}
+}
+
+func (r *detectRun) info() detectRunInfo {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	info := detectRunInfo{
+		LoopID: r.id, CurrentLoopID: r.current, Attempt: r.attempt,
+		Status: r.statusLocked(), StartedAt: r.started, LogPath: r.logPath,
+		Verified: r.verified,
+	}
+	if r.prompts != nil {
+		info.Prompts = r.prompts.Len()
+	}
+	if r.err != nil {
+		info.Error = r.err.Error()
+	}
+	return info
+}
+
+func detectRunRows(runs []*detectRun) []string {
+	rows := make([]string, 0, len(runs)+1)
+	rows = append(rows, fmt.Sprintf("%-30s %-7s %-8s %-19s %-7s %s",
+		"LOOP", "ATTEMPT", "STATUS", "STARTED", "PROMPTS", "LOG"))
+	for _, run := range runs {
+		info := run.info()
+		started := "-"
+		if !info.StartedAt.IsZero() {
+			started = info.StartedAt.Local().Format("2006-01-02 15:04:05")
+		}
+		rows = append(rows, fmt.Sprintf("%-30s %-7d %-8s %-19s %-7d %s",
+			info.LoopID, info.Attempt, info.Status, started, info.Prompts, info.LogPath))
+	}
+	return rows
+}
+
+// stopDetectRun cancels one loop and waits up to wait for it to
+// return. The loop keeps a registry entry with a final status.
+func stopDetectRun(id string, wait time.Duration) (detectRunInfo, bool, error) {
+	run := findDetectRun(id)
+	if run == nil {
+		return detectRunInfo{}, false, fmt.Errorf("loop %q is not running", id)
+	}
+	run.mu.Lock()
+	if run.isDone() {
+		run.mu.Unlock()
+		return run.info(), false, nil
+	}
+	run.stopped = true
+	run.cancel()
+	run.mu.Unlock()
+	if wait > 0 {
+		select {
+		case <-run.done:
+		case <-time.After(wait):
+		}
+	}
+	return run.info(), true, nil
+}
+
+// stopAllDetectRuns cancels every loop. The console calls this on
+// exit; process termination then ends any remaining build or model call.
+func stopAllDetectRuns() {
+	runs := listDetectRuns()
+	if len(runs) == 0 {
+		return
+	}
+	cancelled := 0
+	for _, run := range runs {
+		run.mu.Lock()
+		if !run.isDone() {
+			run.stopped = true
+			run.cancel()
+			cancelled++
+		}
+		run.mu.Unlock()
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		remaining := false
+		for _, run := range runs {
+			if !run.isDone() {
+				remaining = true
+				break
+			}
+		}
+		if !remaining {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	logging.Warningf("detect_loop: cancelled %d loop(s) on console exit", cancelled)
+}
+
+func appendDetectRunPrompt(id, text string) (detectRunInfo, error) {
+	run := findDetectRun(id)
+	if run == nil {
+		return detectRunInfo{}, fmt.Errorf("loop %q is not running", id)
+	}
+	run.mu.Lock()
+	done := run.isDone()
+	run.mu.Unlock()
+	if done {
+		return run.info(), fmt.Errorf("loop %q has finished", id)
+	}
+	if run.prompts == nil {
+		return run.info(), fmt.Errorf("loop %q has no prompt queue", id)
+	}
+	if _, err := run.prompts.Add(text); err != nil {
+		return run.info(), err
+	}
+	return run.info(), nil
+}
+
+// runDetectLoop drives one console loop and its verification restarts.
+func runDetectLoop(run *detectRun, opts detectLoopOptions, shellcode string) {
+	defer run.finish()
+	backend := liveDetectC2Backend{}
+	baseID := run.id
+	currentShellcode := shellcode
+	currentOpts := opts
+	currentID := baseID
+	lastAgent := opts.AgentUUID
+	producers, err := detection.ParseProducerDirs(opts.Producers)
+	if err != nil {
+		run.setError(fmt.Errorf("producer paths: %w", err))
+		return
+	}
+
+	logf := func(format string, args ...any) {
+		if run.logger != nil {
+			run.logger.printf(format, args...)
+		}
+	}
+	for attempt := 1; attempt <= 3; attempt++ {
+		if run.ctx.Err() != nil {
+			run.setError(run.ctx.Err())
+			return
+		}
+		if attempt > 1 {
+			if strings.TrimSpace(currentOpts.Shellcode) != "" {
+				logf("payload verification failed; --shellcode was supplied and cannot be regenerated")
+				break
+			}
+			logf("payload verification failed; restarting loop with a fresh agent (attempt %d/3)", attempt)
+			forgetLoopAgent(lastAgent)
+			nextShellcode, producer, agentType, agentUUID, genErr := generateAgentShellcode(currentOpts, logf)
+			if genErr != nil {
+				run.setError(fmt.Errorf("restart shellcode generation: %w", genErr))
+				break
+			}
+			currentShellcode = nextShellcode
+			currentOpts.AgentType = agentType
+			currentOpts.ShellcodeProducer = producer
+			currentOpts.AgentUUID = agentUUID
+			lastAgent = agentUUID
+			currentID = fmt.Sprintf("%s-r%d", baseID, attempt)
+			run.setCurrent(currentID, attempt)
+			logf("restarted loop %s with agent %s", currentID, agentUUID)
+		}
+
+		cfg := detection.EvolveConfig{
+			LoopID: currentID, Module: "loader_windows", ModuleDir: currentOpts.ModuleDir,
+			Shellcode: currentShellcode, SandboxURL: currentOpts.Sandbox,
+			StoreRoot: filepath.Join(live.EmpWorkSpace, "detection"),
+			Process:   currentOpts.Process, Format: currentOpts.Format,
+			Inject: currentOpts.Inject, SMW: currentOpts.SMW,
+			ProducerDirs: producers, InitialProducer: currentOpts.ShellcodeProducer,
+			ReadRoots: currentOpts.ReadRoots, KnowledgePath: currentOpts.Knowledge,
+			ExpectedAgentUUID: currentOpts.AgentUUID,
+			Iterations:        currentOpts.Iterations, Turns: currentOpts.Turns,
+			Goal: currentOpts.Goal, AgentType: currentOpts.AgentType,
+			AgentArch: currentOpts.Arch, AgentCC: currentOpts.CC,
+			Prompts: run.prompts,
+			BuildAgent: func(buildOpts detection.AgentBuildOptions) (*detection.AgentBuildResult, error) {
+				return backend.GenerateAgent(currentOpts.CC, buildOpts.Type, buildOpts.Arch)
+			},
+			Verify: backend,
+			FinalVerify: func(ctx context.Context, uuid string) (string, error) {
+				return backend.FinalVerify(ctx, uuid, detection.DefaultVerifyModule)
+			},
+			Audit: backend.Audit,
+			Logf:  logClassf(run.logger),
+		}
+		result, runErr := detection.RunEvolve(run.ctx, cfg)
+		if runErr != nil {
+			run.setError(runErr)
+			if run.ctx.Err() != nil {
+				return
+			}
+			logging.Errorf("Detection loop %s: %v", currentID, runErr)
+			logf("loop failed: %v", runErr)
+			return
+		}
+		run.setResult(result)
+		if result.ExpectedAgentUUID != "" {
+			lastAgent = result.ExpectedAgentUUID
+		}
+		printDetectRunReport(run, currentID)
+		if result.PayloadVerified {
+			return
+		}
+		if run.ctx.Err() != nil {
+			run.setError(run.ctx.Err())
+			return
+		}
+	}
+}
+
+func printDetectRunReport(run *detectRun, loopID string) {
+	reportPath := filepath.Join(live.EmpWorkSpace, "detection", "reports", loopID+".md")
+	summary, source := readLoopSummary(reportPath)
+	if strings.TrimSpace(summary) == "" {
+		return
+	}
+	logging.Successf("Detection loop report: %s", reportPath)
+	logging.DisplayMarkdown(summary)
+	if run.logger != nil {
+		run.logger.printf("executive summary printed from %s", source)
+	}
+}
+
+// logClassf adapts the loop logger to detection's Logf callback.
+func logClassf(logger *loopLogger) func(logging.Class, string, ...any) {
+	if logger == nil {
+		return func(logging.Class, string, ...any) {}
+	}
+	return logger.logf
+}

@@ -3,6 +3,7 @@ package operator
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -10,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -30,7 +30,7 @@ import (
 
 const operatorSubprocessEnv = "EMP3R0R_OPERATOR_SUBPROCESS"
 
-// detectLoopCmd starts the autonomous Norma detection loop in a detached worker
+// detectLoopCmd starts the autonomous Norma detection loop in the operator
 // process. The console returns immediately; the loop writes one log file and a
 // separate tmux window tails it, leaving emp3r0r.log alone.
 func completeFlagValues(values ...string) func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
@@ -55,11 +55,10 @@ func detectLoopCmd() *cobra.Command {
 		Long: `Start the autonomous detection loop for loader_windows.
 
 The command generates a real Go Windows agent shellcode when --shellcode is
-omitted, then starts a detached detect-loop-worker process. The worker builds
-the loader from --module-dir, detonates it in LitterBox, and lets a Norma agent
-inspect the SQLite telemetry, edit module source, rebuild, and compare payloads.
-C2 credentials stay in the operator process; the worker only reaches scoped
-agent-generation and verification endpoints over a private Unix IPC socket.
+omitted, then starts the loop. The loop builds the loader
+from --module-dir, detonates it in LitterBox, and lets a Norma agent inspect the
+SQLite telemetry, edit module source, rebuild, and compare payloads. Agent
+generation and C2 verification use the console's existing connection.
 
 --shellcode accepts any x64 position-independent shellcode. Without it, the
 loop generates a Windows EXE agent and wraps it with donut. Pass
@@ -81,6 +80,9 @@ as a code-execution feature controlled by an untrusted model, not as a
 sandbox: run it in a dedicated, disposable VM or container with no host
 credentials, no production C2 keys, and restricted network egress.
 
+Manage running loops with detect_loop list, detect_loop stop <loop-id> or
+--all, and detect_loop prompt <loop-id> <instruction>.
+
 Set the model through the environment:
   EMP3R0R_DETECTION_PROVIDER=openai-responses
   EMP3R0R_DETECTION_MODEL=<model>
@@ -90,6 +92,20 @@ Set the model through the environment:
 		Args:    cobra.NoArgs,
 		Run:     runDetectLoopCommand,
 	}
+	addDetectLoopFlags(cmd)
+	cmd.AddCommand(
+		KnowledgeSyncCmd(),
+		detectLoopStartCmd(),
+		detectLoopListCmd(),
+		detectLoopStopCmd(),
+		detectLoopPromptCmd(),
+	)
+	return cmd
+}
+
+// addDetectLoopFlags registers the build/detonation options shared by
+// `detect_loop` and its explicit `start` alias.
+func addDetectLoopFlags(cmd *cobra.Command) {
 	cmd.Flags().String("module-dir", "", "Module source directory (default: the installed loader_windows path)")
 	cmd.Flags().String("shellcode", "", "x64 PIC shellcode (Donut, Crystal Palace PICO, ...); generated when omitted")
 	cmd.Flags().String("agent-type", "auto", "Agent payload type to generate: auto, windows_executable, or windows_dll")
@@ -122,8 +138,127 @@ Set the model through the environment:
 	_ = cmd.RegisterFlagCompletionFunc("read-root", completeFlagDirs)
 	_ = cmd.RegisterFlagCompletionFunc("shellcode", completeFlagFiles)
 	_ = cmd.RegisterFlagCompletionFunc("knowledge", completeFlagFiles)
-	cmd.AddCommand(KnowledgeSyncCmd())
+}
+
+func detectLoopStartCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "start",
+		Aliases: []string{"launch"},
+		Short:   "Start a detection loop (same options as detect_loop)",
+		Args:    cobra.NoArgs,
+		Run:     runDetectLoopCommand,
+	}
+	addDetectLoopFlags(cmd)
 	return cmd
+}
+
+func detectLoopListCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List detection loops, their attempts, status, and logs",
+		Args:    cobra.NoArgs,
+		Run: func(cmd *cobra.Command, _ []string) {
+			runs := listDetectRuns()
+			asJSON, _ := cmd.Flags().GetBool("json")
+			if asJSON {
+				infos := make([]detectRunInfo, 0, len(runs))
+				for _, run := range runs {
+					infos = append(infos, run.info())
+				}
+				data, err := json.MarshalIndent(infos, "", "  ")
+				if err != nil {
+					logging.Errorf("detect_loop list: %v", err)
+					return
+				}
+				cmd.Println(string(data))
+				return
+			}
+			if len(runs) == 0 {
+				logging.Infof("detect_loop: no loops are running")
+				return
+			}
+			for _, row := range detectRunRows(runs) {
+				cmd.Println(row)
+			}
+		},
+	}
+	cmd.Flags().Bool("json", false, "Print the loop registry as JSON")
+	return cmd
+}
+
+func detectLoopStopCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "stop <loop-id> | --all",
+		Short: "Cancel one detection loop or every running loop",
+		Args:  cobra.MaximumNArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			all, _ := cmd.Flags().GetBool("all")
+			if all && len(args) > 0 {
+				logging.Errorf("detect_loop stop: pass either a loop id or --all, not both")
+				return
+			}
+			if !all && len(args) == 0 {
+				logging.Errorf("detect_loop stop: pass a loop id or --all")
+				return
+			}
+			if all {
+				runs := listDetectRuns()
+				stopped := 0
+				for _, run := range runs {
+					if run.isDone() {
+						continue
+					}
+					info, wasRunning, err := stopDetectRun(run.id, 5*time.Second)
+					if err != nil {
+						logging.Warningf("detect_loop stop %s: %v", run.id, err)
+						continue
+					}
+					if wasRunning {
+						stopped++
+					}
+					logging.Infof("detect_loop: stopped %s (%s)", info.LoopID, info.Status)
+				}
+				logging.Infof("detect_loop: stop requested for %d loop(s)", stopped)
+				return
+			}
+			info, wasRunning, err := stopDetectRun(args[0], 5*time.Second)
+			if err != nil {
+				logging.Errorf("detect_loop stop: %v", err)
+				return
+			}
+			if wasRunning {
+				logging.Warningf("detect_loop: stopped %s (%s)", info.LoopID, info.Status)
+			} else {
+				logging.Infof("detect_loop: %s was already finished (%s)", info.LoopID, info.Status)
+			}
+		},
+	}
+	cmd.Flags().Bool("all", false, "Cancel every detection loop")
+	return cmd
+}
+
+func detectLoopPromptCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "prompt <loop-id> <instruction...>",
+		Short: "Append an operator instruction to a detection loop",
+		Long: `Append an instruction to a loop's prompt queue.
+
+The loop reads new instructions before its next model session and includes them
+in the next DetectionCycle result. It cannot interrupt an in-flight model turn or
+sandbox run, so use detect_loop stop for immediate termination.`,
+		Args: cobra.MinimumNArgs(2),
+		Run: func(_ *cobra.Command, args []string) {
+			text := strings.Join(args[1:], " ")
+			info, err := appendDetectRunPrompt(args[0], text)
+			if err != nil {
+				logging.Errorf("detect_loop prompt: %v", err)
+				return
+			}
+			logging.Successf("detect_loop: prompt queued for %s (attempt %d, %d pending)",
+				info.LoopID, info.Attempt, info.Prompts)
+		},
+	}
 }
 
 type detectLoopOptions struct {
@@ -255,7 +390,15 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 	loopID := "loop-" + time.Now().UTC().Format("20060102-150405")
-	logging.Infof("Detection loop started; log: %s", logPath)
+	prompts := detection.NewOperatorPromptQueue()
+	run, err := registerDetectRun(loopID, prompts, logPath, logger)
+	if err != nil {
+		logging.Errorf("detect_loop: register loop: %v", err)
+		logger.close()
+		return
+	}
+	logging.Infof("Detection loop %s started; log: %s", loopID, logPath)
+	logging.Infof("Manage with: detect_loop list | detect_loop stop %s | detect_loop prompt %s <instruction>", loopID, loopID)
 
 	go func() {
 		shellcode := strings.TrimSpace(opts.Shellcode)
@@ -264,7 +407,8 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 			generated, producer, agentType, agentUUID, genErr := generateAgentShellcode(opts, logf)
 			if genErr != nil {
 				logf("shellcode generation failed: %v", genErr)
-				logger.close()
+				run.setError(genErr)
+				run.finish()
 				return
 			}
 			shellcode = generated
@@ -273,10 +417,7 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 			opts.AgentUUID = agentUUID
 			logf("generated %s shellcode: %s", producer, shellcode)
 		}
-		if err := startDetectLoopWorker(opts, shellcode, loopID, logFile, logger); err != nil {
-			logger.close()
-			logf("worker start failed: %v", err)
-		}
+		runDetectLoop(run, opts, shellcode)
 	}()
 }
 
@@ -533,167 +674,6 @@ func classTag(class logging.Class) string {
 	default:
 		return "line"
 	}
-}
-
-// startDetectLoopWorker launches the detached detect-loop-worker subprocess
-// alongside a parent-owned scoped Unix IPC server. C2 credentials stay in the
-// operator process; each worker attempt receives only the IPC socket path and a
-// per-run bearer token via environment variable.
-func startDetectLoopWorker(opts detectLoopOptions, shellcode, loopID string, logFile *os.File, logger *loopLogger) error {
-	exe, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("resolve executable: %w", err)
-	}
-	ipcServer, err := newDetectIPCServer(opts.CC, opts.AgentUUID, nil)
-	if err != nil {
-		return fmt.Errorf("start detect IPC server: %w", err)
-	}
-	goal := strings.TrimSpace(opts.Goal)
-	if goal == "" {
-		goal = "Keep the loader evasive while making the payload actually execute; the final agent must come online and run a BOF."
-	}
-	opts.Goal = goal
-
-	go func() {
-		defer ipcServer.Close()
-		defer logger.close()
-		baseLoopID := loopID
-		currentShellcode := shellcode
-		currentOpts := opts
-		currentLoopID := baseLoopID
-		for attempt := 1; attempt <= 3; attempt++ {
-			if attempt > 1 {
-				if strings.TrimSpace(currentOpts.Shellcode) != "" {
-					logger.printf("payload verification failed; --shellcode was supplied and cannot be regenerated")
-					break
-				}
-				logger.printf("payload verification failed; restarting loop with a fresh agent (attempt %d/3)", attempt)
-				forgetLoopAgent(ipcServer.ActiveUUID())
-				nextShellcode, producer, agentType, agentUUID, genErr := generateAgentShellcode(currentOpts, logger.printf)
-				if genErr != nil {
-					logger.printf("restart shellcode generation failed: %v", genErr)
-					break
-				}
-				currentShellcode = nextShellcode
-				currentOpts.AgentType = agentType
-				currentOpts.ShellcodeProducer = producer
-				currentOpts.AgentUUID = agentUUID
-				currentLoopID = fmt.Sprintf("%s-r%d", baseLoopID, attempt)
-				ipcServer.ResetAttempt(agentUUID)
-				logger.printf("restarted loop %s with agent %s", currentLoopID, agentUUID)
-			}
-
-			args := detectLoopWorkerArgs(currentOpts, currentShellcode, currentLoopID, ipcServer.SockPath())
-			worker := exec.Command(exe, args...)
-			worker.Stdout = logFile
-			worker.Stderr = logFile
-			worker.Env = append(os.Environ(), detectIPCTokenEnv+"="+ipcServer.Token())
-			detachWorker(worker)
-			if startErr := worker.Start(); startErr != nil {
-				logging.Errorf("Detection loop worker start failed: %v", startErr)
-				logger.printf("worker start failed: %v", startErr)
-				break
-			}
-			logger.printf("worker pid=%d; log=%s", worker.Process.Pid, logFile.Name())
-			waitErr := worker.Wait()
-
-			reportPath := filepath.Join(live.EmpWorkSpace, "detection", "reports", currentLoopID+".md")
-			if summary, source := readLoopSummary(reportPath); summary != "" {
-				logging.Successf("Detection loop report: %s", reportPath)
-				logging.DisplayMarkdown(summary)
-				logger.printf("executive summary printed from %s", source)
-			}
-			if waitErr != nil {
-				logging.Errorf("Detection loop failed: %v", waitErr)
-				logger.printf("worker exited: %v", waitErr)
-				break
-			}
-			if ipcServer.Verified() {
-				return
-			}
-			if attempt == 3 {
-				logger.printf("payload still not verified after %d attempts", attempt)
-			}
-		}
-	}()
-	return nil
-}
-
-func detectLoopWorkerArgs(opts detectLoopOptions, shellcode, loopID, ipcSock string) []string {
-	agentType := strings.ToLower(strings.TrimSpace(opts.AgentType))
-	if agentType == "" || agentType == "auto" {
-		agentType = builder.PayloadTypeWindowsExecutable
-	}
-	args := []string{
-		"detect-loop-worker",
-		"--module", "loader_windows",
-		"--module-dir", opts.ModuleDir,
-		"--shellcode", shellcode,
-		"--sandbox", opts.Sandbox,
-		"--iterations", strconv.Itoa(opts.Iterations),
-		"--stages", strings.Join(opts.Stages, ","),
-		"--format", opts.Format,
-		"--smw", opts.SMW,
-		"--agent-type", agentType,
-		"--arch", opts.Arch,
-		"--turns", strconv.Itoa(opts.Turns),
-		"--timeout", opts.Timeout.String(),
-		"--loop-id", loopID,
-	}
-	if strings.TrimSpace(opts.Process) != "" {
-		args = append(args, "--process", opts.Process)
-	}
-	if strings.TrimSpace(opts.CC) != "" {
-		args = append(args, "--agent-cc", opts.CC)
-	}
-	if strings.TrimSpace(opts.AgentUUID) != "" {
-		args = append(args, "--expected-agent-uuid", opts.AgentUUID)
-	}
-	if strings.TrimSpace(opts.Inject) != "" {
-		args = append(args, "--inject", opts.Inject)
-	}
-	if producer := strings.TrimSpace(opts.ShellcodeProducer); producer != "" {
-		args = append(args, "--shellcode-producer", producer)
-	}
-	for _, producer := range opts.Producers {
-		args = append(args, "--producer", producer)
-	}
-	for _, root := range opts.ReadRoots {
-		args = append(args, "--read-root", root)
-	}
-	if strings.TrimSpace(opts.Knowledge) != "" {
-		args = append(args, "--knowledge", opts.Knowledge)
-	}
-	if strings.TrimSpace(opts.Goal) != "" {
-		args = append(args, "--goal", opts.Goal)
-	}
-	if opts.RenderWidth > 0 {
-		args = append(args, "--render-width", strconv.Itoa(opts.RenderWidth))
-	}
-	if strings.TrimSpace(ipcSock) != "" {
-		args = append(args, "--ipc-sock", ipcSock)
-	}
-	return args
-}
-
-// RunDetectLoopWorker is the detached worker entry point. It holds no C2
-// credentials, WireGuard keys, or tmux/MCP state; when ipcSock is provided, it
-// reaches only the parent's scoped agent-generation and verification endpoints.
-func RunDetectLoopWorker(ctx context.Context, cfg detection.EvolveConfig, ipcSock string) error {
-	workerLog := newLoopLogger(os.Stdout)
-	cfg.Logf = workerLog.logf
-	if sock := strings.TrimSpace(ipcSock); sock != "" {
-		ipcClient, err := NewDetectIPCClient(sock, os.Getenv(detectIPCTokenEnv))
-		if err != nil {
-			return err
-		}
-		cfg.BuildAgent = ipcClient.BuildAgent
-		cfg.Verify = ipcClient
-		cfg.FinalVerify = ipcClient.FinalVerify
-		cfg.Audit = ipcClient.AuditLocalDenial
-	}
-	_, err := detection.RunEvolve(ctx, cfg)
-	return err
 }
 
 // forgetLoopAgent drops the prior test identity so a restart never reuses a

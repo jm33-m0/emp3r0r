@@ -45,8 +45,8 @@ type VerifyModuleResult struct {
 }
 
 // VerifyOps performs scoped C2 verification actions for the loop's test agent.
-// Keeping this behind an interface isolates detection from direct C2 client state
-// so a detached worker only reaches C2 via a scoped operator IPC bridge.
+// Keeping this behind an interface isolates detection from direct C2 client
+// state.
 type VerifyOps interface {
 	AgentStatus(ctx context.Context, agentUUID string) (*VerifyAgentStatus, error)
 	RunVerifyModule(ctx context.Context, agentUUID, module string) (*VerifyModuleResult, error)

@@ -160,41 +160,6 @@ job ownership, and operator locks.`,
 	mcpCmd.Flags().StringVar(&opts.wg_operator_key_file, "operator-wg-key-file", "", "Read the operator WireGuard private key from this file instead of argv")
 	mcpCmd.Flags().StringVar(&opts.mcp_policy, "policy", "", "OPSEC policy file (default: <EmpWorkSpace>/mcp.json)")
 
-	// Detached detection-loop worker. The console detect_loop command starts
-	// this process with Setsid; when --ipc-sock is given, C2 generation and
-	// single-UUID verification go through the parent operator's scoped IPC.
-	detectLoopWorkerCmd := &cobra.Command{
-		Use:    "detect-loop-worker",
-		Short:  "Run one autonomous detection loop (internal)",
-		Hidden: true,
-		Args:   cobra.NoArgs,
-		Run:    runDetectLoopWorkerCmd,
-	}
-	detectLoopWorkerCmd.Flags().String("module", "loader_windows", "Module name")
-	detectLoopWorkerCmd.Flags().String("module-dir", "", "Module source directory")
-	detectLoopWorkerCmd.Flags().String("shellcode", "", "x64 PIC shellcode")
-	detectLoopWorkerCmd.Flags().String("shellcode-producer", "", "Producer module that generated the initial shellcode")
-	detectLoopWorkerCmd.Flags().String("sandbox", "", "LitterBox URL")
-	detectLoopWorkerCmd.Flags().Int("iterations", 3, "Maximum detection cycles")
-	detectLoopWorkerCmd.Flags().StringSlice("stages", []string{"static", "dynamic"}, "Stages")
-	detectLoopWorkerCmd.Flags().String("process", "", "Sacrificial process override")
-	detectLoopWorkerCmd.Flags().String("format", "exe", "Loader host format")
-	detectLoopWorkerCmd.Flags().String("agent-type", "windows_executable", "Agent payload type for GenerateAgent")
-	detectLoopWorkerCmd.Flags().String("arch", "amd64", "Agent architecture")
-	detectLoopWorkerCmd.Flags().String("agent-cc", "", "C2 address override for GenerateAgent")
-	detectLoopWorkerCmd.Flags().String("expected-agent-uuid", "", "Expected agent UUID generated for this loop")
-	detectLoopWorkerCmd.Flags().String("inject", "", "Injection method override; empty uses the module default")
-	detectLoopWorkerCmd.Flags().String("smw", "on", "SilentMoonwalk")
-	detectLoopWorkerCmd.Flags().StringSlice("producer", nil, "Shellcode producer module as name=path")
-	detectLoopWorkerCmd.Flags().StringSlice("read-root", nil, "Read-only source root")
-	detectLoopWorkerCmd.Flags().String("knowledge", "", "Knowledge cache path")
-	detectLoopWorkerCmd.Flags().Int("turns", 60, "Maximum Norma turns")
-	detectLoopWorkerCmd.Flags().Duration("timeout", 0, "Worker deadline; 0 means no deadline")
-	detectLoopWorkerCmd.Flags().String("loop-id", "", "Loop ID")
-	detectLoopWorkerCmd.Flags().String("goal", "", "High-level loop goal shown to the model")
-	detectLoopWorkerCmd.Flags().Int("render-width", 0, "Width of the log pane for Markdown rendering")
-	detectLoopWorkerCmd.Flags().String("ipc-sock", "", "Parent operator Unix IPC socket path")
-
 	// Completion command
 	completionCmd := &cobra.Command{
 		Use:   "completion [bash|zsh]",
@@ -228,7 +193,7 @@ Zsh:
 	}
 
 	// Add subcommands to root
-	rootCmd.AddCommand(clientCmd, serverCmd, mcpCmd, detectLoopWorkerCmd, operator.KnowledgeSyncCmd(), completionCmd)
+	rootCmd.AddCommand(clientCmd, serverCmd, mcpCmd, operator.KnowledgeSyncCmd(), completionCmd)
 
 	// Default behavior if no subcommand is given (backwards compatibility)
 	rootCmd.Run = func(cmd *cobra.Command, args []string) {
@@ -586,76 +551,4 @@ func connectWg(opts *Options) {
 	wireguard.WgOperator = wgDev
 	go wgDev.Wait()
 	logging.Infof("WireGuard userspace tunnel established")
-}
-
-func runDetectLoopWorkerCmd(cmd *cobra.Command, _ []string) {
-	if err := live.SetupFilePaths(); err != nil {
-		fmt.Fprintf(os.Stderr, "detect-loop-worker: %v\n", err)
-		os.Exit(1)
-	}
-	logging.EnableColor()
-	logging.SetOutput(os.Stdout)
-	if loaded, envErr := live.LoadOperatorEnv(); envErr != nil {
-		fmt.Fprintf(os.Stdout, "operator env: %v\n", envErr)
-	} else if loaded > 0 {
-		fmt.Fprintf(os.Stdout, "loaded %d operator environment variables\n", loaded)
-	}
-	module, _ := cmd.Flags().GetString("module")
-	moduleDir, _ := cmd.Flags().GetString("module-dir")
-	shellcode, _ := cmd.Flags().GetString("shellcode")
-	shellcodeProducer, _ := cmd.Flags().GetString("shellcode-producer")
-	sandbox, _ := cmd.Flags().GetString("sandbox")
-	iterations, _ := cmd.Flags().GetInt("iterations")
-	stages, _ := cmd.Flags().GetStringSlice("stages")
-	process, _ := cmd.Flags().GetString("process")
-	format, _ := cmd.Flags().GetString("format")
-	agentType, _ := cmd.Flags().GetString("agent-type")
-	arch, _ := cmd.Flags().GetString("arch")
-	agentCC, _ := cmd.Flags().GetString("agent-cc")
-	expectedAgentUUID, _ := cmd.Flags().GetString("expected-agent-uuid")
-	inject, _ := cmd.Flags().GetString("inject")
-	smw, _ := cmd.Flags().GetString("smw")
-	producerFlags, _ := cmd.Flags().GetStringSlice("producer")
-	readRoots, _ := cmd.Flags().GetStringSlice("read-root")
-	knowledge, _ := cmd.Flags().GetString("knowledge")
-	turns, _ := cmd.Flags().GetInt("turns")
-	timeout, _ := cmd.Flags().GetDuration("timeout")
-	loopID, _ := cmd.Flags().GetString("loop-id")
-	goal, _ := cmd.Flags().GetString("goal")
-	renderWidth, _ := cmd.Flags().GetInt("render-width")
-	ipcSock, _ := cmd.Flags().GetString("ipc-sock")
-	logging.SetRenderWidth(renderWidth)
-	producers, err := detection.ParseProducerDirs(producerFlags)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "detect-loop-worker: %v\n", err)
-		os.Exit(1)
-	}
-	if sandbox == "" {
-		sandbox = os.Getenv("EMP3R0R_DETECTION_SANDBOX")
-	}
-	var (
-		ctx    context.Context
-		cancel context.CancelFunc
-	)
-	if timeout > 0 {
-		ctx, cancel = context.WithTimeout(context.Background(), timeout)
-		defer cancel()
-	} else {
-		ctx = context.Background()
-	}
-	err = operator.RunDetectLoopWorker(ctx, detection.EvolveConfig{
-		LoopID: loopID, Module: module, ModuleDir: moduleDir,
-		Shellcode: shellcode, SandboxURL: sandbox,
-		StoreRoot:       filepath.Join(live.EmpWorkSpace, "detection"),
-		InitialProducer: shellcodeProducer,
-		Process:         process, Format: format, Inject: inject, SMW: smw,
-		AgentType: agentType, AgentArch: arch, AgentCC: agentCC,
-		ExpectedAgentUUID: expectedAgentUUID,
-		ProducerDirs:      producers, ReadRoots: readRoots, KnowledgePath: knowledge,
-		Stages: stages, Iterations: iterations, Turns: turns, Goal: goal,
-	}, ipcSock)
-	if err != nil {
-		fmt.Fprintf(os.Stdout, "detect-loop-worker: %v\n", err)
-		os.Exit(1)
-	}
 }

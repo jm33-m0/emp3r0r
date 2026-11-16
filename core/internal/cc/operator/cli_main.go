@@ -172,6 +172,8 @@ func CliMain(wg_server_ip string, wg_server_port int) {
 	// Also run tmux cleanup for explicit process exits (live.Exit), which skip
 	// deferred functions because they terminate the process.
 	live.OnShutdown(cli.TmuxDeinitWindows)
+	// Cancel detection loops on exit.
+	live.OnShutdown(stopAllDetectRuns)
 
 	// Run the console
 	logging.Fatal(EMP3R0R_CONSOLE.Start())
