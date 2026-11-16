@@ -213,25 +213,27 @@ func TestEvolveDoesNotBuildWhenSandboxIsDown(t *testing.T) {
 	}
 	builds := 0
 	provider := &captureProvider{answer: `{"summary":"sandbox is down","edits":[],"residual":[]}`}
-	_, err := RunEvolve(context.Background(), EvolveConfig{
+	ctx, cancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
+	defer cancel()
+	_, err := RunEvolve(ctx, EvolveConfig{
 		Provider: provider, Model: "scripted",
 		Module: "loader_windows", ModuleDir: dir, Shellcode: shellcode,
 		SandboxURL: "http://127.0.0.1:1", StoreRoot: t.TempDir(),
-		Stages: []string{"dynamic"}, Iterations: 1, Turns: 1, RetryBase: time.Millisecond,
+		Stages: []string{"dynamic"}, Iterations: 1, Turns: 1, RetryBase: 50 * time.Millisecond,
 		Build: func(string, map[string]string) (string, error) {
 			builds++
 			return "", nil
 		},
 		Logf: nil,
 	})
-	if err != nil {
-		t.Fatal(err)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("err = %v, want the caller deadline; the loop must keep retrying", err)
 	}
 	if builds != 0 {
 		t.Fatalf("build ran before the sandbox check: %d", builds)
 	}
-	if len(provider.requests) == 0 || !strings.Contains(provider.requests[0], "unreachable") {
-		t.Fatalf("model did not receive the sandbox failure: %v", provider.requests)
+	if len(provider.requests) < 2 || !strings.Contains(provider.requests[0], "unreachable") {
+		t.Fatalf("model did not receive the sandbox failure on retries: %v", provider.requests)
 	}
 }
 
@@ -300,21 +302,21 @@ func TestCheckExecutionUsesAgentStatus(t *testing.T) {
 	}
 }
 
-func TestExecutionGateCountsOnlyComparableCycles(t *testing.T) {
+func TestExecutionGateTracksExecutingCycles(t *testing.T) {
 	noop := func(logging.Class, string, ...any) {}
 	e := &evolver{logf: noop}
 	ctx := context.Background()
 
 	e.applyExecutionGate(ctx, &Cycle{Iteration: 1, PayloadKey: "sha256:first"}, cycleSummary{Execution: executionStatic})
 	e.applyExecutionGate(ctx, &Cycle{Iteration: 2}, cycleSummary{Execution: executionUnverified})
-	if e.progress != 2 || e.lastExecuting != nil {
-		t.Fatalf("progress = %d lastExecuting = %+v", e.progress, e.lastExecuting)
+	if e.lastExecuting != nil {
+		t.Fatalf("lastExecuting = %+v", e.lastExecuting)
 	}
 
 	verified := &Cycle{Iteration: 3, PayloadKey: "sha256:running", Summary: `{"shellcode":"","producer":"donut"}`}
 	e.applyExecutionGate(ctx, verified, cycleSummary{Execution: executionVerified})
-	if e.progress != 3 || e.lastExecuting != verified {
-		t.Fatalf("progress = %d lastExecuting = %+v", e.progress, e.lastExecuting)
+	if e.lastExecuting != verified {
+		t.Fatalf("lastExecuting = %+v", e.lastExecuting)
 	}
 
 	e.lastExecuting = nil
@@ -479,10 +481,12 @@ func TestEvolveSendsBaselineFailureToModel(t *testing.T) {
 		classMu sync.Mutex
 		classes []logging.Class
 	)
-	result, err := RunEvolve(context.Background(), EvolveConfig{
+	ctx, cancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
+	defer cancel()
+	_, err := RunEvolve(ctx, EvolveConfig{
 		Provider: provider, Model: "scripted",
 		Module: "loader_windows", ModuleDir: t.TempDir(), Shellcode: shellcode,
-		SandboxURL: server.URL, StoreRoot: t.TempDir(), RetryBase: time.Millisecond,
+		SandboxURL: server.URL, StoreRoot: t.TempDir(), RetryBase: 50 * time.Millisecond,
 		Stages: []string{"dynamic"}, Iterations: 1, Turns: 2,
 		Build: func(string, map[string]string) (string, error) {
 			return "compiler exploded", errors.New("simulated build failure")
@@ -493,22 +497,19 @@ func TestEvolveSendsBaselineFailureToModel(t *testing.T) {
 			classMu.Unlock()
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("err = %v, want the caller deadline; the loop must keep retrying", err)
 	}
 	if detonations.Load() != 0 {
 		t.Fatalf("host detonated the payload again without model feedback: %d", detonations.Load())
 	}
-	if len(provider.requests) == 0 {
-		t.Fatal("model was never invoked after the baseline failure")
+	if len(provider.requests) < 2 {
+		t.Fatalf("model was not retried after the baseline failure: %v", provider.requests)
 	}
 	for _, want := range []string{"simulated build failure", "compiler exploded", "Baseline failure"} {
 		if !strings.Contains(provider.requests[0], want) {
 			t.Fatalf("first model prompt missing %q:\n%s", want, provider.requests[0])
 		}
-	}
-	if result == nil || !strings.Contains(string(result.Answer), "fixed the build") {
-		t.Fatalf("result = %+v", result)
 	}
 	classMu.Lock()
 	defer classMu.Unlock()
@@ -641,48 +642,53 @@ func TestRenderLoopReport(t *testing.T) {
 	}
 }
 
-// stallOnceProvider stays inside one model turn until the loop cancels the
-// session, then answers so the resumed session can be inspected.
-type stallOnceProvider struct {
+// deadlineResumeProvider stalls the first session until the cycle deadline,
+// answers on the retry, then cancels the loop to prove it kept running.
+type deadlineResumeProvider struct {
 	wait     time.Duration
 	answer   string
+	cancel   context.CancelFunc
 	mu       sync.Mutex
 	requests []string
 }
 
-func (p *stallOnceProvider) Stream(ctx context.Context, req llm.CompletionRequest) iter.Seq2[llm.StreamEvent, error] {
+func (p *deadlineResumeProvider) Stream(ctx context.Context, req llm.CompletionRequest) iter.Seq2[llm.StreamEvent, error] {
 	p.mu.Lock()
 	p.requests = append(p.requests, fmt.Sprintf("%v", req.Messages))
-	first := len(p.requests) == 1
+	n := len(p.requests)
 	p.mu.Unlock()
 	return func(yield func(llm.StreamEvent, error) bool) {
-		if first {
+		switch {
+		case n == 1:
 			select {
 			case <-ctx.Done():
 				yield(llm.StreamEvent{}, ctx.Err())
 			case <-time.After(p.wait):
 				yield(llm.StreamEvent{Type: llm.SEMessageStop}, nil)
 			}
-			return
+		case n == 2:
+			if !yield(llm.StreamEvent{Type: llm.SEMessageStart}, nil) {
+				return
+			}
+			if !yield(llm.StreamEvent{Type: llm.SETextDelta, Text: p.answer}, nil) {
+				return
+			}
+			if !yield(llm.StreamEvent{Type: llm.SEMessageDelta, StopReason: "end_turn"}, nil) {
+				return
+			}
+			yield(llm.StreamEvent{Type: llm.SEMessageStop}, nil)
+		default:
+			p.cancel()
+			yield(llm.StreamEvent{}, context.Canceled)
 		}
-		if !yield(llm.StreamEvent{Type: llm.SEMessageStart}, nil) {
-			return
-		}
-		if !yield(llm.StreamEvent{Type: llm.SETextDelta, Text: p.answer}, nil) {
-			return
-		}
-		if !yield(llm.StreamEvent{Type: llm.SEMessageDelta, StopReason: "end_turn"}, nil) {
-			return
-		}
-		yield(llm.StreamEvent{Type: llm.SEMessageStop}, nil)
 	}
 }
 
-func (p *stallOnceProvider) Complete(context.Context, llm.CompletionRequest) (llm.Message, string, llm.Usage, error) {
+func (p *deadlineResumeProvider) Complete(context.Context, llm.CompletionRequest) (llm.Message, string, llm.Usage, error) {
 	return llm.Message{}, "", llm.Usage{}, nil
 }
 
-func TestEvolveInterruptsSessionWithoutACycle(t *testing.T) {
+func TestEvolveResumesCycleAfterDeadline(t *testing.T) {
 	moduleDir := t.TempDir()
 	shellcode := filepath.Join(t.TempDir(), "agent.bin")
 	if err := os.WriteFile(shellcode, []byte(strings.Repeat("S", 40000)), 0o600); err != nil {
@@ -696,38 +702,135 @@ func TestEvolveInterruptsSessionWithoutACycle(t *testing.T) {
 		return fmt.Sprintf("[+] generated payload: %s (9 bytes)\n", path), nil
 	}
 	server, _ := fakeEvolveSandbox(t)
-	provider := &stallOnceProvider{
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	provider := &deadlineResumeProvider{
 		wait:   2 * time.Second,
 		answer: `{"summary":"acted","edits":[],"residual":[]}`,
+		cancel: cancel,
 	}
 	started := time.Now()
-	result, err := RunEvolve(context.Background(), EvolveConfig{
+	_, err := RunEvolve(ctx, EvolveConfig{
 		Provider: provider, Model: "scripted",
 		Module: "loader_windows", ModuleDir: moduleDir,
 		Shellcode: shellcode, SandboxURL: server.URL, StoreRoot: t.TempDir(),
 		Stages: []string{"dynamic"}, Iterations: 2, Turns: 4, Build: build,
 		CycleTimeout: 300 * time.Millisecond, ToolIdleTimeout: time.Hour,
-		SessionTimeout: time.Hour,
+		SessionTimeout: time.Hour, RetryBase: time.Millisecond,
 	})
-	if err != nil {
-		t.Fatal(err)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
 	}
 	if elapsed := time.Since(started); elapsed > 3*time.Second {
-		t.Fatalf("the cycle deadline did not interrupt the stalled session: %s", elapsed)
+		t.Fatalf("the cycle deadline did not stop the stalled session: %s", elapsed)
 	}
 	provider.mu.Lock()
 	requests := append([]string(nil), provider.requests...)
 	provider.mu.Unlock()
-	if len(requests) < 2 {
-		t.Fatalf("session was not resumed: %v", requests)
+	if len(requests) != 3 {
+		t.Fatalf("sessions = %d, want 3; the loop did not retry after the cycle deadline", len(requests))
 	}
-	for _, want := range []string{"no cycle completed within 300ms", "Stop inspecting"} {
+	for _, want := range []string{"cycle was stopped", "DetectionCycle", "analysis tools are blocked"} {
 		if !strings.Contains(requests[1], want) {
-			t.Fatalf("resume prompt missing %q:\n%s", want, requests[1])
+			t.Fatalf("retry prompt missing %q:\n%s", want, requests[1])
 		}
 	}
-	if !strings.Contains(string(result.Answer), "acted") {
-		t.Fatalf("answer = %s", result.Answer)
+}
+
+func TestActionRequiredBlocksAnalysisTools(t *testing.T) {
+	e := &evolver{}
+	e.actionRequired.Store(true)
+	for _, name := range []string{
+		"TelemetryQuery", "InspectFeedback", "Payloads", "ComparePayloads",
+		"KnowledgeSearch", "AgentStatus",
+	} {
+		if decision := e.allowToolHook(name); decision.Decision != "block" {
+			t.Fatalf("%s was allowed while a cycle retry is required", name)
+		}
+	}
+	for _, name := range []string{
+		"SourceRead", "SourceSearch", "EditSource", "BuildShellcode",
+		"DetectionCycle",
+	} {
+		if decision := e.allowToolHook(name); decision.Decision == "block" {
+			t.Fatalf("%s was blocked while a cycle retry is required", name)
+		}
+	}
+	e.actionRequired.Store(false)
+	if decision := e.allowToolHook("TelemetryQuery"); decision.Decision == "block" {
+		t.Fatal("TelemetryQuery stayed blocked after a cycle cleared the action requirement")
+	}
+}
+
+// countingAnswerProvider returns a non-JSON turn until the last session, where
+// it cancels the loop. A stalled-restart cap would stop before that session.
+type countingAnswerProvider struct {
+	mu     sync.Mutex
+	calls  int
+	cancel context.CancelFunc
+}
+
+func (p *countingAnswerProvider) Stream(_ context.Context, _ llm.CompletionRequest) iter.Seq2[llm.StreamEvent, error] {
+	p.mu.Lock()
+	p.calls++
+	n := p.calls
+	p.mu.Unlock()
+	return func(yield func(llm.StreamEvent, error) bool) {
+		if n >= 6 {
+			p.cancel()
+			yield(llm.StreamEvent{}, context.Canceled)
+			return
+		}
+		if !yield(llm.StreamEvent{Type: llm.SEMessageStart}, nil) {
+			return
+		}
+		if !yield(llm.StreamEvent{Type: llm.SETextDelta, Text: "still thinking"}, nil) {
+			return
+		}
+		if !yield(llm.StreamEvent{Type: llm.SEMessageDelta, StopReason: "end_turn"}, nil) {
+			return
+		}
+		yield(llm.StreamEvent{Type: llm.SEMessageStop}, nil)
+	}
+}
+
+func (p *countingAnswerProvider) Complete(context.Context, llm.CompletionRequest) (llm.Message, string, llm.Usage, error) {
+	return llm.Message{}, "", llm.Usage{}, nil
+}
+
+func TestEvolveDoesNotStopAfterStalledSessions(t *testing.T) {
+	moduleDir := t.TempDir()
+	shellcode := filepath.Join(t.TempDir(), "agent.bin")
+	if err := os.WriteFile(shellcode, []byte(strings.Repeat("S", 40000)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	build := func(_ string, _ map[string]string) (string, error) {
+		path := filepath.Join(t.TempDir(), "loader.exe")
+		if err := os.WriteFile(path, []byte("MZ"+strings.Repeat("M", 40000)), 0o600); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("[+] generated payload: %s (9 bytes)\n", path), nil
+	}
+	server, _ := fakeEvolveSandbox(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	provider := &countingAnswerProvider{cancel: cancel}
+	_, err := RunEvolve(ctx, EvolveConfig{
+		Provider: provider, Model: "scripted",
+		Module: "loader_windows", ModuleDir: moduleDir,
+		Shellcode: shellcode, SandboxURL: server.URL, StoreRoot: t.TempDir(),
+		Stages: []string{"dynamic"}, Iterations: 2, Turns: 4, Build: build,
+		RetryBase: time.Millisecond, CycleTimeout: time.Hour,
+		ToolIdleTimeout: time.Hour, SessionTimeout: time.Hour,
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
+	}
+	provider.mu.Lock()
+	calls := provider.calls
+	provider.mu.Unlock()
+	if calls != 6 {
+		t.Fatalf("sessions = %d, want 6; the loop stopped on a stalled session", calls)
 	}
 }
 

@@ -69,7 +69,6 @@ func (e *evolver) buildShellcodeTool() tool.CoreTool {
 			if err != nil {
 				return tool.Errorf(fmt.Sprintf("%v", err)), nil
 			}
-			e.progress++
 			out := map[string]any{
 				"producer":   e.activeProducer,
 				"path":       artifact.Path,
@@ -410,7 +409,6 @@ func (e *evolver) revertPayloadTool() tool.CoreTool {
 			if err != nil {
 				return tool.Errorf(fmt.Sprintf("%v", err)), nil
 			}
-			e.progress++
 			data, _ := json.Marshal(map[string]any{
 				"payload":  args.PayloadKey,
 				"reverted": reverted,

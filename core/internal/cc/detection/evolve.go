@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -28,8 +29,6 @@ const (
 	defaultEvolveIterations = 3
 	defaultEvolveTurns      = 60
 	maxEvolveBuildLog       = 8 << 20
-	// maxEvolveStalledResumes bounds restarts that make no cycle progress.
-	maxEvolveStalledResumes = 4
 	// defaultCycleTimeout bounds one build/detonate/verify cycle.
 	defaultCycleTimeout = 60 * time.Minute
 	// defaultSessionTimeout bounds one model session even when it keeps
@@ -117,10 +116,10 @@ type EvolveConfig struct {
 	Model    string
 	// RetryBase is the first recovery delay; it backs off to 30 seconds.
 	RetryBase time.Duration
-	// CycleTimeout bounds one build/detonate/verify cycle, and the time a model
-	// session may run without completing a cycle: the host interrupts a session
-	// that only inspects and requires an edit and a cycle. Zero uses
-	// defaultCycleTimeout.
+	// CycleTimeout bounds one build/detonate/verify cycle and the time a model
+	// session may run without completing a cycle. The session is stopped and
+	// analysis tools are blocked until the model applies an edit and retries;
+	// the loop itself continues. Zero uses defaultCycleTimeout.
 	CycleTimeout time.Duration
 	// SessionTimeout bounds one model session. Zero uses defaultSessionTimeout.
 	SessionTimeout time.Duration
@@ -219,12 +218,8 @@ type evolver struct {
 	lastAnswer                map[string]any
 	baselineFailure           string
 	operatorPrompts           *OperatorPromptQueue
-	// progress counts cycles that produced a comparable result; an offline
-	// cycle consumes the budget but does not count as progress, so the stalled
-	// session guard cannot be reset by builds whose payload never ran.
-	progress         int
-	lastExecuting    *Cycle
-	executionBlocked bool
+	lastExecuting             *Cycle
+	executionBlocked          bool
 	// executionCheckTimeout overrides PayloadVerifyTimeout in tests.
 	executionCheckTimeout time.Duration
 
@@ -241,6 +236,11 @@ type evolver struct {
 	activeTools     atomic.Int32
 	lastCycleAt     atomic.Int64
 	activeCycles    atomic.Int32
+	actionRequired  atomic.Bool
+	deadlineHit     atomic.Bool
+	// toolGate closes the race between a deadline cancelling a session and a
+	// tool starting in that same session.
+	toolGate        sync.Mutex
 	knowledgeSeen   map[string]struct{}
 	started         time.Time
 	cyclesDone      atomic.Int64
@@ -394,6 +394,13 @@ func (e *evolver) waitSandbox(ctx context.Context) (Health, error) {
 // recover logs a failure and waits before the caller retries. Callers bound
 // the number of attempts; recover returns false only when the context is done.
 func (e *evolver) recover(ctx context.Context, attempt int, what string, err error) bool {
+	return e.backoff(ctx, attempt, fmt.Sprintf("%s failed: %v", what, err))
+}
+
+// backoff waits before the next session so a model that keeps returning
+// without progress cannot spin the loop. It returns false only when the loop
+// context is done.
+func (e *evolver) backoff(ctx context.Context, attempt int, reason string) bool {
 	delay := e.cfg.RetryBase
 	if delay <= 0 {
 		delay = 2 * time.Second
@@ -404,7 +411,7 @@ func (e *evolver) recover(ctx context.Context, attempt int, what string, err err
 	if delay > 30*time.Second {
 		delay = 30 * time.Second
 	}
-	e.logClass(logging.ClassWarning, "%s failed (attempt %d): %v; retrying in %s", what, attempt+1, err, delay)
+	e.logClass(logging.ClassWarning, "%s (attempt %d); retrying in %s", reason, attempt+1, delay)
 	select {
 	case <-ctx.Done():
 		return false
@@ -672,20 +679,6 @@ every residual is explained with evidence. Return the final JSON object.`,
 		parseErr error
 	)
 	maxTokens := 16384
-	progress := e.progress
-	stalled := 0
-	canResume := func() bool {
-		if e.progress != progress {
-			progress = e.progress
-			stalled = 0
-		}
-		stalled++
-		if stalled > maxEvolveStalledResumes {
-			e.logClass(logging.ClassWarning, "stopping after %d agent restarts without a new cycle", stalled-1)
-			return false
-		}
-		return true
-	}
 	for attempt := 0; ; attempt++ {
 		if prompts := e.takeOperatorPrompts(); len(prompts) > 0 {
 			prompt = appendOperatorPrompts(prompt, prompts)
@@ -705,10 +698,8 @@ every residual is explained with evidence. Return the final JSON object.`,
 		}
 		sessionCtx, sessionCancel := context.WithCancel(ctx)
 		var sessionExpired, idleExpired, cycleExpired atomic.Bool
-		sessionTimer := time.AfterFunc(sessionTimeout, func() {
-			sessionExpired.Store(true)
-			sessionCancel()
-		})
+		e.deadlineHit.Store(false)
+		sessionStart := time.Now()
 		e.lastToolCall.Store(time.Now().UnixNano())
 		watchdogDone := make(chan struct{})
 		go func() {
@@ -728,6 +719,7 @@ every residual is explained with evidence. Return the final JSON object.`,
 				}
 				if e.activeTools.Load() == 0 {
 					wait = min(wait, idleTimeout-time.Since(time.Unix(0, e.lastToolCall.Load())))
+					wait = min(wait, sessionTimeout-time.Since(sessionStart))
 				}
 				if wait < 10*time.Millisecond {
 					wait = 10 * time.Millisecond
@@ -747,20 +739,33 @@ every residual is explained with evidence. Return the final JSON object.`,
 				// An in-flight tool owns the wall clock: a cycle is bounded by
 				// its own deadline, and neither a long tool nor a running cycle
 				// is a stalled session.
+				e.toolGate.Lock()
 				tools := e.activeTools.Load()
 				cycles := e.activeCycles.Load()
 				idleFor := time.Since(time.Unix(0, e.lastToolCall.Load()))
 				cycleFor := time.Since(time.Unix(0, e.lastCycleAt.Load()))
 				if cycles == 0 && tools == 0 && cycleFor >= cycleTimeout {
+					e.deadlineHit.Store(true)
 					cycleExpired.Store(true)
 					sessionCancel()
+					e.toolGate.Unlock()
 					return
 				}
 				if tools == 0 && idleFor >= idleTimeout {
+					e.deadlineHit.Store(true)
 					idleExpired.Store(true)
 					sessionCancel()
+					e.toolGate.Unlock()
 					return
 				}
+				if tools == 0 && time.Since(sessionStart) >= sessionTimeout {
+					e.deadlineHit.Store(true)
+					sessionExpired.Store(true)
+					sessionCancel()
+					e.toolGate.Unlock()
+					return
+				}
+				e.toolGate.Unlock()
 				timer.Reset(next())
 			}
 		}()
@@ -777,7 +782,6 @@ every residual is explained with evidence. Return the final JSON object.`,
 			Compaction:             &compaction.Config{ContextWindow: 200000, MaxOutputTokens: maxTokens, KeepRecent: 8},
 			OnWarn:                 func(line string) { e.logf(logging.ClassWarning, "%s", line) },
 		}, prompt)
-		sessionTimer.Stop()
 		close(watchdogDone)
 		sessionCancel()
 		if err != nil {
@@ -785,27 +789,25 @@ every residual is explained with evidence. Return the final JSON object.`,
 				return nil, ctx.Err()
 			}
 			if cycleExpired.Load() {
-				if !canResume() {
-					break
-				}
+				e.actionRequired.Store(true)
 				e.logClass(logging.ClassWarning,
-					"no cycle completed within %s; interrupting the session and requiring an edit and cycle", cycleTimeout)
-				// Start a fresh window: the resumed session is instructed to
-				// act immediately, and its own cycle must land before the next
-				// deadline.
+					"no cycle completed within %s; stopping the cycle and requiring an edit and a retry", cycleTimeout)
+				// Give the resumed session a fresh window, but analysis tools
+				// stay blocked until a cycle completes, so the model has to
+				// apply its edits and call DetectionCycle.
 				e.lastCycleAt.Store(time.Now().UnixNano())
 				prompt = e.resumePrompt(cfg, fmt.Sprintf(
-					"no cycle completed within %s. Stop inspecting: apply the strongest grounded edit with EditSource now, then call DetectionCycle with the mechanism and one prediction. Do not spend another turn on analysis.", cycleTimeout))
+					"no cycle completed within %s and the cycle was stopped. Apply your edits with EditSource now, then retry with DetectionCycle; analysis tools are blocked until a cycle completes.", cycleTimeout))
 				continue
 			}
 			if sessionExpired.Load() {
-				e.logClass(logging.ClassError, "stopping the session: it exceeded the %s wall-clock limit", sessionTimeout)
-				break
+				e.logClass(logging.ClassError,
+					"session exceeded the %s wall-clock limit; restarting it", sessionTimeout)
+				prompt = e.resumePrompt(cfg, fmt.Sprintf(
+					"the previous session exceeded the %s wall-clock limit; continue from the dossier", sessionTimeout))
+				continue
 			}
 			if idleExpired.Load() {
-				if !canResume() {
-					break
-				}
 				e.logClass(logging.ClassWarning, "session made no tool call for %s; asking for a cycle or the final JSON", idleTimeout)
 				prompt = e.resumePrompt(cfg, fmt.Sprintf("the previous session made no tool call for %s; call DetectionCycle or return the final JSON now", idleTimeout))
 				continue
@@ -813,9 +815,6 @@ every residual is explained with evidence. Return the final JSON object.`,
 			if e.executionBlocked {
 				e.logClass(logging.ClassError, "stopping the session: the baseline payload did not execute and no executing baseline exists")
 				break
-			}
-			if !canResume() {
-				return nil, fmt.Errorf("agent session failed after repeated restarts: %w", err)
 			}
 			if !e.recover(ctx, attempt, "agent session", err) {
 				return nil, ctx.Err()
@@ -827,21 +826,29 @@ every residual is explained with evidence. Return the final JSON object.`,
 		answer, parseErr = parseAnalystAnswer(text)
 		if parseErr == nil {
 			e.lastAnswer = answer
-			if e.usedCycles() < cfg.Iterations && e.needsMoreWork(ctx) {
-				if !canResume() {
-					break
+			if e.actionRequired.Load() && e.usedCycles() < cfg.Iterations {
+				e.logClass(logging.ClassWarning, "agent answered before retrying the stopped cycle; resuming")
+				if !e.backoff(ctx, attempt, "a cycle retry is required after the cycle deadline") {
+					return nil, ctx.Err()
 				}
+				prompt = e.resumePrompt(cfg, "a cycle retry is required after the cycle deadline; apply your edits and call DetectionCycle")
+				continue
+			}
+			if e.usedCycles() < cfg.Iterations && e.needsMoreWork(ctx) {
 				e.logClass(logging.ClassWarning, "agent stopped with work remaining; resuming")
+				if !e.backoff(ctx, attempt, "the answer did not start a new cycle while work remains") {
+					return nil, ctx.Err()
+				}
 				prompt = e.resumePrompt(cfg, "real verdicts or actionable high/medium findings remain")
 				continue
 			}
 			break
 		}
 		if e.usedCycles() < cfg.Iterations && !e.executionBlocked {
-			if !canResume() {
-				break
-			}
 			e.logClass(logging.ClassWarning, "agent stopped without the required JSON; resuming")
+			if !e.backoff(ctx, attempt, "the answer did not contain the final JSON object") {
+				return nil, ctx.Err()
+			}
 			prompt = e.resumePrompt(cfg, "the previous turn ended without the final JSON object")
 			continue
 		}
@@ -1328,6 +1335,7 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 	// A completed cycle resets the session's cycle deadline even when the
 	// payload did not execute: the model has new feedback to act on.
 	e.lastCycleAt.Store(time.Now().UnixNano())
+	e.actionRequired.Store(false)
 	return cycle, nil
 }
 
@@ -1475,15 +1483,13 @@ func (e *evolver) checkExecution(ctx context.Context, traceID int64, dynamic boo
 	return executionOffline, &online, network
 }
 
-// applyExecutionGate counts only comparable cycles as progress and rolls a
-// non-executing cycle back to the last payload that actually checked in.
+// applyExecutionGate tracks the last executing cycle and rolls a non-executing
+// cycle back to the last payload that actually checked in.
 func (e *evolver) applyExecutionGate(ctx context.Context, cycle *Cycle, summary cycleSummary) {
 	switch summary.Execution {
 	case executionVerified:
 		e.lastExecuting = cycle
-		e.progress++
 	case executionStatic, executionUnverified:
-		e.progress++
 	case executionOffline:
 		if e.lastExecuting == nil {
 			e.executionBlocked = true
@@ -1853,6 +1859,12 @@ func (e *evolver) verifyEnabled() bool {
 }
 
 func (e *evolver) allowToolHook(toolName string) hook.Result {
+	if e.actionRequired.Load() && analysisTool(toolName) {
+		return hook.Result{
+			Decision: "block",
+			Message:  "the cycle deadline expired: apply your edits and call DetectionCycle; analysis tools are blocked until a cycle completes",
+		}
+	}
 	switch toolName {
 	case "SourceList", "SourceRead", "SourceSearch", "TelemetryQuery",
 		"InspectFeedback", "Payloads", "ComparePayloads", "DetectionCycle", "EditSource",
@@ -1871,13 +1883,35 @@ func (e *evolver) allowToolHook(toolName string) hook.Result {
 	return hook.Result{Decision: "block", Message: "tool is not part of the detection loop"}
 }
 
+// analysisTool reports whether a tool only inspects recorded evidence. After a
+// cycle deadline the model must act instead of inspecting, so these tools are
+// blocked until the retry completes.
+func analysisTool(toolName string) bool {
+	switch toolName {
+	case "TelemetryQuery", "InspectFeedback", "Payloads", "ComparePayloads",
+		"KnowledgeSearch", "KnowledgeRead", "KnowledgeStats", "KnowledgeList",
+		"AgentStatus", "RunModule", "CleanupAgent":
+		return true
+	}
+	return false
+}
+
 func (e *evolver) hooks() *hook.Registry {
 	hooks := hook.NewRegistry().On(hook.PreToolUse, func(_ context.Context, event hook.Event) hook.Result {
 		decision := e.allowToolHook(event.ToolName)
-		if decision.Decision != "block" {
-			e.lastToolCall.Store(time.Now().UnixNano())
-			e.activeTools.Add(1)
+		if decision.Decision == "block" {
+			return decision
 		}
+		e.toolGate.Lock()
+		defer e.toolGate.Unlock()
+		if e.deadlineHit.Load() {
+			return hook.Result{
+				Decision: "block",
+				Message:  "the session deadline expired; the loop will retry in a new session",
+			}
+		}
+		e.lastToolCall.Store(time.Now().UnixNano())
+		e.activeTools.Add(1)
 		return decision
 	})
 	hooks.On(hook.PostToolUse, func(_ context.Context, event hook.Event) hook.Result {
@@ -2598,11 +2632,11 @@ Work loop:
    layout, and component boundaries may change. Do not stop at the first lower
    score: the sandbox risk score is noisy and saturates.
 
-Time discipline: the host interrupts a session that completes no cycle within
-the cycle deadline and requires an edit and a DetectionCycle. Decide from the
-evidence you have. Do not re-read the same source, telemetry, or knowledge
-document, and do not defer a mechanism you have already chosen: write the edit
-and run the cycle.
+Time discipline: the host stops a session that completes no cycle within the
+cycle deadline, blocks analysis tools, and requires an edit and a
+DetectionCycle retry. Decide from the evidence you have. Do not re-read the
+same source, telemetry, or knowledge document, and do not defer a mechanism you
+have already chosen: write the edit and run the cycle.
 
 Direction discipline:
 - Name the mechanism before editing: self-load, remote APC/thread, section

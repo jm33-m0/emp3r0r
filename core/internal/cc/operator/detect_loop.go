@@ -129,7 +129,7 @@ func addDetectLoopFlags(cmd *cobra.Command) {
 	cmd.Flags().String("knowledge", "", "Knowledge cache path; defaults to <detection store>/knowledge.db")
 	cmd.Flags().Int("turns", 60, "Maximum Norma agent turns")
 	cmd.Flags().Duration("timeout", 0, "Loop deadline; 0 means no deadline")
-	cmd.Flags().Duration("cycle-timeout", 60*time.Minute, "Deadline for one build, detonation, and verification cycle, and for a model session that completes no cycle; the host then requires an edit and a cycle")
+	cmd.Flags().Duration("cycle-timeout", 60*time.Minute, "Deadline for one build, detonation, and verification cycle, and for a model session that completes no cycle; the cycle is stopped and the model must edit and retry")
 	cmd.Flags().Duration("session-timeout", 2*time.Hour, "Wall-clock deadline for one model session")
 	cmd.Flags().Duration("tool-idle-timeout", 30*time.Minute, "Restart a model session that makes no tool call for this long")
 	cmd.Flags().Bool("tmux", true, "Open a separate tmux window tailing the loop log")
