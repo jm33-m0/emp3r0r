@@ -14,7 +14,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
@@ -254,40 +253,26 @@ func (t *TelemetryDB) CyclesForLogicalLoop(ctx context.Context, base, current st
 		return nil, nil
 	}
 	pattern := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(base) + "-r%"
-	rows, err := t.db.QueryContext(ctx, `
-		SELECT c.id, c.loop_id, c.iteration, c.payload_id, c.run_id, c.score, c.level,
-		       c.findings, c.verdicts, COALESCE(c.trace_id, 0), c.executed, c.execution,
-		       c.agent_online, c.network_events, c.summary, c.created_at,
-		       COALESCE(p.payload_key, ''), COALESCE(p.table_name, '')
-		FROM loop_cycles c LEFT JOIN payloads p ON p.id = c.payload_id
-		WHERE (c.loop_id = ? OR c.loop_id LIKE ? ESCAPE '\') AND c.loop_id <> ?
+	rows, err := t.db.QueryContext(ctx, `SELECT `+cycleColumns+` `+cycleFrom+
+		` WHERE (c.loop_id = ? OR c.loop_id LIKE ? ESCAPE '\') AND c.loop_id <> ?
 		ORDER BY c.created_at, c.id`, base, pattern, current)
 	if err != nil {
 		return nil, fmt.Errorf("read logical loop cycles: %w", err)
 	}
-	defer rows.Close()
-	var out []Cycle
-	for rows.Next() {
-		var cycle Cycle
-		var created int64
-		var online sql.NullInt64
-		if err := rows.Scan(&cycle.ID, &cycle.LoopID, &cycle.Iteration, &cycle.PayloadID,
-			&cycle.RunID, &cycle.Score, &cycle.Level, &cycle.Findings, &cycle.Verdicts,
-			&cycle.TraceID, &cycle.Executed, &cycle.Execution, &online,
-			&cycle.NetworkEvents, &cycle.Summary, &created, &cycle.PayloadKey, &cycle.PayloadTable); err != nil {
-			return nil, err
-		}
-		if currentAttempt > 1 && logicalAttempt(base, cycle.LoopID) >= currentAttempt {
-			continue
-		}
-		if online.Valid {
-			value := online.Int64 != 0
-			cycle.AgentOnline = &value
-		}
-		cycle.CreatedAt = time.UnixMilli(created).UTC()
-		out = append(out, cycle)
+	cycles, err := scanCycleRows(rows)
+	if err != nil {
+		return nil, err
 	}
-	return out, rows.Err()
+	if currentAttempt <= 1 {
+		return cycles, nil
+	}
+	out := cycles[:0]
+	for _, cycle := range cycles {
+		if logicalAttempt(base, cycle.LoopID) < currentAttempt {
+			out = append(out, cycle)
+		}
+	}
+	return out, nil
 }
 
 // LastAnswerForLoops returns the newest persisted answer among prior attempts.

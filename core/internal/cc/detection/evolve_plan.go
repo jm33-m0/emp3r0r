@@ -44,10 +44,7 @@ func (e *evolver) cyclePreconditions(mechanism string) error {
 }
 
 func stageNames(stages []string) []string {
-	seen := map[string]bool{}
-	for _, stage := range stages {
-		seen[strings.ToLower(strings.TrimSpace(stage))] = true
-	}
+	seen, _ := stageSet(stages)
 	var out []string
 	for _, name := range []string{"static", "dynamic", "edr"} {
 		if seen[name] {

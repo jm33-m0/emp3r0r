@@ -245,13 +245,8 @@ type evolver struct {
 }
 
 func (e *evolver) dynamicEnabled() bool {
-	for _, stage := range e.cfg.Stages {
-		switch strings.ToLower(strings.TrimSpace(stage)) {
-		case string(StageDynamic), "edr":
-			return true
-		}
-	}
-	return false
+	stages, err := stageSet(e.cfg.Stages)
+	return err == nil && (stages[string(StageDynamic)] || stages["edr"])
 }
 
 func (e *evolver) activeShellcode() string {
@@ -536,7 +531,7 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 	if e.executionBlocked {
 		executionState = "the baseline payload did not check in and no executing baseline exists; do not run more cycles; return the final JSON with the execution failure"
 	} else if e.lastExecuting != nil {
-		payload := shortSHA(strings.TrimPrefix(e.lastExecuting.PayloadKey, "sha256:"))
+		payload := shortPayloadKey(e.lastExecuting.PayloadKey)
 		if payload == "" {
 			payload = "the baseline"
 		}
@@ -987,21 +982,29 @@ func normalizeEvolveConfig(cfg *EvolveConfig) error {
 	return nil
 }
 
-func parseEvolveStages(stages []string) (static, dynamic, edr bool, err error) {
+// stageSet normalizes stage names once for parsing, prompting, and the
+// dynamic gate.
+func stageSet(stages []string) (map[string]bool, error) {
+	set := make(map[string]bool, 3)
 	for _, stage := range stages {
-		switch strings.ToLower(strings.TrimSpace(stage)) {
-		case "static":
-			static = true
-		case "dynamic":
-			dynamic = true
-		case "edr":
-			edr = true
+		name := strings.ToLower(strings.TrimSpace(stage))
+		switch name {
 		case "":
+		case "static", "dynamic", "edr":
+			set[name] = true
 		default:
-			return false, false, false, fmt.Errorf("unknown stage %q; use static, dynamic, or edr", stage)
+			return nil, fmt.Errorf("unknown stage %q; use static, dynamic, or edr", stage)
 		}
 	}
-	return static, dynamic, edr, nil
+	return set, nil
+}
+
+func parseEvolveStages(stages []string) (static, dynamic, edr bool, err error) {
+	set, err := stageSet(stages)
+	if err != nil {
+		return false, false, false, err
+	}
+	return set["static"], set["dynamic"], set["edr"], nil
 }
 
 type cycleSummary struct {
@@ -1306,6 +1309,11 @@ func shortSHA(sha string) string {
 	return sha
 }
 
+// shortPayloadKey abbreviates a payload key for logs and reports.
+func shortPayloadKey(key string) string {
+	return shortSHA(strings.TrimPrefix(strings.TrimSpace(key), "sha256:"))
+}
+
 // checkExecution verifies that a dynamic payload reached the agent runtime. It
 // returns the recorded state, the C2 online flag when it was checked, and the
 // trace's network event count as corroborating evidence.
@@ -1374,7 +1382,7 @@ func (e *evolver) applyExecutionGate(ctx context.Context, cycle *Cycle, summary 
 		}
 		e.logClass(logging.ClassWarning, "cycle %d did not execute (agent %s offline); restoring payload %s",
 			cycle.Iteration, headerOrNone(e.expectedAgentUUID),
-			shortSHA(strings.TrimPrefix(e.lastExecuting.PayloadKey, "sha256:")))
+			shortPayloadKey(e.lastExecuting.PayloadKey))
 		e.restoreExecutingState(ctx)
 	}
 }
@@ -1389,7 +1397,7 @@ func (e *evolver) restoreExecutingState(ctx context.Context) {
 	}
 	if _, err := e.revertCycleEdits(ctx, e.lastPayloadID(), baseline.PayloadKey); err != nil {
 		e.logClass(logging.ClassWarning, "restore %s source: %v",
-			shortSHA(strings.TrimPrefix(baseline.PayloadKey, "sha256:")), err)
+			shortPayloadKey(baseline.PayloadKey), err)
 	}
 	var summary cycleSummary
 	if err := json.Unmarshal([]byte(baseline.Summary), &summary); err != nil {
@@ -1477,7 +1485,7 @@ func (e *evolver) executionHint() string {
 	}
 	if e.last != nil && e.last.Execution == executionOffline && e.lastExecuting != nil {
 		return fmt.Sprintf("Execution gate: the last cycle did not execute. The host restored payload %s; fix why the generated agent never checked in before changing detection code.",
-			shortSHA(strings.TrimPrefix(e.lastExecuting.PayloadKey, "sha256:")))
+			shortPayloadKey(e.lastExecuting.PayloadKey))
 	}
 	return "Execution gate: the host checks the generated agent after every dynamic cycle and records execution=verified, offline, or unverified."
 }

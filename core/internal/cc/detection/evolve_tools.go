@@ -226,9 +226,6 @@ func producerInputName(producer string, declared def.ModOptions) (string, error)
 	return "", fmt.Errorf("%s declares no input parameter", producer)
 }
 
-// producerInput validates the input PE. The seed agent executable next to the
-// operator shellcode is the only default, so the model cannot point a producer
-// at an arbitrary file.
 // validateProducerPathOption keeps every file-path option a producer accepts
 // inside the operator payload directory. An option such as donut's decoy is
 // embedded into the generated shellcode, so it must not read arbitrary host
@@ -263,6 +260,9 @@ func validateProducerPathOption(name, value, baseDir string) error {
 	return nil
 }
 
+// producerInput validates the input PE. The seed agent executable next to the
+// operator shellcode is the only default, so the model cannot point a producer
+// at an arbitrary file.
 func (e *evolver) producerInput(producer, inputName, value string) (string, error) {
 	input := strings.TrimSpace(value)
 	if input == "" && producer == "donut" {

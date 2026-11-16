@@ -26,12 +26,20 @@ func (liveDetectC2Backend) GenerateAgent(ccAddress, agentType, arch string) (*de
 	})
 }
 
-func (liveDetectC2Backend) AgentStatus(_ context.Context, uuid string) (*detection.VerifyAgentStatus, error) {
+// liveAgentByUUID resolves one agent from the live C2 registry.
+func liveAgentByUUID(uuid string) (*def.Emp3r0rAgent, error) {
 	agents, err := client.GetAgentList()
 	if err != nil {
 		return nil, err
 	}
-	agent := detection.FindAgentByUUID(agents, uuid)
+	return detection.FindAgentByUUID(agents, uuid), nil
+}
+
+func (liveDetectC2Backend) AgentStatus(_ context.Context, uuid string) (*detection.VerifyAgentStatus, error) {
+	agent, err := liveAgentByUUID(uuid)
+	if err != nil {
+		return nil, err
+	}
 	return &detection.VerifyAgentStatus{
 		ExpectedAgent: uuid,
 		Online:        agent != nil,
@@ -41,11 +49,10 @@ func (liveDetectC2Backend) AgentStatus(_ context.Context, uuid string) (*detecti
 
 func (liveDetectC2Backend) RunVerifyModule(ctx context.Context, uuid, module string) (*detection.VerifyModuleResult, error) {
 	deadline := time.Now().Add(detection.PayloadVerifyTimeout)
-	agents, err := client.GetAgentList()
+	agent, err := liveAgentByUUID(uuid)
 	if err != nil {
 		return nil, err
 	}
-	agent := detection.FindAgentByUUID(agents, uuid)
 	if agent == nil {
 		return nil, fmt.Errorf("agent %s is not online; payload is not running", uuid)
 	}

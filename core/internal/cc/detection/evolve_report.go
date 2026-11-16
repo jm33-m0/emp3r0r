@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 )
 
 // RenderLoopSummary returns a compact Markdown summary for the operator
@@ -112,7 +111,7 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 	if len(cycles) > 0 {
 		last := cycles[len(cycles)-1]
 		fmt.Fprintf(&b, "- Rebuilt and detonated the final payload (`%s`, score %.2f, %d findings, %d verdicts, execution=%s).\n",
-			shortSHA(strings.TrimPrefix(last.PayloadKey, "sha256:")), last.Score, last.Findings, last.Verdicts, headerOrNone(last.Execution))
+			shortPayloadKey(last.PayloadKey), last.Score, last.Findings, last.Verdicts, headerOrNone(last.Execution))
 		if last.Execution == executionOffline {
 			fmt.Fprintf(&b, "- Final payload did not execute; its score is not comparable with an executing cycle.\n")
 		} else if last.Verdicts == 0 {
@@ -133,7 +132,7 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 		fmt.Fprintf(&b, "| ---: | --- | --- | ---: | --- | ---: | ---: | --- | ---: |\n")
 		for _, cycle := range cycles {
 			fmt.Fprintf(&b, "| %d | `%s` | `%s` | %.2f | %s | %d | %d | %s | %d |\n",
-				cycle.Iteration, cycle.PayloadKey, shortSHA(strings.TrimPrefix(cycle.PayloadKey, "sha256:")),
+				cycle.Iteration, cycle.PayloadKey, shortPayloadKey(cycle.PayloadKey),
 				cycle.Score, sanitizeLine(cycle.Level), cycle.Findings, cycle.Verdicts, headerOrNone(cycle.Execution), cycle.TraceID)
 		}
 		b.WriteString("\n")
@@ -285,36 +284,12 @@ func (t *TelemetryDB) LoopReport(ctx context.Context, loopID string) (string, er
 
 // CyclesForLoop returns every cycle belonging to one loop, in iteration order.
 func (t *TelemetryDB) CyclesForLoop(ctx context.Context, loopID string) ([]Cycle, error) {
-	rows, err := t.db.QueryContext(ctx, `
-		SELECT c.id, c.loop_id, c.iteration, c.payload_id, c.run_id, c.score, c.level,
-		       c.findings, c.verdicts, COALESCE(c.trace_id, 0), c.executed, c.execution,
-		       c.agent_online, c.network_events, c.summary, c.created_at,
-		       COALESCE(p.payload_key, ''), COALESCE(p.table_name, '')
-		FROM loop_cycles c LEFT JOIN payloads p ON p.id = c.payload_id
-		WHERE c.loop_id = ? ORDER BY c.iteration`, loopID)
+	rows, err := t.db.QueryContext(ctx, `SELECT `+cycleColumns+` `+cycleFrom+
+		` WHERE c.loop_id = ? ORDER BY c.iteration`, loopID)
 	if err != nil {
 		return nil, fmt.Errorf("read loop cycles: %w", err)
 	}
-	defer rows.Close()
-	var out []Cycle
-	for rows.Next() {
-		var cycle Cycle
-		var created int64
-		var online sql.NullInt64
-		if err := rows.Scan(&cycle.ID, &cycle.LoopID, &cycle.Iteration, &cycle.PayloadID,
-			&cycle.RunID, &cycle.Score, &cycle.Level, &cycle.Findings, &cycle.Verdicts,
-			&cycle.TraceID, &cycle.Executed, &cycle.Execution, &online,
-			&cycle.NetworkEvents, &cycle.Summary, &created, &cycle.PayloadKey, &cycle.PayloadTable); err != nil {
-			return nil, err
-		}
-		if online.Valid {
-			value := online.Int64 != 0
-			cycle.AgentOnline = &value
-		}
-		cycle.CreatedAt = time.UnixMilli(created).UTC()
-		out = append(out, cycle)
-	}
-	return out, rows.Err()
+	return scanCycleRows(rows)
 }
 
 // editPath names the edited file with its source root when it is a producer or

@@ -132,7 +132,7 @@ func classPrefix(class Class) string {
 
 // ClassfTo writes one class-rendered line group to w. It is the writer-scoped
 // form of Classf, used by the in-process detection loop so its log keeps the
-// same colored tags and Markdown rendering as the old detached worker.
+// same colored tags and Markdown rendering as the console.
 func ClassfTo(w io.Writer, class Class, format string, a ...any) {
 	if w == nil {
 		return

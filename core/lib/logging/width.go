@@ -15,9 +15,9 @@ const defaultRenderWidth = 120
 
 var renderWidth atomic.Int64
 
-// SetRenderWidth overrides the width used by RenderMarkdown. The detection
-// worker has its stdout redirected to a log file, so its parent passes the
-// width of the tmux pane that tails the log.
+// SetRenderWidth overrides the width used by RenderMarkdown. The detection loop
+// writes to a log file, so the console passes the width of the tmux pane that
+// tails the log.
 func SetRenderWidth(width int) {
 	if width > 0 {
 		renderWidth.Store(int64(width))

@@ -147,6 +147,18 @@ func (r *detectRun) isDone() bool {
 	}
 }
 
+// requestStop cancels the run once. It reports whether this call stopped it.
+func (r *detectRun) requestStop() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.isDone() {
+		return false
+	}
+	r.stopped = true
+	r.cancel()
+	return true
+}
+
 func (r *detectRun) finish() {
 	r.finishOne.Do(func() {
 		if r.logger != nil {
@@ -217,14 +229,9 @@ func stopDetectRun(id string, wait time.Duration) (detectRunInfo, bool, error) {
 	if run == nil {
 		return detectRunInfo{}, false, fmt.Errorf("loop %q is not running", id)
 	}
-	run.mu.Lock()
-	if run.isDone() {
-		run.mu.Unlock()
+	if !run.requestStop() {
 		return run.info(), false, nil
 	}
-	run.stopped = true
-	run.cancel()
-	run.mu.Unlock()
 	if wait > 0 {
 		select {
 		case <-run.done:
@@ -243,13 +250,9 @@ func stopAllDetectRuns() {
 	}
 	cancelled := 0
 	for _, run := range runs {
-		run.mu.Lock()
-		if !run.isDone() {
-			run.stopped = true
-			run.cancel()
+		if run.requestStop() {
 			cancelled++
 		}
-		run.mu.Unlock()
 	}
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {

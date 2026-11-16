@@ -557,10 +557,6 @@ func producerShellcodeExt(producer string) string {
 	return "bin"
 }
 
-// chooseShellcodeProducer maps an agent type to a producer: donut wraps a
-// Windows EXE, crystal_pack wraps a DLL as Crystal Palace PICO and is used when
-// that module can link on this host. Neither is required to be installed.
-//
 // crystalPackAvailable reports whether crystal_pack can actually link a PICO
 // on this host: a Java runtime, the vendored Crystal Palace jar, and the loader
 // spec must all be present.
@@ -662,37 +658,6 @@ func (l *loopLogger) logf(class logging.Class, format string, args ...any) {
 	logging.ClassfToPlain(l.w, class, format, args...)
 }
 
-func classTag(class logging.Class) string {
-	switch class {
-	case logging.ClassThinking:
-		return "thinking"
-	case logging.ClassModel:
-		return "model"
-	case logging.ClassTool:
-		return "tool"
-	case logging.ClassToolResult:
-		return "result"
-	case logging.ClassBuild:
-		return "build"
-	case logging.ClassCycle:
-		return "cycle"
-	case logging.ClassEdit:
-		return "edit"
-	case logging.ClassAnswer:
-		return "answer"
-	case logging.ClassReport:
-		return "report"
-	case logging.ClassWarning:
-		return "warn"
-	case logging.ClassError:
-		return "error"
-	case logging.ClassProgress:
-		return "progress"
-	default:
-		return "line"
-	}
-}
-
 // forgetLoopAgent drops the prior test identity so a restart never reuses a
 // TOFU-pinned UUID.
 func forgetLoopAgent(uuid string) {
@@ -787,27 +752,54 @@ func runKnowledgeSyncCommand(cmd *cobra.Command, _ []string) {
 	logging.Infof("knowledge-sync started in the background; output follows in this pane")
 }
 
+// knowledgeSyncOptions is the resolved knowledge-sync request. The parent and
+// its child process read the flags through this one type so both write the same
+// cache.
+type knowledgeSyncOptions struct {
+	URL      string
+	DB       string
+	Notebook string
+	Content  bool
+}
+
+func readKnowledgeSyncOptions(cmd *cobra.Command) knowledgeSyncOptions {
+	opts := knowledgeSyncOptions{}
+	opts.URL, _ = cmd.Flags().GetString("url")
+	opts.DB, _ = cmd.Flags().GetString("db")
+	opts.Notebook, _ = cmd.Flags().GetString("notebook")
+	opts.Content, _ = cmd.Flags().GetBool("content")
+	if opts.DB == "" {
+		opts.DB = defaultKnowledgePath()
+	}
+	return opts
+}
+
+func (opts knowledgeSyncOptions) args() []string {
+	args := []string{"knowledge-sync", "--url", opts.URL, "--db", opts.DB}
+	if opts.Notebook != "" {
+		args = append(args, "--notebook", opts.Notebook)
+	}
+	if opts.Content {
+		args = append(args, "--content")
+	}
+	return args
+}
+
 func runKnowledgeSync(cmd *cobra.Command) {
 	if os.Getenv(operatorSubprocessEnv) == "1" {
 		// The console parent captures this process's stdout and mirrors it to
 		// the output pane. Send logger messages there as well as to the file.
 		logging.AddWriter(os.Stdout)
 	}
-	urlFlag, _ := cmd.Flags().GetString("url")
-	dbPath, _ := cmd.Flags().GetString("db")
-	notebook, _ := cmd.Flags().GetString("notebook")
-	content, _ := cmd.Flags().GetBool("content")
-	if dbPath == "" {
-		dbPath = defaultKnowledgePath()
-	}
-	db, err := detection.OpenKnowledgeDB(dbPath, true)
+	opts := readKnowledgeSyncOptions(cmd)
+	db, err := detection.OpenKnowledgeDB(opts.DB, true)
 	if err != nil {
 		logging.Errorf("knowledge-sync: %v", err)
 		return
 	}
 	defer func() { _ = db.Close() }()
 	stats, err := detection.SyncKnowledge(context.Background(), db, detection.KnowledgeSyncOptions{
-		URL: urlFlag, Notebook: notebook, Content: content,
+		URL: opts.URL, Notebook: opts.Notebook, Content: opts.Content,
 		Logf: func(line string) { fmt.Println(line) },
 	})
 	if err != nil {
@@ -815,27 +807,13 @@ func runKnowledgeSync(cmd *cobra.Command) {
 		return
 	}
 	logging.Successf("Knowledge cache %s: %d summaries, %d contents from %d notebooks",
-		dbPath, stats.Summaries, stats.Contents, stats.Notebooks)
+		opts.DB, stats.Summaries, stats.Contents, stats.Notebooks)
 }
 
 // knowledgeSyncArgs rebuilds the child's argv from the parsed command. The
 // database path is resolved here so the child writes the same cache.
 func knowledgeSyncArgs(cmd *cobra.Command) []string {
-	urlFlag, _ := cmd.Flags().GetString("url")
-	dbPath, _ := cmd.Flags().GetString("db")
-	notebook, _ := cmd.Flags().GetString("notebook")
-	content, _ := cmd.Flags().GetBool("content")
-	if dbPath == "" {
-		dbPath = defaultKnowledgePath()
-	}
-	args := []string{"knowledge-sync", "--url", urlFlag, "--db", dbPath}
-	if notebook != "" {
-		args = append(args, "--notebook", notebook)
-	}
-	if content {
-		args = append(args, "--content")
-	}
-	return args
+	return readKnowledgeSyncOptions(cmd).args()
 }
 
 // startOutputPaneSubprocess mirrors this executable's output to the pane.

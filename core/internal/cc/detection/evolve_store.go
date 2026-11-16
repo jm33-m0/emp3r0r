@@ -65,6 +65,38 @@ type EditRecord struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// cycleColumns and cycleFrom are the shared projection for cycle readers. All
+// of them join payloads so the payload key and view name come from one place.
+const cycleColumns = `c.id, c.loop_id, c.iteration, c.payload_id, c.run_id, c.score, c.level,
+	c.findings, c.verdicts, COALESCE(c.trace_id, 0), c.executed, c.execution,
+	c.agent_online, c.network_events, c.summary, c.created_at,
+	COALESCE(p.payload_key, ''), COALESCE(p.table_name, '')`
+
+const cycleFrom = `FROM loop_cycles c LEFT JOIN payloads p ON p.id = c.payload_id`
+
+func scanCycleRows(rows *sql.Rows) ([]Cycle, error) {
+	defer rows.Close()
+	var out []Cycle
+	for rows.Next() {
+		var cycle Cycle
+		var created int64
+		var online sql.NullInt64
+		if err := rows.Scan(&cycle.ID, &cycle.LoopID, &cycle.Iteration, &cycle.PayloadID,
+			&cycle.RunID, &cycle.Score, &cycle.Level, &cycle.Findings, &cycle.Verdicts,
+			&cycle.TraceID, &cycle.Executed, &cycle.Execution, &online,
+			&cycle.NetworkEvents, &cycle.Summary, &created, &cycle.PayloadKey, &cycle.PayloadTable); err != nil {
+			return nil, fmt.Errorf("scan cycle: %w", err)
+		}
+		if online.Valid {
+			value := online.Int64 != 0
+			cycle.AgentOnline = &value
+		}
+		cycle.CreatedAt = time.UnixMilli(created).UTC()
+		out = append(out, cycle)
+	}
+	return out, rows.Err()
+}
+
 func payloadIDByKey(ctx context.Context, db *sql.DB, key string) (int64, error) {
 	if key == "" {
 		return 0, nil
@@ -209,35 +241,12 @@ func (t *TelemetryDB) CyclesForPayload(ctx context.Context, payloadKey string) (
 	if err != nil || id == 0 {
 		return nil, err
 	}
-	rows, err := t.db.QueryContext(ctx, `
-		SELECT id, loop_id, iteration, payload_id, run_id, score, level, findings,
-		       verdicts, COALESCE(trace_id, 0), executed, execution, agent_online,
-		       network_events, summary, created_at
-		FROM loop_cycles WHERE payload_id = ? ORDER BY id`, id)
+	rows, err := t.db.QueryContext(ctx, `SELECT `+cycleColumns+` `+cycleFrom+
+		` WHERE c.payload_id = ? ORDER BY c.id`, id)
 	if err != nil {
 		return nil, fmt.Errorf("read cycles: %w", err)
 	}
-	defer rows.Close()
-	var out []Cycle
-	for rows.Next() {
-		var cycle Cycle
-		var created int64
-		var online sql.NullInt64
-		if err := rows.Scan(&cycle.ID, &cycle.LoopID, &cycle.Iteration, &cycle.PayloadID,
-			&cycle.RunID, &cycle.Score, &cycle.Level, &cycle.Findings, &cycle.Verdicts,
-			&cycle.TraceID, &cycle.Executed, &cycle.Execution, &online,
-			&cycle.NetworkEvents, &cycle.Summary, &created); err != nil {
-			return nil, fmt.Errorf("scan cycle: %w", err)
-		}
-		if online.Valid {
-			value := online.Int64 != 0
-			cycle.AgentOnline = &value
-		}
-		cycle.PayloadKey = payloadKey
-		cycle.CreatedAt = time.UnixMilli(created).UTC()
-		out = append(out, cycle)
-	}
-	return out, rows.Err()
+	return scanCycleRows(rows)
 }
 
 // NetworkEventCount returns how many normalized network events one trace holds.
