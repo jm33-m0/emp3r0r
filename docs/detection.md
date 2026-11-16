@@ -88,10 +88,12 @@ use the console's existing C2 connection. The loop then runs:
    payloads;
 4. after the model loop finishes, run the final BOF verification exactly once. The host
    polls once per second for the last generated agent UUID, runs a small BOF
-   such as `whoami`, and records the output. Only a non-empty BOF result proves
-   the loader reached the agent runtime. If the payload never comes online, the
-   loop restarts with a fresh agent and shellcode, up to three attempts. A
-   restart keeps the same logical loop and the total `--iterations` budget; the
+   such as `whoami`, and records the output. A check-in proves the loader reached
+   the agent runtime; a non-empty BOF additionally proves the agent can run code.
+   If the payload never comes online, the loop restarts with a fresh agent and
+   shellcode, up to three attempts. If the agent checked in at any point, an
+   inconclusive final BOF does not restart the loop and discard the completed
+   cycles. A restart keeps the same logical loop and the total `--iterations` budget; the
    new attempt's prompt carries the prior attempts' last eight cycles, final
    answer and residuals, pending source edits, last executing payload, and
    source-tree hash;
@@ -108,12 +110,14 @@ use the console's existing C2 connection. The loop then runs:
 7. after every dynamic cycle, check the cycle's generated agent with
    `AgentStatus` and record `execution=verified|offline|unverified`, the online
    flag, and the trace's network-event count in `loop_cycles` and the cycle
-   summary. An offline cycle consumes the budget but is not a comparable
-   detection result: it does not count as progress, and the host restores the
-   editable source and active shellcode to the last payload whose agent checked
-   in. If no payload has ever checked in, the loop stops and reports the
-   execution failure instead of spending more cycles on a payload that never
-   ran;
+   summary. The host polls the C2 while the payload runs and latches the first
+   check-in, so a beacon that checks in and exits before the post-run poll is
+   still `verified`. An offline cycle consumes the budget but is not a
+   comparable detection result: it does not count as progress, and the host
+   restores the editable source and active shellcode to the last payload whose
+   agent checked in. If no payload has ever checked in, the loop stops and
+   reports the execution failure instead of spending more cycles on a payload
+   that never ran;
 8. write the final JSON and all cycles to the loop tables.
 
 `--shellcode` accepts any x64 position-independent shellcode, so a Crystal
@@ -254,9 +258,15 @@ is enabled, agent checks and rebuilds use the console's existing C2 connection
 (`detect_loop` must therefore run from a connected operator console for live
 verification). `AgentStatus`, `RunModule`, and `CleanupAgent` are only
 registered when verification is configured (MCP `detection_loop` omits them).
-Transient sandbox and detection failures are retried with exponential backoff,
-capped at three retries; model-session failures back off and are capped by the
-stalled-restart limit. One cycle is bounded by
+The sandbox is probed once, and no build or detection failure is retried by the
+host: its error, build tail, stage errors, and trace identity are given to the
+model, which can inspect the source and telemetry and call `DetectionCycle`
+after a fix. A baseline failure therefore starts the model session instead of
+rebuilding the same payload again, and a failed attempt does not consume the
+cycle budget. Model-session failures back off and are capped by the
+stalled-restart limit. A trace without a payload PEB is recorded and kept for
+the model with the `telemetry/attribution` finding instead of being detonated
+again. One cycle is bounded by
 `--cycle-timeout` (default 60m), one model session by `--session-timeout`
 (default 2h), and a session with no tool call by `--tool-idle-timeout`
 (default 30m). An in-flight tool suspends the idle check. `--timeout 0` (the

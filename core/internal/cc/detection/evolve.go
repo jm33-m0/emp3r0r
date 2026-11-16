@@ -35,10 +35,6 @@ const (
 	maxEvolveBuildLog   = 8 << 20
 	// maxEvolveStalledResumes bounds restarts that make no cycle progress.
 	maxEvolveStalledResumes = 4
-	// maxEvolveRetries bounds transient sandbox and detection-run retries.
-	// Without it a permanently broken sandbox can retry until the operator
-	// stops the loop.
-	maxEvolveRetries = 3
 	// defaultCycleTimeout bounds one build/detonate/verify cycle.
 	defaultCycleTimeout = 60 * time.Minute
 	// defaultSessionTimeout bounds one model session even when it keeps
@@ -193,6 +189,7 @@ type EvolveResult struct {
 	Cycles            []Cycle         `json:"cycles"`
 	Last              *Cycle          `json:"last,omitempty"`
 	PayloadVerified   bool            `json:"payload_verified"`
+	AgentOnlineSeen   bool            `json:"agent_online_seen,omitempty"`
 	ExpectedAgentUUID string          `json:"expected_agent_uuid,omitempty"`
 }
 
@@ -214,6 +211,7 @@ type evolver struct {
 	shellSeq          int
 	knowledge         *KnowledgeDB
 	lastAnswer        map[string]any
+	baselineFailure   string
 	operatorPrompts   *OperatorPromptQueue
 	// progress counts cycles that produced a comparable result; an offline
 	// cycle consumes the budget but does not count as progress, so the stalled
@@ -240,6 +238,7 @@ type evolver struct {
 	cyclesDone      atomic.Int64
 	toolCalls       atomic.Int64
 	sessions        atomic.Int64
+	agentSeenOnline atomic.Bool
 	lastExecution   atomic.Value
 	lastAgent       atomic.Value
 }
@@ -366,26 +365,22 @@ func (e *evolver) producerNames() []string {
 	return slices.Sorted(maps.Keys(e.cfg.ProducerDirs))
 }
 
+// waitSandbox probes the sandbox once. The failure goes straight to the model
+// instead of a host retry loop, so the loop never rebuilds or detonates again
+// without model feedback.
 func (e *evolver) waitSandbox(ctx context.Context) (Health, error) {
-	for attempt := 0; ; attempt++ {
-		health := e.loop.Available(ctx)
-		if health.Available {
-			return health, nil
-		}
-		reason := strings.TrimSpace(health.Error)
-		if reason == "" {
-			reason = strings.Join(health.Issues, "; ")
-		}
-		if reason == "" {
-			reason = "health probe failed"
-		}
-		if attempt >= maxEvolveRetries {
-			return Health{}, fmt.Errorf("sandbox %s unreachable after %d retries: %s", health.URL, maxEvolveRetries, reason)
-		}
-		if !e.recover(ctx, attempt, "sandbox", fmt.Errorf("%s is unreachable: %s", health.URL, reason)) {
-			return Health{}, ctx.Err()
-		}
+	health := e.loop.Available(ctx)
+	if health.Available {
+		return health, nil
 	}
+	reason := strings.TrimSpace(health.Error)
+	if reason == "" {
+		reason = strings.Join(health.Issues, "; ")
+	}
+	if reason == "" {
+		reason = "health probe failed"
+	}
+	return Health{}, fmt.Errorf("sandbox %s is unreachable: %s", health.URL, reason)
 }
 
 // recover logs a failure and waits before the caller retries. Callers bound
@@ -494,31 +489,29 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 	}
 	provider = &loggingProvider{next: provider, logf: e.logf}
 
+	// A failed baseline goes to the model instead of a silent host retry: the
+	// model can inspect the build log and telemetry, fix the cause, and then
+	// call DetectionCycle.
 	var baseline Cycle
-	for attempt := 0; ; attempt++ {
-		baseline, err = e.runCycle(ctx, "baseline", "baseline", "")
-		if err == nil {
-			break
+	baseline, err = e.runCycle(ctx, "baseline", "baseline", "")
+	switch {
+	case err == nil:
+		e.last = &baseline
+		if e.dynamicEnabled() {
+			if e.expectedAgentUUID != "" {
+				e.testedAgentUUIDs[e.expectedAgentUUID] = struct{}{}
+			}
+			e.testedShellcodes[e.activeShellcode()] = struct{}{}
 		}
-		if errors.Is(err, ErrCycleBudgetExhausted) {
-			return nil, err
-		}
-		if ctx.Err() != nil {
-			return nil, ctx.Err()
-		}
-		if attempt >= maxEvolveRetries {
-			return nil, fmt.Errorf("baseline failed after %d retries: %w", maxEvolveRetries, err)
-		}
-		if !e.recover(ctx, attempt, "baseline", err) {
-			return nil, ctx.Err()
-		}
-	}
-	e.last = &baseline
-	if e.dynamicEnabled() {
-		if e.expectedAgentUUID != "" {
-			e.testedAgentUUIDs[e.expectedAgentUUID] = struct{}{}
-		}
-		e.testedShellcodes[e.activeShellcode()] = struct{}{}
+	case errors.Is(err, ErrCycleBudgetExhausted):
+		return nil, err
+	case ctx.Err() != nil:
+		return nil, ctx.Err()
+	default:
+		e.baselineFailure = clipUTF8(sanitizeLine(err.Error()), 4000)
+		e.logClass(logging.ClassWarning,
+			"baseline failed; asking the model to diagnose the failure before another attempt: %s",
+			e.baselineFailure)
 	}
 	baselineJSON, _ := json.Marshal(baseline)
 
@@ -528,7 +521,9 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 	}
 	rootList := e.roots.describe()
 	executionState := "the host checks the generated agent after every dynamic cycle with AgentStatus and records execution=verified, offline, or unverified"
-	if e.executionBlocked {
+	if e.baselineFailure != "" {
+		executionState = "the baseline did not complete; diagnose the failure and fix it before another cycle"
+	} else if e.executionBlocked {
 		executionState = "the baseline payload did not check in and no executing baseline exists; do not run more cycles; return the final JSON with the execution failure"
 	} else if e.lastExecuting != nil {
 		payload := shortPayloadKey(e.lastExecuting.PayloadKey)
@@ -582,6 +577,7 @@ Execution gate: %s
 Cycle budget: %d total across attempts; %d used before this attempt; %d remain after this baseline.
 Stages: %s
 Baseline cycle: %s
+Baseline failure: %s
 %s
 
 Continue the loop. The full feedback, builds, and telemetry are in SQLite.
@@ -647,8 +643,14 @@ every residual is explained with evidence. Return the final JSON object.`,
 		cfg.Module, cfg.ModuleDir, e.shellcode, headerOrNone(e.activeProducer), producerList, rootList,
 		headerOrNone(cfg.AgentCC), headerOrNone(e.expectedAgentUUID), headerOrNone(cfg.Goal), knowledgeState,
 		executionState, cfg.Iterations, e.globalUsed, max(0, cfg.Iterations-e.usedCycles()),
-		strings.Join(stageNames(cfg.Stages), ", "), baselineJSON,
+		strings.Join(stageNames(cfg.Stages), ", "), baselineJSON, headerOrNone(e.baselineFailure),
 		carriedState, cfg.Module)
+	if e.baselineFailure != "" {
+		prompt += "\n\nThe baseline failed before any model feedback. Do not repeat the same build blindly: " +
+			"read the failure above, query the run's build and telemetry rows, inspect the source and active " +
+			"shellcode, apply a grounded edit or rebuild the shellcode, then call DetectionCycle. " +
+			"A failed attempt does not consume the cycle budget."
+	}
 	if cfg.BuildAgent == nil {
 		prompt += "\n\nAgent generation (GenerateAgent) is disabled for this run; reuse the supplied shellcode or edit and rebuild an existing producer."
 	}
@@ -831,6 +833,9 @@ every residual is explained with evidence. Return the final JSON object.`,
 		} else {
 			output, verifyErr := cfg.FinalVerify(ctx, e.expectedAgentUUID)
 			answer["payload_verified"] = verifyErr == nil && strings.TrimSpace(output) != ""
+			if answer["payload_verified"] == true {
+				e.agentSeenOnline.Store(true)
+			}
 			answer["payload_verification_output"] = clip(output, 4000)
 			if verifyErr != nil {
 				answer["payload_verification_error"] = verifyErr.Error()
@@ -839,6 +844,7 @@ every residual is explained with evidence. Return the final JSON object.`,
 		}
 	}
 	verified, _ := answer["payload_verified"].(bool)
+	answer["agent_online_seen"] = e.agentSeenOnline.Load()
 	encoded, err := json.Marshal(answer)
 	if err != nil {
 		return nil, fmt.Errorf("encode loop answer: %w", err)
@@ -868,7 +874,8 @@ every residual is explained with evidence. Return the final JSON object.`,
 		LoopID: cfg.LoopID, BaseLoopID: e.baseLoopID, Attempt: e.attempt,
 		GlobalCycles: e.usedCycles(), SourceTreeHash: e.sourceTreeHash,
 		Answer: encoded, Report: report, Cycles: e.cycles, Last: e.last,
-		PayloadVerified: verified, ExpectedAgentUUID: e.expectedAgentUUID,
+		PayloadVerified: verified, AgentOnlineSeen: e.agentSeenOnline.Load(),
+		ExpectedAgentUUID: e.expectedAgentUUID,
 	}, nil
 }
 
@@ -1059,6 +1066,28 @@ func ensurePayloadPreserved(shellcode string, artifact Artifact) error {
 	return nil
 }
 
+// runDiagnostics collects the stage errors, sandbox notes, and trace identity
+// that explain why a detection run was rejected or unattributed.
+func runDiagnostics(run Run) string {
+	var parts []string
+	for _, stage := range run.Stages {
+		if stage.Status == "error" || stage.Error != "" {
+			parts = append(parts, stage.Tool+": "+stage.Error)
+		}
+	}
+	if len(run.Notes) > 0 {
+		parts = append(parts, "notes="+strings.Join(run.Notes, "; "))
+	}
+	if run.Telemetry != nil {
+		parts = append(parts, fmt.Sprintf("trace=%d events=%d attribution=%s",
+			run.Telemetry.TraceID, run.Telemetry.Events, headerOrNone(run.Telemetry.Attribution)))
+	}
+	if len(parts) == 0 {
+		return "no stage error was reported"
+	}
+	return clipUTF8(sanitizeLine(strings.Join(parts, "; ")), 4000)
+}
+
 func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction string) (Cycle, error) {
 	if e.usedCycles() >= e.cfg.Iterations {
 		return Cycle{}, fmt.Errorf("%w: %d of %d cycles used", ErrCycleBudgetExhausted, e.usedCycles(), e.cfg.Iterations)
@@ -1102,7 +1131,8 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 	}
 	e.logClass(logging.ClassBuild, "%s", buildLog)
 	if buildErr != nil {
-		return Cycle{}, fmt.Errorf("build %s: %w", e.cfg.Module, buildErr)
+		return Cycle{}, fmt.Errorf("build %s: %w\n%s", e.cfg.Module, buildErr,
+			clipUTF8(strings.Join(lastLines(buildLog, 20), "\n"), 8000))
 	}
 	payloads := ParseGeneratedPayloads(buildLog)
 	if len(payloads) == 0 {
@@ -1136,55 +1166,42 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 	if e.last != nil {
 		parentKey = e.last.PayloadKey
 	}
-	var (
-		run    Run
-		runErr error
-	)
-	for attempt := 0; ; attempt++ {
-		runCtx, cancel := context.WithTimeout(cycleCtx, 12*time.Minute)
-		run, runErr = e.loop.RunPlan(runCtx, plan, RunOptions{
-			Static: static, Dynamic: dynamic, EDR: edr, ApproveExecution: true,
-			Timeout: 10 * time.Minute, ParentKey: parentKey,
-		})
-		cancel()
-		if runErr == nil && run.Telemetry != nil && run.Telemetry.Attribution != "unknown" {
-			break
-		}
-		if cycleCtx.Err() != nil {
-			return Cycle{}, fmt.Errorf("cycle exceeded %s: %w", timeout, cycleCtx.Err())
-		}
-		reason := runErr
-		if reason == nil {
-			var stageErrors []string
-			for _, stage := range run.Stages {
-				if stage.Status == "error" || stage.Error != "" {
-					stageErrors = append(stageErrors, stage.Tool+": "+stage.Error)
-				}
-			}
-			if run.Telemetry != nil && run.Telemetry.Attribution == "unknown" {
-				reason = fmt.Errorf("telemetry has no payload PEB (%s) notes=%v",
-					strings.Join(stageErrors, "; "), run.Notes)
-			} else {
-				reason = fmt.Errorf("dynamic run produced no telemetry (%s) notes=%v",
-					strings.Join(stageErrors, "; "), run.Notes)
-			}
-		}
-		if attempt >= maxEvolveRetries {
-			return Cycle{}, fmt.Errorf("detection run failed after %d retries: %w", maxEvolveRetries, reason)
-		}
-		if !e.recover(cycleCtx, attempt, "detection run", reason) {
-			return Cycle{}, cycleCtx.Err()
-		}
+	// Watch the C2 while the payload runs. A sandbox beacon can check in and
+	// die before the post-run AgentStatus poll; seeing it once is proof that
+	// the payload executed and must not be downgraded to offline afterwards.
+	watchCtx, stopWatch := context.WithCancel(cycleCtx)
+	seenOnline := e.watchAgentOnline(watchCtx, e.expectedAgentUUID)
+	runCtx, cancel := context.WithTimeout(cycleCtx, 12*time.Minute)
+	run, runErr := e.loop.RunPlan(runCtx, plan, RunOptions{
+		Static: static, Dynamic: dynamic, EDR: edr, ApproveExecution: true,
+		Timeout: 10 * time.Minute, ParentKey: parentKey,
+	})
+	cancel()
+	stopWatch()
+	if runErr != nil {
+		return Cycle{}, fmt.Errorf("detection run %s: %w (%s)", headerOrNone(run.ID), runErr, runDiagnostics(run))
+	}
+	if run.Telemetry == nil {
+		return Cycle{}, fmt.Errorf("detection run %s produced no telemetry: %s", headerOrNone(run.ID), runDiagnostics(run))
+	}
+	// An unattributed trace is still usable evidence: the model sees the
+	// attribution finding and the run notes, and can query the stored events.
+	// Re-running the same payload without model feedback only repeats the
+	// failure, so the trace is kept and reported instead of retried here.
+	if run.Telemetry.Attribution == "unknown" {
+		e.logClass(logging.ClassWarning,
+			"run %s has no payload PEB; keeping trace %d (%d events) for the model",
+			headerOrNone(run.ID), run.Telemetry.TraceID, run.Telemetry.Events)
 	}
 	feedback := BuildFeedback(run)
 	if (dynamic || edr) && !run.Executed {
-		return Cycle{}, fmt.Errorf("dynamic or EDR stages were selected but the sandbox did not execute the artifact")
+		return Cycle{}, fmt.Errorf("dynamic or EDR stages were selected but the sandbox did not execute the artifact: %s", runDiagnostics(run))
 	}
 	traceID := int64(0)
 	if run.Telemetry != nil {
 		traceID = run.Telemetry.TraceID
 	}
-	execution, online, networkEvents := e.checkExecution(cycleCtx, traceID, dynamic || edr)
+	execution, online, networkEvents := e.checkExecution(cycleCtx, traceID, dynamic || edr, seenOnline)
 	if err := e.linkEdits(cycleCtx, iteration, run.Telemetry.PayloadID); err != nil {
 		e.logClass(logging.ClassError, "link edits: %v", err)
 	}
@@ -1245,6 +1262,7 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 	}); err != nil {
 		e.logClass(logging.ClassError, "save build: %v", err)
 	}
+	e.baselineFailure = ""
 	e.last = &cycle
 	e.cycles = append(e.cycles, cycle)
 	e.logClass(logging.ClassCycle, "cycle %d: payload=%s sha=%s score=%.2f verdicts=%v findings=%d execution=%s",
@@ -1314,10 +1332,36 @@ func shortPayloadKey(key string) string {
 	return shortSHA(strings.TrimPrefix(strings.TrimSpace(key), "sha256:"))
 }
 
+// watchAgentOnline polls the C2 while one payload runs and latches the first
+// successful check-in. The returned flag stays set after the beacon dies.
+func (e *evolver) watchAgentOnline(ctx context.Context, uuid string) *atomic.Bool {
+	seen := &atomic.Bool{}
+	uuid = strings.TrimSpace(uuid)
+	if e.cfg.Verify == nil || uuid == "" {
+		return seen
+	}
+	go func() {
+		for {
+			status, err := e.cfg.Verify.AgentStatus(ctx, uuid)
+			if err == nil && status != nil && status.Online {
+				seen.Store(true)
+				e.agentSeenOnline.Store(true)
+				return
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Second):
+			}
+		}
+	}()
+	return seen
+}
+
 // checkExecution verifies that a dynamic payload reached the agent runtime. It
 // returns the recorded state, the C2 online flag when it was checked, and the
 // trace's network event count as corroborating evidence.
-func (e *evolver) checkExecution(ctx context.Context, traceID int64, dynamic bool) (string, *bool, int) {
+func (e *evolver) checkExecution(ctx context.Context, traceID int64, dynamic bool, seenOnline *atomic.Bool) (string, *bool, int) {
 	network := 0
 	if e.db != nil && traceID != 0 {
 		if count, err := e.db.NetworkEventCount(ctx, traceID); err == nil {
@@ -1331,6 +1375,11 @@ func (e *evolver) checkExecution(ctx context.Context, traceID int64, dynamic boo
 	}
 	if e.cfg.Verify == nil || strings.TrimSpace(e.expectedAgentUUID) == "" {
 		return executionUnverified, nil, network
+	}
+	if seenOnline != nil && seenOnline.Load() {
+		online := true
+		e.agentSeenOnline.Store(true)
+		return executionVerified, &online, network
 	}
 	timeout := e.executionCheckTimeout
 	if timeout <= 0 {
@@ -1346,6 +1395,7 @@ func (e *evolver) checkExecution(ctx context.Context, traceID int64, dynamic boo
 		}
 		if status != nil && status.Online {
 			online := true
+			e.agentSeenOnline.Store(true)
 			return executionVerified, &online, network
 		}
 		if !time.Now().Before(deadline) {
@@ -1480,6 +1530,10 @@ out. Return the required JSON object when the loop is complete.`,
 // executionHint makes a non-executing payload the first thing a resumed session
 // sees, because its analyzer score is not evidence about evasion.
 func (e *evolver) executionHint() string {
+	if e.baselineFailure != "" {
+		return "Baseline failure: " + e.baselineFailure +
+			". Diagnose it before another cycle; a failed attempt does not consume the cycle budget."
+	}
 	if e.executionBlocked {
 		return "Execution gate: no dynamic payload has checked in. Do not run more cycles; return the final JSON with the execution failure."
 	}
@@ -1518,6 +1572,9 @@ func (e *evolver) dossier() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "- logical loop: %s; attempt %d (%s)\n", e.baseLoopID, e.attempt, attemptLabel(e.attempt))
 	fmt.Fprintf(&b, "- cycles used: %d of %d global; %d in this attempt\n", e.usedCycles(), e.cfg.Iterations, e.iter)
+	if e.baselineFailure != "" {
+		fmt.Fprintf(&b, "- baseline failure: %s\n", clip(e.baselineFailure, 600))
+	}
 	if e.globalUsed > 0 {
 		fmt.Fprintf(&b, "- prior attempts used %d cycles before this attempt\n", e.globalUsed)
 	}

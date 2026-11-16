@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -211,10 +212,9 @@ func TestEvolveDoesNotBuildWhenSandboxIsDown(t *testing.T) {
 		t.Fatal(err)
 	}
 	builds := 0
-	ctx, cancel := context.WithTimeout(context.Background(), 80*time.Millisecond)
-	defer cancel()
-	_, err := RunEvolve(ctx, EvolveConfig{
-		Provider: scriptedProvider{answer: "{}"}, Model: "scripted",
+	provider := &captureProvider{answer: `{"summary":"sandbox is down","edits":[],"residual":[]}`}
+	_, err := RunEvolve(context.Background(), EvolveConfig{
+		Provider: provider, Model: "scripted",
 		Module: "loader_windows", ModuleDir: dir, Shellcode: shellcode,
 		SandboxURL: "http://127.0.0.1:1", StoreRoot: t.TempDir(),
 		Stages: []string{"dynamic"}, Iterations: 1, Turns: 1, RetryBase: time.Millisecond,
@@ -224,11 +224,14 @@ func TestEvolveDoesNotBuildWhenSandboxIsDown(t *testing.T) {
 		},
 		Logf: nil,
 	})
-	if err == nil {
-		t.Fatal("expected the context deadline")
+	if err != nil {
+		t.Fatal(err)
 	}
 	if builds != 0 {
 		t.Fatalf("build ran before the sandbox check: %d", builds)
+	}
+	if len(provider.requests) == 0 || !strings.Contains(provider.requests[0], "unreachable") {
+		t.Fatalf("model did not receive the sandbox failure: %v", provider.requests)
 	}
 }
 
@@ -274,24 +277,24 @@ func TestCheckExecutionUsesAgentStatus(t *testing.T) {
 		executionCheckTimeout: time.Millisecond,
 		logf:                  noop,
 	}
-	execution, online, network := e.checkExecution(ctx, 0, true)
+	execution, online, network := e.checkExecution(ctx, 0, true, nil)
 	if execution != executionVerified || online == nil || !*online || network != 0 {
 		t.Fatalf("online check = %q %v %d", execution, online, network)
 	}
 
 	e.cfg.Verify = &stubVerifyOps{offline: true}
-	execution, online, _ = e.checkExecution(ctx, 0, true)
+	execution, online, _ = e.checkExecution(ctx, 0, true, nil)
 	if execution != executionOffline || online == nil || *online {
 		t.Fatalf("offline check = %q %v", execution, online)
 	}
 
 	e.cfg.Verify = nil
-	execution, online, _ = e.checkExecution(ctx, 0, true)
+	execution, online, _ = e.checkExecution(ctx, 0, true, nil)
 	if execution != executionUnverified || online != nil {
 		t.Fatalf("unverified check = %q %v", execution, online)
 	}
 
-	execution, online, _ = e.checkExecution(ctx, 0, false)
+	execution, online, _ = e.checkExecution(ctx, 0, false, nil)
 	if execution != executionStatic || online != nil {
 		t.Fatalf("static check = %q %v", execution, online)
 	}
@@ -436,6 +439,100 @@ func TestEvolveRecoversFromAgentSessionFailure(t *testing.T) {
 	}
 	if result == nil || !strings.Contains(string(result.Answer), "recovered") {
 		t.Fatalf("result = %+v", result)
+	}
+}
+
+type captureProvider struct {
+	answer   string
+	requests []string
+}
+
+func (p *captureProvider) Stream(_ context.Context, req llm.CompletionRequest) iter.Seq2[llm.StreamEvent, error] {
+	p.requests = append(p.requests, fmt.Sprintf("%v", req.Messages))
+	return func(yield func(llm.StreamEvent, error) bool) {
+		if !yield(llm.StreamEvent{Type: llm.SEMessageStart}, nil) {
+			return
+		}
+		if !yield(llm.StreamEvent{Type: llm.SETextDelta, Text: p.answer}, nil) {
+			return
+		}
+		if !yield(llm.StreamEvent{Type: llm.SEMessageDelta, StopReason: "end_turn"}, nil) {
+			return
+		}
+		yield(llm.StreamEvent{Type: llm.SEMessageStop}, nil)
+	}
+}
+
+func (p *captureProvider) Complete(context.Context, llm.CompletionRequest) (llm.Message, string, llm.Usage, error) {
+	return llm.Message{Role: llm.RoleAssistant, Content: []llm.ContentBlock{llm.TextBlock(p.answer)}},
+		"end_turn", llm.Usage{}, nil
+}
+
+func TestEvolveSendsBaselineFailureToModel(t *testing.T) {
+	shellcode := filepath.Join(t.TempDir(), "agent.bin")
+	if err := os.WriteFile(shellcode, []byte(strings.Repeat("S", 40000)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	server, detonations := fakeEvolveSandbox(t)
+	provider := &captureProvider{answer: `{"summary":"fixed the build","edits":[],"residual":[]}`}
+	var (
+		classMu sync.Mutex
+		classes []logging.Class
+	)
+	result, err := RunEvolve(context.Background(), EvolveConfig{
+		Provider: provider, Model: "scripted",
+		Module: "loader_windows", ModuleDir: t.TempDir(), Shellcode: shellcode,
+		SandboxURL: server.URL, StoreRoot: t.TempDir(), RetryBase: time.Millisecond,
+		Stages: []string{"dynamic"}, Iterations: 1, Turns: 2,
+		Build: func(string, map[string]string) (string, error) {
+			return "compiler exploded", errors.New("simulated build failure")
+		},
+		Logf: func(class logging.Class, _ string, _ ...any) {
+			classMu.Lock()
+			classes = append(classes, class)
+			classMu.Unlock()
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detonations.Load() != 0 {
+		t.Fatalf("host detonated the payload again without model feedback: %d", detonations.Load())
+	}
+	if len(provider.requests) == 0 {
+		t.Fatal("model was never invoked after the baseline failure")
+	}
+	for _, want := range []string{"simulated build failure", "compiler exploded", "Baseline failure"} {
+		if !strings.Contains(provider.requests[0], want) {
+			t.Fatalf("first model prompt missing %q:\n%s", want, provider.requests[0])
+		}
+	}
+	if result == nil || !strings.Contains(string(result.Answer), "fixed the build") {
+		t.Fatalf("result = %+v", result)
+	}
+	classMu.Lock()
+	defer classMu.Unlock()
+	for _, class := range classes {
+		if class == logging.ClassModel {
+			return
+		}
+	}
+	t.Fatalf("model output was not logged after the baseline failure: %v", classes)
+}
+
+func TestCheckExecutionHonorsOnlineLatch(t *testing.T) {
+	e := &evolver{
+		cfg:               EvolveConfig{Verify: &stubVerifyOps{offline: true}},
+		expectedAgentUUID: "11111111-1111-1111-1111-111111111111",
+	}
+	var seen atomic.Bool
+	seen.Store(true)
+	state, online, _ := e.checkExecution(context.Background(), 0, true, &seen)
+	if state != executionVerified || online == nil || !*online {
+		t.Fatalf("state=%q online=%v, want verified online", state, online)
+	}
+	if !e.agentSeenOnline.Load() {
+		t.Fatal("online latch was not recorded on the evolver")
 	}
 }
 
