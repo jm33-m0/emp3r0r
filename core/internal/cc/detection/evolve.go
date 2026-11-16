@@ -27,12 +27,7 @@ import (
 const (
 	defaultEvolveIterations = 3
 	defaultEvolveTurns      = 60
-	// maxEvolveIterations and maxEvolveTurns bound one loop even when the
-	// caller supplies its own values; an MCP caller must not start an
-	// unbounded model/build/detonation run.
-	maxEvolveIterations = 50
-	maxEvolveTurns      = 240
-	maxEvolveBuildLog   = 8 << 20
+	maxEvolveBuildLog       = 8 << 20
 	// maxEvolveStalledResumes bounds restarts that make no cycle progress.
 	maxEvolveStalledResumes = 4
 	// defaultCycleTimeout bounds one build/detonate/verify cycle.
@@ -1014,9 +1009,6 @@ func normalizeEvolveConfig(cfg *EvolveConfig) error {
 		}
 		roots = append(roots, dir)
 	}
-	if len(roots) > 8 {
-		return fmt.Errorf("at most 8 read roots are supported")
-	}
 	cfg.ReadRoots = roots
 	if len(cfg.Stages) == 0 {
 		cfg.Stages = []string{"static", "dynamic"}
@@ -1032,14 +1024,8 @@ func normalizeEvolveConfig(cfg *EvolveConfig) error {
 	if cfg.Iterations <= 0 {
 		cfg.Iterations = defaultEvolveIterations
 	}
-	if cfg.Iterations > maxEvolveIterations {
-		return fmt.Errorf("iterations must be at most %d", maxEvolveIterations)
-	}
 	if cfg.Turns <= 0 {
 		cfg.Turns = defaultEvolveTurns
-	}
-	if cfg.Turns > maxEvolveTurns {
-		return fmt.Errorf("turns must be at most %d", maxEvolveTurns)
 	}
 	return nil
 }

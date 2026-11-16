@@ -140,7 +140,7 @@ func (a *Actions) detectionTools() map[string]Tool {
 					Parameters: ObjectSchema(map[string]any{
 						"module_dir":        StringProp("loader_windows source directory."),
 						"shellcode":         StringProp("Go agent shellcode path. Generate it first with generate --type windows_executable."),
-						"iterations":        IntegerProp("Maximum cycles including baseline. Default 3, at most 50."),
+						"iterations":        IntegerProp("Maximum cycles including baseline. Default 3."),
 						"stages":            map[string]any{"type": "array", "items": map[string]any{"type": "string", "enum": []string{"static", "dynamic"}}, "description": "Stages; dynamic is required."},
 						"process":           StringProp("Sacrificial process override; omit to let the source default control it."),
 						"format":            StringProp("Loader host format: exe, service, or dll."),
@@ -148,7 +148,7 @@ func (a *Actions) detectionTools() map[string]Tool {
 						"smw":               StringProp("on or off."),
 						"producers":         map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Shellcode producer modules as name=dir; defaults to the installed donut and crystal_pack."},
 						"read_roots":        map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Read-only source roots; defaults to the loader's shared build inputs."},
-						"turns":             IntegerProp("Maximum Norma turns per session. Default 60, at most 240."),
+						"turns":             IntegerProp("Maximum Norma turns per session. Default 60."),
 						"approve_execution": BooleanProp("Allow the loop to detonate the payload and edit module source."),
 					}, "module_dir", "shellcode", "approve_execution"),
 				},

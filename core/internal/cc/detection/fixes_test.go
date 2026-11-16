@@ -658,22 +658,29 @@ func TestValidateProducerPathOption(t *testing.T) {
 	}
 }
 
-func TestNormalizeEvolveConfigCapsLoops(t *testing.T) {
+func TestNormalizeEvolveConfigUsesExplicitBudgets(t *testing.T) {
 	dir := t.TempDir()
 	shell := filepath.Join(dir, "shellcode.bin")
 	if err := os.WriteFile(shell, []byte{0x90}, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	base := EvolveConfig{Module: "loader_windows", ModuleDir: dir, Shellcode: shell, StoreRoot: dir, Stages: []string{"dynamic"}}
-	tooMany := base
-	tooMany.Iterations = maxEvolveIterations + 1
-	if err := normalizeEvolveConfig(&tooMany); err == nil {
-		t.Fatal("iteration cap was not enforced")
+	explicit := base
+	explicit.Iterations = 1000
+	explicit.Turns = 1000
+	if err := normalizeEvolveConfig(&explicit); err != nil {
+		t.Fatalf("explicit budgets rejected: %v", err)
 	}
-	tooManyTurns := base
-	tooManyTurns.Turns = maxEvolveTurns + 1
-	if err := normalizeEvolveConfig(&tooManyTurns); err == nil {
-		t.Fatal("turn cap was not enforced")
+	if explicit.Iterations != 1000 || explicit.Turns != 1000 {
+		t.Fatalf("iterations = %d, turns = %d, want 1000 and 1000", explicit.Iterations, explicit.Turns)
+	}
+	defaulted := base
+	if err := normalizeEvolveConfig(&defaulted); err != nil {
+		t.Fatal(err)
+	}
+	if defaulted.Iterations != defaultEvolveIterations || defaulted.Turns != defaultEvolveTurns {
+		t.Fatalf("defaults = %d/%d, want %d/%d", defaulted.Iterations, defaulted.Turns,
+			defaultEvolveIterations, defaultEvolveTurns)
 	}
 }
 

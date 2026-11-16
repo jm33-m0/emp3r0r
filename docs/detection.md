@@ -207,20 +207,7 @@ detections.
 loader's shared build inputs (`modules/common`, `c_agent/*/util`) are exposed
 read-only, so the model can trace linked code without being able to edit it.
 
-If a cycle regresses, `RevertToPayload` replays the inverse of every recorded
-edit made after the chosen payload and restores the module and producer source.
-`DetectionCycle` records a mechanism label, one falsifiable prediction, the
-observed result, and the stage set with each cycle. It rejects a cycle when
-neither source nor shellcode changed, and it blocks a third cycle on the same
-mechanism after two predictions were not observed. The resume dossier carries
-the recent mechanism, prediction result, tested note, and edit reasons so a
-fresh agent session does not lose the direction it already tried. The cycle
-budget spans all attempts of one logical loop; it and the active shellcode are
-shown in the prompt and in every `DetectionCycle` result; `--iterations` is
-capped at 50 and `--turns` at 240. `--stages` accepts `static`, `dynamic`, and
-`edr`; the loop requires at least one executing stage. `EditSource` has no
-separate per-cycle edit cap; a redesign may use as many edits as the turn
-budget allows.
+If a cycle regresses, `RevertToPayload` replays the inverse of every recorded edit made after the chosen payload and restores the module and producer source. `DetectionCycle` records a mechanism label, one falsifiable prediction, the observed result, and the stage set with each cycle. It rejects a cycle when neither source nor shellcode changed, and it blocks a third cycle on the same mechanism after two predictions were not observed. The resume dossier carries the recent mechanism, prediction result, tested note, and edit reasons so a fresh agent session does not lose the direction it already tried. The cycle budget spans all attempts of one logical loop; it and the active shellcode are shown in the prompt and in every `DetectionCycle` result. `--iterations` and `--turns` default to 3 and 60; an explicit value is used as-is. `--stages` accepts `static`, `dynamic`, and `edr`; the loop requires at least one executing stage. `EditSource` has no separate per-cycle edit cap; a redesign may use as many edits as the turn budget allows.
 
 ### Reference cache
 
@@ -249,11 +236,7 @@ console it runs as a child process and streams its output to the output pane,
 so the prompt stays responsive; the direct CLI form still waits for the refresh
 to finish.
 
-`--inject` and `--process` are overrides. When they are omitted, the module's
-own default controls the load path, so the model can change that default in
-source and have the next cycle use it. `--iterations` and `--turns` are capped at
-50 and 240; values above the cap are rejected, and the cycle budget is shown in
-the prompt and in every `DetectionCycle` result.
+`--inject` and `--process` are overrides. When they are omitted, the module's own default controls the load path, so the model can change that default in source and have the next cycle use it. `--iterations` and `--turns` default to 3 and 60; an explicit value is used as-is, and the cycle budget is shown in the prompt and in every `DetectionCycle` result.
 
 The loop writes one log file under `<workspace>/detection/` and opens a
 separate tmux window tailing it; `emp3r0r.log` is untouched. When verification
