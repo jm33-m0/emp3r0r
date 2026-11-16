@@ -192,8 +192,9 @@ func sourceTreeFile(name string) bool {
 		return true
 	}
 	switch strings.ToLower(filepath.Ext(name)) {
-	case ".c", ".h", ".cc", ".cpp", ".hpp", ".go", ".s", ".asm", ".sh", ".py",
-		".json", ".md", ".txt", ".mk", ".cmake", ".ld", ".rc", ".bat", ".ps1",
+	case ".c", ".h", ".cc", ".cpp", ".cxx", ".hpp", ".hxx", ".inl", ".inc",
+		".go", ".s", ".asm", ".sh", ".py", ".cs", ".java", ".json", ".md",
+		".txt", ".mk", ".cmake", ".ld", ".def", ".rc", ".bat", ".ps1",
 		".yml", ".yaml", ".toml", ".mod", ".sum":
 		return true
 	}

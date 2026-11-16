@@ -22,11 +22,13 @@ const (
 	ClassReport
 	ClassWarning
 	ClassError
+	ClassProgress
 )
 
 func Classf(Class, string, ...any) {}
 
-func ClassfTo(io.Writer, Class, string, ...any) {}
+func ClassfTo(io.Writer, Class, string, ...any)      {}
+func ClassfToPlain(io.Writer, Class, string, ...any) {}
 
 // RenderMarkdown is disabled with the rest of the operator logger in release
 // builds; callers receive the original text.

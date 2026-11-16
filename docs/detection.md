@@ -202,12 +202,16 @@ read-only, so the model can trace linked code without being able to edit it.
 
 If a cycle regresses, `RevertToPayload` replays the inverse of every recorded
 edit made after the chosen payload and restores the module and producer source.
-`DetectionCycle` records a mechanism label with each cycle; the resume dossier
-carries the recent mechanism, tested note, and edit reasons so a fresh agent
-session does not lose the direction it already tried. The cycle budget spans
-all attempts of one logical loop; it and the active shellcode are shown in the
-prompt and in every `DetectionCycle` result; `--iterations` is capped at 50 and
-`--turns` at 240. `EditSource` has no
+`DetectionCycle` records a mechanism label, one falsifiable prediction, the
+observed result, and the stage set with each cycle. It rejects a cycle when
+neither source nor shellcode changed, and it blocks a third cycle on the same
+mechanism after two predictions were not observed. The resume dossier carries
+the recent mechanism, prediction result, tested note, and edit reasons so a
+fresh agent session does not lose the direction it already tried. The cycle
+budget spans all attempts of one logical loop; it and the active shellcode are
+shown in the prompt and in every `DetectionCycle` result; `--iterations` is
+capped at 50 and `--turns` at 240. `--stages` accepts `static`, `dynamic`, and
+`edr`; the loop requires at least one executing stage. `EditSource` has no
 separate per-cycle edit cap; a redesign may use as many edits as the turn
 budget allows.
 
@@ -261,19 +265,25 @@ the requested JSON object is stored as the summary with `parse_error` instead
 of ending the run. The loop writes the full Markdown report to
 `<workspace>/detection/reports/<loop>.md` and a compact executive summary to
 `<loop>-summary.md`, emits the full report through the tmux log pane when the
-loop finishes, and stores the report in `loop_results.report`. The operator
-console prints the rendered executive summary, not the raw report.
+loop finishes, and stores the report in `loop_results.report`. If the loop is
+stopped or fails before the final answer, it writes a partial report and
+summary from the cycles completed so far. The operator console prints the
+rendered executive summary, not the raw report.
+
+Loop timestamps use local time. A `[progress]` heartbeat is written every two
+minutes with elapsed time, cycles used, tool calls, sessions, last execution
+state, and the expected agent UUID, so a long model session is visibly alive.
 
 Loop log lines are tagged and colored by category: model thinking is dimmed,
 model text, thinking, and final answers are rendered as Markdown, tool calls and
 results stay raw for grepping, and builds, edits, cycles, warnings, and errors
-each get their own tag color. Terminal sinks receive the ANSI-styled rendering;
-the on-disk log receives the same structure as plain text without ANSI or
-heading markers. Markdown width follows the tmux log pane or the terminal
-running the console; `COLUMNS` is honored when no terminal size is available,
-with a 120-column fallback. The final report is rendered from Markdown for the
-terminal before it is logged; the on-disk report
-stays Markdown. `NO_COLOR=1` or `TERM=dumb` disables colors.
+each get their own tag color. The tmux pane colors the plain tags with `awk`;
+the on-disk log stays plain text without ANSI or heading markers. Markdown width
+follows the tmux log pane or the terminal running the console; `COLUMNS` is
+honored when no terminal size is available, with a 120-column fallback. The
+final report is rendered from Markdown for the terminal before it is logged;
+the on-disk report stays Markdown. `NO_COLOR=1` or `TERM=dumb` disables
+colors.
 
 Model credentials can be exported in the shell, or put in the operator
 environment file at `<workspace>/operator.env` (mode `0600`):
@@ -373,6 +383,8 @@ Schema:
 | `loop_builds`     | full build log per cycle                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `loop_edits`      | `payload_id` before the edit, `next_payload_id` it produced, `module`, `file`, `old`, `new`, `reason`                                                                                                                                                                                                                                                                                                                                       |
 | `loop_shellcodes` | producer, path, SHA-256, size, options, and iteration for every generated shellcode                                                                                                                                                                                                                                                                                                                                                         |
+| `cycle_history`   | view over `loop_cycles` and `payloads`: `loop_id`, `iteration`, `payload_id`, `payload_key`, `run_id`, `score`, `level`, `findings`, `verdicts`, `trace_id`, `executed`, `execution`, `agent_online`, `network_events`, `summary`, `created_at`                                                                                                                                                                                           |
+| `payload_view`    | view over `payloads` and the latest trace: `payload_id`, `payload_key`, `sha256`, `module`, `label`, `artifact_path`, `table_name`, `parent_id`, `created_at`, `trace_id`, `trace_run_id`, `trace_attribution`                                                                                                                                                                                                                               |
 
 Every payload gets its own SQLite view named `payload_<hash>`; the name is in
 `payloads.table_name`. This is the one-payload-per-table query surface: query

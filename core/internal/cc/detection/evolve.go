@@ -47,6 +47,8 @@ const (
 	// defaultToolIdleTimeout bounds a model session that stops calling tools.
 	// An in-flight tool suspends the idle check.
 	defaultToolIdleTimeout = 30 * time.Minute
+	// defaultProgressInterval emits a heartbeat during long sessions.
+	defaultProgressInterval = 2 * time.Minute
 	// minAgentShellcodeBytes rejects a tiny blob that no real Go agent could
 	// have produced. It catches a loader that drops the payload to reduce
 	// detections.
@@ -234,11 +236,18 @@ type evolver struct {
 	lastToolCall    atomic.Int64
 	activeTools     atomic.Int32
 	knowledgeSeen   map[string]struct{}
+	started         time.Time
+	cyclesDone      atomic.Int64
+	toolCalls       atomic.Int64
+	sessions        atomic.Int64
+	lastExecution   atomic.Value
+	lastAgent       atomic.Value
 }
 
 func (e *evolver) dynamicEnabled() bool {
 	for _, stage := range e.cfg.Stages {
-		if strings.EqualFold(strings.TrimSpace(stage), string(StageDynamic)) {
+		switch strings.ToLower(strings.TrimSpace(stage)) {
+		case string(StageDynamic), "edr":
 			return true
 		}
 	}
@@ -474,6 +483,16 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 	if e.sourceTreeHash != "" {
 		e.log("source tree: %s", e.sourceTreeHash)
 	}
+	e.started = time.Now()
+	progressDone := make(chan struct{})
+	go e.progressLoop(ctx, progressDone)
+	defer close(progressDone)
+	completed := false
+	defer func() {
+		if !completed {
+			e.persistPartial()
+		}
+	}()
 	e.openKnowledge()
 	if e.knowledge != nil {
 		defer func() { _ = e.knowledge.Close() }()
@@ -482,7 +501,7 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 
 	var baseline Cycle
 	for attempt := 0; ; attempt++ {
-		baseline, err = e.runCycle(ctx, "baseline", "baseline")
+		baseline, err = e.runCycle(ctx, "baseline", "baseline", "")
 		if err == nil {
 			break
 		}
@@ -566,6 +585,7 @@ Goal: %s
 Knowledge cache: %s
 Execution gate: %s
 Cycle budget: %d total across attempts; %d used before this attempt; %d remain after this baseline.
+Stages: %s
 Baseline cycle: %s
 %s
 
@@ -577,7 +597,10 @@ dependency root. EditSource writes only to the payload module and producer
 modules; documented options and their choices in config.json cannot be removed.
 Apply grounded source edits: start minimal when that removes the detection, but
 change the design when the design itself is what the sandbox detects. Then call
-DetectionCycle with the mechanism under test.
+DetectionCycle with the mechanism and one falsifiable prediction. The host records
+prediction, observed result, and prediction_result with the cycle; after two
+unobserved predictions for the same mechanism it blocks a third. Do not call
+DetectionCycle without a source or shellcode change: the host rejects no-op cycles.
 
 Changing the shellcode producer is a first-class move. Edit the producer module
 (module="donut" or module="crystal_pack"), then call BuildShellcode with its
@@ -628,7 +651,8 @@ every residual is explained with evidence. Return the final JSON object.`,
 		cfg.LoopID, e.baseLoopID, e.attempt, attemptLabel(e.attempt),
 		cfg.Module, cfg.ModuleDir, e.shellcode, headerOrNone(e.activeProducer), producerList, rootList,
 		headerOrNone(cfg.AgentCC), headerOrNone(e.expectedAgentUUID), headerOrNone(cfg.Goal), knowledgeState,
-		executionState, cfg.Iterations, e.globalUsed, max(0, cfg.Iterations-e.usedCycles()), baselineJSON,
+		executionState, cfg.Iterations, e.globalUsed, max(0, cfg.Iterations-e.usedCycles()),
+		strings.Join(stageNames(cfg.Stages), ", "), baselineJSON,
 		carriedState, cfg.Module)
 	if cfg.BuildAgent == nil {
 		prompt += "\n\nAgent generation (GenerateAgent) is disabled for this run; reuse the supplied shellcode or edit and rebuild an existing producer."
@@ -661,6 +685,7 @@ every residual is explained with evidence. Return the final JSON object.`,
 		if prompts := e.takeOperatorPrompts(); len(prompts) > 0 {
 			prompt = appendOperatorPrompts(prompt, prompts)
 		}
+		e.sessions.Add(1)
 		sessionTimeout := cfg.SessionTimeout
 		if sessionTimeout <= 0 {
 			sessionTimeout = defaultSessionTimeout
@@ -843,6 +868,7 @@ every residual is explained with evidence. Return the final JSON object.`,
 		cfg.LoopID, string(encoded), report, time.Now().UTC().UnixMilli()); err != nil {
 		return nil, fmt.Errorf("save loop result: %w", err)
 	}
+	completed = true
 	return &EvolveResult{
 		LoopID: cfg.LoopID, BaseLoopID: e.baseLoopID, Attempt: e.attempt,
 		GlobalCycles: e.usedCycles(), SourceTreeHash: e.sourceTreeHash,
@@ -938,12 +964,12 @@ func normalizeEvolveConfig(cfg *EvolveConfig) error {
 	if len(cfg.Stages) == 0 {
 		cfg.Stages = []string{"static", "dynamic"}
 	}
-	static, dynamic, err := parseEvolveStages(cfg.Stages)
+	static, dynamic, edr, err := parseEvolveStages(cfg.Stages)
 	if err != nil {
 		return err
 	}
-	if !dynamic {
-		return fmt.Errorf("the autonomous loop requires the dynamic stage for per-payload telemetry")
+	if !dynamic && !edr {
+		return fmt.Errorf("the autonomous loop requires the dynamic or edr stage for per-payload telemetry")
 	}
 	_ = static
 	if cfg.Iterations <= 0 {
@@ -961,52 +987,58 @@ func normalizeEvolveConfig(cfg *EvolveConfig) error {
 	return nil
 }
 
-func parseEvolveStages(stages []string) (static, dynamic bool, err error) {
+func parseEvolveStages(stages []string) (static, dynamic, edr bool, err error) {
 	for _, stage := range stages {
 		switch strings.ToLower(strings.TrimSpace(stage)) {
 		case "static":
 			static = true
 		case "dynamic":
 			dynamic = true
+		case "edr":
+			edr = true
 		case "":
 		default:
-			return false, false, fmt.Errorf("unknown stage %q", stage)
+			return false, false, false, fmt.Errorf("unknown stage %q; use static, dynamic, or edr", stage)
 		}
 	}
-	return static, dynamic, nil
+	return static, dynamic, edr, nil
 }
 
 type cycleSummary struct {
-	LoopID          string          `json:"loop_id"`
-	Iteration       int             `json:"iteration"`
-	Attempt         int             `json:"attempt,omitempty"`
-	GlobalIteration int             `json:"global_iteration,omitempty"`
-	PayloadKey      string          `json:"payload_key"`
-	PayloadTable    string          `json:"payload_table"`
-	RunID           string          `json:"run_id"`
-	SHA256          string          `json:"sha256"`
-	Score           float64         `json:"score"`
-	Level           string          `json:"level,omitempty"`
-	Findings        int             `json:"findings"`
-	Verdicts        []string        `json:"verdicts,omitempty"`
-	TraceID         int64           `json:"trace_id,omitempty"`
-	Events          int             `json:"telemetry_events"`
-	Telemetry       *TelemetryStats `json:"telemetry,omitempty"`
-	SourceEdits     int             `json:"source_edits"`
-	TopFindings     []string        `json:"top_findings,omitempty"`
-	BuildTail       []string        `json:"build_tail,omitempty"`
-	Edits           []EditRecord    `json:"edits,omitempty"`
-	Shellcode       string          `json:"shellcode,omitempty"`
-	Producer        string          `json:"producer,omitempty"`
-	Mechanism       string          `json:"mechanism,omitempty"`
-	Note            string          `json:"note,omitempty"`
-	Executed        bool            `json:"executed"`
-	Execution       string          `json:"execution,omitempty"`
-	AgentOnline     *bool           `json:"agent_online,omitempty"`
-	NetworkEvents   int             `json:"network_events,omitempty"`
-	SourceTreeHash  string          `json:"source_tree_hash,omitempty"`
-	Knowledge       []KnowledgeHit  `json:"knowledge,omitempty"`
-	KBRefs          []string        `json:"kb_refs,omitempty"`
+	LoopID           string          `json:"loop_id"`
+	Iteration        int             `json:"iteration"`
+	Attempt          int             `json:"attempt,omitempty"`
+	GlobalIteration  int             `json:"global_iteration,omitempty"`
+	PayloadKey       string          `json:"payload_key"`
+	PayloadTable     string          `json:"payload_table"`
+	RunID            string          `json:"run_id"`
+	SHA256           string          `json:"sha256"`
+	Score            float64         `json:"score"`
+	Level            string          `json:"level,omitempty"`
+	Findings         int             `json:"findings"`
+	Verdicts         []string        `json:"verdicts,omitempty"`
+	TraceID          int64           `json:"trace_id,omitempty"`
+	Events           int             `json:"telemetry_events"`
+	Telemetry        *TelemetryStats `json:"telemetry,omitempty"`
+	SourceEdits      int             `json:"source_edits"`
+	TopFindings      []string        `json:"top_findings,omitempty"`
+	BuildTail        []string        `json:"build_tail,omitempty"`
+	Edits            []EditRecord    `json:"edits,omitempty"`
+	Shellcode        string          `json:"shellcode,omitempty"`
+	Producer         string          `json:"producer,omitempty"`
+	Mechanism        string          `json:"mechanism,omitempty"`
+	Prediction       string          `json:"prediction,omitempty"`
+	PredictionResult string          `json:"prediction_result,omitempty"`
+	Observed         string          `json:"observed,omitempty"`
+	Stages           []string        `json:"stages,omitempty"`
+	Note             string          `json:"note,omitempty"`
+	Executed         bool            `json:"executed"`
+	Execution        string          `json:"execution,omitempty"`
+	AgentOnline      *bool           `json:"agent_online,omitempty"`
+	NetworkEvents    int             `json:"network_events,omitempty"`
+	SourceTreeHash   string          `json:"source_tree_hash,omitempty"`
+	Knowledge        []KnowledgeHit  `json:"knowledge,omitempty"`
+	KBRefs           []string        `json:"kb_refs,omitempty"`
 }
 
 func ensurePayloadPreserved(shellcode string, artifact Artifact) error {
@@ -1024,7 +1056,7 @@ func ensurePayloadPreserved(shellcode string, artifact Artifact) error {
 	return nil
 }
 
-func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, error) {
+func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction string) (Cycle, error) {
 	if e.usedCycles() >= e.cfg.Iterations {
 		return Cycle{}, fmt.Errorf("%w: %d of %d cycles used", ErrCycleBudgetExhausted, e.usedCycles(), e.cfg.Iterations)
 	}
@@ -1093,7 +1125,10 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, 
 	if err != nil {
 		return Cycle{}, err
 	}
-	static, dynamic, _ := parseEvolveStages(e.cfg.Stages)
+	static, dynamic, edr, err := parseEvolveStages(e.cfg.Stages)
+	if err != nil {
+		return Cycle{}, err
+	}
 	parentKey := ""
 	if e.last != nil {
 		parentKey = e.last.PayloadKey
@@ -1105,7 +1140,7 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, 
 	for attempt := 0; ; attempt++ {
 		runCtx, cancel := context.WithTimeout(cycleCtx, 12*time.Minute)
 		run, runErr = e.loop.RunPlan(runCtx, plan, RunOptions{
-			Static: static, Dynamic: dynamic, ApproveExecution: true,
+			Static: static, Dynamic: dynamic, EDR: edr, ApproveExecution: true,
 			Timeout: 10 * time.Minute, ParentKey: parentKey,
 		})
 		cancel()
@@ -1139,14 +1174,14 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, 
 		}
 	}
 	feedback := BuildFeedback(run)
-	if dynamic && !run.Executed {
-		return Cycle{}, fmt.Errorf("dynamic stages were selected but the sandbox did not execute the artifact")
+	if (dynamic || edr) && !run.Executed {
+		return Cycle{}, fmt.Errorf("dynamic or EDR stages were selected but the sandbox did not execute the artifact")
 	}
 	traceID := int64(0)
 	if run.Telemetry != nil {
 		traceID = run.Telemetry.TraceID
 	}
-	execution, online, networkEvents := e.checkExecution(cycleCtx, traceID, dynamic)
+	execution, online, networkEvents := e.checkExecution(cycleCtx, traceID, dynamic || edr)
 	if err := e.linkEdits(cycleCtx, iteration, run.Telemetry.PayloadID); err != nil {
 		e.logClass(logging.ClassError, "link edits: %v", err)
 	}
@@ -1154,6 +1189,13 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, 
 	summary := summarizeCycle(e.cfg.LoopID, iteration, run, feedback, buildLog, note, mechanism, shellcode, e.activeProducer, execution, online, networkEvents)
 	summary.Attempt = e.attempt
 	summary.GlobalIteration = e.globalUsed + iteration
+	summary.Prediction = clip(prediction, 500)
+	summary.Stages = stageNames(e.cfg.Stages)
+	summary.Observed = observedFindings(feedback)
+	summary.PredictionResult = evaluatePrediction(prediction, feedback)
+	e.cyclesDone.Store(int64(e.globalUsed + iteration))
+	e.lastExecution.Store(summary.Execution)
+	e.lastAgent.Store(e.expectedAgentUUID)
 	e.sourceTreeHash = e.computeSourceTreeHash()
 	summary.SourceTreeHash = e.sourceTreeHash
 	if edits, err := e.db.LoopEdits(cycleCtx, e.cfg.LoopID); err != nil {
@@ -1526,6 +1568,9 @@ func (e *evolver) dossier() string {
 		if strings.TrimSpace(summary.Note) != "" {
 			fmt.Fprintf(&b, "  tested: %s\n", clip(sanitizeLine(summary.Note), 240))
 		}
+		if strings.TrimSpace(summary.Prediction) != "" {
+			fmt.Fprintf(&b, "  predicted: %s -> %s\n", clip(sanitizeLine(summary.Prediction), 240), headerOrNone(summary.PredictionResult))
+		}
 		for i, edit := range summary.Edits {
 			if i >= 2 {
 				break
@@ -1712,6 +1757,7 @@ func (e *evolver) hooks() *hook.Registry {
 	})
 	hooks.On(hook.PostToolUse, func(_ context.Context, event hook.Event) hook.Result {
 		e.lastToolCall.Store(time.Now().UnixNano())
+		e.toolCalls.Add(1)
 		for {
 			active := e.activeTools.Load()
 			if active <= 0 || e.activeTools.CompareAndSwap(active, active-1) {
@@ -1764,7 +1810,8 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 		Description: "Rebuild the module from its current source and detonate the artifact in the sandbox. " +
 			"The full feedback, build log, and telemetry are stored in SQLite; this returns a bounded summary. " +
 			"The host checks the generated agent with AgentStatus and reports execution=verified, offline, or unverified. " +
-			"Call it after applying source edits.",
+			"Call it after a source edit or shellcode build with one falsifiable prediction; a cycle with no source or " +
+			"shellcode change is rejected.",
 		Prompt: "Build and run one detection cycle.",
 		Schema: map[string]any{
 			"type": "object",
@@ -1779,7 +1826,8 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 						"Use a different value when you change the loading path; reuse it only when refining the same mechanism. " +
 						"Name the concrete mechanism, not an incidental file or import change.",
 				},
-				"note": map[string]any{"type": "string", "description": "What this cycle is testing."},
+				"note":       map[string]any{"type": "string", "description": "What this cycle is testing."},
+				"prediction": map[string]any{"type": "string", "description": "One falsifiable prediction for this cycle: the expected analyzer, event, verdict, or absence of one. The host records it with the observed result."},
 			},
 			"required": []string{"mechanism"},
 		},
@@ -1788,8 +1836,9 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 		},
 		Run: func(ctx context.Context, raw json.RawMessage, _ *tool.ToolContext) (tool.Result, error) {
 			var args struct {
-				Mechanism string `json:"mechanism"`
-				Note      string `json:"note"`
+				Mechanism  string `json:"mechanism"`
+				Note       string `json:"note"`
+				Prediction string `json:"prediction"`
 			}
 			_ = json.Unmarshal(raw, &args)
 			if e.executionBlocked {
@@ -1802,6 +1851,9 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 			if strings.TrimSpace(mechanism) == "" {
 				mechanism = "other"
 			}
+			if err := e.cyclePreconditions(mechanism); err != nil {
+				return tool.Errorf(fmt.Sprintf("%v", err)), nil
+			}
 			if e.dynamicEnabled() && e.cfg.BuildAgent != nil {
 				if _, used := e.testedShellcodes[e.activeShellcode()]; used {
 					return tool.Errorf("this shellcode has already run; call GenerateAgent for a fresh UUID and BuildShellcode before DetectionCycle"), nil
@@ -1812,7 +1864,7 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 					}
 				}
 			}
-			cycle, err := e.runCycle(ctx, clip(args.Note, 500), mechanism)
+			cycle, err := e.runCycle(ctx, clip(args.Note, 500), mechanism, clip(args.Prediction, 500))
 			if err != nil {
 				return tool.Errorf(fmt.Sprintf("%v", err)), nil
 			}
@@ -2481,8 +2533,8 @@ Knowledge base:
   disappearance of one verdict as success when ComparePayloads shows new
   telemetry in another surface.
 - Turn what you read into one falsifiable prediction per cycle and put it in
-  the DetectionCycle note as kb=<document_ref> predict=<analyzer or event that
-  should change and in which direction>. Verify it from the cycle feedback. If
+  the DetectionCycle prediction field: the analyzer, event, or verdict that
+  should change and in which direction. Verify it from the cycle feedback. If
   the prediction fails, say so and change the hypothesis instead of re-reading
   the same document.
 

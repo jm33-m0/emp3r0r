@@ -356,6 +356,14 @@ loop_cycles(loop_id, iteration, payload_id, run_id, score, level, findings,
   loop_builds(loop_id, iteration, payload_id,
   artifact, sha256, log), loop_edits(loop_id, iteration, payload_id,
   next_payload_id, file, old, new, reason)
+Views:
+cycle_history(loop_id, iteration, payload_id, payload_key, run_id, score,
+  level, findings, verdicts, trace_id, executed, execution, agent_online,
+  network_events, summary JSON, created_at)
+payload_view(payload_id, payload_key, sha256, module, label, artifact_path,
+  table_name, parent_id, created_at, trace_id, trace_run_id, trace_attribution)
+Query cycle_history instead of joining loop_cycles and payloads; use
+payload_view for stable payload_id, payload_key, and trace_id names.
 Categories: process, image, module, file, network, audit, thread, defender,
 query, hook, memory (ETW-TI), other.
 payload_role: payload, payload-child, payload-target, payload-scan, ambient, unknown.

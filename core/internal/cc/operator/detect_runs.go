@@ -367,14 +367,17 @@ func runDetectLoop(run *detectRun, opts detectLoopOptions, shellcode string) {
 			if errors.Is(runErr, detection.ErrCycleBudgetExhausted) {
 				run.setError(runErr)
 				logf("%v", runErr)
+				printDetectRunReport(run, currentID)
 				return
 			}
 			run.setError(runErr)
 			if run.ctx.Err() != nil {
+				printDetectRunReport(run, currentID)
 				return
 			}
 			logging.Errorf("Detection loop %s: %v", currentID, runErr)
 			logf("loop failed: %v", runErr)
+			printDetectRunReport(run, currentID)
 			return
 		}
 		run.setResult(result)

@@ -225,6 +225,18 @@ CREATE INDEX IF NOT EXISTS events_signal ON events(trace_pk, signal);
 CREATE INDEX IF NOT EXISTS events_key ON events(trace_pk, event_key);
 CREATE INDEX IF NOT EXISTS findings_trace ON findings(trace_pk);
 CREATE INDEX IF NOT EXISTS findings_payload ON findings(payload_id, severity);
+CREATE VIEW IF NOT EXISTS cycle_history AS
+SELECT c.loop_id, c.iteration, c.payload_id, COALESCE(p.payload_key, '') AS payload_key,
+       c.run_id, c.score, c.level, c.findings, c.verdicts, c.trace_id, c.executed,
+       c.execution, c.agent_online, c.network_events, c.summary, c.created_at
+FROM loop_cycles c LEFT JOIN payloads p ON p.id = c.payload_id;
+CREATE VIEW IF NOT EXISTS payload_view AS
+SELECT p.id AS payload_id, p.payload_key, p.sha256, p.module, p.label,
+       p.artifact_path, p.table_name, p.parent_id, p.created_at,
+       (SELECT t.id FROM traces t WHERE t.payload_id = p.id ORDER BY t.id DESC LIMIT 1) AS trace_id,
+       (SELECT t.run_id FROM traces t WHERE t.payload_id = p.id ORDER BY t.id DESC LIMIT 1) AS trace_run_id,
+       (SELECT t.attribution FROM traces t WHERE t.payload_id = p.id ORDER BY t.id DESC LIMIT 1) AS trace_attribution
+FROM payloads p;
 `
 
 // TelemetryDB stores normalized ETW and DefenderObserver telemetry in SQLite.

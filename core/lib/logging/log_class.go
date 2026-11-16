@@ -37,6 +37,7 @@ const (
 	ClassReport
 	ClassWarning
 	ClassError
+	ClassProgress
 )
 
 func (c Class) tag() string {
@@ -63,6 +64,8 @@ func (c Class) tag() string {
 		return "warn"
 	case ClassError:
 		return "error"
+	case ClassProgress:
+		return "progress"
 	default:
 		return ""
 	}
@@ -93,6 +96,8 @@ func (c Class) tagColor() *color.Color {
 		return color.New(color.FgHiYellow, color.Bold)
 	case ClassError:
 		return color.New(color.FgHiRed, color.Bold)
+	case ClassProgress:
+		return color.New(color.FgHiBlack)
 	default:
 		return nil
 	}
@@ -114,7 +119,7 @@ func (c Class) bodyColor() *color.Color {
 // the loop log readable when a model answer or build log spans many lines: the
 // timestamp and tag repeat on every line instead of only the first one.
 func classPrefix(class Class) string {
-	prefix := time.Now().UTC().Format("15:04:05")
+	prefix := time.Now().Format("15:04:05")
 	tag := class.tag()
 	if tag == "" {
 		return prefix
@@ -144,6 +149,39 @@ func ClassfTo(w io.Writer, class Class, format string, a ...any) {
 		return
 	}
 	fmt.Fprint(w, formatClassLines(class, prefix, raw))
+}
+
+// ClassfToPlain writes the same class-tagged groups as ClassfTo without ANSI
+// styling. The detection loop uses it for the on-disk log while its tmux pane
+// colorizes the plain tags.
+func ClassfToPlain(w io.Writer, class Class, format string, a ...any) {
+	if w == nil {
+		return
+	}
+	raw := sanitize.SanitizeText(fmt.Sprintf(format, sanitizeLogArgs(a)...))
+	prefix := string(stripANSICodes([]byte(classPrefix(class))))
+	if class == ClassReport {
+		fmt.Fprintf(w, "%s\n%s\n", prefix, RenderMarkdownPlain(raw, 0))
+		return
+	}
+	if class.rendersMarkdown() {
+		width := bodyRenderWidth(prefix)
+		fmt.Fprint(w, formatPlainClassLines(prefix, RenderMarkdownPlain(raw, width)))
+		return
+	}
+	fmt.Fprint(w, formatPlainClassLines(prefix, raw))
+}
+
+func formatPlainClassLines(prefix, text string) string {
+	var b strings.Builder
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSuffix(line, "\r")
+		b.WriteString(prefix)
+		b.WriteByte(' ')
+		b.WriteString(line)
+		b.WriteByte('\n')
+	}
+	return b.String()
 }
 
 func Classf(class Class, format string, a ...any) {

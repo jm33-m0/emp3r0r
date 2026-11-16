@@ -119,7 +119,7 @@ func addDetectLoopFlags(cmd *cobra.Command) {
 	cmd.Flags().String("cc", "", "C2 address for the generated agent; defaults to the current config, with container-only hosts replaced by a certificate IP reachable from LitterBox")
 	cmd.Flags().String("sandbox", "", "LitterBox URL; defaults to EMP3R0R_DETECTION_SANDBOX or 127.0.0.1:1337")
 	cmd.Flags().Int("iterations", 3, "Maximum detection cycles across attempts, including each baseline (at most 50)")
-	cmd.Flags().StringSlice("stages", []string{"static", "dynamic"}, "Stages to run")
+	cmd.Flags().StringSlice("stages", []string{"static", "dynamic"}, "Stages to run: static, dynamic, edr")
 	cmd.Flags().String("process", "", "Override the sacrificial process; empty uses the module default")
 	cmd.Flags().String("format", "exe", "Loader host format: exe, service, or dll")
 	cmd.Flags().String("inject", "", "Override the injection method; empty uses the module default")
@@ -390,8 +390,7 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 	logf := logger.printf
 
 	if opts.Tmux {
-		window, tmuxErr := cli.TmuxNewPane("Detection Loop", "", "", 0,
-			"tail -F "+shellQuotePath(logPath))
+		window, tmuxErr := cli.TmuxNewPane("Detection Loop", "", "", 0, loopTailCommand(logPath))
 		if tmuxErr != nil {
 			logging.Warningf("detect_loop: tmux window: %v", tmuxErr)
 		} else {
@@ -654,13 +653,13 @@ func (l *loopLogger) printf(format string, args ...any) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	line := sanitize.SanitizeText(fmt.Sprintf(format, args...))
-	fmt.Fprintf(l.w, "%s %s\n", time.Now().UTC().Format("15:04:05"), line)
+	fmt.Fprintf(l.w, "%s %s\n", time.Now().Format("15:04:05"), line)
 }
 
 func (l *loopLogger) logf(class logging.Class, format string, args ...any) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	logging.ClassfTo(l.w, class, format, args...)
+	logging.ClassfToPlain(l.w, class, format, args...)
 }
 
 func classTag(class logging.Class) string {
@@ -687,6 +686,8 @@ func classTag(class logging.Class) string {
 		return "warn"
 	case logging.ClassError:
 		return "error"
+	case logging.ClassProgress:
+		return "progress"
 	default:
 		return "line"
 	}
@@ -725,6 +726,33 @@ func readLoopSummary(reportPath string) (string, string) {
 
 func shellQuotePath(path string) string {
 	return "'" + strings.ReplaceAll(path, "'", `'\''`) + "'"
+}
+
+// loopTailCommand tails the plain log and colors its class tags in the tmux
+// pane. The file on disk stays free of ANSI escapes.
+func loopTailCommand(path string) string {
+	if os.Getenv("NO_COLOR") != "" || strings.EqualFold(os.Getenv("TERM"), "dumb") {
+		return "tail -F " + shellQuotePath(path)
+	}
+	const colorizer = `{
+		tag = $2
+		color = ""
+		if (tag == "[thinking]") color = "\033[2m"
+		else if (tag == "[model]") color = "\033[36m"
+		else if (tag == "[tool]") color = "\033[93m"
+		else if (tag == "[result]") color = "\033[32m"
+		else if (tag == "[build]") color = "\033[94m"
+		else if (tag == "[cycle]") color = "\033[1;35m"
+		else if (tag == "[edit]") color = "\033[96m"
+		else if (tag == "[answer]") color = "\033[1;92m"
+		else if (tag == "[report]") color = "\033[1;97m"
+		else if (tag == "[warn]") color = "\033[1;33m"
+		else if (tag == "[error]") color = "\033[1;31m"
+		else if (tag == "[progress]") color = "\033[90m"
+		if (color != "") printf "%s%s\033[0m\n", color, $0
+		else print
+	}`
+	return "tail -F " + shellQuotePath(path) + " | awk '" + colorizer + "'"
 }
 
 // KnowledgeSyncCmd refreshes the offline reference cache. The loop itself

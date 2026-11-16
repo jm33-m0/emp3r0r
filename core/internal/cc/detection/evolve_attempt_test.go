@@ -90,7 +90,7 @@ func TestLoadAttemptStateCarriesPriorAttempt(t *testing.T) {
 
 func TestRunCycleRejectsExhaustedGlobalBudget(t *testing.T) {
 	e := &evolver{cfg: EvolveConfig{Iterations: 20}, globalUsed: 20}
-	if _, err := e.runCycle(context.Background(), "baseline", "baseline"); !errors.Is(err, ErrCycleBudgetExhausted) {
+	if _, err := e.runCycle(context.Background(), "baseline", "baseline", ""); !errors.Is(err, ErrCycleBudgetExhausted) {
 		t.Fatalf("runCycle error = %v, want budget exhausted", err)
 	}
 }

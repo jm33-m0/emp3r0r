@@ -37,3 +37,18 @@ func TestLoopLoggerSanitizesProgressLines(t *testing.T) {
 		t.Fatalf("progress line lost its text: %q", out.String())
 	}
 }
+
+func TestLoopLoggerWritesPlainClassLines(t *testing.T) {
+	var out bytes.Buffer
+	logger := newLoopLogger(&out)
+	logger.logf(logging.ClassCycle, "cycle %d", 3)
+	logger.logf(logging.ClassModel, "## Heading\n\n- one")
+	if strings.Contains(out.String(), "\x1b[") {
+		t.Fatalf("on-disk logger kept ANSI: %q", out.String())
+	}
+	for _, want := range []string{"[cycle]", "cycle 3", "[model]", "Heading", "one"} {
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("plain log missing %q: %q", want, out.String())
+		}
+	}
+}
