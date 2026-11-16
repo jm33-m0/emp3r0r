@@ -233,6 +233,7 @@ type evolver struct {
 	sourceTreeHash  string
 	lastToolCall    atomic.Int64
 	activeTools     atomic.Int32
+	knowledgeSeen   map[string]struct{}
 }
 
 func (e *evolver) dynamicEnabled() bool {
@@ -524,14 +525,25 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 	}
 	knowledgeState := "unavailable; ask the operator to run detect_loop knowledge-sync"
 	if e.knowledge != nil {
-		knowledgeState = "available: " + e.knowledge.Path() + " (KnowledgeSearch, KnowledgeRead)"
-		if count, countErr := e.knowledge.Count(ctx); countErr == nil {
-			if count == 0 {
+		knowledgeState = "available: " + e.knowledge.Path() + " (KnowledgeSearch, KnowledgeRead, KnowledgeStats, KnowledgeList)"
+		if stats, statsErr := e.knowledge.Stats(ctx); statsErr == nil {
+			switch {
+			case stats.Documents == 0:
 				knowledgeState = "empty at " + e.knowledge.Path() + "; continue with telemetry and source evidence, and ask the operator to run detect_loop knowledge-sync"
-			} else {
-				knowledgeState = fmt.Sprintf("available: %d cached documents at %s; classify the finding and call KnowledgeSearch before choosing or editing a mechanism",
-					count, e.knowledge.Path())
+			default:
+				notebooks := make([]string, 0, 6)
+				for _, item := range stats.Notebooks {
+					if len(notebooks) >= 6 {
+						notebooks = append(notebooks, "...")
+						break
+					}
+					notebooks = append(notebooks, fmt.Sprintf("%s %d/%d content", item.Notebook, item.Contents, item.Documents))
+				}
+				knowledgeState = fmt.Sprintf("available: %d documents at %s (%d summaries, %d content); notebooks: %s; call KnowledgeStats before searching an unfamiliar surface",
+					stats.Documents, e.knowledge.Path(), stats.Summaries, stats.Contents, strings.Join(notebooks, ", "))
 			}
+		} else {
+			knowledgeState = "available: " + e.knowledge.Path() + " (coverage query failed; KnowledgeSearch still works)"
 		}
 	}
 	system := evolveSystemPrompt
@@ -993,6 +1005,8 @@ type cycleSummary struct {
 	AgentOnline     *bool           `json:"agent_online,omitempty"`
 	NetworkEvents   int             `json:"network_events,omitempty"`
 	SourceTreeHash  string          `json:"source_tree_hash,omitempty"`
+	Knowledge       []KnowledgeHit  `json:"knowledge,omitempty"`
+	KBRefs          []string        `json:"kb_refs,omitempty"`
 }
 
 func ensurePayloadPreserved(shellcode string, artifact Artifact) error {
@@ -1157,6 +1171,7 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, 
 			})
 		}
 	}
+	e.attachKnowledge(cycleCtx, &summary, feedback)
 	summaryJSON, _ := json.Marshal(summary)
 	cycle := Cycle{
 		LoopID: e.cfg.LoopID, Iteration: iteration, Attempt: e.attempt, GlobalIteration: e.globalUsed + iteration,
@@ -1520,6 +1535,9 @@ func (e *evolver) dossier() string {
 		if len(summary.TopFindings) > 0 {
 			fmt.Fprintf(&b, "  top: %s\n", strings.Join(limitStrings(summary.TopFindings, 4), " | "))
 		}
+		if len(summary.KBRefs) > 0 {
+			fmt.Fprintf(&b, "  kb: %s\n", strings.Join(limitStrings(summary.KBRefs, 4), ", "))
+		}
 	}
 	if len(e.lastAnswer) > 0 {
 		if mechanism, ok := e.lastAnswer["mechanism"]; ok {
@@ -1668,7 +1686,8 @@ func (e *evolver) allowToolHook(toolName string) hook.Result {
 	switch toolName {
 	case "SourceList", "SourceRead", "SourceSearch", "TelemetryQuery",
 		"InspectFeedback", "Payloads", "ComparePayloads", "DetectionCycle", "EditSource",
-		"BuildShellcode", "RevertToPayload", "KnowledgeSearch", "KnowledgeRead":
+		"BuildShellcode", "RevertToPayload", "KnowledgeSearch", "KnowledgeRead",
+		"KnowledgeStats", "KnowledgeList":
 		return hook.Result{}
 	case "GenerateAgent":
 		if e.cfg.BuildAgent != nil {
@@ -1734,7 +1753,7 @@ func (e *evolver) tools() []tool.CoreTool {
 		tools = append(tools, e.agentStatusTool(), e.runModuleTool(), e.cleanupAgentTool())
 	}
 	if e.knowledge != nil {
-		tools = append(tools, e.knowledgeSearchTool(), e.knowledgeReadTool())
+		tools = append(tools, e.knowledgeSearchTool(), e.knowledgeReadTool(), e.knowledgeStatsTool(), e.knowledgeListTool())
 	}
 	return tools
 }
@@ -2421,9 +2440,11 @@ Direction discipline:
   or a producer change instead.
 
 Knowledge base:
-- KnowledgeSearch and KnowledgeRead read the trusted offline security reference
-  cache. Use it as guidance, but it is not evidence about this payload: source
-  and telemetry win when they disagree.
+- KnowledgeSearch, KnowledgeRead, KnowledgeStats, and KnowledgeList read the
+  trusted offline security reference cache. Use it as guidance, but it is not
+  evidence about this payload: source and telemetry win when they disagree.
+- KnowledgeStats shows per-notebook document counts and content coverage;
+  KnowledgeList lists references; KnowledgeSearch deduplicates hits by URL.
 - Consult it once per mechanism, before the first EditSource or DetectionCycle
   for that mechanism:
   1. Classify the finding by the surface it comes from: on-disk static
@@ -2435,10 +2456,14 @@ Knowledge base:
      paste a sentence.
   3. Read the top hit's summary. If it names the detector or API you are
      fighting, read the content pages you need with next_offset and stop when
-     the mechanism and its telemetry footprint are clear. Content is cached for
-     most but not all documents; when it is missing, continue with the summary.
+     the mechanism and its telemetry footprint are clear. Content is cached only
+     when the operator synced it with --content; if it is missing,
+     KnowledgeRead returns the summary with fallback=true.
   4. Discard hits about a different problem. A document is not support for an
      edit just because it shares a word with the finding.
+- DetectionCycle attaches a few top hits for new high/medium findings and
+  records their kb= references in the cycle summary. Use those instead of
+  searching the same finding again.
 - Notebook focus: maldev (loaders, injection, shellcode, syscalls, call stacks,
   sleep obfuscation), edrdev (EDR internals, ETW/ETW-TI, kernel callbacks,
   drivers, hooks), redteam (C2, BOF, persistence), amsi (AMSI and user-mode ETW
@@ -2446,8 +2471,8 @@ Knowledge base:
   vulndrivers (BYOVD, EDR killers), crystalstardust (Crystal Palace/PICO),
   com (COM/DCOM/RPC), lsass (credential dumping), defender (Defender/AV
   internals), mynotebook (reference essays). Filter with notebook only when the
-  surface is ambiguous; the same URL can appear in several notebooks, so read
-  one copy and do not cite duplicates.
+  surface is ambiguous; KnowledgeSearch already deduplicates URLs, so cite the
+  returned document_ref and do not repeat the same source.
 - The overview 'maldev/blog.deeb.ch_posts_how-edr-works' frames the three
   surfaces as "bubbles of bane": hiding a loader from a signature scan, a
   memory scan, or behavioral telemetry usually moves the detection to another

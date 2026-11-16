@@ -538,7 +538,7 @@ func (e *evolver) knowledgeSearchTool() tool.CoreTool {
 			"staticanalysis, vulndrivers, crystalstardust, com, lsass, defender, mynotebook). Query with two or " +
 			"three concrete tokens: the mechanism plus the exact detector, API, event, or analyzer. Title and " +
 			"summary rank above content. A hit locates a document; its snippet is not evidence of detection " +
-			"behavior. The same URL can appear in several notebooks. Trusted reference; verify each technique " +
+			"behavior. Hits are deduplicated by URL across notebooks. Trusted reference; verify each technique " +
 			"against this payload's telemetry.",
 		Prompt: "Search the reference cache before choosing or editing a mechanism.",
 		Schema: map[string]any{
@@ -588,9 +588,9 @@ func (e *evolver) knowledgeReadTool() tool.CoreTool {
 		Name: "KnowledgeRead",
 		Description: "Read one cached document by document_ref from KnowledgeSearch. Start with summary. When the " +
 			"summary names the detector or API under test, read content for implementation and telemetry detail; " +
-			"content is cached for most but not all documents. Page with offset and next_offset, request only what " +
-			"is needed, and stop when the mechanism is clear. If content is not cached, continue with the summary " +
-			"and telemetry; do not retry.",
+			"content is cached only for documents synced with --content. If content is not cached, the summary is " +
+			"returned with fallback=true. Page with offset and next_offset, request only what is needed, and stop " +
+			"when the mechanism is clear.",
 		Prompt: "Read the summary, then the content only for the detail the edit needs.",
 		Schema: map[string]any{
 			"type": "object",
@@ -625,6 +625,71 @@ func (e *evolver) knowledgeReadTool() tool.CoreTool {
 				return tool.Errorf(fmt.Sprintf("%v", err)), nil
 			}
 			data, _ := json.Marshal(doc)
+			return tool.Text(string(data)), nil
+		},
+	})
+}
+
+func (e *evolver) knowledgeStatsTool() tool.CoreTool {
+	return tool.Build(tool.Spec{
+		Name: "KnowledgeStats",
+		Description: "Return cache coverage by notebook: document counts, summaries, and full-content counts. " +
+			"Use it before searching when the right notebook or content coverage is unclear.",
+		Prompt:     "Check which notebooks and content are cached.",
+		Schema:     map[string]any{"type": "object", "properties": map[string]any{}},
+		ReadOnly:   func(json.RawMessage) bool { return true },
+		Concurrent: func(json.RawMessage) bool { return true },
+		Permissions: func(context.Context, json.RawMessage, permission.Context) permission.Decision {
+			return permission.Allowed()
+		},
+		Run: func(ctx context.Context, _ json.RawMessage, _ *tool.ToolContext) (tool.Result, error) {
+			if e.knowledge == nil {
+				return tool.Errorf("knowledge cache is empty; ask the operator to run detect_loop knowledge-sync"), nil
+			}
+			stats, err := e.knowledge.Stats(ctx)
+			if err != nil {
+				return tool.Errorf(fmt.Sprintf("%v", err)), nil
+			}
+			data, _ := json.Marshal(stats)
+			return tool.Text(string(data)), nil
+		},
+	})
+}
+
+func (e *evolver) knowledgeListTool() tool.CoreTool {
+	return tool.Build(tool.Spec{
+		Name: "KnowledgeList",
+		Description: "List cached document references, titles, URLs, and whether summary or content is available. " +
+			"Optionally filter by notebook. Use KnowledgeRead only on the selected documents.",
+		Prompt: "List cached documents when search terms are not yet clear.",
+		Schema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"notebook": map[string]any{"type": "string", "description": "Optional exact notebook filter."},
+				"limit":    map[string]any{"type": "integer", "description": "Maximum documents, default 100, at most 200."},
+			},
+		},
+		ReadOnly:   func(json.RawMessage) bool { return true },
+		Concurrent: func(json.RawMessage) bool { return true },
+		Permissions: func(context.Context, json.RawMessage, permission.Context) permission.Decision {
+			return permission.Allowed()
+		},
+		Run: func(ctx context.Context, raw json.RawMessage, _ *tool.ToolContext) (tool.Result, error) {
+			var args struct {
+				Notebook string `json:"notebook"`
+				Limit    int    `json:"limit"`
+			}
+			if err := json.Unmarshal(raw, &args); err != nil {
+				return tool.Errorf("invalid arguments"), nil
+			}
+			if e.knowledge == nil {
+				return tool.Errorf("knowledge cache is empty; ask the operator to run detect_loop knowledge-sync"), nil
+			}
+			docs, err := e.knowledge.List(ctx, args.Notebook, args.Limit)
+			if err != nil {
+				return tool.Errorf(fmt.Sprintf("%v", err)), nil
+			}
+			data, _ := json.Marshal(map[string]any{"documents": docs, "count": len(docs)})
 			return tool.Text(string(data)), nil
 		},
 	})

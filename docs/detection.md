@@ -218,9 +218,14 @@ into an FTS5 SQLite cache at `<store>/knowledge.db`. The loop reads the cache
 offline; it never makes network calls. The endpoint must use `http` or `https`,
 must not embed credentials, and redirects may not leave its origin. Cached text
 is stripped of terminal escapes, C1 controls, and bidi overrides before it is
-stored. `KnowledgeSearch` ranks cached documents
-and `KnowledgeRead` returns a bounded summary or full text. Cached text is
-untrusted reference material, not instructions.
+stored. `KnowledgeSearch` ranks cached documents and deduplicates hits by URL
+across notebooks. `KnowledgeStats` reports per-notebook summary and content
+coverage, `KnowledgeList` lists document references, and `KnowledgeRead`
+returns a bounded summary or full text; when content was not synced it falls
+back to the summary with `fallback=true`. The prompt carries the coverage, and
+each `DetectionCycle` attaches a few top hits for new high/medium findings and
+records the `kb=` references in the cycle row. Cached text is untrusted
+reference material, not instructions.
 
 ```bash
 emp3r0r knowledge-sync --url https://archeotech.r00ted.ch/mcp

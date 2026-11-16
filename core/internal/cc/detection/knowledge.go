@@ -104,6 +104,36 @@ type KnowledgeDoc struct {
 	Artifact   string `json:"artifact"`
 	Content    string `json:"content"`
 	NextOffset int    `json:"next_offset,omitempty"`
+	// Fallback means the requested content was not cached and Content holds
+	// the summary instead.
+	Fallback bool `json:"fallback,omitempty"`
+}
+
+// KnowledgeNotebook is one notebook's cache coverage.
+type KnowledgeNotebook struct {
+	Notebook  string `json:"notebook"`
+	Documents int    `json:"documents"`
+	Summaries int    `json:"summaries"`
+	Contents  int    `json:"contents"`
+}
+
+// KnowledgeStats is the cache coverage summary.
+type KnowledgeStats struct {
+	Path      string              `json:"path"`
+	Documents int                 `json:"documents"`
+	Summaries int                 `json:"summaries"`
+	Contents  int                 `json:"contents"`
+	Notebooks []KnowledgeNotebook `json:"notebooks"`
+}
+
+// KnowledgeDocInfo is one cached document without its body.
+type KnowledgeDocInfo struct {
+	DocRef   string `json:"document_ref"`
+	Notebook string `json:"notebook"`
+	Title    string `json:"title,omitempty"`
+	URL      string `json:"url,omitempty"`
+	Summary  bool   `json:"summary"`
+	Content  bool   `json:"content"`
 }
 
 // KnowledgePath returns the cache path inside a detection store.
@@ -220,6 +250,68 @@ func (k *KnowledgeDB) Count(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	return count, nil
+}
+
+// Stats returns per-notebook coverage so the model can choose a corpus before
+// searching and can see whether content was synced.
+func (k *KnowledgeDB) Stats(ctx context.Context) (KnowledgeStats, error) {
+	stats := KnowledgeStats{Path: k.path}
+	conn := k.reader()
+	rows, err := conn.QueryContext(ctx, `
+		SELECT COALESCE(notebook, ''),
+		       COUNT(*),
+		       SUM(CASE WHEN summary <> '' THEN 1 ELSE 0 END),
+		       SUM(CASE WHEN content <> '' THEN 1 ELSE 0 END)
+		FROM knowledge_documents GROUP BY notebook ORDER BY notebook`)
+	if err != nil {
+		return stats, fmt.Errorf("read knowledge coverage: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var item KnowledgeNotebook
+		if err := rows.Scan(&item.Notebook, &item.Documents, &item.Summaries, &item.Contents); err != nil {
+			return stats, err
+		}
+		stats.Documents += item.Documents
+		stats.Summaries += item.Summaries
+		stats.Contents += item.Contents
+		stats.Notebooks = append(stats.Notebooks, item)
+	}
+	return stats, rows.Err()
+}
+
+// List returns cached documents without bodies, optionally scoped to one
+// notebook.
+func (k *KnowledgeDB) List(ctx context.Context, notebook string, limit int) ([]KnowledgeDocInfo, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 100
+	}
+	notebook = strings.ToLower(strings.TrimSpace(notebook))
+	query := `SELECT doc_ref, notebook, title, url, summary <> '', content <> ''
+		FROM knowledge_documents`
+	args := []any{}
+	if notebook != "" {
+		query += ` WHERE notebook = ?`
+		args = append(args, notebook)
+	}
+	query += ` ORDER BY notebook, doc_ref LIMIT ?`
+	args = append(args, limit)
+	rows, err := k.reader().QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list knowledge documents: %w", err)
+	}
+	defer rows.Close()
+	var out []KnowledgeDocInfo
+	for rows.Next() {
+		var item KnowledgeDocInfo
+		if err := rows.Scan(&item.DocRef, &item.Notebook, &item.Title, &item.URL, &item.Summary, &item.Content); err != nil {
+			return nil, err
+		}
+		item.Title = sanitizeKnowledgeText(item.Title)
+		item.URL = sanitizeKnowledgeText(item.URL)
+		out = append(out, item)
+	}
+	return out, rows.Err()
 }
 
 func (k *KnowledgeDB) reader() *sql.DB {
@@ -758,25 +850,59 @@ func (k *KnowledgeDB) searchFTS(ctx context.Context, terms []string, op, noteboo
 		sqlText += ` AND d.notebook = ?`
 		args = append(args, notebook)
 	}
+	// Fetch more rows than requested because the same URL can appear in
+	// several notebooks; dedupe before applying the caller's limit.
+	fetch := limit * 4
+	if fetch < limit || fetch > maxKnowledgeHits*4 {
+		fetch = maxKnowledgeHits * 4
+	}
 	sqlText += ` ORDER BY rank LIMIT ?`
-	args = append(args, limit)
+	args = append(args, fetch)
 	rows, err := k.reader().QueryContext(ctx, sqlText, args...)
 	if err != nil {
 		return nil, fmt.Errorf("search knowledge: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 	var hits []KnowledgeHit
+	seen := map[string]struct{}{}
 	for rows.Next() {
 		var hit KnowledgeHit
 		if err := rows.Scan(&hit.DocRef, &hit.Notebook, &hit.Title, &hit.URL, &hit.Snippet, &hit.Score); err != nil {
 			return nil, err
 		}
+		key := knowledgeURLKey(hit.URL)
+		if key == "" {
+			key = hit.DocRef
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
 		hit.Title = sanitizeKnowledgeText(hit.Title)
 		hit.Snippet = sanitizeKnowledgeText(hit.Snippet)
 		hit.Score = -hit.Score // bm25 returns a negative score; positive reads better
 		hits = append(hits, hit)
+		if len(hits) >= limit {
+			break
+		}
 	}
 	return hits, rows.Err()
+}
+
+func knowledgeURLKey(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Host == "" {
+		return strings.ToLower(strings.TrimRight(raw, "/"))
+	}
+	parsed.Scheme = strings.ToLower(parsed.Scheme)
+	parsed.Host = strings.ToLower(parsed.Host)
+	parsed.Fragment = ""
+	parsed.Path = strings.TrimRight(parsed.Path, "/")
+	return parsed.String()
 }
 
 // Read returns one cached artifact, bounded by byte offset and limit.
@@ -802,11 +928,17 @@ func (k *KnowledgeDB) Read(ctx context.Context, ref, artifact string, offset, li
 		return KnowledgeDoc{}, err
 	}
 	text := summary
+	fallback := false
 	if artifact == "content" {
 		text = content
+		if text == "" {
+			text = summary
+			artifact = "summary"
+			fallback = true
+		}
 	}
 	if text == "" {
-		return KnowledgeDoc{}, fmt.Errorf("document %q has no cached %s; re-run knowledge-sync with --content", ref, artifact)
+		return KnowledgeDoc{}, fmt.Errorf("document %q has no cached summary", ref)
 	}
 	if offset < 0 {
 		offset = 0
@@ -828,7 +960,7 @@ func (k *KnowledgeDB) Read(ctx context.Context, ref, artifact string, offset, li
 	}
 	return KnowledgeDoc{
 		DocRef: ref, Notebook: notebook, Title: sanitizeKnowledgeText(title),
-		URL: sanitizeKnowledgeText(url), Artifact: artifact,
+		URL: sanitizeKnowledgeText(url), Artifact: artifact, Fallback: fallback,
 		Content: sanitizeKnowledgeText(text), NextOffset: next,
 	}, nil
 }
