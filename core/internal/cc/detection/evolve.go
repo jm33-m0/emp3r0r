@@ -1633,6 +1633,9 @@ func (e *evolver) residualCovers(findings []Finding) bool {
 }
 
 func actionableFinding(finding Finding) bool {
+	if finding.Signal == "noise" || finding.Signal == "baseline" {
+		return false
+	}
 	if finding.Rule == "defender/verdict" {
 		return true
 	}

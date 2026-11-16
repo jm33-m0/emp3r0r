@@ -1148,19 +1148,29 @@ func (t *TelemetryDB) Findings(ctx context.Context, traceID int64) ([]Finding, e
 	payloadPID := metaInt(meta, "payload_pid")
 	payloadImage := metaString(meta, "payload_image")
 	var findings []Finding
-	add := func(severity, rule, indicator, detail string) {
+	seenFindings := map[string]struct{}{}
+	addSignal := func(severity, rule, indicator, detail, signal string) {
 		if len(findings) >= maxTelemetryFindings {
 			return
 		}
+		key := strings.ToLower(strings.TrimSpace(rule)) + "|" + strings.ToLower(strings.TrimSpace(indicator))
+		if _, ok := seenFindings[key]; ok {
+			return
+		}
+		seenFindings[key] = struct{}{}
 		findings = append(findings, Finding{
 			Stage:     StageTelemetry,
 			Tool:      "telemetry",
 			Severity:  normalizeSeverity(severity),
 			Rule:      clipUTF8(sanitizeMultiline(rule), 200),
 			Indicator: clipUTF8(sanitizeMultiline(indicator), 300),
+			Signal:    signal,
 			Detail:    clipUTF8(sanitizeMultiline(detail), 500),
 			Executes:  true,
 		})
+	}
+	add := func(severity, rule, indicator, detail string) {
+		addSignal(severity, rule, indicator, detail, "signal")
 	}
 
 	// Defender verdicts and scan engagement. Internal Bm* plumbing is noise;
@@ -1276,7 +1286,7 @@ func (t *TelemetryDB) Findings(ctx context.Context, traceID int64) ([]Finding, e
 	}
 
 	// Images and modules loaded outside the system directories.
-	images, err := t.rows(ctx, `SELECT event, category, image FROM events
+	images, err := t.rows(ctx, `SELECT event, category, image, payload_role, stack FROM events
 		WHERE trace_pk = ? AND category IN ('image', 'module') AND image <> ''
 		AND signal = 'signal' AND payload_role IN ('payload', 'payload-child')
 		ORDER BY id LIMIT 200`, traceID)
@@ -1284,6 +1294,7 @@ func (t *TelemetryDB) Findings(ctx context.Context, traceID int64) ([]Finding, e
 		return nil, err
 	}
 	seenImages := map[string]struct{}{}
+	signalImages := 0
 	for _, row := range images {
 		image := row.string("image")
 		if sameWindowsPath(image, payloadImage) || isSystemImage(image) {
@@ -1298,8 +1309,19 @@ func (t *TelemetryDB) Findings(ctx context.Context, traceID int64) ([]Finding, e
 		if row.string("category") == "module" {
 			rule = "telemetry/user-module"
 		}
-		add("medium", rule, base, "payload loaded an image from a user-writable path: "+image)
-		if len(seenImages) >= 5 {
+		severity := "medium"
+		signal := "signal"
+		detail := "payload loaded an image from a user-writable path: " + image
+		if isAmbientImage(image, row.string("payload_role"), row.string("stack")) {
+			severity = "info"
+			signal = "noise"
+			detail = "sandbox or system image loaded into the payload process: " + image
+		}
+		addSignal(severity, rule, base, detail, signal)
+		if signal == "signal" {
+			signalImages++
+		}
+		if signalImages >= 5 {
 			break
 		}
 	}

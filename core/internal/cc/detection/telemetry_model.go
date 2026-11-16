@@ -1013,7 +1013,43 @@ var windowsSystemModules = map[string]struct{}{
 func looksLikeScanner(name string) bool {
 	lower := strings.ToLower(strings.ReplaceAll(name, "/", `\`))
 	return strings.Contains(lower, "msmpeng") || strings.Contains(lower, "mpengine") ||
-		strings.Contains(lower, "mssense") || strings.Contains(lower, "windefend")
+		strings.Contains(lower, "mssense") || strings.Contains(lower, "windefend") ||
+		strings.Contains(lower, "rededr") || strings.Contains(lower, `\litterbox\`) ||
+		strings.Contains(lower, `\scanners\`) || strings.Contains(lower, "pe-sieve") ||
+		strings.Contains(lower, "hollowshunter") || strings.Contains(lower, "moneta")
+}
+
+// ambientRuntimeModules are compiler and compatibility runtimes that Windows
+// loads into many processes. They are not loader-controlled, so a module-load
+// event for one is evidence, not a finding.
+var ambientRuntimeModules = map[string]struct{}{
+	"msvcp140.dll": {}, "msvcp140_1.dll": {}, "msvcp140_2.dll": {},
+	"msvcp140_atomic_wait.dll": {}, "msvcp140_codecvt_ids.dll": {},
+	"vcruntime140.dll": {}, "vcruntime140_1.dll": {}, "concrt140.dll": {},
+	"apphelp.dll": {}, "dbgcore.dll": {},
+}
+
+func isAmbientImage(image, role, stack string) bool {
+	if strings.EqualFold(strings.TrimSpace(role), "ambient") {
+		return true
+	}
+	if looksLikeScanner(image) {
+		return true
+	}
+	lower := strings.ToLower(strings.ReplaceAll(image, "/", `\`))
+	if strings.Contains(lower, `\rededr\`) || strings.Contains(lower, `\litterbox\`) ||
+		strings.Contains(lower, `\scanners\`) {
+		return true
+	}
+	base := lower
+	if index := strings.LastIndexAny(base, `\/`); index >= 0 {
+		base = base[index+1:]
+	}
+	if _, ok := ambientRuntimeModules[base]; ok {
+		return true
+	}
+	stackLower := strings.ToLower(stack)
+	return strings.Contains(stackLower, "rededr") || strings.Contains(stackLower, "litterbox")
 }
 
 // deriveTelemetryFromStored re-normalizes one stored attrs blob. It is used by

@@ -38,6 +38,7 @@ type Finding struct {
 	Severity  string           `json:"severity"`
 	Rule      string           `json:"rule,omitempty"`
 	Indicator string           `json:"indicator"`
+	Signal    string           `json:"signal,omitempty"`
 	Detail    string           `json:"detail,omitempty"`
 	Executes  bool             `json:"executes"`
 	Sources   []SourceLocation `json:"sources,omitempty"`
@@ -102,6 +103,9 @@ func BuildFeedback(run Run) Feedback {
 
 	if run.Telemetry != nil {
 		for _, finding := range run.Telemetry.Findings {
+			if finding.Signal == "noise" || finding.Signal == "baseline" {
+				continue
+			}
 			finding.Stage = StageTelemetry
 			finding.Tool = "telemetry"
 			finding.Executes = true

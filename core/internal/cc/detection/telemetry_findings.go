@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -27,7 +28,7 @@ func (t *TelemetryDB) persistedFindings(ctx context.Context, traceID int64) ([]F
 		return nil, false, nil
 	}
 	rows, err := t.db.QueryContext(ctx, `
-		SELECT severity, rule, indicator, detail FROM findings
+		SELECT severity, rule, indicator, signal, detail FROM findings
 		WHERE trace_pk = ?
 		ORDER BY CASE severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1
 			WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, rule, indicator`, traceID)
@@ -38,12 +39,17 @@ func (t *TelemetryDB) persistedFindings(ctx context.Context, traceID int64) ([]F
 	var out []Finding
 	for rows.Next() {
 		var finding Finding
-		if err := rows.Scan(&finding.Severity, &finding.Rule, &finding.Indicator, &finding.Detail); err != nil {
+		if err := rows.Scan(&finding.Severity, &finding.Rule, &finding.Indicator, &finding.Signal, &finding.Detail); err != nil {
 			return nil, false, fmt.Errorf("scan telemetry finding: %w", err)
 		}
 		finding.Stage = StageTelemetry
 		finding.Tool = "telemetry"
 		finding.Executes = true
+		if (finding.Rule == "telemetry/user-module" || finding.Rule == "telemetry/user-image") &&
+			isAmbientImage(finding.Indicator, "", "") {
+			finding.Signal = "noise"
+			finding.Severity = "info"
+		}
 		sanitizeFindingText(&finding)
 		out = append(out, finding)
 	}
@@ -66,15 +72,19 @@ func (t *TelemetryDB) saveFindings(ctx context.Context, traceID int64, findings 
 	}
 	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO findings(trace_pk, payload_id, stage, tool, severity, rule, indicator, detail, signal, created_at)
-		VALUES(?, ?, ?, ?, ?, ?, ?, ?, 'signal', ?)`)
+		VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return fmt.Errorf("prepare telemetry findings: %w", err)
 	}
 	defer stmt.Close()
 	now := time.Now().UTC().UnixMilli()
 	for _, finding := range findings {
+		signal := finding.Signal
+		if strings.TrimSpace(signal) == "" {
+			signal = "signal"
+		}
 		if _, err := stmt.ExecContext(ctx, traceID, payloadID, string(finding.Stage), finding.Tool,
-			finding.Severity, finding.Rule, finding.Indicator, finding.Detail, now); err != nil {
+			finding.Severity, finding.Rule, finding.Indicator, finding.Detail, signal, now); err != nil {
 			return fmt.Errorf("store telemetry finding: %w", err)
 		}
 	}

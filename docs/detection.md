@@ -331,6 +331,9 @@ operation, source coverage, payload attribution, and a signal class:
 - `payload_role`: `payload`, `payload-child`, `payload-target`, `payload-scan`,
   `ambient`, or `unknown`.
 - `signal`: `signal`, `verdict`, `scan`, `info`, `baseline`, or `noise`.
+- Ambient instrument images such as `RedEdrDll.dll`, `LitterBox\Scanners`, and
+  MSVC runtimes are stored as `signal=noise`. The feedback view and the
+  actionable-finding check skip them, so they cannot trigger another cycle.
 - `category`: `process`, `image`, `module`, `file`, `network`, `audit`, `thread`,
   `defender`, `query`, `hook`, `memory` (ETW-TI), `analysis`, or `other`.
 
