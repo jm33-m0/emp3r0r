@@ -730,3 +730,22 @@ func TestEvolveInterruptsSessionWithoutACycle(t *testing.T) {
 		t.Fatalf("answer = %s", result.Answer)
 	}
 }
+
+func TestToolErrorResultLogsAsErrorClass(t *testing.T) {
+	var classes []logging.Class
+	e := &evolver{logf: func(class logging.Class, _ string, _ ...any) {
+		classes = append(classes, class)
+	}}
+	hooks := e.hooks()
+	hooks.PostToolUse(context.Background(), "EditSource", nil, []byte("save edit: edit has no payload"), true)
+	hooks.PostToolUse(context.Background(), "SourceRead", nil, []byte("read 10 lines"), false)
+	if len(classes) != 2 {
+		t.Fatalf("log classes = %v", classes)
+	}
+	if classes[0] != logging.ClassError {
+		t.Fatalf("failed tool result logged as %v, want ClassError", classes[0])
+	}
+	if classes[1] != logging.ClassToolResult {
+		t.Fatalf("successful tool result logged as %v, want ClassToolResult", classes[1])
+	}
+}

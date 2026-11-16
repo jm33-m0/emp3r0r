@@ -995,3 +995,69 @@ func TestNormalizeEvolveConfigRejectsStagerLinux(t *testing.T) {
 		t.Fatal("stager_linux was accepted by the autonomous loop")
 	}
 }
+
+// A failed baseline leaves the loop with no payload; the model must still be
+// able to fix the build that broke it.
+func TestEditSourceRecordsEditBeforeTheFirstPayload(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "build.sh")
+	if err := os.WriteFile(path, []byte("exit 1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	db, err := OpenTelemetryDB(filepath.Join(t.TempDir(), "telemetry.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	roots, err := newSourceRoots("loader_windows",
+		sourceRoot{Name: "loader_windows", Dir: dir, Writable: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := &evolver{
+		cfg: EvolveConfig{
+			LoopID: "loop-no-payload", Module: "loader_windows",
+			ModuleDir: dir, Iterations: 3,
+		},
+		db:    db,
+		roots: roots,
+		logf:  func(logging.Class, string, ...any) {},
+	}
+	raw, err := json.Marshal(map[string]any{
+		"file":       "build.sh",
+		"old_string": "exit 1",
+		"new_string": "exit 0",
+		"reason":     "the self loader needs format=exe",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := e.editSourceTool().Call(context.Background(), raw, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.IsError {
+		t.Fatalf("edit failed without a payload: %s", result.Flatten())
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "exit 0") {
+		t.Fatalf("source was not edited: %q", data)
+	}
+	edits, err := db.LoopEdits(context.Background(), "loop-no-payload")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(edits) != 1 || edits[0].PayloadID != 0 || edits[0].File != "build.sh" {
+		t.Fatalf("edits = %+v", edits)
+	}
+	pending, err := db.UncycledEdits(context.Background(), "loop-no-payload")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pending) != 1 {
+		t.Fatalf("pending edits = %+v", pending)
+	}
+}

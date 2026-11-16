@@ -171,18 +171,21 @@ func (t *TelemetryDB) SaveBuild(ctx context.Context, record BuildRecord) error {
 	return nil
 }
 
-// SaveEdit stores one source edit, including the replaced text.
+// SaveEdit stores one source edit, including the replaced text. An edit made
+// before the loop has a payload (a failed baseline) is kept with a NULL
+// payload_id and linked to the next payload by linkEdits.
 func (t *TelemetryDB) SaveEdit(ctx context.Context, record EditRecord) error {
-	if record.PayloadID == 0 {
-		return fmt.Errorf("edit has no payload")
-	}
 	if record.CreatedAt.IsZero() {
 		record.CreatedAt = time.Now().UTC()
+	}
+	var payloadID any
+	if record.PayloadID != 0 {
+		payloadID = record.PayloadID
 	}
 	if _, err := t.db.ExecContext(ctx, `
 		INSERT INTO loop_edits(loop_id, iteration, payload_id, module, file, old, new, reason, created_at)
 		VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		record.LoopID, record.Iteration, record.PayloadID, record.Module, record.File,
+		record.LoopID, record.Iteration, payloadID, record.Module, record.File,
 		record.Old, record.New, clip(record.Reason, 1000),
 		record.CreatedAt.UnixMilli()); err != nil {
 		return fmt.Errorf("save edit: %w", err)

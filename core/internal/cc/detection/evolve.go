@@ -1911,7 +1911,11 @@ func (e *evolver) hooks() *hook.Registry {
 		if preview == "" {
 			preview = "(no output)"
 		}
-		e.logClass(logging.ClassToolResult, "%s %s: %s", event.ToolName, status, preview)
+		class := logging.ClassToolResult
+		if event.IsError {
+			class = logging.ClassError
+		}
+		e.logClass(class, "%s %s: %s", event.ToolName, status, preview)
 		return hook.Result{}
 	})
 	return hooks
