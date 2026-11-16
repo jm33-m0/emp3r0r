@@ -73,12 +73,18 @@ type EvolveConfig struct {
 	BaseLoopID string
 	// Attempt is the one-based attempt number within BaseLoopID. Empty or zero
 	// means the first attempt.
-	Attempt    int
-	Module     string
-	ModuleDir  string
-	Shellcode  string
-	SandboxURL string
-	StoreRoot  string
+	Attempt   int
+	Module    string
+	ModuleDir string
+	Shellcode string
+	// InitialAgentArtifact is the agent executable or DLL wrapped into
+	// Shellcode. The loop deletes it when it rotates the test agent.
+	InitialAgentArtifact string
+	// InitialShellcodeGenerated marks Shellcode as a loop artifact instead of
+	// an operator-supplied file, so rotation may delete it.
+	InitialShellcodeGenerated bool
+	SandboxURL                string
+	StoreRoot                 string
 	// Process is passed to the loader build when non-empty. Leave it empty to
 	// let the module's own default control the sacrificial process, so a source
 	// edit to that default changes the next build.
@@ -194,25 +200,28 @@ type EvolveResult struct {
 }
 
 type evolver struct {
-	cfg               EvolveConfig
-	loop              *Loop
-	db                *TelemetryDB
-	logf              func(logging.Class, string, ...any)
-	iter              int
-	last              *Cycle
-	cycles            []Cycle
-	roots             *sourceRoots
-	shellcode         string
-	agentArtifact     string
-	activeProducer    string
-	expectedAgentUUID string
-	testedAgentUUIDs  map[string]struct{}
-	testedShellcodes  map[string]struct{}
-	shellSeq          int
-	knowledge         *KnowledgeDB
-	lastAnswer        map[string]any
-	baselineFailure   string
-	operatorPrompts   *OperatorPromptQueue
+	cfg           EvolveConfig
+	loop          *Loop
+	db            *TelemetryDB
+	logf          func(logging.Class, string, ...any)
+	iter          int
+	last          *Cycle
+	cycles        []Cycle
+	roots         *sourceRoots
+	shellcode     string
+	agentArtifact string
+	// initialShellcodeGenerated records whether cfg.Shellcode was built by the
+	// loop, so rotation may delete the original file.
+	initialShellcodeGenerated bool
+	activeProducer            string
+	expectedAgentUUID         string
+	testedAgentUUIDs          map[string]struct{}
+	testedShellcodes          map[string]struct{}
+	shellSeq                  int
+	knowledge                 *KnowledgeDB
+	lastAnswer                map[string]any
+	baselineFailure           string
+	operatorPrompts           *OperatorPromptQueue
 	// progress counts cycles that produced a comparable result; an offline
 	// cycle consumes the budget but does not count as progress, so the stalled
 	// session guard cannot be reset by builds whose payload never ran.
@@ -437,10 +446,12 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 	defer loop.Telemetry.Close()
 	e := &evolver{
 		cfg: cfg, loop: loop, db: loop.Telemetry, logf: cfg.Logf, shellcode: cfg.Shellcode,
-		activeProducer:    strings.ToLower(strings.TrimSpace(cfg.InitialProducer)),
-		expectedAgentUUID: strings.TrimSpace(cfg.ExpectedAgentUUID),
-		testedAgentUUIDs:  make(map[string]struct{}),
-		testedShellcodes:  make(map[string]struct{}),
+		agentArtifact:             strings.TrimSpace(cfg.InitialAgentArtifact),
+		initialShellcodeGenerated: cfg.InitialShellcodeGenerated,
+		activeProducer:            strings.ToLower(strings.TrimSpace(cfg.InitialProducer)),
+		expectedAgentUUID:         strings.TrimSpace(cfg.ExpectedAgentUUID),
+		testedAgentUUIDs:          make(map[string]struct{}),
+		testedShellcodes:          make(map[string]struct{}),
 	}
 	if e.logf == nil {
 		e.logf = func(logging.Class, string, ...any) {}
@@ -497,12 +508,6 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 	switch {
 	case err == nil:
 		e.last = &baseline
-		if e.dynamicEnabled() {
-			if e.expectedAgentUUID != "" {
-				e.testedAgentUUIDs[e.expectedAgentUUID] = struct{}{}
-			}
-			e.testedShellcodes[e.activeShellcode()] = struct{}{}
-		}
 	case errors.Is(err, ErrCycleBudgetExhausted):
 		return nil, err
 	case ctx.Err() != nil:
@@ -1103,6 +1108,13 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 	if _, err := e.waitSandbox(cycleCtx); err != nil {
 		return Cycle{}, err
 	}
+	if e.dynamicEnabled() {
+		// TOFU pins the first key per UUID. The host rotates the agent before
+		// reusing a shellcode instead of letting the C2 reject the check-in.
+		if err := e.ensureFreshAgent(cycleCtx); err != nil {
+			return Cycle{}, err
+		}
+	}
 
 	shellcode := e.activeShellcode()
 	flags := map[string]string{
@@ -1165,6 +1177,11 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 	parentKey := ""
 	if e.last != nil {
 		parentKey = e.last.PayloadKey
+	}
+	if dynamic || edr {
+		// Record the attempt before detonation: even a failed run has spent
+		// this agent identity, so the next cycle must rotate it.
+		e.markActiveAgentUsed()
 	}
 	// Watch the C2 while the payload runs. A sandbox beacon can check in and
 	// die before the post-run AgentStatus poll; seeing it once is proof that
@@ -1919,25 +1936,9 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 			if err := e.cyclePreconditions(mechanism); err != nil {
 				return tool.Errorf(fmt.Sprintf("%v", err)), nil
 			}
-			if e.dynamicEnabled() && e.cfg.BuildAgent != nil {
-				if _, used := e.testedShellcodes[e.activeShellcode()]; used {
-					return tool.Errorf("this shellcode has already run; call GenerateAgent for a fresh UUID and BuildShellcode before DetectionCycle"), nil
-				}
-				if e.expectedAgentUUID != "" {
-					if _, used := e.testedAgentUUIDs[e.expectedAgentUUID]; used {
-						return tool.Errorf("agent UUID " + e.expectedAgentUUID + " has already run; TOFU rejects key rotation on reuse. Call GenerateAgent for a fresh UUID and BuildShellcode before DetectionCycle"), nil
-					}
-				}
-			}
 			cycle, err := e.runCycle(ctx, clip(args.Note, 500), mechanism, clip(args.Prediction, 500))
 			if err != nil {
 				return tool.Errorf(fmt.Sprintf("%v", err)), nil
-			}
-			if e.dynamicEnabled() && e.cfg.BuildAgent != nil {
-				if e.expectedAgentUUID != "" {
-					e.testedAgentUUIDs[e.expectedAgentUUID] = struct{}{}
-				}
-				e.testedShellcodes[e.activeShellcode()] = struct{}{}
 			}
 			edits, _ := e.db.EditsForPayload(ctx, cycle.PayloadKey)
 			payload, _ := e.db.PayloadByKey(ctx, cycle.PayloadKey)
@@ -2502,13 +2503,15 @@ Work loop:
    agent: do not shrink the active shellcode or build a loader that skips the
    payload. The host rejects a cycle whose artifact is too small to contain the
    active shellcode.
-4. Every dynamic cycle needs a fresh agent identity and shellcode. The C2 pins
+  4. Every dynamic cycle needs a fresh agent identity and shellcode. The C2 pins
    the first public key per agent UUID (TOFU); re-running a payload whose UUID
-   already checked in is rejected as a key rotation. Call GenerateAgent for a
-   new UUID and then BuildShellcode before DetectionCycle; never reuse a
-   shellcode that a previous cycle already ran. GenerateAgent forgets the
-   previous test agent automatically; CleanupAgent is the explicit form. Static
-   analyses may reuse a payload, but a dynamic run must not.
+   already checked in is rejected as a key rotation. The host enforces this
+   before a cycle that would reuse the active shellcode or UUID: it builds a
+   new agent, wraps it with the active producer, forgets the previous UUID, and
+   deletes the old files. Call GenerateAgent and then BuildShellcode when you
+   want to choose the agent type, wrapper, or producer options yourself; never
+   reuse a shellcode that a previous cycle already ran. Static analyses may
+   reuse a payload, but a dynamic run must not.
 5. Call DetectionCycle with the mechanism under test. It rebuilds from the
    current source and returns a bounded summary, the new payload key, the active
    shellcode, and the remaining cycle budget. Do not exceed the budget. An

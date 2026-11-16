@@ -65,94 +65,13 @@ func (e *evolver) buildShellcodeTool() tool.CoreTool {
 			if err := json.Unmarshal(raw, &args); err != nil {
 				return tool.Errorf("invalid arguments"), nil
 			}
-			producer, dir, err := e.producer(args.Producer)
+			artifact, flags, buildLog, err := e.buildShellcodeWithProducer(ctx, args.Producer, args.Options, args.Note)
 			if err != nil {
 				return tool.Errorf(fmt.Sprintf("%v", err)), nil
 			}
-			configs, err := modconfig.ReadConfigs(filepath.Join(dir, "config.json"))
-			if err != nil {
-				return tool.Errorf(fmt.Sprintf("read %s module config: %v", producer, err)), nil
-			}
-			var options def.ModOptions
-			for _, cfg := range configs {
-				if cfg != nil && strings.EqualFold(cfg.Name, producer) {
-					options = cfg.Options
-					break
-				}
-			}
-			if options == nil {
-				return tool.Errorf(fmt.Sprintf("%s is not defined in %s/config.json", producer, dir)), nil
-			}
-			inputName, err := producerInputName(producer, options)
-			if err != nil {
-				return tool.Errorf(fmt.Sprintf("%v", err)), nil
-			}
-			flags, err := validateProducerOptions(producer, options, args.Options, inputName)
-			if err != nil {
-				return tool.Errorf(fmt.Sprintf("%v", err)), nil
-			}
-			payloadDir, err := filepath.Abs(e.payloadDir())
-			if err != nil {
-				return tool.Errorf(fmt.Sprintf("resolve payload directory: %v", err)), nil
-			}
-			for name, value := range flags {
-				if err := validateProducerPathOption(name, value, payloadDir); err != nil {
-					return tool.Errorf(fmt.Sprintf("%v", err)), nil
-				}
-			}
-			input, err := e.producerInput(producer, inputName, flags[inputName])
-			if err != nil {
-				return tool.Errorf(fmt.Sprintf("%v", err)), nil
-			}
-			flags[inputName] = input
-			e.shellSeq++
-			outDir := filepath.Join(e.cfg.StoreRoot, "shellcode", sanitizeName(e.cfg.LoopID))
-			if err := os.MkdirAll(outDir, 0o700); err != nil {
-				return tool.Errorf(fmt.Sprintf("create shellcode directory: %v", err)), nil
-			}
-			output := filepath.Join(outDir, fmt.Sprintf("%s-%d.bin", producer, e.shellSeq))
-			flags["output"] = output
-			e.logClass(logging.ClassBuild, "producer %s: building %s -> %s", producer, input, output)
-			build := e.cfg.BuildProducer
-			if build == nil {
-				build = modules.BuildLocalModuleAt
-			}
-			buildLog, buildErr := build(dir, producer, flags)
-			if len(buildLog) > maxEvolveBuildLog {
-				buildLog = buildLog[:maxEvolveBuildLog] + "\n[build log truncated]\n"
-			}
-			e.logClass(logging.ClassBuild, "%s", buildLog)
-			if buildErr != nil {
-				return tool.Errorf(fmt.Sprintf("producer %s build failed: %v", producer, buildErr)), nil
-			}
-			artifact, err := producerArtifact(buildLog, output)
-			if err != nil {
-				return tool.Errorf(fmt.Sprintf("%v", err)), nil
-			}
-			if artifact.Size < minAgentShellcodeBytes {
-				return tool.Errorf(fmt.Sprintf("producer output is only %d bytes; a real agent shellcode is larger", artifact.Size)), nil
-			}
-			if err := ensureWithin(filepath.Join(e.cfg.StoreRoot, "shellcode"), artifact.Path); err != nil {
-				return tool.Errorf("producer output escapes the detection store"), nil
-			}
-			if err := e.saveShellcode(ctx, producer, artifact, flags, args.Note); err != nil {
-				return tool.Errorf(fmt.Sprintf("record shellcode: %v", err)), nil
-			}
-			oldShellcode := e.shellcode
-			e.shellcode = artifact.Path
-			// Generated shellcodes are per-cycle artifacts; keeping them grows
-			// the detection store by a full agent image every cycle.
-			shellcodeRoot := filepath.Join(e.cfg.StoreRoot, "shellcode")
-			if oldShellcode != "" && oldShellcode != artifact.Path &&
-				ensureWithin(shellcodeRoot, oldShellcode) == nil {
-				if removeErr := os.Remove(oldShellcode); removeErr != nil && !os.IsNotExist(removeErr) {
-					e.logClass(logging.ClassWarning, "remove previous shellcode %s: %v", oldShellcode, removeErr)
-				}
-			}
-			e.activeProducer = producer
 			e.progress++
 			out := map[string]any{
-				"producer":   producer,
+				"producer":   e.activeProducer,
 				"path":       artifact.Path,
 				"sha256":     artifact.SHA256,
 				"size":       artifact.Size,
@@ -260,12 +179,13 @@ func validateProducerPathOption(name, value, baseDir string) error {
 	return nil
 }
 
-// producerInput validates the input PE. The seed agent executable next to the
-// operator shellcode is the only default, so the model cannot point a producer
-// at an arbitrary file.
+// producerInput validates the input PE. The host-built agent is the only
+// default, so the model cannot point a producer at an arbitrary file.
 func (e *evolver) producerInput(producer, inputName, value string) (string, error) {
 	input := strings.TrimSpace(value)
-	if input == "" && producer == "donut" {
+	if input == "" {
+		// Rotation and the default producer run use the agent the host just
+		// built. A producer that needs a DLL gets the same artifact.
 		input = e.agentArtifact
 		if input == "" {
 			input = strings.TrimSuffix(e.activeShellcode(), ".bin")
@@ -341,6 +261,90 @@ func producerArtifact(buildLog, want string) (Artifact, error) {
 	}
 	artifact.Kind = "shellcode"
 	return artifact, nil
+}
+
+// buildShellcodeWithProducer validates the producer options, runs the
+// producer, records the output, and makes it the active shellcode. The model
+// tool and automatic agent rotation share this path.
+func (e *evolver) buildShellcodeWithProducer(ctx context.Context, producerName string, supplied map[string]string, note string) (Artifact, map[string]string, string, error) {
+	producer, dir, err := e.producer(producerName)
+	if err != nil {
+		return Artifact{}, nil, "", err
+	}
+	configs, err := modconfig.ReadConfigs(filepath.Join(dir, "config.json"))
+	if err != nil {
+		return Artifact{}, nil, "", fmt.Errorf("read %s module config: %w", producer, err)
+	}
+	var options def.ModOptions
+	for _, cfg := range configs {
+		if cfg != nil && strings.EqualFold(cfg.Name, producer) {
+			options = cfg.Options
+			break
+		}
+	}
+	if options == nil {
+		return Artifact{}, nil, "", fmt.Errorf("%s is not defined in %s/config.json", producer, dir)
+	}
+	inputName, err := producerInputName(producer, options)
+	if err != nil {
+		return Artifact{}, nil, "", err
+	}
+	flags, err := validateProducerOptions(producer, options, supplied, inputName)
+	if err != nil {
+		return Artifact{}, nil, "", err
+	}
+	payloadDir, err := filepath.Abs(e.payloadDir())
+	if err != nil {
+		return Artifact{}, nil, "", fmt.Errorf("resolve payload directory: %w", err)
+	}
+	for name, value := range flags {
+		if err := validateProducerPathOption(name, value, payloadDir); err != nil {
+			return Artifact{}, nil, "", err
+		}
+	}
+	input, err := e.producerInput(producer, inputName, flags[inputName])
+	if err != nil {
+		return Artifact{}, nil, "", err
+	}
+	flags[inputName] = input
+	e.shellSeq++
+	outDir := filepath.Join(e.cfg.StoreRoot, "shellcode", sanitizeName(e.cfg.LoopID))
+	if err := os.MkdirAll(outDir, 0o700); err != nil {
+		return Artifact{}, nil, "", fmt.Errorf("create shellcode directory: %w", err)
+	}
+	output := filepath.Join(outDir, fmt.Sprintf("%s-%d.bin", producer, e.shellSeq))
+	flags["output"] = output
+	e.logClass(logging.ClassBuild, "producer %s: building %s -> %s", producer, input, output)
+	build := e.cfg.BuildProducer
+	if build == nil {
+		build = modules.BuildLocalModuleAt
+	}
+	buildLog, buildErr := build(dir, producer, flags)
+	if len(buildLog) > maxEvolveBuildLog {
+		buildLog = buildLog[:maxEvolveBuildLog] + "\n[build log truncated]\n"
+	}
+	e.logClass(logging.ClassBuild, "%s", buildLog)
+	if buildErr != nil {
+		return Artifact{}, nil, buildLog, fmt.Errorf("producer %s build failed: %w", producer, buildErr)
+	}
+	artifact, err := producerArtifact(buildLog, output)
+	if err != nil {
+		return Artifact{}, nil, buildLog, err
+	}
+	if artifact.Size < minAgentShellcodeBytes {
+		return Artifact{}, nil, buildLog, fmt.Errorf("producer output is only %d bytes; a real agent shellcode is larger", artifact.Size)
+	}
+	if err := ensureWithin(filepath.Join(e.cfg.StoreRoot, "shellcode"), artifact.Path); err != nil {
+		return Artifact{}, nil, buildLog, fmt.Errorf("producer output escapes the detection store")
+	}
+	if err := e.saveShellcode(ctx, producer, artifact, flags, note); err != nil {
+		return Artifact{}, nil, buildLog, fmt.Errorf("record shellcode: %w", err)
+	}
+	oldShellcode := e.shellcode
+	e.shellcode = artifact.Path
+	e.cleanupShellcode(oldShellcode)
+	e.activeProducer = producer
+	return artifact, flags, buildLog, nil
 }
 
 func (e *evolver) saveShellcode(ctx context.Context, producer string, artifact Artifact, options map[string]string, note string) error {

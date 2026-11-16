@@ -520,6 +520,83 @@ func TestEvolveSendsBaselineFailureToModel(t *testing.T) {
 	t.Fatalf("model output was not logged after the baseline failure: %v", classes)
 }
 
+func TestEnsureFreshAgentRotatesAndCleansOldFiles(t *testing.T) {
+	workspace := t.TempDir()
+	storeRoot := filepath.Join(workspace, "detection")
+	if err := os.MkdirAll(storeRoot, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	oldShellcode := filepath.Join(workspace, "old-agent.exe.bin")
+	oldArtifact := filepath.Join(workspace, "old-agent.exe")
+	if err := os.WriteFile(oldShellcode, []byte(strings.Repeat("S", 40000)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(oldArtifact, []byte(strings.Repeat("A", 40000)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	producerDir := t.TempDir()
+	config := `[{"name":"donut","build":"bash ./build.sh","is_local":true,"parameters":[
+		{"name":"input","type":"string","required":true},
+		{"name":"output","type":"string"}]}]`
+	if err := os.WriteFile(filepath.Join(producerDir, "config.json"), []byte(config), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	verify := &stubVerifyOps{}
+	e := &evolver{
+		cfg: EvolveConfig{
+			LoopID: "loop-test", Module: "loader_windows", ModuleDir: t.TempDir(),
+			Shellcode: oldShellcode, InitialAgentArtifact: oldArtifact,
+			InitialShellcodeGenerated: true,
+			StoreRoot:                 storeRoot, AgentType: "windows_executable",
+			ProducerDirs: map[string]string{"donut": producerDir},
+			BuildProducer: func(_ string, _ string, flags map[string]string) (string, error) {
+				out := flags["output"]
+				if err := os.WriteFile(out, []byte(strings.Repeat("P", 40000)), 0o600); err != nil {
+					return "", err
+				}
+				return fmt.Sprintf("[+] generated payload: %s (40000 bytes)\n", out), nil
+			},
+			BuildAgent: func(AgentBuildOptions) (*AgentBuildResult, error) {
+				path := filepath.Join(workspace, "new-agent.exe")
+				if err := os.WriteFile(path, []byte(strings.Repeat("N", 40000)), 0o600); err != nil {
+					return nil, err
+				}
+				return &AgentBuildResult{ArtifactPath: path, AgentUUID: "new-uuid", Size: 40000}, nil
+			},
+			Verify: verify,
+		},
+		logf:                      func(logging.Class, string, ...any) {},
+		shellcode:                 oldShellcode,
+		agentArtifact:             oldArtifact,
+		initialShellcodeGenerated: true,
+		activeProducer:            "donut",
+		expectedAgentUUID:         "old-uuid",
+		testedShellcodes:          map[string]struct{}{oldShellcode: {}},
+		testedAgentUUIDs:          map[string]struct{}{"old-uuid": {}},
+	}
+	if err := e.ensureFreshAgent(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if e.expectedAgentUUID != "new-uuid" || e.agentArtifact == oldArtifact || e.shellcode == oldShellcode {
+		t.Fatalf("agent was not rotated: uuid=%s artifact=%s shellcode=%s", e.expectedAgentUUID, e.agentArtifact, e.shellcode)
+	}
+	if len(verify.forgetCalls) != 1 || verify.forgetCalls[0] != "old-uuid" {
+		t.Fatalf("old UUID was not forgotten: %v", verify.forgetCalls)
+	}
+	if _, err := os.Stat(oldShellcode); !os.IsNotExist(err) {
+		t.Fatalf("old shellcode still exists: %v", err)
+	}
+	if _, err := os.Stat(oldArtifact); !os.IsNotExist(err) {
+		t.Fatalf("old agent artifact still exists: %v", err)
+	}
+	if _, err := os.Stat(e.shellcode); err != nil {
+		t.Fatalf("new shellcode missing: %v", err)
+	}
+	if _, err := os.Stat(e.agentArtifact); err != nil {
+		t.Fatalf("new agent artifact missing: %v", err)
+	}
+}
+
 func TestCheckExecutionHonorsOnlineLatch(t *testing.T) {
 	e := &evolver{
 		cfg:               EvolveConfig{Verify: &stubVerifyOps{offline: true}},

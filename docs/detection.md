@@ -97,12 +97,15 @@ use the console's existing C2 connection. The loop then runs:
    new attempt's prompt carries the prior attempts' last eight cycles, final
    answer and residuals, pending source edits, last executing payload, and
    source-tree hash;
-5. for every dynamic cycle, call `GenerateAgent` and then `BuildShellcode` to
-   create a fresh agent UUID and shellcode. The C2 pins the first key for each
-   UUID (TOFU), so reusing a UUID is rejected as key rotation. `GenerateAgent`
-   forgets the previous test agent, and `BuildShellcode` removes the
-   superseded generated shellcode. `CleanupAgent` is the explicit cleanup
-   tool;
+5. for every dynamic cycle, use a fresh agent UUID and shellcode. The C2 pins
+   the first key for each UUID (TOFU), so reusing a UUID is rejected as key
+   rotation. The host enforces the rotation: before a cycle would reuse the
+   active shellcode or UUID, it builds a new agent, wraps it with the active
+   producer, forgets the previous UUID, and deletes the superseded agent
+   executable and shellcode. The model may still call `GenerateAgent` and then
+   `BuildShellcode` to choose the agent type, wrapper, or options explicitly.
+   `CleanupAgent` is the explicit cleanup tool. Loop logs, reports, the
+   telemetry database, and the knowledge cache are kept;
 6. scope every C2 tool to the loop's own agent. `AgentStatus` checks only the
    expected UUID, `CleanupAgent` forgets only that UUID, and `RunModule` runs
    only the `whoami` verification BOF with no options. Denials and dispatches

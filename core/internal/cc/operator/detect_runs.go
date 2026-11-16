@@ -323,12 +323,14 @@ func runDetectLoop(run *detectRun, opts detectLoopOptions, shellcode string) {
 			}
 			logf("payload verification failed; restarting loop with a fresh agent (attempt %d/3)", attempt)
 			forgetLoopAgent(lastAgent)
-			nextShellcode, producer, agentType, agentUUID, genErr := generateAgentShellcode(currentOpts, logf)
+			nextShellcode, agentArtifact, producer, agentType, agentUUID, genErr := generateAgentShellcode(currentOpts, logf)
 			if genErr != nil {
 				run.setError(fmt.Errorf("restart shellcode generation: %w", genErr))
 				break
 			}
 			currentShellcode = nextShellcode
+			currentOpts.AgentArtifact = agentArtifact
+			currentOpts.ShellcodeGenerated = true
 			currentOpts.AgentType = agentType
 			currentOpts.ShellcodeProducer = producer
 			currentOpts.AgentUUID = agentUUID
@@ -341,9 +343,11 @@ func runDetectLoop(run *detectRun, opts detectLoopOptions, shellcode string) {
 		cfg := detection.EvolveConfig{
 			LoopID: currentID, BaseLoopID: baseID, Attempt: attempt,
 			Module: "loader_windows", ModuleDir: currentOpts.ModuleDir,
-			Shellcode: currentShellcode, SandboxURL: currentOpts.Sandbox,
-			StoreRoot: filepath.Join(live.EmpWorkSpace, "detection"),
-			Process:   currentOpts.Process, Format: currentOpts.Format,
+			Shellcode: currentShellcode, InitialAgentArtifact: currentOpts.AgentArtifact,
+			InitialShellcodeGenerated: currentOpts.ShellcodeGenerated,
+			SandboxURL:                currentOpts.Sandbox,
+			StoreRoot:                 filepath.Join(live.EmpWorkSpace, "detection"),
+			Process:                   currentOpts.Process, Format: currentOpts.Format,
 			Inject: currentOpts.Inject, SMW: currentOpts.SMW,
 			ProducerDirs: producers, InitialProducer: currentOpts.ShellcodeProducer,
 			ReadRoots: currentOpts.ReadRoots, KnowledgePath: currentOpts.Knowledge,

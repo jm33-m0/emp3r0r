@@ -102,6 +102,7 @@ func (e *evolver) generateAgentTool() tool.CoreTool {
 			if err != nil {
 				return tool.Errorf(fmt.Sprintf("inspect agent artifact: %v", err)), nil
 			}
+			oldArtifact := e.agentArtifact
 			e.agentArtifact = artifact
 			e.cfg.AgentType = agentType
 			e.cfg.AgentArch = arch
@@ -110,8 +111,11 @@ func (e *evolver) generateAgentTool() tool.CoreTool {
 			if old := e.expectedAgentUUID; old != "" && old != result.AgentUUID {
 				if forgetErr := e.forgetAgent(ctx, old); forgetErr != nil {
 					e.logClass(logging.ClassWarning, "forget previous agent %s: %v", old, forgetErr)
+				} else {
+					e.audit("cleanup_agent", old, "agent rotation")
 				}
 			}
+			e.cleanupAgentArtifact(oldArtifact)
 			if result.AgentUUID != "" {
 				e.expectedAgentUUID = result.AgentUUID
 			}

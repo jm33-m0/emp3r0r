@@ -273,6 +273,12 @@ sandbox run, so use detect_loop stop for immediate termination.`,
 type detectLoopOptions struct {
 	ModuleDir string
 	Shellcode string
+	// AgentArtifact is the agent executable or DLL wrapped into Shellcode.
+	// The loop deletes it when it rotates the test agent.
+	AgentArtifact string
+	// ShellcodeGenerated marks Shellcode as a loop artifact, not an
+	// operator-supplied file, so rotation may delete it.
+	ShellcodeGenerated bool
 	// ShellcodeProducer is the module that generated Shellcode when the
 	// parent process built it, so the loop can tell the model which
 	// producer source describes the blob.
@@ -419,7 +425,7 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 		shellcode := strings.TrimSpace(opts.Shellcode)
 		if shellcode == "" {
 			logf("generating real Go agent shellcode (%s/%s)", opts.AgentType, opts.Arch)
-			generated, producer, agentType, agentUUID, genErr := generateAgentShellcode(opts, logf)
+			generated, agentArtifact, producer, agentType, agentUUID, genErr := generateAgentShellcode(opts, logf)
 			if genErr != nil {
 				logf("shellcode generation failed: %v", genErr)
 				run.setError(genErr)
@@ -427,6 +433,8 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 				return
 			}
 			shellcode = generated
+			opts.AgentArtifact = agentArtifact
+			opts.ShellcodeGenerated = true
 			opts.AgentType = agentType
 			opts.ShellcodeProducer = producer
 			opts.AgentUUID = agentUUID
@@ -469,14 +477,14 @@ func loopC2Address(configured string) string {
 	return configured
 }
 
-func generateAgentShellcode(opts detectLoopOptions, logf func(string, ...any)) (string, string, string, string, error) {
+func generateAgentShellcode(opts detectLoopOptions, logf func(string, ...any)) (shellcode, agentArtifact, producer, agentType, agentUUID string, err error) {
 	producers, err := detection.ParseProducerDirs(opts.Producers)
 	if err != nil {
-		return "", "", "", "", err
+		return "", "", "", "", "", err
 	}
 	producer, producerDir, agentType := chooseShellcodeProducer(producers, opts.AgentType)
 	if producer == "" {
-		return "", "", "", "", fmt.Errorf("no shellcode producer configured for agent type %s; pass --shellcode or add a matching --producer entry", opts.AgentType)
+		return "", "", "", "", "", fmt.Errorf("no shellcode producer configured for agent type %s; pass --shellcode or add a matching --producer entry", opts.AgentType)
 	}
 	agentCfg := builder.AgentConfig{}
 	if strings.TrimSpace(opts.CC) != "" {
@@ -494,10 +502,10 @@ func generateAgentShellcode(opts detectLoopOptions, logf func(string, ...any)) (
 	}
 	generationMu.Unlock()
 	if err != nil {
-		return "", "", "", "", err
+		return "", "", "", "", "", err
 	}
 	if result == nil || strings.TrimSpace(result.OutputFile) == "" {
-		return "", "", "", "", fmt.Errorf("agent build produced no artifact")
+		return "", "", "", "", "", fmt.Errorf("agent build produced no artifact")
 	}
 
 	flags := map[string]string{"output": result.OutputFile + "." + producerShellcodeExt(producer)}
@@ -507,17 +515,17 @@ func generateAgentShellcode(opts detectLoopOptions, logf func(string, ...any)) (
 	case "donut":
 		flags["input"] = result.OutputFile
 	default:
-		return "", "", "", "", fmt.Errorf("producer %q has no agent wrapper", producer)
+		return "", "", "", "", "", fmt.Errorf("producer %q has no agent wrapper", producer)
 	}
 	buildLog, err := modules.BuildLocalModuleAt(producerDir, producer, flags)
 	if err != nil {
-		return "", "", "", "", fmt.Errorf("%s producer: %w\n%s", producer, err, lastLogLines(buildLog, 20))
+		return "", "", "", "", "", fmt.Errorf("%s producer: %w\n%s", producer, err, lastLogLines(buildLog, 20))
 	}
 	payloads := detection.ParseGeneratedPayloads(buildLog)
 	if len(payloads) == 0 {
-		return "", "", "", "", fmt.Errorf("%s producer did not report a generated payload", producer)
+		return "", "", "", "", "", fmt.Errorf("%s producer did not report a generated payload", producer)
 	}
-	return payloads[len(payloads)-1].Path, producer, agentType, result.AgentUUID, nil
+	return payloads[len(payloads)-1].Path, result.OutputFile, producer, agentType, result.AgentUUID, nil
 }
 
 // chooseShellcodeProducer maps an agent type to a producer: donut wraps a
