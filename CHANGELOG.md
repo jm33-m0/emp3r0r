@@ -1,5 +1,26 @@
 # Changelog
 
+## [5.9.1](https://github.com/jm33-m0/emp3r0r/compare/v5.9.0...v5.9.1) (2026-11-16)
+
+
+### Bug Fixes
+
+* **evasion:** add configurable timeouts and caps ([61fb224](https://github.com/jm33-m0/emp3r0r/commit/61fb224ad16f14d385044bb41eea27753a1634c1))
+* **evasion:** all ETW/ETW-TI telemetry categoried as noise ([829c4e0](https://github.com/jm33-m0/emp3r0r/commit/829c4e0041df110358dc2cd306128837105d8c7e))
+* **evasion:** cycle timeout not respected by the model ([7265b5b](https://github.com/jm33-m0/emp3r0r/commit/7265b5b8c5c92f8805dd95cfb2c4c3ad6a7bd640))
+* **evasion:** force end cycle after timeout ([97ee178](https://github.com/jm33-m0/emp3r0r/commit/97ee178cdc62e8c7cd89bdfabf19da93b75acf9e))
+* **evasion:** ignore runtime noise ([fb309df](https://github.com/jm33-m0/emp3r0r/commit/fb309df63c6896c323ec515ecf89c20336b187cb))
+* **evasion:** log errors in red; edit failure ([de87f30](https://github.com/jm33-m0/emp3r0r/commit/de87f3066e13ceda236112d43578ba78d3ccc662))
+* **evasion:** make model progress-aware ([88e6602](https://github.com/jm33-m0/emp3r0r/commit/88e6602f6c1c76f22b43f601648cdc21c2d03c1d))
+* **evasion:** re-generate agent payload for each cycle ([39380d2](https://github.com/jm33-m0/emp3r0r/commit/39380d2c541c11e6e56acc9fbedb4b3e74c19ac3))
+* **evasion:** remove caps and allow users to define their own ([06235a3](https://github.com/jm33-m0/emp3r0r/commit/06235a36231b173718c72d298c7d9d52219ce92a))
+* **evasion:** remove nonsense retries ([ce0d9f2](https://github.com/jm33-m0/emp3r0r/commit/ce0d9f2a6911132b682e9c6b640df0d654eff4e6))
+* **evasion:** remove nonsense tool blocking ([1fa24a5](https://github.com/jm33-m0/emp3r0r/commit/1fa24a5e8b54940eae463a27151393b7918e09db))
+* **evasion:** verify beacon health after each cycle ([9b8220a](https://github.com/jm33-m0/emp3r0r/commit/9b8220a900775b2849d3982d63980bdd62fbed7d))
+* improve logging and store progress in db ([57402e7](https://github.com/jm33-m0/emp3r0r/commit/57402e76a3bb9a3b3738cfaced04fd54eeea060b))
+* in-process `detect_loop` ([3b75901](https://github.com/jm33-m0/emp3r0r/commit/3b7590144672545cc55bdfc290f1dfa2acd0b936))
+* **kb:** kb content not read ([8f0525f](https://github.com/jm33-m0/emp3r0r/commit/8f0525fbac2f0c97e041c36d31e62fd401d4e9d7))
+
 ## [5.9.0](https://github.com/jm33-m0/emp3r0r/compare/v5.8.2...v5.9.0) (2026-11-15)
 
 
