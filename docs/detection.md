@@ -358,10 +358,18 @@ operation, source coverage, payload attribution, and a signal class:
 
 - `payload_role`: `payload`, `payload-child`, `payload-target`, `payload-scan`,
   `ambient`, or `unknown`.
-- `signal`: `signal`, `verdict`, `scan`, `info`, `baseline`, or `noise`.
+- `signal`: `signal`, `verdict`, `scan`, `info`, `unattributed`, `baseline`, or
+  `noise`.
 - Ambient instrument images such as `RedEdrDll.dll`, `LitterBox\Scanners`, and
   MSVC runtimes are stored as `signal=noise`. The feedback view and the
   actionable-finding check skip them, so they cannot trigger another cycle.
+- An event whose payload attribution failed but whose operation is
+  high-value—ETW-TI memory write/protect/map/allocate or process creation—is
+  stored as `signal=unattributed`, not `noise`. Unattributed ETW-TI memory
+  operations produce low-severity `telemetry/unattributed-etwti` findings with
+  the operation, protection, region count, largest size, and PID, and
+  unattributed process creation produces `telemetry/unattributed-process`. The
+  loop can therefore inspect them even when the trace has no payload PEB.
 - `category`: `process`, `image`, `module`, `file`, `network`, `audit`, `thread`,
   `defender`, `query`, `hook`, `memory` (ETW-TI), `analysis`, or `other`.
 

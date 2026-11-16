@@ -245,9 +245,33 @@ func classifyTelemetryEvent(event *telemetryEvent, payloadPID int64, payloadImag
 		event.Role = telemetryRole(event, payloadPID, payloadImage, children)
 	}
 	event.Signal = telemetrySignal(event, payloadPID, payloadImage)
-	if (event.Role == "ambient" || event.Role == "unknown") && event.Signal != "verdict" {
+	switch {
+	case event.Signal == "verdict":
+		// A verdict is actionable even when it came from an ambient engine.
+	case event.Role == "unknown" && event.Signal == "signal" && isUnattributedEvidence(event):
+		// Attribution failed, but the operation itself is high-value. Keep it
+		// visible as unattributed evidence instead of discarding it as noise.
+		event.Signal = "unattributed"
+	case event.Role == "ambient" || event.Role == "unknown":
 		event.Signal = "noise"
 	}
+}
+
+// isUnattributedEvidence reports whether an event with no payload attribution
+// is still specific enough to surface. These are the operations a sandbox
+// baseline or an ambient scanner is unlikely to perform continuously, so a
+// payload that performs them is worth inspecting even without a payload PEB.
+func isUnattributedEvidence(event *telemetryEvent) bool {
+	switch event.Category {
+	case "memory":
+		switch event.Operation {
+		case "write", "protect", "map", "alloc", "allocate":
+			return true
+		}
+	case "process":
+		return event.Operation == "create"
+	}
+	return false
 }
 
 func telemetryRole(event *telemetryEvent, payloadPID int64, payloadImage string, children map[int64]bool) string {
@@ -1083,8 +1107,8 @@ func (t *TelemetryDB) Stats(ctx context.Context, traceID int64) (TelemetryStats,
 		Scan(&stats.Events, &stats.Findings); err != nil {
 		return TelemetryStats{}, fmt.Errorf("load trace stats: %w", err)
 	}
-	counts, err := t.rows(ctx, `SELECT payload_role, signal, category, count(*) AS n
-		FROM events WHERE trace_pk = ? GROUP BY payload_role, signal, category`, traceID)
+	counts, err := t.rows(ctx, `SELECT payload_role, signal, category, provider, count(*) AS n
+		FROM events WHERE trace_pk = ? GROUP BY payload_role, signal, category, provider`, traceID)
 	if err != nil {
 		return TelemetryStats{}, err
 	}
@@ -1097,8 +1121,14 @@ func (t *TelemetryDB) Stats(ctx context.Context, traceID int64) (TelemetryStats,
 		case "payload", "payload-child":
 			stats.PayloadEvents += int(count)
 		}
-		if row.string("signal") == "signal" {
+		switch row.string("signal") {
+		case "signal":
 			stats.SignalEvents += int(count)
+		case "unattributed":
+			stats.UnattributedEvents += int(count)
+			if strings.Contains(row.string("provider"), "Threat-Intelligence") {
+				stats.ETWTIUnattributed += int(count)
+			}
 		}
 	}
 	findings, err := t.rows(ctx, `SELECT severity, rule, count(*) AS n

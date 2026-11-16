@@ -862,3 +862,113 @@ func TestImportSandboxKeepsAnalyzerAttrsValid(t *testing.T) {
 		t.Fatal("analysis attrs was truncated")
 	}
 }
+
+func TestTelemetryUnattributedETWTIIsEvidence(t *testing.T) {
+	const fixture = `[
+ {"type":"etw","event":"KERNEL_THREATINT_TASK_PROTECTVM",
+  "etw_provider_name":"Microsoft-Windows-Threat-Intelligence",
+  "callingprocessid":1968,"targetprocessid":1968,
+  "protectionmask":"R-X","regionsize":3783245,
+  "event_time":134382680150000000},
+ {"type":"etw","event":"KERNEL_THREATINT_TASK_PROTECTVM",
+  "etw_provider_name":"Microsoft-Windows-Threat-Intelligence",
+  "callingprocessid":1968,"targetprocessid":1968,
+  "protectionmask":"RWX","regionsize":64,
+  "event_time":134382680160000000},
+ {"type":"etw","event":"KERNEL_THREATINT_TASK_PROTECTVM",
+  "etw_provider_name":"Microsoft-Windows-Threat-Intelligence",
+  "callingprocessid":2000,"targetprocessid":2000,
+  "protectionmask":"R-X","regionsize":100,
+  "event_time":134382680165000000},
+ {"type":"etw","event":"KERNEL_THREATINT_TASK_MAPVIEW",
+  "etw_provider_name":"Microsoft-Windows-Threat-Intelligence",
+  "callingprocessid":1968,"targetprocessid":1968,
+  "protectionmask":"EXECUTE_WRITECOPY","regionsize":43278336,
+  "event_time":134382680170000000},
+ {"type":"etw","event":"KERNEL_THREATINT_TASK_ALLOCVM",
+  "etw_provider_name":"Microsoft-Windows-Threat-Intelligence",
+  "callingprocessid":1968,"targetprocessid":1968,
+  "protectionmask":"RWX","regionsize":4096,
+  "event_time":134382680180000000},
+ {"type":"etw","event":"ProcessStartStart ",
+  "etw_provider_name":"Microsoft-Windows-Kernel-Process",
+  "etw_pid":1968,"processid":4000,"parentprocessid":1968,
+  "imagename":"\\Device\\HarddiskVolume3\\Users\\Public\\spawn.exe",
+  "event_time":134382680190000000},
+ {"type":"etw","event":"ProcessStartStart ",
+  "etw_provider_name":"Microsoft-Windows-Kernel-Process",
+  "etw_pid":1968,"processid":4000,"parentprocessid":1968,
+  "imagename":"\\Device\\HarddiskVolume3\\Users\\Public\\spawn2.exe",
+  "commandline":"spawn2.exe -x",
+  "event_time":134382680200000000}
+]`
+	db := openTestTelemetry(t)
+	trace, err := db.Import(context.Background(), []byte(fixture), ImportOptions{
+		RunID: "loader_windows-cafe0000", Module: "loader_windows", ArtifactSHA256: "cafe",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var signals, unattributed int
+	if err := db.db.QueryRow(`SELECT
+		sum(CASE WHEN signal='signal' THEN 1 ELSE 0 END),
+		sum(CASE WHEN signal='unattributed' THEN 1 ELSE 0 END)
+		FROM events WHERE trace_pk = ?`, trace.ID).Scan(&signals, &unattributed); err != nil {
+		t.Fatal(err)
+	}
+	if unattributed != 7 || signals != 0 {
+		t.Fatalf("signals=%d unattributed=%d", signals, unattributed)
+	}
+	stats, err := db.Stats(context.Background(), trace.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stats.UnattributedEvents != 7 || stats.ETWTIUnattributed != 5 {
+		t.Fatalf("stats = %+v", stats)
+	}
+	findings, err := db.Findings(context.Background(), trace.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found, largest, allocateFinding, otherPID := false, false, false, false
+	processFindings := 0
+	for _, finding := range findings {
+		if finding.Rule == "telemetry/unattributed-process" {
+			processFindings++
+			if finding.Signal != "unattributed" || finding.Severity != "low" {
+				t.Fatalf("process finding = %+v", finding)
+			}
+			continue
+		}
+		if finding.Rule != "telemetry/unattributed-etwti" {
+			continue
+		}
+		found = true
+		if finding.Signal != "unattributed" || finding.Severity != "low" {
+			t.Fatalf("finding = %+v", finding)
+		}
+		if strings.Contains(finding.Detail, "3783245") {
+			largest = true
+		}
+		if strings.Contains(finding.Indicator, "allocate") {
+			allocateFinding = true
+		}
+		if strings.Contains(finding.Indicator, "pid 2000") {
+			otherPID = true
+		}
+	}
+	if !found || !largest || processFindings != 2 || !allocateFinding || !otherPID {
+		t.Fatalf("findings = %+v", findings)
+	}
+	feedback := BuildFeedback(Run{Telemetry: &TelemetryRun{Findings: findings}})
+	visible := false
+	for _, finding := range feedback.Findings {
+		if finding.Rule == "telemetry/unattributed-etwti" ||
+			finding.Rule == "telemetry/unattributed-process" {
+			visible = true
+		}
+	}
+	if !visible {
+		t.Fatalf("feedback dropped unattributed evidence: %+v", feedback.Findings)
+	}
+}

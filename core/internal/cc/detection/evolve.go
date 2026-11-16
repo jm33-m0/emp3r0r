@@ -2455,12 +2455,17 @@ Data policy:
 - Attribution columns matter: actor_pid performed the operation, pid is the
   subject, target_pid is the target or child, payload_role says whether the
   event belongs to the payload, a child, the payload as a target, a Defender
-  scan, or ambient traffic. signal is signal/verdict/scan/info/baseline/noise.
+  scan, or ambient traffic. signal is
+  signal/verdict/scan/info/unattributed/baseline/noise. unattributed means the
+  capture could not identify the payload process, but the operation itself is
+  high-value; treat it as evidence, not as noise.
 - Categories include process, image, file, network, audit, thread, defender,
   query, module, hook, memory (ETW-TI), and analysis. ETW-TI rows carry
   operation, protection, size, bytes, status, and stack. Hook rows carry the
   intercepted Nt* API. Ambient MsMpEng events are stored but are not payload
-  actions.
+  actions. Unattributed ETW-TI memory operations are also emitted as
+  low-severity telemetry/unattributed-etwti findings; inspect their protection,
+  size, and pid sequence before dismissing them.
 
 Work loop:
 1. Inspect the baseline and identify a real defender verdict or a high/medium

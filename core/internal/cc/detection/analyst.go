@@ -367,10 +367,13 @@ payload_view for stable payload_id, payload_key, and trace_id names.
 Categories: process, image, module, file, network, audit, thread, defender,
 query, hook, memory (ETW-TI), other.
 payload_role: payload, payload-child, payload-target, payload-scan, ambient, unknown.
-signal: signal, verdict, scan, info, baseline, noise.
+signal: signal, verdict, scan, info, unattributed, baseline, noise.
 Use trace_pk to scope one trace, or query payloads.table_name for one payload.
 Use findings for the deterministic result and events for evidence; ignore
 signal='noise' and signal='baseline' unless corroborating another finding.
+signal='unattributed' means payload attribution failed but the operation is
+high-value; treat it as evidence and inspect the ETW-TI operation, protection,
+and size.
 execution=verified means the generated agent checked in; offline means the
 payload never executed and its score must not be compared with an executing
 cycle; unverified means verification was not configured.

@@ -392,15 +392,17 @@ type TelemetryCoverage struct {
 // TelemetryStats is the bounded per-trace summary attached to a run and shown
 // to the loop. Full events stay in SQLite.
 type TelemetryStats struct {
-	TraceID       int64             `json:"trace_id"`
-	Events        int               `json:"events"`
-	PayloadEvents int               `json:"payload_events"`
-	SignalEvents  int               `json:"signal_events"`
-	Findings      int               `json:"findings"`
-	ByCategory    map[string]int    `json:"by_category,omitempty"`
-	ByRule        map[string]int    `json:"by_rule,omitempty"`
-	BySeverity    map[string]int    `json:"by_severity,omitempty"`
-	Coverage      TelemetryCoverage `json:"coverage"`
+	TraceID            int64             `json:"trace_id"`
+	Events             int               `json:"events"`
+	PayloadEvents      int               `json:"payload_events"`
+	SignalEvents       int               `json:"signal_events"`
+	UnattributedEvents int               `json:"unattributed_events"`
+	ETWTIUnattributed  int               `json:"etwti_unattributed_events"`
+	Findings           int               `json:"findings"`
+	ByCategory         map[string]int    `json:"by_category,omitempty"`
+	ByRule             map[string]int    `json:"by_rule,omitempty"`
+	BySeverity         map[string]int    `json:"by_severity,omitempty"`
+	Coverage           TelemetryCoverage `json:"coverage"`
 }
 
 // TelemetryTrace is one persisted telemetry trace.
@@ -1232,6 +1234,67 @@ func (t *TelemetryDB) Findings(ctx context.Context, traceID int64) ([]Finding, e
 		seenAnalyzer[key] = true
 		add(severity, "analyzer/"+name, name,
 			"LitterBox analyzer "+name+" reported "+severity+" findings")
+	}
+
+	// ETW-TI memory operations that the capture could not attribute to the
+	// payload. They are not findings about a confirmed payload action, but they
+	// are too specific to discard as ambient noise. Keep them as low-severity
+	// unattributed evidence so the loop can inspect the protection/size sequence.
+	etwti, err := t.rows(ctx, `SELECT event, operation, protection, pid, count(*) AS n,
+		max(size) AS max_size
+		FROM events WHERE trace_pk = ? AND provider LIKE 'Microsoft-Windows-Threat-Intelligence%'
+		AND category = 'memory' AND signal = 'unattributed'
+		GROUP BY event, operation, protection, pid
+		ORDER BY max_size DESC LIMIT 5`, traceID)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range etwti {
+		event := row.string("event")
+		operation := row.string("operation")
+		protection := row.string("protection")
+		pid := row.int("pid")
+		indicator := firstNonEmpty(event, operation)
+		if operation != "" && !strings.EqualFold(operation, event) {
+			indicator += " " + operation
+		}
+		if protection != "" {
+			indicator += " " + protection
+		}
+		indicator += fmt.Sprintf(" pid %d", pid)
+		detail := fmt.Sprintf("ETW-TI observed %s %s on %d region(s), largest %d bytes, pid %d; the capture has no payload PEB, so payload attribution is unavailable",
+			firstNonEmpty(operation, event), protection, row.int("n"), row.int("max_size"), pid)
+		addSignal("low", "telemetry/unattributed-etwti", indicator, detail, "unattributed")
+	}
+
+	// Process creation that cannot be attributed to the payload. Keep it as
+	// low-severity evidence so an unknown creator is still visible.
+	unattributedProcesses, err := t.rows(ctx, `SELECT pid, image, command, count(*) AS n
+		FROM events WHERE trace_pk = ? AND category = 'process' AND operation = 'create'
+		AND signal = 'unattributed'
+		GROUP BY pid, image, command ORDER BY n DESC LIMIT 5`, traceID)
+	if err != nil {
+		return nil, err
+	}
+	for _, row := range unattributedProcesses {
+		pid := row.int("pid")
+		image := row.string("image")
+		command := row.string("command")
+		// The query groups by (pid, image, command). Include a digest of the
+		// full group in the indicator so addSignal's rule|indicator dedupe does
+		// not collapse two different images or command lines for the same PID.
+		group := sha256.Sum256([]byte(image + "\x00" + command))
+		indicator := fmt.Sprintf("CreateProcessW pid %d", pid)
+		if image != "" {
+			indicator += " " + filepath.Base(strings.ReplaceAll(image, `\`, "/"))
+		}
+		indicator += " " + hex.EncodeToString(group[:4])
+		detail := fmt.Sprintf("ETW observed process %d created from %s; the capture has no payload PEB, so payload attribution is unavailable",
+			pid, firstNonEmpty(image, "an unknown image"))
+		if command != "" {
+			detail += ": " + command
+		}
+		addSignal("low", "telemetry/unattributed-process", indicator, detail, "unattributed")
 	}
 
 	// Child process creation and its image path.
