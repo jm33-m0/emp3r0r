@@ -142,6 +142,9 @@ the source edits themselves execute with the operator's privileges. Prompt
 injection from sandbox telemetry, module source, or cached knowledge can steer
 those edits, so a rogue model is equivalent to code execution on the host.
 
+> [!WARNING]
+> Source-edit review, payload reversion, and the loop prompt reduce exposure but do not contain the model. `build.sh` is a required edit surface, and blocking one edit does not close the path: a `Makefile`, `config.json`, generated source, or another build input can run commands. The loop prompt is a soft guardrail against prompt injection, not a defense. Complete VM or container isolation is the only reliable boundary.
+
 Emp3r0r cannot bound that from inside the loop. Run the loop on a dedicated,
 disposable VM or container:
 

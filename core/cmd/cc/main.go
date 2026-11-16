@@ -138,7 +138,11 @@ func main() {
 	mcpCmd := &cobra.Command{
 		Use:   "mcp",
 		Short: "Serve the autonomous operator toolset over MCP",
-		Long: `Join the C2 as an operator and expose emp3r0r modules, agents, and jobs
+		Long: `Warning: this exposes the operator surface to an AI harness and creates a
+large attack surface. Run it in a dedicated VM or container with no host
+credentials, no production C2 keys, and restricted egress.
+
+Join the C2 as an operator and expose emp3r0r modules, agents, and jobs
 over MCP. Mutating tools execute after a deterministic OPSEC screen; the
 policy file decides which capabilities, noise bands, and state changes are
 allowed.
@@ -272,6 +276,10 @@ func connectClient(opts *Options) {
 // runMCPMode serves the operator toolset over MCP on stdin/stdout. Protocol
 // output is the only thing on stdout; all logging goes to the operator log.
 func runMCPMode(opts *Options) {
+	warning := "WARNING: MCP exposes the operator surface to an AI harness and creates a large attack surface. Run it in a dedicated VM or container with no host credentials, no production C2 keys, and restricted egress."
+	logging.Warningf("%s", warning)
+	fmt.Fprintln(os.Stderr, warning)
+
 	// connectWg prompts for a missing key on the terminal, which would read the
 	// MCP stream. A remote connection therefore needs the key up front. Prefer
 	// the file form: argv is visible in the process list.
@@ -370,12 +378,6 @@ autonomously, but every mutating call is screened by a deterministic OPSEC
 policy. A result with blocked=true did not execute; read its decision and
 reason instead of retrying the same action. A result with warnings executed:
 surface every warning and matched rule to the operator before continuing.
-
-Architecture limitation: this server cannot mitigate all AI-related threats
-because it does not control the AI harness, the model, the prompt, the model
-provider, or the harness's own file and shell tools. The operator must rely on
-host isolation and the harness's own security controls; this server only
-screens calls made through it.
 
 Use these MCP tools for emp3r0r work. Do not use your own file or shell tools
 to inspect module source, read module docs, run build scripts, generate

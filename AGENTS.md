@@ -125,6 +125,7 @@
 - Write user-facing docs in `docs/` for usage only: prerequisites, commands, options, output, and constraints. Leave internals out.
 - Add a `docs/<name>.md` page for a tool or module that operators configure or run directly. Do not duplicate a docs page in a README.
 - Keep links relative and valid. Update every reference when moving, renaming, or adding a doc.
+- Do NOT touch `SECURITY.md` unless you are asked to.
 
 ## Testing
 

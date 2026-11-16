@@ -404,7 +404,7 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 	e.operatorPrompts = cfg.Prompts
 	e.roots = e.sourceRoots()
 	e.log("detection loop %s: module=%s model=%s shellcode=%s", cfg.LoopID, cfg.Module, model, cfg.Shellcode)
-	e.logClass(logging.ClassWarning, "the loop executes model-chosen builds on this host; run it in a dedicated, disposable VM with no host credentials")
+	e.logClass(logging.ClassWarning, "the loop executes model-chosen builds on this host; source review and prompt rules do not contain the model, so run it in a dedicated, disposable VM with no host credentials")
 	if roots := e.roots.describe(); roots != "" {
 		e.log("source roots: %s", roots)
 	}

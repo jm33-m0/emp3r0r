@@ -133,13 +133,16 @@ A netonly session keeps the agent's local identity and borrows the target user o
 
 #### MCP server and OPSEC screen
 
-`emp3r0r mcp` exposes the operator surface over the Model Context Protocol on stdin/stdout so external MCP clients such as Claude Code and Codex can select targets, inspect and run modules, use typed filesystem and process tools, transfer files, read job output, reload modules, and build Go or C agents.
+> [!WARNING]
+> The MCP server exposes the operator surface to an AI harness and creates a large attack surface. Run it in a dedicated VM or container with no host credentials, no production C2 keys, and restricted egress.
+
+The server speaks the Model Context Protocol over stdin/stdout so external clients such as Claude Code and Codex can select targets, inspect and run modules, use typed filesystem and process tools, transfer files, read job output, reload modules, and build Go or C agents.
 
 Every mutating tool call passes through a deterministic OPSEC screen before reaching the target. The screen classifies module metadata and command lines into telemetry capabilities (such as process creation, filesystem writes, CLR loading, and credential access), noise bands, and reversibility, then enforces the operator's `mcp.json` policy (`allow`, `warn`, or `block`) and writes pre- and post-execution records to the audit log. The C2 still enforces WireGuard peer identity, single-owner target locks, and job ownership. Tool help is served over MCP; for changing the server, see the [MCP development guide](./docs/MCP.md).
 
 Read-only tools expose the module registry, target detail, job output, and the operator log, and `review_command` computes the same deterministic OPSEC verdict without executing anything.
 
-MCP trusts the operator harness and treats target output as hostile data. emp3r0r does not control the harness and cannot mitigate all AI-related threats; isolation and the harness's own security controls remain the operator's responsibility. See [AI security](./docs/SECURITY.md#ai-security) for prompt-injection guidance, data-egress rules, and the policy controls to apply before letting a model act autonomously.
+MCP trusts the operator harness and treats target output as hostile data. emp3r0r does not control the harness and cannot mitigate all AI-related threats; isolation and the harness's own security controls remain the operator's responsibility. The screen, source-edit review, payload reversion, and prompt instructions reduce attack surface but do not guarantee containment. A model that can edit source or build inputs can execute code on the operator host, including through a `Makefile` or another build input when a build-script change is blocked. The loop prompt is a soft guardrail against prompt injection, not a defense. Use complete host or VM isolation for autonomous work. See [AI security](./docs/SECURITY.md#ai-security) for model-risk and reporting scope.
 
 #### Autonomous evasion loop
 
@@ -147,7 +150,7 @@ MCP trusts the operator harness and treats target output as hostile data. emp3r0
 
 Before choosing a mechanism, the model reads a cached reference notebook through `KnowledgeSearch` and `KnowledgeRead`. `knowledge-sync` refreshes that offline cache from an MCP notebook server, so the loop itself makes no network calls. The prompt classifies findings by detection surface, asks for a falsifiable telemetry prediction per cycle, and requires source evidence before an edit.
 
-A final host-side check polls for the generated agent UUID and runs a small BOF before the loop reports success. The loop uses the console's C2 connection for agent generation and single-UUID verification. Every dispatch and denial is written to the operator audit log. See the [detection testing guide](./docs/detection.md) for stages, approvals, and the MCP equivalents.
+A final host-side check polls for the generated agent UUID and runs a small BOF before the loop reports success. The loop uses the console's C2 connection for agent generation and single-UUID verification. Every dispatch and denial is written to the operator audit log. Source and build edits are code execution; review and prompt rules reduce exposure but do not contain the model, so run the loop in an isolated VM or container. See the [detection testing guide](./docs/detection.md) for stages, approvals, and the MCP equivalents.
 
 ### Build profiles
 

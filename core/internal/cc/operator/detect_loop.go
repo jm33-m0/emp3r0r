@@ -80,6 +80,12 @@ as a code-execution feature controlled by an untrusted model, not as a
 sandbox: run it in a dedicated, disposable VM or container with no host
 credentials, no production C2 keys, and restricted network egress.
 
+Source-edit review, payload reversion, and the loop prompt reduce exposure but
+do not contain the model. build.sh, Makefile, config.json, generated source, and
+other build inputs can execute commands with operator privileges. The prompt is
+a soft guardrail against prompt injection, not a boundary. Complete isolation
+is the only reliable control.
+
 Manage running loops with detect_loop list, detect_loop stop <loop-id> or
 --all, and detect_loop prompt <loop-id> <instruction>.
 
@@ -398,6 +404,7 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 	logging.Infof("Detection loop %s started; log: %s", loopID, logPath)
+	logging.Warningf("detect_loop: source and build edits execute on this host; review and prompt rules do not contain the model. Use complete isolation.")
 	logging.Infof("Manage with: detect_loop list | detect_loop stop %s | detect_loop prompt %s <instruction>", loopID, loopID)
 
 	go func() {

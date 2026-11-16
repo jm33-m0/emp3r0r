@@ -1,5 +1,8 @@
 # MCP Server Development
 
+> [!WARNING]
+> Running the MCP server exposes the operator surface to an AI harness and creates a large attack surface. Run it in a dedicated VM or container with no host credentials, no production C2 keys, and restricted egress.
+
 This guide covers changing the MCP server. Operator-facing help is served by
 the protocol:
 
