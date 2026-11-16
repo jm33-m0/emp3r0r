@@ -730,35 +730,23 @@ func TestEvolveResumesCycleAfterDeadline(t *testing.T) {
 	if len(requests) != 3 {
 		t.Fatalf("sessions = %d, want 3; the loop did not retry after the cycle deadline", len(requests))
 	}
-	for _, want := range []string{"cycle was stopped", "DetectionCycle", "analysis tools are blocked"} {
+	for _, want := range []string{"cycle was stopped", "DetectionCycle"} {
 		if !strings.Contains(requests[1], want) {
 			t.Fatalf("retry prompt missing %q:\n%s", want, requests[1])
 		}
 	}
 }
 
-func TestActionRequiredBlocksAnalysisTools(t *testing.T) {
+func TestActionRequiredKeepsAnalysisToolsAvailable(t *testing.T) {
 	e := &evolver{}
 	e.actionRequired.Store(true)
 	for _, name := range []string{
 		"TelemetryQuery", "InspectFeedback", "Payloads", "ComparePayloads",
-		"KnowledgeSearch", "AgentStatus",
-	} {
-		if decision := e.allowToolHook(name); decision.Decision != "block" {
-			t.Fatalf("%s was allowed while a cycle retry is required", name)
-		}
-	}
-	for _, name := range []string{
-		"SourceRead", "SourceSearch", "EditSource", "BuildShellcode",
-		"DetectionCycle",
+		"KnowledgeSearch", "SourceRead", "EditSource", "DetectionCycle",
 	} {
 		if decision := e.allowToolHook(name); decision.Decision == "block" {
 			t.Fatalf("%s was blocked while a cycle retry is required", name)
 		}
-	}
-	e.actionRequired.Store(false)
-	if decision := e.allowToolHook("TelemetryQuery"); decision.Decision == "block" {
-		t.Fatal("TelemetryQuery stayed blocked after a cycle cleared the action requirement")
 	}
 }
 

@@ -1,6 +1,7 @@
 package detection
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -150,19 +151,33 @@ func (s *sourceRoots) resolve(name, supplied string) (sourceRoot, string, error)
 	return root, path, nil
 }
 
+// sourceSniffBytes is the prefix checked for NUL bytes before a file is
+// treated as source text.
+const sourceSniffBytes = 8 << 10
+
 // readBoundedSource reads one source file without loading more than the
-// per-file budget. The stat check in newSourceIndex is advisory: a model can
-// point SourceRead/SourceSearch at a path that exists but is much larger.
+// per-file budget. Any text file under the root is readable; a binary prefix
+// is rejected so a read cannot pull build artifacts into the model context.
 func readBoundedSource(path string) ([]byte, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = file.Close() }()
-	data, err := io.ReadAll(io.LimitReader(file, maxSourceFileBytes+1))
+	head := make([]byte, sourceSniffBytes)
+	n, err := io.ReadFull(file, head)
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		return nil, err
+	}
+	head = head[:n]
+	if bytes.IndexByte(head, 0) >= 0 {
+		return nil, fmt.Errorf("%s is a binary file", filepath.Base(path))
+	}
+	rest, err := io.ReadAll(io.LimitReader(file, maxSourceFileBytes+1-int64(n)))
 	if err != nil {
 		return nil, err
 	}
+	data := append(head, rest...)
 	if len(data) > maxSourceFileBytes {
 		return nil, fmt.Errorf("%s exceeds the read bound", filepath.Base(path))
 	}

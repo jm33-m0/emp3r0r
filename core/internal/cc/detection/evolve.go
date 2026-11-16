@@ -118,8 +118,8 @@ type EvolveConfig struct {
 	RetryBase time.Duration
 	// CycleTimeout bounds one build/detonate/verify cycle and the time a model
 	// session may run without completing a cycle. The session is stopped and
-	// analysis tools are blocked until the model applies an edit and retries;
-	// the loop itself continues. Zero uses defaultCycleTimeout.
+	// the model is required to apply an edit and retry; the loop continues.
+	// Zero uses defaultCycleTimeout.
 	CycleTimeout time.Duration
 	// SessionTimeout bounds one model session. Zero uses defaultSessionTimeout.
 	SessionTimeout time.Duration
@@ -792,12 +792,11 @@ every residual is explained with evidence. Return the final JSON object.`,
 				e.actionRequired.Store(true)
 				e.logClass(logging.ClassWarning,
 					"no cycle completed within %s; stopping the cycle and requiring an edit and a retry", cycleTimeout)
-				// Give the resumed session a fresh window, but analysis tools
-				// stay blocked until a cycle completes, so the model has to
-				// apply its edits and call DetectionCycle.
+				// Give the resumed session a fresh window and require it to
+				// apply an edit and call DetectionCycle.
 				e.lastCycleAt.Store(time.Now().UnixNano())
 				prompt = e.resumePrompt(cfg, fmt.Sprintf(
-					"no cycle completed within %s and the cycle was stopped. Apply your edits with EditSource now, then retry with DetectionCycle; analysis tools are blocked until a cycle completes.", cycleTimeout))
+					"no cycle completed within %s and the cycle was stopped. Apply your edits with EditSource now, then retry with DetectionCycle.", cycleTimeout))
 				continue
 			}
 			if sessionExpired.Load() {
@@ -1859,12 +1858,6 @@ func (e *evolver) verifyEnabled() bool {
 }
 
 func (e *evolver) allowToolHook(toolName string) hook.Result {
-	if e.actionRequired.Load() && analysisTool(toolName) {
-		return hook.Result{
-			Decision: "block",
-			Message:  "the cycle deadline expired: apply your edits and call DetectionCycle; analysis tools are blocked until a cycle completes",
-		}
-	}
 	switch toolName {
 	case "SourceList", "SourceRead", "SourceSearch", "TelemetryQuery",
 		"InspectFeedback", "Payloads", "ComparePayloads", "DetectionCycle", "EditSource",
@@ -1883,28 +1876,17 @@ func (e *evolver) allowToolHook(toolName string) hook.Result {
 	return hook.Result{Decision: "block", Message: "tool is not part of the detection loop"}
 }
 
-// analysisTool reports whether a tool only inspects recorded evidence. After a
-// cycle deadline the model must act instead of inspecting, so these tools are
-// blocked until the retry completes.
-func analysisTool(toolName string) bool {
-	switch toolName {
-	case "TelemetryQuery", "InspectFeedback", "Payloads", "ComparePayloads",
-		"KnowledgeSearch", "KnowledgeRead", "KnowledgeStats", "KnowledgeList",
-		"AgentStatus", "RunModule", "CleanupAgent":
-		return true
-	}
-	return false
-}
-
 func (e *evolver) hooks() *hook.Registry {
 	hooks := hook.NewRegistry().On(hook.PreToolUse, func(_ context.Context, event hook.Event) hook.Result {
 		decision := e.allowToolHook(event.ToolName)
 		if decision.Decision == "block" {
+			e.logClass(logging.ClassWarning, "tool %s blocked: %s", event.ToolName, decision.Message)
 			return decision
 		}
 		e.toolGate.Lock()
 		defer e.toolGate.Unlock()
 		if e.deadlineHit.Load() {
+			e.logClass(logging.ClassWarning, "tool %s blocked: the session deadline expired", event.ToolName)
 			return hook.Result{
 				Decision: "block",
 				Message:  "the session deadline expired; the loop will retry in a new session",
@@ -2633,10 +2615,9 @@ Work loop:
    score: the sandbox risk score is noisy and saturates.
 
 Time discipline: the host stops a session that completes no cycle within the
-cycle deadline, blocks analysis tools, and requires an edit and a
-DetectionCycle retry. Decide from the evidence you have. Do not re-read the
-same source, telemetry, or knowledge document, and do not defer a mechanism you
-have already chosen: write the edit and run the cycle.
+cycle deadline and requires an edit and a DetectionCycle retry. Decide from the
+evidence you have. Do not defer a mechanism you have already chosen: write the
+edit and run the cycle.
 
 Direction discipline:
 - Name the mechanism before editing: self-load, remote APC/thread, section

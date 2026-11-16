@@ -318,9 +318,6 @@ func analystPath(root, supplied string) (string, error) {
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
 		return "", fmt.Errorf("source path escapes the module directory")
 	}
-	if !sourceExtensions[strings.ToLower(filepath.Ext(resolved))] {
-		return "", fmt.Errorf("source path has an unsupported extension")
-	}
 	return resolved, nil
 }
 

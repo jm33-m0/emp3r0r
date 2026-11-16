@@ -927,6 +927,33 @@ func TestReadBoundedSourceRejectsOversizedFile(t *testing.T) {
 	}
 }
 
+func TestReadBoundedSourceAcceptsAnyTextFile(t *testing.T) {
+	dir := t.TempDir()
+	spec := filepath.Join(dir, "loader.spec")
+	if err := os.WriteFile(spec, []byte("text build spec\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	roots, err := newSourceRoots("module", sourceRoot{Name: "module", Dir: dir, Writable: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, resolved, err := roots.resolve("", "loader.spec")
+	if err != nil {
+		t.Fatalf("text file with a build extension was rejected: %v", err)
+	}
+	data, err := readBoundedSource(resolved)
+	if err != nil || string(data) != "text build spec\n" {
+		t.Fatalf("read = %q err=%v", data, err)
+	}
+	binary := filepath.Join(dir, "loader.o")
+	if err := os.WriteFile(binary, []byte{'M', 'Z', 0, 1}, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readBoundedSource(binary); err == nil {
+		t.Fatal("binary source file was accepted")
+	}
+}
+
 func TestEditsForPayloadIncludesModule(t *testing.T) {
 	db, err := OpenTelemetryDB(filepath.Join(t.TempDir(), "telemetry.db"))
 	if err != nil {

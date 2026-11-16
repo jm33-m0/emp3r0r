@@ -593,11 +593,6 @@ type sourceIndex struct {
 	files []sourceFile
 }
 
-var sourceExtensions = map[string]bool{
-	".c": true, ".h": true, ".s": true, ".sh": true, ".py": true, ".json": true,
-	".ld": true, ".mk": true, ".txt": true, ".yml": true, ".yaml": true,
-}
-
 func newSourceIndex(dir string) *sourceIndex {
 	index := &sourceIndex{}
 	dir = strings.TrimSpace(dir)
@@ -616,7 +611,7 @@ func newSourceIndex(dir string) *sourceIndex {
 			}
 			return nil
 		}
-		if !info.Mode().IsRegular() || !sourceExtensions[strings.ToLower(filepath.Ext(name))] {
+		if !info.Mode().IsRegular() {
 			return nil
 		}
 		if info.Size() > maxSourceFileBytes || len(index.files) >= maxSourceFiles || total > maxSourceTotalBytes {
