@@ -3,6 +3,7 @@ package detection
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"iter"
 	"maps"
@@ -58,7 +59,12 @@ const (
 // EvolveConfig drives an autonomous detection -> feedback -> edit -> rebuild
 // loop for one local payload module.
 type EvolveConfig struct {
-	LoopID     string
+	LoopID string
+	// BaseLoopID is the logical loop that spans attempts. Empty means LoopID.
+	BaseLoopID string
+	// Attempt is the one-based attempt number within BaseLoopID. Empty or zero
+	// means the first attempt.
+	Attempt    int
 	Module     string
 	ModuleDir  string
 	Shellcode  string
@@ -157,6 +163,10 @@ type AgentBuildResult struct {
 // EvolveResult is the final answer plus the cycles the agent ran.
 type EvolveResult struct {
 	LoopID            string          `json:"loop_id"`
+	BaseLoopID        string          `json:"base_loop_id,omitempty"`
+	Attempt           int             `json:"attempt,omitempty"`
+	GlobalCycles      int             `json:"global_cycles,omitempty"`
+	SourceTreeHash    string          `json:"source_tree_hash,omitempty"`
 	Answer            json.RawMessage `json:"answer"`
 	Report            string          `json:"report"`
 	Cycles            []Cycle         `json:"cycles"`
@@ -192,6 +202,16 @@ type evolver struct {
 	executionBlocked bool
 	// executionCheckTimeout overrides PayloadVerifyTimeout in tests.
 	executionCheckTimeout time.Duration
+
+	baseLoopID      string
+	attempt         int
+	globalUsed      int
+	priorCycles     []Cycle
+	priorAnswer     map[string]any
+	pendingEdits    []EditRecord
+	priorLastGood   *Cycle
+	priorSourceHash string
+	sourceTreeHash  string
 }
 
 func (e *evolver) dynamicEnabled() bool {
@@ -401,12 +421,33 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 	if e.logf == nil {
 		e.logf = func(logging.Class, string, ...any) {}
 	}
+	e.baseLoopID = strings.TrimSpace(cfg.BaseLoopID)
+	if e.baseLoopID == "" {
+		e.baseLoopID = cfg.LoopID
+	}
+	e.attempt = cfg.Attempt
+	if e.attempt < 1 {
+		e.attempt = 1
+	}
 	e.operatorPrompts = cfg.Prompts
 	e.roots = e.sourceRoots()
-	e.log("detection loop %s: module=%s model=%s shellcode=%s", cfg.LoopID, cfg.Module, model, cfg.Shellcode)
+	e.sourceTreeHash = e.computeSourceTreeHash()
+	if e.attempt > 1 || e.baseLoopID != cfg.LoopID {
+		if err := e.loadAttemptState(ctx); err != nil {
+			return nil, err
+		}
+	}
+	if e.usedCycles() >= cfg.Iterations {
+		return nil, fmt.Errorf("%w: %d of %d cycles used across attempts", ErrCycleBudgetExhausted, e.usedCycles(), cfg.Iterations)
+	}
+	e.log("detection loop %s: base=%s attempt=%d module=%s model=%s shellcode=%s",
+		cfg.LoopID, e.baseLoopID, e.attempt, cfg.Module, model, cfg.Shellcode)
 	e.logClass(logging.ClassWarning, "the loop executes model-chosen builds on this host; source review and prompt rules do not contain the model, so run it in a dedicated, disposable VM with no host credentials")
 	if roots := e.roots.describe(); roots != "" {
 		e.log("source roots: %s", roots)
+	}
+	if e.sourceTreeHash != "" {
+		e.log("source tree: %s", e.sourceTreeHash)
 	}
 	e.openKnowledge()
 	if e.knowledge != nil {
@@ -419,6 +460,9 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 		baseline, err = e.runCycle(ctx, "baseline", "baseline")
 		if err == nil {
 			break
+		}
+		if errors.Is(err, ErrCycleBudgetExhausted) {
+			return nil, err
 		}
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
@@ -464,7 +508,13 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 		}
 	}
 	system := evolveSystemPrompt
+	carriedState := ""
+	if len(e.priorCycles) > 0 || e.attempt > 1 {
+		carriedState = "\nPrior attempt state:\n" + e.dossier()
+	}
 	prompt := fmt.Sprintf(`Loop ID: %s
+Base loop ID: %s
+Attempt: %d (%s)
 Module: %s
 Module source: %s
 Active shellcode: %s
@@ -476,8 +526,9 @@ Expected agent UUID: %s
 Goal: %s
 Knowledge cache: %s
 Execution gate: %s
-Cycle budget: %d total, including the baseline; %d cycles remain.
+Cycle budget: %d total across attempts; %d used before this attempt; %d remain after this baseline.
 Baseline cycle: %s
+%s
 
 Continue the loop. The full feedback, builds, and telemetry are in SQLite.
 Use InspectFeedback, Payloads, ComparePayloads, TelemetryQuery, and the source
@@ -535,9 +586,11 @@ If coverage.missing is not empty, or an analyzer reports a scan error or early
 termination, name the gap and do not treat the cycle as clean. Stop when the
 cycle budget is exhausted, or when no actionable high/medium finding remains and
 every residual is explained with evidence. Return the final JSON object.`,
-		cfg.LoopID, cfg.Module, cfg.ModuleDir, e.shellcode, headerOrNone(e.activeProducer), producerList, rootList,
+		cfg.LoopID, e.baseLoopID, e.attempt, attemptLabel(e.attempt),
+		cfg.Module, cfg.ModuleDir, e.shellcode, headerOrNone(e.activeProducer), producerList, rootList,
 		headerOrNone(cfg.AgentCC), headerOrNone(e.expectedAgentUUID), headerOrNone(cfg.Goal), knowledgeState,
-		executionState, cfg.Iterations, max(0, cfg.Iterations-e.iter), baselineJSON, cfg.Module)
+		executionState, cfg.Iterations, e.globalUsed, max(0, cfg.Iterations-e.usedCycles()), baselineJSON,
+		carriedState, cfg.Module)
 	if cfg.BuildAgent == nil {
 		prompt += "\n\nAgent generation (GenerateAgent) is disabled for this run; reuse the supplied shellcode or edit and rebuild an existing producer."
 	}
@@ -603,7 +656,7 @@ every residual is explained with evidence. Return the final JSON object.`,
 		answer, parseErr = parseAnalystAnswer(text)
 		if parseErr == nil {
 			e.lastAnswer = answer
-			if e.iter < cfg.Iterations && e.needsMoreWork(ctx) {
+			if e.usedCycles() < cfg.Iterations && e.needsMoreWork(ctx) {
 				if !canResume() {
 					break
 				}
@@ -613,7 +666,7 @@ every residual is explained with evidence. Return the final JSON object.`,
 			}
 			break
 		}
-		if e.iter < cfg.Iterations && !e.executionBlocked {
+		if e.usedCycles() < cfg.Iterations && !e.executionBlocked {
 			if !canResume() {
 				break
 			}
@@ -636,6 +689,21 @@ every residual is explained with evidence. Return the final JSON object.`,
 		}
 	}
 	answer["loop_id"] = cfg.LoopID
+	answer["base_loop_id"] = e.baseLoopID
+	answer["attempt"] = e.attempt
+	answer["global_cycles"] = e.usedCycles()
+	answer["expected_agent_uuid"] = e.expectedAgentUUID
+	e.sourceTreeHash = e.computeSourceTreeHash()
+	if e.sourceTreeHash != "" {
+		answer["source_tree_hash"] = e.sourceTreeHash
+	}
+	lastGood := e.lastExecuting
+	if lastGood == nil {
+		lastGood = e.priorLastGood
+	}
+	if lastGood != nil {
+		answer["last_executing_payload"] = lastGood.PayloadKey
+	}
 	answer["cycles"] = e.cycles
 	if cfg.FinalVerify != nil {
 		if e.expectedAgentUUID == "" {
@@ -676,7 +744,12 @@ every residual is explained with evidence. Return the final JSON object.`,
 		cfg.LoopID, string(encoded), report, time.Now().UTC().UnixMilli()); err != nil {
 		return nil, fmt.Errorf("save loop result: %w", err)
 	}
-	return &EvolveResult{LoopID: cfg.LoopID, Answer: encoded, Report: report, Cycles: e.cycles, Last: e.last, PayloadVerified: verified, ExpectedAgentUUID: e.expectedAgentUUID}, nil
+	return &EvolveResult{
+		LoopID: cfg.LoopID, BaseLoopID: e.baseLoopID, Attempt: e.attempt,
+		GlobalCycles: e.usedCycles(), SourceTreeHash: e.sourceTreeHash,
+		Answer: encoded, Report: report, Cycles: e.cycles, Last: e.last,
+		PayloadVerified: verified, ExpectedAgentUUID: e.expectedAgentUUID,
+	}, nil
 }
 
 func normalizeEvolveConfig(cfg *EvolveConfig) error {
@@ -805,31 +878,34 @@ func parseEvolveStages(stages []string) (static, dynamic bool, err error) {
 }
 
 type cycleSummary struct {
-	LoopID        string          `json:"loop_id"`
-	Iteration     int             `json:"iteration"`
-	PayloadKey    string          `json:"payload_key"`
-	PayloadTable  string          `json:"payload_table"`
-	RunID         string          `json:"run_id"`
-	SHA256        string          `json:"sha256"`
-	Score         float64         `json:"score"`
-	Level         string          `json:"level,omitempty"`
-	Findings      int             `json:"findings"`
-	Verdicts      []string        `json:"verdicts,omitempty"`
-	TraceID       int64           `json:"trace_id,omitempty"`
-	Events        int             `json:"telemetry_events"`
-	Telemetry     *TelemetryStats `json:"telemetry,omitempty"`
-	SourceEdits   int             `json:"source_edits"`
-	TopFindings   []string        `json:"top_findings,omitempty"`
-	BuildTail     []string        `json:"build_tail,omitempty"`
-	Edits         []EditRecord    `json:"edits,omitempty"`
-	Shellcode     string          `json:"shellcode,omitempty"`
-	Producer      string          `json:"producer,omitempty"`
-	Mechanism     string          `json:"mechanism,omitempty"`
-	Note          string          `json:"note,omitempty"`
-	Executed      bool            `json:"executed"`
-	Execution     string          `json:"execution,omitempty"`
-	AgentOnline   *bool           `json:"agent_online,omitempty"`
-	NetworkEvents int             `json:"network_events,omitempty"`
+	LoopID          string          `json:"loop_id"`
+	Iteration       int             `json:"iteration"`
+	Attempt         int             `json:"attempt,omitempty"`
+	GlobalIteration int             `json:"global_iteration,omitempty"`
+	PayloadKey      string          `json:"payload_key"`
+	PayloadTable    string          `json:"payload_table"`
+	RunID           string          `json:"run_id"`
+	SHA256          string          `json:"sha256"`
+	Score           float64         `json:"score"`
+	Level           string          `json:"level,omitempty"`
+	Findings        int             `json:"findings"`
+	Verdicts        []string        `json:"verdicts,omitempty"`
+	TraceID         int64           `json:"trace_id,omitempty"`
+	Events          int             `json:"telemetry_events"`
+	Telemetry       *TelemetryStats `json:"telemetry,omitempty"`
+	SourceEdits     int             `json:"source_edits"`
+	TopFindings     []string        `json:"top_findings,omitempty"`
+	BuildTail       []string        `json:"build_tail,omitempty"`
+	Edits           []EditRecord    `json:"edits,omitempty"`
+	Shellcode       string          `json:"shellcode,omitempty"`
+	Producer        string          `json:"producer,omitempty"`
+	Mechanism       string          `json:"mechanism,omitempty"`
+	Note            string          `json:"note,omitempty"`
+	Executed        bool            `json:"executed"`
+	Execution       string          `json:"execution,omitempty"`
+	AgentOnline     *bool           `json:"agent_online,omitempty"`
+	NetworkEvents   int             `json:"network_events,omitempty"`
+	SourceTreeHash  string          `json:"source_tree_hash,omitempty"`
 }
 
 func ensurePayloadPreserved(shellcode string, artifact Artifact) error {
@@ -848,6 +924,9 @@ func ensurePayloadPreserved(shellcode string, artifact Artifact) error {
 }
 
 func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, error) {
+	if e.usedCycles() >= e.cfg.Iterations {
+		return Cycle{}, fmt.Errorf("%w: %d of %d cycles used", ErrCycleBudgetExhausted, e.usedCycles(), e.cfg.Iterations)
+	}
 	iteration := e.iter + 1
 
 	if _, err := e.waitSandbox(ctx); err != nil {
@@ -867,7 +946,8 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, 
 	if e.cfg.Process != "" {
 		flags["process"] = e.cfg.Process
 	}
-	e.logClass(logging.ClassCycle, "cycle %d: building %s (shellcode %s)", iteration, e.cfg.Module, shellcode)
+	e.logClass(logging.ClassCycle, "cycle %d (attempt %d, global %d): building %s (shellcode %s)",
+		iteration, e.attempt, e.globalUsed+iteration, e.cfg.Module, shellcode)
 	build := e.cfg.Build
 	if build == nil {
 		build = func(dir string, values map[string]string) (string, error) {
@@ -962,6 +1042,10 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, 
 	}
 	e.iter = iteration
 	summary := summarizeCycle(e.cfg.LoopID, iteration, run, feedback, buildLog, note, mechanism, shellcode, e.activeProducer, execution, online, networkEvents)
+	summary.Attempt = e.attempt
+	summary.GlobalIteration = e.globalUsed + iteration
+	e.sourceTreeHash = e.computeSourceTreeHash()
+	summary.SourceTreeHash = e.sourceTreeHash
 	if edits, err := e.db.LoopEdits(ctx, e.cfg.LoopID); err != nil {
 		e.logClass(logging.ClassError, "read edits for cycle summary: %v", err)
 	} else {
@@ -979,7 +1063,8 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, 
 	}
 	summaryJSON, _ := json.Marshal(summary)
 	cycle := Cycle{
-		LoopID: e.cfg.LoopID, Iteration: iteration, PayloadID: run.Telemetry.PayloadID,
+		LoopID: e.cfg.LoopID, Iteration: iteration, Attempt: e.attempt, GlobalIteration: e.globalUsed + iteration,
+		PayloadID:  run.Telemetry.PayloadID,
 		PayloadKey: run.Telemetry.PayloadKey, RunID: run.ID, Score: feedback.Score,
 		Level: feedback.Level, Findings: len(feedback.Findings),
 		Verdicts: len(summary.Verdicts), TraceID: run.Telemetry.TraceID,
@@ -1247,12 +1332,13 @@ func (e *evolver) executionHint() string {
 // directionHint calls out a repeated mechanism so a resumed session does not
 // continue polishing the same loading path for another cycle.
 func (e *evolver) directionHint() string {
-	if len(e.cycles) < 2 {
+	cycles := e.recentCycles(2)
+	if len(cycles) < 2 {
 		return ""
 	}
 	var previous, last cycleSummary
-	if json.Unmarshal([]byte(e.cycles[len(e.cycles)-2].Summary), &previous) != nil ||
-		json.Unmarshal([]byte(e.cycles[len(e.cycles)-1].Summary), &last) != nil {
+	if json.Unmarshal([]byte(cycles[len(cycles)-2].Summary), &previous) != nil ||
+		json.Unmarshal([]byte(cycles[len(cycles)-1].Summary), &last) != nil {
 		return ""
 	}
 	if previous.Mechanism == "" || previous.Mechanism != last.Mechanism {
@@ -1261,30 +1347,70 @@ func (e *evolver) directionHint() string {
 	return fmt.Sprintf("The last two cycles both used mechanism %q. Do not spend another cycle on the same mechanism unless you are changing a different component of it; test a different mechanism or record the concrete constraint that rules the alternatives out.", last.Mechanism)
 }
 
-// dossier is the compact state carried into a fresh agent session.
+// dossier is the compact state carried into a fresh agent session. It spans
+// attempts so a restart sees the logical loop's history, not just its own
+// baseline.
 func (e *evolver) dossier() string {
+	if hash := e.computeSourceTreeHash(); hash != "" {
+		e.sourceTreeHash = hash
+	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "- cycles used: %d of %d\n", e.iter, e.cfg.Iterations)
+	fmt.Fprintf(&b, "- logical loop: %s; attempt %d (%s)\n", e.baseLoopID, e.attempt, attemptLabel(e.attempt))
+	fmt.Fprintf(&b, "- cycles used: %d of %d global; %d in this attempt\n", e.usedCycles(), e.cfg.Iterations, e.iter)
+	if e.globalUsed > 0 {
+		fmt.Fprintf(&b, "- prior attempts used %d cycles before this attempt\n", e.globalUsed)
+	}
+	if e.sourceTreeHash != "" {
+		fmt.Fprintf(&b, "- source tree: %s\n", e.sourceTreeHash)
+	}
+	priorHash := answerString(e.priorAnswer, "source_tree_hash")
+	if priorHash == "" {
+		priorHash = e.priorSourceHash
+	}
+	if priorHash != "" && priorHash != e.sourceTreeHash {
+		fmt.Fprintf(&b, "- prior attempt source tree: %s\n", priorHash)
+	}
+	if e.priorLastGood != nil {
+		fmt.Fprintf(&b, "- last executing payload from a prior attempt: %s\n", lastGoodRef(e.priorLastGood))
+	}
+	if len(e.priorAnswer) > 0 {
+		if summary := answerString(e.priorAnswer, "summary"); summary != "" {
+			fmt.Fprintf(&b, "- prior attempt summary: %s\n", clip(sanitizeLine(summary), 600))
+		}
+		if residual, ok := e.priorAnswer["residual"]; ok {
+			fmt.Fprintf(&b, "- prior attempt residuals: %s\n", clip(fmt.Sprintf("%v", residual), 600))
+		}
+		if verifyErr := answerString(e.priorAnswer, "payload_verification_error"); verifyErr != "" {
+			fmt.Fprintf(&b, "- prior attempt verification error: %s\n", clip(sanitizeLine(verifyErr), 400))
+		}
+	}
+	for _, line := range e.pendingEditLines(6) {
+		fmt.Fprintf(&b, "- %s\n", line)
+	}
 	fmt.Fprintf(&b, "- active shellcode: %s\n", e.shellcode)
 	fmt.Fprintf(&b, "- active shellcode producer: %s\n", headerOrNone(e.activeProducer))
 	if names := e.producerNames(); len(names) > 0 {
 		fmt.Fprintf(&b, "- producers: %s\n", strings.Join(names, ", "))
 	}
 	fmt.Fprintf(&b, "- editable roots: %s\n", e.roots.describe())
-	start := 0
-	if len(e.cycles) > 8 {
-		start = len(e.cycles) - 8
-	}
-	for _, cycle := range e.cycles[start:] {
+	for _, cycle := range e.recentCycles(8) {
 		var summary cycleSummary
 		_ = json.Unmarshal([]byte(cycle.Summary), &summary)
 		files := make([]string, 0, len(summary.Edits))
 		for _, edit := range summary.Edits {
 			files = append(files, edit.Module+"/"+edit.File)
 		}
-		fmt.Fprintf(&b, "- cycle %d: mechanism=%s score=%.2f level=%s findings=%d verdicts=%d execution=%s network=%d shellcode=%s files=%s\n",
-			cycle.Iteration, headerOrNone(summary.Mechanism), cycle.Score, cycle.Level, cycle.Findings, cycle.Verdicts,
-			headerOrNone(summary.Execution), summary.NetworkEvents,
+		attempt := cycle.Attempt
+		if attempt < 1 {
+			attempt = logicalAttempt(e.baseLoopID, cycle.LoopID)
+		}
+		global := cycle.GlobalIteration
+		if global < 1 {
+			global = e.globalUsed + cycle.Iteration
+		}
+		fmt.Fprintf(&b, "- attempt %d cycle %d (global %d): mechanism=%s score=%.2f level=%s findings=%d verdicts=%d execution=%s network=%d shellcode=%s files=%s\n",
+			attempt, cycle.Iteration, global, headerOrNone(summary.Mechanism), cycle.Score, cycle.Level,
+			cycle.Findings, cycle.Verdicts, headerOrNone(summary.Execution), summary.NetworkEvents,
 			headerOrNone(filepath.Base(summary.Shellcode)), joinOrNone(files))
 		if strings.TrimSpace(summary.Note) != "" {
 			fmt.Fprintf(&b, "  tested: %s\n", clip(sanitizeLine(summary.Note), 240))
@@ -1509,7 +1635,7 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 			if e.executionBlocked {
 				return tool.Errorf("payload execution is blocked: no dynamic payload has checked in and no executing baseline exists; return the final JSON with the execution failure"), nil
 			}
-			if e.iter >= e.cfg.Iterations {
+			if e.usedCycles() >= e.cfg.Iterations {
 				return tool.Errorf(fmt.Sprintf("iteration limit reached (%d); return the final JSON", e.cfg.Iterations)), nil
 			}
 			mechanism := clip(args.Mechanism, 80)
@@ -1559,7 +1685,7 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 				"payload":          payload,
 				"edits":            edits,
 				"iterations":       e.cfg.Iterations,
-				"remaining_cycles": max(0, e.cfg.Iterations-e.iter),
+				"remaining_cycles": max(0, e.cfg.Iterations-e.usedCycles()),
 				"active_shellcode": e.shellcode,
 				"message":          message,
 			}
@@ -1731,7 +1857,7 @@ func (e *evolver) editSourceTool() tool.CoreTool {
 			if err := json.Unmarshal(raw, &args); err != nil {
 				return tool.Errorf("invalid arguments"), nil
 			}
-			if e.iter >= e.cfg.Iterations {
+			if e.usedCycles() >= e.cfg.Iterations {
 				return tool.Errorf("iteration limit reached; the edit could not be built or tested"), nil
 			}
 			root, err := e.root(args.Module)

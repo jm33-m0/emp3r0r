@@ -118,7 +118,7 @@ func addDetectLoopFlags(cmd *cobra.Command) {
 	cmd.Flags().String("arch", "amd64", "Agent architecture")
 	cmd.Flags().String("cc", "", "C2 address for the generated agent; defaults to the current config, with container-only hosts replaced by a certificate IP reachable from LitterBox")
 	cmd.Flags().String("sandbox", "", "LitterBox URL; defaults to EMP3R0R_DETECTION_SANDBOX or 127.0.0.1:1337")
-	cmd.Flags().Int("iterations", 3, "Maximum detection cycles including the baseline (at most 50)")
+	cmd.Flags().Int("iterations", 3, "Maximum detection cycles across attempts, including each baseline (at most 50)")
 	cmd.Flags().StringSlice("stages", []string{"static", "dynamic"}, "Stages to run")
 	cmd.Flags().String("process", "", "Override the sacrificial process; empty uses the module default")
 	cmd.Flags().String("format", "exe", "Loader host format: exe, service, or dll")

@@ -2,6 +2,7 @@ package operator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -335,7 +336,8 @@ func runDetectLoop(run *detectRun, opts detectLoopOptions, shellcode string) {
 		}
 
 		cfg := detection.EvolveConfig{
-			LoopID: currentID, Module: "loader_windows", ModuleDir: currentOpts.ModuleDir,
+			LoopID: currentID, BaseLoopID: baseID, Attempt: attempt,
+			Module: "loader_windows", ModuleDir: currentOpts.ModuleDir,
 			Shellcode: currentShellcode, SandboxURL: currentOpts.Sandbox,
 			StoreRoot: filepath.Join(live.EmpWorkSpace, "detection"),
 			Process:   currentOpts.Process, Format: currentOpts.Format,
@@ -359,6 +361,11 @@ func runDetectLoop(run *detectRun, opts detectLoopOptions, shellcode string) {
 		}
 		result, runErr := detection.RunEvolve(run.ctx, cfg)
 		if runErr != nil {
+			if errors.Is(runErr, detection.ErrCycleBudgetExhausted) {
+				run.setError(runErr)
+				logf("%v", runErr)
+				return
+			}
 			run.setError(runErr)
 			if run.ctx.Err() != nil {
 				return

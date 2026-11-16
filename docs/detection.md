@@ -90,7 +90,11 @@ use the console's existing C2 connection. The loop then runs:
    polls once per second for the last generated agent UUID, runs a small BOF
    such as `whoami`, and records the output. Only a non-empty BOF result proves
    the loader reached the agent runtime. If the payload never comes online, the
-   loop restarts with a fresh agent and shellcode, up to three attempts;
+   loop restarts with a fresh agent and shellcode, up to three attempts. A
+   restart keeps the same logical loop and the total `--iterations` budget; the
+   new attempt's prompt carries the prior attempts' last eight cycles, final
+   answer and residuals, pending source edits, last executing payload, and
+   source-tree hash;
 5. for every dynamic cycle, call `GenerateAgent` and then `BuildShellcode` to
    create a fresh agent UUID and shellcode. The C2 pins the first key for each
    UUID (TOFU), so reusing a UUID is rejected as key rotation. `GenerateAgent`
@@ -200,9 +204,10 @@ If a cycle regresses, `RevertToPayload` replays the inverse of every recorded
 edit made after the chosen payload and restores the module and producer source.
 `DetectionCycle` records a mechanism label with each cycle; the resume dossier
 carries the recent mechanism, tested note, and edit reasons so a fresh agent
-session does not lose the direction it already tried. The cycle budget and the
-active shellcode are shown in the prompt and in every `DetectionCycle` result;
-`--iterations` is capped at 50 and `--turns` at 240. `EditSource` has no
+session does not lose the direction it already tried. The cycle budget spans
+all attempts of one logical loop; it and the active shellcode are shown in the
+prompt and in every `DetectionCycle` result; `--iterations` is capped at 50 and
+`--turns` at 240. `EditSource` has no
 separate per-cycle edit cap; a redesign may use as many edits as the turn
 budget allows.
 

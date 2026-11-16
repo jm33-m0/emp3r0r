@@ -11,24 +11,26 @@ import (
 
 // Cycle is one build-and-detonate step of a detection loop.
 type Cycle struct {
-	ID            int64     `json:"id,omitempty"`
-	LoopID        string    `json:"loop_id"`
-	Iteration     int       `json:"iteration"`
-	PayloadID     int64     `json:"payload_id"`
-	PayloadKey    string    `json:"payload_key,omitempty"`
-	RunID         string    `json:"run_id"`
-	Score         float64   `json:"score"`
-	Level         string    `json:"level,omitempty"`
-	Findings      int       `json:"findings"`
-	Verdicts      int       `json:"verdicts"`
-	TraceID       int64     `json:"trace_id,omitempty"`
-	PayloadTable  string    `json:"payload_table,omitempty"`
-	Executed      bool      `json:"executed"`
-	Execution     string    `json:"execution,omitempty"`
-	AgentOnline   *bool     `json:"agent_online,omitempty"`
-	NetworkEvents int       `json:"network_events,omitempty"`
-	Summary       string    `json:"summary,omitempty"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID              int64     `json:"id,omitempty"`
+	LoopID          string    `json:"loop_id"`
+	Iteration       int       `json:"iteration"`
+	Attempt         int       `json:"attempt,omitempty"`
+	GlobalIteration int       `json:"global_iteration,omitempty"`
+	PayloadID       int64     `json:"payload_id"`
+	PayloadKey      string    `json:"payload_key,omitempty"`
+	RunID           string    `json:"run_id"`
+	Score           float64   `json:"score"`
+	Level           string    `json:"level,omitempty"`
+	Findings        int       `json:"findings"`
+	Verdicts        int       `json:"verdicts"`
+	TraceID         int64     `json:"trace_id,omitempty"`
+	PayloadTable    string    `json:"payload_table,omitempty"`
+	Executed        bool      `json:"executed"`
+	Execution       string    `json:"execution,omitempty"`
+	AgentOnline     *bool     `json:"agent_online,omitempty"`
+	NetworkEvents   int       `json:"network_events,omitempty"`
+	Summary         string    `json:"summary,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 // FeedbackRecord is the full feedback JSON, stored outside the model context.
