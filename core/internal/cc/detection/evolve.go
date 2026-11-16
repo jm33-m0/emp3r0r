@@ -45,6 +45,16 @@ const (
 	minArtifactShellcodeRatio = 4
 )
 
+// Execution states recorded for every cycle. A dynamic cycle is valid only
+// when its generated agent checked in on the C2; the analyzer score of a
+// payload that never ran says nothing about evasion.
+const (
+	executionVerified   = "verified"
+	executionOffline    = "offline"
+	executionUnverified = "unverified"
+	executionStatic     = "static"
+)
+
 // EvolveConfig drives an autonomous detection -> feedback -> edit -> rebuild
 // loop for one local payload module.
 type EvolveConfig struct {
@@ -168,6 +178,14 @@ type evolver struct {
 	shellSeq          int
 	knowledge         *KnowledgeDB
 	lastAnswer        map[string]any
+	// progress counts cycles that produced a comparable result; an offline
+	// cycle consumes the budget but does not count as progress, so the stalled
+	// session guard cannot be reset by builds whose payload never ran.
+	progress         int
+	lastExecuting    *Cycle
+	executionBlocked bool
+	// executionCheckTimeout overrides PayloadVerifyTimeout in tests.
+	executionCheckTimeout time.Duration
 }
 
 func (e *evolver) dynamicEnabled() bool {
@@ -416,6 +434,16 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 		producerList = strings.Join(names, ", ")
 	}
 	rootList := e.roots.describe()
+	executionState := "the host checks the generated agent after every dynamic cycle with AgentStatus and records execution=verified, offline, or unverified"
+	if e.executionBlocked {
+		executionState = "the baseline payload did not check in and no executing baseline exists; do not run more cycles; return the final JSON with the execution failure"
+	} else if e.lastExecuting != nil {
+		payload := shortSHA(strings.TrimPrefix(e.lastExecuting.PayloadKey, "sha256:"))
+		if payload == "" {
+			payload = "the baseline"
+		}
+		executionState = fmt.Sprintf("the last executing payload is %s; the host checks every dynamic cycle with AgentStatus and restores this payload after a non-executing cycle", payload)
+	}
 	knowledgeState := "unavailable; ask the operator to run detect_loop knowledge-sync"
 	if e.knowledge != nil {
 		knowledgeState = "available: " + e.knowledge.Path() + " (KnowledgeSearch, KnowledgeRead)"
@@ -440,6 +468,7 @@ Agent C2: %s
 Expected agent UUID: %s
 Goal: %s
 Knowledge cache: %s
+Execution gate: %s
 Cycle budget: %d total, including the baseline; %d cycles remain.
 Baseline cycle: %s
 
@@ -501,7 +530,7 @@ cycle budget is exhausted, or when no actionable high/medium finding remains and
 every residual is explained with evidence. Return the final JSON object.`,
 		cfg.LoopID, cfg.Module, cfg.ModuleDir, e.shellcode, headerOrNone(e.activeProducer), producerList, rootList,
 		headerOrNone(cfg.AgentCC), headerOrNone(e.expectedAgentUUID), headerOrNone(cfg.Goal), knowledgeState,
-		cfg.Iterations, max(0, cfg.Iterations-e.iter), cfg.Module, baselineJSON)
+		executionState, cfg.Iterations, max(0, cfg.Iterations-e.iter), baselineJSON, cfg.Module)
 	if cfg.BuildAgent == nil {
 		prompt += "\n\nAgent generation (GenerateAgent) is disabled for this run; reuse the supplied shellcode or edit and rebuild an existing producer."
 	}
@@ -515,11 +544,11 @@ every residual is explained with evidence. Return the final JSON object.`,
 		parseErr error
 	)
 	maxTokens := 16384
-	progress := e.iter
+	progress := e.progress
 	stalled := 0
 	canResume := func() bool {
-		if e.iter != progress {
-			progress = e.iter
+		if e.progress != progress {
+			progress = e.progress
 			stalled = 0
 		}
 		stalled++
@@ -547,6 +576,10 @@ every residual is explained with evidence. Return the final JSON object.`,
 			if ctx.Err() != nil {
 				return nil, ctx.Err()
 			}
+			if e.executionBlocked {
+				e.logClass(logging.ClassError, "stopping the session: the baseline payload did not execute and no executing baseline exists")
+				break
+			}
 			if !canResume() {
 				return nil, fmt.Errorf("agent session failed after repeated restarts: %w", err)
 			}
@@ -570,7 +603,7 @@ every residual is explained with evidence. Return the final JSON object.`,
 			}
 			break
 		}
-		if e.iter < cfg.Iterations {
+		if e.iter < cfg.Iterations && !e.executionBlocked {
 			if !canResume() {
 				break
 			}
@@ -762,26 +795,31 @@ func parseEvolveStages(stages []string) (static, dynamic bool, err error) {
 }
 
 type cycleSummary struct {
-	LoopID       string          `json:"loop_id"`
-	Iteration    int             `json:"iteration"`
-	PayloadKey   string          `json:"payload_key"`
-	PayloadTable string          `json:"payload_table"`
-	RunID        string          `json:"run_id"`
-	SHA256       string          `json:"sha256"`
-	Score        float64         `json:"score"`
-	Level        string          `json:"level,omitempty"`
-	Findings     int             `json:"findings"`
-	Verdicts     []string        `json:"verdicts,omitempty"`
-	TraceID      int64           `json:"trace_id,omitempty"`
-	Events       int             `json:"telemetry_events"`
-	Telemetry    *TelemetryStats `json:"telemetry,omitempty"`
-	SourceEdits  int             `json:"source_edits"`
-	TopFindings  []string        `json:"top_findings,omitempty"`
-	BuildTail    []string        `json:"build_tail,omitempty"`
-	Edits        []EditRecord    `json:"edits,omitempty"`
-	Shellcode    string          `json:"shellcode,omitempty"`
-	Mechanism    string          `json:"mechanism,omitempty"`
-	Note         string          `json:"note,omitempty"`
+	LoopID        string          `json:"loop_id"`
+	Iteration     int             `json:"iteration"`
+	PayloadKey    string          `json:"payload_key"`
+	PayloadTable  string          `json:"payload_table"`
+	RunID         string          `json:"run_id"`
+	SHA256        string          `json:"sha256"`
+	Score         float64         `json:"score"`
+	Level         string          `json:"level,omitempty"`
+	Findings      int             `json:"findings"`
+	Verdicts      []string        `json:"verdicts,omitempty"`
+	TraceID       int64           `json:"trace_id,omitempty"`
+	Events        int             `json:"telemetry_events"`
+	Telemetry     *TelemetryStats `json:"telemetry,omitempty"`
+	SourceEdits   int             `json:"source_edits"`
+	TopFindings   []string        `json:"top_findings,omitempty"`
+	BuildTail     []string        `json:"build_tail,omitempty"`
+	Edits         []EditRecord    `json:"edits,omitempty"`
+	Shellcode     string          `json:"shellcode,omitempty"`
+	Producer      string          `json:"producer,omitempty"`
+	Mechanism     string          `json:"mechanism,omitempty"`
+	Note          string          `json:"note,omitempty"`
+	Executed      bool            `json:"executed"`
+	Execution     string          `json:"execution,omitempty"`
+	AgentOnline   *bool           `json:"agent_online,omitempty"`
+	NetworkEvents int             `json:"network_events,omitempty"`
 }
 
 func ensurePayloadPreserved(shellcode string, artifact Artifact) error {
@@ -904,11 +942,16 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, 
 	if dynamic && !run.Executed {
 		return Cycle{}, fmt.Errorf("dynamic stages were selected but the sandbox did not execute the artifact")
 	}
+	traceID := int64(0)
+	if run.Telemetry != nil {
+		traceID = run.Telemetry.TraceID
+	}
+	execution, online, networkEvents := e.checkExecution(ctx, traceID, dynamic)
 	if err := e.linkEdits(ctx, iteration, run.Telemetry.PayloadID); err != nil {
 		e.logClass(logging.ClassError, "link edits: %v", err)
 	}
 	e.iter = iteration
-	summary := summarizeCycle(e.cfg.LoopID, iteration, run, feedback, buildLog, note, mechanism, shellcode)
+	summary := summarizeCycle(e.cfg.LoopID, iteration, run, feedback, buildLog, note, mechanism, shellcode, e.activeProducer, execution, online, networkEvents)
 	if edits, err := e.db.LoopEdits(ctx, e.cfg.LoopID); err != nil {
 		e.logClass(logging.ClassError, "read edits for cycle summary: %v", err)
 	} else {
@@ -930,6 +973,8 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, 
 		PayloadKey: run.Telemetry.PayloadKey, RunID: run.ID, Score: feedback.Score,
 		Level: feedback.Level, Findings: len(feedback.Findings),
 		Verdicts: len(summary.Verdicts), TraceID: run.Telemetry.TraceID,
+		Executed: summary.Executed, Execution: summary.Execution,
+		AgentOnline: summary.AgentOnline, NetworkEvents: summary.NetworkEvents,
 		Summary: string(summaryJSON), CreatedAt: time.Now().UTC(),
 	}
 	if _, err := e.db.SaveCycle(ctx, cycle); err != nil {
@@ -951,18 +996,21 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism string) (Cycle, 
 	}
 	e.last = &cycle
 	e.cycles = append(e.cycles, cycle)
-	e.logClass(logging.ClassCycle, "cycle %d: payload=%s sha=%s score=%.2f verdicts=%v findings=%d",
-		iteration, cycle.PayloadKey, shortSHA(artifact.SHA256), cycle.Score, summary.Verdicts, cycle.Findings)
+	e.logClass(logging.ClassCycle, "cycle %d: payload=%s sha=%s score=%.2f verdicts=%v findings=%d execution=%s",
+		iteration, cycle.PayloadKey, shortSHA(artifact.SHA256), cycle.Score, summary.Verdicts, cycle.Findings, summary.Execution)
+	e.applyExecutionGate(ctx, &cycle, summary)
 	return cycle, nil
 }
 
-func summarizeCycle(loopID string, iteration int, run Run, feedback Feedback, buildLog, note, mechanism, shellcode string) cycleSummary {
+func summarizeCycle(loopID string, iteration int, run Run, feedback Feedback, buildLog, note, mechanism, shellcode, producer, execution string, online *bool, networkEvents int) cycleSummary {
 	summary := cycleSummary{
 		LoopID: loopID, Iteration: iteration, RunID: run.ID,
 		Mechanism: mechanism,
 		SHA256:    run.Plan.Artifact.SHA256, Score: feedback.Score, Level: sanitizeLine(feedback.Level),
 		Findings: len(feedback.Findings), SourceEdits: len(feedback.SourceEdits),
-		Shellcode: shellcode, Note: note,
+		Shellcode: shellcode, Producer: producer, Note: note,
+		Executed: execution == executionVerified, Execution: execution,
+		AgentOnline: online, NetworkEvents: networkEvents,
 	}
 	if run.Telemetry != nil {
 		summary.PayloadKey = run.Telemetry.PayloadKey
@@ -1010,6 +1058,113 @@ func shortSHA(sha string) string {
 	return sha
 }
 
+// checkExecution verifies that a dynamic payload reached the agent runtime. It
+// returns the recorded state, the C2 online flag when it was checked, and the
+// trace's network event count as corroborating evidence.
+func (e *evolver) checkExecution(ctx context.Context, traceID int64, dynamic bool) (string, *bool, int) {
+	network := 0
+	if e.db != nil && traceID != 0 {
+		if count, err := e.db.NetworkEventCount(ctx, traceID); err == nil {
+			network = count
+		} else {
+			e.logClass(logging.ClassWarning, "count network events for trace %d: %v", traceID, err)
+		}
+	}
+	if !dynamic {
+		return executionStatic, nil, network
+	}
+	if e.cfg.Verify == nil || strings.TrimSpace(e.expectedAgentUUID) == "" {
+		return executionUnverified, nil, network
+	}
+	timeout := e.executionCheckTimeout
+	if timeout <= 0 {
+		timeout = PayloadVerifyTimeout
+	}
+	deadline := time.Now().Add(timeout)
+	for {
+		status, err := e.cfg.Verify.AgentStatus(ctx, e.expectedAgentUUID)
+		if err != nil {
+			// A transient C2 error is not proof that the payload failed to run.
+			e.logClass(logging.ClassWarning, "agent status for %s: %v", e.expectedAgentUUID, err)
+			return executionUnverified, nil, network
+		}
+		if status != nil && status.Online {
+			online := true
+			return executionVerified, &online, network
+		}
+		if !time.Now().Before(deadline) {
+			break
+		}
+		wait := time.Second
+		if remaining := time.Until(deadline); remaining < wait {
+			wait = remaining
+		}
+		select {
+		case <-ctx.Done():
+			return executionUnverified, nil, network
+		case <-time.After(wait):
+		}
+	}
+	online := false
+	return executionOffline, &online, network
+}
+
+// applyExecutionGate counts only comparable cycles as progress and rolls a
+// non-executing cycle back to the last payload that actually checked in.
+func (e *evolver) applyExecutionGate(ctx context.Context, cycle *Cycle, summary cycleSummary) {
+	switch summary.Execution {
+	case executionVerified:
+		e.lastExecuting = cycle
+		e.progress++
+	case executionStatic, executionUnverified:
+		e.progress++
+	case executionOffline:
+		if e.lastExecuting == nil {
+			e.executionBlocked = true
+			e.logClass(logging.ClassError, "cycle %d did not execute and no executing baseline exists; stopping further detection cycles", cycle.Iteration)
+			return
+		}
+		e.logClass(logging.ClassWarning, "cycle %d did not execute (agent %s offline); restoring payload %s",
+			cycle.Iteration, headerOrNone(e.expectedAgentUUID),
+			shortSHA(strings.TrimPrefix(e.lastExecuting.PayloadKey, "sha256:")))
+		e.restoreExecutingState(ctx)
+	}
+}
+
+// restoreExecutingState rolls the editable source and active shellcode back to
+// the last payload whose agent checked in.
+func (e *evolver) restoreExecutingState(ctx context.Context) {
+	baseline := e.lastExecuting
+	if baseline == nil {
+		e.executionBlocked = true
+		return
+	}
+	if _, err := e.revertCycleEdits(ctx, e.lastPayloadID(), baseline.PayloadKey); err != nil {
+		e.logClass(logging.ClassWarning, "restore %s source: %v",
+			shortSHA(strings.TrimPrefix(baseline.PayloadKey, "sha256:")), err)
+	}
+	var summary cycleSummary
+	if err := json.Unmarshal([]byte(baseline.Summary), &summary); err != nil {
+		return
+	}
+	path := strings.TrimSpace(summary.Shellcode)
+	if path == "" {
+		return
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		e.logClass(logging.ClassWarning, "restore shellcode %s: %v", path, err)
+		return
+	}
+	if !info.Mode().IsRegular() {
+		e.logClass(logging.ClassWarning, "restore shellcode %s: not a regular file", path)
+		return
+	}
+	e.shellcode = path
+	e.activeProducer = summary.Producer
+	e.logClass(logging.ClassEdit, "restored shellcode %s (producer %s)", path, headerOrNone(summary.Producer))
+}
+
 func (e *evolver) linkEdits(ctx context.Context, iteration int, payloadID int64) error {
 	_, err := e.db.db.ExecContext(ctx, `
 		UPDATE loop_edits SET next_payload_id = ?
@@ -1055,6 +1210,7 @@ Latest cycle: %s
 Dossier (already established; do not re-derive it):
 %s
 %s
+%s
 Full feedback, builds, and telemetry are in SQLite. Continue from the current
 source state: inspect only what the dossier does not answer, apply any remaining
 source edit, and call DetectionCycle with the mechanism under test. The dossier
@@ -1062,7 +1218,20 @@ records the mechanism and edit reasons for recent cycles; do not repeat a
 hypothesis it lists as tried. If those cycles refined the same mechanism, choose
 a different one or record the concrete constraint that rules the alternatives
 out. Return the required JSON object when the loop is complete.`,
-		cfg.LoopID, reason, latest, e.dossier(), e.directionHint())
+		cfg.LoopID, reason, latest, e.dossier(), e.executionHint(), e.directionHint())
+}
+
+// executionHint makes a non-executing payload the first thing a resumed session
+// sees, because its analyzer score is not evidence about evasion.
+func (e *evolver) executionHint() string {
+	if e.executionBlocked {
+		return "Execution gate: no dynamic payload has checked in. Do not run more cycles; return the final JSON with the execution failure."
+	}
+	if e.last != nil && e.last.Execution == executionOffline && e.lastExecuting != nil {
+		return fmt.Sprintf("Execution gate: the last cycle did not execute. The host restored payload %s; fix why the generated agent never checked in before changing detection code.",
+			shortSHA(strings.TrimPrefix(e.lastExecuting.PayloadKey, "sha256:")))
+	}
+	return "Execution gate: the host checks the generated agent after every dynamic cycle and records execution=verified, offline, or unverified."
 }
 
 // directionHint calls out a repeated mechanism so a resumed session does not
@@ -1103,8 +1272,9 @@ func (e *evolver) dossier() string {
 		for _, edit := range summary.Edits {
 			files = append(files, edit.Module+"/"+edit.File)
 		}
-		fmt.Fprintf(&b, "- cycle %d: mechanism=%s score=%.2f level=%s findings=%d verdicts=%d shellcode=%s files=%s\n",
+		fmt.Fprintf(&b, "- cycle %d: mechanism=%s score=%.2f level=%s findings=%d verdicts=%d execution=%s network=%d shellcode=%s files=%s\n",
 			cycle.Iteration, headerOrNone(summary.Mechanism), cycle.Score, cycle.Level, cycle.Findings, cycle.Verdicts,
+			headerOrNone(summary.Execution), summary.NetworkEvents,
 			headerOrNone(filepath.Base(summary.Shellcode)), joinOrNone(files))
 		if strings.TrimSpace(summary.Note) != "" {
 			fmt.Fprintf(&b, "  tested: %s\n", clip(sanitizeLine(summary.Note), 240))
@@ -1155,7 +1325,13 @@ func limitStrings(values []string, n int) []string {
 }
 
 func (e *evolver) needsMoreWork(ctx context.Context) bool {
+	if e.executionBlocked {
+		return false
+	}
 	if e.last == nil {
+		return true
+	}
+	if e.last.Execution == executionOffline {
 		return true
 	}
 	if e.last.Verdicts > 0 {
@@ -1269,6 +1445,7 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 		Name: "DetectionCycle",
 		Description: "Rebuild the module from its current source and detonate the artifact in the sandbox. " +
 			"The full feedback, build log, and telemetry are stored in SQLite; this returns a bounded summary. " +
+			"The host checks the generated agent with AgentStatus and reports execution=verified, offline, or unverified. " +
 			"Call it after applying source edits.",
 		Prompt: "Build and run one detection cycle.",
 		Schema: map[string]any{
@@ -1297,6 +1474,9 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 				Note      string `json:"note"`
 			}
 			_ = json.Unmarshal(raw, &args)
+			if e.executionBlocked {
+				return tool.Errorf("payload execution is blocked: no dynamic payload has checked in and no executing baseline exists; return the final JSON with the execution failure"), nil
+			}
 			if e.iter >= e.cfg.Iterations {
 				return tool.Errorf(fmt.Sprintf("iteration limit reached (%d); return the final JSON", e.cfg.Iterations)), nil
 			}
@@ -1328,6 +1508,19 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 			payload, _ := e.db.PayloadByKey(ctx, cycle.PayloadKey)
 			var summary any
 			_ = json.Unmarshal([]byte(cycle.Summary), &summary)
+			message := "full feedback and build log are in SQLite; use InspectFeedback or TelemetryQuery"
+			switch cycle.Execution {
+			case executionVerified:
+				message = "the payload executed and its agent checked in; full feedback and build log are in SQLite"
+			case executionOffline:
+				if e.lastExecuting != nil {
+					message = "the payload did not execute; the host restored the last executing source and shellcode. Fix agent check-in before changing detection code."
+				} else {
+					message = "the payload did not execute and no executing baseline exists; return the final JSON with the execution failure."
+				}
+			case executionUnverified:
+				message = "agent verification is not configured, so execution could not be proven; full feedback and build log are in SQLite"
+			}
 			out := map[string]any{
 				"cycle":            cycle,
 				"summary":          summary,
@@ -1336,7 +1529,7 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 				"iterations":       e.cfg.Iterations,
 				"remaining_cycles": max(0, e.cfg.Iterations-e.iter),
 				"active_shellcode": e.shellcode,
-				"message":          "full feedback and build log are in SQLite; use InspectFeedback or TelemetryQuery",
+				"message":          message,
 			}
 			data, _ := json.Marshal(out)
 			return tool.Text(string(data)), nil
@@ -1881,16 +2074,18 @@ Work loop:
 5. Call DetectionCycle with the mechanism under test. It rebuilds from the
    current source and returns a bounded summary, the new payload key, the active
    shellcode, and the remaining cycle budget. Do not exceed the budget.
-6. Do not verify the payload after every cycle. The host runs one final
-   verification after the loop stops: it polls for the last generated agent
-   UUID, runs a small BOF (whoami by default), and records the result. If the
-   payload never comes online, the host restarts the loop. Use AgentStatus to
-   check whether the UUID generated for this loop is online, and RunModule for
-   the whoami verification BOF; neither tool can target another agent. Do not
-   spend model turns polling an agent that cannot exist when
-   the dynamic feedback already proves the loader failed before initialization.
-   If the agent never checks in, verify the C2 address is reachable from the
-   sandbox (not a container-only hostname) before changing detection code.
+6. The host checks the generated agent after every dynamic cycle and records
+   execution=verified when it checks in, offline when it does not, and
+   unverified when verification is not configured. Do not spend model turns
+   polling; read the execution field. A cycle with execution=offline is not a
+   comparable detection result: the host restores the last executing source and
+   shellcode, and you must fix why the agent never checked in before changing
+   detection code. If no payload has ever checked in, stop and return the final
+   JSON with the execution failure. The host still runs one final whoami
+   verification after the loop stops. AgentStatus and RunModule remain scoped to
+   this loop's UUID and cannot target another agent. If the agent never checks
+   in, check the C2 address reachability and the generated agent or producer
+   before changing loader detection code.
 7. ComparePayloads the previous and new payloads. A cycle with a coverage gap
    (failed analyzer, early termination, missing telemetry) is not comparable;
    do not treat it as clean or as an improvement.

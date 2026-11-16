@@ -2,6 +2,7 @@ package detection
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -414,6 +415,14 @@ func (e *evolver) revertPayloadTool() tool.CoreTool {
 	})
 }
 
+type revertEdit struct {
+	id     int64
+	module string
+	file   string
+	old    string
+	new    string
+}
+
 func (e *evolver) revertToPayload(ctx context.Context, payloadKey string) (int, error) {
 	payloadKey = strings.TrimSpace(payloadKey)
 	id, err := payloadIDByKey(ctx, e.db.db, payloadKey)
@@ -430,24 +439,8 @@ func (e *evolver) revertToPayload(ctx context.Context, payloadKey string) (int, 
 	if err != nil {
 		return 0, fmt.Errorf("read edit history: %w", err)
 	}
-	type edit struct {
-		id     int64
-		module string
-		file   string
-		old    string
-		new    string
-	}
-	var edits []edit
-	for rows.Next() {
-		var item edit
-		if err := rows.Scan(&item.id, &item.module, &item.file, &item.old, &item.new); err != nil {
-			_ = rows.Close()
-			return 0, err
-		}
-		edits = append(edits, item)
-	}
-	_ = rows.Close()
-	if err := rows.Err(); err != nil {
+	edits, err := scanRevertEdits(rows)
+	if err != nil {
 		return 0, err
 	}
 	if len(edits) == 0 {
@@ -456,10 +449,57 @@ func (e *evolver) revertToPayload(ctx context.Context, payloadKey string) (int, 
 	if len(edits) > maxRevertEdits {
 		return 0, fmt.Errorf("more than %d edits were made after payload %q; revert in smaller steps", maxRevertEdits, payloadKey)
 	}
-	payloadID := int64(0)
-	if e.last != nil {
-		payloadID = e.last.PayloadID
+	return e.applyRevertEdits(ctx, edits, e.lastPayloadID(), payloadKey)
+}
+
+// revertCycleEdits undoes only the edits linked to one failed payload. The
+// automatic execution gate uses this so a later failed cycle does not replay
+// the source edits that an earlier auto-revert already undid.
+func (e *evolver) revertCycleEdits(ctx context.Context, payloadID int64, label string) (int, error) {
+	if payloadID == 0 {
+		return 0, fmt.Errorf("failed payload id is required")
 	}
+	rows, err := e.db.db.QueryContext(ctx, `
+		SELECT id, COALESCE(module, ''), file, old, new FROM loop_edits
+		WHERE loop_id = ? AND next_payload_id = ?
+		ORDER BY id DESC LIMIT ?`, e.cfg.LoopID, payloadID, maxRevertEdits+1)
+	if err != nil {
+		return 0, fmt.Errorf("read failed-cycle edits: %w", err)
+	}
+	edits, err := scanRevertEdits(rows)
+	if err != nil {
+		return 0, err
+	}
+	if len(edits) == 0 {
+		return 0, nil
+	}
+	if len(edits) > maxRevertEdits {
+		return 0, fmt.Errorf("more than %d edits produced payload %s; revert in smaller steps", maxRevertEdits, label)
+	}
+	return e.applyRevertEdits(ctx, edits, payloadID, label)
+}
+
+func scanRevertEdits(rows *sql.Rows) ([]revertEdit, error) {
+	defer rows.Close()
+	var edits []revertEdit
+	for rows.Next() {
+		var item revertEdit
+		if err := rows.Scan(&item.id, &item.module, &item.file, &item.old, &item.new); err != nil {
+			return nil, err
+		}
+		edits = append(edits, item)
+	}
+	return edits, rows.Err()
+}
+
+func (e *evolver) lastPayloadID() int64 {
+	if e.last == nil {
+		return 0
+	}
+	return e.last.PayloadID
+}
+
+func (e *evolver) applyRevertEdits(ctx context.Context, edits []revertEdit, payloadID int64, label string) (int, error) {
 	for _, item := range edits {
 		root, err := e.roots.pick(item.module)
 		if err != nil {
@@ -475,7 +515,7 @@ func (e *evolver) revertToPayload(ctx context.Context, payloadKey string) (int, 
 		if err := e.db.SaveEdit(ctx, EditRecord{
 			LoopID: e.cfg.LoopID, Iteration: e.iter + 1, PayloadID: payloadID,
 			Module: root.Name, File: item.file, Old: item.new, New: item.old,
-			Reason: "revert to payload " + payloadKey,
+			Reason: "revert to payload " + label,
 		}); err != nil {
 			if restoreErr := restoreSourceFile(write.Path, write.Original); restoreErr != nil {
 				return 0, fmt.Errorf("save revert: %w (restore %s failed: %v)", err, item.file, restoreErr)

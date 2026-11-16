@@ -149,6 +149,10 @@ CREATE TABLE IF NOT EXISTS loop_cycles (
 	findings INTEGER NOT NULL DEFAULT 0,
 	verdicts INTEGER NOT NULL DEFAULT 0,
 	trace_id INTEGER,
+	executed INTEGER NOT NULL DEFAULT 0,
+	execution TEXT NOT NULL DEFAULT '',
+	agent_online INTEGER,
+	network_events INTEGER NOT NULL DEFAULT 0,
 	summary TEXT NOT NULL DEFAULT '',
 	created_at INTEGER NOT NULL DEFAULT 0
 );
@@ -299,6 +303,10 @@ func OpenTelemetryDB(path string) (*TelemetryDB, error) {
 		{"events", "payload_role", "TEXT NOT NULL DEFAULT ''"},
 		{"loop_edits", "next_payload_id", "INTEGER REFERENCES payloads(id)"},
 		{"loop_edits", "module", "TEXT NOT NULL DEFAULT ''"},
+		{"loop_cycles", "executed", "INTEGER NOT NULL DEFAULT 0"},
+		{"loop_cycles", "execution", "TEXT NOT NULL DEFAULT ''"},
+		{"loop_cycles", "agent_online", "INTEGER"},
+		{"loop_cycles", "network_events", "INTEGER NOT NULL DEFAULT 0"},
 		{"loop_results", "report", "TEXT NOT NULL DEFAULT ''"},
 	} {
 		if err := ensureColumn(db, column.table, column.name, column.typ); err != nil {
@@ -614,6 +622,14 @@ func nullableInt(value int64) any {
 		return nil
 	}
 	return value
+}
+
+// nullableBool stores a tri-state flag: true, false, or unknown (nil).
+func nullableBool(value *bool) any {
+	if value == nil {
+		return nil
+	}
+	return boolInt(*value)
 }
 
 // ImportFile reads and imports one local telemetry file.

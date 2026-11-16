@@ -11,20 +11,24 @@ import (
 
 // Cycle is one build-and-detonate step of a detection loop.
 type Cycle struct {
-	ID           int64     `json:"id,omitempty"`
-	LoopID       string    `json:"loop_id"`
-	Iteration    int       `json:"iteration"`
-	PayloadID    int64     `json:"payload_id"`
-	PayloadKey   string    `json:"payload_key,omitempty"`
-	RunID        string    `json:"run_id"`
-	Score        float64   `json:"score"`
-	Level        string    `json:"level,omitempty"`
-	Findings     int       `json:"findings"`
-	Verdicts     int       `json:"verdicts"`
-	TraceID      int64     `json:"trace_id,omitempty"`
-	PayloadTable string    `json:"payload_table,omitempty"`
-	Summary      string    `json:"summary,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID            int64     `json:"id,omitempty"`
+	LoopID        string    `json:"loop_id"`
+	Iteration     int       `json:"iteration"`
+	PayloadID     int64     `json:"payload_id"`
+	PayloadKey    string    `json:"payload_key,omitempty"`
+	RunID         string    `json:"run_id"`
+	Score         float64   `json:"score"`
+	Level         string    `json:"level,omitempty"`
+	Findings      int       `json:"findings"`
+	Verdicts      int       `json:"verdicts"`
+	TraceID       int64     `json:"trace_id,omitempty"`
+	PayloadTable  string    `json:"payload_table,omitempty"`
+	Executed      bool      `json:"executed"`
+	Execution     string    `json:"execution,omitempty"`
+	AgentOnline   *bool     `json:"agent_online,omitempty"`
+	NetworkEvents int       `json:"network_events,omitempty"`
+	Summary       string    `json:"summary,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 // FeedbackRecord is the full feedback JSON, stored outside the model context.
@@ -87,11 +91,13 @@ func (t *TelemetryDB) SaveCycle(ctx context.Context, cycle Cycle) (int64, error)
 	}
 	result, err := t.db.ExecContext(ctx, `
 		INSERT INTO loop_cycles(loop_id, iteration, payload_id, run_id, score, level,
-			findings, verdicts, trace_id, summary, created_at)
-		VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			findings, verdicts, trace_id, executed, execution, agent_online,
+			network_events, summary, created_at)
+		VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		cycle.LoopID, cycle.Iteration, cycle.PayloadID, cycle.RunID, cycle.Score,
 		cycle.Level, cycle.Findings, cycle.Verdicts, nullableInt(cycle.TraceID),
-		cycle.Summary, cycle.CreatedAt.UnixMilli())
+		boolInt(cycle.Executed), cycle.Execution, nullableBool(cycle.AgentOnline),
+		cycle.NetworkEvents, cycle.Summary, cycle.CreatedAt.UnixMilli())
 	if err != nil {
 		return 0, fmt.Errorf("save cycle: %w", err)
 	}
@@ -203,7 +209,8 @@ func (t *TelemetryDB) CyclesForPayload(ctx context.Context, payloadKey string) (
 	}
 	rows, err := t.db.QueryContext(ctx, `
 		SELECT id, loop_id, iteration, payload_id, run_id, score, level, findings,
-		       verdicts, COALESCE(trace_id, 0), summary, created_at
+		       verdicts, COALESCE(trace_id, 0), executed, execution, agent_online,
+		       network_events, summary, created_at
 		FROM loop_cycles WHERE payload_id = ? ORDER BY id`, id)
 	if err != nil {
 		return nil, fmt.Errorf("read cycles: %w", err)
@@ -213,14 +220,34 @@ func (t *TelemetryDB) CyclesForPayload(ctx context.Context, payloadKey string) (
 	for rows.Next() {
 		var cycle Cycle
 		var created int64
+		var online sql.NullInt64
 		if err := rows.Scan(&cycle.ID, &cycle.LoopID, &cycle.Iteration, &cycle.PayloadID,
 			&cycle.RunID, &cycle.Score, &cycle.Level, &cycle.Findings, &cycle.Verdicts,
-			&cycle.TraceID, &cycle.Summary, &created); err != nil {
+			&cycle.TraceID, &cycle.Executed, &cycle.Execution, &online,
+			&cycle.NetworkEvents, &cycle.Summary, &created); err != nil {
 			return nil, fmt.Errorf("scan cycle: %w", err)
+		}
+		if online.Valid {
+			value := online.Int64 != 0
+			cycle.AgentOnline = &value
 		}
 		cycle.PayloadKey = payloadKey
 		cycle.CreatedAt = time.UnixMilli(created).UTC()
 		out = append(out, cycle)
 	}
 	return out, rows.Err()
+}
+
+// NetworkEventCount returns how many normalized network events one trace holds.
+func (t *TelemetryDB) NetworkEventCount(ctx context.Context, traceID int64) (int, error) {
+	if traceID == 0 {
+		return 0, nil
+	}
+	var count int
+	if err := t.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM events WHERE trace_pk = ? AND category = 'network'`,
+		traceID).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count network events: %w", err)
+	}
+	return count, nil
 }

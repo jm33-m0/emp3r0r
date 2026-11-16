@@ -264,6 +264,133 @@ func TestEvolveFallsBackWhenAgentTextIsNotJSON(t *testing.T) {
 	}
 }
 
+func TestCheckExecutionUsesAgentStatus(t *testing.T) {
+	noop := func(logging.Class, string, ...any) {}
+	ctx := context.Background()
+
+	e := &evolver{
+		cfg:                   EvolveConfig{Stages: []string{"dynamic"}, Verify: &stubVerifyOps{}},
+		expectedAgentUUID:     "loop-uuid",
+		executionCheckTimeout: time.Millisecond,
+		logf:                  noop,
+	}
+	execution, online, network := e.checkExecution(ctx, 0, true)
+	if execution != executionVerified || online == nil || !*online || network != 0 {
+		t.Fatalf("online check = %q %v %d", execution, online, network)
+	}
+
+	e.cfg.Verify = &stubVerifyOps{offline: true}
+	execution, online, _ = e.checkExecution(ctx, 0, true)
+	if execution != executionOffline || online == nil || *online {
+		t.Fatalf("offline check = %q %v", execution, online)
+	}
+
+	e.cfg.Verify = nil
+	execution, online, _ = e.checkExecution(ctx, 0, true)
+	if execution != executionUnverified || online != nil {
+		t.Fatalf("unverified check = %q %v", execution, online)
+	}
+
+	execution, online, _ = e.checkExecution(ctx, 0, false)
+	if execution != executionStatic || online != nil {
+		t.Fatalf("static check = %q %v", execution, online)
+	}
+}
+
+func TestExecutionGateCountsOnlyComparableCycles(t *testing.T) {
+	noop := func(logging.Class, string, ...any) {}
+	e := &evolver{logf: noop}
+	ctx := context.Background()
+
+	e.applyExecutionGate(ctx, &Cycle{Iteration: 1, PayloadKey: "sha256:first"}, cycleSummary{Execution: executionStatic})
+	e.applyExecutionGate(ctx, &Cycle{Iteration: 2}, cycleSummary{Execution: executionUnverified})
+	if e.progress != 2 || e.lastExecuting != nil {
+		t.Fatalf("progress = %d lastExecuting = %+v", e.progress, e.lastExecuting)
+	}
+
+	verified := &Cycle{Iteration: 3, PayloadKey: "sha256:running", Summary: `{"shellcode":"","producer":"donut"}`}
+	e.applyExecutionGate(ctx, verified, cycleSummary{Execution: executionVerified})
+	if e.progress != 3 || e.lastExecuting != verified {
+		t.Fatalf("progress = %d lastExecuting = %+v", e.progress, e.lastExecuting)
+	}
+
+	e.lastExecuting = nil
+	e.applyExecutionGate(ctx, &Cycle{Iteration: 4}, cycleSummary{Execution: executionOffline})
+	if !e.executionBlocked {
+		t.Fatal("an offline cycle without an executing baseline must block further cycles")
+	}
+}
+
+func TestExecutionGateRestoresLastExecutingPayload(t *testing.T) {
+	moduleDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(moduleDir, "loader.c"), []byte("GOOD"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	roots, err := newSourceRoots("loader_windows", sourceRoot{Name: "loader_windows", Dir: moduleDir, Writable: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	db, err := OpenTelemetryDB(filepath.Join(t.TempDir(), "telemetry.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	ctx := context.Background()
+	insert := func(key string) int64 {
+		res, err := db.db.ExecContext(ctx, `INSERT INTO payloads(payload_key, sha256, module, table_name)
+			VALUES(?, ?, 'loader_windows', 'payload_view')`, key, strings.TrimPrefix(key, "sha256:"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		id, err := res.LastInsertId()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	goodID := insert("sha256:good")
+	badID := insert("sha256:bad")
+	if _, err := db.db.ExecContext(ctx, `INSERT INTO loop_edits(loop_id, iteration, payload_id, next_payload_id, module, file, old, new, reason)
+		VALUES('loop', 2, ?, ?, 'loader_windows', 'loader.c', 'GOOD', 'BAD', 'cycle edit')`, goodID, badID); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(moduleDir, "loader.c"), []byte("BAD"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	goodShellcode := filepath.Join(t.TempDir(), "good.bin")
+	if err := os.WriteFile(goodShellcode, []byte("GOOD-SHELLCODE"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	badShellcode := filepath.Join(t.TempDir(), "bad.bin")
+	if err := os.WriteFile(badShellcode, []byte("BAD-SHELLCODE"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	summary, _ := json.Marshal(cycleSummary{Shellcode: goodShellcode, Producer: "donut"})
+	e := &evolver{
+		cfg: EvolveConfig{LoopID: "loop"}, db: db, roots: roots, iter: 2,
+		last:           &Cycle{PayloadID: badID, PayloadKey: "sha256:bad"},
+		lastExecuting:  &Cycle{PayloadID: goodID, PayloadKey: "sha256:good", Summary: string(summary)},
+		shellcode:      badShellcode,
+		activeProducer: "crystal_pack",
+		logf:           func(logging.Class, string, ...any) {},
+	}
+	e.restoreExecutingState(ctx)
+
+	content, err := os.ReadFile(filepath.Join(moduleDir, "loader.c"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(content) != "GOOD" {
+		t.Fatalf("source was not restored: %q", content)
+	}
+	if e.shellcode != goodShellcode {
+		t.Fatalf("shellcode = %q, want %q", e.shellcode, goodShellcode)
+	}
+	if e.activeProducer != "donut" {
+		t.Fatalf("producer = %q, want donut", e.activeProducer)
+	}
+}
+
 type failOnceProvider struct {
 	inner  llm.Provider
 	failed atomic.Bool

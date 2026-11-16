@@ -726,9 +726,13 @@ func TestDossierCarriesMechanismAndEditReasons(t *testing.T) {
 }
 
 func TestSummarizeCycleRecordsMechanism(t *testing.T) {
-	summary := summarizeCycle("loop-test", 2, Run{ID: "run-2"}, Feedback{}, "", "switch paths", "module-stomp", "agent.bin")
+	online := true
+	summary := summarizeCycle("loop-test", 2, Run{ID: "run-2"}, Feedback{}, "", "switch paths", "module-stomp", "agent.bin", "donut", executionVerified, &online, 3)
 	if summary.Mechanism != "module-stomp" || summary.Note != "switch paths" {
 		t.Fatalf("mechanism or note lost: %+v", summary)
+	}
+	if !summary.Executed || summary.Execution != executionVerified || summary.AgentOnline == nil || !*summary.AgentOnline || summary.NetworkEvents != 3 {
+		t.Fatalf("execution evidence lost: %+v", summary)
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 )
 
 type stubVerifyOps struct {
+	offline     bool
 	statusCalls []string
 	moduleCalls []string
 	forgetCalls []string
@@ -21,7 +22,7 @@ func (s *stubVerifyOps) AgentStatus(_ context.Context, agentUUID string) (*Verif
 	s.statusCalls = append(s.statusCalls, agentUUID)
 	return &VerifyAgentStatus{
 		ExpectedAgent: agentUUID,
-		Online:        true,
+		Online:        !s.offline,
 		Agent:         map[string]any{"uuid": agentUUID, "tag": "agent-tag"},
 	}, nil
 }

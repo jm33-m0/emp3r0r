@@ -88,7 +88,7 @@ Unix IPC socket in the parent operator process. The loop then runs:
    HolyGrail, and every EDR profile;
 3. let a Norma agent query SQLite, edit module source, rebuild, and compare
    payloads;
-4. after the model loop finishes, run verification exactly once. The host
+4. after the model loop finishes, run the final BOF verification exactly once. The host
    polls once per second for the last generated agent UUID, runs a small BOF
    such as `whoami`, and records the output. Only a non-empty BOF result proves
    the loader reached the agent runtime. If the payload never comes online, the
@@ -103,7 +103,16 @@ Unix IPC socket in the parent operator process. The loop then runs:
    expected UUID, `CleanupAgent` forgets only that UUID, and `RunModule` runs
    only the `whoami` verification BOF with no options. Denials and dispatches
    are written to the operator audit log;
-7. write the final JSON and all cycles to the loop tables.
+7. after every dynamic cycle, check the cycle's generated agent with
+   `AgentStatus` and record `execution=verified|offline|unverified`, the online
+   flag, and the trace's network-event count in `loop_cycles` and the cycle
+   summary. An offline cycle consumes the budget but is not a comparable
+   detection result: it does not count as progress, and the host restores the
+   editable source and active shellcode to the last payload whose agent checked
+   in. If no payload has ever checked in, the loop stops and reports the
+   execution failure instead of spending more cycles on a payload that never
+   ran;
+8. write the final JSON and all cycles to the loop tables.
 
 `--shellcode` accepts any x64 position-independent shellcode, so a Crystal
 Palace/Crystal-Kit PICO from `crystal_pack` can replace the generated Donut

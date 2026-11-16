@@ -350,7 +350,8 @@ events(id, payload_id, trace_pk, event_key, ts_ns, type, source, event,
 findings(id, trace_pk, payload_id, stage, tool, severity, rule, indicator,
   detail, signal, created_at)
 loop_cycles(loop_id, iteration, payload_id, run_id, score, level, findings,
-  verdicts, trace_id, summary JSON), loop_feedback(loop_id, iteration,
+  verdicts, trace_id, executed, execution, agent_online, network_events,
+  summary JSON), loop_feedback(loop_id, iteration,
   payload_id, run_id, body JSON), loop_results(loop_id, answer JSON),
   loop_builds(loop_id, iteration, payload_id,
   artifact, sha256, log), loop_edits(loop_id, iteration, payload_id,
@@ -362,6 +363,9 @@ signal: signal, verdict, scan, info, baseline, noise.
 Use trace_pk to scope one trace, or query payloads.table_name for one payload.
 Use findings for the deterministic result and events for evidence; ignore
 signal='noise' and signal='baseline' unless corroborating another finding.
+execution=verified means the generated agent checked in; offline means the
+payload never executed and its score must not be compared with an executing
+cycle; unverified means verification was not configured.
 json_extract(attrs,'$.field') reads raw ETW fields that have no column.`
 
 func analystTelemetryTool(db *TelemetryDB) tool.CoreTool {
