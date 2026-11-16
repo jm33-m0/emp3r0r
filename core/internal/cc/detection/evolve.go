@@ -122,7 +122,9 @@ type EvolveConfig struct {
 	Model    string
 	// RetryBase is the first recovery delay; it backs off to 30 seconds.
 	RetryBase time.Duration
-	// CycleTimeout bounds one build/detonate/verify cycle. Zero uses
+	// CycleTimeout bounds one build/detonate/verify cycle, and the time a model
+	// session may run without completing a cycle: the host interrupts a session
+	// that only inspects and requires an edit and a cycle. Zero uses
 	// defaultCycleTimeout.
 	CycleTimeout time.Duration
 	// SessionTimeout bounds one model session. Zero uses defaultSessionTimeout.
@@ -242,6 +244,8 @@ type evolver struct {
 	sourceTreeHash  string
 	lastToolCall    atomic.Int64
 	activeTools     atomic.Int32
+	lastCycleAt     atomic.Int64
+	activeCycles    atomic.Int32
 	knowledgeSeen   map[string]struct{}
 	started         time.Time
 	cyclesDone      atomic.Int64
@@ -485,6 +489,7 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 		e.log("source tree: %s", e.sourceTreeHash)
 	}
 	e.started = time.Now()
+	e.lastCycleAt.Store(e.started.UnixNano())
 	progressDone := make(chan struct{})
 	go e.progressLoop(ctx, progressDone)
 	defer close(progressDone)
@@ -518,6 +523,9 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 			"baseline failed; asking the model to diagnose the failure before another attempt: %s",
 			e.baselineFailure)
 	}
+	// Start the cycle deadline when the model starts working: a slow baseline
+	// must not consume the first model session's window.
+	e.lastCycleAt.Store(time.Now().UnixNano())
 	baselineJSON, _ := json.Marshal(baseline)
 
 	producerList := "none configured"
@@ -696,8 +704,12 @@ every residual is explained with evidence. Return the final JSON object.`,
 		if idleTimeout <= 0 {
 			idleTimeout = defaultToolIdleTimeout
 		}
+		cycleTimeout := cfg.CycleTimeout
+		if cycleTimeout <= 0 {
+			cycleTimeout = defaultCycleTimeout
+		}
 		sessionCtx, sessionCancel := context.WithCancel(ctx)
-		var sessionExpired, idleExpired atomic.Bool
+		var sessionExpired, idleExpired, cycleExpired atomic.Bool
 		sessionTimer := time.AfterFunc(sessionTimeout, func() {
 			sessionExpired.Store(true)
 			sessionCancel()
@@ -712,25 +724,49 @@ every residual is explained with evidence. Return the final JSON object.`,
 			if tick < time.Second {
 				tick = time.Second
 			}
-			ticker := time.NewTicker(tick)
-			defer ticker.Stop()
+			// A deadline shorter than the tick must fire on time, including
+			// the first check of the session.
+			next := func() time.Duration {
+				wait := tick
+				if e.activeCycles.Load() == 0 && e.activeTools.Load() == 0 {
+					wait = min(wait, cycleTimeout-time.Since(time.Unix(0, e.lastCycleAt.Load())))
+				}
+				if e.activeTools.Load() == 0 {
+					wait = min(wait, idleTimeout-time.Since(time.Unix(0, e.lastToolCall.Load())))
+				}
+				if wait < 10*time.Millisecond {
+					wait = 10 * time.Millisecond
+				}
+				return wait
+			}
+			timer := time.NewTimer(next())
+			defer timer.Stop()
 			for {
 				select {
 				case <-watchdogDone:
 					return
 				case <-sessionCtx.Done():
 					return
-				case <-ticker.C:
-					if e.activeTools.Load() > 0 {
-						continue
-					}
-					last := time.Unix(0, e.lastToolCall.Load())
-					if time.Since(last) >= idleTimeout {
-						idleExpired.Store(true)
-						sessionCancel()
-						return
-					}
+				case <-timer.C:
 				}
+				// An in-flight tool owns the wall clock: a cycle is bounded by
+				// its own deadline, and neither a long tool nor a running cycle
+				// is a stalled session.
+				tools := e.activeTools.Load()
+				cycles := e.activeCycles.Load()
+				idleFor := time.Since(time.Unix(0, e.lastToolCall.Load()))
+				cycleFor := time.Since(time.Unix(0, e.lastCycleAt.Load()))
+				if cycles == 0 && tools == 0 && cycleFor >= cycleTimeout {
+					cycleExpired.Store(true)
+					sessionCancel()
+					return
+				}
+				if tools == 0 && idleFor >= idleTimeout {
+					idleExpired.Store(true)
+					sessionCancel()
+					return
+				}
+				timer.Reset(next())
 			}
 		}()
 		text, err = agentcore.Run(sessionCtx, agentcore.Options{
@@ -752,6 +788,20 @@ every residual is explained with evidence. Return the final JSON object.`,
 		if err != nil {
 			if ctx.Err() != nil {
 				return nil, ctx.Err()
+			}
+			if cycleExpired.Load() {
+				if !canResume() {
+					break
+				}
+				e.logClass(logging.ClassWarning,
+					"no cycle completed within %s; interrupting the session and requiring an edit and cycle", cycleTimeout)
+				// Start a fresh window: the resumed session is instructed to
+				// act immediately, and its own cycle must land before the next
+				// deadline.
+				e.lastCycleAt.Store(time.Now().UnixNano())
+				prompt = e.resumePrompt(cfg, fmt.Sprintf(
+					"no cycle completed within %s. Stop inspecting: apply the strongest grounded edit with EditSource now, then call DetectionCycle with the mechanism and one prediction. Do not spend another turn on analysis.", cycleTimeout))
+				continue
 			}
 			if sessionExpired.Load() {
 				e.logClass(logging.ClassError, "stopping the session: it exceeded the %s wall-clock limit", sessionTimeout)
@@ -1103,6 +1153,10 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 	}
 	cycleCtx, cancelCycle := context.WithTimeout(ctx, timeout)
 	defer cancelCycle()
+	// A cycle in flight is bounded by its own context; the session watchdog
+	// must not expire the cycle deadline underneath it.
+	e.activeCycles.Add(1)
+	defer e.activeCycles.Add(-1)
 	iteration := e.iter + 1
 
 	if _, err := e.waitSandbox(cycleCtx); err != nil {
@@ -1285,6 +1339,9 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 	e.logClass(logging.ClassCycle, "cycle %d: payload=%s sha=%s score=%.2f verdicts=%v findings=%d execution=%s",
 		iteration, cycle.PayloadKey, shortSHA(artifact.SHA256), cycle.Score, summary.Verdicts, cycle.Findings, summary.Execution)
 	e.applyExecutionGate(cycleCtx, &cycle, summary)
+	// A completed cycle resets the session's cycle deadline even when the
+	// payload did not execute: the model has new feedback to act on.
+	e.lastCycleAt.Store(time.Now().UnixNano())
 	return cycle, nil
 }
 
@@ -2550,6 +2607,12 @@ Work loop:
    remove a documented module, option, or declared choice. Internal APIs, file
    layout, and component boundaries may change. Do not stop at the first lower
    score: the sandbox risk score is noisy and saturates.
+
+Time discipline: the host interrupts a session that completes no cycle within
+the cycle deadline and requires an edit and a DetectionCycle. Decide from the
+evidence you have. Do not re-read the same source, telemetry, or knowledge
+document, and do not defer a mechanism you have already chosen: write the edit
+and run the cycle.
 
 Direction discipline:
 - Name the mechanism before editing: self-load, remote APC/thread, section

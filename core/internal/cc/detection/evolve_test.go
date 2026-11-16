@@ -640,3 +640,93 @@ func TestRenderLoopReport(t *testing.T) {
 		}
 	}
 }
+
+// stallOnceProvider stays inside one model turn until the loop cancels the
+// session, then answers so the resumed session can be inspected.
+type stallOnceProvider struct {
+	wait     time.Duration
+	answer   string
+	mu       sync.Mutex
+	requests []string
+}
+
+func (p *stallOnceProvider) Stream(ctx context.Context, req llm.CompletionRequest) iter.Seq2[llm.StreamEvent, error] {
+	p.mu.Lock()
+	p.requests = append(p.requests, fmt.Sprintf("%v", req.Messages))
+	first := len(p.requests) == 1
+	p.mu.Unlock()
+	return func(yield func(llm.StreamEvent, error) bool) {
+		if first {
+			select {
+			case <-ctx.Done():
+				yield(llm.StreamEvent{}, ctx.Err())
+			case <-time.After(p.wait):
+				yield(llm.StreamEvent{Type: llm.SEMessageStop}, nil)
+			}
+			return
+		}
+		if !yield(llm.StreamEvent{Type: llm.SEMessageStart}, nil) {
+			return
+		}
+		if !yield(llm.StreamEvent{Type: llm.SETextDelta, Text: p.answer}, nil) {
+			return
+		}
+		if !yield(llm.StreamEvent{Type: llm.SEMessageDelta, StopReason: "end_turn"}, nil) {
+			return
+		}
+		yield(llm.StreamEvent{Type: llm.SEMessageStop}, nil)
+	}
+}
+
+func (p *stallOnceProvider) Complete(context.Context, llm.CompletionRequest) (llm.Message, string, llm.Usage, error) {
+	return llm.Message{}, "", llm.Usage{}, nil
+}
+
+func TestEvolveInterruptsSessionWithoutACycle(t *testing.T) {
+	moduleDir := t.TempDir()
+	shellcode := filepath.Join(t.TempDir(), "agent.bin")
+	if err := os.WriteFile(shellcode, []byte(strings.Repeat("S", 40000)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	build := func(_ string, _ map[string]string) (string, error) {
+		path := filepath.Join(t.TempDir(), "loader.exe")
+		if err := os.WriteFile(path, []byte("MZ"+strings.Repeat("M", 40000)), 0o600); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("[+] generated payload: %s (9 bytes)\n", path), nil
+	}
+	server, _ := fakeEvolveSandbox(t)
+	provider := &stallOnceProvider{
+		wait:   2 * time.Second,
+		answer: `{"summary":"acted","edits":[],"residual":[]}`,
+	}
+	started := time.Now()
+	result, err := RunEvolve(context.Background(), EvolveConfig{
+		Provider: provider, Model: "scripted",
+		Module: "loader_windows", ModuleDir: moduleDir,
+		Shellcode: shellcode, SandboxURL: server.URL, StoreRoot: t.TempDir(),
+		Stages: []string{"dynamic"}, Iterations: 2, Turns: 4, Build: build,
+		CycleTimeout: 300 * time.Millisecond, ToolIdleTimeout: time.Hour,
+		SessionTimeout: time.Hour,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if elapsed := time.Since(started); elapsed > 3*time.Second {
+		t.Fatalf("the cycle deadline did not interrupt the stalled session: %s", elapsed)
+	}
+	provider.mu.Lock()
+	requests := append([]string(nil), provider.requests...)
+	provider.mu.Unlock()
+	if len(requests) < 2 {
+		t.Fatalf("session was not resumed: %v", requests)
+	}
+	for _, want := range []string{"no cycle completed within 300ms", "Stop inspecting"} {
+		if !strings.Contains(requests[1], want) {
+			t.Fatalf("resume prompt missing %q:\n%s", want, requests[1])
+		}
+	}
+	if !strings.Contains(string(result.Answer), "acted") {
+		t.Fatalf("answer = %s", result.Answer)
+	}
+}

@@ -261,27 +261,7 @@ is enabled, agent checks and rebuilds use the console's existing C2 connection
 (`detect_loop` must therefore run from a connected operator console for live
 verification). `AgentStatus`, `RunModule`, and `CleanupAgent` are only
 registered when verification is configured (MCP `detection_loop` omits them).
-The sandbox is probed once, and no build or detection failure is retried by the
-host: its error, build tail, stage errors, and trace identity are given to the
-model, which can inspect the source and telemetry and call `DetectionCycle`
-after a fix. A baseline failure therefore starts the model session instead of
-rebuilding the same payload again, and a failed attempt does not consume the
-cycle budget. Model-session failures back off and are capped by the
-stalled-restart limit. A trace without a payload PEB is recorded and kept for
-the model with the `telemetry/attribution` finding instead of being detonated
-again. One cycle is bounded by
-`--cycle-timeout` (default 60m), one model session by `--session-timeout`
-(default 2h), and a session with no tool call by `--tool-idle-timeout`
-(default 30m). An in-flight tool suspends the idle check. `--timeout 0` (the
-default) means no loop-wide deadline. A final answer that is not
-the requested JSON object is stored as the summary with `parse_error` instead
-of ending the run. The loop writes the full Markdown report to
-`<workspace>/detection/reports/<loop>.md` and a compact executive summary to
-`<loop>-summary.md`, emits the full report through the tmux log pane when the
-loop finishes, and stores the report in `loop_results.report`. If the loop is
-stopped or fails before the final answer, it writes a partial report and
-summary from the cycles completed so far. The operator console prints the
-rendered executive summary, not the raw report.
+The sandbox is probed once, and no build or detection failure is retried by the host: its error, build tail, stage errors, and trace identity are given to the model, which can inspect the source and telemetry and call `DetectionCycle` after a fix. A baseline failure therefore starts the model session instead of rebuilding the same payload again, and a failed attempt does not consume the cycle budget. Model-session failures back off and are capped by the stalled-restart limit. A trace without a payload PEB is recorded and kept for the model with the `telemetry/attribution` finding instead of being detonated again. One build/detonate/verify cycle is bounded by `--cycle-timeout` (default 60m), and a session that completes no cycle within that deadline is interrupted and told to edit and run a cycle instead of inspecting further; repeated interruptions use the stalled-restart limit. One model session is bounded by `--session-timeout` (default 2h), and a session with no tool call by `--tool-idle-timeout` (default 30m). An in-flight tool suspends the idle check and an in-flight cycle is bounded by its own deadline. `--timeout 0` (the default) means no loop-wide deadline. A final answer that is not the requested JSON object is stored as the summary with `parse_error` instead of ending the run. The loop writes the full Markdown report to `<workspace>/detection/reports/<loop>.md` and a compact executive summary to `<loop>-summary.md`, emits the full report through the tmux log pane when the loop finishes, and stores the report in `loop_results.report`. If the loop is stopped or fails before the final answer, it writes a partial report and summary from the cycles completed so far. The operator console prints the rendered executive summary, not the raw report.
 
 Loop timestamps use local time. A `[progress]` heartbeat is written every two
 minutes with elapsed time, cycles used, tool calls, sessions, last execution
