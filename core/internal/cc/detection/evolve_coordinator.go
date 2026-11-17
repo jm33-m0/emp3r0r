@@ -37,7 +37,6 @@ type coordinator struct {
 	model    string
 
 	baselineJSON   json.RawMessage
-	executionState string
 	knowledgeState string
 
 	plannerNote      string
@@ -136,10 +135,6 @@ func (c *coordinator) run(ctx context.Context) (map[string]any, error) {
 			}
 			return final, nil
 		case "test":
-			if c.e.executionBlocked.Load() {
-				c.plannerNote = "execution is blocked; return action=stop with the final JSON, or action=debug when the guest can explain why the payload never ran"
-				continue
-			}
 			if c.e.usedCycles() >= c.e.cfg.Iterations {
 				c.plannerNote = "the cycle budget is exhausted; return action=stop with the final JSON"
 				continue
@@ -348,43 +343,60 @@ func (c *coordinator) afterCycle(ctx context.Context, cycle *Cycle) error {
 		summary.Execution = cycle.Execution
 	}
 	gate := c.e.recordExecution(cycle, summary)
-	if gate != gateRestore && gate != gateBlocked {
+	if gate == gateExecuting {
+		c.lastDiagnosis = nil
+		c.forcedFixes = 0
+	}
+	if gate == gateBlocked {
+		c.plannerNote = "Execution is blocked: the host could not establish a usable execution path. Return action=stop with the final JSON."
 		return nil
 	}
-	restore := gate == gateRestore
-	if c.e.guest == nil {
-		if restore {
-			c.e.logClass(logging.ClassWarning, "cycle %d did not execute; restoring payload %s",
-				cycle.Iteration, shortPayloadKey(c.e.lastExecuting.PayloadKey))
-			c.e.restoreExecutingState(ctx)
-		}
+	if gate != gateRestore {
 		return nil
 	}
-	if cycle.ID != 0 {
-		if _, seen := c.debugged.Load(cycle.ID); seen {
-			if restore {
-				c.e.restoreExecutingState(ctx)
-			}
-			return nil
-		}
-		c.debugged.Store(cycle.ID, true)
+
+	run := fmt.Sprintf("Cycle %d did not execute", cycle.Iteration)
+	restore := c.e.lastExecuting != nil
+	restored := "no executing baseline exists yet"
+	if restore {
+		restored = "the host restored " + lastGoodRef(c.e.lastExecuting)
 	}
-	diag, err := c.debug(ctx, fmt.Sprintf("execution=%s on cycle %d", headerOrNone(summary.Execution), cycle.Iteration), cycle)
+	restoreIfPossible := func() string {
+		if !restore {
+			return ""
+		}
+		if err := c.e.restoreExecutingState(ctx); err != nil {
+			return " Restore incomplete: " + clip(err.Error(), 300)
+		}
+		return ""
+	}
+	if !c.debuggerAvailableFor(cycle) {
+		unavailable := c.debuggerUnavailableFor(cycle)
+		c.e.logClass(logging.ClassWarning, "cycle %d did not execute; no debugger pass: %s", cycle.Iteration, unavailable)
+		c.plannerNote = fmt.Sprintf("%s and the debugger is unavailable (%s). %s. Continue with action=test: fix why the generated agent never checked in before changing detection code.", run, unavailable, restored) + restoreIfPossible()
+		return nil
+	}
+
+	diag, err := c.debug(ctx, debugRequest{
+		Trigger: fmt.Sprintf("execution=%s on cycle %d", headerOrNone(summary.Execution), cycle.Iteration),
+		Cycle:   cycle,
+	})
 	if err != nil {
 		c.e.logClass(logging.ClassWarning, "debugger worker: %v", err)
-		if restore {
-			c.e.restoreExecutingState(ctx)
+		c.plannerNote = fmt.Sprintf("%s and the debugger failed: %s. %s. Continue with action=test using the evidence in the dossier, or action=stop.", run, clip(err.Error(), 300), restored) + restoreIfPossible()
+		return nil
+	}
+	if diag != nil {
+		c.lastDiagnosis = diag
+		if c.e.lastExecutionVerified(cycle) {
+			c.plannerNote = fmt.Sprintf("Cycle %d was recovered by the guest debugger (cause: %s). Its telemetry is not a clean detection baseline; plan a fresh cycle after the execution fix.", cycle.Iteration, clip(diag.Cause, 240))
+			return nil
 		}
-		return nil
+		c.plannerNote = fmt.Sprintf("%s. Debugger cause: %s; source_fix=%v; online_after=%v. Fix the execution cause before changing detection code; this cycle's score is not a detection result.", run, clip(diag.Cause, 400), diag.SourceFixRequired, diag.AgentOnlineAfter)
+	} else {
+		c.plannerNote = fmt.Sprintf("%s. %s. Continue with action=test or action=stop.", run, restored)
 	}
-	if diag != nil && c.e.lastExecutionVerified(cycle) {
-		return nil
-	}
-	if restore {
-		c.e.logClass(logging.ClassWarning, "cycle %d did not execute; restoring payload %s",
-			cycle.Iteration, shortPayloadKey(c.e.lastExecuting.PayloadKey))
-		c.e.restoreExecutingState(ctx)
-	}
+	c.plannerNote += restoreIfPossible()
 	return nil
 }
 
@@ -392,30 +404,31 @@ func (e *evolver) lastExecutionVerified(cycle *Cycle) bool {
 	return cycle != nil && cycle.Execution == executionVerified && e.lastExecuting == cycle
 }
 
-// plan asks the coordinator worker for the next move. A plan that is not
-// JSON is repaired while budget remains; when the budget is gone the loop
-// reports the failure instead of looping forever.
+// plan asks the coordinator worker for the next move. Parse repair continues
+// the same session, so the planner keeps the evidence it already read.
 func (c *coordinator) plan(ctx context.Context) (plannerPlan, error) {
+	ws := c.newWorkerSession(rolePlanner)
+	defer ws.close()
 	prompt := c.plannerBrief()
 	for attempt := 0; ; attempt++ {
-		text, err := c.runSession(ctx, rolePlanner, prompt, c.plannerResume)
+		result, err := ws.run(ctx, prompt, c.plannerResume)
+		c.recordWorkerResult(ctx, rolePlanner, prompt, result, err)
 		if err != nil {
 			return plannerPlan{}, err
 		}
-		plan, parseErr := parsePlannerPlan(text)
-		c.recordWorker(ctx, rolePlanner, prompt, text, parseErr)
+		plan, parseErr := parsePlannerPlan(result.text)
 		if parseErr == nil {
 			c.e.logClass(logging.ClassCycle, "planner: action=%s mechanism=%s", plan.Action, headerOrNone(plan.Mechanism))
 			return plan, nil
 		}
 		c.e.logClass(logging.ClassWarning, "planner answer was not a valid plan: %v", parseErr)
-		if c.e.usedCycles() >= c.e.cfg.Iterations || c.e.executionBlocked.Load() {
-			return plannerPlan{Action: "stop", Final: c.planFailureFinal(text, parseErr)}, nil
+		if attempt >= maxPlanRetries || c.e.usedCycles() >= c.e.cfg.Iterations {
+			return plannerPlan{Action: "stop", Final: c.planFailureFinal(result.text, parseErr)}, nil
 		}
 		if !c.e.backoff(ctx, attempt, "invalid planner answer") {
 			return plannerPlan{}, ctx.Err()
 		}
-		prompt = c.plannerBrief() + "\n\nYour previous answer was not the required JSON object: " + parseErr.Error() + ". Return one JSON object now."
+		prompt = "Your previous answer was not the required planner JSON object: " + parseErr.Error() + ". Return exactly one JSON object now; do not call tools."
 	}
 }
 
@@ -552,8 +565,6 @@ func (c *coordinator) recoverCycle(ctx context.Context, cycle *Cycle, diag debug
 	cycle.Execution = executionVerified
 	cycle.AgentOnline = &online
 	c.e.lastExecuting = cycle
-	c.e.executionBlocked.Store(false)
-	c.e.actionRequired.Store(false)
 	c.e.lastExecution.Store(executionVerified)
 	for i := range c.e.cycles {
 		if c.e.cycles[i].ID == cycle.ID {
@@ -746,12 +757,26 @@ func (c *coordinator) plannerBrief() string {
 	fmt.Fprintf(&b, "Cycle budget: %d total; %d used; %d remain\nStages: %s\n",
 		c.e.cfg.Iterations, c.e.usedCycles(), max(0, c.e.cfg.Iterations-c.e.usedCycles()), strings.Join(stageNames(c.e.cfg.Stages), ", "))
 	fmt.Fprintf(&b, "Baseline: %s\nBaseline failure: %s\n", string(c.baselineJSON), headerOrNone(c.e.baselineFailure))
-	fmt.Fprintf(&b, "Execution gate: %s\nKnowledge cache: %s\n", c.executionState, c.knowledgeState)
-	if c.e.guest == nil {
+	fmt.Fprintf(&b, "Execution gate: %s\nKnowledge cache: %s\n", c.e.executionHint(), c.knowledgeState)
+	switch {
+	case c.e.guest == nil:
 		b.WriteString("Guest debugger: disabled (no --guest-ssh); execution=offline cannot be diagnosed inside the VM.\n")
-	} else {
-		b.WriteString("Guest debugger: available over GuestSSH.\n")
+	case c.debuggerRemaining() <= 0:
+		fmt.Fprintf(&b, "Guest debugger: unavailable (%d of %d sessions used); do not choose action=debug.\n",
+			c.debuggerSessions, c.debuggerBudget())
+	default:
+		fmt.Fprintf(&b, "Guest debugger: available (%d of %d sessions remain).\n",
+			c.debuggerRemaining(), c.debuggerBudget())
 	}
+	if cycle := c.e.last; cycle != nil && cycle.ID != 0 {
+		if _, seen := c.debugged.Load(cycle.ID); seen {
+			fmt.Fprintf(&b, "Cycle %d was already debugged; use its diagnosis instead of requesting debug again.\n", cycle.Iteration)
+		}
+	}
+	if c.e.restoreErr != nil {
+		fmt.Fprintf(&b, "Incomplete restore: %s\n", clip(c.e.restoreErr.Error(), 400))
+	}
+	b.WriteString("Host limits: 12 read-only calls and 16 total calls per decision. The host blocks further calls and requires the planner JSON object; do not repeat evidence already in the dossier.\n")
 	if c.e.cfg.Verify == nil {
 		b.WriteString("C2 verification: disabled; execution is unverified.\n")
 	}
@@ -823,6 +848,10 @@ func (c *coordinator) editorBrief(plan plannerPlan) string {
 	if !c.e.verifyEnabled() {
 		b.WriteString("\nC2 verification is disabled; execution is unverified.\n")
 	}
+	if c.e.restoreErr != nil {
+		fmt.Fprintf(&b, "\nRestore incomplete: %s\n", clip(c.e.restoreErr.Error(), 400))
+	}
+	b.WriteString("\nHost limits: 12 read-only calls without an edit; the host then blocks reading. The host sends you back in this session if you stop without calling DetectionCycle, and a session that completes no cycle is retried, not restarted.")
 	b.WriteString("\nApply every edit the change needs, then call DetectionCycle exactly once. End with the required JSON object.")
 	return b.String()
 }
