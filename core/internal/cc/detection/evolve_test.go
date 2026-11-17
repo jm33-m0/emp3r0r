@@ -268,7 +268,7 @@ func TestEvolveDoesNotBuildWhenSandboxIsDown(t *testing.T) {
 	provider := &captureProvider{answer: `{"summary":"sandbox is down","edits":[],"residual":[]}`}
 	ctx, cancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
 	defer cancel()
-	_, err := RunEvolve(ctx, EvolveConfig{
+	result, err := RunEvolve(ctx, EvolveConfig{
 		Provider: provider, Model: "scripted",
 		Module: "loader_windows", ModuleDir: dir, Shellcode: shellcode,
 		SandboxURL: "http://127.0.0.1:1", StoreRoot: t.TempDir(),
@@ -279,14 +279,17 @@ func TestEvolveDoesNotBuildWhenSandboxIsDown(t *testing.T) {
 		},
 		Logf: nil,
 	})
-	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("err = %v, want the caller deadline; the loop must keep retrying", err)
+	if !errors.Is(err, ErrSandboxUnreachable) {
+		t.Fatalf("err = %v, want ErrSandboxUnreachable", err)
+	}
+	if result != nil {
+		t.Fatalf("result = %+v, want no result for a host outage", result)
 	}
 	if builds != 0 {
 		t.Fatalf("build ran before the sandbox check: %d", builds)
 	}
-	if len(provider.requests) < 2 || !strings.Contains(provider.requests[0], "unreachable") {
-		t.Fatalf("model did not receive the sandbox failure on retries: %v", provider.requests)
+	if len(provider.requests) != 0 {
+		t.Fatalf("the model should not run for a sandbox outage: %v", provider.requests)
 	}
 }
 
@@ -535,7 +538,7 @@ func TestEvolveSendsBaselineFailureToModel(t *testing.T) {
 	)
 	ctx, cancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
 	defer cancel()
-	_, err := RunEvolve(ctx, EvolveConfig{
+	result, err := RunEvolve(ctx, EvolveConfig{
 		Provider: provider, Model: "scripted",
 		Module: "loader_windows", ModuleDir: t.TempDir(), Shellcode: shellcode,
 		SandboxURL: server.URL, StoreRoot: t.TempDir(), RetryBase: 50 * time.Millisecond,
@@ -549,8 +552,11 @@ func TestEvolveSendsBaselineFailureToModel(t *testing.T) {
 			classMu.Unlock()
 		},
 	})
-	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("err = %v, want the caller deadline; the loop must keep retrying", err)
+	if err != nil {
+		t.Fatalf("err = %v, want a bounded stop after the planner kept stopping", err)
+	}
+	if result == nil || !strings.Contains(string(result.Answer), "fixed the build") {
+		t.Fatalf("result = %+v", result)
 	}
 	if detonations.Load() != 0 {
 		t.Fatalf("host detonated the payload again without model feedback: %d", detonations.Load())
