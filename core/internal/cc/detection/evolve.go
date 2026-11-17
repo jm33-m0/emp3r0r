@@ -1180,7 +1180,7 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 		e.logClass(logging.ClassError, "read edits for cycle summary: %v", err)
 	} else {
 		for _, edit := range edits {
-			if edit.Iteration != iteration {
+			if edit.Iteration != iteration || editKind(edit.Kind) != EditKindModel {
 				continue
 			}
 			if len(summary.Edits) >= 24 {
@@ -1838,6 +1838,13 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 			}
 			cycle, err := e.runCycle(ctx, clip(args.Note, 500), mechanism, clip(args.Prediction, 500))
 			if err != nil {
+				e.setCycleError(err)
+				if errors.Is(err, ErrSandboxUnreachable) {
+					// The sandbox is down; another tool call in this session
+					// only repeats the outage. The coordinator retries the same
+					// plan after a bounded backoff.
+					e.stopSessionAfterCycle()
+				}
 				return tool.Errorf(fmt.Sprintf("%v", err)), nil
 			}
 			e.sessionCycles.Add(1)

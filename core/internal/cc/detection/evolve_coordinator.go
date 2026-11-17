@@ -690,7 +690,7 @@ func (c *coordinator) modelFor(role evolveRole) string {
 	return c.model
 }
 
-func (c *coordinator) recordWorker(ctx context.Context, role evolveRole, prompt, output string, err error) {
+func (c *coordinator) recordWorkerResult(ctx context.Context, role evolveRole, prompt string, result workerResult, err error) {
 	if c.e.db == nil {
 		return
 	}
@@ -704,7 +704,9 @@ func (c *coordinator) recordWorker(ctx context.Context, role evolveRole, prompt,
 	defer cancel()
 	if saveErr := c.e.db.SaveWorker(saveCtx, WorkerRun{
 		LoopID: c.e.cfg.LoopID, Iteration: c.e.iter, Role: string(role),
-		Model: c.modelFor(role), Prompt: prompt, Output: output, Status: status, Error: detail,
+		Model: c.modelFor(role), Prompt: prompt, Output: result.text, Status: status, Error: detail,
+		Reason: string(result.reason), Turns: result.turns,
+		TokensIn: result.usage.InputTokens, TokensOut: result.usage.OutputTokens,
 	}); saveErr != nil {
 		c.e.logClass(logging.ClassWarning, "record %s worker: %v", role.label(), saveErr)
 	}
@@ -712,36 +714,44 @@ func (c *coordinator) recordWorker(ctx context.Context, role evolveRole, prompt,
 
 func (c *coordinator) plannerResume(reason string) string {
 	switch reason {
-	case "cycle":
-		return c.plannerBrief() + "\n\nNo cycle completed within the cycle deadline and the cycle was stopped. Return exactly one JSON plan now; the editor will apply edits and call DetectionCycle."
 	case "session":
-		return c.plannerBrief() + "\n\nThe planner decision window expired. Return exactly one JSON plan now; the editor will inspect and edit source."
+		return "The planner decision window expired. Return exactly one JSON plan now; do not call more tools."
 	case "idle":
-		return c.plannerBrief() + "\n\nThe previous planner session made no tool call. Return one plan or action=stop now."
+		return "The previous planner turn made no tool call. Return one plan now, or action=stop with the final JSON."
+	case "empty":
+		return "Your last turn produced no content and no tool call. Return exactly one planner JSON object now: action=test, action=debug only when the brief says the debugger is available, or action=stop."
 	default:
-		return c.plannerBrief() + "\n\nThe previous planner session failed. Return exactly one JSON plan now."
+		return "The previous model call failed. Continue from the evidence in this session and return exactly one JSON plan now."
 	}
 }
 
 func (c *coordinator) editorResume(reason string) string {
 	switch reason {
-	case "cycle":
-		return c.editorBrief(c.currentPlan) + "\n\nNo cycle completed within the cycle deadline and the session was stopped. Apply the remaining edits with EditSource now, then retry with DetectionCycle. Do not keep reading."
 	case "session":
 		if c.e.sessionCycles.Load() >= 1 {
-			return c.editorBrief(c.currentPlan) + "\n\nThe editor decision window expired after a completed cycle. Return the result JSON now; the planner will choose the next hypothesis."
+			return "The editor decision window expired after a completed cycle. Return the result JSON now."
 		}
-		return c.editorBrief(c.currentPlan) + "\n\nThe editor decision window expired. Apply the edit now with EditSource and call DetectionCycle. Do not keep reading."
+		return "The editor decision window expired. Apply the edit with EditSource now, then call DetectionCycle exactly once. Do not read more files."
 	case "idle":
-		return c.editorBrief(c.currentPlan) + "\n\nThe previous editor session made no tool call. Apply the edit or call DetectionCycle now."
+		return "The previous editor turn made no tool call. Apply the edit or call DetectionCycle now."
+	case "empty":
+		return "Your last turn produced no content. Apply the remaining edit with EditSource and call DetectionCycle exactly once; if the change is already applied, call DetectionCycle now."
 	default:
-		return c.editorBrief(c.currentPlan) + "\n\nThe previous editor session failed. Continue from the source state and run the cycle."
+		return "The previous model call failed. Continue from the current source state, finish the edit, and call DetectionCycle."
 	}
 }
 
 func (c *coordinator) debuggerResume(reason string) string {
-	return c.debuggerBrief(context.Background(), "retry after "+reason, c.e.last) +
-		"\n\nThe previous debugger session failed or stalled. Report the cause you have and return the JSON object."
+	switch reason {
+	case "empty":
+		return "Your last turn produced no content. Return exactly one debugger JSON object now with the cause, evidence, and guest actions you already have."
+	case "session":
+		return "The debugger window elapsed. Return exactly one debugger JSON object now."
+	case "idle":
+		return "The previous debugger turn made no tool call. Return the debugger JSON object now."
+	default:
+		return "The previous model call failed. Continue from the evidence you gathered and return exactly one debugger JSON object now."
+	}
 }
 
 func (c *coordinator) plannerBrief() string {

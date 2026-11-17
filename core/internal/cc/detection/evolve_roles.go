@@ -73,6 +73,10 @@ type WorkerRun struct {
 	Output    string `json:"output,omitempty"`
 	Status    string `json:"status,omitempty"`
 	Error     string `json:"error,omitempty"`
+	Reason    string `json:"reason,omitempty"`
+	Turns     int    `json:"turns,omitempty"`
+	TokensIn  int    `json:"tokens_in,omitempty"`
+	TokensOut int    `json:"tokens_out,omitempty"`
 	CreatedAt int64  `json:"created_at,omitempty"`
 }
 

@@ -107,7 +107,7 @@ func (e *evolver) pendingEditLines(limit int) []string {
 		}
 		reason := strings.TrimSpace(sanitizeLine(edit.Reason))
 		label := "pending source edit"
-		if strings.HasPrefix(strings.ToLower(reason), "revert to payload") {
+		if editKind(edit.Kind) == EditKindRestore || strings.HasPrefix(strings.ToLower(reason), "revert to payload") {
 			label = "pending revert"
 		}
 		line := fmt.Sprintf("%s: %s", label, path)
@@ -314,8 +314,8 @@ func (t *TelemetryDB) LastAnswerForLoops(ctx context.Context, loopIDs []string) 
 // UncycledEdits returns edits that were made after the last recorded cycle.
 func (t *TelemetryDB) UncycledEdits(ctx context.Context, loopID string) ([]EditRecord, error) {
 	rows, err := t.db.QueryContext(ctx, `SELECT `+editColumns+`
-		FROM loop_edits WHERE loop_id = ? AND next_payload_id IS NULL
-		ORDER BY id DESC LIMIT 8`, loopID)
+		FROM loop_edits WHERE loop_id = ? AND next_payload_id IS NULL AND kind = ?
+		ORDER BY id DESC LIMIT 8`, loopID, EditKindModel)
 	if err != nil {
 		return nil, fmt.Errorf("read pending edits: %w", err)
 	}
