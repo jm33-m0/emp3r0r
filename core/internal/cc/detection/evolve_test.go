@@ -373,9 +373,8 @@ func TestExecutionGateTracksExecutingCycles(t *testing.T) {
 	}
 
 	e.lastExecuting = nil
-	e.applyExecutionGate(ctx, &Cycle{Iteration: 4}, cycleSummary{Execution: executionOffline})
-	if !e.executionBlocked.Load() {
-		t.Fatal("an offline cycle without an executing baseline must block further cycles")
+	if gate := e.recordExecution(&Cycle{Iteration: 4}, cycleSummary{Execution: executionOffline}); gate != gateRestore {
+		t.Fatal("an offline cycle without an executing baseline must go to the debugger")
 	}
 }
 

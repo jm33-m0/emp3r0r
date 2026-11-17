@@ -252,7 +252,6 @@ type evolver struct {
 	baselineFailure  string
 	operatorPrompts  *OperatorPromptQueue
 	lastExecuting    *Cycle
-	executionBlocked atomic.Bool
 	// executionCheckTimeout overrides PayloadVerifyTimeout in tests.
 	executionCheckTimeout time.Duration
 
@@ -655,7 +654,7 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 			knowledgeState = "available: " + e.knowledge.Path() + " (coverage query failed; KnowledgeSearch still works)"
 		}
 	}
-	coord := newCoordinator(e, provider, model, baselineJSON, executionState, knowledgeState)
+	coord := newCoordinator(e, provider, model, baselineJSON, knowledgeState)
 	answer, err := coord.run(ctx)
 	if err != nil {
 		return nil, err
@@ -1352,15 +1351,15 @@ func (e *evolver) recordExecution(cycle *Cycle, summary cycleSummary) executionG
 	switch summary.Execution {
 	case executionVerified:
 		e.lastExecuting = cycle
+		e.setPreservedShellcode(summary.Shellcode)
+		e.restoreErr = nil
 		return gateExecuting
 	case executionStatic, executionUnverified:
 		return gateUnchanged
 	case executionOffline:
-		if e.lastExecuting == nil {
-			e.executionBlocked.Store(true)
-			e.logClass(logging.ClassError, "cycle %d did not execute and no executing baseline exists; stopping further detection cycles", cycle.Iteration)
-			return gateBlocked
-		}
+		// Restore only when a payload has executed before. A loop whose
+		// baseline never checked in still goes to the guest debugger and the
+		// planner: execution is unproven, not a dead end.
 		return gateRestore
 	}
 	return gateUnchanged
@@ -1377,49 +1376,76 @@ func (e *evolver) applyExecutionGate(ctx context.Context, cycle *Cycle, summary 
 		e.logClass(logging.ClassWarning, "cycle %d did not execute (agent %s offline); restoring payload %s",
 			cycle.Iteration, headerOrNone(e.expectedAgentUUID),
 			shortPayloadKey(e.lastExecuting.PayloadKey))
-		e.restoreExecutingState(ctx)
+		if err := e.restoreExecutingState(ctx); err != nil {
+			e.logClass(logging.ClassWarning, "restore incomplete: %v", err)
+		}
+	}
+}
+
+// setPreservedShellcode records the shellcode that belongs to the last
+// executing payload. Rotation keeps it so the execution gate can restore a
+// state that is known to run.
+func (e *evolver) setPreservedShellcode(path string) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return
+	}
+	previous := e.preservedShellcode
+	e.preservedShellcode = path
+	if previous != "" && previous != path {
+		e.cleanupGeneratedFile(previous)
 	}
 }
 
 // restoreExecutingState rolls the editable source and active shellcode back to
-// the last payload whose agent checked in.
-func (e *evolver) restoreExecutingState(ctx context.Context) {
+// the last payload whose agent checked in. It returns an error when only part
+// of the state could be restored, so the next brief does not claim a working
+// baseline.
+func (e *evolver) restoreExecutingState(ctx context.Context) error {
 	baseline := e.lastExecuting
 	if baseline == nil {
-		e.executionBlocked.Store(true)
-		return
+		return fmt.Errorf("no executing baseline to restore")
 	}
+	var errs []error
 	if _, err := e.revertCycleEdits(ctx, e.lastPayloadID(), baseline.PayloadKey); err != nil {
 		e.logClass(logging.ClassWarning, "restore %s source: %v",
 			shortPayloadKey(baseline.PayloadKey), err)
+		errs = append(errs, fmt.Errorf("source: %w", err))
 	}
 	var summary cycleSummary
 	if err := json.Unmarshal([]byte(baseline.Summary), &summary); err != nil {
-		return
+		errs = append(errs, fmt.Errorf("baseline summary: %w", err))
+	} else {
+		path := strings.TrimSpace(summary.Shellcode)
+		switch {
+		case path == "":
+			errs = append(errs, fmt.Errorf("baseline has no shellcode path"))
+		default:
+			info, statErr := os.Stat(path)
+			if statErr != nil {
+				e.logClass(logging.ClassWarning, "restore shellcode %s: %v", path, statErr)
+				errs = append(errs, fmt.Errorf("shellcode %s: %w", path, statErr))
+				break
+			}
+			if !info.Mode().IsRegular() {
+				errs = append(errs, fmt.Errorf("shellcode %s is not a regular file", path))
+				break
+			}
+			e.shellcode = path
+			e.activeProducer = summary.Producer
+			e.preservedShellcode = path
+			e.logClass(logging.ClassEdit, "restored shellcode %s (producer %s)", path, headerOrNone(summary.Producer))
+		}
 	}
-	path := strings.TrimSpace(summary.Shellcode)
-	if path == "" {
-		return
-	}
-	info, err := os.Stat(path)
-	if err != nil {
-		e.logClass(logging.ClassWarning, "restore shellcode %s: %v", path, err)
-		return
-	}
-	if !info.Mode().IsRegular() {
-		e.logClass(logging.ClassWarning, "restore shellcode %s: not a regular file", path)
-		return
-	}
-	e.shellcode = path
-	e.activeProducer = summary.Producer
-	e.logClass(logging.ClassEdit, "restored shellcode %s (producer %s)", path, headerOrNone(summary.Producer))
+	e.restoreErr = errors.Join(errs...)
+	return e.restoreErr
 }
 
 func (e *evolver) linkEdits(ctx context.Context, iteration int, payloadID int64) error {
 	_, err := e.db.db.ExecContext(ctx, `
 		UPDATE loop_edits SET next_payload_id = ?
-		WHERE loop_id = ? AND iteration = ? AND next_payload_id IS NULL`,
-		payloadID, e.cfg.LoopID, iteration)
+		WHERE loop_id = ? AND iteration = ? AND next_payload_id IS NULL AND kind = ?`,
+		payloadID, e.cfg.LoopID, iteration, EditKindModel)
 	return err
 }
 
@@ -1457,11 +1483,15 @@ func (e *evolver) executionHint() string {
 		return "Baseline failure: " + e.baselineFailure +
 			". Diagnose it before another cycle; a failed attempt does not consume the cycle budget."
 	}
-	if e.executionBlocked.Load() {
-		return "Execution gate: no dynamic payload has checked in. Do not run more cycles; return the final JSON with the execution failure."
+	if e.last != nil && e.last.Execution == executionOffline && e.lastExecuting == nil {
+		return "Execution gate: the last cycle did not execute and no payload has checked in yet. Execution is unproven; do not compare this score with an executing cycle. The guest debugger can inspect the sandbox; otherwise fix why the generated agent never checked in before changing detection code."
 	}
 	if e.last != nil && e.last.Execution == executionOffline && e.lastExecuting != nil {
-		return fmt.Sprintf("Execution gate: the last cycle did not execute. The host restored payload %s; fix why the generated agent never checked in before changing detection code.",
+		if e.restoreErr != nil {
+			return fmt.Sprintf("Execution gate: the last cycle did not execute. The source was rolled back to payload %s, but the restore is incomplete: %s. Do not treat the restored state as executable; fix the shellcode or agent path, then run a test cycle.",
+				shortPayloadKey(e.lastExecuting.PayloadKey), clip(e.restoreErr.Error(), 400))
+		}
+		return fmt.Sprintf("Execution gate: the last cycle did not execute. The host restored source and shellcode to payload %s; fix why the generated agent never checked in before changing detection code.",
 			shortPayloadKey(e.lastExecuting.PayloadKey))
 	}
 	return "Execution gate: the host checks the generated agent after every dynamic cycle and records execution=verified, offline, or unverified."
@@ -1625,9 +1655,6 @@ func (e *evolver) takeOperatorPrompts() []string {
 }
 
 func (e *evolver) needsMoreWork(ctx context.Context) bool {
-	if e.executionBlocked.Load() {
-		return false
-	}
 	if e.last == nil {
 		return true
 	}
@@ -1756,9 +1783,6 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 				Prediction string `json:"prediction"`
 			}
 			_ = json.Unmarshal(raw, &args)
-			if e.executionBlocked.Load() {
-				return tool.Errorf("payload execution is blocked: no dynamic payload has checked in and no executing baseline exists; return the final JSON with the execution failure"), nil
-			}
 			if e.usedCycles() >= e.cfg.Iterations {
 				return tool.Errorf(fmt.Sprintf("iteration limit reached (%d); return the final JSON", e.cfg.Iterations)), nil
 			}
