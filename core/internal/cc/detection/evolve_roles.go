@@ -195,7 +195,42 @@ func (e *evolver) hooksFor(role evolveRole) *hook.Registry {
 		e.logClass(class, "%s %s %s: %s", role.label(), event.ToolName, status, preview)
 		return hook.Result{}
 	})
+	hooks.On(hook.Stop, func(_ context.Context, event hook.Event) hook.Result {
+		text := lastAssistantText(event.Messages)
+		switch role {
+		case roleEditor:
+			if e.sessionCycles.Load() == 0 {
+				return hook.Result{
+					Decision: "block",
+					AdditionalContext: "You have not called DetectionCycle. Apply the remaining source edit with EditSource now, " +
+						"then call DetectionCycle exactly once. Do not end this session without it.",
+				}
+			}
+		case rolePlanner:
+			if _, err := parsePlannerPlan(text); err != nil {
+				return hook.Result{
+					Decision: "block",
+					AdditionalContext: "Your answer is not the required planner JSON object (" + err.Error() + "). " +
+						"Return exactly one JSON object now: action=test, action=debug only when the brief says the debugger is available, or action=stop. Do not call tools.",
+				}
+			}
+		case roleDebugger:
+			if _, err := parseDebugDiagnosis(text); err != nil {
+				return hook.Result{
+					Decision: "block",
+					AdditionalContext: "Your answer is not the required debugger JSON object (" + err.Error() + "). " +
+						"Return exactly one JSON object now with cause, evidence, guest_actions, agent_online_after, source_fix_required, and confidence.",
+				}
+			}
+		}
+		return hook.Result{}
+	})
 	return hooks
+}
+
+func (e *evolver) blockTool(role evolveRole, toolName, message string) hook.Result {
+	e.logClass(logging.ClassWarning, "%s worker blocked tool %s: %s", role.label(), toolName, message)
+	return hook.Result{Decision: "block", Message: message}
 }
 
 // hooks is the union hook registry used by diagnostics and tests.

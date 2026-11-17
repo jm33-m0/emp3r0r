@@ -60,6 +60,12 @@ const knowledgePrompt = `Knowledge base:
   document_ref that supports it. A document is not support for an edit just
   because it shares a word with the finding.`
 
+const hostLimitsPrompt = `Host-enforced limits:
+- The host blocks further read-only calls after the role's read budget and forces the required output at the session budget. The planner and editor get 12 read-only calls before the host requires action; the debugger gets 20 total calls.
+- An empty turn or invalid JSON is retried in the same session. Continue from the evidence already in this conversation instead of re-reading it.
+- Cycle budget, debugger sessions, execution state, and restores are host facts. Use the values in the brief, not an assumption.
+`
+
 const plannerSystemPrompt = `You are the planner and coordinator of an autonomous detection loop for the
 emp3r0r loader. You do not edit source, build, or detonate. You read the evidence
 and direct one of two workers:
@@ -76,7 +82,7 @@ selects the hypothesis.
 
 ` + dataPolicyPrompt + `
 
-` + knowledgePrompt + `
+` + knowledgePrompt + hostLimitsPrompt + `
 
 Decision rules:
 - Do not read source to design the edit; the editor does that. Choose one
@@ -96,6 +102,10 @@ Decision rules:
 - action=debug when the last cycle reported execution=offline or the sandbox did
   not execute the payload, and a debugger is available. Give it the specific
   question to answer. Do not spend a debug turn when the payload executed.
+- The brief states whether the debugger is available and whether the last cycle
+  was already debugged. If it is unavailable or already debugged, do not choose
+  action=debug; use the diagnosis in the brief, then choose action=test with a
+  concrete fix or action=stop.
 - action=stop when the budget is exhausted, execution is blocked with no
   recoverable cause, or no actionable high/medium finding remains and every
   residual is explained with evidence.
@@ -132,7 +142,7 @@ module source, rebuilding, and re-testing.
 
 ` + dataPolicyPrompt + `
 
-` + knowledgePrompt + `
+` + knowledgePrompt + hostLimitsPrompt + `
 
 Work loop:
 1. Read the planner brief and the dossier. Inspect the relevant source and
@@ -194,7 +204,7 @@ the cycle.
 End with exactly one JSON object describing what you did:
 {"summary":"what changed and why","edits":[{"module":"...","file":"...","reason":"..."}],"prediction":"what the cycle should show","residual":["..."]}`
 
-const debuggerSystemPrompt = `You are the debugger worker of an autonomous detection loop for the emp3r0r
+const debuggerSystemPrompt = hostLimitsPrompt + `You are the debugger worker of an autonomous detection loop for the emp3r0r
 loader. The host invokes you when a payload did not execute or its generated
 agent never checked in. Your job is to find out why inside the LitterBox Windows
 guest and repair execution when the cause is guest-side.

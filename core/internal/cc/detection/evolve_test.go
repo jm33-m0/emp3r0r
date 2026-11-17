@@ -744,7 +744,7 @@ func (p *deadlineResumeProvider) Complete(context.Context, llm.CompletionRequest
 	return llm.Message{}, "", llm.Usage{}, nil
 }
 
-func TestEvolveResumesCycleAfterDeadline(t *testing.T) {
+func TestEvolveResumesPlannerAfterDeadline(t *testing.T) {
 	moduleDir := t.TempDir()
 	shellcode := filepath.Join(t.TempDir(), "agent.bin")
 	if err := os.WriteFile(shellcode, []byte(strings.Repeat("S", 40000)), 0o600); err != nil {
@@ -771,22 +771,22 @@ func TestEvolveResumesCycleAfterDeadline(t *testing.T) {
 		Module: "loader_windows", ModuleDir: moduleDir,
 		Shellcode: shellcode, SandboxURL: server.URL, StoreRoot: t.TempDir(),
 		Stages: []string{"dynamic"}, Iterations: 2, Turns: 4, Build: build,
-		CycleTimeout: 300 * time.Millisecond, ToolIdleTimeout: time.Hour,
+		PlannerTimeout: 300 * time.Millisecond, ToolIdleTimeout: time.Hour,
 		SessionTimeout: time.Hour, RetryBase: time.Millisecond,
 	})
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("err = %v, want context.Canceled", err)
 	}
 	if elapsed := time.Since(started); elapsed > 3*time.Second {
-		t.Fatalf("the cycle deadline did not stop the stalled session: %s", elapsed)
+		t.Fatalf("the planner window did not stop the stalled session: %s", elapsed)
 	}
 	provider.mu.Lock()
 	requests := append([]string(nil), provider.requests...)
 	provider.mu.Unlock()
 	if len(requests) != 3 {
-		t.Fatalf("sessions = %d, want 3; the loop did not retry after the cycle deadline", len(requests))
+		t.Fatalf("sessions = %d, want 3; the loop did not retry after the planner window", len(requests))
 	}
-	for _, want := range []string{"cycle was stopped", "DetectionCycle"} {
+	for _, want := range []string{"decision window expired", "Return exactly one JSON plan"} {
 		if !strings.Contains(requests[1], want) {
 			t.Fatalf("retry prompt missing %q:\n%s", want, requests[1])
 		}
@@ -842,15 +842,14 @@ func TestEvolveForcesPlanAfterPlannerTimeout(t *testing.T) {
 	}
 }
 
-func TestActionRequiredKeepsAnalysisToolsAvailable(t *testing.T) {
+func TestAllWorkerToolsPassUnionCheck(t *testing.T) {
 	e := &evolver{}
-	e.actionRequired.Store(true)
 	for _, name := range []string{
 		"TelemetryQuery", "InspectFeedback", "Payloads", "ComparePayloads",
 		"SourceRead", "EditSource", "DetectionCycle",
 	} {
 		if decision := e.allowToolHook(name); decision.Decision == "block" {
-			t.Fatalf("%s was blocked while a cycle retry is required", name)
+			t.Fatalf("%s was blocked by the union check", name)
 		}
 	}
 }

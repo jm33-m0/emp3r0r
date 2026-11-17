@@ -3,23 +3,30 @@ package detection
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/Autumn-27/norma/agentcore"
-	"github.com/Autumn-27/norma/compaction"
 	"github.com/Autumn-27/norma/llm"
-	"github.com/Autumn-27/norma/permission"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
 const (
-	maxEditorFailures   = 3
-	maxDebuggerSessions = 4
-	maxWorkerTokens     = 16384
+	maxEditorFailures = 3
+	// maxInfraFailures bounds consecutive empty/provider failures. They are
+	// not hypothesis failures, so they do not end the loop on the first one.
+	maxInfraFailures = 3
+	// maxPlanRetries bounds parse repair inside one planner session.
+	maxPlanRetries = 2
+	// maxForcedResumes bounds how many times a stopping planner is sent back
+	// because actionable findings remain.
+	maxForcedResumes = 2
+	// maxRejectedPlans bounds consecutive plans that ask for an action the
+	// host cannot run (for example a debugger with no sessions left).
+	maxRejectedPlans = 2
 )
 
 // coordinator owns the role sequencing and the structural decisions. The
@@ -38,15 +45,20 @@ type coordinator struct {
 	lastDiagnosis    *debugDiagnosis
 	debugged         sync.Map
 	editorFailures   int
+	infraFailures    int
+	rejectedPlans    int
+	stopResumes      int
 	debuggerSessions int
 	plans            int
 	currentPlan      plannerPlan
+	pendingPlan      *plannerPlan
+	forcedFixes      int
 }
 
-func newCoordinator(e *evolver, provider llm.Provider, model string, baselineJSON json.RawMessage, executionState, knowledgeState string) *coordinator {
+func newCoordinator(e *evolver, provider llm.Provider, model string, baselineJSON json.RawMessage, knowledgeState string) *coordinator {
 	return &coordinator{
 		e: e, provider: provider, model: model,
-		baselineJSON: baselineJSON, executionState: executionState,
+		baselineJSON:   baselineJSON,
 		knowledgeState: knowledgeState,
 	}
 }
@@ -63,10 +75,35 @@ func (c *coordinator) run(ctx context.Context) (map[string]any, error) {
 		if c.plans > c.e.cfg.Iterations*4+10 {
 			return c.editorFailureFinal(fmt.Errorf("the coordinator exceeded its planning budget")), nil
 		}
-		plan, err := c.plan(ctx)
-		if err != nil {
-			return nil, err
+		var (
+			plan plannerPlan
+			err  error
+		)
+		if c.pendingPlan != nil {
+			plan = *c.pendingPlan
+			c.pendingPlan = nil
+		} else {
+			plan, err = c.plan(ctx)
+			if err != nil {
+				if ctx.Err() != nil {
+					return nil, ctx.Err()
+				}
+				if !isInfrastructureFailure(err) {
+					return nil, err
+				}
+				c.infraFailures++
+				c.e.logClass(logging.ClassWarning, "planner infrastructure failure: %v", err)
+				if c.infraFailures >= maxInfraFailures {
+					return c.editorFailureFinal(err), nil
+				}
+				c.plannerNote = "The previous planner session ended without a plan: " + clip(err.Error(), 400)
+				if !c.e.backoff(ctx, c.infraFailures, "planner infrastructure failure") {
+					return nil, ctx.Err()
+				}
+				continue
+			}
 		}
+		c.infraFailures = 0
 		switch plan.Action {
 		case "stop":
 			final := plan.Final
@@ -77,7 +114,18 @@ func (c *coordinator) run(ctx context.Context) (map[string]any, error) {
 				final["summary"] = "the planner stopped the loop"
 			}
 			c.e.lastAnswer = final
+			if forced, ok := c.forceExecutionFix(); ok {
+				c.e.logClass(logging.ClassWarning, "planner stopped with an unresolved source-level execution fault; forcing the debugger's fix cycle")
+				c.pendingPlan = &forced
+				c.stopResumes = 0
+				continue
+			}
 			if c.e.usedCycles() < c.e.cfg.Iterations && c.e.needsMoreWork(ctx) {
+				if c.stopResumes >= maxForcedResumes {
+					c.e.logClass(logging.ClassWarning, "planner stopped again with work remaining; accepting the stop")
+					return final, nil
+				}
+				c.stopResumes++
 				c.e.logClass(logging.ClassWarning, "planner stopped with work remaining; resuming")
 				c.plannerNote = "real verdicts or actionable high/medium findings remain; continue the loop"
 				c.editorFailures = 0
@@ -99,18 +147,22 @@ func (c *coordinator) run(ctx context.Context) (map[string]any, error) {
 			before := c.e.iter
 			if err := c.edit(ctx, plan); err != nil {
 				c.lastEditorError = err.Error()
+				if isInfrastructureFailure(err) {
+					c.infraFailures++
+					c.e.logClass(logging.ClassWarning, "editor infrastructure failure: %v", err)
+					if c.infraFailures >= maxInfraFailures {
+						return c.editorFailureFinal(err), nil
+					}
+					if !c.e.backoff(ctx, c.infraFailures, "editor infrastructure failure") {
+						return nil, ctx.Err()
+					}
+					// The hypothesis is still valid; retry the same plan after
+					// the host recovers instead of spending a planner session.
+					c.pendingPlan = &plan
+					continue
+				}
 				c.editorFailures++
 				c.e.logClass(logging.ClassWarning, "editor worker: %v", err)
-				if c.e.guest != nil && strings.Contains(strings.ToLower(err.Error()), "did not execute") {
-					// The sandbox did not start the artifact: this is a guest
-					// execution fault, not a detection result. Diagnose it
-					// before asking for another build.
-					if diag, diagErr := c.debug(ctx, "the sandbox did not execute the artifact: "+clip(err.Error(), 300), c.e.last); diagErr != nil {
-						c.e.logClass(logging.ClassWarning, "debugger worker: %v", diagErr)
-					} else if diag != nil {
-						c.lastDiagnosis = diag
-					}
-				}
 				if c.editorFailures >= maxEditorFailures {
 					return c.editorFailureFinal(err), nil
 				}
@@ -119,6 +171,7 @@ func (c *coordinator) run(ctx context.Context) (map[string]any, error) {
 			if c.e.iter == before {
 				c.lastEditorError = "the editor returned without a completed DetectionCycle"
 				c.editorFailures++
+				c.e.logClass(logging.ClassWarning, "editor worker: %s", c.lastEditorError)
 				if c.editorFailures >= maxEditorFailures {
 					return c.editorFailureFinal(fmt.Errorf("%s", c.lastEditorError)), nil
 				}
@@ -126,18 +179,32 @@ func (c *coordinator) run(ctx context.Context) (map[string]any, error) {
 			}
 			c.lastEditorError = ""
 			c.editorFailures = 0
+			c.infraFailures = 0
+			c.rejectedPlans = 0
 			if err := c.afterCycle(ctx, c.e.last); err != nil {
 				return nil, err
 			}
 		case "debug":
-			if c.e.guest == nil {
-				c.plannerNote = "the guest debugger is not configured; return action=stop or action=test"
+			if !c.debuggerAvailable() {
+				reason := c.debuggerUnavailableReason()
+				c.rejectedPlans++
+				c.plannerNote = "The debugger is unavailable: " + reason + ". Do not choose action=debug; choose action=test with a concrete fix, or action=stop."
+				c.e.logClass(logging.ClassWarning, "planner requested an unavailable debugger: %s", reason)
+				if c.rejectedPlans >= maxRejectedPlans {
+					return c.coordinatorStopFinal("the planner requested an unavailable debugger twice: " + reason), nil
+				}
 				continue
 			}
-			if _, err := c.debug(ctx, "planner request: "+clip(plan.DebugFocus, 300), c.e.last); err != nil {
+			if _, err := c.debug(ctx, debugRequest{Trigger: "planner request: " + clip(plan.DebugFocus, 300), Cycle: c.e.last}); err != nil {
 				c.e.logClass(logging.ClassWarning, "debugger worker: %v", err)
-				c.plannerNote = "the debugger could not complete: " + clip(err.Error(), 300)
+				c.plannerNote = "The debugger could not complete: " + clip(err.Error(), 300) + ". Choose action=test with a concrete fix, or action=stop."
+				c.rejectedPlans++
+				if c.rejectedPlans >= maxRejectedPlans {
+					return c.coordinatorStopFinal("the debugger could not complete: " + clip(err.Error(), 400)), nil
+				}
+				continue
 			}
+			c.rejectedPlans = 0
 		}
 	}
 }
@@ -152,6 +219,111 @@ func (c *coordinator) editorFailureFinal(err error) map[string]any {
 	c.e.lastAnswer = final
 	c.e.logClass(logging.ClassError, "stopping after repeated editor failures: %v", err)
 	return final
+}
+
+// forceExecutionFix turns a debugger-identified source-level execution fault
+// into one editor cycle. A planner stop must not leave the payload unable to
+// check in; the fix is bounded so a broken diagnosis cannot loop forever.
+func (c *coordinator) forceExecutionFix() (plannerPlan, bool) {
+	if c.forcedFixes >= 2 || c.e.usedCycles() >= c.e.cfg.Iterations {
+		return plannerPlan{}, false
+	}
+	if c.e.last == nil || c.e.last.Execution != executionOffline {
+		return plannerPlan{}, false
+	}
+	diag := c.lastDiagnosis
+	if diag == nil || !diag.SourceFixRequired {
+		return plannerPlan{}, false
+	}
+	brief := strings.TrimSpace(diag.EditorBrief)
+	if brief == "" {
+		brief = strings.TrimSpace(diag.Cause)
+	}
+	if brief == "" {
+		return plannerPlan{}, false
+	}
+	c.forcedFixes++
+	return plannerPlan{
+		Action:      "test",
+		Mechanism:   c.lastMechanism(),
+		Prediction:  "the generated agent checks in after the debugger's execution fix",
+		EditorBrief: brief,
+		Reason:      "the guest debugger found a source-level execution fault; the host is forcing the fix before another stop",
+	}, true
+}
+
+// lastMechanism keeps a forced fix on the loading path under test instead of
+// inventing a new one.
+func (c *coordinator) lastMechanism() string {
+	cycles := c.e.recentCycles(1)
+	if len(cycles) == 0 {
+		return "other"
+	}
+	var summary cycleSummary
+	if json.Unmarshal([]byte(cycles[0].Summary), &summary) != nil || strings.TrimSpace(summary.Mechanism) == "" {
+		return "other"
+	}
+	return summary.Mechanism
+}
+
+func (c *coordinator) coordinatorStopFinal(reason string) map[string]any {
+	final := map[string]any{
+		"summary":     "the coordinator stopped the loop: " + reason,
+		"edits":       []any{},
+		"residual":    []string{reason},
+		"parse_error": "coordinator stopped the loop",
+	}
+	c.e.lastAnswer = final
+	c.e.logClass(logging.ClassError, "%s", final["summary"])
+	return final
+}
+
+// debuggerBudget is the total debugger sessions available to this loop. One
+// pass is allowed per cycle; the total follows the cycle budget.
+func (c *coordinator) debuggerBudget() int {
+	return max(4, c.e.cfg.Iterations)
+}
+
+func (c *coordinator) debuggerRemaining() int {
+	return max(0, c.debuggerBudget()-c.debuggerSessions)
+}
+
+// debuggerAvailable reports whether a debug pass can run for the last cycle.
+func (c *coordinator) debuggerAvailable() bool {
+	return c.debuggerAvailableFor(c.e.last)
+}
+
+func (c *coordinator) debuggerAvailableFor(cycle *Cycle) bool {
+	if c.e.guest == nil || c.debuggerRemaining() <= 0 {
+		return false
+	}
+	if cycle != nil && cycle.ID != 0 {
+		if _, seen := c.debugged.Load(cycle.ID); seen {
+			return false
+		}
+	}
+	return true
+}
+
+// debuggerUnavailableReason explains a refused debug plan so the planner can
+// choose action=test or action=stop without guessing.
+func (c *coordinator) debuggerUnavailableReason() string {
+	return c.debuggerUnavailableFor(c.e.last)
+}
+
+func (c *coordinator) debuggerUnavailableFor(cycle *Cycle) string {
+	if c.e.guest == nil {
+		return "guest SSH is not configured"
+	}
+	if c.debuggerRemaining() <= 0 {
+		return fmt.Sprintf("no sessions remain (%d/%d used)", c.debuggerSessions, c.debuggerBudget())
+	}
+	if cycle != nil && cycle.ID != 0 {
+		if _, seen := c.debugged.Load(cycle.ID); seen {
+			return fmt.Sprintf("cycle %d was already debugged; use its diagnosis", cycle.Iteration)
+		}
+	}
+	return "debugger is not available for the last cycle"
 }
 
 func (c *coordinator) afterBaseline(ctx context.Context) error {
@@ -265,30 +437,50 @@ func (c *coordinator) planFailureFinal(text string, err error) map[string]any {
 func (c *coordinator) edit(ctx context.Context, plan plannerPlan) error {
 	c.currentPlan = plan
 	c.e.sessionCycles.Store(0)
-	c.e.actionRequired.Store(false)
-	// The planner may have used part of the previous window; give the editor a
-	// full cycle deadline for the build and detonation.
-	c.e.lastCycleAt.Store(time.Now().UnixNano())
+	c.e.clearCycleError()
 	prompt := c.editorBrief(plan)
-	text, err := c.runSession(ctx, roleEditor, prompt, c.editorResume)
+	ws := c.newWorkerSession(roleEditor)
+	defer ws.close()
+	result, err := ws.run(ctx, prompt, c.editorResume)
+	c.recordWorkerResult(ctx, roleEditor, prompt, result, err)
 	if err != nil {
-		c.recordWorker(ctx, roleEditor, prompt, text, err)
 		return err
 	}
-	c.recordWorker(ctx, roleEditor, prompt, text, nil)
-	c.e.logClass(logging.ClassAnswer, "%s", clip(text, 6000))
+	c.e.logClass(logging.ClassAnswer, "%s", clip(result.text, 6000))
 	if c.e.sessionCycles.Load() == 0 {
+		if cycleErr := c.e.takeCycleError(); cycleErr != nil {
+			if errors.Is(cycleErr, ErrSandboxUnreachable) {
+				return fmt.Errorf("%w: %v", errCycleInfrastructure, cycleErr)
+			}
+			return fmt.Errorf("the editor cycle failed: %v", cycleErr)
+		}
 		return fmt.Errorf("the editor returned without running DetectionCycle")
 	}
 	return nil
 }
 
-func (c *coordinator) debug(ctx context.Context, trigger string, cycle *Cycle) (*debugDiagnosis, error) {
-	if c.debuggerSessions >= maxDebuggerSessions {
-		return nil, fmt.Errorf("debugger session limit reached (%d)", maxDebuggerSessions)
-	}
+// debugRequest describes one debugger pass. Repeat allows the final
+// verification pass to inspect the same cycle again after a successful fix.
+type debugRequest struct {
+	Trigger string
+	Cycle   *Cycle
+	Repeat  bool
+}
+
+func (c *coordinator) debug(ctx context.Context, req debugRequest) (*debugDiagnosis, error) {
 	if c.e.guest == nil {
 		return nil, fmt.Errorf("guest SSH is not configured")
+	}
+	if c.debuggerRemaining() <= 0 {
+		return nil, fmt.Errorf("debugger session limit reached (%d/%d)", c.debuggerSessions, c.debuggerBudget())
+	}
+	if !req.Repeat && req.Cycle != nil && req.Cycle.ID != 0 {
+		if _, seen := c.debugged.Load(req.Cycle.ID); seen {
+			return nil, fmt.Errorf("cycle %d was already debugged; use its diagnosis", req.Cycle.Iteration)
+		}
+	}
+	if req.Cycle != nil && req.Cycle.ID != 0 {
+		c.debugged.Store(req.Cycle.ID, true)
 	}
 	c.debuggerSessions++
 	exclusion := "not verified"
@@ -300,25 +492,32 @@ func (c *coordinator) debug(ctx context.Context, trigger string, cycle *Cycle) (
 		c.e.audit("guest_exclusion", c.e.guestAddr(), fmt.Sprintf("path=%s added=%v", status.Path, status.Added))
 	}
 	c.e.logClass(logging.ClassLine, "guest debug exclusion: %s", exclusion)
-	prompt := c.debuggerBrief(ctx, trigger, cycle) + "\nGuest exclusion: " + exclusion
-	text, err := c.runSession(ctx, roleDebugger, prompt, c.debuggerResume)
-	if err != nil {
-		c.recordWorker(ctx, roleDebugger, prompt, text, err)
-		return nil, err
+	prompt := c.debuggerBrief(ctx, req.Trigger, req.Cycle) + "\nGuest exclusion: " + exclusion
+	ws := c.newWorkerSession(roleDebugger)
+	defer ws.close()
+	for attempt := 0; ; attempt++ {
+		result, err := ws.run(ctx, prompt, c.debuggerResume)
+		if err != nil {
+			c.recordWorkerResult(ctx, roleDebugger, prompt, result, err)
+			return nil, err
+		}
+		diag, parseErr := parseDebugDiagnosis(result.text)
+		c.recordWorkerResult(ctx, roleDebugger, prompt, result, parseErr)
+		if parseErr == nil {
+			c.lastDiagnosis = &diag
+			c.e.logClass(logging.ClassCycle, "debugger: cause=%s source_fix=%v online=%v",
+				clip(diag.Cause, 200), diag.SourceFixRequired, diag.AgentOnlineAfter)
+			if c.confirmOnline(ctx) {
+				c.recoverCycle(ctx, req.Cycle, diag)
+			}
+			return &diag, nil
+		}
+		c.e.logClass(logging.ClassWarning, "debugger answer was not valid JSON: %v", parseErr)
+		if attempt >= 1 {
+			return nil, parseErr
+		}
+		prompt = "Your previous answer was not the required debugger JSON object: " + parseErr.Error() + ". Return exactly one JSON object now."
 	}
-	diag, parseErr := parseDebugDiagnosis(text)
-	c.recordWorker(ctx, roleDebugger, prompt, text, parseErr)
-	if parseErr != nil {
-		return nil, parseErr
-	}
-	c.lastDiagnosis = &diag
-	c.e.logClass(logging.ClassCycle, "debugger: cause=%s source_fix=%v online=%v",
-		clip(diag.Cause, 200), diag.SourceFixRequired, diag.AgentOnlineAfter)
-	if c.confirmOnline(ctx) {
-		c.recoverCycle(ctx, cycle, diag)
-		return &diag, nil
-	}
-	return &diag, nil
 }
 
 func (c *coordinator) confirmOnline(ctx context.Context) bool {
@@ -369,108 +568,7 @@ func (c *coordinator) recoverCycle(ctx context.Context, cycle *Cycle, diag debug
 	c.e.logClass(logging.ClassCycle, "debugger recovered cycle %d: %s", cycle.Iteration, clip(diag.Cause, 200))
 }
 
-// runSession runs one worker with the role's tools, hooks, turn cap, and
-// timeouts. Planner and editor sessions are also bounded by the cycle
-// deadline, so a stalled worker cannot delay the next detonation forever.
-func (c *coordinator) runSession(ctx context.Context, role evolveRole, prompt string, resume func(reason string) string) (string, error) {
-	maxTurns := c.turns(role)
-	sessionTimeout := c.sessionTimeout(role)
-	hardSession := role == rolePlanner
-	if hardSession && c.e.cfg.PlannerTimeout > 0 {
-		sessionTimeout = c.e.cfg.PlannerTimeout
-	}
-	idleTimeout := c.idleTimeout(role)
-	sessionStart := time.Now()
-	cycleTimeout := c.e.cfg.CycleTimeout
-	if cycleTimeout <= 0 {
-		cycleTimeout = defaultCycleTimeout
-	}
-	enforceCycle := role != roleDebugger
-	for attempt := 0; ; attempt++ {
-		c.e.sessions.Add(1)
-		sessionCtx, sessionCancel := context.WithCancel(ctx)
-		c.e.setSessionCancel(sessionCancel)
-		var sessionExpired, idleExpired, cycleExpired atomic.Bool
-		c.e.deadlineHit.Store(false)
-		sessionStart = time.Now()
-		c.e.lastToolCall.Store(time.Now().UnixNano())
-		watchdogDone := make(chan struct{})
-		go c.watchdog(sessionCtx, sessionCancel, watchdogDone, enforceCycle, hardSession, role == roleEditor, sessionTimeout, idleTimeout, cycleTimeout, sessionStart, &sessionExpired, &idleExpired, &cycleExpired)
-		text, err := agentcore.Run(sessionCtx, agentcore.Options{
-			Provider:               c.provider,
-			SystemPrompt:           []string{roleSystemPrompt(role)},
-			Tools:                  c.e.toolsFor(role),
-			PermissionMode:         permission.ModeDontAsk,
-			Hooks:                  c.e.hooksFor(role),
-			WorkingDir:             c.e.cfg.ModuleDir,
-			MaxTurns:               maxTurns,
-			MaxTokens:              maxWorkerTokens,
-			DisableBackgroundTasks: true,
-			Compaction:             &compaction.Config{ContextWindow: 200000, MaxOutputTokens: maxWorkerTokens, KeepRecent: 8},
-			OnWarn:                 func(line string) { c.e.logf(logging.ClassWarning, "%s: %s", role.label(), line) },
-		}, prompt)
-		close(watchdogDone)
-		sessionCancel()
-		if c.e.sessionStopped() {
-			return text, nil
-		}
-		if err == nil {
-			return text, nil
-		}
-		if ctx.Err() != nil {
-			return text, ctx.Err()
-		}
-		if role == roleDebugger && attempt >= 2 {
-			return text, fmt.Errorf("debugger session failed: %w", err)
-		}
-		if enforceCycle && cycleExpired.Load() {
-			c.e.actionRequired.Store(role == roleEditor)
-			c.e.logClass(logging.ClassWarning,
-				"%s: no cycle completed within %s; stopping the session and requiring a retry", role.label(), cycleTimeout)
-			c.e.lastCycleAt.Store(time.Now().UnixNano())
-			prompt = resume("cycle")
-			continue
-		}
-		if sessionExpired.Load() {
-			switch role {
-			case rolePlanner:
-				c.e.logClass(logging.ClassWarning,
-					"planner decision window expired after %s; forcing a plan", sessionTimeout)
-			case roleEditor:
-				c.e.logClass(logging.ClassWarning,
-					"editor decision window expired after %s; forcing an edit and cycle", sessionTimeout)
-			default:
-				c.e.logClass(logging.ClassError,
-					"%s: session exceeded the %s wall-clock limit; restarting", role.label(), sessionTimeout)
-			}
-			prompt = resume("session")
-			continue
-		}
-		if idleExpired.Load() {
-			c.e.logClass(logging.ClassWarning, "%s: session made no tool call for %s", role.label(), idleTimeout)
-			prompt = resume("idle")
-			continue
-		}
-		if c.e.executionBlocked.Load() && role == roleEditor {
-			return text, fmt.Errorf("execution is blocked: no dynamic payload checked in and no executing baseline exists")
-		}
-		if !c.e.recover(ctx, attempt, role.label()+" session", err) {
-			return text, ctx.Err()
-		}
-		prompt = resume("provider")
-	}
-}
-
-func (c *coordinator) watchdog(ctx context.Context, cancel context.CancelFunc, done <-chan struct{}, enforceCycle, hardSession, resetOnCycle bool, sessionTimeout, idleTimeout, cycleTimeout time.Duration, started time.Time, sessionExpired, idleExpired, cycleExpired *atomic.Bool) {
-	sessionWindowStart := func() time.Time {
-		start := started
-		if resetOnCycle {
-			if last := time.Unix(0, c.e.lastCycleAt.Load()); last.After(start) {
-				start = last
-			}
-		}
-		return start
-	}
+func (c *coordinator) watchdog(ctx context.Context, cancel context.CancelFunc, done <-chan struct{}, hardSession bool, sessionTimeout, idleTimeout time.Duration, started time.Time, sessionExpired, idleExpired *atomic.Bool) {
 	tick := idleTimeout / 4
 	if tick > time.Minute {
 		tick = time.Minute
@@ -480,12 +578,9 @@ func (c *coordinator) watchdog(ctx context.Context, cancel context.CancelFunc, d
 	}
 	next := func() time.Duration {
 		wait := tick
-		if enforceCycle && c.e.activeCycles.Load() == 0 && c.e.activeTools.Load() == 0 {
-			wait = min(wait, cycleTimeout-time.Since(time.Unix(0, c.e.lastCycleAt.Load())))
-		}
 		if c.e.activeTools.Load() == 0 {
 			wait = min(wait, idleTimeout-time.Since(time.Unix(0, c.e.lastToolCall.Load())))
-			wait = min(wait, sessionTimeout-time.Since(sessionWindowStart()))
+			wait = min(wait, sessionTimeout-time.Since(started))
 		}
 		if wait < 10*time.Millisecond {
 			wait = 10 * time.Millisecond
@@ -504,19 +599,10 @@ func (c *coordinator) watchdog(ctx context.Context, cancel context.CancelFunc, d
 		}
 		c.e.toolGate.Lock()
 		tools := c.e.activeTools.Load()
-		cycles := c.e.activeCycles.Load()
 		idleFor := time.Since(time.Unix(0, c.e.lastToolCall.Load()))
-		cycleFor := time.Since(time.Unix(0, c.e.lastCycleAt.Load()))
 		if hardSession && time.Since(started) >= sessionTimeout {
 			c.e.deadlineHit.Store(true)
 			sessionExpired.Store(true)
-			cancel()
-			c.e.toolGate.Unlock()
-			return
-		}
-		if enforceCycle && cycles == 0 && tools == 0 && cycleFor >= cycleTimeout {
-			c.e.deadlineHit.Store(true)
-			cycleExpired.Store(true)
 			cancel()
 			c.e.toolGate.Unlock()
 			return
@@ -528,7 +614,7 @@ func (c *coordinator) watchdog(ctx context.Context, cancel context.CancelFunc, d
 			c.e.toolGate.Unlock()
 			return
 		}
-		if tools == 0 && time.Since(sessionWindowStart()) >= sessionTimeout {
+		if tools == 0 && time.Since(started) >= sessionTimeout {
 			c.e.deadlineHit.Store(true)
 			sessionExpired.Store(true)
 			cancel()
@@ -766,6 +852,6 @@ func (c *coordinator) debuggerBrief(ctx context.Context, trigger string, cycle *
 		fmt.Fprintf(&b, "Baseline failure: %s\n", c.e.baselineFailure)
 	}
 	fmt.Fprintf(&b, "\nDossier:\n%s\n", c.e.dossier())
-	b.WriteString("\nStart with GuestSSH action=ensure_exclusion, then inspect the guest. Return the debugger JSON object.")
+	b.WriteString("\nStart with GuestSSH action=ensure_exclusion, then inspect the guest. This is the only debugger pass for this cycle; the host allows 20 tool calls and then requires the JSON object. Do not repeat a command that already failed.")
 	return b.String()
 }

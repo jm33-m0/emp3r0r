@@ -267,10 +267,19 @@ type evolver struct {
 	sourceTreeHash  string
 	lastToolCall    atomic.Int64
 	activeTools     atomic.Int32
-	lastCycleAt     atomic.Int64
-	activeCycles    atomic.Int32
-	actionRequired  atomic.Bool
 	deadlineHit     atomic.Bool
+	// preservedShellcode is the shellcode of the last payload whose agent
+	// checked in. Rotation must not delete it: the execution gate restores it
+	// when a later cycle never runs.
+	preservedShellcode string
+	// restoreErr records an incomplete execution-gate restore so the next
+	// planner brief does not describe a broken state as executable.
+	restoreErr     error
+	cycleErrMu     sync.Mutex
+	lastCycleError error
+	tokensIn       atomic.Int64
+	tokensOut      atomic.Int64
+	lastReason     atomic.Value
 	// toolGate closes the race between a deadline cancelling a session and a
 	// tool starting in that same session.
 	toolGate          sync.Mutex
@@ -585,7 +594,6 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 		e.log("source tree: %s", e.sourceTreeHash)
 	}
 	e.started = time.Now()
-	e.lastCycleAt.Store(e.started.UnixNano())
 	progressDone := make(chan struct{})
 	go e.progressLoop(ctx, progressDone)
 	defer close(progressDone)
@@ -599,6 +607,7 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 	if e.knowledge != nil {
 		defer func() { _ = e.knowledge.Close() }()
 	}
+	provider = &resilientProvider{next: provider, logf: e.logf}
 	provider = &loggingProvider{next: provider, logf: e.logf}
 
 	// A failed baseline goes to the model instead of a silent host retry: the
@@ -619,23 +628,10 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 			"baseline failed; asking the model to diagnose the failure before another attempt: %s",
 			e.baselineFailure)
 	}
-	// Start the cycle deadline when the model starts working: a slow baseline
-	// must not consume the first model session's window.
-	e.lastCycleAt.Store(time.Now().UnixNano())
+	// The baseline does not consume a model decision window: each worker
+	// session starts its own watchdog.
 	baselineJSON, _ := json.Marshal(baseline)
 
-	executionState := "the host checks the generated agent after every dynamic cycle with AgentStatus and records execution=verified, offline, or unverified"
-	if e.baselineFailure != "" {
-		executionState = "the baseline did not complete; diagnose the failure and fix it before another cycle"
-	} else if e.executionBlocked.Load() {
-		executionState = "the baseline payload did not check in and no executing baseline exists; do not run more cycles; return the final JSON with the execution failure"
-	} else if e.lastExecuting != nil {
-		payload := shortPayloadKey(e.lastExecuting.PayloadKey)
-		if payload == "" {
-			payload = "the baseline"
-		}
-		executionState = fmt.Sprintf("the last executing payload is %s; the host checks every dynamic cycle with AgentStatus and restores this payload after a non-executing cycle", payload)
-	}
 	knowledgeState := "unavailable; ask the operator to run detect_loop knowledge-sync"
 	if e.knowledge != nil {
 		knowledgeState = "available: " + e.knowledge.Path() + " (KnowledgeSearch, KnowledgeRead, KnowledgeStats, KnowledgeList)"
@@ -710,7 +706,7 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 				// A fresh agent restart cannot fix a guest-side execution
 				// fault. Let the debugger inspect the sandbox first, then
 				// retry the final check once when it reports a fix.
-				diag, diagErr := coord.debug(ctx, "final payload verification", e.last)
+				diag, diagErr := coord.debug(ctx, debugRequest{Trigger: "final payload verification", Cycle: e.last, Repeat: true})
 				if diagErr != nil {
 					e.logClass(logging.ClassWarning, "final debugger: %v", diagErr)
 				}
@@ -996,10 +992,6 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 	}
 	cycleCtx, cancelCycle := context.WithTimeout(ctx, timeout)
 	defer cancelCycle()
-	// A cycle in flight is bounded by its own context; the session watchdog
-	// must not expire the cycle deadline underneath it.
-	e.activeCycles.Add(1)
-	defer e.activeCycles.Add(-1)
 	iteration := e.iter + 1
 
 	if _, err := e.waitSandbox(cycleCtx); err != nil {
@@ -1195,10 +1187,6 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 		iteration, cycle.PayloadKey, shortSHA(artifact.SHA256), cycle.Score, summary.Verdicts, cycle.Findings, summary.Execution)
 	// The coordinator applies the execution gate after the editor session so a
 	// debugger can inspect the guest before a non-executing cycle is reverted.
-	// A completed cycle resets the session's cycle deadline even when the
-	// payload did not execute: the model has new feedback to act on.
-	e.lastCycleAt.Store(time.Now().UnixNano())
-	e.actionRequired.Store(false)
 	return cycle, nil
 }
 

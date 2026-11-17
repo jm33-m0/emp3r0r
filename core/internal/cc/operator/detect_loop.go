@@ -158,9 +158,9 @@ func addDetectLoopFlags(cmd *cobra.Command) {
 	cmd.Flags().Duration("guest-ssh-timeout", 60*time.Second, "Guest command timeout")
 	cmd.Flags().Bool("git", true, "Record source edits in a shadow git repository under the detection store")
 	cmd.Flags().Duration("timeout", 0, "Loop deadline; 0 means no deadline")
-	cmd.Flags().Duration("cycle-timeout", 60*time.Minute, "Deadline for one build, detonation, and verification cycle, and for a model session that completes no cycle; the cycle is stopped and the model must edit and retry")
+	cmd.Flags().Duration("cycle-timeout", 60*time.Minute, "Deadline for one build, detonation, and verification cycle")
 	cmd.Flags().Duration("session-timeout", 2*time.Hour, "Wall-clock deadline for one model session")
-	cmd.Flags().Duration("tool-idle-timeout", 30*time.Minute, "Restart a model session that makes no tool call for this long")
+	cmd.Flags().Duration("tool-idle-timeout", 30*time.Minute, "Continue a model session that makes no tool call for this long")
 	cmd.Flags().Bool("tmux", true, "Open a separate tmux window tailing the loop log")
 	cmd.Flags().String("goal", "", "High-level loop goal shown to the model")
 
