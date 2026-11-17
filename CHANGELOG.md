@@ -1,5 +1,21 @@
 # Changelog
 
+## [5.10.1](https://github.com/jm33-m0/emp3r0r/compare/v5.10.0...v5.10.1) (2026-11-17)
+
+
+### Bug Fixes
+
+* **evasion:** add configurable worker tool budgets ([2dcabe8](https://github.com/jm33-m0/emp3r0r/commit/2dcabe86351b64cc9bea897195ccab78f2ab9146))
+* **evasion:** add SQL query error hints and thinking options ([ff321a9](https://github.com/jm33-m0/emp3r0r/commit/ff321a925aa0854091e9f1953405095ca6b1ca0e))
+* **evasion:** fail fast on baseline sandbox outages ([cb61141](https://github.com/jm33-m0/emp3r0r/commit/cb611415285167d69e01159a0e15eeeda3f5aa98))
+* **evasion:** preserve last executing shellcode during rotation ([90c2f1d](https://github.com/jm33-m0/emp3r0r/commit/90c2f1d1d5611b1bfa1b549fd79e88cd4635496e))
+* **evasion:** reuse worker sessions and add provider retries ([5df0bd1](https://github.com/jm33-m0/emp3r0r/commit/5df0bd1248d977c3d52ff2e92586c80b26402069))
+* **evasion:** route offline baselines to debugger instead of blocking ([8d85c0e](https://github.com/jm33-m0/emp3r0r/commit/8d85c0e488e99e4f2aed55d02eefe0a48df369e1))
+* **evasion:** share guest SSH parser and normalize source-root paths ([663f0ab](https://github.com/jm33-m0/emp3r0r/commit/663f0abf8afe05ff700f050b8b1be0d82dacc69b))
+* **evasion:** track edit kinds, worker metrics, and cycle errors ([bee3599](https://github.com/jm33-m0/emp3r0r/commit/bee35995632c67fb01979b90a15a2ed4dc4dcf64))
+* **mcp:** add rotation, verification, and guest SSH to detection_loop ([df88b9d](https://github.com/jm33-m0/emp3r0r/commit/df88b9da6d338be0e7660ce3fc6f95a5422deb30))
+* **opsec:** register local-code-edit capability ([cb67f99](https://github.com/jm33-m0/emp3r0r/commit/cb67f9940eb62c63b02051af50d02add80dc9bf8))
+
 ## [5.10.0](https://github.com/jm33-m0/emp3r0r/compare/v5.9.1...v5.10.0) (2026-11-17)
 
 
