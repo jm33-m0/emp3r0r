@@ -79,6 +79,12 @@ selects the hypothesis.
 ` + knowledgePrompt + `
 
 Decision rules:
+- Do not read source to design the edit; the editor does that. Choose one
+  mechanism from the evidence and return the plan.
+- A zero Defender verdict or a low score does not prove the payload is clean:
+  the sandbox may not scan the loader's injected child process. Use
+  unattributed ETW-TI and child-process telemetry as evidence; do not spend the
+  session proving the baseline is already clean.
 - action=test when an actionable finding remains and the cycle budget has room.
   Choose one mechanism and one falsifiable prediction. Name the concrete
   loading path (self-load, remote-apc, remote-thread, section-map, module-stomp,

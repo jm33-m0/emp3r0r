@@ -12,7 +12,8 @@ func TestDetectLoopRegistersWorkerGuestAndGitFlags(t *testing.T) {
 	for _, name := range []string{
 		"guest-ssh", "guest-ssh-key", "guest-ssh-exclude", "guest-ssh-known-hosts",
 		"guest-ssh-fingerprint", "guest-ssh-insecure", "guest-ssh-timeout",
-		"planner-turns", "editor-turns", "debugger-turns", "debugger-timeout", "worker-model", "git",
+		"planner-turns", "planner-timeout", "editor-turns",
+		"debugger-turns", "debugger-timeout", "worker-model", "git",
 	} {
 		if cmd.Flags().Lookup(name) == nil {
 			t.Fatalf("detect_loop is missing --%s", name)

@@ -374,6 +374,10 @@ func (c *coordinator) recoverCycle(ctx context.Context, cycle *Cycle, diag debug
 func (c *coordinator) runSession(ctx context.Context, role evolveRole, prompt string, resume func(reason string) string) (string, error) {
 	maxTurns := c.turns(role)
 	sessionTimeout := c.sessionTimeout(role)
+	hardSession := role == rolePlanner
+	if hardSession && c.e.cfg.PlannerTimeout > 0 {
+		sessionTimeout = c.e.cfg.PlannerTimeout
+	}
 	idleTimeout := c.idleTimeout(role)
 	cycleTimeout := c.e.cfg.CycleTimeout
 	if cycleTimeout <= 0 {
@@ -388,7 +392,7 @@ func (c *coordinator) runSession(ctx context.Context, role evolveRole, prompt st
 		sessionStart := time.Now()
 		c.e.lastToolCall.Store(time.Now().UnixNano())
 		watchdogDone := make(chan struct{})
-		go c.watchdog(sessionCtx, sessionCancel, watchdogDone, enforceCycle, sessionTimeout, idleTimeout, cycleTimeout, sessionStart, &sessionExpired, &idleExpired, &cycleExpired)
+		go c.watchdog(sessionCtx, sessionCancel, watchdogDone, enforceCycle, hardSession, sessionTimeout, idleTimeout, cycleTimeout, sessionStart, &sessionExpired, &idleExpired, &cycleExpired)
 		text, err := agentcore.Run(sessionCtx, agentcore.Options{
 			Provider:               c.provider,
 			SystemPrompt:           []string{roleSystemPrompt(role)},
@@ -422,8 +426,13 @@ func (c *coordinator) runSession(ctx context.Context, role evolveRole, prompt st
 			continue
 		}
 		if sessionExpired.Load() {
-			c.e.logClass(logging.ClassError,
-				"%s: session exceeded the %s wall-clock limit; restarting", role.label(), sessionTimeout)
+			if role == rolePlanner {
+				c.e.logClass(logging.ClassWarning,
+					"planner decision window expired after %s; forcing a plan", sessionTimeout)
+			} else {
+				c.e.logClass(logging.ClassError,
+					"%s: session exceeded the %s wall-clock limit; restarting", role.label(), sessionTimeout)
+			}
 			prompt = resume("session")
 			continue
 		}
@@ -442,7 +451,7 @@ func (c *coordinator) runSession(ctx context.Context, role evolveRole, prompt st
 	}
 }
 
-func (c *coordinator) watchdog(ctx context.Context, cancel context.CancelFunc, done <-chan struct{}, enforceCycle bool, sessionTimeout, idleTimeout, cycleTimeout time.Duration, started time.Time, sessionExpired, idleExpired, cycleExpired *atomic.Bool) {
+func (c *coordinator) watchdog(ctx context.Context, cancel context.CancelFunc, done <-chan struct{}, enforceCycle, hardSession bool, sessionTimeout, idleTimeout, cycleTimeout time.Duration, started time.Time, sessionExpired, idleExpired, cycleExpired *atomic.Bool) {
 	tick := idleTimeout / 4
 	if tick > time.Minute {
 		tick = time.Minute
@@ -479,6 +488,13 @@ func (c *coordinator) watchdog(ctx context.Context, cancel context.CancelFunc, d
 		cycles := c.e.activeCycles.Load()
 		idleFor := time.Since(time.Unix(0, c.e.lastToolCall.Load()))
 		cycleFor := time.Since(time.Unix(0, c.e.lastCycleAt.Load()))
+		if hardSession && time.Since(started) >= sessionTimeout {
+			c.e.deadlineHit.Store(true)
+			sessionExpired.Store(true)
+			cancel()
+			c.e.toolGate.Unlock()
+			return
+		}
 		if enforceCycle && cycles == 0 && tools == 0 && cycleFor >= cycleTimeout {
 			c.e.deadlineHit.Store(true)
 			cycleExpired.Store(true)
@@ -579,13 +595,13 @@ func (c *coordinator) recordWorker(ctx context.Context, role evolveRole, prompt,
 func (c *coordinator) plannerResume(reason string) string {
 	switch reason {
 	case "cycle":
-		return c.plannerBrief() + "\n\nNo cycle completed within the cycle deadline and the cycle was stopped. Issue action=test now; the editor will apply edits and call DetectionCycle. Do not keep reading."
+		return c.plannerBrief() + "\n\nNo cycle completed within the cycle deadline and the cycle was stopped. Return exactly one JSON plan now; the editor will apply edits and call DetectionCycle."
 	case "session":
-		return c.plannerBrief() + "\n\nThe previous planner session exceeded its wall-clock limit. Continue from the dossier and return one plan."
+		return c.plannerBrief() + "\n\nThe planner decision window expired. Return exactly one JSON plan now; the editor will inspect and edit source."
 	case "idle":
 		return c.plannerBrief() + "\n\nThe previous planner session made no tool call. Return one plan or action=stop now."
 	default:
-		return c.plannerBrief() + "\n\nThe previous planner session failed. Continue from the dossier and return one plan."
+		return c.plannerBrief() + "\n\nThe previous planner session failed. Return exactly one JSON plan now."
 	}
 }
 

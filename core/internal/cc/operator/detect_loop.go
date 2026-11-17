@@ -142,6 +142,7 @@ func addDetectLoopFlags(cmd *cobra.Command) {
 	cmd.Flags().String("knowledge", "", "Knowledge cache path; defaults to <detection store>/knowledge.db")
 	cmd.Flags().Int("turns", 60, "Default per-worker turn cap; overridden by the role flags")
 	cmd.Flags().Int("planner-turns", 24, "Maximum planner turns per session")
+	cmd.Flags().Duration("planner-timeout", 5*time.Minute, "Hard decision window for one planner call; the planner is forced to answer when it expires")
 	cmd.Flags().Int("editor-turns", 60, "Maximum editor turns per session")
 	cmd.Flags().Int("debugger-turns", 24, "Maximum debugger turns per session")
 	cmd.Flags().Duration("debugger-timeout", 10*time.Minute, "Wall-clock limit for one debugger session")
@@ -328,6 +329,7 @@ type detectLoopOptions struct {
 	Turns               int
 	Git                 bool
 	PlannerTurns        int
+	PlannerTimeout      time.Duration
 	EditorTurns         int
 	DebuggerTurns       int
 	DebuggerTimeout     time.Duration
@@ -376,6 +378,7 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 	opts.Turns, _ = cmd.Flags().GetInt("turns")
 	opts.Git, _ = cmd.Flags().GetBool("git")
 	opts.PlannerTurns, _ = cmd.Flags().GetInt("planner-turns")
+	opts.PlannerTimeout, _ = cmd.Flags().GetDuration("planner-timeout")
 	opts.EditorTurns, _ = cmd.Flags().GetInt("editor-turns")
 	opts.DebuggerTurns, _ = cmd.Flags().GetInt("debugger-turns")
 	opts.DebuggerTimeout, _ = cmd.Flags().GetDuration("debugger-timeout")

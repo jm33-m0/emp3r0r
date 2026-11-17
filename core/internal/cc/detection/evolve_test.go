@@ -787,6 +787,55 @@ func TestEvolveResumesCycleAfterDeadline(t *testing.T) {
 	}
 }
 
+func TestEvolveForcesPlanAfterPlannerTimeout(t *testing.T) {
+	moduleDir := t.TempDir()
+	shellcode := filepath.Join(t.TempDir(), "agent.bin")
+	if err := os.WriteFile(shellcode, []byte(strings.Repeat("S", 40000)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	build := func(_ string, _ map[string]string) (string, error) {
+		path := filepath.Join(t.TempDir(), "loader.exe")
+		if err := os.WriteFile(path, []byte("MZ"+strings.Repeat("M", 40000)), 0o600); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("[+] generated payload: %s (9 bytes)\n", path), nil
+	}
+	server, _ := fakeEvolveSandbox(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	provider := &deadlineResumeProvider{
+		wait:   2 * time.Second,
+		answer: `{"summary":"acted","edits":[],"residual":[]}`,
+		cancel: cancel,
+	}
+	started := time.Now()
+	_, err := RunEvolve(ctx, EvolveConfig{
+		Provider: provider, Model: "scripted",
+		Module: "loader_windows", ModuleDir: moduleDir,
+		Shellcode: shellcode, SandboxURL: server.URL, StoreRoot: t.TempDir(),
+		Stages: []string{"dynamic"}, Iterations: 2, Turns: 4, Build: build,
+		PlannerTimeout: 300 * time.Millisecond, CycleTimeout: time.Hour,
+		ToolIdleTimeout: time.Hour, SessionTimeout: time.Hour, RetryBase: time.Millisecond,
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
+	}
+	if elapsed := time.Since(started); elapsed > 3*time.Second {
+		t.Fatalf("the planner timeout did not stop the stalled session: %s", elapsed)
+	}
+	provider.mu.Lock()
+	requests := append([]string(nil), provider.requests...)
+	provider.mu.Unlock()
+	if len(requests) != 3 {
+		t.Fatalf("planner sessions = %d, want 3", len(requests))
+	}
+	for _, want := range []string{"decision window expired", "Return exactly one JSON plan"} {
+		if !strings.Contains(requests[1], want) {
+			t.Fatalf("forced-plan prompt missing %q:\n%s", want, requests[1])
+		}
+	}
+}
+
 func TestActionRequiredKeepsAnalysisToolsAvailable(t *testing.T) {
 	e := &evolver{}
 	e.actionRequired.Store(true)

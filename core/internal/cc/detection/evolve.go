@@ -36,6 +36,9 @@ const (
 	defaultToolIdleTimeout = 30 * time.Minute
 	// defaultProgressInterval emits a heartbeat during long sessions.
 	defaultProgressInterval = 2 * time.Minute
+	// defaultPlannerTimeout bounds one coordinator decision. The planner reads
+	// evidence; it does not design the edit, so it gets a short window.
+	defaultPlannerTimeout = 5 * time.Minute
 	// minAgentShellcodeBytes rejects a tiny blob that no real Go agent could
 	// have produced. It catches a loader that drops the payload to reduce
 	// detections.
@@ -114,9 +117,12 @@ type EvolveConfig struct {
 	Turns int
 	// PlannerTurns, EditorTurns, and DebuggerTurns bound each worker session.
 	// Zero falls back to Turns.
-	PlannerTurns  int
-	EditorTurns   int
-	DebuggerTurns int
+	PlannerTurns int
+	// PlannerTimeout bounds one planner decision, including retries after a
+	// malformed answer. Zero uses five minutes.
+	PlannerTimeout time.Duration
+	EditorTurns    int
+	DebuggerTurns  int
 	// DebuggerTimeout bounds one debugger session. Zero uses the cycle timeout.
 	DebuggerTimeout time.Duration
 	// WorkerModels overrides the model per worker role ("planner", "editor",
@@ -821,6 +827,9 @@ func normalizeEvolveConfig(cfg *EvolveConfig) error {
 	_ = static
 	if cfg.Iterations <= 0 {
 		cfg.Iterations = defaultEvolveIterations
+	}
+	if cfg.PlannerTimeout <= 0 {
+		cfg.PlannerTimeout = defaultPlannerTimeout
 	}
 	if cfg.Turns <= 0 {
 		cfg.Turns = defaultEvolveTurns
