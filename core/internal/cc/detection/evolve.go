@@ -39,6 +39,9 @@ const (
 	// defaultPlannerTimeout bounds one coordinator decision. The planner reads
 	// evidence; it does not design the edit, so it gets a short window.
 	defaultPlannerTimeout = 5 * time.Minute
+	// defaultEditorTimeout bounds the editor's analysis before it must act.
+	// The window resets on a completed cycle.
+	defaultEditorTimeout = 10 * time.Minute
 	// minAgentShellcodeBytes rejects a tiny blob that no real Go agent could
 	// have produced. It catches a loader that drops the payload to reduce
 	// detections.
@@ -121,8 +124,12 @@ type EvolveConfig struct {
 	// PlannerTimeout bounds one planner decision, including retries after a
 	// malformed answer. Zero uses five minutes.
 	PlannerTimeout time.Duration
-	EditorTurns    int
-	DebuggerTurns  int
+	// EditorTimeout bounds the editor's model time before it must apply an
+	// edit and call DetectionCycle. A running tool or cycle suspends the
+	// window, so a build is never cut off. Zero uses ten minutes.
+	EditorTimeout time.Duration
+	EditorTurns   int
+	DebuggerTurns int
 	// DebuggerTimeout bounds one debugger session. Zero uses the cycle timeout.
 	DebuggerTimeout time.Duration
 	// WorkerModels overrides the model per worker role ("planner", "editor",
@@ -830,6 +837,9 @@ func normalizeEvolveConfig(cfg *EvolveConfig) error {
 	}
 	if cfg.PlannerTimeout <= 0 {
 		cfg.PlannerTimeout = defaultPlannerTimeout
+	}
+	if cfg.EditorTimeout <= 0 {
+		cfg.EditorTimeout = defaultEditorTimeout
 	}
 	if cfg.Turns <= 0 {
 		cfg.Turns = defaultEvolveTurns

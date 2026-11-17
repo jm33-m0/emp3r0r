@@ -379,6 +379,7 @@ func (c *coordinator) runSession(ctx context.Context, role evolveRole, prompt st
 		sessionTimeout = c.e.cfg.PlannerTimeout
 	}
 	idleTimeout := c.idleTimeout(role)
+	sessionStart := time.Now()
 	cycleTimeout := c.e.cfg.CycleTimeout
 	if cycleTimeout <= 0 {
 		cycleTimeout = defaultCycleTimeout
@@ -389,10 +390,10 @@ func (c *coordinator) runSession(ctx context.Context, role evolveRole, prompt st
 		sessionCtx, sessionCancel := context.WithCancel(ctx)
 		var sessionExpired, idleExpired, cycleExpired atomic.Bool
 		c.e.deadlineHit.Store(false)
-		sessionStart := time.Now()
+		sessionStart = time.Now()
 		c.e.lastToolCall.Store(time.Now().UnixNano())
 		watchdogDone := make(chan struct{})
-		go c.watchdog(sessionCtx, sessionCancel, watchdogDone, enforceCycle, hardSession, sessionTimeout, idleTimeout, cycleTimeout, sessionStart, &sessionExpired, &idleExpired, &cycleExpired)
+		go c.watchdog(sessionCtx, sessionCancel, watchdogDone, enforceCycle, hardSession, role == roleEditor, sessionTimeout, idleTimeout, cycleTimeout, sessionStart, &sessionExpired, &idleExpired, &cycleExpired)
 		text, err := agentcore.Run(sessionCtx, agentcore.Options{
 			Provider:               c.provider,
 			SystemPrompt:           []string{roleSystemPrompt(role)},
@@ -426,10 +427,14 @@ func (c *coordinator) runSession(ctx context.Context, role evolveRole, prompt st
 			continue
 		}
 		if sessionExpired.Load() {
-			if role == rolePlanner {
+			switch role {
+			case rolePlanner:
 				c.e.logClass(logging.ClassWarning,
 					"planner decision window expired after %s; forcing a plan", sessionTimeout)
-			} else {
+			case roleEditor:
+				c.e.logClass(logging.ClassWarning,
+					"editor decision window expired after %s; forcing an edit and cycle", sessionTimeout)
+			default:
 				c.e.logClass(logging.ClassError,
 					"%s: session exceeded the %s wall-clock limit; restarting", role.label(), sessionTimeout)
 			}
@@ -451,7 +456,16 @@ func (c *coordinator) runSession(ctx context.Context, role evolveRole, prompt st
 	}
 }
 
-func (c *coordinator) watchdog(ctx context.Context, cancel context.CancelFunc, done <-chan struct{}, enforceCycle, hardSession bool, sessionTimeout, idleTimeout, cycleTimeout time.Duration, started time.Time, sessionExpired, idleExpired, cycleExpired *atomic.Bool) {
+func (c *coordinator) watchdog(ctx context.Context, cancel context.CancelFunc, done <-chan struct{}, enforceCycle, hardSession, resetOnCycle bool, sessionTimeout, idleTimeout, cycleTimeout time.Duration, started time.Time, sessionExpired, idleExpired, cycleExpired *atomic.Bool) {
+	sessionWindowStart := func() time.Time {
+		start := started
+		if resetOnCycle {
+			if last := time.Unix(0, c.e.lastCycleAt.Load()); last.After(start) {
+				start = last
+			}
+		}
+		return start
+	}
 	tick := idleTimeout / 4
 	if tick > time.Minute {
 		tick = time.Minute
@@ -466,7 +480,7 @@ func (c *coordinator) watchdog(ctx context.Context, cancel context.CancelFunc, d
 		}
 		if c.e.activeTools.Load() == 0 {
 			wait = min(wait, idleTimeout-time.Since(time.Unix(0, c.e.lastToolCall.Load())))
-			wait = min(wait, sessionTimeout-time.Since(started))
+			wait = min(wait, sessionTimeout-time.Since(sessionWindowStart()))
 		}
 		if wait < 10*time.Millisecond {
 			wait = 10 * time.Millisecond
@@ -509,7 +523,7 @@ func (c *coordinator) watchdog(ctx context.Context, cancel context.CancelFunc, d
 			c.e.toolGate.Unlock()
 			return
 		}
-		if tools == 0 && time.Since(started) >= sessionTimeout {
+		if tools == 0 && time.Since(sessionWindowStart()) >= sessionTimeout {
 			c.e.deadlineHit.Store(true)
 			sessionExpired.Store(true)
 			cancel()
@@ -540,7 +554,8 @@ func (c *coordinator) turns(role evolveRole) int {
 }
 
 func (c *coordinator) sessionTimeout(role evolveRole) time.Duration {
-	if role == roleDebugger {
+	switch role {
+	case roleDebugger:
 		if c.e.cfg.DebuggerTimeout > 0 {
 			return c.e.cfg.DebuggerTimeout
 		}
@@ -548,6 +563,11 @@ func (c *coordinator) sessionTimeout(role evolveRole) time.Duration {
 			return c.e.cfg.CycleTimeout
 		}
 		return defaultCycleTimeout
+	case roleEditor:
+		if c.e.cfg.EditorTimeout > 0 {
+			return c.e.cfg.EditorTimeout
+		}
+		return defaultEditorTimeout
 	}
 	if c.e.cfg.SessionTimeout > 0 {
 		return c.e.cfg.SessionTimeout
@@ -610,7 +630,10 @@ func (c *coordinator) editorResume(reason string) string {
 	case "cycle":
 		return c.editorBrief(c.currentPlan) + "\n\nNo cycle completed within the cycle deadline and the session was stopped. Apply the remaining edits with EditSource now, then retry with DetectionCycle. Do not keep reading."
 	case "session":
-		return c.editorBrief(c.currentPlan) + "\n\nThe previous editor session exceeded its wall-clock limit. Continue from the source state and run the cycle."
+		if c.e.sessionCycles.Load() >= 1 {
+			return c.editorBrief(c.currentPlan) + "\n\nThe editor decision window expired after a completed cycle. Return the result JSON now; the planner will choose the next hypothesis."
+		}
+		return c.editorBrief(c.currentPlan) + "\n\nThe editor decision window expired. Apply the edit now with EditSource and call DetectionCycle. Do not keep reading."
 	case "idle":
 		return c.editorBrief(c.currentPlan) + "\n\nThe previous editor session made no tool call. Apply the edit or call DetectionCycle now."
 	default:

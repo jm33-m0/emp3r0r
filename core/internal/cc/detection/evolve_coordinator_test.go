@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Autumn-27/norma/llm"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -278,5 +279,44 @@ func TestParseDebugDiagnosis(t *testing.T) {
 	}
 	if _, err := parseDebugDiagnosis(`{"confidence":"low"}`); err == nil {
 		t.Fatal("a diagnosis without cause or evidence was accepted")
+	}
+}
+
+func TestEditorDecisionWindowForcesRetry(t *testing.T) {
+	moduleDir := t.TempDir()
+	db, err := OpenTelemetryDB(filepath.Join(t.TempDir(), "telemetry.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	roots, err := newSourceRoots("loader_windows", sourceRoot{Name: "loader_windows", Dir: moduleDir, Writable: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := &evolver{
+		cfg: EvolveConfig{
+			LoopID: "loop", Module: "loader_windows", ModuleDir: moduleDir,
+			StoreRoot: t.TempDir(), Turns: 4, EditorTimeout: 200 * time.Millisecond,
+			CycleTimeout: time.Hour, ToolIdleTimeout: time.Hour, SessionTimeout: time.Hour,
+		},
+		db: db, roots: roots, logf: func(logging.Class, string, ...any) {},
+	}
+	e.lastCycleAt.Store(time.Now().UnixNano())
+	provider := &deadlineResumeProvider{wait: 2 * time.Second, answer: "done", cancel: func() {}}
+	c := newCoordinator(e, provider, "scripted", nil, "", "")
+	var reasons []string
+	started := time.Now()
+	text, err := c.runSession(context.Background(), roleEditor, "edit now", func(reason string) string {
+		reasons = append(reasons, reason)
+		return "retry"
+	})
+	if err != nil || text != "done" {
+		t.Fatalf("runSession = %q err=%v", text, err)
+	}
+	if elapsed := time.Since(started); elapsed > 3*time.Second {
+		t.Fatalf("the editor window did not cut the stalled session: %s", elapsed)
+	}
+	if len(reasons) != 1 || reasons[0] != "session" {
+		t.Fatalf("resume reasons = %v", reasons)
 	}
 }
