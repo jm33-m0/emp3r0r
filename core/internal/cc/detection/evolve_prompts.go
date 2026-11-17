@@ -61,7 +61,7 @@ const knowledgePrompt = `Knowledge base:
   because it shares a word with the finding.`
 
 const hostLimitsPrompt = `Host-enforced limits:
-- The host blocks further read-only calls after the role's read budget and forces the required output at the session budget. The planner and editor get 12 read-only calls before the host requires action; the debugger gets 20 total calls.
+- The host blocks further read-only calls after the role's read budget and forces the required output at the session budget. The brief states the limits that apply; do not estimate remaining calls or stop early because of an assumed budget. Call a tool until the host blocks it.
 - An empty turn or invalid JSON is retried in the same session. Continue from the evidence already in this conversation instead of re-reading it.
 - Cycle budget, debugger sessions, execution state, and restores are host facts. Use the values in the brief, not an assumption.
 `

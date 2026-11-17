@@ -633,6 +633,13 @@ func (c *coordinator) watchdog(ctx context.Context, cancel context.CancelFunc, d
 	}
 }
 
+func limitCalls(n int, unlimited string) string {
+	if n > 0 {
+		return fmt.Sprintf("%d calls", n)
+	}
+	return unlimited
+}
+
 func (c *coordinator) turns(role evolveRole) int {
 	switch role {
 	case rolePlanner:
@@ -782,7 +789,7 @@ func (c *coordinator) plannerBrief() string {
 	if c.e.restoreErr != nil {
 		fmt.Fprintf(&b, "Incomplete restore: %s\n", clip(c.e.restoreErr.Error(), 400))
 	}
-	b.WriteString("Host limits: 12 read-only calls and 16 total calls per decision. The host blocks further calls and requires the planner JSON object; do not repeat evidence already in the dossier.\n")
+	fmt.Fprintf(&b, "Host limits: %s read-only; %d planner turns; %s decision window. The host blocks read-only calls at the budget and requires the planner JSON at the window; do not count calls yourself.\n", limitCalls(c.e.cfg.PlannerReadBudget, "no read-only cap"), c.turns(rolePlanner), c.e.cfg.PlannerTimeout)
 	if c.e.cfg.Verify == nil {
 		b.WriteString("C2 verification: disabled; execution is unverified.\n")
 	}
@@ -857,7 +864,7 @@ func (c *coordinator) editorBrief(plan plannerPlan) string {
 	if c.e.restoreErr != nil {
 		fmt.Fprintf(&b, "\nRestore incomplete: %s\n", clip(c.e.restoreErr.Error(), 400))
 	}
-	b.WriteString("\nHost limits: 12 read-only calls without an edit; the host then blocks reading. The host sends you back in this session if you stop without calling DetectionCycle, and a session that completes no cycle is retried, not restarted.")
+	fmt.Fprintf(&b, "\nHost limits: %s read-only without an edit; %d editor turns; %s decision window. The host blocks reading at the read budget; mutation, build, and cycle tools remain available.", limitCalls(c.e.cfg.EditorReadBudget, "no read-only cap"), c.turns(roleEditor), c.sessionTimeout(roleEditor))
 	b.WriteString("\nApply every edit the change needs, then call DetectionCycle exactly once. End with the required JSON object.")
 	return b.String()
 }
@@ -887,6 +894,7 @@ func (c *coordinator) debuggerBrief(ctx context.Context, trigger string, cycle *
 		fmt.Fprintf(&b, "Baseline failure: %s\n", c.e.baselineFailure)
 	}
 	fmt.Fprintf(&b, "\nDossier:\n%s\n", c.e.dossier())
-	b.WriteString("\nStart with GuestSSH action=ensure_exclusion, then inspect the guest. This is the only debugger pass for this cycle; the host allows 20 tool calls and then requires the JSON object. Do not repeat a command that already failed.")
+	fmt.Fprintf(&b, "Host limits: %s; %d debugger turns; %s decision window. ", limitCalls(c.e.cfg.DebuggerToolBudget, "no total tool cap"), c.turns(roleDebugger), c.sessionTimeout(roleDebugger))
+	b.WriteString("\nStart with GuestSSH action=ensure_exclusion, then inspect the guest. This is the only debugger pass for this cycle. Do not repeat a command that already failed.")
 	return b.String()
 }
