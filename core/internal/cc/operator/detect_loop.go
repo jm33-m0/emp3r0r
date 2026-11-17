@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -564,18 +563,18 @@ func (opts detectLoopOptions) guestConfig() (*detection.GuestSSHConfig, error) {
 	if endpoint == "" || key == "" {
 		return nil, fmt.Errorf("guest SSH requires both --guest-ssh user@host:port and --guest-ssh-key")
 	}
-	user, host, port, err := parseGuestSSHEndpoint(endpoint)
+	user, host, port, err := detection.ParseGuestSSHEndpoint(endpoint)
 	if err != nil {
 		return nil, err
 	}
-	key = expandHomePath(key)
+	key = detection.ExpandHomePath(key)
 	if info, err := os.Stat(key); err != nil || !info.Mode().IsRegular() {
 		return nil, fmt.Errorf("guest SSH key %q is not readable", key)
 	}
 	exclude := envOr(opts.GuestSSHExclude, "EMP3R0R_DETECTION_GUEST_SSH_EXCLUDE")
 	return &detection.GuestSSHConfig{
 		Host: host, Port: port, User: user, KeyPath: key,
-		KnownHostsPath: expandHomePath(opts.GuestSSHKnownHosts),
+		KnownHostsPath: detection.ExpandHomePath(opts.GuestSSHKnownHosts),
 		Fingerprint:    strings.TrimSpace(opts.GuestSSHFingerprint),
 		Insecure:       opts.GuestSSHInsecure,
 		ExcludePath:    exclude,
@@ -590,51 +589,10 @@ func envOr(value, key string) string {
 	return strings.TrimSpace(os.Getenv(key))
 }
 
-func expandHomePath(path string) string {
-	path = strings.TrimSpace(path)
-	if path == "" || path[0] != '~' {
-		return path
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return path
-	}
-	if path == "~" {
-		return home
-	}
-	if strings.HasPrefix(path, "~/") {
-		return filepath.Join(home, path[2:])
-	}
-	return path
-}
-
+// parseGuestSSHEndpoint keeps the operator test surface stable; the parser
+// itself lives in the detection package so MCP uses the same rules.
 func parseGuestSSHEndpoint(value string) (user, host string, port int, err error) {
-	value = strings.TrimSpace(value)
-	if at := strings.LastIndex(value, "@"); at >= 0 {
-		user = strings.TrimSpace(value[:at])
-		value = strings.TrimSpace(value[at+1:])
-	}
-	if user == "" {
-		return "", "", 0, fmt.Errorf("guest SSH endpoint must include a user, for example litterbox@127.0.0.1:2222")
-	}
-	if value == "" {
-		return "", "", 0, fmt.Errorf("guest SSH endpoint has no host")
-	}
-	host, portText, splitErr := net.SplitHostPort(value)
-	if splitErr != nil {
-		host = value
-		port = 22
-	} else {
-		port, err = strconv.Atoi(portText)
-		if err != nil || port < 1 || port > 65535 {
-			return "", "", 0, fmt.Errorf("guest SSH port %q is invalid", portText)
-		}
-	}
-	host = strings.Trim(host, "[]")
-	if host == "" {
-		return "", "", 0, fmt.Errorf("guest SSH endpoint has no host")
-	}
-	return user, host, port, nil
+	return detection.ParseGuestSSHEndpoint(value)
 }
 
 func generateAgentShellcode(opts detectLoopOptions, logf func(string, ...any)) (shellcode, agentArtifact, producer, agentType, agentUUID string, err error) {
