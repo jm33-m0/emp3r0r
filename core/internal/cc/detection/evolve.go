@@ -455,6 +455,11 @@ func (e *evolver) producerNames() []string {
 	return slices.Sorted(maps.Keys(e.cfg.ProducerDirs))
 }
 
+// ErrSandboxUnreachable means the LitterBox endpoint is not answering. The
+// loop cannot build or detonate until it returns; this is a host outage, not a
+// hypothesis failure.
+var ErrSandboxUnreachable = errors.New("sandbox unreachable")
+
 // waitSandbox probes the sandbox once. The failure goes straight to the model
 // instead of a host retry loop, so the loop never rebuilds or detonates again
 // without model feedback.
@@ -470,7 +475,28 @@ func (e *evolver) waitSandbox(ctx context.Context) (Health, error) {
 	if reason == "" {
 		reason = "health probe failed"
 	}
-	return Health{}, fmt.Errorf("sandbox %s is unreachable: %s", health.URL, reason)
+	return Health{}, fmt.Errorf("%w: %s: %s", ErrSandboxUnreachable, health.URL, reason)
+}
+
+// setCycleError records why DetectionCycle failed before a detonation. The
+// editor session can end without a cycle; the coordinator reads this cause
+// instead of reporting a generic contract failure.
+func (e *evolver) setCycleError(err error) {
+	e.cycleErrMu.Lock()
+	e.lastCycleError = err
+	e.cycleErrMu.Unlock()
+}
+
+func (e *evolver) takeCycleError() error {
+	e.cycleErrMu.Lock()
+	defer e.cycleErrMu.Unlock()
+	err := e.lastCycleError
+	e.lastCycleError = nil
+	return err
+}
+
+func (e *evolver) clearCycleError() {
+	e.setCycleError(nil)
 }
 
 // recover logs a failure and waits before the caller retries. Callers bound
@@ -618,6 +644,8 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 	case err == nil:
 		e.last = &baseline
 	case errors.Is(err, ErrCycleBudgetExhausted):
+		return nil, err
+	case errors.Is(err, ErrSandboxUnreachable):
 		return nil, err
 	case ctx.Err() != nil:
 		return nil, ctx.Err()

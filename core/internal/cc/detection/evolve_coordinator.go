@@ -330,10 +330,6 @@ func (c *coordinator) afterBaseline(ctx context.Context) error {
 }
 
 func (c *coordinator) afterCycle(ctx context.Context, cycle *Cycle) error {
-	defer func() {
-		c.executionState = c.e.executionHint()
-		c.e.lastCycleAt.Store(time.Now().UnixNano())
-	}()
 	if cycle == nil {
 		return nil
 	}
