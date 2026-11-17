@@ -681,6 +681,10 @@ func (c *coordinator) plannerBrief() string {
 		if c.lastDiagnosis.EditorBrief != "" {
 			fmt.Fprintf(&b, "  editor brief: %s\n", clip(c.lastDiagnosis.EditorBrief, 800))
 		}
+		if len(c.lastDiagnosis.GuestActions) > 0 {
+			fmt.Fprintf(&b, "  guest actions: %s\n", clip(strings.Join(limitStrings(c.lastDiagnosis.GuestActions, 8), "; "), 800))
+			b.WriteString("The debugger changed the guest; the last cycle is debug-assisted, not a clean detection baseline. Plan a fresh cycle.\n")
+		}
 	}
 	if c.plannerNote != "" {
 		fmt.Fprintf(&b, "\nCoordinator note: %s\n", c.plannerNote)

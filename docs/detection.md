@@ -167,9 +167,9 @@ detect_loop --guest-ssh litterbox@127.0.0.1:2222 \
 
 There is no implicit host. `EMP3R0R_DETECTION_GUEST_SSH` and `EMP3R0R_DETECTION_GUEST_SSH_KEY` provide the same values. Authentication is public-key only; password authentication and agent forwarding are never used. The host key is recorded on first use in `<store>/guest_known_hosts` and fails closed on a change; `--guest-ssh-fingerprint SHA256:...` pins it instead.
 
-`--guest-ssh-exclude` sets the debug staging directory and the Defender exclusion (default `C:\LitterBox\emp-debug`). The coordinator verifies the exclusion before every debugger session, and the debugger may also call `GuestSSH action=ensure_exclusion`; the check adds the exclusion only when it is missing. Every other Defender, firewall, ASR, RedEdr, and analyzer change is refused, because weakening detection would invalidate the cycle. Guest commands are bounded, sanitized, and written to the operator audit log; guest output is treated as untrusted evidence.
+`--guest-ssh-exclude` sets the debug staging directory and the Defender exclusion (default `C:\LitterBox\emp-debug`). The coordinator verifies the exclusion before every debugger session, and the debugger may also call `GuestSSH action=ensure_exclusion`; the check adds the exclusion only when it is missing. The debugger may change guest detection settings (Defender, firewall/ASR, RedEdr, analyzers) when they block execution or observation and records every change in `guest_actions`; such a cycle is debug-assisted, not a clean evasion baseline. The guest is the disposable sandbox: commands and file writes inside it are not restricted. The tool's only host-side credential is the configured SSH key; it exposes no other host paths and keeps no guest evidence on the host. The host boundary is the sandbox-only SSH key and host-key verification.
 
-The debugger may launch an uploaded artifact from an allowed directory, kill a stuck process, read WER and Defender logs, collect a dump under the staging directory, and test C2 reachability from inside the guest. It cannot edit module source; when the cause is a crash or a rejected injection, it returns `source_fix_required=true` and a brief for the editor. A guest-side repair is confirmed by the host with a fresh `AgentStatus` poll, never by model text.
+The debugger may launch a tool or artifact, kill a stuck process, read WER and Defender logs, collect a dump, and test C2 reachability from inside the guest. It cannot edit module source; when the cause is a crash or a rejected injection, it returns `source_fix_required=true` and a brief for the editor. A guest-side repair is confirmed by the host with a fresh `AgentStatus` poll, never by model text.
 
 ### Managing loops
 
@@ -204,7 +204,7 @@ disposable VM or container:
 
 - give it no host credentials, no production C2 server keys, and no access to
   the operator's home directory or SSH agent;
-- when the debugger is enabled, use a sandbox-only SSH key: the debugger can add the configured Defender exclusion for its staging directory and nothing else, and it is scoped to the LitterBox guest, never a target;
+- when the debugger is enabled, use a sandbox-only SSH key: the debugger can change guest detection settings and run commands as needed to make the payload observable, the key is its only host-side file, and it is scoped to the LitterBox guest, never a target;
 - restrict egress to the model provider and the LitterBox sandbox;
 - rebuild or discard the VM after a run instead of reusing a workstation;
 - keep the model provider's data handling in mind: source excerpts, build logs,

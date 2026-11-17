@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -32,84 +33,37 @@ func TestPowershellEncodedRoundTrip(t *testing.T) {
 	}
 }
 
-func TestGuestCommandPolicy(t *testing.T) {
-	g := &guestSSH{cfg: GuestSSHConfig{ExcludePath: guestStageDir}}
-	allowed := []string{
-		`Get-Process | Select-Object Id,ProcessName,Path`,
-		`Get-MpThreatDetection | ConvertTo-Json -Depth 4`,
-		`Start-Process 'C:\LitterBox\Uploads\loader.exe'`,
-		`[IO.File]::WriteAllBytes('C:\LitterBox\emp-debug\dump.bin', $bytes)`,
-		`procdump64.exe -accepteula -ma 1234 C:\LitterBox\emp-debug\loader.dmp`,
-		`Test-NetConnection 10.0.0.1 -Port 443`,
+func TestGuestSSHKeyPermissions(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows does not expose Unix permission bits")
 	}
-	for _, command := range allowed {
-		if err := g.screenCommand(command); err != nil {
-			t.Fatalf("allowed command rejected: %v\n%s", err, command)
-		}
+	key := filepath.Join(t.TempDir(), "guest_key")
+	if err := os.WriteFile(key, []byte("key"), 0o600); err != nil {
+		t.Fatal(err)
 	}
-	denied := []string{
-		`Set-MpPreference -DisableRealtimeMonitoring $true`,
-		`Add-MpPreference -ExclusionPath C:\`,
-		`Remove-MpPreference -ExclusionPath C:\LitterBox`,
-		`netsh advfirewall set allprofiles state off`,
-		`Stop-Service WinDefend`,
-		`Remove-Item C:\LitterBox\Results -Recurse -Force`,
-		`[IO.File]::WriteAllBytes('C:\LitterBox\Config\config.json', $bytes)`,
-		`Start-Process C:\Windows\System32\cmd.exe`,
-		`Invoke-WebRequest https://example.com`,
-		`wevtutil cl System`,
+	if err := os.Chmod(key, 0o644); err != nil {
+		t.Fatal(err)
 	}
-	for _, command := range denied {
-		if err := g.screenCommand(command); err == nil {
-			t.Fatalf("denied command accepted: %s", command)
-		}
+	cfg := GuestSSHConfig{Host: "127.0.0.1", User: "litterbox", KeyPath: key, ExcludePath: guestStageDir}
+	if err := cfg.normalize(t.TempDir()); err == nil {
+		t.Fatal("a group/world-readable key was accepted")
 	}
-}
-
-func TestGuestReadPathProtectsKeyMaterial(t *testing.T) {
-	for _, path := range []string{
-		`C:\ProgramData\ssh\ssh_host_ed25519_key`,
-		`C:\Users\litterbox\.ssh\authorized_keys`,
-		`C:\ProgramData\ssh`,
-	} {
-		if err := screenGuestReadPath(path); err == nil {
-			t.Fatalf("key material path accepted: %s", path)
-		}
+	if err := os.Chmod(key, 0o600); err != nil {
+		t.Fatal(err)
 	}
-	if err := screenGuestReadPath(`C:\LitterBox\Results\x\dynamic.json`); err != nil {
-		t.Fatalf("result path rejected: %v", err)
-	}
-	g := &guestSSH{cfg: GuestSSHConfig{ExcludePath: guestStageDir}}
-	if err := g.screenCommand(`Get-Content C:\ProgramData\ssh\ssh_host_ed25519_key`); err == nil {
-		t.Fatal("a command reading the host key was accepted")
-	}
-}
-
-func TestGuestUploadPathConfined(t *testing.T) {
-	g := &guestSSH{cfg: GuestSSHConfig{ExcludePath: guestStageDir}}
-	if err := g.screenUploadPath(`C:\LitterBox\emp-debug\helper.ps1`); err != nil {
-		t.Fatalf("staging upload rejected: %v", err)
-	}
-	for _, path := range []string{
-		`C:\LitterBox\Config\helper.ps1`,
-		`C:\Windows\Temp\helper.ps1`,
-		`C:\LitterBox\emp-debug-evil\helper.ps1`,
-	} {
-		if err := g.screenUploadPath(path); err == nil {
-			t.Fatalf("upload outside the staging directory accepted: %s", path)
-		}
+	if err := cfg.normalize(t.TempDir()); err != nil {
+		t.Fatalf("a 0600 key was rejected: %v", err)
 	}
 }
 
 func TestValidateGuestExcludePath(t *testing.T) {
-	for _, path := range []string{`C:\LitterBox\emp-debug`, `D:\stage`} {
+	for _, path := range []string{`C:\LitterBox\emp-debug`, `D:\stage`, `C:\LitterBox\Config`, `C:\LitterBox\Uploads`} {
 		if err := validateGuestExcludePath(path); err != nil {
 			t.Fatalf("valid path rejected: %v", err)
 		}
 	}
 	for _, path := range []string{
-		`C:\`, `relative\stage`, `C:\LitterBox\Config`, `C:\LitterBox\Uploads`,
-		`C:\Windows\System32\..\stage`, `C:\Stage` + "\x00",
+		`C:\`, `relative\stage`, `C:\Windows\System32\..\stage`, `C:\Stage` + "\x00",
 	} {
 		if err := validateGuestExcludePath(path); err == nil {
 			t.Fatalf("invalid path accepted: %q", path)
@@ -163,7 +117,6 @@ func TestGuestHostKeyTOFUAndPin(t *testing.T) {
 
 type fakeGuestRunner struct {
 	commands []string
-	uploads  []string
 	excluded bool
 }
 
@@ -176,15 +129,6 @@ func (f *fakeGuestRunner) ReadFile(_ context.Context, _ string, _, _ int64) ([]b
 	return []byte("guest-bytes"), nil
 }
 
-func (f *fakeGuestRunner) Download(_ context.Context, _, local string, _ int64) error {
-	return os.WriteFile(local, []byte("downloaded"), 0o600)
-}
-
-func (f *fakeGuestRunner) Upload(_ context.Context, local, remote string, _ int64) error {
-	f.uploads = append(f.uploads, local+"->"+remote)
-	return nil
-}
-
 func (f *fakeGuestRunner) EnsureExclusion(_ context.Context) (GuestExclusionStatus, error) {
 	f.excluded = true
 	return GuestExclusionStatus{Path: guestStageDir, Present: true, Added: true}, nil
@@ -192,7 +136,7 @@ func (f *fakeGuestRunner) EnsureExclusion(_ context.Context) (GuestExclusionStat
 
 func (f *fakeGuestRunner) Close() error { return nil }
 
-func newGuestToolTestEvolver(t *testing.T, guest GuestRunner) (*evolver, string) {
+func newGuestToolTestEvolver(t *testing.T, guest GuestRunner) *evolver {
 	t.Helper()
 	store := t.TempDir()
 	e := &evolver{
@@ -203,12 +147,12 @@ func newGuestToolTestEvolver(t *testing.T, guest GuestRunner) (*evolver, string)
 		guest: guest,
 		logf:  func(logging.Class, string, ...any) {},
 	}
-	return e, store
+	return e
 }
 
 func TestGuestSSHToolActions(t *testing.T) {
 	fake := &fakeGuestRunner{}
-	e, store := newGuestToolTestEvolver(t, fake)
+	e := newGuestToolTestEvolver(t, fake)
 	toolUnderTest := e.guestSSHTool()
 
 	res, err := toolUnderTest.Call(context.Background(), json.RawMessage(`{"action":"ensure_exclusion"}`), nil)
@@ -224,36 +168,10 @@ func TestGuestSSHToolActions(t *testing.T) {
 		t.Fatalf("commands = %v", fake.commands)
 	}
 
-	evidence := filepath.Join(store, "guest", "loop")
-	local := filepath.Join(evidence, "dump.bin")
-	if err := os.MkdirAll(evidence, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(local, []byte("x"), 0o600); err != nil {
-		t.Fatal(err)
-	}
 	res, err = toolUnderTest.Call(context.Background(),
-		json.RawMessage(`{"action":"upload","local":"`+local+`","path":"C:\\LitterBox\\emp-debug\\helper.ps1"}`), nil)
-	if err != nil || res.IsError || len(fake.uploads) != 1 {
-		t.Fatalf("upload: err=%v result=%+v uploads=%v", err, res, fake.uploads)
-	}
-
-	res, err = toolUnderTest.Call(context.Background(),
-		json.RawMessage(`{"action":"download","path":"C:\\LitterBox\\Results\\x\\dynamic.json","local":"dynamic.json"}`), nil)
-	if err != nil || res.IsError {
-		t.Fatalf("download: err=%v result=%+v", err, res)
-	}
-	if _, err := os.Stat(filepath.Join(evidence, "dynamic.json")); err != nil {
-		t.Fatalf("download destination missing: %v", err)
-	}
-
-	res, err = toolUnderTest.Call(context.Background(),
-		json.RawMessage(`{"action":"download","path":"C:\\x","local":"../../escape.json"}`), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !res.IsError {
-		t.Fatal("download outside the evidence directory was accepted")
+		json.RawMessage(`{"action":"read","path":"C:\\LitterBox\\Results\\x\\dynamic.json"}`), nil)
+	if err != nil || res.IsError || res.Flatten() != "guest-bytes" {
+		t.Fatalf("read: err=%v result=%+v", err, res)
 	}
 }
 

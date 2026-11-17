@@ -81,8 +81,9 @@ Enable the debugger with --guest-ssh user@host:port and --guest-ssh-key. There
 is no implicit host. The debugger uses public-key SSH into the sandbox guest,
 verifies or adds the Defender exclusion for --guest-ssh-exclude (default
 C:\\LitterBox\\emp-debug), and may launch an uploaded artifact, read logs and
-dumps, and test C2 reachability. It cannot edit module source, and every other
-Defender, firewall, ASR, RedEdr, or analyzer change is refused.
+dumps, and test C2 reachability. It cannot edit module source. The guest is the
+sandbox: the debugger may change its detection settings when they block
+execution and records every change; such a cycle is debug-assisted.
 
 The loop records source history in a shadow go-git repository under the
 detection store; no git binary is required. Pass --git=false to disable it.
