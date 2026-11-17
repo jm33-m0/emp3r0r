@@ -222,6 +222,10 @@ CREATE TABLE IF NOT EXISTS loop_workers (
 	output TEXT NOT NULL DEFAULT '',
 	status TEXT NOT NULL DEFAULT '',
 	error TEXT NOT NULL DEFAULT '',
+	reason TEXT NOT NULL DEFAULT '',
+	turns INTEGER NOT NULL DEFAULT 0,
+	tokens_in INTEGER NOT NULL DEFAULT 0,
+	tokens_out INTEGER NOT NULL DEFAULT 0,
 	created_at INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS loop_workers_loop ON loop_workers(loop_id, id);
@@ -329,6 +333,11 @@ func OpenTelemetryDB(path string) (*TelemetryDB, error) {
 		{"events", "payload_role", "TEXT NOT NULL DEFAULT ''"},
 		{"loop_edits", "next_payload_id", "INTEGER REFERENCES payloads(id)"},
 		{"loop_edits", "module", "TEXT NOT NULL DEFAULT ''"},
+		{"loop_edits", "kind", "TEXT NOT NULL DEFAULT 'model'"},
+		{"loop_workers", "reason", "TEXT NOT NULL DEFAULT ''"},
+		{"loop_workers", "turns", "INTEGER NOT NULL DEFAULT 0"},
+		{"loop_workers", "tokens_in", "INTEGER NOT NULL DEFAULT 0"},
+		{"loop_workers", "tokens_out", "INTEGER NOT NULL DEFAULT 0"},
 		{"loop_cycles", "executed", "INTEGER NOT NULL DEFAULT 0"},
 		{"loop_cycles", "execution", "TEXT NOT NULL DEFAULT ''"},
 		{"loop_cycles", "agent_online", "INTEGER"},

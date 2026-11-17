@@ -517,9 +517,9 @@ func (e *evolver) applyRevertEdits(ctx context.Context, edits []revertEdit, payl
 			return 0, fmt.Errorf("revert %s/%s: %w", root.Name, item.file, err)
 		}
 		if err := e.db.SaveEdit(ctx, EditRecord{
-			LoopID: e.cfg.LoopID, Iteration: e.iter + 1, PayloadID: payloadID,
+			LoopID: e.cfg.LoopID, Iteration: e.iter,
 			Module: root.Name, File: item.file, Old: item.new, New: item.old,
-			Reason: "revert to payload " + label,
+			Reason: "revert to payload " + label, Kind: EditKindRestore,
 		}); err != nil {
 			if restoreErr := restoreSourceFile(write.Path, write.Original); restoreErr != nil {
 				return 0, fmt.Errorf("save revert: %w (restore %s failed: %v)", err, item.file, restoreErr)

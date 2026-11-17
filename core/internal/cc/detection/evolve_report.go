@@ -14,6 +14,7 @@ import (
 // console. The full report remains next to it for the log pane and the report
 // file.
 func RenderLoopSummary(answer map[string]any, cycles []Cycle, edits []EditRecord) string {
+	edits = modelEdits(edits)
 	var b strings.Builder
 	loopID := answerString(answer, "loop_id")
 	if loopID == "" && len(cycles) > 0 {
@@ -75,6 +76,7 @@ func RenderLoopSummary(answer map[string]any, cycles []Cycle, edits []EditRecord
 // RenderLoopReport turns the agent's JSON answer and the persisted cycles into
 // a human-readable Markdown report. The raw JSON remains in loop_results.
 func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord) string {
+	edits = modelEdits(edits)
 	var b strings.Builder
 	loopID := answerString(answer, "loop_id")
 	if loopID == "" && len(cycles) > 0 {
@@ -215,6 +217,16 @@ func telemetryStatsFromSummary(summary string) *TelemetryStats {
 		return nil
 	}
 	return value.Telemetry
+}
+
+func modelEdits(edits []EditRecord) []EditRecord {
+	out := make([]EditRecord, 0, len(edits))
+	for _, edit := range edits {
+		if editKind(edit.Kind) == EditKindModel {
+			out = append(out, edit)
+		}
+	}
+	return out
 }
 
 func answerString(answer map[string]any, key string) string {

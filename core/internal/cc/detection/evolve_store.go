@@ -55,16 +55,26 @@ type BuildRecord struct {
 
 // EditRecord is one source edit with its before and after text.
 type EditRecord struct {
-	LoopID    string    `json:"loop_id"`
-	Iteration int       `json:"iteration"`
-	PayloadID int64     `json:"payload_id"`
-	Module    string    `json:"module,omitempty"`
-	File      string    `json:"file"`
-	Old       string    `json:"old"`
-	New       string    `json:"new"`
-	Reason    string    `json:"reason,omitempty"`
+	LoopID    string `json:"loop_id"`
+	Iteration int    `json:"iteration"`
+	PayloadID int64  `json:"payload_id"`
+	Module    string `json:"module,omitempty"`
+	File      string `json:"file"`
+	Old       string `json:"old"`
+	New       string `json:"new"`
+	Reason    string `json:"reason,omitempty"`
+	// Kind distinguishes a model edit from a host rollback. A restore must not
+	// be linked to the next payload or reported as the next cycle's change.
+	Kind      string    `json:"kind,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 }
+
+const (
+	// EditKindModel is a source change the editor worker made.
+	EditKindModel = "model"
+	// EditKindRestore is a host rollback to the last executing payload.
+	EditKindRestore = "restore"
+)
 
 // cycleColumns and cycleFrom are the shared projection for cycle readers. All
 // of them join payloads so the payload key and view name come from one place.
@@ -184,17 +194,24 @@ func (t *TelemetryDB) SaveEdit(ctx context.Context, record EditRecord) error {
 		payloadID = record.PayloadID
 	}
 	if _, err := t.db.ExecContext(ctx, `
-		INSERT INTO loop_edits(loop_id, iteration, payload_id, module, file, old, new, reason, created_at)
-		VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		INSERT INTO loop_edits(loop_id, iteration, payload_id, module, file, old, new, reason, kind, created_at)
+		VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		record.LoopID, record.Iteration, payloadID, record.Module, record.File,
 		record.Old, record.New, clip(record.Reason, 1000),
-		record.CreatedAt.UnixMilli()); err != nil {
+		editKind(record.Kind), record.CreatedAt.UnixMilli()); err != nil {
 		return fmt.Errorf("save edit: %w", err)
 	}
 	return nil
 }
 
-const editColumns = `loop_id, iteration, COALESCE(payload_id, 0), module, file, old, new, reason, created_at`
+func editKind(kind string) string {
+	if strings.TrimSpace(kind) == EditKindRestore {
+		return EditKindRestore
+	}
+	return EditKindModel
+}
+
+const editColumns = `loop_id, iteration, COALESCE(payload_id, 0), module, file, old, new, reason, kind, created_at`
 
 func scanEdits(rows *sql.Rows) ([]EditRecord, error) {
 	defer rows.Close()
@@ -203,7 +220,8 @@ func scanEdits(rows *sql.Rows) ([]EditRecord, error) {
 		var record EditRecord
 		var created int64
 		if err := rows.Scan(&record.LoopID, &record.Iteration, &record.PayloadID,
-			&record.Module, &record.File, &record.Old, &record.New, &record.Reason, &created); err != nil {
+			&record.Module, &record.File, &record.Old, &record.New, &record.Reason,
+			&record.Kind, &created); err != nil {
 			return nil, fmt.Errorf("scan edit: %w", err)
 		}
 		record.CreatedAt = time.UnixMilli(created).UTC()
@@ -212,7 +230,7 @@ func scanEdits(rows *sql.Rows) ([]EditRecord, error) {
 	return out, rows.Err()
 }
 
-// EditsForPayload returns the edits that produced one payload.
+// EditsForPayload returns the model edits that produced one payload.
 func (t *TelemetryDB) EditsForPayload(ctx context.Context, payloadKey string) ([]EditRecord, error) {
 	if strings.TrimSpace(payloadKey) == "" {
 		return nil, nil
@@ -222,7 +240,7 @@ func (t *TelemetryDB) EditsForPayload(ctx context.Context, payloadKey string) ([
 		return nil, err
 	}
 	rows, err := t.db.QueryContext(ctx, `SELECT `+editColumns+`
-		FROM loop_edits WHERE next_payload_id = ? ORDER BY id`, id)
+		FROM loop_edits WHERE next_payload_id = ? AND kind = ? ORDER BY id`, id, EditKindModel)
 	if err != nil {
 		return nil, fmt.Errorf("read edits: %w", err)
 	}
@@ -276,11 +294,12 @@ func (t *TelemetryDB) SaveWorker(ctx context.Context, run WorkerRun) error {
 		run.CreatedAt = time.Now().UTC().UnixMilli()
 	}
 	if _, err := t.db.ExecContext(ctx, `
-		INSERT INTO loop_workers(loop_id, iteration, role, model, prompt, output, status, error, created_at)
-		VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		INSERT INTO loop_workers(loop_id, iteration, role, model, prompt, output, status, error, reason, turns, tokens_in, tokens_out, created_at)
+		VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		run.LoopID, run.Iteration, run.Role, run.Model,
 		clip(run.Prompt, maxWorkerText), clip(run.Output, maxWorkerText),
-		run.Status, clip(run.Error, 4000), run.CreatedAt); err != nil {
+		run.Status, clip(run.Error, 4000), run.Reason, run.Turns,
+		run.TokensIn, run.TokensOut, run.CreatedAt); err != nil {
 		return fmt.Errorf("save worker run: %w", err)
 	}
 	return nil
@@ -293,7 +312,8 @@ func (t *TelemetryDB) LoopWorkers(ctx context.Context, loopID string, limit int)
 		limit = 50
 	}
 	rows, err := t.db.QueryContext(ctx, `
-		SELECT loop_id, iteration, role, model, prompt, output, status, error, created_at
+		SELECT loop_id, iteration, role, model, prompt, output, status, error,
+			reason, turns, tokens_in, tokens_out, created_at
 		FROM loop_workers WHERE loop_id = ? ORDER BY id DESC LIMIT ?`, loopID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("list worker runs: %w", err)
@@ -303,7 +323,8 @@ func (t *TelemetryDB) LoopWorkers(ctx context.Context, loopID string, limit int)
 	for rows.Next() {
 		var run WorkerRun
 		if err := rows.Scan(&run.LoopID, &run.Iteration, &run.Role, &run.Model,
-			&run.Prompt, &run.Output, &run.Status, &run.Error, &run.CreatedAt); err != nil {
+			&run.Prompt, &run.Output, &run.Status, &run.Error,
+			&run.Reason, &run.Turns, &run.TokensIn, &run.TokensOut, &run.CreatedAt); err != nil {
 			return nil, fmt.Errorf("scan worker run: %w", err)
 		}
 		out = append(out, run)
