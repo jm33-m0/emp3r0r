@@ -160,9 +160,11 @@ func configuredProvider() (llm.Provider, string, error) {
 		format = llm.FormatOpenAIResponses
 	}
 	llmProvider, err := llm.NewProvider(llm.Config{
-		Format:  format,
-		BaseURL: strings.TrimSpace(os.Getenv("EMP3R0R_DETECTION_BASE_URL")),
-		Model:   model,
+		Format:          format,
+		BaseURL:         strings.TrimSpace(os.Getenv("EMP3R0R_DETECTION_BASE_URL")),
+		Model:           model,
+		ThinkingType:    strings.TrimSpace(os.Getenv("EMP3R0R_DETECTION_THINKING")),
+		ReasoningEffort: strings.TrimSpace(os.Getenv("EMP3R0R_DETECTION_REASONING_EFFORT")),
 	})
 	if err != nil {
 		return nil, "", fmt.Errorf("analyst provider: %w", err)
@@ -380,7 +382,12 @@ func analystTelemetryTool(db *TelemetryDB) tool.CoreTool {
 	return tool.Build(tool.Spec{
 		Name: "TelemetryQuery",
 		Description: "Run one read-only SQL SELECT against the detection telemetry database. " +
-			telemetrySchemaHint,
+			telemetrySchemaHint + `
+Examples:
+  SELECT id, rule, indicator, severity, signal FROM findings WHERE trace_pk=7 ORDER BY severity LIMIT 60
+  SELECT ts_ns, event, operation, protection, size, pid FROM events WHERE trace_pk=7 AND category='memory' ORDER BY ts_ns LIMIT 100
+  SELECT * FROM cycle_history WHERE loop_id='loop-id' ORDER BY iteration
+  SELECT * FROM payload_view ORDER BY payload_id DESC LIMIT 5`,
 		Prompt: "Query the sandbox telemetry database.",
 		Schema: map[string]any{
 			"type": "object",
@@ -407,7 +414,7 @@ func analystTelemetryTool(db *TelemetryDB) tool.CoreTool {
 			defer cancel()
 			result, err := db.Query(queryCtx, args.SQL, args.Limit)
 			if err != nil {
-				return tool.Errorf(fmt.Sprintf("%v", err)), nil
+				return tool.Errorf(db.explainQueryError(queryCtx, args.SQL, err)), nil
 			}
 			data, err := json.Marshal(result)
 			if err != nil {
@@ -416,4 +423,84 @@ func analystTelemetryTool(db *TelemetryDB) tool.CoreTool {
 			return tool.Text(string(data)), nil
 		},
 	})
+}
+
+var queryTableRef = regexp.MustCompile(`(?i)\b(?:from|join)\s+([a-z_][a-z0-9_]*)`)
+
+// explainQueryError turns a failed query into a correction the model can act
+// on. The schema hint lists every table, but a model still guesses column
+// names; returning the actual columns ends the guess-and-retry loop.
+func (t *TelemetryDB) explainQueryError(ctx context.Context, statement string, err error) string {
+	msg := err.Error()
+	var b strings.Builder
+	b.WriteString(msg)
+	switch {
+	case strings.Contains(msg, "sql is required"):
+		b.WriteString("\nHint: pass one SELECT or WITH statement. Use findings for the deterministic result, events for raw evidence, and cycle_history/payload_view for history.")
+	case strings.Contains(msg, "no such column"):
+		seen := map[string]bool{}
+		for _, table := range queryTableRef.FindAllStringSubmatch(statement, -1) {
+			name := strings.ToLower(table[1])
+			if seen[name] || !sourceRootName.MatchString(name) {
+				continue
+			}
+			seen[name] = true
+			if columns := t.tableColumns(ctx, name); len(columns) > 0 {
+				fmt.Fprintf(&b, "\n%s columns: %s", name, strings.Join(columns, ", "))
+			}
+		}
+		b.WriteString("\nHint: findings has no attrs or source column; events has no tool column; payloads uses id, not payload_id.")
+	case strings.Contains(msg, "no such table"):
+		if tables := t.tableNames(ctx); len(tables) > 0 {
+			fmt.Fprintf(&b, "\nTables and views: %s", strings.Join(tables, ", "))
+		}
+	case strings.Contains(msg, "only one SQL statement"), strings.Contains(msg, "is not allowed"),
+		strings.Contains(msg, "only SELECT"):
+		b.WriteString("\nHint: use exactly one SELECT or WITH statement; no PRAGMA, temp tables, or multiple statements.")
+	}
+	return clipUTF8(b.String(), 4000)
+}
+
+func (t *TelemetryDB) tableColumns(ctx context.Context, table string) []string {
+	if t == nil || t.ro == nil || !sourceRootName.MatchString(table) {
+		return nil
+	}
+	rows, err := t.ro.QueryContext(ctx, "PRAGMA table_info("+table+")")
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var columns []string
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notNull, pk int
+		var defaultValue any
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &defaultValue, &pk); err != nil {
+			return columns
+		}
+		columns = append(columns, name)
+	}
+	return columns
+}
+
+func (t *TelemetryDB) tableNames(ctx context.Context) []string {
+	if t == nil || t.ro == nil {
+		return nil
+	}
+	rows, err := t.ro.QueryContext(ctx, `SELECT name FROM sqlite_master
+		WHERE type IN ('table','view') AND name NOT LIKE 'sqlite_%' ORDER BY name LIMIT 40`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var names []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return names
+		}
+		names = append(names, name)
+	}
+	return names
 }
