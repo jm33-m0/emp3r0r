@@ -1858,7 +1858,6 @@ func (e *evolver) inspectFeedbackTool() tool.CoreTool {
 			edits, _ := e.db.EditsForPayload(ctx, payloadKey)
 			out := feedbackSummary(feedback, runID, payloadKey, edits)
 			data, _ := json.Marshal(out)
-			e.stopSessionAfterCycle()
 			return tool.Text(string(data)), nil
 		},
 	})
