@@ -2123,6 +2123,10 @@ func writeSourceFile(root sourceRoot, file, oldText, newText string) (sourceWrit
 	if !root.Writable {
 		return sourceWrite{}, fmt.Errorf("source root %s is read-only", root.Name)
 	}
+	file = strings.TrimSpace(strings.ReplaceAll(file, "\\", "/"))
+	if prefix, rest, ok := strings.Cut(file, "/"); ok && strings.EqualFold(prefix, root.Name) {
+		file = rest
+	}
 	path, err := analystPath(root.Dir, file)
 	if err != nil {
 		return sourceWrite{}, err

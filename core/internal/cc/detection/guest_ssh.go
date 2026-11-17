@@ -59,6 +59,56 @@ type GuestSSHConfig struct {
 	MaxOutput   int
 }
 
+// ParseGuestSSHEndpoint parses a user@host:port endpoint. A missing port
+// means 22.
+func ParseGuestSSHEndpoint(value string) (user, host string, port int, err error) {
+	value = strings.TrimSpace(value)
+	if at := strings.LastIndex(value, "@"); at >= 0 {
+		user = strings.TrimSpace(value[:at])
+		value = strings.TrimSpace(value[at+1:])
+	}
+	if user == "" {
+		return "", "", 0, fmt.Errorf("guest SSH endpoint must include a user, for example litterbox@127.0.0.1:2222")
+	}
+	if value == "" {
+		return "", "", 0, fmt.Errorf("guest SSH endpoint has no host")
+	}
+	host, portText, splitErr := net.SplitHostPort(value)
+	if splitErr != nil {
+		host = value
+		port = 22
+	} else {
+		port, err = strconv.Atoi(portText)
+		if err != nil || port < 1 || port > 65535 {
+			return "", "", 0, fmt.Errorf("guest SSH port %q is invalid", portText)
+		}
+	}
+	host = strings.Trim(host, "[]")
+	if host == "" {
+		return "", "", 0, fmt.Errorf("guest SSH endpoint has no host")
+	}
+	return user, host, port, nil
+}
+
+// ExpandHomePath expands a leading ~ or ~/ using the current user's home.
+func ExpandHomePath(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" || path[0] != '~' {
+		return path
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return path
+	}
+	if path == "~" {
+		return home
+	}
+	if strings.HasPrefix(path, "~/") {
+		return filepath.Join(home, path[2:])
+	}
+	return path
+}
+
 func (c *GuestSSHConfig) normalize(storeRoot string) error {
 	c.Host = strings.TrimSpace(c.Host)
 	c.User = strings.TrimSpace(c.User)

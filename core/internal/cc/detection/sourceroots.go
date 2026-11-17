@@ -140,15 +140,29 @@ func (s *sourceRoots) pick(name string) (sourceRoot, error) {
 }
 
 func (s *sourceRoots) resolve(name, supplied string) (sourceRoot, string, error) {
+	supplied = strings.TrimSpace(strings.ReplaceAll(supplied, "\\", "/"))
+	name = strings.ToLower(strings.TrimSpace(name))
+	if prefix, rest, ok := strings.Cut(supplied, "/"); ok {
+		prefix = strings.ToLower(prefix)
+		if _, exists := s.roots[prefix]; exists && (name == "" || name == prefix) {
+			name, supplied = prefix, rest
+		}
+	}
 	root, err := s.pick(name)
 	if err != nil {
 		return sourceRoot{}, "", err
 	}
 	path, err := analystPath(root.Dir, supplied)
 	if err != nil {
-		return sourceRoot{}, "", err
+		return sourceRoot{}, "", fmt.Errorf("%w; %s", err, s.rootHint(root))
 	}
 	return root, path, nil
+}
+
+// rootHint explains a path failure without dumping the root's contents.
+func (s *sourceRoots) rootHint(root sourceRoot) string {
+	return fmt.Sprintf("paths are relative to root %q; call SourceList to list files (roots: %s)",
+		root.Name, s.describe())
 }
 
 // sourceSniffBytes is the prefix checked for NUL bytes before a file is
