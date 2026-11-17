@@ -46,6 +46,13 @@ func defaultOpsecRules() []opsecRule {
 			},
 		},
 		{
+			id: "local-code-edit", platform: "any",
+			source:    "operator-host source control; build process audit",
+			noise:     "high",
+			reason:    "edits operator-host source and runs model-chosen build inputs with operator privileges",
+			artifacts: []string{"host source change", "build process on the operator host"},
+		},
+		{
 			id: "script-execution", platform: "any",
 			source:    "PowerShell 4104/AMSI; Sigma proc_creation_win_powershell_encoded; auditd execve; Falco Run shell untrusted",
 			noise:     "high",

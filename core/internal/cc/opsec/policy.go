@@ -29,6 +29,7 @@ const (
 var capabilityOrder = []string{
 	"process-creation",
 	"filesystem-artifact",
+	"local-code-edit",
 	"script-execution",
 	"clr-loading",
 	"lolbin-execution",
@@ -61,6 +62,7 @@ func DefaultCapabilities() map[string]Mode {
 	return map[string]Mode{
 		"process-creation":          ModeWarn,
 		"filesystem-artifact":       ModeWarn,
+		"local-code-edit":           ModeWarn,
 		"script-execution":          ModeWarn,
 		"clr-loading":               ModeWarn,
 		"lolbin-execution":          ModeWarn,
@@ -271,6 +273,8 @@ func capabilityReason(id string) string {
 		return "starts a child process; process creation and its command line are audited"
 	case "filesystem-artifact":
 		return "writes a file on the target"
+	case "local-code-edit":
+		return "edits operator-host source and runs model-chosen build inputs with operator privileges"
 	case "script-execution":
 		return "runs a script or script host; script content and command line are logged"
 	case "clr-loading":
