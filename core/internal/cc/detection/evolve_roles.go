@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/Autumn-27/norma/hook"
+	"github.com/Autumn-27/norma/llm"
 	"github.com/Autumn-27/norma/tool"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
@@ -151,12 +153,77 @@ func (e *evolver) allowToolHook(toolName string) hook.Result {
 	return hook.Result{Decision: "block", Message: "tool is not part of the detection loop"}
 }
 
+const (
+	// plannerReadBudget is how many read-only calls the planner gets before the
+	// host requires the plan. The planner decides; it does not need to
+	// re-prove the same baseline.
+	plannerReadBudget = 12
+	// editorReadBudget is how many read-only calls the editor gets without a
+	// mutation. The host then blocks reading and requires an action.
+	editorReadBudget = 12
+)
+
+func readOnlyToolName(name string) bool {
+	switch name {
+	case "SourceList", "SourceRead", "SourceSearch", "TelemetryQuery",
+		"InspectFeedback", "Payloads", "ComparePayloads", "GitHistory",
+		"KnowledgeSearch", "KnowledgeRead", "KnowledgeStats", "KnowledgeList",
+		"AgentStatus":
+		return true
+	}
+	return false
+}
+
+// mutatingToolName reports a tool that changes source, artifacts, or the
+// guest. A call to one of these ends the read-only streak.
+func mutatingToolName(name string) bool {
+	switch name {
+	case "EditSource", "BuildShellcode", "RevertToPayload", "DetectionCycle",
+		"GenerateAgent", "RunModule", "CleanupAgent":
+		return true
+	}
+	return false
+}
+
+func lastAssistantText(messages []llm.Message) string {
+	for i := len(messages) - 1; i >= 0; i-- {
+		if messages[i].Role == llm.RoleAssistant {
+			return messages[i].Text()
+		}
+	}
+	return ""
+}
+
 func (e *evolver) hooksFor(role evolveRole) *hook.Registry {
+	plannerRead := e.cfg.PlannerReadBudget
+	if plannerRead == 0 {
+		plannerRead = plannerReadBudget
+	}
+	editorRead := e.cfg.EditorReadBudget
+	if editorRead == 0 {
+		editorRead = editorReadBudget
+	}
+	debuggerTools := e.cfg.DebuggerToolBudget
+	var totalCalls, readOnlyCalls atomic.Int32
 	hooks := hook.NewRegistry().On(hook.PreToolUse, func(_ context.Context, event hook.Event) hook.Result {
 		decision := e.allowToolHookFor(role, event.ToolName)
 		if decision.Decision == "block" {
 			e.logClass(logging.ClassWarning, "%s worker blocked tool %s: %s", role.label(), event.ToolName, decision.Message)
 			return decision
+		}
+		switch role {
+		case rolePlanner:
+			if plannerRead > 0 && readOnlyToolName(event.ToolName) && readOnlyCalls.Load() >= int32(plannerRead) {
+				return e.blockTool(role, event.ToolName, "you have read enough evidence; return one JSON plan now instead of another query")
+			}
+		case roleEditor:
+			if editorRead > 0 && readOnlyToolName(event.ToolName) && readOnlyCalls.Load() >= int32(editorRead) {
+				return e.blockTool(role, event.ToolName, "the editor read budget is exhausted; apply the edit with EditSource and call DetectionCycle now")
+			}
+		case roleDebugger:
+			if debuggerTools > 0 && totalCalls.Load() >= int32(debuggerTools) {
+				return e.blockTool(role, event.ToolName, "the debugger tool budget is exhausted; return the debugger JSON object now with the cause you have")
+			}
 		}
 		e.toolGate.Lock()
 		defer e.toolGate.Unlock()
@@ -164,11 +231,15 @@ func (e *evolver) hooksFor(role evolveRole) *hook.Registry {
 			e.logClass(logging.ClassWarning, "%s worker blocked tool %s: the session deadline expired", role.label(), event.ToolName)
 			return hook.Result{
 				Decision: "block",
-				Message:  "the session deadline expired; the loop will retry in a new session",
+				Message:  "the session deadline expired; the loop will continue this session with the required output",
 			}
 		}
 		e.lastToolCall.Store(time.Now().UnixNano())
 		e.activeTools.Add(1)
+		totalCalls.Add(1)
+		if readOnlyToolName(event.ToolName) {
+			readOnlyCalls.Add(1)
+		}
 		return decision
 	})
 	hooks.On(hook.PostToolUse, func(_ context.Context, event hook.Event) hook.Result {
@@ -179,6 +250,11 @@ func (e *evolver) hooksFor(role evolveRole) *hook.Registry {
 			if active <= 0 || e.activeTools.CompareAndSwap(active, active-1) {
 				break
 			}
+		}
+		if mutatingToolName(event.ToolName) {
+			// A mutation attempt ends the read-only streak even when it failed:
+			// the model may need one corrective read to fix the edit.
+			readOnlyCalls.Store(0)
 		}
 		status := "ok"
 		if event.IsError {
