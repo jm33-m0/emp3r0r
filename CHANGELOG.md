@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.10.2](https://github.com/jm33-m0/emp3r0r/compare/v5.10.1...v5.10.2) (2026-11-17)
+
+
+### Bug Fixes
+
+* **ai:** remove tool-call budget wording from agent prompts ([a6e98d4](https://github.com/jm33-m0/emp3r0r/commit/a6e98d4167518379d958578bcb059c8d36c504ed))
+
 ## [5.10.1](https://github.com/jm33-m0/emp3r0r/compare/v5.10.0...v5.10.1) (2026-11-17)
 
 
