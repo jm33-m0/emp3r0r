@@ -151,7 +151,7 @@ func TestDebuggerRecoversOfflineCycleBeforeRestore(t *testing.T) {
 		Summary: `{"execution":"offline"}`,
 	}
 	e.last = badCycle
-	c := newCoordinator(e, provider, "scripted", nil, "", "")
+	c := newCoordinator(e, provider, "scripted", nil, "")
 	if err := c.afterCycle(ctx, badCycle); err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +237,7 @@ func TestDebuggerFailureRestoresNonExecutingCycle(t *testing.T) {
 	}
 	badCycle := &Cycle{ID: 2, LoopID: "loop", Iteration: 2, PayloadID: payloadID, PayloadKey: "sha256:bad", Execution: executionOffline, Summary: `{"execution":"offline"}`}
 	e.last = badCycle
-	c := newCoordinator(e, provider, "scripted", nil, "", "")
+	c := newCoordinator(e, provider, "scripted", nil, "")
 	if err := c.afterCycle(ctx, badCycle); err != nil {
 		t.Fatal(err)
 	}
@@ -301,9 +301,11 @@ func TestEditorDecisionWindowForcesRetry(t *testing.T) {
 		},
 		db: db, roots: roots, logf: func(logging.Class, string, ...any) {},
 	}
-	e.lastCycleAt.Store(time.Now().UnixNano())
+	// Emulate a completed cycle so the editor Stop hook does not force another
+	// turn; this test is only about the decision window.
+	e.sessionCycles.Store(1)
 	provider := &deadlineResumeProvider{wait: 2 * time.Second, answer: "done", cancel: func() {}}
-	c := newCoordinator(e, provider, "scripted", nil, "", "")
+	c := newCoordinator(e, provider, "scripted", nil, "")
 	var reasons []string
 	started := time.Now()
 	text, err := c.runSession(context.Background(), roleEditor, "edit now", func(reason string) string {

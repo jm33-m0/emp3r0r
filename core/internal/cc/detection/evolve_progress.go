@@ -27,10 +27,15 @@ func (e *evolver) progressLoop(ctx context.Context, done <-chan struct{}) {
 			if value := e.lastAgent.Load(); value != nil {
 				agent = headerOrNone(value.(string))
 			}
+			reason := "none"
+			if value := e.lastReason.Load(); value != nil {
+				reason = headerOrNone(value.(string))
+			}
 			e.logClass(logging.ClassProgress,
-				"[progress] elapsed=%s cycles=%d/%d tools=%d sessions=%d last_execution=%s agent=%s",
+				"[progress] elapsed=%s cycles=%d/%d tools=%d sessions=%d in=%d out=%d reason=%s last_execution=%s agent=%s",
 				time.Since(e.started).Round(time.Second), e.cyclesDone.Load(), e.cfg.Iterations,
-				e.toolCalls.Load(), e.sessions.Load(), execution, agent)
+				e.toolCalls.Load(), e.sessions.Load(), e.tokensIn.Load(), e.tokensOut.Load(),
+				reason, execution, agent)
 		}
 	}
 }
