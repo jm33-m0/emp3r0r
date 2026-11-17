@@ -1,5 +1,25 @@
 # Changelog
 
+## [5.11.0](https://github.com/jm33-m0/emp3r0r/compare/v5.10.0...v5.11.0) (2026-11-17)
+
+
+### Features
+
+* **evasion:** add configurable worker tool budgets ([b1bd525](https://github.com/jm33-m0/emp3r0r/commit/b1bd5252f69668a020e793de215cc157edb5d938))
+* **evasion:** add SQL query error hints and thinking options ([88fca7f](https://github.com/jm33-m0/emp3r0r/commit/88fca7fa712b6a72c5b06e89251126bfe6d01d62))
+* **evasion:** reuse worker sessions and add provider retries ([1574c05](https://github.com/jm33-m0/emp3r0r/commit/1574c053bab78925fbdf37414e742d572d30b459))
+* **mcp:** add rotation, verification, and guest SSH to detection_loop ([d5fabe2](https://github.com/jm33-m0/emp3r0r/commit/d5fabe2b4e6e4acdce18a2c2f0aca19b0df1b543))
+
+
+### Bug Fixes
+
+* **evasion:** fail fast on baseline sandbox outages ([0f56310](https://github.com/jm33-m0/emp3r0r/commit/0f56310c9fb21f40f1d80ce5ff0122a0ad4f63df))
+* **evasion:** preserve last executing shellcode during rotation ([b168a5b](https://github.com/jm33-m0/emp3r0r/commit/b168a5be840ba54452a783be3a24f7b836bcfcf5))
+* **evasion:** route offline baselines to debugger instead of blocking ([3cfa4ff](https://github.com/jm33-m0/emp3r0r/commit/3cfa4ff67634b6d3dac2caf6838f46501e5d6b44))
+* **evasion:** share guest SSH parser and normalize source-root paths ([df07049](https://github.com/jm33-m0/emp3r0r/commit/df070496aa79ff37ed3cb099585a5dfc31a15ce2))
+* **evasion:** track edit kinds, worker metrics, and cycle errors ([8d2d30a](https://github.com/jm33-m0/emp3r0r/commit/8d2d30a41529abea7da6ec4130cd28ded414cd45))
+* **opsec:** register local-code-edit capability ([7e429e3](https://github.com/jm33-m0/emp3r0r/commit/7e429e3d20d6c1bb16eb1e94480af210b65733ca))
+
 ## [5.10.0](https://github.com/jm33-m0/emp3r0r/compare/v5.9.1...v5.10.0) (2026-11-17)
 
 
