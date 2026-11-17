@@ -39,7 +39,7 @@ unreachable, the block says `sandbox-unavailable` and carries the plan;
 | `detection_runs`             | List recorded runs, newest first, with telemetry trace and event counts.                                    |
 | `detection_telemetry_import` | Import RedEdr or DefenderObserver telemetry from a local file or the configured sandbox origin.             |
 | `detection_query`            | Run one read-only SELECT over the telemetry database (500 rows maximum).                                    |
-| `detection_loop`             | Run the autonomous Norma loop: build, detonate, edit source, rebuild, compare. Needs approval.              |
+| `detection_loop`             | Run the autonomous Norma loop with planner, editor, and debugger workers: build, detonate, edit source, rebuild, compare. Needs approval. |
 | `detection_payloads`         | List payloads with their per-payload SQLite view, parent, score, and verdict count.                         |
 | `detection_compare`          | Diff two payloads' telemetry views to show what an edit changed.                                            |
 | `detection_report`           | Return the Markdown final report for one loop, including achieved objectives and edits.                     |
@@ -84,8 +84,10 @@ use the console's existing C2 connection. The loop then runs:
 2. detonate it in LitterBox and import every saved analyzer result: RedEdr,
    Moneta, pe-sieve, HollowsHunter, HSB, Patriot, Blender, YARA, CheckPlz,
    HolyGrail, and every EDR profile;
-3. let a Norma agent query SQLite, edit module source, rebuild, and compare
-   payloads;
+3. run three Norma workers over SQLite and the module source: a planner that
+   chooses one hypothesis, an editor that applies the source/producer edits and
+   detonates one cycle, and a debugger that inspects the sandbox guest when the
+   payload did not execute;
 4. after the model loop finishes, run the final BOF verification exactly once. The host
    polls once per second for the last generated agent UUID, runs a small BOF
    such as `whoami`, and records the output. A check-in proves the loader reached
@@ -116,17 +118,50 @@ use the console's existing C2 connection. The loop then runs:
    summary. The host polls the C2 while the payload runs and latches the first
    check-in, so a beacon that checks in and exits before the post-run poll is
    still `verified`. An offline cycle consumes the budget but is not a
-   comparable detection result: it does not count as progress, and the host
+   comparable detection result: it does not count as progress. Before
+   restoring, the coordinator gives the debugger worker the cycle evidence and
+   lets it inspect the guest. If the debugger repairs the guest and the agent
+   re-checks in, the cycle is recorded as verified with
+   `recovered_by=guest-debugger` and the source is kept. Otherwise the host
    restores the editable source and active shellcode to the last payload whose
-   agent checked in. If no payload has ever checked in, the loop stops and
-   reports the execution failure instead of spending more cycles on a payload
-   that never ran;
+   agent checked in. If no payload has ever checked in and the debugger cannot
+   repair it, the loop stops and reports the execution failure instead of
+   spending more cycles on a payload that never ran;
 8. write the final JSON and all cycles to the loop tables.
 
 `--shellcode` accepts any x64 position-independent shellcode, so a Crystal
 Palace/Crystal-Kit PICO from `crystal_pack` can replace the generated Donut
 shellcode. Norma can change the loader, wrapper, injection path, or shellcode
 producer when telemetry points at that design.
+
+### Workers
+
+The loop runs three independent Norma sessions, each with its own system prompt, tool set, turn cap, and optional model. The host coordinator owns the budget, no-op rejection, agent rotation, execution gate, restoration, and final report; the workers only reason and call their own tools.
+
+| Worker | Responsibility | Tools it cannot use |
+| --- | --- | --- |
+| planner | Chooses one mechanism, one prediction, and the next worker. Returns one of `test`, `debug`, or `stop`. | `EditSource`, `DetectionCycle`, `BuildShellcode`, `GuestSSH` |
+| editor | Applies every source/producer edit a change needs, rebuilds the agent or shellcode, then runs exactly one `DetectionCycle`. | `GuestSSH`, `AgentStatus`, `RunModule` |
+| debugger | Inspects the guest over SSH when a payload did not execute or its agent did not check in. Files a source-level brief when the cause is in the module. | `EditSource`, `DetectionCycle`, `BuildShellcode`, `RevertToPayload` |
+
+The editor may make as many `EditSource` calls as the change needs; the limit is one detonation per plan. The planner re-plans after every completed cycle, so each hypothesis has its own mechanism and prediction. Worker prompts and outputs are stored in `loop_workers`; full feedback, builds, and telemetry stay in the existing tables.
+
+`--planner-turns`, `--editor-turns`, and `--debugger-turns` default to 24, 60, and 24; `--turns` is the fallback for all three. `--worker-model` overrides the model per worker, for example `--worker-model planner=...,editor=...`. `--debugger-timeout` bounds one debugger session.
+
+### Guest debugging
+
+The debugger worker is enabled only when the operator supplies the sandbox guest's SSH endpoint and key:
+
+```bash
+detect_loop --guest-ssh litterbox@127.0.0.1:2222 \
+  --guest-ssh-key ~/.ssh/litterbox-vm_ed25519
+```
+
+There is no implicit host. `EMP3R0R_DETECTION_GUEST_SSH` and `EMP3R0R_DETECTION_GUEST_SSH_KEY` provide the same values. Authentication is public-key only; password authentication and agent forwarding are never used. The host key is recorded on first use in `<store>/guest_known_hosts` and fails closed on a change; `--guest-ssh-fingerprint SHA256:...` pins it instead.
+
+`--guest-ssh-exclude` sets the debug staging directory and the Defender exclusion (default `C:\LitterBox\emp-debug`). The coordinator verifies the exclusion before every debugger session, and the debugger may also call `GuestSSH action=ensure_exclusion`; the check adds the exclusion only when it is missing. Every other Defender, firewall, ASR, RedEdr, and analyzer change is refused, because weakening detection would invalidate the cycle. Guest commands are bounded, sanitized, and written to the operator audit log; guest output is treated as untrusted evidence.
+
+The debugger may launch an uploaded artifact from an allowed directory, kill a stuck process, read WER and Defender logs, collect a dump under the staging directory, and test C2 reachability from inside the guest. It cannot edit module source; when the cause is a crash or a rejected injection, it returns `source_fix_required=true` and a brief for the editor. A guest-side repair is confirmed by the host with a fresh `AgentStatus` poll, never by model text.
 
 ### Managing loops
 
@@ -161,6 +196,7 @@ disposable VM or container:
 
 - give it no host credentials, no production C2 server keys, and no access to
   the operator's home directory or SSH agent;
+- when the debugger is enabled, use a sandbox-only SSH key: the debugger can add the configured Defender exclusion for its staging directory and nothing else, and it is scoped to the LitterBox guest, never a target;
 - restrict egress to the model provider and the LitterBox sandbox;
 - rebuild or discard the VM after a run instead of reusing a workstation;
 - keep the model provider's data handling in mind: source excerpts, build logs,
@@ -236,7 +272,7 @@ console it runs as a child process and streams its output to the output pane,
 so the prompt stays responsive; the direct CLI form still waits for the refresh
 to finish.
 
-`--inject` and `--process` are overrides. When they are omitted, the module's own default controls the load path, so the model can change that default in source and have the next cycle use it. `--iterations` and `--turns` default to 3 and 60; an explicit value is used as-is, and the cycle budget is shown in the prompt and in every `DetectionCycle` result.
+`--inject` and `--process` are overrides. When they are omitted, the module's own default controls the load path, so the model can change that default in source and have the next cycle use it. `--iterations` defaults to 3; the role turn flags default to 24 for the planner and debugger and 60 for the editor. An explicit value is used as-is, and the cycle budget is shown in every worker brief and in every `DetectionCycle` result.
 
 The loop writes one log file under `<workspace>/detection/` and opens a
 separate tmux window tailing it; `emp3r0r.log` is untouched. When verification
@@ -244,6 +280,8 @@ is enabled, agent checks and rebuilds use the console's existing C2 connection
 (`detect_loop` must therefore run from a connected operator console for live
 verification). `AgentStatus`, `RunModule`, and `CleanupAgent` are only
 registered when verification is configured (MCP `detection_loop` omits them).
+`GuestSSH` is registered only when `--guest-ssh` is configured; MCP
+`detection_loop` does not enable it.
 The sandbox is probed once, and no build or detection failure is retried by the host: its error, build tail, stage errors, and trace identity are given to the model, which can inspect the source and telemetry and call `DetectionCycle` after a fix. A baseline failure therefore starts the model session instead of rebuilding the same payload again, and a failed attempt does not consume the cycle budget. Model-session failures back off and resume; the loop is not ended because a session stalls. A trace without a payload PEB is recorded and kept for the model with the `telemetry/attribution` finding instead of being detonated again. One build/detonate/verify cycle is bounded by `--cycle-timeout` (default 60m). A session that completes no cycle within that deadline is stopped and the model must apply an edit and retry; the loop continues. One model session is bounded by `--session-timeout` (default 2h), and a session with no tool call by `--tool-idle-timeout` (default 30m). An in-flight tool suspends the idle check and an in-flight cycle is bounded by its own deadline. `--timeout 0` (the default) means no loop-wide deadline. A final answer that is not the requested JSON object is stored as the summary with `parse_error` instead of ending the run. The loop writes the full Markdown report to `<workspace>/detection/reports/<loop>.md` and a compact executive summary to `<loop>-summary.md`, emits the full report through the tmux log pane when the loop finishes, and stores the report in `loop_results.report`. If the loop is stopped or fails before the final answer, it writes a partial report and summary from the cycles completed so far. The operator console prints the rendered executive summary, not the raw report.
 
 Loop timestamps use local time. A `[progress]` heartbeat is written every two

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -264,4 +265,78 @@ func (t *TelemetryDB) NetworkEventCount(ctx context.Context, traceID int64) (int
 		return 0, fmt.Errorf("count network events: %w", err)
 	}
 	return count, nil
+}
+
+// SaveWorker records one model worker session. Prompts and outputs are capped
+// so a verbose model cannot grow the database without bound; the full cycle
+// evidence stays in the feedback and build tables.
+func (t *TelemetryDB) SaveWorker(ctx context.Context, run WorkerRun) error {
+	const maxWorkerText = 64 << 10
+	if run.CreatedAt == 0 {
+		run.CreatedAt = time.Now().UTC().UnixMilli()
+	}
+	if _, err := t.db.ExecContext(ctx, `
+		INSERT INTO loop_workers(loop_id, iteration, role, model, prompt, output, status, error, created_at)
+		VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		run.LoopID, run.Iteration, run.Role, run.Model,
+		clip(run.Prompt, maxWorkerText), clip(run.Output, maxWorkerText),
+		run.Status, clip(run.Error, 4000), run.CreatedAt); err != nil {
+		return fmt.Errorf("save worker run: %w", err)
+	}
+	return nil
+}
+
+// LoopWorkers returns the most recent worker sessions for one loop, newest
+// last.
+func (t *TelemetryDB) LoopWorkers(ctx context.Context, loopID string, limit int) ([]WorkerRun, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	rows, err := t.db.QueryContext(ctx, `
+		SELECT loop_id, iteration, role, model, prompt, output, status, error, created_at
+		FROM loop_workers WHERE loop_id = ? ORDER BY id DESC LIMIT ?`, loopID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list worker runs: %w", err)
+	}
+	defer rows.Close()
+	var out []WorkerRun
+	for rows.Next() {
+		var run WorkerRun
+		if err := rows.Scan(&run.LoopID, &run.Iteration, &run.Role, &run.Model,
+			&run.Prompt, &run.Output, &run.Status, &run.Error, &run.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scan worker run: %w", err)
+		}
+		out = append(out, run)
+	}
+	return out, rows.Err()
+}
+
+// BuildForIteration returns the build record for one cycle.
+func (t *TelemetryDB) BuildForIteration(ctx context.Context, loopID string, iteration int) (BuildRecord, bool, error) {
+	var record BuildRecord
+	err := t.db.QueryRowContext(ctx, `
+		SELECT loop_id, iteration, payload_id, artifact, sha256, log
+		FROM loop_builds WHERE loop_id = ? AND iteration = ?
+		ORDER BY id DESC LIMIT 1`, loopID, iteration).
+		Scan(&record.LoopID, &record.Iteration, &record.PayloadID, &record.Artifact, &record.SHA256, &record.Log)
+	if errors.Is(err, sql.ErrNoRows) {
+		return BuildRecord{}, false, nil
+	}
+	if err != nil {
+		return BuildRecord{}, false, fmt.Errorf("read build: %w", err)
+	}
+	return record, true, nil
+}
+
+// UpdateCycleRecovery records a debugger-assisted execution recovery.
+func (t *TelemetryDB) UpdateCycleRecovery(ctx context.Context, cycleID int64, execution string, online *bool, summary string) error {
+	if cycleID == 0 {
+		return fmt.Errorf("cycle id is required")
+	}
+	if _, err := t.db.ExecContext(ctx, `
+		UPDATE loop_cycles SET execution = ?, agent_online = ?, summary = ?
+		WHERE id = ?`, execution, nullableBool(online), summary, cycleID); err != nil {
+		return fmt.Errorf("update cycle recovery: %w", err)
+	}
+	return nil
 }

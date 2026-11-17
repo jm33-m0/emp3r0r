@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -55,10 +56,12 @@ func detectLoopCmd() *cobra.Command {
 		Long: `Start the autonomous detection loop for loader_windows.
 
 The command generates a real Go Windows agent shellcode when --shellcode is
-omitted, then starts the loop. The loop builds the loader
-from --module-dir, detonates it in LitterBox, and lets a Norma agent inspect the
-SQLite telemetry, edit module source, rebuild, and compare payloads. Agent
-generation and C2 verification use the console's existing connection.
+omitted, then starts the loop. The loop builds the loader from --module-dir,
+detonates it in LitterBox, and runs three Norma workers: a planner that chooses
+one mechanism and prediction, an editor that applies every source or producer
+edit the change needs and detonates one cycle, and a debugger that inspects the
+sandbox guest when the payload did not execute. Agent generation and C2
+verification use the console's existing connection.
 
 --shellcode accepts any x64 position-independent shellcode. Without it, the
 loop generates a Windows EXE agent and wraps it with donut. Pass
@@ -74,8 +77,15 @@ every EDR profile. Full feedback, builds, and per-payload telemetry stay in
 SQLite. The loop writes only its instructions and bounded tool results to the
 model context.
 
-The model can edit module and producer source, and the build scripts and
-generators it edits run on this host with operator privileges. Treat the loop
+Enable the debugger with --guest-ssh user@host:port and --guest-ssh-key. There
+is no implicit host. The debugger uses public-key SSH into the sandbox guest,
+verifies or adds the Defender exclusion for --guest-ssh-exclude (default
+C:\\LitterBox\\emp-debug), and may launch an uploaded artifact, read logs and
+dumps, and test C2 reachability. It cannot edit module source, and every other
+Defender, firewall, ASR, RedEdr, or analyzer change is refused.
+
+The workers can edit module and producer source, and the build scripts and
+generators they edit run on this host with operator privileges. Treat the loop
 as a code-execution feature controlled by an untrusted model, not as a
 sandbox: run it in a dedicated, disposable VM or container with no host
 credentials, no production C2 keys, and restricted network egress.
@@ -127,7 +137,19 @@ func addDetectLoopFlags(cmd *cobra.Command) {
 	cmd.Flags().StringSlice("producer", nil, "Shellcode producer as name=path (donut=..., crystal_pack=...); the baseline uses the installed producers")
 	cmd.Flags().StringSlice("read-root", nil, "Read-only source root the model may inspect (repeatable)")
 	cmd.Flags().String("knowledge", "", "Knowledge cache path; defaults to <detection store>/knowledge.db")
-	cmd.Flags().Int("turns", 60, "Maximum Norma agent turns")
+	cmd.Flags().Int("turns", 60, "Default per-worker turn cap; overridden by the role flags")
+	cmd.Flags().Int("planner-turns", 24, "Maximum planner turns per session")
+	cmd.Flags().Int("editor-turns", 60, "Maximum editor turns per session")
+	cmd.Flags().Int("debugger-turns", 24, "Maximum debugger turns per session")
+	cmd.Flags().Duration("debugger-timeout", 10*time.Minute, "Wall-clock limit for one debugger session")
+	cmd.Flags().StringToString("worker-model", nil, "Per-worker model override, for example planner=...,editor=...,debugger=...")
+	cmd.Flags().String("guest-ssh", "", "Sandbox guest SSH endpoint as user@host:port; enables the debugger worker (env EMP3R0R_DETECTION_GUEST_SSH)")
+	cmd.Flags().String("guest-ssh-key", "", "Sandbox-only SSH private key (env EMP3R0R_DETECTION_GUEST_SSH_KEY)")
+	cmd.Flags().String("guest-ssh-exclude", "", "Defender exclusion and debug staging path (default C:\\LitterBox\\emp-debug; env EMP3R0R_DETECTION_GUEST_SSH_EXCLUDE)")
+	cmd.Flags().String("guest-ssh-known-hosts", "", "TOFU known-hosts file; defaults under the detection store")
+	cmd.Flags().String("guest-ssh-fingerprint", "", "Pin the guest host key as SHA256:...")
+	cmd.Flags().Bool("guest-ssh-insecure", false, "Disable guest host-key verification (not recommended)")
+	cmd.Flags().Duration("guest-ssh-timeout", 60*time.Second, "Guest command timeout")
 	cmd.Flags().Duration("timeout", 0, "Loop deadline; 0 means no deadline")
 	cmd.Flags().Duration("cycle-timeout", 60*time.Minute, "Deadline for one build, detonation, and verification cycle, and for a model session that completes no cycle; the cycle is stopped and the model must edit and retry")
 	cmd.Flags().Duration("session-timeout", 2*time.Hour, "Wall-clock deadline for one model session")
@@ -285,28 +307,40 @@ type detectLoopOptions struct {
 	ShellcodeProducer string
 	// AgentUUID is the identity of the generated baseline agent. The loop
 	// uses it to prove that this payload checked in and can run a module.
-	AgentUUID       string
-	AgentType       string
-	Arch            string
-	CC              string
-	Sandbox         string
-	Iterations      int
-	Stages          []string
-	Process         string
-	Format          string
-	Inject          string
-	SMW             string
-	Producers       []string
-	ReadRoots       []string
-	Knowledge       string
-	Turns           int
-	Timeout         time.Duration
-	CycleTimeout    time.Duration
-	SessionTimeout  time.Duration
-	ToolIdleTimeout time.Duration
-	Tmux            bool
-	Goal            string
-	RenderWidth     int
+	AgentUUID           string
+	AgentType           string
+	Arch                string
+	CC                  string
+	Sandbox             string
+	Iterations          int
+	Stages              []string
+	Process             string
+	Format              string
+	Inject              string
+	SMW                 string
+	Producers           []string
+	ReadRoots           []string
+	Knowledge           string
+	Turns               int
+	PlannerTurns        int
+	EditorTurns         int
+	DebuggerTurns       int
+	DebuggerTimeout     time.Duration
+	WorkerModels        map[string]string
+	GuestSSH            string
+	GuestSSHKey         string
+	GuestSSHExclude     string
+	GuestSSHKnownHosts  string
+	GuestSSHFingerprint string
+	GuestSSHInsecure    bool
+	GuestSSHTimeout     time.Duration
+	Timeout             time.Duration
+	CycleTimeout        time.Duration
+	SessionTimeout      time.Duration
+	ToolIdleTimeout     time.Duration
+	Tmux                bool
+	Goal                string
+	RenderWidth         int
 }
 
 func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
@@ -327,6 +361,18 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 	opts.ReadRoots, _ = cmd.Flags().GetStringSlice("read-root")
 	opts.Knowledge, _ = cmd.Flags().GetString("knowledge")
 	opts.Turns, _ = cmd.Flags().GetInt("turns")
+	opts.PlannerTurns, _ = cmd.Flags().GetInt("planner-turns")
+	opts.EditorTurns, _ = cmd.Flags().GetInt("editor-turns")
+	opts.DebuggerTurns, _ = cmd.Flags().GetInt("debugger-turns")
+	opts.DebuggerTimeout, _ = cmd.Flags().GetDuration("debugger-timeout")
+	opts.WorkerModels, _ = cmd.Flags().GetStringToString("worker-model")
+	opts.GuestSSH, _ = cmd.Flags().GetString("guest-ssh")
+	opts.GuestSSHKey, _ = cmd.Flags().GetString("guest-ssh-key")
+	opts.GuestSSHExclude, _ = cmd.Flags().GetString("guest-ssh-exclude")
+	opts.GuestSSHKnownHosts, _ = cmd.Flags().GetString("guest-ssh-known-hosts")
+	opts.GuestSSHFingerprint, _ = cmd.Flags().GetString("guest-ssh-fingerprint")
+	opts.GuestSSHInsecure, _ = cmd.Flags().GetBool("guest-ssh-insecure")
+	opts.GuestSSHTimeout, _ = cmd.Flags().GetDuration("guest-ssh-timeout")
 	opts.Timeout, _ = cmd.Flags().GetDuration("timeout")
 	opts.CycleTimeout, _ = cmd.Flags().GetDuration("cycle-timeout")
 	opts.SessionTimeout, _ = cmd.Flags().GetDuration("session-timeout")
@@ -475,6 +521,90 @@ func loopC2Address(configured string) string {
 		return u.String()
 	}
 	return configured
+}
+
+// guestConfig resolves the debugger's sandbox SSH endpoint. The operator must
+// opt in with a flag or the environment; there is no implicit default host.
+func (opts detectLoopOptions) guestConfig() (*detection.GuestSSHConfig, error) {
+	endpoint := envOr(opts.GuestSSH, "EMP3R0R_DETECTION_GUEST_SSH")
+	key := envOr(opts.GuestSSHKey, "EMP3R0R_DETECTION_GUEST_SSH_KEY")
+	if endpoint == "" && key == "" {
+		return nil, nil
+	}
+	if endpoint == "" || key == "" {
+		return nil, fmt.Errorf("guest SSH requires both --guest-ssh user@host:port and --guest-ssh-key")
+	}
+	user, host, port, err := parseGuestSSHEndpoint(endpoint)
+	if err != nil {
+		return nil, err
+	}
+	key = expandHomePath(key)
+	if info, err := os.Stat(key); err != nil || !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("guest SSH key %q is not readable", key)
+	}
+	exclude := envOr(opts.GuestSSHExclude, "EMP3R0R_DETECTION_GUEST_SSH_EXCLUDE")
+	return &detection.GuestSSHConfig{
+		Host: host, Port: port, User: user, KeyPath: key,
+		KnownHostsPath: expandHomePath(opts.GuestSSHKnownHosts),
+		Fingerprint:    strings.TrimSpace(opts.GuestSSHFingerprint),
+		Insecure:       opts.GuestSSHInsecure,
+		ExcludePath:    exclude,
+		Timeout:        opts.GuestSSHTimeout,
+	}, nil
+}
+
+func envOr(value, key string) string {
+	if strings.TrimSpace(value) != "" {
+		return strings.TrimSpace(value)
+	}
+	return strings.TrimSpace(os.Getenv(key))
+}
+
+func expandHomePath(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" || path[0] != '~' {
+		return path
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return path
+	}
+	if path == "~" {
+		return home
+	}
+	if strings.HasPrefix(path, "~/") {
+		return filepath.Join(home, path[2:])
+	}
+	return path
+}
+
+func parseGuestSSHEndpoint(value string) (user, host string, port int, err error) {
+	value = strings.TrimSpace(value)
+	if at := strings.LastIndex(value, "@"); at >= 0 {
+		user = strings.TrimSpace(value[:at])
+		value = strings.TrimSpace(value[at+1:])
+	}
+	if user == "" {
+		return "", "", 0, fmt.Errorf("guest SSH endpoint must include a user, for example litterbox@127.0.0.1:2222")
+	}
+	if value == "" {
+		return "", "", 0, fmt.Errorf("guest SSH endpoint has no host")
+	}
+	host, portText, splitErr := net.SplitHostPort(value)
+	if splitErr != nil {
+		host = value
+		port = 22
+	} else {
+		port, err = strconv.Atoi(portText)
+		if err != nil || port < 1 || port > 65535 {
+			return "", "", 0, fmt.Errorf("guest SSH port %q is invalid", portText)
+		}
+	}
+	host = strings.Trim(host, "[]")
+	if host == "" {
+		return "", "", 0, fmt.Errorf("guest SSH endpoint has no host")
+	}
+	return user, host, port, nil
 }
 
 func generateAgentShellcode(opts detectLoopOptions, logf func(string, ...any)) (shellcode, agentArtifact, producer, agentType, agentUUID string, err error) {

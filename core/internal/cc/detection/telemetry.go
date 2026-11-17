@@ -211,6 +211,20 @@ CREATE TABLE IF NOT EXISTS loop_shellcodes (
 	created_at INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS loop_shellcodes_loop ON loop_shellcodes(loop_id, id);
+
+CREATE TABLE IF NOT EXISTS loop_workers (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	loop_id TEXT NOT NULL,
+	iteration INTEGER NOT NULL DEFAULT 0,
+	role TEXT NOT NULL,
+	model TEXT NOT NULL DEFAULT '',
+	prompt TEXT NOT NULL DEFAULT '',
+	output TEXT NOT NULL DEFAULT '',
+	status TEXT NOT NULL DEFAULT '',
+	error TEXT NOT NULL DEFAULT '',
+	created_at INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS loop_workers_loop ON loop_workers(loop_id, id);
 `
 
 // telemetryIndexesV2 is applied after ensureColumn because older databases do

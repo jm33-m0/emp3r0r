@@ -15,9 +15,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Autumn-27/norma/agentcore"
-	"github.com/Autumn-27/norma/compaction"
-	"github.com/Autumn-27/norma/hook"
 	"github.com/Autumn-27/norma/llm"
 	"github.com/Autumn-27/norma/permission"
 	"github.com/Autumn-27/norma/tool"
@@ -109,7 +106,25 @@ type EvolveConfig struct {
 	// under test from unrelated agents already connected to the C2.
 	ExpectedAgentUUID string
 	Iterations        int
-	Turns             int
+	// Turns is the per-session turn cap used when the role-specific value is
+	// zero.
+	Turns int
+	// PlannerTurns, EditorTurns, and DebuggerTurns bound each worker session.
+	// Zero falls back to Turns.
+	PlannerTurns  int
+	EditorTurns   int
+	DebuggerTurns int
+	// DebuggerTimeout bounds one debugger session. Zero uses the cycle timeout.
+	DebuggerTimeout time.Duration
+	// WorkerModels overrides the model per worker role ("planner", "editor",
+	// "debugger"). Empty entries use Model.
+	WorkerModels map[string]string
+	// Guest is the sandbox guest SSH endpoint. When nil, the debugger worker
+	// is not registered and offline cycles follow the restore-only path.
+	Guest *GuestSSHConfig
+	// GuestRunner overrides the SSH client. Tests inject a fake; production
+	// leaves it nil so Guest builds the real client.
+	GuestRunner GuestRunner
 	// Provider and Model override the environment; tests use a scripted
 	// provider, production uses EMP3R0R_DETECTION_* and the usual API key.
 	Provider llm.Provider
@@ -249,6 +264,11 @@ type evolver struct {
 	agentSeenOnline atomic.Bool
 	lastExecution   atomic.Value
 	lastAgent       atomic.Value
+	// guest is the debugger's sandbox surface. Nil when SSH is not configured.
+	guest GuestRunner
+	// sessionCycles counts completed DetectionCycle calls in the current
+	// editor session; one plan produces one detonation.
+	sessionCycles atomic.Int32
 }
 
 func (e *evolver) dynamicEnabled() bool {
@@ -462,6 +482,18 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 	if e.logf == nil {
 		e.logf = func(logging.Class, string, ...any) {}
 	}
+	switch {
+	case cfg.GuestRunner != nil:
+		e.guest = cfg.GuestRunner
+		defer func() { _ = cfg.GuestRunner.Close() }()
+	case cfg.Guest != nil:
+		guest, guestErr := newGuestSSH(*cfg.Guest, cfg.StoreRoot)
+		if guestErr != nil {
+			return nil, fmt.Errorf("guest SSH: %w", guestErr)
+		}
+		e.guest = guest
+		defer func() { _ = guest.Close() }()
+	}
 	e.baseLoopID = strings.TrimSpace(cfg.BaseLoopID)
 	if e.baseLoopID == "" {
 		e.baseLoopID = cfg.LoopID
@@ -530,11 +562,6 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 	e.lastCycleAt.Store(time.Now().UnixNano())
 	baselineJSON, _ := json.Marshal(baseline)
 
-	producerList := "none configured"
-	if names := e.producerNames(); len(names) > 0 {
-		producerList = strings.Join(names, ", ")
-	}
-	rootList := e.roots.describe()
 	executionState := "the host checks the generated agent after every dynamic cycle with AgentStatus and records execution=verified, offline, or unverified"
 	if e.baselineFailure != "" {
 		executionState = "the baseline did not complete; diagnose the failure and fix it before another cycle"
@@ -570,299 +597,19 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 			knowledgeState = "available: " + e.knowledge.Path() + " (coverage query failed; KnowledgeSearch still works)"
 		}
 	}
-	system := evolveSystemPrompt
-	carriedState := ""
-	if len(e.priorCycles) > 0 || e.attempt > 1 {
-		carriedState = "\nPrior attempt state:\n" + e.dossier()
+	coord := newCoordinator(e, provider, model, baselineJSON, executionState, knowledgeState)
+	answer, err := coord.run(ctx)
+	if err != nil {
+		return nil, err
 	}
-	prompt := fmt.Sprintf(`Loop ID: %s
-Base loop ID: %s
-Attempt: %d (%s)
-Module: %s
-Module source: %s
-Active shellcode: %s
-Active shellcode producer: %s
-Producer modules: %s
-Source roots: %s
-Agent C2: %s
-Expected agent UUID: %s
-Goal: %s
-Knowledge cache: %s
-Execution gate: %s
-Cycle budget: %d total across attempts; %d used before this attempt; %d remain after this baseline.
-Stages: %s
-Baseline cycle: %s
-Baseline failure: %s
-%s
-
-Continue the loop. The full feedback, builds, and telemetry are in SQLite.
-Use InspectFeedback, Payloads, ComparePayloads, TelemetryQuery, and the source
-tools. Source tools accept module=%q for the payload module, a producer name
-(donut, crystal_pack) to inspect or tune the shellcode generator, or a read-only
-dependency root. EditSource writes only to the payload module and producer
-modules; documented options and their choices in config.json cannot be removed.
-Apply grounded source edits: start minimal when that removes the detection, but
-change the design when the design itself is what the sandbox detects. Then call
-DetectionCycle with the mechanism and one falsifiable prediction. The host records
-prediction, observed result, and prediction_result with the cycle; after two
-unobserved predictions for the same mechanism it blocks a third. Do not call
-DetectionCycle without a source or shellcode change: the host rejects no-op cycles.
-
-Changing the shellcode producer is a first-class move. Edit the producer module
-(module="donut" or module="crystal_pack"), then call BuildShellcode with its
-declared options. The produced artifact becomes the shellcode for every later
-cycle; the cycle summary records its path. BuildShellcode validates options,
-forces the output under the detection store, and refuses files outside the
-operator payload directory. crystal_pack's runtime loader is
-postex-loader/src; build.sh rebuilds those objects from the edited source
-before linking the PICO, so loader edits take effect. donut rebuilds its
-stubs and generator from src/ on every build.
-
-GenerateAgent rebuilds the Go agent, not just the wrapper. agent_type may be
-windows_executable or windows_dll; the result returns artifact_path without
-wrapping it. Use BuildShellcode producer=donut with input=artifact_path, or
-producer=crystal_pack with dll=artifact_path, to choose the shellcode wrapper.
-Java is required for crystal_pack. Switching from a donut EXE agent to a
-crystal_pack DLL agent is a design change, not a replacement of the agent
-payload: the new artifact is a freshly built agent with the same configuration.
-The agent payload itself must remain: do not replace the shellcode with a
-smaller blob or build a loader that does not execute it.
-
-Use all telemetry. Defender verdicts are one input; the events table carries
-ETW, ETW-TI memory operations, kernel callbacks, ntdll hooks, PEB and loaded-DLL
-queries, and Defender behavior. Each row has actor_pid, target_pid, operation,
-category, signal, payload_role, src/dst endpoints, protection, status, and the
-top kernel stack frames. payload_role is payload, payload-child, payload-target,
-payload-scan, ambient, or unknown. Treat signal='noise' and signal='baseline' as
-evidence only, not as findings. Query the findings table for the deterministic
-result and the payload view for the raw events, then compare payloads after
-every edit.
-
-An actionable finding is one with a source location (finding.Sources is not
-empty) or a real defender verdict. A finding with no source location cannot be
-fixed by editing this module; report it as a residual with evidence instead of
-repeating the same hypothesis. High static findings (.rdata entropy, checksum)
-and analyzer matches on the embedded shellcode are residuals unless a producer
-change removes them. Do not game static checks with size-inflating encoding or
-padding.
-
-If a cycle regresses, revert before trying another hypothesis: RevertToPayload
-undoes every recorded edit made after the chosen payload and restores the source
-and producer state. Then call DetectionCycle to confirm.
-
-If coverage.missing is not empty, or an analyzer reports a scan error or early
-termination, name the gap and do not treat the cycle as clean. Stop when the
-cycle budget is exhausted, or when no actionable high/medium finding remains and
-every residual is explained with evidence. Return the final JSON object.`,
-		cfg.LoopID, e.baseLoopID, e.attempt, attemptLabel(e.attempt),
-		cfg.Module, cfg.ModuleDir, e.shellcode, headerOrNone(e.activeProducer), producerList, rootList,
-		headerOrNone(cfg.AgentCC), headerOrNone(e.expectedAgentUUID), headerOrNone(cfg.Goal), knowledgeState,
-		executionState, cfg.Iterations, e.globalUsed, max(0, cfg.Iterations-e.usedCycles()),
-		strings.Join(stageNames(cfg.Stages), ", "), baselineJSON, headerOrNone(e.baselineFailure),
-		carriedState, cfg.Module)
-	if e.baselineFailure != "" {
-		prompt += "\n\nThe baseline failed before any model feedback. Do not repeat the same build blindly: " +
-			"read the failure above, query the run's build and telemetry rows, inspect the source and active " +
-			"shellcode, apply a grounded edit or rebuild the shellcode, then call DetectionCycle. " +
-			"A failed attempt does not consume the cycle budget."
-	}
-	if cfg.BuildAgent == nil {
-		prompt += "\n\nAgent generation (GenerateAgent) is disabled for this run; reuse the supplied shellcode or edit and rebuild an existing producer."
-	}
-	if !e.verifyEnabled() {
-		prompt += "\n\nC2 agent verification tools (AgentStatus, RunModule, CleanupAgent) are disabled for this run."
-	}
-
-	var (
-		text     string
-		answer   map[string]any
-		parseErr error
-	)
-	maxTokens := 16384
-	for attempt := 0; ; attempt++ {
-		if prompts := e.takeOperatorPrompts(); len(prompts) > 0 {
-			prompt = appendOperatorPrompts(prompt, prompts)
-		}
-		e.sessions.Add(1)
-		sessionTimeout := cfg.SessionTimeout
-		if sessionTimeout <= 0 {
-			sessionTimeout = defaultSessionTimeout
-		}
-		idleTimeout := cfg.ToolIdleTimeout
-		if idleTimeout <= 0 {
-			idleTimeout = defaultToolIdleTimeout
-		}
-		cycleTimeout := cfg.CycleTimeout
-		if cycleTimeout <= 0 {
-			cycleTimeout = defaultCycleTimeout
-		}
-		sessionCtx, sessionCancel := context.WithCancel(ctx)
-		var sessionExpired, idleExpired, cycleExpired atomic.Bool
-		e.deadlineHit.Store(false)
-		sessionStart := time.Now()
-		e.lastToolCall.Store(time.Now().UnixNano())
-		watchdogDone := make(chan struct{})
-		go func() {
-			tick := idleTimeout / 4
-			if tick > time.Minute {
-				tick = time.Minute
-			}
-			if tick < time.Second {
-				tick = time.Second
-			}
-			// A deadline shorter than the tick must fire on time, including
-			// the first check of the session.
-			next := func() time.Duration {
-				wait := tick
-				if e.activeCycles.Load() == 0 && e.activeTools.Load() == 0 {
-					wait = min(wait, cycleTimeout-time.Since(time.Unix(0, e.lastCycleAt.Load())))
-				}
-				if e.activeTools.Load() == 0 {
-					wait = min(wait, idleTimeout-time.Since(time.Unix(0, e.lastToolCall.Load())))
-					wait = min(wait, sessionTimeout-time.Since(sessionStart))
-				}
-				if wait < 10*time.Millisecond {
-					wait = 10 * time.Millisecond
-				}
-				return wait
-			}
-			timer := time.NewTimer(next())
-			defer timer.Stop()
-			for {
-				select {
-				case <-watchdogDone:
-					return
-				case <-sessionCtx.Done():
-					return
-				case <-timer.C:
-				}
-				// An in-flight tool owns the wall clock: a cycle is bounded by
-				// its own deadline, and neither a long tool nor a running cycle
-				// is a stalled session.
-				e.toolGate.Lock()
-				tools := e.activeTools.Load()
-				cycles := e.activeCycles.Load()
-				idleFor := time.Since(time.Unix(0, e.lastToolCall.Load()))
-				cycleFor := time.Since(time.Unix(0, e.lastCycleAt.Load()))
-				if cycles == 0 && tools == 0 && cycleFor >= cycleTimeout {
-					e.deadlineHit.Store(true)
-					cycleExpired.Store(true)
-					sessionCancel()
-					e.toolGate.Unlock()
-					return
-				}
-				if tools == 0 && idleFor >= idleTimeout {
-					e.deadlineHit.Store(true)
-					idleExpired.Store(true)
-					sessionCancel()
-					e.toolGate.Unlock()
-					return
-				}
-				if tools == 0 && time.Since(sessionStart) >= sessionTimeout {
-					e.deadlineHit.Store(true)
-					sessionExpired.Store(true)
-					sessionCancel()
-					e.toolGate.Unlock()
-					return
-				}
-				e.toolGate.Unlock()
-				timer.Reset(next())
-			}
-		}()
-		text, err = agentcore.Run(sessionCtx, agentcore.Options{
-			Provider:               provider,
-			SystemPrompt:           []string{system},
-			Tools:                  e.tools(),
-			PermissionMode:         permission.ModeDontAsk,
-			Hooks:                  e.hooks(),
-			WorkingDir:             cfg.ModuleDir,
-			MaxTurns:               cfg.Turns,
-			MaxTokens:              maxTokens,
-			DisableBackgroundTasks: true,
-			Compaction:             &compaction.Config{ContextWindow: 200000, MaxOutputTokens: maxTokens, KeepRecent: 8},
-			OnWarn:                 func(line string) { e.logf(logging.ClassWarning, "%s", line) },
-		}, prompt)
-		close(watchdogDone)
-		sessionCancel()
-		if err != nil {
-			if ctx.Err() != nil {
-				return nil, ctx.Err()
-			}
-			if cycleExpired.Load() {
-				e.actionRequired.Store(true)
-				e.logClass(logging.ClassWarning,
-					"no cycle completed within %s; stopping the cycle and requiring an edit and a retry", cycleTimeout)
-				// Give the resumed session a fresh window and require it to
-				// apply an edit and call DetectionCycle.
-				e.lastCycleAt.Store(time.Now().UnixNano())
-				prompt = e.resumePrompt(cfg, fmt.Sprintf(
-					"no cycle completed within %s and the cycle was stopped. Apply your edits with EditSource now, then retry with DetectionCycle.", cycleTimeout))
-				continue
-			}
-			if sessionExpired.Load() {
-				e.logClass(logging.ClassError,
-					"session exceeded the %s wall-clock limit; restarting it", sessionTimeout)
-				prompt = e.resumePrompt(cfg, fmt.Sprintf(
-					"the previous session exceeded the %s wall-clock limit; continue from the dossier", sessionTimeout))
-				continue
-			}
-			if idleExpired.Load() {
-				e.logClass(logging.ClassWarning, "session made no tool call for %s; asking for a cycle or the final JSON", idleTimeout)
-				prompt = e.resumePrompt(cfg, fmt.Sprintf("the previous session made no tool call for %s; call DetectionCycle or return the final JSON now", idleTimeout))
-				continue
-			}
-			if e.executionBlocked {
-				e.logClass(logging.ClassError, "stopping the session: the baseline payload did not execute and no executing baseline exists")
-				break
-			}
-			if !e.recover(ctx, attempt, "agent session", err) {
-				return nil, ctx.Err()
-			}
-			prompt = e.resumePrompt(cfg, "the previous agent session failed")
-			continue
-		}
-		e.logClass(logging.ClassAnswer, "%s", clip(text, 8000))
-		answer, parseErr = parseAnalystAnswer(text)
-		if parseErr == nil {
-			e.lastAnswer = answer
-			if e.actionRequired.Load() && e.usedCycles() < cfg.Iterations {
-				e.logClass(logging.ClassWarning, "agent answered before retrying the stopped cycle; resuming")
-				if !e.backoff(ctx, attempt, "a cycle retry is required after the cycle deadline") {
-					return nil, ctx.Err()
-				}
-				prompt = e.resumePrompt(cfg, "a cycle retry is required after the cycle deadline; apply your edits and call DetectionCycle")
-				continue
-			}
-			if e.usedCycles() < cfg.Iterations && e.needsMoreWork(ctx) {
-				e.logClass(logging.ClassWarning, "agent stopped with work remaining; resuming")
-				if !e.backoff(ctx, attempt, "the answer did not start a new cycle while work remains") {
-					return nil, ctx.Err()
-				}
-				prompt = e.resumePrompt(cfg, "real verdicts or actionable high/medium findings remain")
-				continue
-			}
-			break
-		}
-		if e.usedCycles() < cfg.Iterations && !e.executionBlocked {
-			e.logClass(logging.ClassWarning, "agent stopped without the required JSON; resuming")
-			if !e.backoff(ctx, attempt, "the answer did not contain the final JSON object") {
-				return nil, ctx.Err()
-			}
-			prompt = e.resumePrompt(cfg, "the previous turn ended without the final JSON object")
-			continue
-		}
-		break
+	if coord.lastDiagnosis != nil {
+		answer["debugger_diagnosis"] = coord.lastDiagnosis
 	}
 	if answer == nil {
-		summary := strings.TrimSpace(text)
-		if summary == "" {
-			summary = "the agent stopped without returning a final summary"
-		}
 		answer = map[string]any{
-			"summary":     clip(summary, 4000),
-			"edits":       []any{},
-			"residual":    []string{"the agent did not return the required JSON object"},
-			"parse_error": "agent did not return JSON before the iteration limit",
+			"summary":  "the coordinator returned no answer",
+			"edits":    []any{},
+			"residual": []string{"no final answer"},
 		}
 	}
 	answer["loop_id"] = cfg.LoopID
@@ -888,15 +635,32 @@ every residual is explained with evidence. Return the final JSON object.`,
 			answer["payload_verification_error"] = "no expected agent UUID"
 		} else {
 			output, verifyErr := cfg.FinalVerify(ctx, e.expectedAgentUUID)
-			answer["payload_verified"] = verifyErr == nil && strings.TrimSpace(output) != ""
-			if answer["payload_verified"] == true {
+			verified := verifyErr == nil && strings.TrimSpace(output) != ""
+			if !verified && e.guest != nil && !e.agentSeenOnline.Load() {
+				// A fresh agent restart cannot fix a guest-side execution
+				// fault. Let the debugger inspect the sandbox first, then
+				// retry the final check once when it reports a fix.
+				diag, diagErr := coord.debug(ctx, "final payload verification", e.last)
+				if diagErr != nil {
+					e.logClass(logging.ClassWarning, "final debugger: %v", diagErr)
+				}
+				if diag != nil {
+					answer["final_diagnosis"] = diag
+					if diag.AgentOnlineAfter {
+						output, verifyErr = cfg.FinalVerify(ctx, e.expectedAgentUUID)
+						verified = verifyErr == nil && strings.TrimSpace(output) != ""
+					}
+				}
+			}
+			answer["payload_verified"] = verified
+			if verified {
 				e.agentSeenOnline.Store(true)
 			}
 			answer["payload_verification_output"] = clip(output, 4000)
 			if verifyErr != nil {
 				answer["payload_verification_error"] = verifyErr.Error()
 			}
-			e.logClass(logging.ClassCycle, "final payload verification for %s: verified=%v", e.expectedAgentUUID, answer["payload_verified"])
+			e.logClass(logging.ClassCycle, "final payload verification for %s: verified=%v", e.expectedAgentUUID, verified)
 		}
 	}
 	verified, _ := answer["payload_verified"].(bool)
@@ -965,6 +729,11 @@ func normalizeEvolveConfig(cfg *EvolveConfig) error {
 	}
 	if cfg.StoreRoot == "" {
 		return fmt.Errorf("detection store root is required")
+	}
+	if cfg.Guest != nil {
+		if err := cfg.Guest.normalize(cfg.StoreRoot); err != nil {
+			return fmt.Errorf("guest SSH: %w", err)
+		}
 	}
 	if cfg.LoopID == "" {
 		cfg.LoopID = "loop-" + time.Now().UTC().Format("20060102-150405")
@@ -1096,6 +865,11 @@ type cycleSummary struct {
 	SourceTreeHash   string          `json:"source_tree_hash,omitempty"`
 	Knowledge        []KnowledgeHit  `json:"knowledge,omitempty"`
 	KBRefs           []string        `json:"kb_refs,omitempty"`
+	// RecoveredBy, DebuggerCause, and GuestActions record a debugger-assisted
+	// execution recovery without changing the cycle's detection data.
+	RecoveredBy   string   `json:"recovered_by,omitempty"`
+	DebuggerCause string   `json:"debugger_cause,omitempty"`
+	GuestActions  []string `json:"guest_actions,omitempty"`
 }
 
 func ensurePayloadPreserved(shellcode string, artifact Artifact) error {
@@ -1308,9 +1082,11 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 		AgentOnline: summary.AgentOnline, NetworkEvents: summary.NetworkEvents,
 		Summary: string(summaryJSON), CreatedAt: time.Now().UTC(),
 	}
-	if _, err := e.db.SaveCycle(cycleCtx, cycle); err != nil {
+	cycleID, err := e.db.SaveCycle(cycleCtx, cycle)
+	if err != nil {
 		return Cycle{}, err
 	}
+	cycle.ID = cycleID
 	if body, err := json.Marshal(feedback); err == nil {
 		if err := e.db.SaveFeedback(cycleCtx, FeedbackRecord{
 			LoopID: e.cfg.LoopID, Iteration: iteration, PayloadID: run.Telemetry.PayloadID,
@@ -1330,7 +1106,8 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 	e.cycles = append(e.cycles, cycle)
 	e.logClass(logging.ClassCycle, "cycle %d: payload=%s sha=%s score=%.2f verdicts=%v findings=%d execution=%s",
 		iteration, cycle.PayloadKey, shortSHA(artifact.SHA256), cycle.Score, summary.Verdicts, cycle.Findings, summary.Execution)
-	e.applyExecutionGate(cycleCtx, &cycle, summary)
+	// The coordinator applies the execution gate after the editor session so a
+	// debugger can inspect the guest before a non-executing cycle is reverted.
 	// A completed cycle resets the session's cycle deadline even when the
 	// payload did not execute: the model has new feedback to act on.
 	e.lastCycleAt.Store(time.Now().UnixNano())
@@ -1484,17 +1261,44 @@ func (e *evolver) checkExecution(ctx context.Context, traceID int64, dynamic boo
 
 // applyExecutionGate tracks the last executing cycle and rolls a non-executing
 // cycle back to the last payload that actually checked in.
-func (e *evolver) applyExecutionGate(ctx context.Context, cycle *Cycle, summary cycleSummary) {
+type executionGate int
+
+const (
+	gateUnchanged executionGate = iota
+	gateExecuting
+	gateBlocked
+	gateRestore
+)
+
+// recordExecution updates the last-executing state without touching the
+// source. The coordinator can then run the debugger before deciding whether
+// to restore a non-executing cycle.
+func (e *evolver) recordExecution(cycle *Cycle, summary cycleSummary) executionGate {
 	switch summary.Execution {
 	case executionVerified:
 		e.lastExecuting = cycle
+		return gateExecuting
 	case executionStatic, executionUnverified:
+		return gateUnchanged
 	case executionOffline:
 		if e.lastExecuting == nil {
 			e.executionBlocked = true
 			e.logClass(logging.ClassError, "cycle %d did not execute and no executing baseline exists; stopping further detection cycles", cycle.Iteration)
-			return
+			return gateBlocked
 		}
+		return gateRestore
+	}
+	return gateUnchanged
+}
+
+// applyExecutionGate is the immediate path used when no debugger is
+// configured. The coordinator uses recordExecution and restores only after the
+// guest diagnosis.
+func (e *evolver) applyExecutionGate(ctx context.Context, cycle *Cycle, summary cycleSummary) {
+	switch e.recordExecution(cycle, summary) {
+	case gateBlocked:
+		return
+	case gateRestore:
 		e.logClass(logging.ClassWarning, "cycle %d did not execute (agent %s offline); restoring payload %s",
 			cycle.Iteration, headerOrNone(e.expectedAgentUUID),
 			shortPayloadKey(e.lastExecuting.PayloadKey))
@@ -1569,27 +1373,6 @@ func writeLoopText(storeRoot, name, text string) (string, error) {
 		return "", err
 	}
 	return path, nil
-}
-
-func (e *evolver) resumePrompt(cfg EvolveConfig, reason string) string {
-	latest, _ := json.Marshal(e.last)
-	return fmt.Sprintf(`Resume the detection loop.
-Loop ID: %s
-Reason: %s
-Latest cycle: %s
-
-Dossier (already established; do not re-derive it):
-%s
-%s
-%s
-Full feedback, builds, and telemetry are in SQLite. Continue from the current
-source state: inspect only what the dossier does not answer, apply any remaining
-source edit, and call DetectionCycle with the mechanism under test. The dossier
-records the mechanism and edit reasons for recent cycles; do not repeat a
-hypothesis it lists as tried. If those cycles refined the same mechanism, choose
-a different one or record the concrete constraint that rules the alternatives
-out. Return the required JSON object when the loop is complete.`,
-		cfg.LoopID, reason, latest, e.dossier(), e.executionHint(), e.directionHint())
 }
 
 // executionHint makes a non-executing payload the first thing a resumed session
@@ -1695,6 +1478,9 @@ func (e *evolver) dossier() string {
 			attempt, cycle.Iteration, global, headerOrNone(summary.Mechanism), cycle.Score, cycle.Level,
 			cycle.Findings, cycle.Verdicts, headerOrNone(summary.Execution), summary.NetworkEvents,
 			headerOrNone(filepath.Base(summary.Shellcode)), joinOrNone(files))
+		if summary.RecoveredBy != "" {
+			fmt.Fprintf(&b, "  recovered_by=%s cause=%s\n", summary.RecoveredBy, clip(sanitizeLine(summary.DebuggerCause), 240))
+		}
 		if strings.TrimSpace(summary.Note) != "" {
 			fmt.Fprintf(&b, "  tested: %s\n", clip(sanitizeLine(summary.Note), 240))
 		}
@@ -1763,14 +1549,6 @@ func (e *evolver) takeOperatorPrompts() []string {
 	return prompts
 }
 
-func appendOperatorPrompts(prompt string, prompts []string) string {
-	block := FormatOperatorPrompts(prompts)
-	if block == "" {
-		return prompt
-	}
-	return strings.TrimRight(prompt, "\n") + "\n\n" + block
-}
-
 func (e *evolver) needsMoreWork(ctx context.Context) bool {
 	if e.executionBlocked {
 		return false
@@ -1779,6 +1557,12 @@ func (e *evolver) needsMoreWork(ctx context.Context) bool {
 		return true
 	}
 	if e.last.Execution == executionOffline {
+		return true
+	}
+	var lastSummary cycleSummary
+	if json.Unmarshal([]byte(e.last.Summary), &lastSummary) == nil && lastSummary.RecoveredBy != "" {
+		// A debugger-recovered cycle proves execution but its sandbox
+		// telemetry is not a clean detection baseline.
 		return true
 	}
 	var body string
@@ -1857,98 +1641,6 @@ func (e *evolver) verifyEnabled() bool {
 	return e.cfg.Verify != nil
 }
 
-func (e *evolver) allowToolHook(toolName string) hook.Result {
-	switch toolName {
-	case "SourceList", "SourceRead", "SourceSearch", "TelemetryQuery",
-		"InspectFeedback", "Payloads", "ComparePayloads", "DetectionCycle", "EditSource",
-		"BuildShellcode", "RevertToPayload", "KnowledgeSearch", "KnowledgeRead",
-		"KnowledgeStats", "KnowledgeList":
-		return hook.Result{}
-	case "GenerateAgent":
-		if e.cfg.BuildAgent != nil {
-			return hook.Result{}
-		}
-	case "AgentStatus", "RunModule", "CleanupAgent":
-		if e.verifyEnabled() {
-			return hook.Result{}
-		}
-	}
-	return hook.Result{Decision: "block", Message: "tool is not part of the detection loop"}
-}
-
-func (e *evolver) hooks() *hook.Registry {
-	hooks := hook.NewRegistry().On(hook.PreToolUse, func(_ context.Context, event hook.Event) hook.Result {
-		decision := e.allowToolHook(event.ToolName)
-		if decision.Decision == "block" {
-			e.logClass(logging.ClassWarning, "tool %s blocked: %s", event.ToolName, decision.Message)
-			return decision
-		}
-		e.toolGate.Lock()
-		defer e.toolGate.Unlock()
-		if e.deadlineHit.Load() {
-			e.logClass(logging.ClassWarning, "tool %s blocked: the session deadline expired", event.ToolName)
-			return hook.Result{
-				Decision: "block",
-				Message:  "the session deadline expired; the loop will retry in a new session",
-			}
-		}
-		e.lastToolCall.Store(time.Now().UnixNano())
-		e.activeTools.Add(1)
-		return decision
-	})
-	hooks.On(hook.PostToolUse, func(_ context.Context, event hook.Event) hook.Result {
-		e.lastToolCall.Store(time.Now().UnixNano())
-		e.toolCalls.Add(1)
-		for {
-			active := e.activeTools.Load()
-			if active <= 0 || e.activeTools.CompareAndSwap(active, active-1) {
-				break
-			}
-		}
-		status := "ok"
-		if event.IsError {
-			status = "error"
-		}
-		preview := clip(sanitizeLine(string(event.Result)), 300)
-		if preview == "" {
-			preview = "(no output)"
-		}
-		class := logging.ClassToolResult
-		if event.IsError {
-			class = logging.ClassError
-		}
-		e.logClass(class, "%s %s: %s", event.ToolName, status, preview)
-		return hook.Result{}
-	})
-	return hooks
-}
-
-func (e *evolver) tools() []tool.CoreTool {
-	tools := []tool.CoreTool{
-		moduleListTool(e.roots),
-		moduleReadTool(e.roots),
-		moduleSearchTool(e.roots),
-		analystTelemetryTool(e.db),
-		e.detectionCycleTool(),
-		e.inspectFeedbackTool(),
-		e.payloadsTool(),
-		e.comparePayloadsTool(),
-		e.editSourceTool(),
-		e.buildShellcodeTool(),
-		e.revertPayloadTool(),
-	}
-	if e.cfg.BuildAgent != nil {
-		tools = append(tools, e.generateAgentTool())
-	}
-	if e.verifyEnabled() {
-		tools = append(tools, e.agentStatusTool(), e.runModuleTool(), e.cleanupAgentTool())
-	}
-	if e.knowledge != nil {
-		tools = append(tools, e.knowledgeSearchTool(), e.knowledgeReadTool(), e.knowledgeStatsTool(), e.knowledgeListTool())
-	}
-	return tools
-}
-
 func (e *evolver) detectionCycleTool() tool.CoreTool {
 	return tool.Build(tool.Spec{
 		Name: "DetectionCycle",
@@ -1980,6 +1672,9 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 			return permission.Allowed()
 		},
 		Run: func(ctx context.Context, raw json.RawMessage, _ *tool.ToolContext) (tool.Result, error) {
+			if e.sessionCycles.Load() >= 1 {
+				return tool.Errorf("one DetectionCycle per plan; return your result and let the planner choose the next hypothesis"), nil
+			}
 			var args struct {
 				Mechanism  string `json:"mechanism"`
 				Note       string `json:"note"`
@@ -2003,6 +1698,7 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 			if err != nil {
 				return tool.Errorf(fmt.Sprintf("%v", err)), nil
 			}
+			e.sessionCycles.Add(1)
 			edits, _ := e.db.EditsForPayload(ctx, cycle.PayloadKey)
 			payload, _ := e.db.PayloadByKey(ctx, cycle.PayloadKey)
 			var summary any
@@ -2494,199 +2190,6 @@ func feedbackSummary(feedback Feedback, runID, payloadKey string, edits []EditRe
 
 // BuildFeedbackFromCycle is a small adapter for logging; the full feedback is
 // read from SQLite when the model asks for it.
-const evolveSystemPrompt = `You are an autonomous detection engineer for the emp3r0r loader.
-
-The host has already built and detonated a baseline. Your job is to remove real
-detections by editing module source, rebuilding, and re-testing.
-
-Data policy:
-- SQLite is the source of truth. Full feedback, build logs, and per-payload
-  telemetry stay there. Never ask for them as raw blobs.
-- Each payload has its own SQLite view named payload_<hash>. The payloads table
-  maps artifact SHA-256, parent payload, view name, score, and verdict count.
-- Use InspectFeedback for a bounded summary, Payloads to see build history,
-  ComparePayloads to see what your edit changed, and TelemetryQuery for SQL.
-- Use only the read-only SQL tool; it accepts one SELECT or WITH statement.
-- The findings table holds the deterministic telemetry findings for a trace;
-  the events table holds every raw event. Query trace_pk-scoped events or the
-  per-payload view.
-- The sandbox result bundle contains file info, static YARA/CheckPlz/Stringnalyzer, dynamic
-  RedEdr/Moneta/pe-sieve/HollowsHunter/HSB/Patriot/Blender/YARA/CheckPlz,
-  HolyGrail, and every EDR profile. Analyzer output is a type='analysis' event
-  with the analyzer JSON in attrs; its finding rule is analyzer/<analyzer>.
-  Query the findings table and these events together.
-- Attribution columns matter: actor_pid performed the operation, pid is the
-  subject, target_pid is the target or child, payload_role says whether the
-  event belongs to the payload, a child, the payload as a target, a Defender
-  scan, or ambient traffic. signal is
-  signal/verdict/scan/info/unattributed/baseline/noise. unattributed means the
-  capture could not identify the payload process, but the operation itself is
-  high-value; treat it as evidence, not as noise.
-- Categories include process, image, file, network, audit, thread, defender,
-  query, module, hook, memory (ETW-TI), and analysis. ETW-TI rows carry
-  operation, protection, size, bytes, status, and stack. Hook rows carry the
-  intercepted Nt* API. Ambient MsMpEng events are stored but are not payload
-  actions. Unattributed ETW-TI memory operations are also emitted as
-  low-severity telemetry/unattributed-etwti findings; inspect their protection,
-  size, and pid sequence before dismissing them.
-
-Work loop:
-1. Inspect the baseline and identify a real defender verdict or a high/medium
-   telemetry finding that maps to module source. Use the findings table first,
-   then the payload view for the events behind a finding. Check RedEdr and the
-   type='analysis' analyzers before deciding a finding is resolved.
-2. Before choosing a mechanism or editing source, consult the knowledge base
-   as described under "Knowledge base" below: classify the finding, search with
-   the mechanism plus the exact detector/API name, read the best document, and
-   put the document_ref and the prediction it supports in the edit reason and
-   the cycle note. A missing cache or a no-hit search is a valid result: state
-   it and continue with telemetry and source evidence.
-   Read the relevant source and trace the detection to its cause. Prefer a
-   minimal, grounded EditSource call when that removes the detection. A design
-   change is allowed and expected when the current design is what the sandbox
-   detects: add, remove, split, merge, or replace source files and components,
-   restructure data flow, change the loading or call path, and rewrite the
-   implementation. Do not preserve a detected design just because it already
-   exists, and do not settle for renaming, reordering, or hiding the same
-   behavior. Update every default that controls the behavior, not a dead copy.
-   Use multiple EditSource calls when a redesign needs them. Source tools take
-   module=<name> to read a read-only dependency or a producer module.
-3. The shellcode producer is part of the design. You may edit the configured
-   producer modules (donut, crystal_pack) through EditSource with
-   module=<producer>, then call BuildShellcode to regenerate the shellcode. The
-   result replaces the shellcode every later cycle loads. Producer options are
-   validated against the module's config.json; the output path is chosen by the
-   host. A producer change is the right move when the signal is a signature or
-   layout in the generated blob; a loader-only edit cannot remove it. The
-   active producer is recorded in the prompt and dossier: crystal_pack PICO
-   uses the runtime loader in postex-loader/src, while donut rebuilds
-   src/loader and src/donut.c.
-   GenerateAgent rebuilds the Go agent itself with agent_type
-   windows_executable or windows_dll. Its artifact_path can be passed as the
-   dll option to BuildShellcode producer=crystal_pack; crystal_pack uses the
-   installed Java runtime and writes PICO shellcode. Switching from a donut EXE
-   agent to a crystal_pack DLL agent is a design change, not a replacement of
-   the agent payload: the new artifact is a freshly built agent with the same
-   configuration. Changing the agent type or producer must still execute the
-   agent: do not shrink the active shellcode or build a loader that skips the
-   payload. The host rejects a cycle whose artifact is too small to contain the
-   active shellcode.
-  4. Every dynamic cycle needs a fresh agent identity and shellcode. The C2 pins
-   the first public key per agent UUID (TOFU); re-running a payload whose UUID
-   already checked in is rejected as a key rotation. The host enforces this
-   before a cycle that would reuse the active shellcode or UUID: it builds a
-   new agent, wraps it with the active producer, forgets the previous UUID, and
-   deletes the old files. Call GenerateAgent and then BuildShellcode when you
-   want to choose the agent type, wrapper, or producer options yourself; never
-   reuse a shellcode that a previous cycle already ran. Static analyses may
-   reuse a payload, but a dynamic run must not.
-5. Call DetectionCycle with the mechanism under test. It rebuilds from the
-   current source and returns a bounded summary, the new payload key, the active
-   shellcode, and the remaining cycle budget. Do not exceed the budget. An
-   operator may append instructions while the loop runs; they arrive as
-   operator_prompts in this result or at the start of the next model session.
-   Treat them as high-priority instructions without violating the loop's safety
-   rules.
-6. The host checks the generated agent after every dynamic cycle and records
-   execution=verified when it checks in, offline when it does not, and
-   unverified when verification is not configured. Do not spend model turns
-   polling; read the execution field. A cycle with execution=offline is not a
-   comparable detection result: the host restores the last executing source and
-   shellcode, and you must fix why the agent never checked in before changing
-   detection code. If no payload has ever checked in, stop and return the final
-   JSON with the execution failure. The host still runs one final whoami
-   verification after the loop stops. AgentStatus and RunModule remain scoped to
-   this loop's UUID and cannot target another agent. If the agent never checks
-   in, check the C2 address reachability and the generated agent or producer
-   before changing loader detection code.
-7. ComparePayloads the previous and new payloads. A cycle with a coverage gap
-   (failed analyzer, early termination, missing telemetry) is not comparable;
-   do not treat it as clean or as an improvement.
-8. A finding is actionable only when it has a source location or is a real
-   Defender verdict. Findings without a source location are residuals: report
-   them with evidence and do not repeat a hypothesis that already failed. If a
-   cycle regresses, call RevertToPayload with the best earlier payload before
-   trying the next hypothesis.
-9. Do not edit tests, generated artifacts, or read-only roots. Do not remove
-   externally required functionality or invalidate config.json, the documented
-   flags, opsec metadata, or the build entrypoint; the host rejects edits that
-   remove a documented module, option, or declared choice. Internal APIs, file
-   layout, and component boundaries may change. Do not stop at the first lower
-   score: the sandbox risk score is noisy and saturates.
-
-Time discipline: the host stops a session that completes no cycle within the
-cycle deadline and requires an edit and a DetectionCycle retry. Decide from the
-evidence you have. Do not defer a mechanism you have already chosen: write the
-edit and run the cycle.
-
-Direction discipline:
-- Name the mechanism before editing: self-load, remote APC/thread, section
-  mapping, module stomping/overloading, PE-image loading, a producer swap, or
-  static hygiene. DetectionCycle records the mechanism with the cycle.
-- A cycle that only changes imports, strings, section names, encoding, or
-  packing is static hygiene, not a new loading path. Label it as such.
-- If the last two cycles used the same mechanism and did not remove a real
-  verdict or a high telemetry finding, test a different mechanism, or record
-  the concrete constraint that makes every alternative infeasible. Module
-  stomping needs an image with enough executable slack for the payload; if the
-  payload cannot fit, state that and choose section mapping, PE-image loading,
-  or a producer change instead.
-
-Knowledge base:
-- KnowledgeSearch, KnowledgeRead, KnowledgeStats, and KnowledgeList read the
-  trusted offline security reference cache. Use it as guidance, but it is not
-  evidence about this payload: source and telemetry win when they disagree.
-- KnowledgeStats shows per-notebook document counts and content coverage;
-  KnowledgeList lists references; KnowledgeSearch deduplicates hits by URL.
-- Consult it once per mechanism, before the first EditSource or DetectionCycle
-  for that mechanism:
-  1. Classify the finding by the surface it comes from: on-disk static
-     signature, in-memory scan, or behavioral telemetry.
-  2. Search two or three concrete tokens: the mechanism plus the exact
-     detector, API, event, or analyzer from the finding. For example
-     "module stomping pe-sieve", "indirect syscall ETW-TI", "AMSI
-     AmsiScanBuffer", "Crystal Palace PICO", "call stack spoofing". Do not
-     paste a sentence.
-  3. Read the top hit's summary. If it names the detector or API you are
-     fighting, read the content pages you need with next_offset and stop when
-     the mechanism and its telemetry footprint are clear. Content is cached only
-     when the operator synced it with --content; if it is missing,
-     KnowledgeRead returns the summary with fallback=true.
-  4. Discard hits about a different problem. A document is not support for an
-     edit just because it shares a word with the finding.
-- DetectionCycle attaches a few top hits for new high/medium findings and
-  records their kb= references in the cycle summary. Use those instead of
-  searching the same finding again.
-- Notebook focus: maldev (loaders, injection, shellcode, syscalls, call stacks,
-  sleep obfuscation), edrdev (EDR internals, ETW/ETW-TI, kernel callbacks,
-  drivers, hooks), redteam (C2, BOF, persistence), amsi (AMSI and user-mode ETW
-  bypass, CLR/.NET), staticanalysis (PE format, obfuscation, signatures),
-  vulndrivers (BYOVD, EDR killers), crystalstardust (Crystal Palace/PICO),
-  com (COM/DCOM/RPC), lsass (credential dumping), defender (Defender/AV
-  internals), mynotebook (reference essays). Filter with notebook only when the
-  surface is ambiguous; KnowledgeSearch already deduplicates URLs, so cite the
-  returned document_ref and do not repeat the same source.
-- The overview 'maldev/blog.deeb.ch_posts_how-edr-works' frames the three
-  surfaces as "bubbles of bane": hiding a loader from a signature scan, a
-  memory scan, or behavioral telemetry usually moves the detection to another
-  surface or adds telemetry. Search "bubbles of bane" to find it; read it once
-  when the baseline has findings in more than one surface. Do not treat the
-  disappearance of one verdict as success when ComparePayloads shows new
-  telemetry in another surface.
-- Turn what you read into one falsifiable prediction per cycle and put it in
-  the DetectionCycle prediction field: the analyzer, event, or verdict that
-  should change and in which direction. Verify it from the cycle feedback. If
-  the prediction fails, say so and change the hypothesis instead of re-reading
-  the same document.
-
-Stop when no actionable high/medium finding remains and every residual is
-explained with evidence, or when the cycle budget is exhausted. The host runs
-final payload verification and restarts the loop if the agent does not come
-online; report the last cycle honestly. Return one JSON object:
-{"summary":"what changed and why","mechanism":"the loading path or producer under test","verdicts_before":["..."],"verdicts_after":["..."],"edits":[{"module":"...","file":"...","reason":"..."}],"residual":["..."],"cycles":<number>}
-
-The host will store your answer. Be concise.`
-
 // loggingProvider forwards Norma's normalized stream events unchanged while
 // writing model text, thinking, and tool calls to the loop log. agentcore.Run
 // itself returns only the final assistant text, so without this wrapper the log

@@ -36,15 +36,25 @@ func TestEvolveAgentEditsBuildsAndComparesPayloads(t *testing.T) {
 		return fmt.Sprintf("[+] generated payload: %s (10 bytes)\n", path), nil
 	}
 	server, dynamicCalls := fakeEvolveSandbox(t)
-	provider := &scriptedToolProvider{turns: []llm.Message{
-		toolUseMessage("edit-1", "EditSource", map[string]any{
-			"file": "bootstrap.c", "old_string": "OLD", "new_string": "NEW",
-			"reason": "remove the detected default",
-		}),
-		toolUseMessage("cycle-2", "DetectionCycle", map[string]any{"note": "after edit"}),
-		{Role: llm.RoleAssistant, Content: []llm.ContentBlock{
-			llm.TextBlock(`{"summary":"edited","verdicts_before":["Behavior:Win32/Test.A"],"verdicts_after":[],"edits":[{"file":"bootstrap.c","reason":"default"}],"residual":[],"cycles":2}`),
-		}},
+	provider := &roleScriptProvider{scripts: map[string][]llm.Message{
+		"planner": {
+			{Role: llm.RoleAssistant, Content: []llm.ContentBlock{
+				llm.TextBlock(`{"action":"test","mechanism":"self-load","prediction":"the defender behavior disappears","editor_brief":"remove the detected default from bootstrap.c","reason":"the baseline has a real verdict"}`),
+			}},
+			{Role: llm.RoleAssistant, Content: []llm.ContentBlock{
+				llm.TextBlock(`{"action":"stop","reason":"done","final":{"summary":"edited","verdicts_before":["Behavior:Win32/Test.A"],"verdicts_after":[],"edits":[{"file":"bootstrap.c","reason":"default"}],"residual":[],"cycles":2}}`),
+			}},
+		},
+		"editor": {
+			toolUseMessage("edit-1", "EditSource", map[string]any{
+				"file": "bootstrap.c", "old_string": "OLD", "new_string": "NEW",
+				"reason": "remove the detected default",
+			}),
+			toolUseMessage("cycle-2", "DetectionCycle", map[string]any{"note": "after edit"}),
+			{Role: llm.RoleAssistant, Content: []llm.ContentBlock{
+				llm.TextBlock(`{"summary":"edited","edits":[{"file":"bootstrap.c","reason":"default"}]}`),
+			}},
+		},
 	}}
 	storeRoot := t.TempDir()
 	shellcode := filepath.Join(t.TempDir(), "agent.bin")
@@ -96,11 +106,6 @@ func TestEvolveAgentEditsBuildsAndComparesPayloads(t *testing.T) {
 	_ = data
 }
 
-type scriptedToolProvider struct {
-	turns []llm.Message
-	index atomic.Int32
-}
-
 func toolUseMessage(id, name string, input map[string]any) llm.Message {
 	raw, _ := json.Marshal(input)
 	return llm.Message{Role: llm.RoleAssistant, Content: []llm.ContentBlock{{
@@ -108,43 +113,85 @@ func toolUseMessage(id, name string, input map[string]any) llm.Message {
 	}}}
 }
 
-func (p *scriptedToolProvider) Stream(_ context.Context, _ llm.CompletionRequest) iter.Seq2[llm.StreamEvent, error] {
-	return func(yield func(llm.StreamEvent, error) bool) {
-		n := int(p.index.Add(1)) - 1
-		if n >= len(p.turns) {
-			n = len(p.turns) - 1
-		}
-		message := p.turns[n]
-		if !yield(llm.StreamEvent{Type: llm.SEMessageStart}, nil) {
-			return
-		}
-		stop := "end_turn"
-		for _, block := range message.Content {
-			if block.Type == llm.BlockToolUse {
-				stop = "tool_use"
-				if !yield(llm.StreamEvent{Type: llm.SEToolUseStart, ToolID: block.ID, ToolName: block.Name}, nil) {
-					return
-				}
-				if !yield(llm.StreamEvent{Type: llm.SEToolInputJSON, Text: string(block.Input)}, nil) {
-					return
-				}
-				continue
-			}
-			if block.Type == llm.BlockText {
-				if !yield(llm.StreamEvent{Type: llm.SETextDelta, Text: block.Text}, nil) {
-					return
-				}
-			}
-		}
-		if !yield(llm.StreamEvent{Type: llm.SEMessageDelta, StopReason: stop}, nil) {
-			return
-		}
-		yield(llm.StreamEvent{Type: llm.SEMessageStop}, nil)
+// roleScriptProvider selects a script by worker system prompt, so a test can
+// drive the planner, editor, and debugger independently.
+type roleScriptProvider struct {
+	mu      sync.Mutex
+	scripts map[string][]llm.Message
+	index   map[string]int
+}
+
+func workerRole(req llm.CompletionRequest) string {
+	system := strings.Join(req.System, "\n")
+	switch {
+	case strings.Contains(system, "planner and coordinator"):
+		return "planner"
+	case strings.Contains(system, "editor (evasion) worker"):
+		return "editor"
+	case strings.Contains(system, "debugger worker"):
+		return "debugger"
+	default:
+		return "editor"
 	}
 }
 
-func (p *scriptedToolProvider) Complete(context.Context, llm.CompletionRequest) (llm.Message, string, llm.Usage, error) {
+func (p *roleScriptProvider) next(req llm.CompletionRequest) llm.Message {
+	role := workerRole(req)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.index == nil {
+		p.index = make(map[string]int)
+	}
+	turns := p.scripts[role]
+	if len(turns) == 0 {
+		return llm.Message{}
+	}
+	n := p.index[role]
+	p.index[role]++
+	if n >= len(turns) {
+		n = len(turns) - 1
+	}
+	return turns[n]
+}
+
+func (p *roleScriptProvider) Stream(_ context.Context, req llm.CompletionRequest) iter.Seq2[llm.StreamEvent, error] {
+	return func(yield func(llm.StreamEvent, error) bool) {
+		emitScriptedMessage(yield, p.next(req))
+	}
+}
+
+func (p *roleScriptProvider) Complete(context.Context, llm.CompletionRequest) (llm.Message, string, llm.Usage, error) {
 	return llm.Message{}, "", llm.Usage{}, nil
+}
+
+// emitScriptedMessage turns one assistant message into the event stream the
+// harness expects.
+func emitScriptedMessage(yield func(llm.StreamEvent, error) bool, message llm.Message) {
+	if !yield(llm.StreamEvent{Type: llm.SEMessageStart}, nil) {
+		return
+	}
+	stop := "end_turn"
+	for _, block := range message.Content {
+		if block.Type == llm.BlockToolUse {
+			stop = "tool_use"
+			if !yield(llm.StreamEvent{Type: llm.SEToolUseStart, ToolID: block.ID, ToolName: block.Name}, nil) {
+				return
+			}
+			if !yield(llm.StreamEvent{Type: llm.SEToolInputJSON, Text: string(block.Input)}, nil) {
+				return
+			}
+			continue
+		}
+		if block.Type == llm.BlockText {
+			if !yield(llm.StreamEvent{Type: llm.SETextDelta, Text: block.Text}, nil) {
+				return
+			}
+		}
+	}
+	if !yield(llm.StreamEvent{Type: llm.SEMessageDelta, StopReason: stop}, nil) {
+		return
+	}
+	yield(llm.StreamEvent{Type: llm.SEMessageStop}, nil)
 }
 
 func fakeEvolveSandbox(t *testing.T) (*httptest.Server, *atomic.Int32) {
@@ -742,7 +789,7 @@ func TestActionRequiredKeepsAnalysisToolsAvailable(t *testing.T) {
 	e.actionRequired.Store(true)
 	for _, name := range []string{
 		"TelemetryQuery", "InspectFeedback", "Payloads", "ComparePayloads",
-		"KnowledgeSearch", "SourceRead", "EditSource", "DetectionCycle",
+		"SourceRead", "EditSource", "DetectionCycle",
 	} {
 		if decision := e.allowToolHook(name); decision.Decision == "block" {
 			t.Fatalf("%s was blocked while a cycle retry is required", name)

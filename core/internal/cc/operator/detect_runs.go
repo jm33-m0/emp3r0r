@@ -305,6 +305,12 @@ func runDetectLoop(run *detectRun, opts detectLoopOptions, shellcode string) {
 		run.setError(fmt.Errorf("producer paths: %w", err))
 		return
 	}
+	guest, err := opts.guestConfig()
+	if err != nil {
+		run.setError(fmt.Errorf("guest SSH: %w", err))
+		logging.Errorf("detect_loop: %v", err)
+		return
+	}
 
 	logf := func(format string, args ...any) {
 		if run.logger != nil {
@@ -353,6 +359,9 @@ func runDetectLoop(run *detectRun, opts detectLoopOptions, shellcode string) {
 			ReadRoots: currentOpts.ReadRoots, KnowledgePath: currentOpts.Knowledge,
 			ExpectedAgentUUID: currentOpts.AgentUUID,
 			Iterations:        currentOpts.Iterations, Turns: currentOpts.Turns,
+			PlannerTurns: currentOpts.PlannerTurns, EditorTurns: currentOpts.EditorTurns,
+			DebuggerTurns: currentOpts.DebuggerTurns, DebuggerTimeout: currentOpts.DebuggerTimeout,
+			WorkerModels: currentOpts.WorkerModels, Guest: guest,
 			CycleTimeout:    currentOpts.CycleTimeout,
 			SessionTimeout:  currentOpts.SessionTimeout,
 			ToolIdleTimeout: currentOpts.ToolIdleTimeout,
