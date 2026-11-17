@@ -1,5 +1,22 @@
 # Changelog
 
+## [5.10.0](https://github.com/jm33-m0/emp3r0r/compare/v5.9.1...v5.10.0) (2026-11-17)
+
+
+### Features
+
+* **evasion:** add git version control ([9038dc2](https://github.com/jm33-m0/emp3r0r/commit/9038dc29c6d1c40663d20c9077ca80c893484236))
+* **evasion:** initial implementation of subagents in the loop ([f56fb15](https://github.com/jm33-m0/emp3r0r/commit/f56fb15aaddde374cebcbe109502c0f2d1bacca3))
+
+
+### Bug Fixes
+
+* **evasion:** add time budget for planner ([6622868](https://github.com/jm33-m0/emp3r0r/commit/662286855488b76c6b10a58a9c11515f4f88ab96))
+* **evasion:** bound editor's analysis and reset it after a cycle ([9b6b849](https://github.com/jm33-m0/emp3r0r/commit/9b6b8497467c28c3f3be275f7dcc86ce22d1eed4))
+* **evasion:** inspect feedback can end the worker session ([fe71094](https://github.com/jm33-m0/emp3r0r/commit/fe710944bd8aa2666da96ded7d4f75e15634d8d1))
+* **evasion:** remove nonsense guardrails for debugger agent ([a791c42](https://github.com/jm33-m0/emp3r0r/commit/a791c42b9923db05317874195425c07552ffda5f))
+* **evasion:** run debugger agent whenever beacon fails ([55fb2b2](https://github.com/jm33-m0/emp3r0r/commit/55fb2b28e4d179d8beb7f7265c9652a7dccbeefa))
+
 ## [5.9.1](https://github.com/jm33-m0/emp3r0r/compare/v5.9.0...v5.9.1) (2026-11-16)
 
 
