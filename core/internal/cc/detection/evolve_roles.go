@@ -90,6 +90,9 @@ func (e *evolver) toolsFor(role evolveRole) []tool.CoreTool {
 	if e.knowledge != nil {
 		tools = append(tools, e.knowledgeSearchTool(), e.knowledgeReadTool(), e.knowledgeStatsTool(), e.knowledgeListTool())
 	}
+	if e.git != nil {
+		tools = append(tools, e.gitHistoryTool())
+	}
 	switch role {
 	case rolePlanner:
 		if e.verifyEnabled() {

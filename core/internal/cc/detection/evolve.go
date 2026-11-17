@@ -76,6 +76,9 @@ type EvolveConfig struct {
 	InitialShellcodeGenerated bool
 	SandboxURL                string
 	StoreRoot                 string
+	// Git records every writable source root in a shadow repository under the
+	// detection store. Callers enable it explicitly; the console and MCP do.
+	Git bool
 	// Process is passed to the loader build when non-empty. Leave it empty to
 	// let the module's own default control the sacrificial process, so a source
 	// edit to that default changes the next build.
@@ -266,6 +269,8 @@ type evolver struct {
 	lastAgent       atomic.Value
 	// guest is the debugger's sandbox surface. Nil when SSH is not configured.
 	guest GuestRunner
+	// git records source commits in shadow repositories. Nil when disabled.
+	git *gitRecorder
 	// sessionCycles counts completed DetectionCycle calls in the current
 	// editor session; one plan produces one detonation.
 	sessionCycles atomic.Int32
@@ -504,6 +509,16 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 	}
 	e.operatorPrompts = cfg.Prompts
 	e.roots = e.sourceRoots()
+	if cfg.Git {
+		recorder, gitErr := newGitRecorder(cfg.StoreRoot, e.baseLoopID, e.roots, e.logf)
+		if gitErr != nil {
+			return nil, gitErr
+		}
+		if initErr := recorder.Init(ctx); initErr != nil {
+			return nil, fmt.Errorf("git init: %w", initErr)
+		}
+		e.git = recorder
+	}
 	e.sourceTreeHash = e.computeSourceTreeHash()
 	if e.attempt > 1 || e.baseLoopID != cfg.LoopID {
 		if err := e.loadAttemptState(ctx); err != nil {
@@ -604,6 +619,14 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 	}
 	if coord.lastDiagnosis != nil {
 		answer["debugger_diagnosis"] = coord.lastDiagnosis
+	}
+	if e.git != nil {
+		if commits, gitErr := e.git.CommitAll(ctx, "final"); gitErr != nil {
+			e.logClass(logging.ClassWarning, "git final commit: %v", gitErr)
+		} else {
+			answer["git_heads"] = commits
+			answer["git_dir"] = e.git.baseDir
+		}
 	}
 	if answer == nil {
 		answer = map[string]any{
@@ -867,9 +890,10 @@ type cycleSummary struct {
 	KBRefs           []string        `json:"kb_refs,omitempty"`
 	// RecoveredBy, DebuggerCause, and GuestActions record a debugger-assisted
 	// execution recovery without changing the cycle's detection data.
-	RecoveredBy   string   `json:"recovered_by,omitempty"`
-	DebuggerCause string   `json:"debugger_cause,omitempty"`
-	GuestActions  []string `json:"guest_actions,omitempty"`
+	RecoveredBy   string            `json:"recovered_by,omitempty"`
+	DebuggerCause string            `json:"debugger_cause,omitempty"`
+	GuestActions  []string          `json:"guest_actions,omitempty"`
+	GitCommits    map[string]string `json:"git_commits,omitempty"`
 }
 
 func ensurePayloadPreserved(shellcode string, artifact Artifact) error {
@@ -936,6 +960,15 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 		}
 	}
 
+	var gitCommits map[string]string
+	if e.git != nil {
+		commits, gitErr := e.git.CommitAll(cycleCtx, fmt.Sprintf("cycle %d: %s", iteration, mechanism))
+		if gitErr != nil {
+			e.logClass(logging.ClassWarning, "git commit: %v", gitErr)
+		} else {
+			gitCommits = commits
+		}
+	}
 	shellcode := e.activeShellcode()
 	flags := map[string]string{
 		"shellcode": shellcode,
@@ -1050,6 +1083,7 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 	summary.Stages = stageNames(e.cfg.Stages)
 	summary.Observed = observedFindings(feedback)
 	summary.PredictionResult = evaluatePrediction(prediction, feedback)
+	summary.GitCommits = gitCommits
 	e.cyclesDone.Store(int64(e.globalUsed + iteration))
 	e.lastExecution.Store(summary.Execution)
 	e.lastAgent.Store(e.expectedAgentUUID)

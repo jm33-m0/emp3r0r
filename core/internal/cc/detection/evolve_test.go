@@ -668,6 +668,8 @@ func TestRenderLoopReport(t *testing.T) {
 		"verdicts_before": []any{"Behavior:Win32/Test.A"},
 		"verdicts_after":  []any{},
 		"residual":        []any{".rdata entropy is inherent"},
+		"git_dir":         "/tmp/git/loop-test",
+		"git_heads":       map[string]string{"loader_windows": "0123456789abcdef0123456789abcdef01234567"},
 	}
 	cycles := []Cycle{{
 		LoopID: "loop-test", Iteration: 1, PayloadID: 1,
@@ -682,6 +684,7 @@ func TestRenderLoopReport(t *testing.T) {
 		"# Detection loop `loop-test`", "## Outcome", "removed the verdict",
 		"## Achieved objectives", "build.sh", "switch the default process",
 		"## Cycles", "payload_abcdef0123456789", "## Residual findings",
+		"## Source history", "loader_windows",
 	} {
 		if !strings.Contains(report, want) {
 			t.Fatalf("report missing %q:\n%s", want, report)

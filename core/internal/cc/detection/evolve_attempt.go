@@ -138,32 +138,12 @@ func (e *evolver) computeSourceTreeHash() string {
 		if !ok {
 			continue
 		}
-		_ = filepath.WalkDir(root.Dir, func(path string, entry fs.DirEntry, walkErr error) error {
-			if walkErr != nil {
-				return nil
-			}
-			rel, err := filepath.Rel(root.Dir, path)
-			if err != nil {
-				return nil
-			}
-			if entry.IsDir() {
-				if rel != "." && skipSourceDir(entry.Name()) {
-					return fs.SkipDir
-				}
-				return nil
-			}
-			if !entry.Type().IsRegular() || !sourceTreeFile(entry.Name()) {
-				return nil
-			}
-			info, err := entry.Info()
-			if err != nil || info.Size() > 2<<20 {
-				return nil
-			}
+		_ = walkSourceFiles(root.Dir, func(rel, path string) error {
 			data, err := os.ReadFile(path)
 			if err != nil {
 				return nil
 			}
-			fmt.Fprintf(h, "%s/%s\x00", name, filepath.ToSlash(rel))
+			fmt.Fprintf(h, "%s/%s\x00", name, rel)
 			_, _ = h.Write(data)
 			_, _ = h.Write([]byte{0})
 			wrote = true
@@ -174,6 +154,35 @@ func (e *evolver) computeSourceTreeHash() string {
 		return ""
 	}
 	return "sha256:" + hex.EncodeToString(h.Sum(nil))
+}
+
+// walkSourceFiles visits source-like regular files under dir. The source hash
+// and the git recorder share this filter, so the committed tree and the
+// no-op guard always describe the same files.
+func walkSourceFiles(dir string, visit func(rel, path string) error) error {
+	return filepath.WalkDir(dir, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return nil
+		}
+		rel, err := filepath.Rel(dir, path)
+		if err != nil {
+			return nil
+		}
+		if entry.IsDir() {
+			if rel != "." && skipSourceDir(entry.Name()) {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if !entry.Type().IsRegular() || !sourceTreeFile(entry.Name()) {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil || info.Size() > 2<<20 {
+			return nil
+		}
+		return visit(filepath.ToSlash(rel), path)
+	})
 }
 
 func skipSourceDir(name string) bool {

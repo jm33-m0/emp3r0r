@@ -84,6 +84,9 @@ C:\\LitterBox\\emp-debug), and may launch an uploaded artifact, read logs and
 dumps, and test C2 reachability. It cannot edit module source, and every other
 Defender, firewall, ASR, RedEdr, or analyzer change is refused.
 
+The loop records source history in a shadow go-git repository under the
+detection store; no git binary is required. Pass --git=false to disable it.
+
 The workers can edit module and producer source, and the build scripts and
 generators they edit run on this host with operator privileges. Treat the loop
 as a code-execution feature controlled by an untrusted model, not as a
@@ -150,6 +153,7 @@ func addDetectLoopFlags(cmd *cobra.Command) {
 	cmd.Flags().String("guest-ssh-fingerprint", "", "Pin the guest host key as SHA256:...")
 	cmd.Flags().Bool("guest-ssh-insecure", false, "Disable guest host-key verification (not recommended)")
 	cmd.Flags().Duration("guest-ssh-timeout", 60*time.Second, "Guest command timeout")
+	cmd.Flags().Bool("git", true, "Record source edits in a shadow git repository under the detection store")
 	cmd.Flags().Duration("timeout", 0, "Loop deadline; 0 means no deadline")
 	cmd.Flags().Duration("cycle-timeout", 60*time.Minute, "Deadline for one build, detonation, and verification cycle, and for a model session that completes no cycle; the cycle is stopped and the model must edit and retry")
 	cmd.Flags().Duration("session-timeout", 2*time.Hour, "Wall-clock deadline for one model session")
@@ -322,6 +326,7 @@ type detectLoopOptions struct {
 	ReadRoots           []string
 	Knowledge           string
 	Turns               int
+	Git                 bool
 	PlannerTurns        int
 	EditorTurns         int
 	DebuggerTurns       int
@@ -344,6 +349,14 @@ type detectLoopOptions struct {
 }
 
 func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
+	// The console loads operator.env at startup, but a long-lived console
+	// must see guest SSH values added for a new loop. The loader never
+	// overrides an existing environment variable.
+	if loaded, err := live.LoadOperatorEnv(); err != nil {
+		logging.Warningf("detect_loop: load operator env: %v", err)
+	} else if loaded > 0 {
+		logging.Infof("detect_loop: loaded %d operator env values", loaded)
+	}
 	opts := detectLoopOptions{}
 	opts.ModuleDir, _ = cmd.Flags().GetString("module-dir")
 	opts.Shellcode, _ = cmd.Flags().GetString("shellcode")
@@ -361,6 +374,7 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 	opts.ReadRoots, _ = cmd.Flags().GetStringSlice("read-root")
 	opts.Knowledge, _ = cmd.Flags().GetString("knowledge")
 	opts.Turns, _ = cmd.Flags().GetInt("turns")
+	opts.Git, _ = cmd.Flags().GetBool("git")
 	opts.PlannerTurns, _ = cmd.Flags().GetInt("planner-turns")
 	opts.EditorTurns, _ = cmd.Flags().GetInt("editor-turns")
 	opts.DebuggerTurns, _ = cmd.Flags().GetInt("debugger-turns")

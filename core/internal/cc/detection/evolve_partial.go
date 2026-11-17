@@ -17,6 +17,11 @@ func (e *evolver) persistPartial() {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	if e.git != nil {
+		if _, gitErr := e.git.CommitAll(ctx, "partial"); gitErr != nil {
+			e.logClass(logging.ClassWarning, "git partial commit: %v", gitErr)
+		}
+	}
 	answer := map[string]any{}
 	for key, value := range e.lastAnswer {
 		answer[key] = value

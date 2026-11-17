@@ -795,7 +795,7 @@ func (a *Actions) detectionLoop(ctx context.Context, raw json.RawMessage) (any, 
 		SandboxURL: a.Detection.Client.URL(), StoreRoot: a.Detection.Store.Root,
 		Process: args.Process, Format: args.Format, Inject: args.Inject, SMW: args.SMW,
 		ProducerDirs: producers, ReadRoots: readRoots,
-		Stages: args.Stages, Iterations: args.Iterations, Turns: args.Turns,
+		Stages: args.Stages, Iterations: args.Iterations, Turns: args.Turns, Git: true,
 		Logf: nil,
 		Audit: func(action, target, detail string) {
 			if a.Audit == nil {

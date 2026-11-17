@@ -148,6 +148,12 @@ The editor may make as many `EditSource` calls as the change needs; the limit is
 
 `--planner-turns`, `--editor-turns`, and `--debugger-turns` default to 24, 60, and 24; `--turns` is the fallback for all three. `--worker-model` overrides the model per worker, for example `--worker-model planner=...,editor=...`. `--debugger-timeout` bounds one debugger session.
 
+### Source history
+
+`--git` (default on) records every writable source root in a shadow repository under `<store>/git/<loop>/<root>/`. It uses the pure-Go go-git library, so no git binary, hooks, or user configuration is involved; the module's own checkout and the operator's repository are never modified. The loop commits the baseline, one commit per cycle before the build (source edits only; generated files and build outputs are excluded), and a final or partial commit when it stops. Commit messages name the cycle and mechanism, each cycle summary carries `git_commits`, and the final answer carries `git_heads` and `git_dir`.
+
+`GitHistory` returns commit messages and changed-file stats to the workers. `--git=false` disables the record.
+
 ### Guest debugging
 
 The debugger worker is enabled only when the operator supplies the sandbox guest's SSH endpoint and key:

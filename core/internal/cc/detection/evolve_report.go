@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -54,6 +55,8 @@ func RenderLoopSummary(answer map[string]any, cycles []Cycle, edits []EditRecord
 			fmt.Fprintf(&b, "- `%s`: %s\n", sanitizeLine(editPath(edit)), clipUTF8(sanitizeLine(edit.Reason), 180))
 		}
 	}
+
+	renderGitHistory(&b, answer)
 
 	residual := answerStrings(answer, "residual")
 	if len(residual) > 0 {
@@ -124,6 +127,8 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 	}
 	b.WriteString("\n")
 
+	renderGitHistory(&b, answer)
+
 	fmt.Fprintf(&b, "## Cycles\n\n")
 	if len(cycles) == 0 {
 		fmt.Fprintf(&b, "No cycle completed.\n\n")
@@ -168,6 +173,8 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 			fmt.Fprintf(&b, "### `%s`\n\n%s\n\n", sanitizeLine(editPath(edit)), sanitizeMultiline(edit.Reason))
 		}
 	}
+
+	renderGitHistory(&b, answer)
 
 	residual := answerStrings(answer, "residual")
 	if len(residual) > 0 {
@@ -299,4 +306,40 @@ func editPath(edit EditRecord) string {
 		return edit.File
 	}
 	return edit.Module + "/" + edit.File
+}
+
+// renderGitHistory adds the shadow-repository record when versioning ran.
+func renderGitHistory(b *strings.Builder, answer map[string]any) {
+	dir := answerString(answer, "git_dir")
+	if dir == "" {
+		return
+	}
+	fmt.Fprintf(b, "## Source history\n\n")
+	fmt.Fprintf(b, "Shadow repository: `%s`\n\n", sanitizeLine(dir))
+	heads := make(map[string]string)
+	switch value := answer["git_heads"].(type) {
+	case map[string]string:
+		for name, commit := range value {
+			heads[name] = commit
+		}
+	case map[string]any:
+		for name, commit := range value {
+			if text, ok := commit.(string); ok {
+				heads[name] = text
+			}
+		}
+	}
+	if len(heads) == 0 {
+		fmt.Fprintf(b, "No commit was recorded.\n\n")
+		return
+	}
+	names := make([]string, 0, len(heads))
+	for name := range heads {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		fmt.Fprintf(b, "- `%s`: `%s`\n", sanitizeLine(name), sanitizeLine(heads[name]))
+	}
+	b.WriteString("\n")
 }
