@@ -2,6 +2,7 @@ package detection
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -52,11 +53,23 @@ func (e *evolver) cleanupGeneratedFile(path string) {
 }
 
 // cleanupShellcode removes a superseded shellcode unless the operator supplied
-// it explicitly.
+// it explicitly or it belongs to the last payload that executed. That shellcode
+// is the execution gate's restore target.
 func (e *evolver) cleanupShellcode(path string) {
 	path = strings.TrimSpace(path)
 	if path == "" || path == strings.TrimSpace(e.shellcode) {
 		return
+	}
+	if path == strings.TrimSpace(e.preservedShellcode) {
+		return
+	}
+	if e.lastExecuting != nil {
+		var summary cycleSummary
+		if json.Unmarshal([]byte(e.lastExecuting.Summary), &summary) == nil &&
+			strings.TrimSpace(summary.Shellcode) == path {
+			e.preservedShellcode = path
+			return
+		}
 	}
 	if path == strings.TrimSpace(e.cfg.Shellcode) && !e.initialShellcodeGenerated {
 		return
