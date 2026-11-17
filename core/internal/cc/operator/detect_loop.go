@@ -143,11 +143,14 @@ func addDetectLoopFlags(cmd *cobra.Command) {
 	cmd.Flags().String("knowledge", "", "Knowledge cache path; defaults to <detection store>/knowledge.db")
 	cmd.Flags().Int("turns", 60, "Default per-worker turn cap; overridden by the role flags")
 	cmd.Flags().Int("planner-turns", 24, "Maximum planner turns per session")
-	cmd.Flags().Duration("planner-timeout", 5*time.Minute, "Hard decision window for one planner call; the planner is forced to answer when it expires")
-	cmd.Flags().Duration("editor-timeout", 10*time.Minute, "Decision window for one editor session; the editor is forced to apply an edit and run a cycle")
+	cmd.Flags().Duration("planner-timeout", 10*time.Minute, "Hard decision window for one planner decision; the planner is forced to return its JSON plan when it expires")
+	cmd.Flags().Int("planner-read-budget", 12, "Read-only calls before the planner must return a plan; negative disables the cap")
+	cmd.Flags().Int("editor-read-budget", 12, "Read-only calls without an edit before the editor loses read tools; negative disables the cap")
+	cmd.Flags().Int("debugger-tool-budget", 0, "Total tool calls per debugger pass; 0 means no cap (turn and time limits still apply)")
+	cmd.Flags().Duration("editor-timeout", 15*time.Minute, "Decision window for one editor session; the editor is forced to apply the edit and call DetectionCycle when it expires")
 	cmd.Flags().Int("editor-turns", 60, "Maximum editor turns per session")
 	cmd.Flags().Int("debugger-turns", 24, "Maximum debugger turns per session")
-	cmd.Flags().Duration("debugger-timeout", 10*time.Minute, "Wall-clock limit for one debugger session")
+	cmd.Flags().Duration("debugger-timeout", 15*time.Minute, "Wall-clock limit for one debugger pass")
 	cmd.Flags().StringToString("worker-model", nil, "Per-worker model override, for example planner=...,editor=...,debugger=...")
 	cmd.Flags().String("guest-ssh", "", "Sandbox guest SSH endpoint as user@host:port; enables the debugger worker (env EMP3R0R_DETECTION_GUEST_SSH)")
 	cmd.Flags().String("guest-ssh-key", "", "Sandbox-only SSH private key (env EMP3R0R_DETECTION_GUEST_SSH_KEY)")
@@ -332,6 +335,9 @@ type detectLoopOptions struct {
 	Git                 bool
 	PlannerTurns        int
 	PlannerTimeout      time.Duration
+	PlannerReadBudget   int
+	EditorReadBudget    int
+	DebuggerToolBudget  int
 	EditorTimeout       time.Duration
 	EditorTurns         int
 	DebuggerTurns       int
@@ -382,6 +388,9 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 	opts.Git, _ = cmd.Flags().GetBool("git")
 	opts.PlannerTurns, _ = cmd.Flags().GetInt("planner-turns")
 	opts.PlannerTimeout, _ = cmd.Flags().GetDuration("planner-timeout")
+	opts.PlannerReadBudget, _ = cmd.Flags().GetInt("planner-read-budget")
+	opts.EditorReadBudget, _ = cmd.Flags().GetInt("editor-read-budget")
+	opts.DebuggerToolBudget, _ = cmd.Flags().GetInt("debugger-tool-budget")
 	opts.EditorTimeout, _ = cmd.Flags().GetDuration("editor-timeout")
 	opts.EditorTurns, _ = cmd.Flags().GetInt("editor-turns")
 	opts.DebuggerTurns, _ = cmd.Flags().GetInt("debugger-turns")

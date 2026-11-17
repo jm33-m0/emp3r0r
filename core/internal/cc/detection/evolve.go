@@ -130,6 +130,15 @@ type EvolveConfig struct {
 	EditorTimeout time.Duration
 	EditorTurns   int
 	DebuggerTurns int
+	// PlannerReadBudget and EditorReadBudget bound the read-only calls before
+	// the worker must act. Zero uses the built-in default (12); a negative
+	// value disables the cap. Mutation, build, and detonation tools are never
+	// blocked by these budgets.
+	PlannerReadBudget int
+	EditorReadBudget  int
+	// DebuggerToolBudget bounds the total calls in one debugger pass. Zero
+	// means no total cap; the turn and time limits still apply.
+	DebuggerToolBudget int
 	// DebuggerTimeout bounds one debugger session. Zero uses the cycle timeout.
 	DebuggerTimeout time.Duration
 	// WorkerModels overrides the model per worker role ("planner", "editor",
@@ -900,6 +909,12 @@ func normalizeEvolveConfig(cfg *EvolveConfig) error {
 	}
 	if cfg.Turns <= 0 {
 		cfg.Turns = defaultEvolveTurns
+	}
+	if cfg.PlannerReadBudget == 0 {
+		cfg.PlannerReadBudget = plannerReadBudget
+	}
+	if cfg.EditorReadBudget == 0 {
+		cfg.EditorReadBudget = editorReadBudget
 	}
 	return nil
 }
