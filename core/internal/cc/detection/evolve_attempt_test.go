@@ -46,14 +46,12 @@ func TestLoadAttemptStateCarriesPriorAttempt(t *testing.T) {
 	}
 
 	e := &evolver{
-		cfg:              EvolveConfig{LoopID: "loop-r2", BaseLoopID: "loop", Attempt: 2, Iterations: 20, Module: "loader_windows"},
-		db:               db,
-		baseLoopID:       "loop",
-		attempt:          2,
-		testedAgentUUIDs: make(map[string]struct{}),
-		testedShellcodes: make(map[string]struct{}),
-		logf:             func(class logging.Class, format string, args ...any) {},
-		roots:            newSingleRoot(t.TempDir()),
+		cfg:        EvolveConfig{LoopID: "loop-r2", BaseLoopID: "loop", Attempt: 2, Iterations: 20, Module: "loader_windows"},
+		db:         db,
+		baseLoopID: "loop",
+		attempt:    2,
+		logf:       func(class logging.Class, format string, args ...any) {},
+		roots:      newSingleRoot(t.TempDir()),
 	}
 	if err := e.loadAttemptState(ctx); err != nil {
 		t.Fatal(err)
@@ -70,7 +68,7 @@ func TestLoadAttemptStateCarriesPriorAttempt(t *testing.T) {
 	if len(e.pendingEdits) != 1 || e.pendingEdits[0].File != "build.sh" {
 		t.Fatalf("pending edits = %+v", e.pendingEdits)
 	}
-	if _, ok := e.testedAgentUUIDs["uuid-prior"]; !ok {
+	if _, ok := e.testedAgentUUIDs.Load("uuid-prior"); !ok {
 		t.Fatal("prior expected agent UUID was not seeded")
 	}
 

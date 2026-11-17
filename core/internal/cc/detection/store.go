@@ -1,6 +1,8 @@
 package detection
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -8,7 +10,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"sync"
+	"time"
 )
 
 var safeID = regexp.MustCompile(`^[A-Za-z0-9._-]{1,160}$`)
@@ -16,10 +18,6 @@ var safeID = regexp.MustCompile(`^[A-Za-z0-9._-]{1,160}$`)
 // Store persists detection runs under one operator workspace directory.
 type Store struct {
 	Root string
-
-	// artifactMu serializes the read-modify-write of the artifact registry.
-	// Every other file is replaced atomically, so readers never need it.
-	artifactMu sync.Mutex
 }
 
 // NewStore returns a store rooted at dir.
@@ -195,34 +193,22 @@ func writeJSONAtomic(path string, value any) error {
 
 // RecordArtifact remembers one artifact produced by a module build. The MCP
 // detection tools only detonate artifacts recorded here, so a caller cannot
-// point the sandbox at an arbitrary operator file.
+// point the sandbox at an arbitrary operator file. Each artifact is an
+// immutable file, so concurrent builds need no lock around the registry.
 func (s *Store) RecordArtifact(module string, artifact Artifact) error {
 	if s.Root == "" {
 		return fmt.Errorf("detection store root is not configured")
 	}
-	s.artifactMu.Lock()
-	defer s.artifactMu.Unlock()
-	dir := filepath.Join(s.Root, "artifacts")
+	dir := filepath.Join(s.Root, "artifacts", sanitizeName(module))
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("create artifact directory: %w", err)
 	}
-	path := filepath.Join(dir, sanitizeName(module)+".json")
-	known := s.knownArtifacts(path)
-	replaced := false
-	for i, existing := range known {
-		if existing.Path == artifact.Path {
-			known[i] = artifact
-			replaced = true
-			break
-		}
+	path := filepath.Join(dir, artifactFile(artifact.Path))
+	if err := writeJSONAtomic(path, artifact); err != nil {
+		return err
 	}
-	if !replaced {
-		known = append(known, artifact)
-	}
-	if len(known) > 50 {
-		known = known[len(known)-50:]
-	}
-	return writeJSONAtomic(path, known)
+	s.pruneArtifacts(dir, 50)
+	return nil
 }
 
 // KnownArtifact returns a recorded artifact by path.
@@ -230,8 +216,15 @@ func (s *Store) KnownArtifact(module, path string) (Artifact, bool) {
 	if s.Root == "" {
 		return Artifact{}, false
 	}
-	file := filepath.Join(s.Root, "artifacts", sanitizeName(module)+".json")
-	for _, artifact := range s.knownArtifacts(file) {
+	file := filepath.Join(s.Root, "artifacts", sanitizeName(module), artifactFile(path))
+	data, err := os.ReadFile(file)
+	if err == nil {
+		var artifact Artifact
+		if json.Unmarshal(data, &artifact) == nil && artifact.Path == path {
+			return artifact, true
+		}
+	}
+	for _, artifact := range s.legacyArtifacts(module) {
 		if artifact.Path == path {
 			return artifact, true
 		}
@@ -244,15 +237,42 @@ func (s *Store) LatestArtifact(module string) (Artifact, bool) {
 	if s.Root == "" {
 		return Artifact{}, false
 	}
-	file := filepath.Join(s.Root, "artifacts", sanitizeName(module)+".json")
-	known := s.knownArtifacts(file)
+	dir := filepath.Join(s.Root, "artifacts", sanitizeName(module))
+	entries, err := os.ReadDir(dir)
+	if err == nil {
+		var newest os.FileInfo
+		var newestPath string
+		for _, entry := range entries {
+			if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+				continue
+			}
+			info, infoErr := entry.Info()
+			if infoErr != nil {
+				continue
+			}
+			if newest == nil || info.ModTime().After(newest.ModTime()) {
+				newest, newestPath = info, filepath.Join(dir, entry.Name())
+			}
+		}
+		if newestPath != "" {
+			data, readErr := os.ReadFile(newestPath)
+			if readErr == nil {
+				var artifact Artifact
+				if json.Unmarshal(data, &artifact) == nil {
+					return artifact, true
+				}
+			}
+		}
+	}
+	known := s.legacyArtifacts(module)
 	if len(known) == 0 {
 		return Artifact{}, false
 	}
 	return known[len(known)-1], true
 }
 
-func (s *Store) knownArtifacts(path string) []Artifact {
+func (s *Store) legacyArtifacts(module string) []Artifact {
+	path := filepath.Join(s.Root, "artifacts", sanitizeName(module)+".json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil
@@ -262,4 +282,35 @@ func (s *Store) knownArtifacts(path string) []Artifact {
 		return nil
 	}
 	return artifacts
+}
+
+func artifactFile(path string) string {
+	sum := sha256.Sum256([]byte(path))
+	return hex.EncodeToString(sum[:]) + ".json"
+}
+
+func (s *Store) pruneArtifacts(dir string, limit int) {
+	entries, err := os.ReadDir(dir)
+	if err != nil || len(entries) <= limit {
+		return
+	}
+	type artifactEntry struct {
+		path string
+		mod  time.Time
+	}
+	items := make([]artifactEntry, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+			continue
+		}
+		info, infoErr := entry.Info()
+		if infoErr != nil {
+			continue
+		}
+		items = append(items, artifactEntry{path: filepath.Join(dir, entry.Name()), mod: info.ModTime()})
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].mod.After(items[j].mod) })
+	for _, item := range items[limit:] {
+		_ = os.Remove(item.path)
+	}
 }

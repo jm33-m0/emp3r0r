@@ -787,34 +787,83 @@ func lastLogLines(log string, n int) string {
 	return strings.Join(lines, "\n")
 }
 
-// loopLogger serializes progress and class-tagged lines into one log file or
-// stdout stream.
+// loopLogger serializes progress and class-tagged lines through one writer
+// goroutine. Callers never hold a lock while the log file is written.
 type loopLogger struct {
-	mu sync.Mutex
-	w  io.Writer
+	w         io.Writer
+	entries   chan logEntry
+	stop      chan struct{}
+	done      chan struct{}
+	closeOnce sync.Once
 }
 
-func newLoopLogger(w io.Writer) *loopLogger { return &loopLogger{w: w} }
+type logEntry struct {
+	class    logging.Class
+	progress bool
+	format   string
+	args     []any
+}
+
+func newLoopLogger(w io.Writer) *loopLogger {
+	logger := &loopLogger{
+		w: w, entries: make(chan logEntry, 256),
+		stop: make(chan struct{}), done: make(chan struct{}),
+	}
+	go logger.run()
+	return logger
+}
+
+func (l *loopLogger) run() {
+	defer close(l.done)
+	for {
+		select {
+		case entry := <-l.entries:
+			l.write(entry)
+		case <-l.stop:
+			for {
+				select {
+				case entry := <-l.entries:
+					l.write(entry)
+				default:
+					return
+				}
+			}
+		}
+	}
+}
+
+func (l *loopLogger) write(entry logEntry) {
+	if entry.progress {
+		line := sanitize.SanitizeText(fmt.Sprintf(entry.format, entry.args...))
+		fmt.Fprintf(l.w, "%s %s\n", time.Now().Format("15:04:05"), line)
+		return
+	}
+	logging.ClassfToPlain(l.w, entry.class, entry.format, entry.args...)
+}
 
 func (l *loopLogger) close() {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if closer, ok := l.w.(io.Closer); ok {
-		_ = closer.Close()
+	l.closeOnce.Do(func() {
+		close(l.stop)
+		<-l.done
+		if closer, ok := l.w.(io.Closer); ok {
+			_ = closer.Close()
+		}
+	})
+}
+
+func (l *loopLogger) enqueue(entry logEntry) {
+	select {
+	case l.entries <- entry:
+	case <-l.stop:
 	}
 }
 
 func (l *loopLogger) printf(format string, args ...any) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	line := sanitize.SanitizeText(fmt.Sprintf(format, args...))
-	fmt.Fprintf(l.w, "%s %s\n", time.Now().Format("15:04:05"), line)
+	l.enqueue(logEntry{progress: true, format: format, args: args})
 }
 
 func (l *loopLogger) logf(class logging.Class, format string, args ...any) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	logging.ClassfToPlain(l.w, class, format, args...)
+	l.enqueue(logEntry{class: class, format: format, args: args})
 }
 
 // forgetLoopAgent drops the prior test identity so a restart never reuses a

@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/detection"
@@ -27,13 +28,17 @@ type detectRun struct {
 	logger  *loopLogger
 	done    chan struct{}
 
-	mu        sync.Mutex
-	current   string
-	attempt   int
-	stopped   bool
-	verified  bool
-	err       error
+	current   atomic.Value // string
+	attempt   atomic.Int32
+	stopped   atomic.Bool
+	verified  atomic.Bool
+	err       atomic.Pointer[runError]
 	finishOne sync.Once
+}
+
+// runError boxes an error so the atomic pointer has one concrete type.
+type runError struct {
+	err error
 }
 
 type detectRunInfo struct {
@@ -48,50 +53,47 @@ type detectRunInfo struct {
 	Error         string    `json:"error,omitempty"`
 }
 
-var (
-	detectRunMu sync.Mutex
-	detectRuns  = map[string]*detectRun{}
-)
+var detectRuns sync.Map
 
 func registerDetectRun(id string, prompts *detection.OperatorPromptQueue, logPath string, logger *loopLogger) (*detectRun, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	run := &detectRun{
 		id: id, ctx: ctx, cancel: cancel, prompts: prompts,
 		started: time.Now().UTC(), logPath: logPath, logger: logger,
-		current: id, attempt: 1, done: make(chan struct{}),
+		done: make(chan struct{}),
 	}
-	detectRunMu.Lock()
-	defer detectRunMu.Unlock()
-	if _, exists := detectRuns[id]; exists {
+	run.current.Store(id)
+	run.attempt.Store(1)
+	if _, loaded := detectRuns.LoadOrStore(id, run); loaded {
 		cancel()
 		return nil, fmt.Errorf("loop %s is already registered", id)
 	}
-	detectRuns[id] = run
 	return run, nil
 }
 
 func findDetectRun(id string) *detectRun {
 	id = strings.TrimSpace(id)
-	detectRunMu.Lock()
-	defer detectRunMu.Unlock()
-	if run, ok := detectRuns[id]; ok {
-		return run
+	if run, ok := detectRuns.Load(id); ok {
+		return run.(*detectRun)
 	}
-	for _, run := range detectRuns {
+	var found *detectRun
+	detectRuns.Range(func(_, value any) bool {
+		run := value.(*detectRun)
 		if run.currentLoopID() == id {
-			return run
+			found = run
+			return false
 		}
-	}
-	return nil
+		return true
+	})
+	return found
 }
 
 func listDetectRuns() []*detectRun {
-	detectRunMu.Lock()
-	runs := make([]*detectRun, 0, len(detectRuns))
-	for _, run := range detectRuns {
-		runs = append(runs, run)
-	}
-	detectRunMu.Unlock()
+	var runs []*detectRun
+	detectRuns.Range(func(_, value any) bool {
+		runs = append(runs, value.(*detectRun))
+		return true
+	})
 	sort.Slice(runs, func(i, j int) bool {
 		return runs[i].started.Before(runs[j].started)
 	})
@@ -99,43 +101,37 @@ func listDetectRuns() []*detectRun {
 }
 
 func resetDetectRunsForTest() {
-	detectRunMu.Lock()
-	detectRuns = map[string]*detectRun{}
-	detectRunMu.Unlock()
+	detectRuns.Range(func(key, _ any) bool {
+		detectRuns.Delete(key)
+		return true
+	})
 }
 
 func (r *detectRun) currentLoopID() string {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.current
+	current, _ := r.current.Load().(string)
+	return current
 }
 
 func (r *detectRun) setCurrent(current string, attempt int) {
-	r.mu.Lock()
-	r.current = current
-	r.attempt = attempt
-	r.mu.Unlock()
+	r.current.Store(current)
+	r.attempt.Store(int32(attempt))
 }
 
 func (r *detectRun) setResult(result *detection.EvolveResult) {
 	if result == nil {
 		return
 	}
-	r.mu.Lock()
-	r.verified = result.PayloadVerified
+	r.verified.Store(result.PayloadVerified)
 	if result.LoopID != "" {
-		r.current = result.LoopID
+		r.current.Store(result.LoopID)
 	}
-	r.mu.Unlock()
 }
 
 func (r *detectRun) setError(err error) {
 	if err == nil {
 		return
 	}
-	r.mu.Lock()
-	r.err = err
-	r.mu.Unlock()
+	r.err.Store(&runError{err: err})
 }
 
 func (r *detectRun) isDone() bool {
@@ -149,12 +145,12 @@ func (r *detectRun) isDone() bool {
 
 // requestStop cancels the run once. It reports whether this call stopped it.
 func (r *detectRun) requestStop() bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	if r.isDone() {
 		return false
 	}
-	r.stopped = true
+	if !r.stopped.CompareAndSwap(false, true) {
+		return false
+	}
 	r.cancel()
 	return true
 }
@@ -168,21 +164,21 @@ func (r *detectRun) finish() {
 	})
 }
 
-func (r *detectRun) statusLocked() string {
+func (r *detectRun) status() string {
 	select {
 	case <-r.done:
 		switch {
-		case r.err != nil && !r.stopped:
+		case r.err.Load() != nil && !r.stopped.Load():
 			return "failed"
-		case r.verified:
+		case r.verified.Load():
 			return "verified"
-		case r.stopped:
+		case r.stopped.Load():
 			return "stopped"
 		default:
 			return "done"
 		}
 	default:
-		if r.stopped {
+		if r.stopped.Load() {
 			return "stopping"
 		}
 		return "running"
@@ -190,18 +186,16 @@ func (r *detectRun) statusLocked() string {
 }
 
 func (r *detectRun) info() detectRunInfo {
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	info := detectRunInfo{
-		LoopID: r.id, CurrentLoopID: r.current, Attempt: r.attempt,
-		Status: r.statusLocked(), StartedAt: r.started, LogPath: r.logPath,
-		Verified: r.verified,
+		LoopID: r.id, CurrentLoopID: r.currentLoopID(), Attempt: int(r.attempt.Load()),
+		Status: r.status(), StartedAt: r.started, LogPath: r.logPath,
+		Verified: r.verified.Load(),
 	}
 	if r.prompts != nil {
 		info.Prompts = r.prompts.Len()
 	}
-	if r.err != nil {
-		info.Error = r.err.Error()
+	if failure := r.err.Load(); failure != nil {
+		info.Error = failure.err.Error()
 	}
 	return info
 }
@@ -276,10 +270,7 @@ func appendDetectRunPrompt(id, text string) (detectRunInfo, error) {
 	if run == nil {
 		return detectRunInfo{}, fmt.Errorf("loop %q is not running", id)
 	}
-	run.mu.Lock()
-	done := run.isDone()
-	run.mu.Unlock()
-	if done {
+	if run.isDone() {
 		return run.info(), fmt.Errorf("loop %q has finished", id)
 	}
 	if run.prompts == nil {

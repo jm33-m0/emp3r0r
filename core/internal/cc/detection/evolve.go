@@ -242,15 +242,17 @@ type evolver struct {
 	initialShellcodeGenerated bool
 	activeProducer            string
 	expectedAgentUUID         string
-	testedAgentUUIDs          map[string]struct{}
-	testedShellcodes          map[string]struct{}
-	shellSeq                  int
-	knowledge                 *KnowledgeDB
-	lastAnswer                map[string]any
-	baselineFailure           string
-	operatorPrompts           *OperatorPromptQueue
-	lastExecuting             *Cycle
-	executionBlocked          bool
+	// testedAgentUUIDs and testedShellcodes are sets shared with tool
+	// goroutines; sync.Map publishes immutable membership.
+	testedAgentUUIDs sync.Map
+	testedShellcodes sync.Map
+	shellSeq         int
+	knowledge        *KnowledgeDB
+	lastAnswer       map[string]any
+	baselineFailure  string
+	operatorPrompts  *OperatorPromptQueue
+	lastExecuting    *Cycle
+	executionBlocked atomic.Bool
 	// executionCheckTimeout overrides PayloadVerifyTimeout in tests.
 	executionCheckTimeout time.Duration
 
@@ -271,15 +273,16 @@ type evolver struct {
 	deadlineHit     atomic.Bool
 	// toolGate closes the race between a deadline cancelling a session and a
 	// tool starting in that same session.
-	toolGate        sync.Mutex
-	knowledgeSeen   map[string]struct{}
-	started         time.Time
-	cyclesDone      atomic.Int64
-	toolCalls       atomic.Int64
-	sessions        atomic.Int64
-	agentSeenOnline atomic.Bool
-	lastExecution   atomic.Value
-	lastAgent       atomic.Value
+	toolGate          sync.Mutex
+	knowledgeSeen     sync.Map
+	knowledgeSeenOnce sync.Once
+	started           time.Time
+	cyclesDone        atomic.Int64
+	toolCalls         atomic.Int64
+	sessions          atomic.Int64
+	agentSeenOnline   atomic.Bool
+	lastExecution     atomic.Value
+	lastAgent         atomic.Value
 	// guest is the debugger's sandbox surface. Nil when SSH is not configured.
 	guest GuestRunner
 	// git records source commits in shadow repositories. Nil when disabled.
@@ -287,6 +290,39 @@ type evolver struct {
 	// sessionCycles counts completed DetectionCycle calls in the current
 	// editor session; one plan produces one detonation.
 	sessionCycles atomic.Int32
+	// sessionCancel stops the active worker session. DetectionCycle closes it
+	// as soon as the cycle finishes so the coordinator can route an offline
+	// cycle to the debugger instead of letting the editor keep theorizing.
+	sessionCancel atomic.Pointer[sessionCanceller]
+	sessionDone   atomic.Bool
+}
+
+// sessionCanceller publishes one immutable cancel function for the active
+// session. The pointer is swapped, never mutated.
+type sessionCanceller struct {
+	cancel context.CancelFunc
+}
+
+// setSessionCancel records the cancel function for the active session and
+// clears any stop left by a previous session.
+func (e *evolver) setSessionCancel(cancel context.CancelFunc) {
+	e.sessionCancel.Store(&sessionCanceller{cancel: cancel})
+	e.sessionDone.Store(false)
+}
+
+// stopSessionAfterCycle ends the editor session as soon as its one allowed
+// cycle has completed. The coordinator then runs the execution gate and the
+// guest debugger before any more source analysis.
+func (e *evolver) stopSessionAfterCycle() {
+	e.sessionDone.Store(true)
+	if canceller := e.sessionCancel.Load(); canceller != nil {
+		canceller.cancel()
+	}
+}
+
+// sessionStopped reports whether a completed cycle closed the current session.
+func (e *evolver) sessionStopped() bool {
+	return e.sessionDone.Load()
 }
 
 func (e *evolver) dynamicEnabled() bool {
@@ -494,8 +530,6 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 		initialShellcodeGenerated: cfg.InitialShellcodeGenerated,
 		activeProducer:            strings.ToLower(strings.TrimSpace(cfg.InitialProducer)),
 		expectedAgentUUID:         strings.TrimSpace(cfg.ExpectedAgentUUID),
-		testedAgentUUIDs:          make(map[string]struct{}),
-		testedShellcodes:          make(map[string]struct{}),
 	}
 	if e.logf == nil {
 		e.logf = func(logging.Class, string, ...any) {}
@@ -593,7 +627,7 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 	executionState := "the host checks the generated agent after every dynamic cycle with AgentStatus and records execution=verified, offline, or unverified"
 	if e.baselineFailure != "" {
 		executionState = "the baseline did not complete; diagnose the failure and fix it before another cycle"
-	} else if e.executionBlocked {
+	} else if e.executionBlocked.Load() {
 		executionState = "the baseline payload did not check in and no executing baseline exists; do not run more cycles; return the final JSON with the execution failure"
 	} else if e.lastExecuting != nil {
 		payload := shortPayloadKey(e.lastExecuting.PayloadKey)
@@ -1335,7 +1369,7 @@ func (e *evolver) recordExecution(cycle *Cycle, summary cycleSummary) executionG
 		return gateUnchanged
 	case executionOffline:
 		if e.lastExecuting == nil {
-			e.executionBlocked = true
+			e.executionBlocked.Store(true)
 			e.logClass(logging.ClassError, "cycle %d did not execute and no executing baseline exists; stopping further detection cycles", cycle.Iteration)
 			return gateBlocked
 		}
@@ -1364,7 +1398,7 @@ func (e *evolver) applyExecutionGate(ctx context.Context, cycle *Cycle, summary 
 func (e *evolver) restoreExecutingState(ctx context.Context) {
 	baseline := e.lastExecuting
 	if baseline == nil {
-		e.executionBlocked = true
+		e.executionBlocked.Store(true)
 		return
 	}
 	if _, err := e.revertCycleEdits(ctx, e.lastPayloadID(), baseline.PayloadKey); err != nil {
@@ -1435,7 +1469,7 @@ func (e *evolver) executionHint() string {
 		return "Baseline failure: " + e.baselineFailure +
 			". Diagnose it before another cycle; a failed attempt does not consume the cycle budget."
 	}
-	if e.executionBlocked {
+	if e.executionBlocked.Load() {
 		return "Execution gate: no dynamic payload has checked in. Do not run more cycles; return the final JSON with the execution failure."
 	}
 	if e.last != nil && e.last.Execution == executionOffline && e.lastExecuting != nil {
@@ -1603,7 +1637,7 @@ func (e *evolver) takeOperatorPrompts() []string {
 }
 
 func (e *evolver) needsMoreWork(ctx context.Context) bool {
-	if e.executionBlocked {
+	if e.executionBlocked.Load() {
 		return false
 	}
 	if e.last == nil {
@@ -1734,7 +1768,7 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 				Prediction string `json:"prediction"`
 			}
 			_ = json.Unmarshal(raw, &args)
-			if e.executionBlocked {
+			if e.executionBlocked.Load() {
 				return tool.Errorf("payload execution is blocked: no dynamic payload has checked in and no executing baseline exists; return the final JSON with the execution failure"), nil
 			}
 			if e.usedCycles() >= e.cfg.Iterations {
@@ -1762,7 +1796,7 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 				message = "the payload executed and its agent checked in; full feedback and build log are in SQLite"
 			case executionOffline:
 				if e.lastExecuting != nil {
-					message = "the payload did not execute; the host restored the last executing source and shellcode. Fix agent check-in before changing detection code."
+					message = "the payload did not execute; the debugger will inspect the guest before the host restores the last executing source and shellcode. Fix agent check-in before changing detection code."
 				} else {
 					message = "the payload did not execute and no executing baseline exists; return the final JSON with the execution failure."
 				}
@@ -1783,6 +1817,7 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 				out["operator_prompts"] = prompts
 			}
 			data, _ := json.Marshal(out)
+			e.stopSessionAfterCycle()
 			return tool.Text(string(data)), nil
 		},
 	})
@@ -1823,6 +1858,7 @@ func (e *evolver) inspectFeedbackTool() tool.CoreTool {
 			edits, _ := e.db.EditsForPayload(ctx, payloadKey)
 			out := feedbackSummary(feedback, runID, payloadKey, edits)
 			data, _ := json.Marshal(out)
+			e.stopSessionAfterCycle()
 			return tool.Text(string(data)), nil
 		},
 	})

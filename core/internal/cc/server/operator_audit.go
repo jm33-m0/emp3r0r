@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -16,9 +15,6 @@ import (
 // operatorAuditFileName is the server-side audit log, kept next to the
 // operator config in the workspace.
 const operatorAuditFileName = "operator_audit.log"
-
-// auditMu serializes appends so concurrent operators never interleave a line.
-var auditMu sync.Mutex
 
 // operatorAuditPath returns the audit log path for the current workspace.
 func operatorAuditPath() string {
@@ -47,8 +43,6 @@ func auditOperatorAction(operatorID, action, target, detail string) {
 	}
 	line := strings.Join(fields, " ") + "\n"
 
-	auditMu.Lock()
-	defer auditMu.Unlock()
 	f, err := os.OpenFile(operatorAuditPath(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		logging.Warningf("operator audit: open %s: %v", operatorAuditPath(), err)

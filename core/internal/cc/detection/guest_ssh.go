@@ -14,7 +14,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"time"
 	"unicode/utf16"
 	"unicode/utf8"
@@ -142,8 +142,7 @@ type GuestRunner interface {
 type guestSSH struct {
 	cfg GuestSSHConfig
 
-	mu   sync.Mutex
-	conn *ssh.Client
+	conn atomic.Pointer[ssh.Client]
 }
 
 func newGuestSSH(cfg GuestSSHConfig, storeRoot string) (*guestSSH, error) {
@@ -154,10 +153,7 @@ func newGuestSSH(cfg GuestSSHConfig, storeRoot string) (*guestSSH, error) {
 }
 
 func (g *guestSSH) Close() error {
-	g.mu.Lock()
-	conn := g.conn
-	g.conn = nil
-	g.mu.Unlock()
+	conn := g.conn.Swap(nil)
 	if conn == nil {
 		return nil
 	}
@@ -166,23 +162,16 @@ func (g *guestSSH) Close() error {
 
 // dropConn forgets a broken connection so the next call reconnects.
 func (g *guestSSH) dropConn() {
-	g.mu.Lock()
-	conn := g.conn
-	g.conn = nil
-	g.mu.Unlock()
-	if conn != nil {
+	if conn := g.conn.Swap(nil); conn != nil {
 		_ = conn.Close()
 	}
 }
 
-// client reconnects lazily. The connection is published under the mutex, but
-// dialing, the handshake (which includes host-key file I/O), and closing run
-// outside it.
+// client reconnects lazily. The connection is published atomically, so
+// dialing, the handshake (which includes host-key file I/O), and closing never
+// hold a lock.
 func (g *guestSSH) client(ctx context.Context) (*ssh.Client, error) {
-	g.mu.Lock()
-	existing := g.conn
-	g.mu.Unlock()
-	if existing != nil {
+	if existing := g.conn.Load(); existing != nil {
 		return existing, nil
 	}
 	key, err := os.ReadFile(g.cfg.KeyPath)
@@ -212,14 +201,13 @@ func (g *guestSSH) client(ctx context.Context) (*ssh.Client, error) {
 		return nil, fmt.Errorf("guest SSH handshake: %w", err)
 	}
 	client := ssh.NewClient(clientConn, chans, reqs)
-	g.mu.Lock()
-	if g.conn == nil {
-		g.conn = client
+	if g.conn.CompareAndSwap(nil, client) {
+		return client, nil
 	}
-	current := g.conn
-	g.mu.Unlock()
-	if current != client {
-		_ = client.Close()
+	current := g.conn.Load()
+	_ = client.Close()
+	if current == nil {
+		return nil, fmt.Errorf("guest SSH connection closed during handshake")
 	}
 	return current, nil
 }

@@ -5,17 +5,12 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/jm33-m0/emp3r0r/core/internal/live"
 )
 
 func TestAuditDetectionActionWritesOperatorAuditLog(t *testing.T) {
-	old := live.EmpWorkSpace
-	live.EmpWorkSpace = t.TempDir()
-	t.Cleanup(func() { live.EmpWorkSpace = old })
-
-	auditDetectionAction("run_module_denied", "uuid-1", "module=shell\n\x1b]0;x\x07")
-	data, err := os.ReadFile(filepath.Join(live.EmpWorkSpace, operatorAuditFileName))
+	path := filepath.Join(t.TempDir(), operatorAuditFileName)
+	auditDetectionActionAt(path, "run_module_denied", "uuid-1", "module=shell\n\x1b]0;x\x07")
+	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}

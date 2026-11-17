@@ -12,6 +12,7 @@ func TestLoopLoggerTagsEveryClassLine(t *testing.T) {
 	var out bytes.Buffer
 	logger := newLoopLogger(&out)
 	logger.logf(logging.ClassCycle, "cycle %d\nsecond line", 3)
+	logger.close()
 	lines := strings.Split(strings.TrimSpace(out.String()), "\n")
 	if len(lines) != 2 {
 		t.Fatalf("lines = %q, want two", out.String())
@@ -30,6 +31,7 @@ func TestLoopLoggerSanitizesProgressLines(t *testing.T) {
 	var out bytes.Buffer
 	logger := newLoopLogger(&out)
 	logger.printf("sandbox said %s", "\x1b]0;pwn\x07\nvisible")
+	logger.close()
 	if strings.Contains(out.String(), "\x1b]0;") || strings.Contains(out.String(), "\x07") {
 		t.Fatalf("progress line kept a terminal escape: %q", out.String())
 	}
@@ -43,6 +45,7 @@ func TestLoopLoggerWritesPlainClassLines(t *testing.T) {
 	logger := newLoopLogger(&out)
 	logger.logf(logging.ClassCycle, "cycle %d", 3)
 	logger.logf(logging.ClassModel, "## Heading\n\n- one")
+	logger.close()
 	if strings.Contains(out.String(), "\x1b[") {
 		t.Fatalf("on-disk logger kept ANSI: %q", out.String())
 	}

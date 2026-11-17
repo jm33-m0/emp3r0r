@@ -20,8 +20,7 @@ func (e *evolver) attachKnowledge(ctx context.Context, summary *cycleSummary, fe
 	if e.knowledge == nil || summary == nil {
 		return
 	}
-	if e.knowledgeSeen == nil {
-		e.knowledgeSeen = map[string]struct{}{}
+	e.knowledgeSeenOnce.Do(func() {
 		for _, cycle := range e.recentCycles(0) {
 			var prior cycleSummary
 			if json.Unmarshal([]byte(cycle.Summary), &prior) != nil {
@@ -32,10 +31,10 @@ func (e *evolver) attachKnowledge(ctx context.Context, summary *cycleSummary, fe
 				if len(fields) != 3 {
 					continue
 				}
-				e.knowledgeSeen[knowledgeFindingKey(fields[1], fields[2])] = struct{}{}
+				e.knowledgeSeen.Store(knowledgeFindingKey(fields[1], fields[2]), struct{}{})
 			}
 		}
-	}
+	})
 	seenURL := map[string]struct{}{}
 	for _, finding := range feedback.Findings {
 		if finding.Severity != "high" && finding.Severity != "medium" {
@@ -45,10 +44,10 @@ func (e *evolver) attachKnowledge(ctx context.Context, summary *cycleSummary, fe
 			continue
 		}
 		key := knowledgeFindingKey(finding.Rule, finding.Indicator)
-		if _, ok := e.knowledgeSeen[key]; ok {
+		if _, ok := e.knowledgeSeen.Load(key); ok {
 			continue
 		}
-		e.knowledgeSeen[key] = struct{}{}
+		e.knowledgeSeen.Store(key, struct{}{})
 		query := strings.TrimSpace(finding.Rule + " " + finding.Indicator)
 		hits, err := e.knowledge.Search(ctx, query, "", maxFindingKnowledgeHits+1)
 		if err != nil {

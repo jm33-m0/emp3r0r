@@ -144,7 +144,7 @@ The loop runs three independent Norma sessions, each with its own system prompt,
 | editor | Applies every source/producer edit a change needs, rebuilds the agent or shellcode, then runs exactly one `DetectionCycle`. | `GuestSSH`, `AgentStatus`, `RunModule` |
 | debugger | Inspects the guest over SSH when a payload did not execute or its agent did not check in. Files a source-level brief when the cause is in the module. | `EditSource`, `DetectionCycle`, `BuildShellcode`, `RevertToPayload` |
 
-The editor may make as many `EditSource` calls as the change needs; the limit is one detonation per plan. The planner re-plans after every completed cycle, so each hypothesis has its own mechanism and prediction. Worker prompts and outputs are stored in `loop_workers`; full feedback, builds, and telemetry stay in the existing tables.
+The editor may make as many `EditSource` calls as the change needs; the limit is one detonation per plan, and the host ends the editor session as soon as `DetectionCycle` returns. The planner re-plans after every completed cycle, so each hypothesis has its own mechanism and prediction. An offline cycle goes to the guest debugger before the editor does any further analysis; the editor then works from the debugger's diagnosis and brief. Worker prompts and outputs are stored in `loop_workers`; full feedback, builds, and telemetry stay in the existing tables.
 
 `--planner-turns`, `--editor-turns`, and `--debugger-turns` default to 24, 60, and 24; `--turns` is the fallback for all three. `--worker-model` overrides the model per worker, for example `--worker-model planner=...,editor=...`. `--debugger-timeout` bounds one debugger session.
 

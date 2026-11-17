@@ -3,7 +3,7 @@ package detection
 import (
 	"fmt"
 	"strings"
-	"sync"
+	"sync/atomic"
 
 	"github.com/jm33-m0/emp3r0r/core/lib/sanitize"
 )
@@ -15,13 +15,13 @@ const maxOperatorPromptBytes = 4 << 10
 // running. The loop drains it before each model session and includes new
 // prompts in the DetectionCycle result.
 type OperatorPromptQueue struct {
-	mu      sync.Mutex
-	prompts []string
+	prompts chan string
+	count   atomic.Int64
 }
 
 // NewOperatorPromptQueue returns an empty queue.
 func NewOperatorPromptQueue() *OperatorPromptQueue {
-	return &OperatorPromptQueue{}
+	return &OperatorPromptQueue{prompts: make(chan string, 1024)}
 }
 
 // Add validates and appends one operator instruction. It returns the number of
@@ -34,10 +34,15 @@ func (q *OperatorPromptQueue) Add(text string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	q.prompts = append(q.prompts, text)
-	return len(q.prompts), nil
+	if q.prompts == nil {
+		return 0, fmt.Errorf("operator prompt queue is not initialized")
+	}
+	select {
+	case q.prompts <- text:
+		return int(q.count.Add(1)), nil
+	default:
+		return 0, fmt.Errorf("operator prompt queue is full")
+	}
 }
 
 // Len returns the number of waiting instructions.
@@ -45,9 +50,7 @@ func (q *OperatorPromptQueue) Len() int {
 	if q == nil {
 		return 0
 	}
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	return len(q.prompts)
+	return int(q.count.Load())
 }
 
 // Drain returns and clears the waiting instructions.
@@ -55,14 +58,16 @@ func (q *OperatorPromptQueue) Drain() []string {
 	if q == nil {
 		return nil
 	}
-	q.mu.Lock()
-	defer q.mu.Unlock()
-	if len(q.prompts) == 0 {
-		return nil
+	var prompts []string
+	for {
+		select {
+		case prompt := <-q.prompts:
+			prompts = append(prompts, prompt)
+			q.count.Add(-1)
+		default:
+			return prompts
+		}
 	}
-	prompts := q.prompts
-	q.prompts = nil
-	return prompts
 }
 
 // FormatOperatorPrompts renders drained prompts for the model.

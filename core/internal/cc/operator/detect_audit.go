@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -14,9 +13,6 @@ import (
 )
 
 const operatorAuditFileName = "operator_audit.log"
-
-// detectAuditMu serializes appends from the detection loop's tool calls.
-var detectAuditMu sync.Mutex
 
 // operatorAuditPath resolves the audit log next to the operator workspace.
 // The detection loop runs in the console process, so it can fall back to the
@@ -39,7 +35,13 @@ func operatorAuditPath() string {
 // module dispatch, agent forget, and denied attempt is attributable even
 // though there is no interactive operator identity.
 func auditDetectionAction(action, target, detail string) {
-	path := operatorAuditPath()
+	auditDetectionActionAt(operatorAuditPath(), action, target, detail)
+}
+
+// auditDetectionActionAt writes one audit line at path. A single O_APPEND
+// write keeps concurrent detection actions from interleaving without holding
+// a lock across disk I/O.
+func auditDetectionActionAt(path, action, target, detail string) {
 	if path == "" {
 		logging.Warningf("detection audit: no operator workspace for action %s", action)
 		return
@@ -56,8 +58,6 @@ func auditDetectionAction(action, target, detail string) {
 	}
 	line := strings.Join(fields, " ") + "\n"
 
-	detectAuditMu.Lock()
-	defer detectAuditMu.Unlock()
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		logging.Warningf("detection audit: open %s: %v", path, err)

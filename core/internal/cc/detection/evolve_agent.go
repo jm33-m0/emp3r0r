@@ -76,10 +76,10 @@ func (e *evolver) cleanupAgentArtifact(path string) {
 // failed run still forces the next cycle to rotate the agent.
 func (e *evolver) markActiveAgentUsed() {
 	if shellcode := strings.TrimSpace(e.activeShellcode()); shellcode != "" {
-		e.testedShellcodes[shellcode] = struct{}{}
+		e.testedShellcodes.Store(shellcode, struct{}{})
 	}
 	if uuid := strings.TrimSpace(e.expectedAgentUUID); uuid != "" {
-		e.testedAgentUUIDs[uuid] = struct{}{}
+		e.testedAgentUUIDs.Store(uuid, struct{}{})
 	}
 }
 
@@ -92,8 +92,8 @@ func (e *evolver) ensureFreshAgent(ctx context.Context) error {
 	}
 	shellcode := strings.TrimSpace(e.activeShellcode())
 	uuid := strings.TrimSpace(e.expectedAgentUUID)
-	_, shellUsed := e.testedShellcodes[shellcode]
-	_, uuidUsed := e.testedAgentUUIDs[uuid]
+	_, shellUsed := e.testedShellcodes.Load(shellcode)
+	_, uuidUsed := e.testedAgentUUIDs.Load(uuid)
 	if shellcode != "" && !shellUsed && !uuidUsed {
 		return nil
 	}

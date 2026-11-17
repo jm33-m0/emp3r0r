@@ -80,6 +80,12 @@ func TestEvolveAgentEditsBuildsAndComparesPayloads(t *testing.T) {
 	if dynamicCalls.Load() != 2 {
 		t.Fatalf("dynamic calls = %d", dynamicCalls.Load())
 	}
+	provider.mu.Lock()
+	editorTurns := provider.index["editor"]
+	provider.mu.Unlock()
+	if editorTurns != 2 {
+		t.Fatalf("editor turns = %d, want 2; the session continued after DetectionCycle", editorTurns)
+	}
 	data, err := os.ReadFile(filepath.Join(moduleDir, "bootstrap.c"))
 	if err != nil {
 		t.Fatal(err)
@@ -368,7 +374,7 @@ func TestExecutionGateTracksExecutingCycles(t *testing.T) {
 
 	e.lastExecuting = nil
 	e.applyExecutionGate(ctx, &Cycle{Iteration: 4}, cycleSummary{Execution: executionOffline})
-	if !e.executionBlocked {
+	if !e.executionBlocked.Load() {
 		t.Fatal("an offline cycle without an executing baseline must block further cycles")
 	}
 }
@@ -619,9 +625,9 @@ func TestEnsureFreshAgentRotatesAndCleansOldFiles(t *testing.T) {
 		initialShellcodeGenerated: true,
 		activeProducer:            "donut",
 		expectedAgentUUID:         "old-uuid",
-		testedShellcodes:          map[string]struct{}{oldShellcode: {}},
-		testedAgentUUIDs:          map[string]struct{}{"old-uuid": {}},
 	}
+	e.testedShellcodes.Store(oldShellcode, struct{}{})
+	e.testedAgentUUIDs.Store("old-uuid", struct{}{})
 	if err := e.ensureFreshAgent(context.Background()); err != nil {
 		t.Fatal(err)
 	}

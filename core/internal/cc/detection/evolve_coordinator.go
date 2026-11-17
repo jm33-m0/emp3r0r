@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -35,7 +36,7 @@ type coordinator struct {
 	plannerNote      string
 	lastEditorError  string
 	lastDiagnosis    *debugDiagnosis
-	debugged         map[int64]bool
+	debugged         sync.Map
 	editorFailures   int
 	debuggerSessions int
 	plans            int
@@ -46,7 +47,7 @@ func newCoordinator(e *evolver, provider llm.Provider, model string, baselineJSO
 	return &coordinator{
 		e: e, provider: provider, model: model,
 		baselineJSON: baselineJSON, executionState: executionState,
-		knowledgeState: knowledgeState, debugged: make(map[int64]bool),
+		knowledgeState: knowledgeState,
 	}
 }
 
@@ -87,7 +88,7 @@ func (c *coordinator) run(ctx context.Context) (map[string]any, error) {
 			}
 			return final, nil
 		case "test":
-			if c.e.executionBlocked {
+			if c.e.executionBlocked.Load() {
 				c.plannerNote = "execution is blocked; return action=stop with the final JSON, or action=debug when the guest can explain why the payload never ran"
 				continue
 			}
@@ -187,14 +188,14 @@ func (c *coordinator) afterCycle(ctx context.Context, cycle *Cycle) error {
 		}
 		return nil
 	}
-	if cycle.ID != 0 && c.debugged[cycle.ID] {
-		if restore {
-			c.e.restoreExecutingState(ctx)
-		}
-		return nil
-	}
 	if cycle.ID != 0 {
-		c.debugged[cycle.ID] = true
+		if _, seen := c.debugged.Load(cycle.ID); seen {
+			if restore {
+				c.e.restoreExecutingState(ctx)
+			}
+			return nil
+		}
+		c.debugged.Store(cycle.ID, true)
 	}
 	diag, err := c.debug(ctx, fmt.Sprintf("execution=%s on cycle %d", headerOrNone(summary.Execution), cycle.Iteration), cycle)
 	if err != nil {
@@ -236,7 +237,7 @@ func (c *coordinator) plan(ctx context.Context) (plannerPlan, error) {
 			return plan, nil
 		}
 		c.e.logClass(logging.ClassWarning, "planner answer was not a valid plan: %v", parseErr)
-		if c.e.usedCycles() >= c.e.cfg.Iterations || c.e.executionBlocked {
+		if c.e.usedCycles() >= c.e.cfg.Iterations || c.e.executionBlocked.Load() {
 			return plannerPlan{Action: "stop", Final: c.planFailureFinal(text, parseErr)}, nil
 		}
 		if !c.e.backoff(ctx, attempt, "invalid planner answer") {
@@ -352,7 +353,7 @@ func (c *coordinator) recoverCycle(ctx context.Context, cycle *Cycle, diag debug
 	cycle.Execution = executionVerified
 	cycle.AgentOnline = &online
 	c.e.lastExecuting = cycle
-	c.e.executionBlocked = false
+	c.e.executionBlocked.Store(false)
 	c.e.actionRequired.Store(false)
 	c.e.lastExecution.Store(executionVerified)
 	for i := range c.e.cycles {
@@ -388,6 +389,7 @@ func (c *coordinator) runSession(ctx context.Context, role evolveRole, prompt st
 	for attempt := 0; ; attempt++ {
 		c.e.sessions.Add(1)
 		sessionCtx, sessionCancel := context.WithCancel(ctx)
+		c.e.setSessionCancel(sessionCancel)
 		var sessionExpired, idleExpired, cycleExpired atomic.Bool
 		c.e.deadlineHit.Store(false)
 		sessionStart = time.Now()
@@ -409,6 +411,9 @@ func (c *coordinator) runSession(ctx context.Context, role evolveRole, prompt st
 		}, prompt)
 		close(watchdogDone)
 		sessionCancel()
+		if c.e.sessionStopped() {
+			return text, nil
+		}
 		if err == nil {
 			return text, nil
 		}
@@ -446,7 +451,7 @@ func (c *coordinator) runSession(ctx context.Context, role evolveRole, prompt st
 			prompt = resume("idle")
 			continue
 		}
-		if c.e.executionBlocked && role == roleEditor {
+		if c.e.executionBlocked.Load() && role == roleEditor {
 			return text, fmt.Errorf("execution is blocked: no dynamic payload checked in and no executing baseline exists")
 		}
 		if !c.e.recover(ctx, attempt, role.label()+" session", err) {

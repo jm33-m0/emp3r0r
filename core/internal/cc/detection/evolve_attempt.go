@@ -38,7 +38,7 @@ func (e *evolver) loadAttemptState(ctx context.Context) error {
 		var summary cycleSummary
 		if json.Unmarshal([]byte(e.priorCycles[i].Summary), &summary) == nil {
 			if summary.Shellcode != "" {
-				e.testedShellcodes[summary.Shellcode] = struct{}{}
+				e.testedShellcodes.Store(summary.Shellcode, struct{}{})
 			}
 			if summary.SourceTreeHash != "" {
 				e.priorSourceHash = summary.SourceTreeHash
@@ -60,7 +60,7 @@ func (e *evolver) loadAttemptState(ctx context.Context) error {
 		} else if answer != nil {
 			e.priorAnswer = answer
 			if uuid, ok := answer["expected_agent_uuid"].(string); ok && strings.TrimSpace(uuid) != "" {
-				e.testedAgentUUIDs[uuid] = struct{}{}
+				e.testedAgentUUIDs.Store(uuid, struct{}{})
 			}
 		}
 	}

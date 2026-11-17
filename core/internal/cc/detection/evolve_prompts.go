@@ -164,13 +164,16 @@ Work loop:
    prediction_result; after two unobserved predictions for the same mechanism
    it blocks a third. Do not call DetectionCycle without a source or shellcode
    change: the host rejects no-op cycles. A second DetectionCycle in the same
-   session is rejected; return and let the planner choose another hypothesis.
+   session is rejected. The host ends your session as soon as the cycle
+   returns; do not continue analyzing after it. Let the coordinator hand an
+   offline cycle to the debugger and choose the next hypothesis.
 7. The host checks the generated agent after every dynamic cycle and records
    execution=verified, offline, or unverified. Do not spend turns polling. An
-   offline cycle is not a comparable detection result: the host debugs the guest
-   and then restores the last executing source and shellcode. If the debugger
-   says the cause is source-level, fix that cause; do not change detection code
-   for an execution failure.
+   offline cycle is not a comparable detection result: the host ends the editor
+   session, runs the guest debugger immediately, and then restores the last
+   executing source and shellcode. If the debugger says the cause is
+   source-level, fix that cause; do not change detection code for an execution
+   failure.
 8. A cycle marked recovered_by=guest-debugger proves execution, not a clean
    detection result: its sandbox telemetry may be incomplete. Continue from the
    debugger brief and plan another cycle after the execution fix.
