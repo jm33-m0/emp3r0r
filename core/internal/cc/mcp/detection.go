@@ -169,7 +169,7 @@ func (a *Actions) detectionTools() map[string]Tool {
 						"format":               StringProp("Loader host format: exe, service, or dll."),
 						"inject":               StringProp("Injection override; omit to let the module default control it."),
 						"smw":                  StringProp("on or off."),
-						"producers":            map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Shellcode producer modules as name=dir; defaults to the installed donut and crystal_pack."},
+						"producers":            map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Shellcode producer modules as name or name=dir; a bare name uses the installed module; defaults to the installed donut and crystal_pack."},
 						"read_roots":           map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Read-only source roots; defaults to the loader's shared build inputs."},
 						"turns":                IntegerProp("Maximum Norma turns per session. Default 60."),
 						"approve_execution":    BooleanProp("Allow the loop to detonate the payload and edit module source."),

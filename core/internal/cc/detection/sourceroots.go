@@ -22,10 +22,23 @@ import (
 func ParseProducerDirs(entries []string) (map[string]string, error) {
 	out := make(map[string]string, len(entries))
 	for _, item := range entries {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
 		name, dir, ok := strings.Cut(item, "=")
 		name = strings.ToLower(strings.TrimSpace(name))
 		dir = strings.TrimSpace(dir)
-		if !ok || name == "" || dir == "" {
+		if !ok {
+			// A bare name selects the installed producer module.
+			installed, exists := DefaultProducerDirs()[name]
+			if !exists {
+				return nil, fmt.Errorf("producer %q is not installed; pass name=dir", name)
+			}
+			out[name] = installed
+			continue
+		}
+		if name == "" || dir == "" {
 			return nil, fmt.Errorf("producer entries must be name=dir, got %q", item)
 		}
 		out[name] = dir

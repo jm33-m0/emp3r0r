@@ -223,8 +223,7 @@ LitterBox, so a host-side build is no longer a trust boundary.
 
 ### Producers
 
-`--producer name=dir` exposes a shellcode producer module to the model. The
-installed `donut` and `crystal_pack` modules are added automatically. The
+`--producer name` selects an installed shellcode producer module; `--producer name=dir` points at an uninstalled tree. The installed `donut` and `crystal_pack` modules are added automatically. The
 model may read and edit a producer's source (`EditSource module=donut`), then
 call `BuildShellcode`. The `donut` module rebuilds its x86/x64 loader stubs and
 generator from `core/modules/donut/src` on every build, so loader edits take

@@ -142,7 +142,7 @@ func addDetectLoopFlags(cmd *cobra.Command) {
 	cmd.Flags().String("format", "exe", "Loader host format: exe, service, or dll")
 	cmd.Flags().String("inject", "", "Override the injection method; empty uses the module default")
 	cmd.Flags().String("smw", "on", "SilentMoonwalk: on or off")
-	cmd.Flags().StringSlice("producer", nil, "Shellcode producer as name=path (donut=..., crystal_pack=...); the baseline uses the installed producers")
+	cmd.Flags().StringSlice("producer", nil, "Shellcode producer as name or name=path (donut, crystal_pack, donut=/path); a bare name uses the installed module; the baseline uses the installed producers")
 	cmd.Flags().StringSlice("read-root", nil, "Read-only source root the model may inspect (repeatable)")
 	cmd.Flags().String("knowledge", "", "Knowledge cache path; defaults to <detection store>/knowledge.db")
 	cmd.Flags().Int("turns", 60, "Default per-worker turn cap; overridden by the role flags")
