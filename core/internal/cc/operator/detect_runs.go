@@ -357,6 +357,7 @@ func runDetectLoop(run *detectRun, opts detectLoopOptions, shellcode string) {
 			EditorTimeout:      currentOpts.EditorTimeout, EditorTurns: currentOpts.EditorTurns,
 			DebuggerTurns: currentOpts.DebuggerTurns, DebuggerTimeout: currentOpts.DebuggerTimeout,
 			DebuggerPolicy: currentOpts.DebuggerPolicy,
+			Pricing:        currentOpts.Pricing,
 			WorkerModels:   currentOpts.WorkerModels, Guest: guest,
 			CycleTimeout:    currentOpts.CycleTimeout,
 			SessionTimeout:  currentOpts.SessionTimeout,

@@ -40,8 +40,17 @@ func RenderLoopSummary(answer map[string]any, cycles []Cycle, edits []EditRecord
 	}
 	if len(cycles) > 0 {
 		first, last := cycles[0], cycles[len(cycles)-1]
-		fmt.Fprintf(&b, "**Cycles:** %d | **Score:** %.2f → %.2f | **Final findings:** %d | **Verdicts:** %d\n",
-			len(cycles), first.Score, last.Score, last.Findings, last.Verdicts)
+		firstCounts, lastCounts := cycleFindingCounts(&first), cycleFindingCounts(&last)
+		fmt.Fprintf(&b, "**High findings:** %d → %d | **Static signatures:** %d → %d | **Total findings:** %d → %d | **Verdicts:** %d → %d | **Cycles:** %d\n",
+			firstCounts.High, lastCounts.High, firstCounts.Static, lastCounts.Static,
+			firstCounts.Total, lastCounts.Total, first.Verdicts, last.Verdicts, len(cycles))
+		if last.Execution == executionOffline {
+			fmt.Fprintf(&b, "\n> The final cycle did not execute; its finding counts are not comparable with an executing cycle.\n")
+		}
+	}
+	if usage, ok := tokenUsageFromAnswer(answer); ok {
+		fmt.Fprintf(&b, "**Tokens:** %s in / %s out | **Estimated cost:** %s\n",
+			formatTokenCount(usage.Input), formatTokenCount(usage.Output), costLabel(usage))
 	}
 
 	fmt.Fprintf(&b, "\n## Changes\n\n")
@@ -101,6 +110,8 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 		fmt.Fprintf(&b, "> The agent's final text was not the requested JSON object: %s\n\n", parseErr)
 	}
 
+	renderFindingObjective(&b, cycles)
+
 	fmt.Fprintf(&b, "## Achieved objectives\n\n")
 	achieved := false
 	if len(before) > 0 && len(after) == 0 {
@@ -115,12 +126,16 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 	}
 	if len(cycles) > 0 {
 		last := cycles[len(cycles)-1]
-		fmt.Fprintf(&b, "- Rebuilt and detonated the final payload (`%s`, score %.2f, %d findings, %d verdicts, execution=%s).\n",
-			shortPayloadKey(last.PayloadKey), last.Score, last.Findings, last.Verdicts, headerOrNone(last.Execution))
+		counts := cycleFindingCounts(&last)
+		fmt.Fprintf(&b, "- Rebuilt and detonated the final payload (`%s`, high=%d, medium=%d, static=%d, total=%d, verdicts=%d, execution=%s).\n",
+			shortPayloadKey(last.PayloadKey), counts.High, counts.Medium, counts.Static, counts.Total, last.Verdicts, headerOrNone(last.Execution))
 		if last.Execution == executionOffline {
-			fmt.Fprintf(&b, "- Final payload did not execute; its score is not comparable with an executing cycle.\n")
+			fmt.Fprintf(&b, "- Final payload did not execute; its finding counts are not comparable with an executing cycle.\n")
 		} else if last.Verdicts == 0 {
-			fmt.Fprintf(&b, "- Final cycle recorded no real Defender verdicts; remaining items are generic/static findings.\n")
+			fmt.Fprintf(&b, "- Final cycle recorded no real Defender verdicts; remaining items are static/dynamic findings.\n")
+		}
+		if counts.Static == 0 {
+			fmt.Fprintf(&b, "- No static YARA/CheckPlz/Stringnalyzer signature finding was recorded in the final cycle.\n")
 		}
 		achieved = true
 	}
@@ -131,16 +146,20 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 
 	renderGitHistory(&b, answer)
 
+	renderModelUsage(&b, answer)
+
 	fmt.Fprintf(&b, "## Cycles\n\n")
 	if len(cycles) == 0 {
 		fmt.Fprintf(&b, "No cycle completed.\n\n")
 	} else {
-		fmt.Fprintf(&b, "| # | Payload | SHA-256 | Score | Level | Findings | Verdicts | Execution | Trace |\n")
-		fmt.Fprintf(&b, "| ---: | --- | --- | ---: | --- | ---: | ---: | --- | ---: |\n")
+		fmt.Fprintf(&b, "| # | Payload | SHA-256 | High | Medium | Static | Total | Verdicts | Execution | Trace |\n")
+		fmt.Fprintf(&b, "| ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | ---: |\n")
 		for _, cycle := range cycles {
-			fmt.Fprintf(&b, "| %d | `%s` | `%s` | %.2f | %s | %d | %d | %s | %d |\n",
+			counts := cycleFindingCounts(&cycle)
+			fmt.Fprintf(&b, "| %d | `%s` | `%s` | %d | %d | %d | %d | %d | %s | %d |\n",
 				cycle.Iteration, cycle.PayloadKey, shortPayloadKey(cycle.PayloadKey),
-				cycle.Score, sanitizeLine(cycle.Level), cycle.Findings, cycle.Verdicts, headerOrNone(cycle.Execution), cycle.TraceID)
+				counts.High, counts.Medium, counts.Static, counts.Total, cycle.Verdicts,
+				headerOrNone(cycle.Execution), cycle.TraceID)
 		}
 		b.WriteString("\n")
 	}
@@ -354,4 +373,91 @@ func renderGitHistory(b *strings.Builder, answer map[string]any) {
 		fmt.Fprintf(b, "- `%s`: `%s`\n", sanitizeLine(name), sanitizeLine(heads[name]))
 	}
 	b.WriteString("\n")
+}
+
+// renderFindingObjective puts the loop's actual objective before the change
+// log: high findings, static signatures, total findings, and real verdicts.
+func renderFindingObjective(b *strings.Builder, cycles []Cycle) {
+	if len(cycles) == 0 {
+		return
+	}
+	first, last := cycles[0], cycles[len(cycles)-1]
+	before, after := cycleFindingCounts(&first), cycleFindingCounts(&last)
+	executing := 0
+	for i := range cycles {
+		if cycles[i].Execution == executionVerified {
+			executing++
+		}
+	}
+	fmt.Fprintf(b, "## Findings objective\n\n")
+	fmt.Fprintf(b, "| Metric | Baseline | Final | Change |\n")
+	fmt.Fprintf(b, "| --- | ---: | ---: | ---: |\n")
+	fmt.Fprintf(b, "| High findings | %d | %d | %s |\n", before.High, after.High, signedChange(after.High-before.High))
+	fmt.Fprintf(b, "| Static signatures | %d | %d | %s |\n", before.Static, after.Static, signedChange(after.Static-before.Static))
+	fmt.Fprintf(b, "| Total findings | %d | %d | %s |\n", before.Total, after.Total, signedChange(after.Total-before.Total))
+	fmt.Fprintf(b, "| Defender verdicts | %d | %d | %s |\n", first.Verdicts, last.Verdicts, signedChange(last.Verdicts-first.Verdicts))
+	fmt.Fprintf(b, "\nExecuting cycles: %d/%d.", executing, len(cycles))
+	if last.Execution != executionVerified {
+		fmt.Fprintf(b, " The final cycle did not execute, so its counts are not a detection result.")
+	}
+	b.WriteString("\n\n")
+}
+
+func signedChange(delta int) string {
+	if delta > 0 {
+		return fmt.Sprintf("+%d", delta)
+	}
+	return fmt.Sprintf("%d", delta)
+}
+
+// renderModelUsage shows where the model budget went. Rates are optional; a
+// report without rates still gives the exact token counts.
+func renderModelUsage(b *strings.Builder, answer map[string]any) {
+	usage, ok := tokenUsageFromAnswer(answer)
+	if !ok {
+		return
+	}
+	fmt.Fprintf(b, "## Model usage\n\n")
+	if !usage.PricingConfigured {
+		fmt.Fprintf(b, "Cost rates were not configured; token counts are exact and the cost column is omitted. Pass `--input-price`, `--output-price`, `--cache-read-price`, and `--cache-write-price` in USD per million tokens to estimate cost.\n\n")
+	}
+	fmt.Fprintf(b, "| Role | Input | Output | Cache read | Cache write | Cost |\n")
+	fmt.Fprintf(b, "| --- | ---: | ---: | ---: | ---: | ---: |\n")
+	for _, role := range usage.Roles {
+		cost := "—"
+		if usage.PricingConfigured {
+			cost = formatUSD(role.CostUSD)
+		}
+		fmt.Fprintf(b, "| %s | %s | %s | %s | %s | %s |\n",
+			sanitizeLine(role.Role), formatTokenCount(role.Input), formatTokenCount(role.Output),
+			formatTokenCount(role.CacheRead), formatTokenCount(role.CacheWrite), cost)
+	}
+	totalCost := "—"
+	if usage.PricingConfigured {
+		totalCost = formatUSD(usage.CostUSD)
+	}
+	fmt.Fprintf(b, "| **total** | **%s** | **%s** | **%s** | **%s** | **%s** |\n\n",
+		formatTokenCount(usage.Input), formatTokenCount(usage.Output),
+		formatTokenCount(usage.CacheRead), formatTokenCount(usage.CacheWrite), totalCost)
+}
+
+// tokenUsageFromAnswer accepts the live struct and the JSON-decoded map that a
+// persisted loop report carries.
+func tokenUsageFromAnswer(answer map[string]any) (TokenUsage, bool) {
+	raw, ok := answer["token_usage"]
+	if !ok {
+		return TokenUsage{}, false
+	}
+	if usage, ok := raw.(TokenUsage); ok {
+		return usage, true
+	}
+	body, err := json.Marshal(raw)
+	if err != nil {
+		return TokenUsage{}, false
+	}
+	var usage TokenUsage
+	if json.Unmarshal(body, &usage) != nil {
+		return TokenUsage{}, false
+	}
+	return usage, true
 }

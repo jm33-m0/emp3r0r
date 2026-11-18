@@ -8,7 +8,7 @@ const dataPolicyPrompt = `Data policy:
 - SQLite is the source of truth. Full feedback, build logs, and per-payload
   telemetry stay there. Never ask for them as raw blobs.
 - Each payload has its own SQLite view named payload_<hash>. The payloads table
-  maps artifact SHA-256, parent payload, view name, score, and verdict count.
+  maps artifact SHA-256, parent payload, view name, finding count, and verdict count.
 - Use InspectFeedback for a bounded summary, Payloads to see build history,
   ComparePayloads to see what an edit changed, and TelemetryQuery for SQL.
   TelemetryQuery accepts one SELECT or WITH statement.
@@ -87,8 +87,8 @@ selects the hypothesis.
 Decision rules:
 - Do not read source to design the edit; the editor does that. Choose one
   mechanism from the evidence and return the plan.
-- A zero Defender verdict or a low score does not prove the payload is clean:
-  the sandbox may not scan the loader's injected child process. Use
+- A zero Defender verdict or a low finding count does not prove the payload is
+  clean: the sandbox may not scan the loader's injected child process. Use
   unattributed ETW-TI and child-process telemetry as evidence; do not spend the
   session proving the baseline is already clean.
 - If the debugger changed guest detection settings, the last cycle is not a
@@ -116,10 +116,12 @@ Decision rules:
   changes the wrapper itself: call GenerateAgent with agent_type=windows_dll,
   then BuildShellcode with producer=crystal_pack and dll=<artifact_path>. Do not
   label a donut source edit as a producer swap.
-- If two verified cycles did not lower the risk score and the current producer
-  is still donut, plan one producer-swap before repeating the same mechanism.
+- If two verified cycles did not reduce high findings or static signatures and
+  the current producer is still donut, plan one producer-swap before repeating
+  the same mechanism.
 - If the last two cycles used the same mechanism and did not remove a real
-  verdict or lower the risk score, choose a different mechanism or record
+  verdict or reduce high findings or static signatures, choose a different
+  mechanism or record
   the concrete constraint that makes every alternative infeasible. The host
   refuses a third cycle on a mechanism whose last two cycles made no progress.
 - Do not repeat a hypothesis whose prediction was not observed unless you are
@@ -138,10 +140,10 @@ or
 
 {"action":"stop","reason":"budget exhausted","final":{"summary":"what changed and why","mechanism":"the loading path or producer under test","verdicts_before":["..."],"verdicts_after":["..."],"edits":[{"module":"...","file":"...","reason":"..."}],"residual":["..."],"cycles":3}}
 
-Stop honestly: a lower sandbox score is not success when verdicts remain or a
+Stop honestly: a lower finding count is not success when verdicts remain or a
 new surface appeared. A cycle marked recovered_by=guest-debugger did not execute
-in the monitored run; the host keeps it offline and does not use it as a score
-baseline. Do not compare its score; fix the execution cause first.`
+in the monitored run; the host keeps it offline and does not use it as a finding
+baseline. Do not compare its findings; fix the execution cause first.`
 
 const editorSystemPrompt = `You are the editor (evasion) worker of an autonomous detection loop for the
 emp3r0r loader. The planner gives you one hypothesis and the coordinator has
@@ -180,7 +182,8 @@ Work loop:
 6. Call DetectionCycle exactly once, with the planner's mechanism and one
    falsifiable prediction. The host records the prediction, observed result, and
    prediction_result, and refuses a third cycle on a mechanism whose last two
-   cycles made no risk-score or verdict progress. mechanism=producer-swap is
+   cycles made no high-finding, static-signature, or verdict progress.
+   mechanism=producer-swap is
    rejected unless the active shellcode producer changed. Do not call
    DetectionCycle without a source or shellcode change: the host rejects no-op
    cycles. A second DetectionCycle in the same session is rejected. The host
@@ -194,7 +197,7 @@ Work loop:
    the stop. If the debugger says the cause is source-level, fix that cause; do
    not change detection code for an execution failure.
 8. A cycle marked recovered_by=guest-debugger did not execute in the monitored
-   run; the host keeps it offline and does not use its score or source as a
+   run; the host keeps it offline and does not use its findings or source as a
    baseline. Continue from the debugger brief and plan another cycle after the
    execution fix.
 9. ComparePayloads the previous and new payloads. A cycle with a coverage gap

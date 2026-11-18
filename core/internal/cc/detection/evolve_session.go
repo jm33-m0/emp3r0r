@@ -126,10 +126,11 @@ func (ws *workerSession) run(ctx context.Context, prompt string, resume func(rea
 		result, err := ws.prompt(sessionCtx, prompt)
 		close(watchdogDone)
 		cancel()
-		c.e.recordWorkerUsage(result)
-		c.e.logClass(logging.ClassLine, "%s session ended: reason=%s turns=%d in=%d out=%d",
+		c.e.recordWorkerUsage(ws.role, result)
+		c.e.logClass(logging.ClassLine, "%s session ended: reason=%s turns=%d in=%d out=%d cache_read=%d cache_write=%d",
 			ws.role.label(), headerOrNone(string(result.reason)), result.turns,
-			result.usage.InputTokens, result.usage.OutputTokens)
+			result.usage.InputTokens, result.usage.OutputTokens,
+			result.usage.CacheReadTokens, result.usage.CacheWriteTokens)
 
 		if c.e.sessionStopped() {
 			return result, nil
@@ -281,13 +282,8 @@ func (c *coordinator) transcriptStore() *transcript.Store {
 
 // recordWorkerUsage folds one terminal usage into the loop counters used by
 // the progress heartbeat and the worker audit row.
-func (e *evolver) recordWorkerUsage(result workerResult) {
-	if result.usage.InputTokens > 0 {
-		e.tokensIn.Add(int64(result.usage.InputTokens))
-	}
-	if result.usage.OutputTokens > 0 {
-		e.tokensOut.Add(int64(result.usage.OutputTokens))
-	}
+func (e *evolver) recordWorkerUsage(role evolveRole, result workerResult) {
+	e.usage.add(role, result.usage)
 	if result.reason != "" {
 		e.lastReason.Store(string(result.reason))
 	}

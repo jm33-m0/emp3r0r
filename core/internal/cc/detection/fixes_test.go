@@ -770,7 +770,7 @@ func TestRenderLoopSummaryIsCompact(t *testing.T) {
 	}
 	edits := []EditRecord{{Module: "loader_windows", File: "loader.c", Reason: "replace remote injection"}}
 	out := RenderLoopSummary(answer, cycles, edits)
-	for _, want := range []string{"**Mechanism:** `self-load`", "**Score:** 87.52 → 40.10", "loader_windows/loader.c", "Donutloader YARA"} {
+	for _, want := range []string{"**Mechanism:** `self-load`", "**High findings:** 0 → 0", "**Static signatures:** 0 → 0", "**Total findings:** 57 → 50", "loader_windows/loader.c", "Donutloader YARA"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("summary missing %q:\n%s", want, out)
 		}

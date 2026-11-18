@@ -360,33 +360,39 @@ func TestDebuggerPolicyNormalization(t *testing.T) {
 	}
 }
 
-func TestVerifiedScoreRegressionKeepsBaseline(t *testing.T) {
+func TestVerifiedFindingRegressionKeepsBaseline(t *testing.T) {
 	e := &evolver{logf: func(logging.Class, string, ...any) {}}
-	e.lastExecuting = &Cycle{ID: 1, PayloadKey: "sha256:good", Score: 52.1}
-	gate := e.recordExecution(&Cycle{ID: 2, PayloadKey: "sha256:worse", Score: 59.3}, cycleSummary{Execution: executionVerified})
+	e.lastExecuting = &Cycle{ID: 1, PayloadKey: "sha256:good", Findings: 10, Summary: `{"execution":"verified","high_findings":2,"static_findings":1}`}
+	gate := e.recordExecution(&Cycle{ID: 2, PayloadKey: "sha256:worse", Findings: 10, Summary: `{"execution":"verified","high_findings":3,"static_findings":1}`},
+		cycleSummary{Execution: executionVerified, HighFindings: 3, StaticFindings: 1})
 	if gate != gateRegressed {
 		t.Fatalf("gate = %v, want gateRegressed", gate)
 	}
 	if e.lastExecuting == nil || e.lastExecuting.ID != 1 {
 		t.Fatalf("baseline was replaced by a worse cycle: %+v", e.lastExecuting)
 	}
-	gate = e.recordExecution(&Cycle{ID: 3, PayloadKey: "sha256:same", Score: 52.5, Summary: `{"shellcode":"","producer":"donut"}`}, cycleSummary{Execution: executionVerified})
+	gate = e.recordExecution(&Cycle{ID: 3, PayloadKey: "sha256:same", Findings: 10, Summary: `{"execution":"verified","high_findings":2,"static_findings":1}`},
+		cycleSummary{Execution: executionVerified, HighFindings: 2, StaticFindings: 1})
 	if gate != gateExecuting {
-		t.Fatalf("gate = %v, want gateExecuting for a noisy score", gate)
+		t.Fatalf("gate = %v, want gateExecuting for equal findings", gate)
 	}
 	if e.lastExecuting == nil || e.lastExecuting.ID != 3 {
-		t.Fatalf("an equal-score cycle was not adopted: %+v", e.lastExecuting)
+		t.Fatalf("an equal-findings cycle was not adopted: %+v", e.lastExecuting)
 	}
-	e.lastExecuting = &Cycle{ID: 4, Score: 55.0, Summary: `{"execution":"verified","high_findings":0}`}
-	gate = e.recordExecution(&Cycle{ID: 5, Score: 50.0, Summary: `{"execution":"verified","high_findings":1}`}, cycleSummary{Execution: executionVerified, HighFindings: 1})
+	e.lastExecuting = &Cycle{ID: 4, Findings: 10, Summary: `{"execution":"verified","high_findings":0,"static_findings":0}`}
+	gate = e.recordExecution(&Cycle{ID: 5, Findings: 10, Summary: `{"execution":"verified","high_findings":0,"static_findings":1}`},
+		cycleSummary{Execution: executionVerified, HighFindings: 0, StaticFindings: 1})
 	if gate != gateRegressed {
-		t.Fatalf("gate = %v, want gateRegressed for a high-finding increase", gate)
+		t.Fatalf("gate = %v, want gateRegressed for a static-signature increase", gate)
 	}
-	high, medium := countFindingsBySeverity([]Finding{
-		{Severity: "high"}, {Severity: "critical"}, {Severity: "medium"}, {Severity: "low"},
+	counts := countFindings([]Finding{
+		{Severity: "high", Stage: StageStatic},
+		{Severity: "critical", Stage: StageDynamic},
+		{Severity: "medium", Stage: StageStatic},
+		{Severity: "low", Stage: StageTelemetry},
 	})
-	if high != 2 || medium != 1 {
-		t.Fatalf("severity counts = %d/%d, want 2/1", high, medium)
+	if counts.High != 2 || counts.Medium != 1 || counts.Static != 2 || counts.Total != 4 {
+		t.Fatalf("finding counts = %+v, want high 2 medium 1 static 2 total 4", counts)
 	}
 }
 
@@ -446,9 +452,9 @@ func TestFinalDebuggerPolicyRunsOnePassAtStop(t *testing.T) {
 }
 
 func TestRepeatedNonImprovingMechanism(t *testing.T) {
-	mk := func(mechanism string, score float64, execution string, verdicts int) Cycle {
-		summary, _ := json.Marshal(cycleSummary{Mechanism: mechanism, Execution: execution})
-		return Cycle{Score: score, Execution: execution, Verdicts: verdicts, Summary: string(summary)}
+	mk := func(mechanism string, high, static, total int, execution string, verdicts int) Cycle {
+		summary, _ := json.Marshal(cycleSummary{Mechanism: mechanism, Execution: execution, HighFindings: high, StaticFindings: static})
+		return Cycle{Findings: total, Execution: execution, Verdicts: verdicts, Summary: string(summary)}
 	}
 	cases := []struct {
 		name      string
@@ -456,11 +462,12 @@ func TestRepeatedNonImprovingMechanism(t *testing.T) {
 		candidate string
 		want      bool
 	}{
-		{"different mechanisms", []Cycle{mk("module-stomp", 55.3, executionVerified, 0), mk("section-map", 55.3, executionVerified, 0)}, "section-map", false},
-		{"same mechanism, equal score", []Cycle{mk("producer", 59.3, executionVerified, 0), mk("producer", 59.3, executionVerified, 0)}, "producer", true},
-		{"same mechanism, better score", []Cycle{mk("producer", 59.3, executionVerified, 0), mk("producer", 52.1, executionVerified, 0)}, "producer", false},
-		{"same mechanism, fewer verdicts", []Cycle{mk("producer", 59.3, executionVerified, 2), mk("producer", 59.3, executionVerified, 1)}, "producer", false},
-		{"same mechanism, offline", []Cycle{mk("producer", 59.3, executionOffline, 0), mk("producer", 59.3, executionOffline, 0)}, "producer", true},
+		{"different mechanisms", []Cycle{mk("module-stomp", 1, 0, 10, executionVerified, 0), mk("section-map", 1, 0, 10, executionVerified, 0)}, "section-map", false},
+		{"same mechanism, equal findings", []Cycle{mk("producer", 1, 0, 10, executionVerified, 0), mk("producer", 1, 0, 10, executionVerified, 0)}, "producer", true},
+		{"same mechanism, fewer high", []Cycle{mk("producer", 1, 0, 10, executionVerified, 0), mk("producer", 0, 0, 10, executionVerified, 0)}, "producer", false},
+		{"same mechanism, fewer static", []Cycle{mk("producer", 1, 1, 10, executionVerified, 0), mk("producer", 1, 0, 10, executionVerified, 0)}, "producer", false},
+		{"same mechanism, fewer verdicts", []Cycle{mk("producer", 1, 0, 10, executionVerified, 2), mk("producer", 1, 0, 10, executionVerified, 1)}, "producer", false},
+		{"same mechanism, offline", []Cycle{mk("producer", 1, 0, 10, executionOffline, 0), mk("producer", 1, 0, 10, executionOffline, 0)}, "producer", true},
 	}
 	for _, tc := range cases {
 		e := &evolver{cycles: tc.cycles, logf: func(logging.Class, string, ...any) {}}

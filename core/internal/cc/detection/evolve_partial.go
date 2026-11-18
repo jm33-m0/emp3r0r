@@ -38,6 +38,7 @@ func (e *evolver) persistPartial() {
 	answer["attempt"] = e.attempt
 	answer["global_cycles"] = e.usedCycles()
 	answer["cycles"] = e.cycles
+	answer["token_usage"] = e.usage.snapshot(e.cfg.Pricing)
 	if e.sourceTreeHash != "" {
 		answer["source_tree_hash"] = e.sourceTreeHash
 	}

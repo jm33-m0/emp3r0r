@@ -53,9 +53,6 @@ const (
 	// defaultDebuggerPolicy spends the guest pass once, on the last payload,
 	// instead of after every execution failure.
 	defaultDebuggerPolicy = debuggerPolicyFinal
-	// scoreRegressionSlack is the risk-score increase that counts as a
-	// regression. The sandbox score is coarse, so a small change is noise.
-	scoreRegressionSlack = 0.5
 	// minAgentShellcodeBytes rejects a tiny blob that no real Go agent could
 	// have produced. It catches a loader that drops the payload to reduce
 	// detections.
@@ -164,6 +161,9 @@ type EvolveConfig struct {
 	// DebuggerPolicy selects when the guest debugger runs: final (default),
 	// cycle, or off. final reserves one pass for the stop decision.
 	DebuggerPolicy string
+	// Pricing is the operator's USD-per-million-token price sheet for the
+	// worker model. Unset rates show token counts without a dollar estimate.
+	Pricing TokenPricing
 	// GuestRunner overrides the SSH client. Tests inject a fake; production
 	// leaves it nil so Guest builds the real client.
 	GuestRunner GuestRunner
@@ -250,6 +250,7 @@ type EvolveResult struct {
 	PayloadVerified   bool            `json:"payload_verified"`
 	AgentOnlineSeen   bool            `json:"agent_online_seen,omitempty"`
 	ExpectedAgentUUID string          `json:"expected_agent_uuid,omitempty"`
+	TokenUsage        TokenUsage      `json:"token_usage"`
 }
 
 type evolver struct {
@@ -302,9 +303,8 @@ type evolver struct {
 	restoreErr     error
 	cycleErrMu     sync.Mutex
 	lastCycleError error
-	tokensIn       atomic.Int64
-	tokensOut      atomic.Int64
 	lastReason     atomic.Value
+	usage          usageTracker
 	// toolGate closes the race between a deadline cancelling a session and a
 	// tool starting in that same session.
 	toolGate          sync.Mutex
@@ -784,6 +784,8 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 	}
 	verified, _ := answer["payload_verified"].(bool)
 	answer["agent_online_seen"] = e.agentSeenOnline.Load()
+	usage := e.usage.snapshot(cfg.Pricing)
+	answer["token_usage"] = usage
 	encoded, err := json.Marshal(answer)
 	if err != nil {
 		return nil, fmt.Errorf("encode loop answer: %w", err)
@@ -814,7 +816,7 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 		GlobalCycles: e.usedCycles(), SourceTreeHash: e.sourceTreeHash,
 		Answer: encoded, Report: report, Cycles: e.cycles, Last: e.last,
 		PayloadVerified: verified, AgentOnlineSeen: e.agentSeenOnline.Load(),
-		ExpectedAgentUUID: e.expectedAgentUUID,
+		ExpectedAgentUUID: e.expectedAgentUUID, TokenUsage: usage,
 	}, nil
 }
 
@@ -933,6 +935,10 @@ func normalizeEvolveConfig(cfg *EvolveConfig) error {
 	if cfg.EditorReadBudget == 0 {
 		cfg.EditorReadBudget = editorReadBudget
 	}
+	if cfg.Pricing.InputPerMillion < 0 || cfg.Pricing.OutputPerMillion < 0 ||
+		cfg.Pricing.CacheReadPerMillion < 0 || cfg.Pricing.CacheWritePerMillion < 0 {
+		return fmt.Errorf("token prices must not be negative")
+	}
 	switch strings.ToLower(strings.TrimSpace(cfg.DebuggerPolicy)) {
 	case "":
 		cfg.DebuggerPolicy = defaultDebuggerPolicy
@@ -983,6 +989,7 @@ type cycleSummary struct {
 	Findings         int             `json:"findings"`
 	HighFindings     int             `json:"high_findings,omitempty"`
 	MediumFindings   int             `json:"medium_findings,omitempty"`
+	StaticFindings   int             `json:"static_findings,omitempty"`
 	Verdicts         []string        `json:"verdicts,omitempty"`
 	TraceID          int64           `json:"trace_id,omitempty"`
 	Events           int             `json:"telemetry_events"`
@@ -1259,8 +1266,9 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 	e.baselineFailure = ""
 	e.last = &cycle
 	e.cycles = append(e.cycles, cycle)
-	e.logClass(logging.ClassCycle, "cycle %d: payload=%s sha=%s score=%.2f verdicts=%v findings=%d execution=%s",
-		iteration, cycle.PayloadKey, shortSHA(artifact.SHA256), cycle.Score, summary.Verdicts, cycle.Findings, summary.Execution)
+	e.logClass(logging.ClassCycle, "cycle %d: payload=%s sha=%s high=%d static=%d findings=%d verdicts=%v execution=%s",
+		iteration, cycle.PayloadKey, shortSHA(artifact.SHA256), summary.HighFindings,
+		summary.StaticFindings, cycle.Findings, summary.Verdicts, summary.Execution)
 	// The coordinator applies the execution gate after the editor session so a
 	// debugger can inspect the guest before a non-executing cycle is reverted.
 	return cycle, nil
@@ -1276,7 +1284,8 @@ func summarizeCycle(loopID string, iteration int, run Run, feedback Feedback, bu
 		Executed: execution == executionVerified, Execution: execution,
 		AgentOnline: online, NetworkEvents: networkEvents,
 	}
-	summary.HighFindings, summary.MediumFindings = countFindingsBySeverity(feedback.Findings)
+	counts := countFindings(feedback.Findings)
+	summary.HighFindings, summary.MediumFindings, summary.StaticFindings = counts.High, counts.Medium, counts.Static
 	if run.Telemetry != nil {
 		summary.PayloadKey = run.Telemetry.PayloadKey
 		summary.PayloadTable = run.Telemetry.PayloadTable
@@ -1316,19 +1325,52 @@ func summarizeCycle(loopID string, iteration int, run Run, feedback Feedback, bu
 	return summary
 }
 
-// countFindingsBySeverity records the metric the loop optimizes. The total
-// finding count includes low-severity context, so it cannot show whether a
-// cycle reduced high telemetry.
-func countFindingsBySeverity(findings []Finding) (high, medium int) {
+// findingCounts is the metric the loop optimizes: high-severity findings,
+// static signature hits, and the total for a secondary comparison. Sandbox
+// risk scores are not part of this tuple.
+type findingCounts struct {
+	High   int
+	Medium int
+	Static int
+	Total  int
+}
+
+// countFindings classifies one feedback set. Static signatures are the
+// YARA/CheckPlz/Stringnalyzer stage matches, whatever their severity.
+func countFindings(findings []Finding) findingCounts {
+	counts := findingCounts{Total: len(findings)}
 	for _, finding := range findings {
 		switch strings.ToLower(strings.TrimSpace(finding.Severity)) {
 		case "critical", "high":
-			high++
+			counts.High++
 		case "medium":
-			medium++
+			counts.Medium++
+		}
+		if finding.Stage == StageStatic {
+			counts.Static++
 		}
 	}
-	return high, medium
+	return counts
+}
+
+// findingRegression reports whether current is worse than previous: high
+// findings first, then static signatures, then total findings. Severity is
+// compared lexicographically so a cycle that removes a high finding is not
+// rejected for adding a medium one.
+func findingRegression(previous, current findingCounts) bool {
+	switch {
+	case current.High != previous.High:
+		return current.High > previous.High
+	case current.Static != previous.Static:
+		return current.Static > previous.Static
+	default:
+		return current.Total > previous.Total
+	}
+}
+
+// findingsImproved is the inverse comparison used by the mechanism gate.
+func findingsImproved(previous, current findingCounts) bool {
+	return findingRegression(current, previous)
 }
 
 func shortSHA(sha string) string {
@@ -1438,17 +1480,30 @@ const (
 	gateRegressed
 )
 
-// cycleHighFindings reads the comparable high-severity count from a cycle
-// summary. Older rows without the field count as zero.
-func cycleHighFindings(cycle *Cycle) int {
-	if cycle == nil || strings.TrimSpace(cycle.Summary) == "" {
-		return 0
+// cycleFindingCounts reads the comparable finding counts from a cycle
+// summary. Older rows without the fields count as zero; the total comes from
+// the cycle row so it is available even when the summary is absent.
+func cycleFindingCounts(cycle *Cycle) findingCounts {
+	if cycle == nil {
+		return findingCounts{}
+	}
+	counts := findingCounts{Total: cycle.Findings}
+	if strings.TrimSpace(cycle.Summary) == "" {
+		return counts
 	}
 	var summary cycleSummary
 	if json.Unmarshal([]byte(cycle.Summary), &summary) != nil {
-		return 0
+		return counts
 	}
-	return summary.HighFindings
+	counts.High, counts.Medium, counts.Static = summary.HighFindings, summary.MediumFindings, summary.StaticFindings
+	return counts
+}
+
+func summaryFindingCounts(summary cycleSummary, total int) findingCounts {
+	return findingCounts{
+		High: summary.HighFindings, Medium: summary.MediumFindings,
+		Static: summary.StaticFindings, Total: total,
+	}
 }
 
 // recordExecution updates the last-executing state without touching the
@@ -1458,16 +1513,11 @@ func (e *evolver) recordExecution(cycle *Cycle, summary cycleSummary) executionG
 	switch summary.Execution {
 	case executionVerified:
 		// A verified cycle replaces the baseline only when it does not raise
-		// high telemetry and does not worsen the risk score. Otherwise the
-		// worse payload would become the source later cycles restore to.
+		// high findings, static signatures, or the total finding count.
+		// Otherwise the worse payload would become the source later cycles
+		// restore to.
 		if previous := e.lastExecuting; previous != nil && previous.ID != 0 {
-			previousHigh := cycleHighFindings(previous)
-			if summary.HighFindings > previousHigh {
-				return gateRegressed
-			}
-			if summary.HighFindings == previousHigh &&
-				previous.Score > 0 && cycle.Score > 0 &&
-				cycle.Score > previous.Score+scoreRegressionSlack {
+			if findingRegression(cycleFindingCounts(previous), summaryFindingCounts(summary, cycle.Findings)) {
 				return gateRegressed
 			}
 		}
@@ -1605,7 +1655,7 @@ func (e *evolver) executionHint() string {
 			". Diagnose it before another cycle; a failed attempt does not consume the cycle budget."
 	}
 	if e.last != nil && e.last.Execution == executionOffline && e.lastExecuting == nil {
-		return "Execution gate: the last cycle did not execute and no payload has checked in yet. Execution is unproven; do not compare this score with an executing cycle. The guest debugger can inspect the sandbox; otherwise fix why the generated agent never checked in before changing detection code."
+		return "Execution gate: the last cycle did not execute and no payload has checked in yet. Execution is unproven; do not compare these findings with an executing cycle. The guest debugger can inspect the sandbox; otherwise fix why the generated agent never checked in before changing detection code."
 	}
 	if e.last != nil && e.last.Execution == executionOffline && e.lastExecuting != nil {
 		if e.restoreErr != nil {
@@ -1700,9 +1750,9 @@ func (e *evolver) dossier() string {
 		if global < 1 {
 			global = e.globalUsed + cycle.Iteration
 		}
-		fmt.Fprintf(&b, "- attempt %d cycle %d (global %d): mechanism=%s score=%.2f level=%s findings=%d high=%d medium=%d verdicts=%d execution=%s network=%d shellcode=%s files=%s\n",
-			attempt, cycle.Iteration, global, headerOrNone(summary.Mechanism), cycle.Score, cycle.Level,
-			cycle.Findings, summary.HighFindings, summary.MediumFindings, cycle.Verdicts,
+		fmt.Fprintf(&b, "- attempt %d cycle %d (global %d): mechanism=%s findings=%d high=%d medium=%d static=%d verdicts=%d execution=%s network=%d shellcode=%s files=%s\n",
+			attempt, cycle.Iteration, global, headerOrNone(summary.Mechanism),
+			cycle.Findings, summary.HighFindings, summary.MediumFindings, summary.StaticFindings, cycle.Verdicts,
 			headerOrNone(summary.Execution), summary.NetworkEvents,
 			headerOrNone(filepath.Base(summary.Shellcode)), joinOrNone(files))
 		if summary.RecoveredBy != "" {
@@ -1972,8 +2022,8 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 func (e *evolver) inspectFeedbackTool() tool.CoreTool {
 	return tool.Build(tool.Spec{
 		Name: "InspectFeedback",
-		Description: "Return the stored feedback for a payload or run: score, top findings with source " +
-			"locations, pending stages, telemetry trace, and edits that produced it. Full feedback stays in SQLite.",
+		Description: "Return the stored feedback for a payload or run: high/static finding counts, top findings " +
+			"with source locations, pending stages, telemetry trace, and edits that produced it. The sandbox score is informational. Full feedback stays in SQLite.",
 		Prompt: "Inspect stored detection feedback.",
 		Schema: map[string]any{
 			"type": "object",
@@ -2012,7 +2062,7 @@ func (e *evolver) inspectFeedbackTool() tool.CoreTool {
 func (e *evolver) payloadsTool() tool.CoreTool {
 	return tool.Build(tool.Spec{
 		Name:        "Payloads",
-		Description: "List recent payloads with their per-payload SQLite view name, artifact hash, score, verdict count, and parent payload.",
+		Description: "List recent payloads with their per-payload SQLite view name, artifact hash, high/static finding counts, verdict count, parent payload, and the sandbox score for reference.",
 		Prompt:      "List payloads.",
 		Schema: map[string]any{
 			"type": "object",
@@ -2376,10 +2426,13 @@ func (e *evolver) loadFeedback(ctx context.Context, runID, payloadKey string) (j
 
 func feedbackSummary(feedback Feedback, runID, payloadKey string, edits []EditRecord) map[string]any {
 	SanitizeFeedback(&feedback)
+	counts := countFindings(feedback.Findings)
 	out := map[string]any{
 		"run_id": runID, "payload_key": payloadKey,
-		"score": feedback.Score, "level": feedback.Level,
-		"findings": len(feedback.Findings), "source_edits": len(feedback.SourceEdits),
+		"findings": len(feedback.Findings), "high_findings": counts.High,
+		"medium_findings": counts.Medium, "static_findings": counts.Static,
+		"source_edits": len(feedback.SourceEdits),
+		"score":        feedback.Score, "level": feedback.Level,
 	}
 	if feedback.Telemetry != nil {
 		telemetry := map[string]any{

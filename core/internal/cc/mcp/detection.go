@@ -159,6 +159,10 @@ func (a *Actions) detectionTools() map[string]Tool {
 						"editor_read_budget":   IntegerProp("Read-only calls without an edit before the editor loses read tools. Default 12; negative disables."),
 						"debugger_tool_budget": IntegerProp("Total calls per debugger pass. 0 means no cap; turn and time limits still apply."),
 						"debugger_policy":      map[string]any{"type": "string", "enum": []string{"final", "cycle", "off"}, "description": "When the guest debugger runs: final (one pass at the stop, default), cycle (after every non-executing cycle), or off."},
+						"input_price":          map[string]any{"type": "number", "description": "USD per 1M input tokens for the cost estimate; 0 leaves the rate unset."},
+						"output_price":         map[string]any{"type": "number", "description": "USD per 1M output tokens for the cost estimate; 0 leaves the rate unset."},
+						"cache_read_price":     map[string]any{"type": "number", "description": "USD per 1M cache-read tokens for the cost estimate; 0 leaves the rate unset."},
+						"cache_write_price":    map[string]any{"type": "number", "description": "USD per 1M cache-write tokens for the cost estimate; 0 leaves the rate unset."},
 						"iterations":           IntegerProp("Maximum cycles including baseline. Default 3."),
 						"stages":               map[string]any{"type": "array", "items": map[string]any{"type": "string", "enum": []string{"static", "dynamic"}}, "description": "Stages; dynamic is required."},
 						"process":              StringProp("Sacrificial process override; omit to let the source default control it."),
@@ -250,6 +254,10 @@ type detectionArgs struct {
 	EditorReadBudget   int      `json:"editor_read_budget"`
 	DebuggerToolBudget int      `json:"debugger_tool_budget"`
 	DebuggerPolicy     string   `json:"debugger_policy"`
+	InputPrice         float64  `json:"input_price"`
+	OutputPrice        float64  `json:"output_price"`
+	CacheReadPrice     float64  `json:"cache_read_price"`
+	CacheWritePrice    float64  `json:"cache_write_price"`
 	Iterations         int      `json:"iterations"`
 	Process            string   `json:"process"`
 	Format             string   `json:"format"`
@@ -851,6 +859,10 @@ func (a *Actions) detectionLoop(ctx context.Context, raw json.RawMessage) (any, 
 		ExpectedAgentUUID: strings.TrimSpace(args.AgentUUID),
 		AgentType:         agentType, AgentArch: arch, AgentCC: strings.TrimSpace(a.DefaultCC),
 		Guest: guest, Verify: verify, DebuggerPolicy: args.DebuggerPolicy,
+		Pricing: detection.TokenPricing{
+			InputPerMillion: args.InputPrice, OutputPerMillion: args.OutputPrice,
+			CacheReadPerMillion: args.CacheReadPrice, CacheWritePerMillion: args.CacheWritePrice,
+		},
 		BuildAgent: func(opts detection.AgentBuildOptions) (*detection.AgentBuildResult, error) {
 			return a.buildDetectionAgent(opts)
 		},

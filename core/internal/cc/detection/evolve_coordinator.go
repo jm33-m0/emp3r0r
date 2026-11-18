@@ -151,7 +151,7 @@ func (c *coordinator) run(ctx context.Context) (map[string]any, error) {
 			}
 			if c.repeatedNonImprovingMechanism(plan.Mechanism) {
 				c.rejectedPlans++
-				c.plannerNote = fmt.Sprintf("The last two cycles used mechanism %q without a risk-score or verdict improvement. Choose a different mechanism or producer-swap, or action=stop.", plan.Mechanism)
+				c.plannerNote = fmt.Sprintf("The last two cycles used mechanism %q without a high-finding, static-signature, or verdict improvement. Choose a different mechanism or producer-swap, or action=stop.", plan.Mechanism)
 				c.e.logClass(logging.ClassWarning, "planner repeated mechanism %q without progress", plan.Mechanism)
 				if c.rejectedPlans >= maxRejectedPlans {
 					final := c.coordinatorStopFinal("the planner repeated a non-improving mechanism twice: " + plan.Mechanism)
@@ -333,7 +333,7 @@ func (c *coordinator) producerSwapTarget() string {
 }
 
 // repeatedNonImprovingMechanism enforces the planner rule that two cycles of
-// the same mechanism without a score or verdict improvement must be followed
+// the same mechanism without a finding or verdict improvement must be followed
 // by a different mechanism. A non-executing cycle has no comparable result, so
 // it also counts as no improvement.
 func (c *coordinator) repeatedNonImprovingMechanism(candidate string) bool {
@@ -356,7 +356,7 @@ func (c *coordinator) repeatedNonImprovingMechanism(candidate string) bool {
 		return false
 	}
 	if previous.Execution == executionVerified && last.Execution == executionVerified &&
-		previous.Score > 0 && last.Score > 0 && last.Score < previous.Score {
+		findingsImproved(cycleFindingCounts(&previous), cycleFindingCounts(&last)) {
 		return false
 	}
 	return true
@@ -500,19 +500,22 @@ func (c *coordinator) afterCycle(ctx context.Context, cycle *Cycle) error {
 		baseline := c.e.lastExecuting
 		c.lastDiagnosis = nil
 		restore := "no clean baseline exists"
-		previousHigh, previousScore := 0, 0.0
+		previous := findingCounts{}
+		current := summaryFindingCounts(summary, cycle.Findings)
 		if baseline != nil {
 			restore = lastGoodRef(baseline)
-			previousHigh, previousScore = cycleHighFindings(baseline), baseline.Score
+			previous = cycleFindingCounts(baseline)
 			if err := c.e.restoreExecutingState(ctx); err != nil {
 				restore += " (restore incomplete: " + clip(err.Error(), 300) + ")"
 			}
 			c.e.logClass(logging.ClassWarning,
-				"cycle %d regressed (high %d -> %d, score %.2f -> %.2f); restored %s",
-				cycle.Iteration, previousHigh, summary.HighFindings, previousScore, cycle.Score, lastGoodRef(baseline))
+				"cycle %d regressed (high %d -> %d, static %d -> %d, total %d -> %d); restored %s",
+				cycle.Iteration, previous.High, current.High, previous.Static, current.Static,
+				previous.Total, current.Total, lastGoodRef(baseline))
 		}
-		c.plannerNote = fmt.Sprintf("Cycle %d regressed (high findings %d -> %d, risk score %.2f -> %.2f); the host restored %s. Do not repeat this change: test a different producer or mechanism, or stop with the evidence.",
-			cycle.Iteration, previousHigh, summary.HighFindings, previousScore, cycle.Score, restore)
+		c.plannerNote = fmt.Sprintf("Cycle %d regressed (high findings %d -> %d, static signatures %d -> %d, total %d -> %d); the host restored %s. Do not repeat this change: test a different producer or mechanism, or stop with the evidence.",
+			cycle.Iteration, previous.High, current.High, previous.Static, current.Static,
+			previous.Total, current.Total, restore)
 		return nil
 	}
 	if gate != gateRestore {
@@ -540,7 +543,7 @@ func (c *coordinator) afterCycle(ctx context.Context, cycle *Cycle) error {
 			reason = "disabled"
 		}
 		c.e.logClass(logging.ClassWarning, "cycle %d did not execute; debugger pass %s", cycle.Iteration, reason)
-		c.plannerNote = fmt.Sprintf("%s. The guest debugger is %s. %s. Fix why the generated agent never checked in before changing detection code, or choose action=stop; this cycle's score is not a detection result.", run, reason, restored) + restoreIfPossible()
+		c.plannerNote = fmt.Sprintf("%s. The guest debugger is %s. %s. Fix why the generated agent never checked in before changing detection code, or choose action=stop; this cycle's finding counts are not a detection result.", run, reason, restored) + restoreIfPossible()
 		return nil
 	}
 	if !c.debuggerAvailableFor(cycle) {
@@ -561,7 +564,7 @@ func (c *coordinator) afterCycle(ctx context.Context, cycle *Cycle) error {
 	}
 	if diag != nil {
 		c.lastDiagnosis = diag
-		c.plannerNote = fmt.Sprintf("%s. Debugger cause: %s; source_fix=%v; online_after=%v. A manual relaunch is not a detection baseline. Fix the execution cause before changing detection code; this cycle's score is not a detection result.", run, clip(diag.Cause, 400), diag.SourceFixRequired, diag.AgentOnlineAfter)
+		c.plannerNote = fmt.Sprintf("%s. Debugger cause: %s; source_fix=%v; online_after=%v. A manual relaunch is not a detection baseline. Fix the execution cause before changing detection code; this cycle's finding counts are not a detection result.", run, clip(diag.Cause, 400), diag.SourceFixRequired, diag.AgentOnlineAfter)
 	} else {
 		c.plannerNote = fmt.Sprintf("%s. %s. Continue with action=test or action=stop.", run, restored)
 	}
@@ -721,7 +724,7 @@ func (c *coordinator) recoverCycle(ctx context.Context, cycle *Cycle, diag debug
 	_ = json.Unmarshal([]byte(cycle.Summary), &summary)
 	// A manual relaunch proves the payload can run, not that the monitored run
 	// produced a comparable detection result. Keep the cycle offline so it
-	// cannot become the score baseline or the source later cycles restore to.
+	// cannot become the finding baseline or the source later cycles restore to.
 	summary.AgentOnline = &online
 	summary.RecoveredBy = "guest-debugger"
 	summary.DebuggerCause = diag.Cause

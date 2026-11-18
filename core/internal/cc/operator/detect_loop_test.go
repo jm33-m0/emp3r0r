@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
+
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/builder"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 )
@@ -150,4 +152,18 @@ func crystalPackFixture(t *testing.T) string {
 	t.Setenv("CC_64", "sh -c")
 	t.Setenv("NASM", "/bin/sh")
 	return dir
+}
+
+func TestDetectLoopRegistersPricingFlags(t *testing.T) {
+	cmd := &cobra.Command{Use: "detect_loop"}
+	addDetectLoopFlags(cmd)
+	for _, name := range []string{"input-price", "output-price", "cache-read-price", "cache-write-price"} {
+		flag := cmd.Flags().Lookup(name)
+		if flag == nil {
+			t.Fatalf("flag --%s is not registered", name)
+		}
+		if flag.Value.Type() != "float64" {
+			t.Fatalf("flag --%s type = %s, want float64", name, flag.Value.Type())
+		}
+	}
 }

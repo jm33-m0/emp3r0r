@@ -158,6 +158,10 @@ func addDetectLoopFlags(cmd *cobra.Command) {
 	cmd.Flags().Int("debugger-turns", 24, "Maximum debugger turns per session")
 	cmd.Flags().Duration("debugger-timeout", 15*time.Minute, "Wall-clock limit for one debugger pass")
 	cmd.Flags().String("debugger-policy", "final", "When the guest debugger runs: final (one pass at the stop), cycle (after every non-executing cycle), or off")
+	cmd.Flags().Float64("input-price", 0, "USD per 1M input tokens for the cost estimate; 0 leaves the rate unset")
+	cmd.Flags().Float64("output-price", 0, "USD per 1M output tokens for the cost estimate; 0 leaves the rate unset")
+	cmd.Flags().Float64("cache-read-price", 0, "USD per 1M cache-read tokens for the cost estimate; 0 leaves the rate unset")
+	cmd.Flags().Float64("cache-write-price", 0, "USD per 1M cache-write tokens for the cost estimate; 0 leaves the rate unset")
 	cmd.Flags().StringToString("worker-model", nil, "Per-worker model override, for example planner=...,editor=...,debugger=...")
 	cmd.Flags().String("guest-ssh", "", "Sandbox guest SSH endpoint as user@host:port; enables the debugger worker (env EMP3R0R_DETECTION_GUEST_SSH)")
 	cmd.Flags().String("guest-ssh-key", "", "Sandbox-only SSH private key (env EMP3R0R_DETECTION_GUEST_SSH_KEY)")
@@ -352,6 +356,7 @@ type detectLoopOptions struct {
 	DebuggerTimeout     time.Duration
 	DebuggerPolicy      string
 	WorkerModels        map[string]string
+	Pricing             detection.TokenPricing
 	GuestSSH            string
 	GuestSSHKey         string
 	GuestSSHExclude     string
@@ -405,6 +410,10 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 	opts.DebuggerTurns, _ = cmd.Flags().GetInt("debugger-turns")
 	opts.DebuggerTimeout, _ = cmd.Flags().GetDuration("debugger-timeout")
 	opts.DebuggerPolicy, _ = cmd.Flags().GetString("debugger-policy")
+	opts.Pricing.InputPerMillion, _ = cmd.Flags().GetFloat64("input-price")
+	opts.Pricing.OutputPerMillion, _ = cmd.Flags().GetFloat64("output-price")
+	opts.Pricing.CacheReadPerMillion, _ = cmd.Flags().GetFloat64("cache-read-price")
+	opts.Pricing.CacheWritePerMillion, _ = cmd.Flags().GetFloat64("cache-write-price")
 	opts.WorkerModels, _ = cmd.Flags().GetStringToString("worker-model")
 	opts.GuestSSH, _ = cmd.Flags().GetString("guest-ssh")
 	opts.GuestSSHKey, _ = cmd.Flags().GetString("guest-ssh-key")
