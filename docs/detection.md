@@ -87,7 +87,8 @@ use the console's existing C2 connection. The loop then runs:
 3. run three Norma workers over SQLite and the module source: a planner that
    chooses one hypothesis, an editor that applies the source/producer edits and
    detonates one cycle, and a debugger that inspects the sandbox guest when the
-   payload did not execute;
+   payload did not execute; by default the debugger runs once at the final stop
+   (`--debugger-policy final`);
 4. after the model loop finishes, run the final BOF verification exactly once. The host
    polls once per second for the last generated agent UUID, runs a small BOF
    such as `whoami`, and records the output. A check-in proves the loader reached
@@ -118,15 +119,19 @@ use the console's existing C2 connection. The loop then runs:
    summary. The host polls the C2 while the payload runs and latches the first
    check-in, so a beacon that checks in and exits before the post-run poll is
    still `verified`. An offline cycle consumes the budget but is not a
-   comparable detection result: it does not count as progress. Before
-   restoring, the coordinator gives the debugger worker the cycle evidence and
-   lets it inspect the guest. If the debugger repairs the guest and the agent
-   re-checks in, the cycle is recorded as verified with
-   `recovered_by=guest-debugger` and the source is kept. Otherwise the host
-   restores the editable source and active shellcode to the last payload whose
-   agent checked in. If no payload has ever checked in and the debugger cannot
-   repair it, the loop stops and reports the execution failure instead of
-   spending more cycles on a payload that never ran;
+   comparable detection result: it does not count as progress. The host
+   restores the editable source and active shellcode to the last clean
+   verified baseline. `--debugger-policy cycle` adds a guest pass after every
+   non-executing cycle; `final` (the default) reserves one pass for the stop
+   decision, and `off` disables it. A payload that the debugger relaunches
+   manually can re-check in, but the cycle stays `offline` with
+   `recovered_by=guest-debugger`: a manual run does not turn an
+   unattributed trace into a score baseline, and the source is not kept. A
+   verified cycle that raises high-severity findings or worsens the risk score
+   is recorded, reverted, and reported to the planner instead of becoming the
+   new baseline. If no payload has ever checked in and the debugger cannot repair
+   it, the loop stops and reports the execution failure instead of spending
+   more cycles on a payload that never ran;
 8. write the final JSON and all cycles to the loop tables.
 
 `--shellcode` accepts any x64 position-independent shellcode, so a Crystal
@@ -144,13 +149,13 @@ The loop runs three independent Norma sessions, each with its own system prompt,
 | editor | Applies every source/producer edit a change needs, rebuilds the agent or shellcode, then runs exactly one `DetectionCycle`. | `GuestSSH`, `AgentStatus`, `RunModule` |
 | debugger | Inspects the guest over SSH when a payload did not execute or its agent did not check in. Files a source-level brief when the cause is in the module. | `EditSource`, `DetectionCycle`, `BuildShellcode`, `RevertToPayload` |
 
-The editor may make as many `EditSource` calls as the change needs; the limit is one detonation per plan, and the host ends the editor session as soon as `DetectionCycle` returns. The planner re-plans after every completed cycle, so each hypothesis has its own mechanism and prediction. An offline cycle goes to the guest debugger before the editor does any further analysis; the editor then works from the debugger's diagnosis and brief. Worker prompts and outputs are stored in `loop_workers`; full feedback, builds, and telemetry stay in the existing tables.
+The editor may make as many `EditSource` calls as the change needs; the limit is one detonation per plan, and the host ends the editor session as soon as `DetectionCycle` returns. The planner re-plans after every completed cycle, so each hypothesis has its own mechanism and prediction. With `--debugger-policy cycle`, an offline cycle goes to the guest debugger before the editor does further analysis; with `final` (the default), the host restores the last clean verified baseline and reserves the debugger for the stop decision. Worker prompts and outputs are stored in `loop_workers`; full feedback, builds, and telemetry stay in the existing tables.
 
 Each worker step keeps one Norma session across deadline retries, empty answers, and provider failures, so a forced answer continues from the evidence already read instead of re-reading the dossier. The host enforces the worker contract: a planner that stops without a JSON plan is sent back in the same session, an editor that stops without `DetectionCycle` is sent back with the remaining edit, and a debugger that stops without its JSON object is sent back with the required schema. After 12 read-only calls the planner and editor lose their read tools until they act; `--planner-read-budget` and `--editor-read-budget` override that, and a negative value disables it. The debugger has no total tool cap by default; `--debugger-tool-budget` sets one. Mutation, build, and detonation tools are never blocked by the read budget. The host also forces the required output at the decision window and at `MaxTurns`.
 
-`--planner-turns`, `--editor-turns`, and `--debugger-turns` default to 24, 60, and 24; `--turns` is the fallback for all three. `--worker-model` overrides the model per worker, for example `--worker-model planner=...,editor=...`. `--debugger-timeout` (default 15m) bounds one debugger pass. `--planner-read-budget` and `--editor-read-budget` default to 12 read-only calls; `--debugger-tool-budget` defaults to 0 (no total cap). A negative read budget disables that cap; turn and time limits still bound every session.
+`--planner-turns`, `--editor-turns`, and `--debugger-turns` default to 24, 60, and 24; `--turns` is the fallback for all three. `--worker-model` overrides the model per worker, for example `--worker-model planner=...,editor=...`. `--debugger-timeout` (default 15m) bounds one debugger pass. `--debugger-policy` selects `final` (default), `cycle`, or `off`. `--planner-read-budget` and `--editor-read-budget` default to 12 read-only calls; `--debugger-tool-budget` defaults to 0 (no total cap). A negative read budget disables that cap; turn and time limits still bound every session.
 
-`--planner-timeout` (default 10m) is a hard decision window: when it expires, the host continues the same planner session and requires one JSON plan. `--editor-timeout` (default 15m) does the same for the editor's analysis; a running tool or `DetectionCycle` suspends it, and a completed cycle resets it. The planner and editor sessions are not restarted at the window boundary, so their reasoning and tool results survive. The debugger gets one pass per cycle; the brief reports the remaining sessions and the host refuses a second pass for the same cycle. A zero verdict or a low score is not proof of a clean payload: the sandbox may not scan the loader's injected child process, so unattributed ETW-TI and child-process telemetry remain evidence.
+`--planner-timeout` (default 10m) is a hard decision window: when it expires, the host continues the same planner session and requires one JSON plan. `--editor-timeout` (default 15m) does the same for the editor's analysis; a running tool or `DetectionCycle` suspends it, and a completed cycle resets it. The planner and editor sessions are not restarted at the window boundary, so their reasoning and tool results survive. With `--debugger-policy cycle`, the debugger gets one pass per cycle and the host refuses a second pass for the same cycle; with `final`, it gets one pass at the stop. A zero verdict or a low score is not proof of a clean payload: the sandbox may not scan the loader's injected child process, so unattributed ETW-TI and child-process telemetry remain evidence.
 
 ### Source history
 
@@ -171,7 +176,7 @@ There is no implicit host. `EMP3R0R_DETECTION_GUEST_SSH` and `EMP3R0R_DETECTION_
 
 `--guest-ssh-exclude` sets the debug staging directory and the Defender exclusion (default `C:\LitterBox\emp-debug`). The coordinator verifies the exclusion before every debugger session, and the debugger may also call `GuestSSH action=ensure_exclusion`; the check adds the exclusion only when it is missing. The debugger may change guest detection settings (Defender, firewall/ASR, RedEdr, analyzers) when they block execution or observation and records every change in `guest_actions`; such a cycle is debug-assisted, not a clean evasion baseline. The guest is the disposable sandbox: commands and file writes inside it are not restricted. The tool's only host-side credential is the configured SSH key; it exposes no other host paths and keeps no guest evidence on the host. The host boundary is the sandbox-only SSH key and host-key verification.
 
-The debugger may launch a tool or artifact, kill a stuck process, read WER and Defender logs, collect a dump, and test C2 reachability from inside the guest. It cannot edit module source; when the cause is a crash or a rejected injection, it returns `source_fix_required=true` and a brief for the editor. A guest-side repair is confirmed by the host with a fresh `AgentStatus` poll, never by model text.
+The debugger may launch a tool or artifact, kill a stuck process, read WER and Defender logs, collect a dump, and test C2 reachability from inside the guest. It cannot edit module source; when the cause is a crash or a rejected injection, it returns `source_fix_required=true` and a brief for the editor. A guest-side repair is confirmed by the host with a fresh `AgentStatus` poll, never by model text. The confirmation is recorded as `recovered_by=guest-debugger`; the cycle stays offline because the monitored run did not produce an attributable trace, so it is not a score baseline.
 
 ### Managing loops
 
@@ -244,6 +249,18 @@ EXE/DLL as `artifact_path`. Call
 `producer=crystal_pack dll=<artifact_path>` for Crystal Palace PICO shellcode;
 the producer output becomes active.
 
+A producer edit and a producer swap are different mechanisms. `producer` edits
+the current producer's source. `producer-swap` changes the wrapper itself and
+requires `GenerateAgent agent_type=windows_dll` followed by `BuildShellcode
+producer=crystal_pack dll=<artifact_path>`; the host rejects a `producer-swap`
+cycle when the active producer did not change. `crystal_pack` output is
+exercised by the Crystal-Kit module tests, including a deliberately invalid
+PICO that the DLL loader's crash gate contains; a failed PICO build or load is
+reported as a cycle error like any other producer failure. While
+`crystal_pack` is the active producer, automatic agent rotation builds a
+`windows_dll` agent even if `--agent-type` selected an executable, because
+Crystal Palace PICO cannot wrap an EXE.
+
 For `loader_windows`, the loop rejects a cycle whose artifact is too small to
 contain the active shellcode, and rejects a dynamic cycle the sandbox never
 executed. This prevents a loader that drops the agent payload just to reduce
@@ -253,7 +270,7 @@ detections.
 loader's shared build inputs (`modules/common`, `c_agent/*/util`) are exposed
 read-only, so the model can trace linked code without being able to edit it.
 
-If a cycle regresses, `RevertToPayload` replays the inverse of every recorded edit made after the chosen payload and restores the module and producer source. `DetectionCycle` records a mechanism label, one falsifiable prediction, the observed result, and the stage set with each cycle. It rejects a cycle when neither source nor shellcode changed, and it blocks a third cycle on the same mechanism after two predictions were not observed. The resume dossier carries the recent mechanism, prediction result, tested note, and edit reasons so a fresh agent session does not lose the direction it already tried. The cycle budget spans all attempts of one logical loop; it and the active shellcode are shown in the prompt and in every `DetectionCycle` result. `--iterations` and `--turns` default to 3 and 60; an explicit value is used as-is. `--stages` accepts `static`, `dynamic`, and `edr`; the loop requires at least one executing stage. `EditSource` has no separate per-cycle edit cap; a redesign may use as many edits as the turn budget allows.
+If a cycle regresses, `RevertToPayload` replays the inverse of every recorded edit made after the chosen payload and restores the module and producer source. `DetectionCycle` records a mechanism label, one falsifiable prediction, the observed result, and the stage set with each cycle. It rejects a cycle when neither source nor shellcode changed, and it refuses a third cycle on a mechanism whose last two cycles made no risk-score or verdict progress. `producer-swap` is a distinct mechanism: the host rejects it unless the active shellcode producer changed. The resume dossier carries the recent mechanism, prediction result, tested note, and edit reasons so a fresh agent session does not lose the direction it already tried. The cycle budget spans all attempts of one logical loop; it and the active shellcode are shown in the prompt and in every `DetectionCycle` result. `--iterations` and `--turns` default to 3 and 60; an explicit value is used as-is. `--stages` accepts `static`, `dynamic`, and `edr`; the loop requires at least one executing stage. `EditSource` has no separate per-cycle edit cap; a redesign may use as many edits as the turn budget allows.
 
 ### Reference cache
 

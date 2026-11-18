@@ -113,6 +113,20 @@ func (e *evolver) ensureFreshAgent(ctx context.Context) error {
 	return e.rotateAgent(ctx)
 }
 
+// rotationAgentType keeps the agent format compatible with the active
+// producer. Crystal Palace PICO wraps a DLL, so an explicit executable choice
+// must not survive a producer swap.
+func (e *evolver) rotationAgentType() string {
+	if strings.EqualFold(strings.TrimSpace(e.activeProducer), "crystal_pack") {
+		return "windows_dll"
+	}
+	agentType := strings.ToLower(strings.TrimSpace(e.cfg.AgentType))
+	if agentType == "" || agentType == "auto" {
+		return "windows_executable"
+	}
+	return agentType
+}
+
 func (e *evolver) rotationProducer(agentType string) string {
 	configured := func(name string) bool {
 		_, ok := e.cfg.ProducerDirs[name]
@@ -140,13 +154,7 @@ func (e *evolver) rotateAgent(ctx context.Context) error {
 	if e.cfg.BuildAgent == nil {
 		return fmt.Errorf("agent rotation is not configured")
 	}
-	agentType := strings.ToLower(strings.TrimSpace(e.cfg.AgentType))
-	if agentType == "" || agentType == "auto" {
-		agentType = "windows_executable"
-		if strings.EqualFold(strings.TrimSpace(e.activeProducer), "crystal_pack") {
-			agentType = "windows_dll"
-		}
-	}
+	agentType := e.rotationAgentType()
 	arch := strings.ToLower(strings.TrimSpace(e.cfg.AgentArch))
 	if arch == "" {
 		arch = "amd64"

@@ -84,6 +84,13 @@ dumps, and test C2 reachability. It cannot edit module source. The guest is the
 sandbox: the debugger may change its detection settings when they block
 execution and records every change; such a cycle is debug-assisted.
 
+--debugger-policy selects when it runs. final (default) reserves one pass for
+the stop decision, after the last payload has been rolled back; cycle restores
+the older behaviour of one pass after every non-executing cycle; off disables
+the debugger. A payload relaunched manually by the debugger does not become a
+verified baseline: the cycle stays offline and is not used for score
+comparisons or source restore.
+
 The loop records source history in a shadow go-git repository under the
 detection store; no git binary is required. Pass --git=false to disable it.
 
@@ -150,6 +157,7 @@ func addDetectLoopFlags(cmd *cobra.Command) {
 	cmd.Flags().Int("editor-turns", 60, "Maximum editor turns per session")
 	cmd.Flags().Int("debugger-turns", 24, "Maximum debugger turns per session")
 	cmd.Flags().Duration("debugger-timeout", 15*time.Minute, "Wall-clock limit for one debugger pass")
+	cmd.Flags().String("debugger-policy", "final", "When the guest debugger runs: final (one pass at the stop), cycle (after every non-executing cycle), or off")
 	cmd.Flags().StringToString("worker-model", nil, "Per-worker model override, for example planner=...,editor=...,debugger=...")
 	cmd.Flags().String("guest-ssh", "", "Sandbox guest SSH endpoint as user@host:port; enables the debugger worker (env EMP3R0R_DETECTION_GUEST_SSH)")
 	cmd.Flags().String("guest-ssh-key", "", "Sandbox-only SSH private key (env EMP3R0R_DETECTION_GUEST_SSH_KEY)")
@@ -172,6 +180,7 @@ func addDetectLoopFlags(cmd *cobra.Command) {
 	_ = cmd.RegisterFlagCompletionFunc("arch", completeFlagValues("amd64"))
 	_ = cmd.RegisterFlagCompletionFunc("smw", completeFlagValues("on", "off"))
 	_ = cmd.RegisterFlagCompletionFunc("stages", completeFlagValues("static", "dynamic"))
+	_ = cmd.RegisterFlagCompletionFunc("debugger-policy", completeFlagValues("final", "cycle", "off"))
 	_ = cmd.RegisterFlagCompletionFunc("process", completeFlagValues("dllhost.exe", "notepad.exe", "svchost.exe", "explorer.exe", "rundll32.exe"))
 	_ = cmd.RegisterFlagCompletionFunc("producer", completeFlagValues("donut", "crystal_pack"))
 	_ = cmd.RegisterFlagCompletionFunc("module-dir", completeFlagDirs)
@@ -341,6 +350,7 @@ type detectLoopOptions struct {
 	EditorTurns         int
 	DebuggerTurns       int
 	DebuggerTimeout     time.Duration
+	DebuggerPolicy      string
 	WorkerModels        map[string]string
 	GuestSSH            string
 	GuestSSHKey         string
@@ -394,6 +404,7 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 	opts.EditorTurns, _ = cmd.Flags().GetInt("editor-turns")
 	opts.DebuggerTurns, _ = cmd.Flags().GetInt("debugger-turns")
 	opts.DebuggerTimeout, _ = cmd.Flags().GetDuration("debugger-timeout")
+	opts.DebuggerPolicy, _ = cmd.Flags().GetString("debugger-policy")
 	opts.WorkerModels, _ = cmd.Flags().GetStringToString("worker-model")
 	opts.GuestSSH, _ = cmd.Flags().GetString("guest-ssh")
 	opts.GuestSSHKey, _ = cmd.Flags().GetString("guest-ssh-key")
@@ -424,6 +435,15 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 	}
 	if opts.Arch != "amd64" {
 		logging.Errorf("detect_loop: loader_windows is built for amd64; use --arch amd64")
+		return
+	}
+	switch policy := strings.ToLower(strings.TrimSpace(opts.DebuggerPolicy)); policy {
+	case "", "final":
+		opts.DebuggerPolicy = "final"
+	case "cycle", "off":
+		opts.DebuggerPolicy = policy
+	default:
+		logging.Errorf("detect_loop: debugger policy must be final, cycle, or off")
 		return
 	}
 	if opts.ModuleDir == "" {

@@ -143,6 +143,7 @@ func TestDebuggerOnePassPerCycleAndBudget(t *testing.T) {
 		cfg: EvolveConfig{
 			LoopID: "loop", Module: "loader_windows", ModuleDir: moduleDir,
 			StoreRoot: t.TempDir(), Iterations: 4, Turns: 4,
+			DebuggerPolicy: debuggerPolicyCycle,
 		},
 		db: db, roots: mustRoots(t, moduleDir), logf: func(logging.Class, string, ...any) {},
 		guest: &fakeGuestRunner{},

@@ -52,6 +52,7 @@ type coordinator struct {
 	currentPlan      plannerPlan
 	pendingPlan      *plannerPlan
 	forcedFixes      int
+	finalDebugDone   bool
 }
 
 func newCoordinator(e *evolver, provider llm.Provider, model string, baselineJSON json.RawMessage, knowledgeState string) *coordinator {
@@ -72,7 +73,12 @@ func (c *coordinator) run(ctx context.Context) (map[string]any, error) {
 		}
 		c.plans++
 		if c.plans > c.e.cfg.Iterations*4+10 {
-			return c.editorFailureFinal(fmt.Errorf("the coordinator exceeded its planning budget")), nil
+			final := c.failureFinal("the coordinator exceeded its planning budget", fmt.Errorf("the planner repeated or produced plans without completing a cycle"))
+			if c.lastEditorError != "" {
+				appendFinalResidual(final, "last editor error: "+clip(c.lastEditorError, 600))
+			}
+			c.finalDiagnosis(ctx, final)
+			return final, nil
 		}
 		var (
 			plan plannerPlan
@@ -93,7 +99,7 @@ func (c *coordinator) run(ctx context.Context) (map[string]any, error) {
 				c.infraFailures++
 				c.e.logClass(logging.ClassWarning, "planner infrastructure failure: %v", err)
 				if c.infraFailures >= maxInfraFailures {
-					return c.editorFailureFinal(err), nil
+					return c.failureFinal("the planner worker could not produce a plan", err), nil
 				}
 				c.plannerNote = "The previous planner session ended without a plan: " + clip(err.Error(), 400)
 				if !c.e.backoff(ctx, c.infraFailures, "planner infrastructure failure") {
@@ -101,8 +107,8 @@ func (c *coordinator) run(ctx context.Context) (map[string]any, error) {
 				}
 				continue
 			}
+			c.infraFailures = 0
 		}
-		c.infraFailures = 0
 		switch plan.Action {
 		case "stop":
 			final := plan.Final
@@ -113,15 +119,18 @@ func (c *coordinator) run(ctx context.Context) (map[string]any, error) {
 				final["summary"] = "the planner stopped the loop"
 			}
 			c.e.lastAnswer = final
-			if forced, ok := c.forceExecutionFix(); ok {
-				c.e.logClass(logging.ClassWarning, "planner stopped with an unresolved source-level execution fault; forcing the debugger's fix cycle")
-				c.pendingPlan = &forced
-				c.stopResumes = 0
-				continue
+			if c.debuggerPolicy() != debuggerPolicyFinal {
+				if forced, ok := c.forceExecutionFix(); ok {
+					c.e.logClass(logging.ClassWarning, "planner stopped with an unresolved source-level execution fault; forcing the debugger's fix cycle")
+					c.pendingPlan = &forced
+					c.stopResumes = 0
+					continue
+				}
 			}
 			if c.e.usedCycles() < c.e.cfg.Iterations && c.e.needsMoreWork(ctx) {
 				if c.stopResumes >= maxForcedResumes {
 					c.e.logClass(logging.ClassWarning, "planner stopped again with work remaining; accepting the stop")
+					c.finalDiagnosis(ctx, final)
 					return final, nil
 				}
 				c.stopResumes++
@@ -133,10 +142,22 @@ func (c *coordinator) run(ctx context.Context) (map[string]any, error) {
 				}
 				continue
 			}
+			c.finalDiagnosis(ctx, final)
 			return final, nil
 		case "test":
 			if c.e.usedCycles() >= c.e.cfg.Iterations {
 				c.plannerNote = "the cycle budget is exhausted; return action=stop with the final JSON"
+				continue
+			}
+			if c.repeatedNonImprovingMechanism(plan.Mechanism) {
+				c.rejectedPlans++
+				c.plannerNote = fmt.Sprintf("The last two cycles used mechanism %q without a risk-score or verdict improvement. Choose a different mechanism or producer-swap, or action=stop.", plan.Mechanism)
+				c.e.logClass(logging.ClassWarning, "planner repeated mechanism %q without progress", plan.Mechanism)
+				if c.rejectedPlans >= maxRejectedPlans {
+					final := c.coordinatorStopFinal("the planner repeated a non-improving mechanism twice: " + plan.Mechanism)
+					c.finalDiagnosis(ctx, final)
+					return final, nil
+				}
 				continue
 			}
 			before := c.e.iter
@@ -182,11 +203,13 @@ func (c *coordinator) run(ctx context.Context) (map[string]any, error) {
 		case "debug":
 			if !c.debuggerAvailable() {
 				reason := c.debuggerUnavailableReason()
-				c.rejectedPlans++
 				c.plannerNote = "The debugger is unavailable: " + reason + ". Do not choose action=debug; choose action=test with a concrete fix, or action=stop."
 				c.e.logClass(logging.ClassWarning, "planner requested an unavailable debugger: %s", reason)
+				c.rejectedPlans++
 				if c.rejectedPlans >= maxRejectedPlans {
-					return c.coordinatorStopFinal("the planner requested an unavailable debugger twice: " + reason), nil
+					final := c.coordinatorStopFinal("the planner requested an unavailable debugger twice: " + reason)
+					c.finalDiagnosis(ctx, final)
+					return final, nil
 				}
 				continue
 			}
@@ -205,14 +228,24 @@ func (c *coordinator) run(ctx context.Context) (map[string]any, error) {
 }
 
 func (c *coordinator) editorFailureFinal(err error) map[string]any {
-	summary := "the editor worker could not complete a cycle"
-	residual := []string{"editor failure: " + clip(err.Error(), 1000)}
+	return c.failureFinal("the editor worker could not complete a cycle", err)
+}
+
+// failureFinal reports the worker that actually stopped the loop. The final
+// answer must name the coordinator, planner, or editor failure instead of
+// blaming the editor for every path.
+func (c *coordinator) failureFinal(summary string, err error) map[string]any {
+	detail := "the loop stopped before a completed cycle"
+	if err != nil {
+		detail = err.Error()
+	}
 	final := map[string]any{
-		"summary": summary, "edits": []any{}, "residual": residual,
-		"parse_error": "the editor worker stopped before a completed cycle",
+		"summary": summary, "edits": []any{},
+		"residual":    []string{summary + ": " + clip(detail, 1000)},
+		"parse_error": summary,
 	}
 	c.e.lastAnswer = final
-	c.e.logClass(logging.ClassError, "stopping after repeated editor failures: %v", err)
+	c.e.logClass(logging.ClassError, "%s: %s", summary, clip(detail, 400))
 	return final
 }
 
@@ -273,6 +306,113 @@ func (c *coordinator) coordinatorStopFinal(reason string) map[string]any {
 	return final
 }
 
+// debuggerPolicy returns the normalized scheduling policy. An unset policy
+// behaves like final so a caller that bypasses normalization cannot fall back
+// to a guest pass after every cycle.
+func (c *coordinator) debuggerPolicy() string {
+	switch policy := strings.ToLower(strings.TrimSpace(c.e.cfg.DebuggerPolicy)); policy {
+	case debuggerPolicyCycle, debuggerPolicyOff:
+		return policy
+	default:
+		return debuggerPolicyFinal
+	}
+}
+
+// producerSwapTarget names a configured producer the loop has not used. A
+// swap needs a fresh agent artifact in the producer's expected format.
+func (c *coordinator) producerSwapTarget() string {
+	if c.e.cfg.BuildAgent == nil {
+		return ""
+	}
+	for _, name := range []string{"crystal_pack", "donut"} {
+		if _, ok := c.e.cfg.ProducerDirs[name]; ok && !strings.EqualFold(strings.TrimSpace(c.e.activeProducer), name) {
+			return name
+		}
+	}
+	return ""
+}
+
+// repeatedNonImprovingMechanism enforces the planner rule that two cycles of
+// the same mechanism without a score or verdict improvement must be followed
+// by a different mechanism. A non-executing cycle has no comparable result, so
+// it also counts as no improvement.
+func (c *coordinator) repeatedNonImprovingMechanism(candidate string) bool {
+	cycles := c.e.recentCycles(2)
+	if len(cycles) < 2 || strings.TrimSpace(candidate) == "" {
+		return false
+	}
+	previous, last := cycles[0], cycles[1]
+	var previousSummary, lastSummary cycleSummary
+	if json.Unmarshal([]byte(previous.Summary), &previousSummary) != nil ||
+		json.Unmarshal([]byte(last.Summary), &lastSummary) != nil {
+		return false
+	}
+	if previousSummary.Mechanism == "" ||
+		previousSummary.Mechanism != lastSummary.Mechanism ||
+		lastSummary.Mechanism != candidate {
+		return false
+	}
+	if last.Verdicts < previous.Verdicts {
+		return false
+	}
+	if previous.Execution == executionVerified && last.Execution == executionVerified &&
+		previous.Score > 0 && last.Score > 0 && last.Score < previous.Score {
+		return false
+	}
+	return true
+}
+
+// finalDiagnosis spends the deferred debugger pass on the last cycle when the
+// loop stops without a verified execution. The diagnosis belongs to the final
+// answer; it does not schedule another cycle.
+func (c *coordinator) finalDiagnosis(ctx context.Context, final map[string]any) {
+	if c.debuggerPolicy() != debuggerPolicyFinal || c.finalDebugDone {
+		return
+	}
+	if c.e.guest == nil || c.debuggerRemaining() <= 0 {
+		return
+	}
+	if c.e.last == nil || c.e.last.Execution == executionVerified || c.e.last.Execution == executionStatic {
+		return
+	}
+	c.finalDebugDone = true
+	diag, err := c.debug(ctx, debugRequest{
+		Trigger: fmt.Sprintf("final stop: cycle %d did not execute in the monitored run", c.e.last.Iteration),
+		Cycle:   c.e.last,
+		Repeat:  true,
+	})
+	if err != nil {
+		c.e.logClass(logging.ClassWarning, "final debugger pass: %v", err)
+		appendFinalResidual(final, "final debugger failed: "+clip(err.Error(), 400))
+		return
+	}
+	if diag == nil {
+		return
+	}
+	final["debugger_diagnosis"] = diag
+	appendFinalResidual(final, fmt.Sprintf("final debugger: %s (source_fix=%v, online_after=%v)",
+		clip(diag.Cause, 500), diag.SourceFixRequired, diag.AgentOnlineAfter))
+}
+
+// appendFinalResidual adds one line to the planner's final answer without
+// assuming the JSON array arrived as []any or []string.
+func appendFinalResidual(final map[string]any, item string) {
+	switch existing := final["residual"].(type) {
+	case []any:
+		final["residual"] = append(existing, item)
+	case []string:
+		values := make([]any, 0, len(existing)+1)
+		for _, value := range existing {
+			values = append(values, value)
+		}
+		final["residual"] = append(values, item)
+	case nil:
+		final["residual"] = []any{item}
+	default:
+		final["residual"] = []any{fmt.Sprintf("%v", existing), item}
+	}
+}
+
 // debuggerBudget is the total debugger sessions available to this loop. One
 // pass is allowed per cycle; the total follows the cycle budget.
 func (c *coordinator) debuggerBudget() int {
@@ -290,6 +430,9 @@ func (c *coordinator) debuggerAvailable() bool {
 
 func (c *coordinator) debuggerAvailableFor(cycle *Cycle) bool {
 	if c.e.guest == nil || c.debuggerRemaining() <= 0 {
+		return false
+	}
+	if c.debuggerPolicy() != debuggerPolicyCycle {
 		return false
 	}
 	if cycle != nil && cycle.ID != 0 {
@@ -312,6 +455,12 @@ func (c *coordinator) debuggerUnavailableFor(cycle *Cycle) string {
 	}
 	if c.debuggerRemaining() <= 0 {
 		return fmt.Sprintf("no sessions remain (%d/%d used)", c.debuggerSessions, c.debuggerBudget())
+	}
+	switch c.debuggerPolicy() {
+	case debuggerPolicyOff:
+		return "the debugger is disabled by --debugger-policy off"
+	case debuggerPolicyFinal:
+		return "the debugger runs once at the final stop (--debugger-policy final)"
 	}
 	if cycle != nil && cycle.ID != 0 {
 		if _, seen := c.debugged.Load(cycle.ID); seen {
@@ -347,6 +496,25 @@ func (c *coordinator) afterCycle(ctx context.Context, cycle *Cycle) error {
 		c.plannerNote = "Execution is blocked: the host could not establish a usable execution path. Return action=stop with the final JSON."
 		return nil
 	}
+	if gate == gateRegressed {
+		baseline := c.e.lastExecuting
+		c.lastDiagnosis = nil
+		restore := "no clean baseline exists"
+		previousHigh, previousScore := 0, 0.0
+		if baseline != nil {
+			restore = lastGoodRef(baseline)
+			previousHigh, previousScore = cycleHighFindings(baseline), baseline.Score
+			if err := c.e.restoreExecutingState(ctx); err != nil {
+				restore += " (restore incomplete: " + clip(err.Error(), 300) + ")"
+			}
+			c.e.logClass(logging.ClassWarning,
+				"cycle %d regressed (high %d -> %d, score %.2f -> %.2f); restored %s",
+				cycle.Iteration, previousHigh, summary.HighFindings, previousScore, cycle.Score, lastGoodRef(baseline))
+		}
+		c.plannerNote = fmt.Sprintf("Cycle %d regressed (high findings %d -> %d, risk score %.2f -> %.2f); the host restored %s. Do not repeat this change: test a different producer or mechanism, or stop with the evidence.",
+			cycle.Iteration, previousHigh, summary.HighFindings, previousScore, cycle.Score, restore)
+		return nil
+	}
 	if gate != gateRestore {
 		return nil
 	}
@@ -366,6 +534,15 @@ func (c *coordinator) afterCycle(ctx context.Context, cycle *Cycle) error {
 		}
 		return ""
 	}
+	if policy := c.debuggerPolicy(); policy != debuggerPolicyCycle {
+		reason := "deferred to the final stop"
+		if policy == debuggerPolicyOff {
+			reason = "disabled"
+		}
+		c.e.logClass(logging.ClassWarning, "cycle %d did not execute; debugger pass %s", cycle.Iteration, reason)
+		c.plannerNote = fmt.Sprintf("%s. The guest debugger is %s. %s. Fix why the generated agent never checked in before changing detection code, or choose action=stop; this cycle's score is not a detection result.", run, reason, restored) + restoreIfPossible()
+		return nil
+	}
 	if !c.debuggerAvailableFor(cycle) {
 		unavailable := c.debuggerUnavailableFor(cycle)
 		c.e.logClass(logging.ClassWarning, "cycle %d did not execute; no debugger pass: %s", cycle.Iteration, unavailable)
@@ -384,20 +561,12 @@ func (c *coordinator) afterCycle(ctx context.Context, cycle *Cycle) error {
 	}
 	if diag != nil {
 		c.lastDiagnosis = diag
-		if c.e.lastExecutionVerified(cycle) {
-			c.plannerNote = fmt.Sprintf("Cycle %d was recovered by the guest debugger (cause: %s). Its telemetry is not a clean detection baseline; plan a fresh cycle after the execution fix.", cycle.Iteration, clip(diag.Cause, 240))
-			return nil
-		}
-		c.plannerNote = fmt.Sprintf("%s. Debugger cause: %s; source_fix=%v; online_after=%v. Fix the execution cause before changing detection code; this cycle's score is not a detection result.", run, clip(diag.Cause, 400), diag.SourceFixRequired, diag.AgentOnlineAfter)
+		c.plannerNote = fmt.Sprintf("%s. Debugger cause: %s; source_fix=%v; online_after=%v. A manual relaunch is not a detection baseline. Fix the execution cause before changing detection code; this cycle's score is not a detection result.", run, clip(diag.Cause, 400), diag.SourceFixRequired, diag.AgentOnlineAfter)
 	} else {
 		c.plannerNote = fmt.Sprintf("%s. %s. Continue with action=test or action=stop.", run, restored)
 	}
 	c.plannerNote += restoreIfPossible()
 	return nil
-}
-
-func (e *evolver) lastExecutionVerified(cycle *Cycle) bool {
-	return cycle != nil && cycle.Execution == executionVerified && e.lastExecuting == cycle
 }
 
 // plan asks the coordinator worker for the next move. Parse repair continues
@@ -550,7 +719,9 @@ func (c *coordinator) recoverCycle(ctx context.Context, cycle *Cycle, diag debug
 	online := true
 	var summary cycleSummary
 	_ = json.Unmarshal([]byte(cycle.Summary), &summary)
-	summary.Execution = executionVerified
+	// A manual relaunch proves the payload can run, not that the monitored run
+	// produced a comparable detection result. Keep the cycle offline so it
+	// cannot become the score baseline or the source later cycles restore to.
 	summary.AgentOnline = &online
 	summary.RecoveredBy = "guest-debugger"
 	summary.DebuggerCause = diag.Cause
@@ -558,21 +729,20 @@ func (c *coordinator) recoverCycle(ctx context.Context, cycle *Cycle, diag debug
 	if encoded, err := json.Marshal(summary); err == nil {
 		cycle.Summary = string(encoded)
 	}
-	cycle.Execution = executionVerified
 	cycle.AgentOnline = &online
-	c.e.lastExecuting = cycle
-	c.e.lastExecution.Store(executionVerified)
 	for i := range c.e.cycles {
 		if c.e.cycles[i].ID == cycle.ID {
 			c.e.cycles[i] = *cycle
 		}
 	}
 	if cycle.ID != 0 {
-		if err := c.e.db.UpdateCycleRecovery(ctx, cycle.ID, executionVerified, &online, cycle.Summary); err != nil {
+		if err := c.e.db.UpdateCycleRecovery(ctx, cycle.ID, cycle.Execution, &online, cycle.Summary); err != nil {
 			c.e.logClass(logging.ClassError, "record debugger recovery: %v", err)
 		}
 	}
-	c.e.logClass(logging.ClassCycle, "debugger recovered cycle %d: %s", cycle.Iteration, clip(diag.Cause, 200))
+	c.e.logClass(logging.ClassCycle,
+		"debugger confirmed cycle %d runs after a manual relaunch; the cycle remains %s and is not a detection baseline: %s",
+		cycle.Iteration, headerOrNone(cycle.Execution), clip(diag.Cause, 200))
 }
 
 func (c *coordinator) watchdog(ctx context.Context, cancel context.CancelFunc, done <-chan struct{}, hardSession bool, sessionTimeout, idleTimeout time.Duration, started time.Time, sessionExpired, idleExpired *atomic.Bool) {
@@ -767,6 +937,10 @@ func (c *coordinator) plannerBrief() string {
 	fmt.Fprintf(&b, "Module: %s\nModule source: %s\nGoal: %s\n", c.e.cfg.Module, c.e.cfg.ModuleDir, headerOrNone(c.e.cfg.Goal))
 	fmt.Fprintf(&b, "Agent C2: %s\nExpected agent UUID: %s\nAgent type: %s\n", headerOrNone(c.e.cfg.AgentCC), headerOrNone(c.e.expectedAgentUUID), headerOrNone(c.e.cfg.AgentType))
 	fmt.Fprintf(&b, "Active shellcode: %s\nActive producer: %s\nSource roots: %s\n", c.e.shellcode, headerOrNone(c.e.activeProducer), c.e.roots.describe())
+	if target := c.producerSwapTarget(); target != "" {
+		fmt.Fprintf(&b, "Producer swap: %s is configured and not active; the swap needs GenerateAgent agent_type=windows_dll, then BuildShellcode producer=%s dll=<artifact_path>, then mechanism=producer-swap. A donut source edit is mechanism=producer, not a swap.\n",
+			target, target)
+	}
 	fmt.Fprintf(&b, "Cycle budget: %d total; %d used; %d remain\nStages: %s\n",
 		c.e.cfg.Iterations, c.e.usedCycles(), max(0, c.e.cfg.Iterations-c.e.usedCycles()), strings.Join(stageNames(c.e.cfg.Stages), ", "))
 	fmt.Fprintf(&b, "Baseline: %s\nBaseline failure: %s\n", string(c.baselineJSON), headerOrNone(c.e.baselineFailure))
@@ -774,6 +948,11 @@ func (c *coordinator) plannerBrief() string {
 	switch {
 	case c.e.guest == nil:
 		b.WriteString("Guest debugger: disabled (no --guest-ssh); execution=offline cannot be diagnosed inside the VM.\n")
+	case c.debuggerPolicy() == debuggerPolicyOff:
+		b.WriteString("Guest debugger: disabled by --debugger-policy off; do not choose action=debug.\n")
+	case c.debuggerPolicy() == debuggerPolicyFinal:
+		fmt.Fprintf(&b, "Guest debugger: deferred to the final stop (%d of %d sessions remain); do not choose action=debug in this cycle.\n",
+			c.debuggerRemaining(), c.debuggerBudget())
 	case c.debuggerRemaining() <= 0:
 		fmt.Fprintf(&b, "Guest debugger: unavailable (%d of %d sessions used); do not choose action=debug.\n",
 			c.debuggerSessions, c.debuggerBudget())

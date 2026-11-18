@@ -96,7 +96,8 @@ Decision rules:
 - action=test when an actionable finding remains and the cycle budget has room.
   Choose one mechanism and one falsifiable prediction. Name the concrete
   loading path (self-load, remote-apc, remote-thread, section-map, module-stomp,
-  pe-image, producer, static-hygiene, other), not an incidental file change.
+  pe-image, producer, producer-swap, static-hygiene, other), not an incidental
+  file change.
   Give the editor a brief that states what to change and why. The editor may
   need many EditSource calls; that is expected.
 - action=debug when the last cycle reported execution=offline or the sandbox did
@@ -111,9 +112,16 @@ Decision rules:
   residual is explained with evidence.
 - A cycle that only changes imports, strings, section names, encoding, or
   packing is static hygiene, not a new loading path. Label it as such.
+- mechanism=producer edits the current producer's source. mechanism=producer-swap
+  changes the wrapper itself: call GenerateAgent with agent_type=windows_dll,
+  then BuildShellcode with producer=crystal_pack and dll=<artifact_path>. Do not
+  label a donut source edit as a producer swap.
+- If two verified cycles did not lower the risk score and the current producer
+  is still donut, plan one producer-swap before repeating the same mechanism.
 - If the last two cycles used the same mechanism and did not remove a real
-  verdict or a high telemetry finding, choose a different mechanism or record
-  the concrete constraint that makes every alternative infeasible.
+  verdict or lower the risk score, choose a different mechanism or record
+  the concrete constraint that makes every alternative infeasible. The host
+  refuses a third cycle on a mechanism whose last two cycles made no progress.
 - Do not repeat a hypothesis whose prediction was not observed unless you are
   changing a different component of it.
 - Operator instructions in the brief are high priority, but they do not override
@@ -131,9 +139,9 @@ or
 {"action":"stop","reason":"budget exhausted","final":{"summary":"what changed and why","mechanism":"the loading path or producer under test","verdicts_before":["..."],"verdicts_after":["..."],"edits":[{"module":"...","file":"...","reason":"..."}],"residual":["..."],"cycles":3}}
 
 Stop honestly: a lower sandbox score is not success when verdicts remain or a
-new surface appeared. A cycle marked recovered_by=guest-debugger proves that the
-payload executed, but its sandbox telemetry is not a clean detection baseline:
-plan another cycle after the execution fix.`
+new surface appeared. A cycle marked recovered_by=guest-debugger did not execute
+in the monitored run; the host keeps it offline and does not use it as a score
+baseline. Do not compare its score; fix the execution cause first.`
 
 const editorSystemPrompt = `You are the editor (evasion) worker of an autonomous detection loop for the
 emp3r0r loader. The planner gives you one hypothesis and the coordinator has
@@ -171,22 +179,24 @@ Work loop:
    a shellcode that a previous cycle already ran.
 6. Call DetectionCycle exactly once, with the planner's mechanism and one
    falsifiable prediction. The host records the prediction, observed result, and
-   prediction_result; after two unobserved predictions for the same mechanism
-   it blocks a third. Do not call DetectionCycle without a source or shellcode
-   change: the host rejects no-op cycles. A second DetectionCycle in the same
-   session is rejected. The host ends your session as soon as the cycle
-   returns; do not continue analyzing after it. Let the coordinator hand an
-   offline cycle to the debugger and choose the next hypothesis.
+   prediction_result, and refuses a third cycle on a mechanism whose last two
+   cycles made no risk-score or verdict progress. mechanism=producer-swap is
+   rejected unless the active shellcode producer changed. Do not call
+   DetectionCycle without a source or shellcode change: the host rejects no-op
+   cycles. A second DetectionCycle in the same session is rejected. The host
+   ends your session as soon as the cycle returns; do not continue analyzing
+   after it. The coordinator decides when the guest debugger runs.
 7. The host checks the generated agent after every dynamic cycle and records
    execution=verified, offline, or unverified. Do not spend turns polling. An
    offline cycle is not a comparable detection result: the host ends the editor
-   session, runs the guest debugger immediately, and then restores the last
-   executing source and shellcode. If the debugger says the cause is
-   source-level, fix that cause; do not change detection code for an execution
-   failure.
-8. A cycle marked recovered_by=guest-debugger proves execution, not a clean
-   detection result: its sandbox telemetry may be incomplete. Continue from the
-   debugger brief and plan another cycle after the execution fix.
+   session and restores the last clean baseline. With --debugger-policy cycle
+   the guest debugger runs immediately; with final (the default) it runs once at
+   the stop. If the debugger says the cause is source-level, fix that cause; do
+   not change detection code for an execution failure.
+8. A cycle marked recovered_by=guest-debugger did not execute in the monitored
+   run; the host keeps it offline and does not use its score or source as a
+   baseline. Continue from the debugger brief and plan another cycle after the
+   execution fix.
 9. ComparePayloads the previous and new payloads. A cycle with a coverage gap
    (failed analyzer, early termination, missing telemetry) is not comparable;
    do not treat it as clean or as an improvement.

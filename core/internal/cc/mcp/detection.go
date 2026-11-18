@@ -158,6 +158,7 @@ func (a *Actions) detectionTools() map[string]Tool {
 						"planner_read_budget":  IntegerProp("Read-only calls before the planner must return a plan. Default 12; negative disables."),
 						"editor_read_budget":   IntegerProp("Read-only calls without an edit before the editor loses read tools. Default 12; negative disables."),
 						"debugger_tool_budget": IntegerProp("Total calls per debugger pass. 0 means no cap; turn and time limits still apply."),
+						"debugger_policy":      map[string]any{"type": "string", "enum": []string{"final", "cycle", "off"}, "description": "When the guest debugger runs: final (one pass at the stop, default), cycle (after every non-executing cycle), or off."},
 						"iterations":           IntegerProp("Maximum cycles including baseline. Default 3."),
 						"stages":               map[string]any{"type": "array", "items": map[string]any{"type": "string", "enum": []string{"static", "dynamic"}}, "description": "Stages; dynamic is required."},
 						"process":              StringProp("Sacrificial process override; omit to let the source default control it."),
@@ -248,6 +249,7 @@ type detectionArgs struct {
 	PlannerReadBudget  int      `json:"planner_read_budget"`
 	EditorReadBudget   int      `json:"editor_read_budget"`
 	DebuggerToolBudget int      `json:"debugger_tool_budget"`
+	DebuggerPolicy     string   `json:"debugger_policy"`
 	Iterations         int      `json:"iterations"`
 	Process            string   `json:"process"`
 	Format             string   `json:"format"`
@@ -848,7 +850,7 @@ func (a *Actions) detectionLoop(ctx context.Context, raw json.RawMessage) (any, 
 		Stages: args.Stages, Iterations: args.Iterations, Turns: args.Turns, Git: true,
 		ExpectedAgentUUID: strings.TrimSpace(args.AgentUUID),
 		AgentType:         agentType, AgentArch: arch, AgentCC: strings.TrimSpace(a.DefaultCC),
-		Guest: guest, Verify: verify,
+		Guest: guest, Verify: verify, DebuggerPolicy: args.DebuggerPolicy,
 		BuildAgent: func(opts detection.AgentBuildOptions) (*detection.AgentBuildResult, error) {
 			return a.buildDetectionAgent(opts)
 		},

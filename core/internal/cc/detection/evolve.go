@@ -42,6 +42,20 @@ const (
 	// defaultEditorTimeout bounds the editor's analysis before it must act.
 	// The window resets on a completed cycle.
 	defaultEditorTimeout = 10 * time.Minute
+	// Debugger policies. cycle runs a guest pass after every non-executing
+	// cycle, final reserves one pass for the stop decision, and off disables
+	// the debugger. A non-executing cycle is rolled back to the last clean
+	// baseline, so mid-loop diagnosis mostly repeats the same harness
+	// findings instead of informing a new edit.
+	debuggerPolicyCycle = "cycle"
+	debuggerPolicyFinal = "final"
+	debuggerPolicyOff   = "off"
+	// defaultDebuggerPolicy spends the guest pass once, on the last payload,
+	// instead of after every execution failure.
+	defaultDebuggerPolicy = debuggerPolicyFinal
+	// scoreRegressionSlack is the risk-score increase that counts as a
+	// regression. The sandbox score is coarse, so a small change is noise.
+	scoreRegressionSlack = 0.5
 	// minAgentShellcodeBytes rejects a tiny blob that no real Go agent could
 	// have produced. It catches a loader that drops the payload to reduce
 	// detections.
@@ -147,6 +161,9 @@ type EvolveConfig struct {
 	// Guest is the sandbox guest SSH endpoint. When nil, the debugger worker
 	// is not registered and offline cycles follow the restore-only path.
 	Guest *GuestSSHConfig
+	// DebuggerPolicy selects when the guest debugger runs: final (default),
+	// cycle, or off. final reserves one pass for the stop decision.
+	DebuggerPolicy string
 	// GuestRunner overrides the SSH client. Tests inject a fake; production
 	// leaves it nil so Guest builds the real client.
 	GuestRunner GuestRunner
@@ -916,6 +933,14 @@ func normalizeEvolveConfig(cfg *EvolveConfig) error {
 	if cfg.EditorReadBudget == 0 {
 		cfg.EditorReadBudget = editorReadBudget
 	}
+	switch strings.ToLower(strings.TrimSpace(cfg.DebuggerPolicy)) {
+	case "":
+		cfg.DebuggerPolicy = defaultDebuggerPolicy
+	case debuggerPolicyCycle, debuggerPolicyFinal, debuggerPolicyOff:
+		cfg.DebuggerPolicy = strings.ToLower(strings.TrimSpace(cfg.DebuggerPolicy))
+	default:
+		return fmt.Errorf("unknown debugger policy %q; use final, cycle, or off", cfg.DebuggerPolicy)
+	}
 	return nil
 }
 
@@ -956,6 +981,8 @@ type cycleSummary struct {
 	Score            float64         `json:"score"`
 	Level            string          `json:"level,omitempty"`
 	Findings         int             `json:"findings"`
+	HighFindings     int             `json:"high_findings,omitempty"`
+	MediumFindings   int             `json:"medium_findings,omitempty"`
 	Verdicts         []string        `json:"verdicts,omitempty"`
 	TraceID          int64           `json:"trace_id,omitempty"`
 	Events           int             `json:"telemetry_events"`
@@ -1035,6 +1062,13 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 	cycleCtx, cancelCycle := context.WithTimeout(ctx, timeout)
 	defer cancelCycle()
 	iteration := e.iter + 1
+	if mechanism == "producer-swap" {
+		previous := e.lastProducer()
+		if previous != "" && strings.EqualFold(previous, e.activeProducer) {
+			return Cycle{}, fmt.Errorf("producer-swap did not change the shellcode producer (still %s); call GenerateAgent and BuildShellcode with a different producer before DetectionCycle",
+				headerOrNone(e.activeProducer))
+		}
+	}
 
 	if _, err := e.waitSandbox(cycleCtx); err != nil {
 		return Cycle{}, err
@@ -1242,6 +1276,7 @@ func summarizeCycle(loopID string, iteration int, run Run, feedback Feedback, bu
 		Executed: execution == executionVerified, Execution: execution,
 		AgentOnline: online, NetworkEvents: networkEvents,
 	}
+	summary.HighFindings, summary.MediumFindings = countFindingsBySeverity(feedback.Findings)
 	if run.Telemetry != nil {
 		summary.PayloadKey = run.Telemetry.PayloadKey
 		summary.PayloadTable = run.Telemetry.PayloadTable
@@ -1279,6 +1314,21 @@ func summarizeCycle(loopID string, iteration int, run Run, feedback Feedback, bu
 		summary.BuildTail = append(summary.BuildTail, clipUTF8(line, 500))
 	}
 	return summary
+}
+
+// countFindingsBySeverity records the metric the loop optimizes. The total
+// finding count includes low-severity context, so it cannot show whether a
+// cycle reduced high telemetry.
+func countFindingsBySeverity(findings []Finding) (high, medium int) {
+	for _, finding := range findings {
+		switch strings.ToLower(strings.TrimSpace(finding.Severity)) {
+		case "critical", "high":
+			high++
+		case "medium":
+			medium++
+		}
+	}
+	return high, medium
 }
 
 func shortSHA(sha string) string {
@@ -1385,7 +1435,21 @@ const (
 	gateExecuting
 	gateBlocked
 	gateRestore
+	gateRegressed
 )
+
+// cycleHighFindings reads the comparable high-severity count from a cycle
+// summary. Older rows without the field count as zero.
+func cycleHighFindings(cycle *Cycle) int {
+	if cycle == nil || strings.TrimSpace(cycle.Summary) == "" {
+		return 0
+	}
+	var summary cycleSummary
+	if json.Unmarshal([]byte(cycle.Summary), &summary) != nil {
+		return 0
+	}
+	return summary.HighFindings
+}
 
 // recordExecution updates the last-executing state without touching the
 // source. The coordinator can then run the debugger before deciding whether
@@ -1393,6 +1457,20 @@ const (
 func (e *evolver) recordExecution(cycle *Cycle, summary cycleSummary) executionGate {
 	switch summary.Execution {
 	case executionVerified:
+		// A verified cycle replaces the baseline only when it does not raise
+		// high telemetry and does not worsen the risk score. Otherwise the
+		// worse payload would become the source later cycles restore to.
+		if previous := e.lastExecuting; previous != nil && previous.ID != 0 {
+			previousHigh := cycleHighFindings(previous)
+			if summary.HighFindings > previousHigh {
+				return gateRegressed
+			}
+			if summary.HighFindings == previousHigh &&
+				previous.Score > 0 && cycle.Score > 0 &&
+				cycle.Score > previous.Score+scoreRegressionSlack {
+				return gateRegressed
+			}
+		}
 		e.lastExecuting = cycle
 		e.setPreservedShellcode(summary.Shellcode)
 		e.restoreErr = nil
@@ -1622,9 +1700,10 @@ func (e *evolver) dossier() string {
 		if global < 1 {
 			global = e.globalUsed + cycle.Iteration
 		}
-		fmt.Fprintf(&b, "- attempt %d cycle %d (global %d): mechanism=%s score=%.2f level=%s findings=%d verdicts=%d execution=%s network=%d shellcode=%s files=%s\n",
+		fmt.Fprintf(&b, "- attempt %d cycle %d (global %d): mechanism=%s score=%.2f level=%s findings=%d high=%d medium=%d verdicts=%d execution=%s network=%d shellcode=%s files=%s\n",
 			attempt, cycle.Iteration, global, headerOrNone(summary.Mechanism), cycle.Score, cycle.Level,
-			cycle.Findings, cycle.Verdicts, headerOrNone(summary.Execution), summary.NetworkEvents,
+			cycle.Findings, summary.HighFindings, summary.MediumFindings, cycle.Verdicts,
+			headerOrNone(summary.Execution), summary.NetworkEvents,
 			headerOrNone(filepath.Base(summary.Shellcode)), joinOrNone(files))
 		if summary.RecoveredBy != "" {
 			fmt.Fprintf(&b, "  recovered_by=%s cause=%s\n", summary.RecoveredBy, clip(sanitizeLine(summary.DebuggerCause), 240))
@@ -1702,7 +1781,11 @@ func (e *evolver) needsMoreWork(ctx context.Context) bool {
 		return true
 	}
 	if e.last.Execution == executionOffline {
-		return true
+		// An execution failure is an execution-gate problem, not a detection
+		// result. The plan already restored the last clean baseline, and the
+		// debugger policy decides whether the guest is inspected. Another
+		// detection cycle cannot fix a payload that never ran.
+		return false
 	}
 	var lastSummary cycleSummary
 	if json.Unmarshal([]byte(e.last.Summary), &lastSummary) == nil && lastSummary.RecoveredBy != "" {
@@ -1802,10 +1885,11 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 					"type": "string",
 					"enum": []string{
 						"baseline", "self-load", "remote-apc", "remote-thread",
-						"section-map", "module-stomp", "pe-image", "producer", "static-hygiene", "other",
+						"section-map", "module-stomp", "pe-image", "producer", "producer-swap", "static-hygiene", "other",
 					},
 					"description": "Execution mechanism or producer under test. " +
 						"Use a different value when you change the loading path; reuse it only when refining the same mechanism. " +
+						"producer edits the current producer source; producer-swap changes the wrapper and requires a different active producer. " +
 						"Name the concrete mechanism, not an incidental file or import change.",
 				},
 				"note":       map[string]any{"type": "string", "description": "What this cycle is testing."},

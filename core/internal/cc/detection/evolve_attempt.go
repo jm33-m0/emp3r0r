@@ -95,6 +95,21 @@ func (e *evolver) recentCycles(limit int) []Cycle {
 	return all
 }
 
+// lastProducer reports the shellcode producer of the most recent cycle. It
+// distinguishes a source edit inside the current producer from an actual
+// producer swap.
+func (e *evolver) lastProducer() string {
+	cycles := e.recentCycles(1)
+	if len(cycles) == 0 {
+		return ""
+	}
+	var summary cycleSummary
+	if json.Unmarshal([]byte(cycles[0].Summary), &summary) != nil {
+		return ""
+	}
+	return strings.TrimSpace(summary.Producer)
+}
+
 func (e *evolver) pendingEditLines(limit int) []string {
 	if len(e.pendingEdits) == 0 {
 		return nil

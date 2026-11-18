@@ -388,7 +388,8 @@ func parsePlannerPlan(text string) (plannerPlan, error) {
 var evolveMechanisms = map[string]bool{
 	"baseline": true, "self-load": true, "remote-apc": true,
 	"remote-thread": true, "section-map": true, "module-stomp": true,
-	"pe-image": true, "producer": true, "static-hygiene": true, "other": true,
+	"pe-image": true, "producer": true, "producer-swap": true,
+	"static-hygiene": true, "other": true,
 }
 
 func parseDebugDiagnosis(text string) (debugDiagnosis, error) {
