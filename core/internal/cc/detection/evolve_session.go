@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/Autumn-27/norma/agentcore"
-	"github.com/Autumn-27/norma/compaction"
 	"github.com/Autumn-27/norma/harness"
 	"github.com/Autumn-27/norma/llm"
 	"github.com/Autumn-27/norma/permission"
@@ -82,7 +81,7 @@ func (c *coordinator) newWorkerSession(role evolveRole) *workerSession {
 		MaxTokens:              maxWorkerTokens,
 		EscalateMaxTokens:      true,
 		DisableBackgroundTasks: true,
-		Compaction:             &compaction.Config{ContextWindow: 200000, MaxOutputTokens: maxWorkerTokens, KeepRecent: 8},
+		Compactor:              newWorkerCompactor(c.provider, maxWorkerTokens),
 		Settlement:             c.settlementFor(role),
 		OnWarn:                 func(line string) { c.e.logf(logging.ClassWarning, "%s: %s", role.label(), line) },
 	}
