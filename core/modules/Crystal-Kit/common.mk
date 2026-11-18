@@ -8,16 +8,20 @@
 #     -O0 (__ubsan_handle_*, __stack_chk_guard/__stack_chk_fail);
 #   - it lowers aggregate zero-initialization to libc memset calls at -O0,
 #     and -O2 turns the hand-rolled zeroing loops into memset as well;
-#   - -O2 may emit jump tables in .rdata, which Crystal Palace rejects.
-# -O2 with the -fno-* flags below keeps the code free of all of those while
-# still letting Crystal Palace's own `make pic +optimize` control final size.
+#   - -O2 may emit jump tables in .rdata, which Crystal Palace rejects;
+#   - Crystal Palace concatenates sections without preserving the 16-byte
+#     alignment of .rdata, so an aligned SSE2 constant load (movdqa) faults
+#     at runtime. -mno-sse2 keeps the objects on integer moves.
+# -O2 with the flags below keeps the code free of all of those while still
+# letting Crystal Palace's own `make pic +optimize` control final size.
 # -g0 also drops CodeView debug info from the shellcode.
 
 CC_64 ?= x86_64-w64-mingw32-gcc
 NASM ?= nasm
 
 CFLAGS_COMMON = -DWIN_X64 -shared -Wall -Wno-pointer-arith -O2 -g0 \
-	-fno-builtin -fno-jump-tables -fno-sanitize=undefined -fno-stack-protector
+	-fno-builtin -fno-jump-tables -fno-sanitize=undefined -fno-stack-protector \
+	-mno-sse2
 
 # Native MinGW gcc needs a Windows temp path when invoked from MSYS/Cygwin;
 # otherwise it falls back to C:\Windows and fails to create temporary files.
