@@ -135,13 +135,15 @@ func (e *evolver) rotationProducer(agentType string) string {
 	if active := strings.ToLower(strings.TrimSpace(e.activeProducer)); active != "" && configured(active) {
 		return active
 	}
-	if strings.EqualFold(agentType, "windows_dll") && configured("crystal_pack") {
+	if strings.EqualFold(agentType, "windows_dll") && configured("crystal_pack") &&
+		producerCanRun("crystal_pack", e.cfg.ProducerDirs["crystal_pack"]) {
 		return "crystal_pack"
 	}
 	if configured("donut") {
 		return "donut"
 	}
-	if configured("crystal_pack") {
+	if configured("crystal_pack") &&
+		producerCanRun("crystal_pack", e.cfg.ProducerDirs["crystal_pack"]) {
 		return "crystal_pack"
 	}
 	return ""

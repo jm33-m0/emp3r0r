@@ -325,7 +325,11 @@ func (c *coordinator) producerSwapTarget() string {
 		return ""
 	}
 	for _, name := range []string{"crystal_pack", "donut"} {
-		if _, ok := c.e.cfg.ProducerDirs[name]; ok && !strings.EqualFold(strings.TrimSpace(c.e.activeProducer), name) {
+		dir, ok := c.e.cfg.ProducerDirs[name]
+		if !ok || !producerCanRun(name, dir) {
+			continue
+		}
+		if !strings.EqualFold(strings.TrimSpace(c.e.activeProducer), name) {
 			return name
 		}
 	}

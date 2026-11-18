@@ -122,13 +122,27 @@ if [ ! -f "$LIBTCG" ]; then
   exit 1
 fi
 
+if [ -z "$JAVA" ] && [ -n "${JAVA_HOME:-}" ] && [ -x "$JAVA_HOME/bin/java" ]; then
+  JAVA="$JAVA_HOME/bin/java"
+fi
+if [ -z "$JAVA" ] && command -v java >/dev/null 2>&1; then
+  JAVA="$(command -v java)"
+fi
 if [ -z "$JAVA" ]; then
-  if command -v java >/dev/null 2>&1; then
-    JAVA="$(command -v java)"
-  else
-    echo "[-] java not found in PATH. Install a JRE or set JAVA=/path/to/java." >&2
-    exit 1
-  fi
+  for candidate in \
+    "${EMP3R0R_PREFIX:-/usr/local}/lib/emp3r0r/jre/bin/java" \
+    "$HOME/.emp3r0r/jre/bin/java" \
+    /usr/lib/jvm/*/bin/java \
+    /usr/lib64/jvm/*/bin/java; do
+    if [ -x "$candidate" ]; then
+      JAVA="$candidate"
+      break
+    fi
+  done
+fi
+if [ -z "$JAVA" ]; then
+  echo "[-] java not found. Install a JRE, set JAVA=/path/to/java, or put one in $HOME/.emp3r0r/jre." >&2
+  exit 1
 fi
 
 DLL_ABS="$(abspath "$DLL")"

@@ -270,6 +270,12 @@ func (e *evolver) buildShellcodeWithProducer(ctx context.Context, producerName s
 	if err != nil {
 		return Artifact{}, nil, "", err
 	}
+	if !producerCanRun(producer, dir) {
+		if producer == "crystal_pack" {
+			return Artifact{}, nil, "", fmt.Errorf("producer %s is not runnable on this host: Crystal Palace needs a Java runtime in JAVA, JAVA_HOME, PATH, or a standard JVM directory", producer)
+		}
+		return Artifact{}, nil, "", fmt.Errorf("producer %s is not runnable on this host", producer)
+	}
 	configs, err := modconfig.ReadConfigs(filepath.Join(dir, "config.json"))
 	if err != nil {
 		return Artifact{}, nil, "", fmt.Errorf("read %s module config: %w", producer, err)

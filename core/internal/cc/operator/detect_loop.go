@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -136,7 +134,7 @@ func addDetectLoopFlags(cmd *cobra.Command) {
 	cmd.Flags().String("shellcode", "", "x64 PIC shellcode (Donut, Crystal Palace PICO, ...); generated when omitted")
 	cmd.Flags().String("agent-type", "auto", "Agent payload type to generate: auto, windows_executable, or windows_dll")
 	cmd.Flags().String("arch", "amd64", "Agent architecture")
-	cmd.Flags().String("cc", "", "C2 address for the generated agent; defaults to the current config, with container-only hosts replaced by a certificate IP reachable from LitterBox")
+	cmd.Flags().String("cc", "", "C2 address for the generated agent; defaults to the configured address and is used verbatim")
 	cmd.Flags().String("sandbox", "", "LitterBox URL; defaults to EMP3R0R_DETECTION_SANDBOX or 127.0.0.1:1337")
 	cmd.Flags().Int("iterations", 3, "Maximum detection cycles across attempts, including each baseline")
 	cmd.Flags().StringSlice("stages", []string{"static", "dynamic"}, "Stages to run: static, dynamic, edr")
@@ -429,7 +427,7 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 	opts.Tmux, _ = cmd.Flags().GetBool("tmux")
 	opts.Goal, _ = cmd.Flags().GetString("goal")
 	if strings.TrimSpace(opts.CC) == "" {
-		opts.CC = loopC2Address(live.GetRuntimeConfig().CCAddress)
+		opts.CC = strings.TrimSpace(live.GetRuntimeConfig().CCAddress)
 	}
 
 	if opts.AgentType = strings.ToLower(strings.TrimSpace(opts.AgentType)); opts.AgentType == "" {
@@ -548,39 +546,6 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 	}()
 }
 
-// loopC2Address keeps the payload's C2 URL reachable from the LitterBox guest.
-// host.containers.internal is a Podman/Docker name on the operator host and
-// does not resolve inside the Windows VM; prefer a non-loopback IP from the
-// server certificate, which the guest can reach through the host gateway.
-func loopC2Address(configured string) string {
-	configured = strings.TrimSpace(configured)
-	if configured == "" {
-		return ""
-	}
-	u, err := url.Parse(configured)
-	if err != nil || u.Hostname() == "" {
-		return configured
-	}
-	host := u.Hostname()
-	ip := net.ParseIP(host)
-	if host != "host.containers.internal" && host != "localhost" && (ip == nil || !ip.IsLoopback()) {
-		return configured
-	}
-	port := u.Port()
-	if port == "" {
-		port = live.GetRuntimeConfig().CCH2Port
-	}
-	for _, name := range transport.NamesInCert(transport.ServerCrtFile) {
-		candidate := net.ParseIP(name)
-		if candidate == nil || candidate.IsLoopback() {
-			continue
-		}
-		u.Host = net.JoinHostPort(candidate.String(), port)
-		return u.String()
-	}
-	return configured
-}
-
 // guestConfig resolves the debugger's sandbox SSH endpoint. The operator must
 // opt in with a flag or the environment; there is no implicit default host.
 func (opts detectLoopOptions) guestConfig() (*detection.GuestSSHConfig, error) {
@@ -688,7 +653,7 @@ func chooseShellcodeProducer(producers map[string]string, requested string) (pro
 		}
 		return "", "", ""
 	case builder.PayloadTypeWindowsDLL:
-		if dir := strings.TrimSpace(producers["crystal_pack"]); dir != "" && crystalPackAvailable(dir) {
+		if dir := strings.TrimSpace(producers["crystal_pack"]); dir != "" && modules.CrystalPackAvailable(dir) {
 			return "crystal_pack", dir, builder.PayloadTypeWindowsDLL
 		}
 		if dir := strings.TrimSpace(producers["donut"]); dir != "" {
@@ -699,7 +664,7 @@ func chooseShellcodeProducer(producers map[string]string, requested string) (pro
 	if dir := strings.TrimSpace(producers["donut"]); dir != "" {
 		return "donut", dir, builder.PayloadTypeWindowsExecutable
 	}
-	if dir := strings.TrimSpace(producers["crystal_pack"]); dir != "" && crystalPackAvailable(dir) {
+	if dir := strings.TrimSpace(producers["crystal_pack"]); dir != "" && modules.CrystalPackAvailable(dir) {
 		return "crystal_pack", dir, builder.PayloadTypeWindowsDLL
 	}
 	return "", "", ""
@@ -710,69 +675,6 @@ func producerShellcodeExt(producer string) string {
 		return "pico.bin"
 	}
 	return "bin"
-}
-
-// crystalPackAvailable reports whether crystal_pack can actually link a PICO
-// on this host: a Java runtime, the vendored Crystal Palace jar, and the loader
-// spec must all be present.
-func crystalPackAvailable(dir string) bool {
-	jar := filepath.Join(dir, "crystalpalace", "crystalpalace.jar")
-	if info, err := os.Stat(jar); err != nil || !info.Mode().IsRegular() {
-		return false
-	}
-	spec := filepath.Join(dir, "postex-loader", "loader.spec")
-	if info, err := os.Stat(spec); err != nil || !info.Mode().IsRegular() {
-		return false
-	}
-	libtcg := filepath.Join(dir, "libtcg.x64.zip")
-	if info, err := os.Stat(libtcg); err != nil || !info.Mode().IsRegular() {
-		return false
-	}
-	if !crystalPackToolchain() {
-		return false
-	}
-	java := strings.TrimSpace(os.Getenv("JAVA"))
-	if java == "" {
-		java = "java"
-	}
-	return commandExists(java)
-}
-
-// crystalPackToolchain mirrors build.sh: postex-loader objects are rebuilt on
-// every link, so a Windows C compiler and nasm must be resolvable. CC_64 and
-// ZIG may contain arguments (for example "zig cc -target ..."), so only the
-// command word is resolved.
-func crystalPackToolchain() bool {
-	compiler := strings.TrimSpace(os.Getenv("CC_64"))
-	if compiler == "" {
-		if commandExists("x86_64-w64-mingw32-gcc") {
-			compiler = "x86_64-w64-mingw32-gcc"
-		} else {
-			compiler = strings.TrimSpace(os.Getenv("ZIG"))
-			if compiler == "" {
-				compiler = "zig"
-			}
-		}
-	}
-	if !commandExists(compiler) {
-		return false
-	}
-	nasm := strings.TrimSpace(os.Getenv("NASM"))
-	if nasm == "" {
-		nasm = "nasm"
-	}
-	return commandExists(nasm)
-}
-
-// commandExists reports whether the first word of a shell command is an
-// executable. Environment overrides such as CC_64 can carry target flags.
-func commandExists(command string) bool {
-	fields := strings.Fields(command)
-	if len(fields) == 0 {
-		return false
-	}
-	_, err := exec.LookPath(fields[0])
-	return err == nil
 }
 
 func lastLogLines(log string, n int) string {
