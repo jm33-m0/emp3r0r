@@ -296,7 +296,7 @@ func analystListTool(root string) tool.CoreTool {
 }
 
 func analystReadTool(root string) tool.CoreTool {
-	return moduleReadTool(newSingleRoot(root))
+	return moduleReadTool(newSingleRoot(root), nil)
 }
 
 func analystSearchTool(root string) tool.CoreTool {
@@ -449,7 +449,7 @@ func (t *TelemetryDB) explainQueryError(ctx context.Context, statement string, e
 				fmt.Fprintf(&b, "\n%s columns: %s", name, strings.Join(columns, ", "))
 			}
 		}
-		b.WriteString("\nHint: findings has no attrs or source column; events has no tool column; payloads uses id, not payload_id.")
+		b.WriteString("\nHint: findings has no attrs or source column; events has no tool column; payloads uses id, not payload_id; executed, execution, and agent_online are loop_cycles columns, not traces.")
 	case strings.Contains(msg, "no such table"):
 		if tables := t.tableNames(ctx); len(tables) > 0 {
 			fmt.Fprintf(&b, "\nTables and views: %s", strings.Join(tables, ", "))

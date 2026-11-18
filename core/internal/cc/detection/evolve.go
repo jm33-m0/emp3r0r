@@ -276,9 +276,13 @@ type evolver struct {
 	shellSeq         int
 	knowledge        *KnowledgeDB
 	lastAnswer       map[string]any
-	baselineFailure  string
-	operatorPrompts  *OperatorPromptQueue
-	lastExecuting    *Cycle
+	// producerReads and producerQueries record the module-reading done before
+	// a PICO-contract edit. The map keys are "module|path" and "module".
+	producerReads   sync.Map
+	producerQueries sync.Map
+	baselineFailure string
+	operatorPrompts *OperatorPromptQueue
+	lastExecuting   *Cycle
 	// executionCheckTimeout overrides PayloadVerifyTimeout in tests.
 	executionCheckTimeout time.Duration
 
@@ -2203,6 +2207,9 @@ func (e *evolver) editSourceTool() tool.CoreTool {
 			if !root.Writable {
 				return tool.Errorf(fmt.Sprintf("source root %s is read-only", root.Name)), nil
 			}
+			if err := e.requireProducerContract(root.Name, args.File); err != nil {
+				return tool.Errorf(fmt.Sprintf("%v", err)), nil
+			}
 			result, err := e.applyEdit(ctx, root, args.File, args.OldString, args.NewString, args.Reason)
 			if err != nil {
 				return tool.Errorf(fmt.Sprintf("%v", err)), nil
@@ -2211,6 +2218,51 @@ func (e *evolver) editSourceTool() tool.CoreTool {
 			return tool.Text(string(data)), nil
 		},
 	})
+}
+
+// requireProducerContract enforces the reading a crystal_pack PICO edit needs
+// before the first edit: the module README, the linker spec, and (when the
+// knowledge cache is present) one Crystal Palace query. The model otherwise
+// edits the resource contract from guesswork.
+func (e *evolver) requireProducerContract(module, file string) error {
+	if e == nil || !strings.EqualFold(strings.TrimSpace(module), "crystal_pack") {
+		return nil
+	}
+	rel := strings.ToLower(strings.TrimPrefix(strings.ReplaceAll(strings.TrimSpace(file), "\\", "/"), "crystal_pack/"))
+	if !crystalPICOContractFile(rel) {
+		return nil
+	}
+	var missing []string
+	for _, doc := range []string{"README.md", "postex-loader/loader.spec"} {
+		if _, ok := e.producerReads.Load(module + "|" + strings.ToLower(doc)); !ok {
+			missing = append(missing, "SourceRead module=crystal_pack path="+doc)
+		}
+	}
+	if e.knowledge != nil {
+		if _, ok := e.producerQueries.Load(module); !ok {
+			missing = append(missing, `KnowledgeSearch "Crystal Palace PICO postex loader resource markers"`)
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	return fmt.Errorf("crystal_pack PICO edits require the module contract first: %s", strings.Join(missing, "; "))
+}
+
+func crystalPICOContractFile(rel string) bool {
+	switch rel {
+	case "build.sh", "common.mk", "makefile":
+		return true
+	}
+	return strings.HasPrefix(rel, "postex-loader/") || strings.HasPrefix(rel, "crystalpalace/")
+}
+
+func crystalPalaceQuery(query string) bool {
+	query = strings.ToLower(query)
+	if !strings.Contains(query, "crystal") {
+		return false
+	}
+	return strings.Contains(query, "palace") || strings.Contains(query, "pico") || strings.Contains(query, "postex")
 }
 
 type editResult struct {

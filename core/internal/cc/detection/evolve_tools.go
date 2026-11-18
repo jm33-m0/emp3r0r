@@ -579,6 +579,9 @@ func (e *evolver) knowledgeSearchTool() tool.CoreTool {
 			if err != nil {
 				return tool.Errorf(fmt.Sprintf("%v", err)), nil
 			}
+			if crystalPalaceQuery(args.Query) {
+				e.producerQueries.Store("crystal_pack", struct{}{})
+			}
 			if len(hits) == 0 {
 				return tool.Text("no cached document matched"), nil
 			}

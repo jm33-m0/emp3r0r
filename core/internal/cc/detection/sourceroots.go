@@ -265,7 +265,7 @@ func moduleListTool(trees *sourceRoots) tool.CoreTool {
 	})
 }
 
-func moduleReadTool(trees *sourceRoots) tool.CoreTool {
+func moduleReadTool(trees *sourceRoots, tracker *evolver) tool.CoreTool {
 	return tool.Build(tool.Spec{
 		Name: "SourceRead",
 		Description: "Read one source file from a root, optionally a line range. " +
@@ -322,6 +322,10 @@ func moduleReadTool(trees *sourceRoots) tool.CoreTool {
 			var b strings.Builder
 			for lineNo := start; lineNo <= end && lineNo <= len(lines); lineNo++ {
 				fmt.Fprintf(&b, "%d: %s\n", lineNo, clipUTF8(lines[lineNo-1], 400))
+			}
+			if tracker != nil && strings.EqualFold(root.Name, "crystal_pack") {
+				rel := strings.TrimPrefix(strings.ReplaceAll(args.Path, "\\", "/"), "crystal_pack/")
+				tracker.producerReads.Store(root.Name+"|"+strings.ToLower(rel), struct{}{})
 			}
 			if root.Name != trees.def {
 				return tool.Text(fmt.Sprintf("# %s\n%s", root.Name, b.String())), nil

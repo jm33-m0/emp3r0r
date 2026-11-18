@@ -58,7 +58,43 @@ const knowledgePrompt = `Knowledge base:
   when the surface is ambiguous.
 - Turn what you read into one falsifiable prediction per cycle and record the
   document_ref that supports it. A document is not support for an edit just
-  because it shares a word with the finding.`
+  because it shares a word with the finding.
+- Before the first edit to a producer's PICO or linker sources, search the KB
+  for the technique and read the module README/spec. For Crystal Palace, the
+  repo's postex-loader/loader.spec is authoritative; the KB explains the
+  technique, not this module's resource contract.`
+
+const crystalKitPrompt = `Crystal-Kit (crystal_pack) contract:
+- crystal_pack wraps a Windows DLL into a Crystal Palace PICO. Its agent must be
+  windows_dll; never wrap a windows_executable agent or substitute donut.
+- The PICO is the postex-loader linked by postex-loader/loader.spec. The spec
+  binds four resources by name: _DLL_, _MASK_, _PICO_, _DLLARGS_. The marker
+  names, section names, the spec, and build.sh's toolchain are the artifact
+  contract. Do not rename them, remove the nested PICO, make _PICO_ optional,
+  or change compiler selection unless a PICO-level failure proves that exact
+  change.
+- build.sh rebuilds the postex-loader objects on every link with the module
+  toolchain (the x86_64-w64-mingw32-gcc shim, i.e. Zig clang) and -mno-sse2.
+  Crystal Palace does not preserve 16-byte .rdata alignment, so an aligned SSE2
+  constant load faults at runtime; keep -mno-sse2.
+- Diagnose execution bottom-up before editing the producer:
+  1. loader_windows: does the loader reach the PICO? A loader that exits before
+     mapping and calling the PICO is a loader bug. The verified self-load path is
+     RC4 -> VirtualAlloc RW -> memcpy -> VirtualProtect RX -> call PICO -> Sleep.
+  2. crystal_pack: does the PICO map the masked DLL, resolve imports, run TLS
+     callbacks, and call the DLL entry and exported main? If the loader process
+     lives but has no network, compare with the known-good active PICO.
+  3. agent: does the expected UUID check in? Confirm with AgentStatus before
+     blaming the producer.
+- The active PICO that checked in is the known-good reference. A fresh PICO from
+  a new agent DLL differs by a few bytes because the UUID/config size changed;
+  byte inequality is not a failure.
+- Before the first edit to crystal_pack or postex-loader, call KnowledgeSearch
+  for "Crystal Palace PICO postex loader resource markers" and SourceRead
+  README.md and postex-loader/loader.spec. The KB explains the technique, not
+  this module's resource contract; the repo spec is authoritative.
+- Never fix a loader-side execution failure by editing postex-loader or
+  build.sh. Revert the producer to its baseline first.`
 
 const hostLimitsPrompt = `Host-enforced limits:
 - The host blocks further read-only calls after the role's read budget and forces the required output at the session budget. The brief states the limits that apply; do not estimate remaining calls or stop early because of an assumed budget. Call a tool until the host blocks it.
@@ -82,7 +118,7 @@ selects the hypothesis.
 
 ` + dataPolicyPrompt + `
 
-` + knowledgePrompt + hostLimitsPrompt + `
+` + knowledgePrompt + crystalKitPrompt + hostLimitsPrompt + `
 
 Decision rules:
 - Do not read source to design the edit; the editor does that. Choose one
@@ -152,7 +188,7 @@ module source, rebuilding, and re-testing.
 
 ` + dataPolicyPrompt + `
 
-` + knowledgePrompt + hostLimitsPrompt + `
+` + knowledgePrompt + crystalKitPrompt + hostLimitsPrompt + `
 
 Work loop:
 1. Read the planner brief and the dossier. Inspect the relevant source and

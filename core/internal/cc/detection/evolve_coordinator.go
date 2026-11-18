@@ -1028,6 +1028,9 @@ func (c *coordinator) editorBrief(plan plannerPlan) string {
 	}
 	fmt.Fprintf(&b, "Cycle budget: %d total; %d used; %d remain\n", c.e.cfg.Iterations, c.e.usedCycles(), max(0, c.e.cfg.Iterations-c.e.usedCycles()))
 	fmt.Fprintf(&b, "Execution gate: %s\n", c.e.executionHint())
+	if strings.EqualFold(strings.TrimSpace(c.e.activeProducer), "crystal_pack") {
+		b.WriteString("Crystal-Kit: crystal_pack PICO; the agent must be windows_dll. loader.spec binds _DLL_/_MASK_/_PICO_/_DLLARGS_; do not edit postex-loader or build.sh to fix a loader-side exit. Diagnose loader -> PICO -> agent check-in in that order.\n")
+	}
 	if c.e.baselineFailure != "" {
 		fmt.Fprintf(&b, "Baseline failure: %s\n", c.e.baselineFailure)
 	}

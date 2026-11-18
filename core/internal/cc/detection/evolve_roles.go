@@ -86,7 +86,7 @@ type WorkerRun struct {
 func (e *evolver) toolsFor(role evolveRole) []tool.CoreTool {
 	tools := []tool.CoreTool{
 		moduleListTool(e.roots),
-		moduleReadTool(e.roots),
+		moduleReadTool(e.roots, e),
 		moduleSearchTool(e.roots),
 		analystTelemetryTool(e.db),
 		e.inspectFeedbackTool(),

@@ -90,6 +90,15 @@ bash make_all.sh
   `x86_64-w64-mingw32-gcc` when present and Zig's `x86_64-windows-gnu` target
   otherwise, and needs `nasm` for the stack-spoofing stub.
 
+## Detection loop contract
+
+- `crystal_pack` takes a `windows_dll` agent. Never wrap a `windows_executable` agent or use donut as a substitute when the loop's producer is `crystal_pack`.
+- The generated PICO is the `postex-loader` linked by `postex-loader/loader.spec`. The spec binds `_DLL_`, `_MASK_`, `_PICO_`, and `_DLLARGS_` by name; those markers, the section names, the spec, and `build.sh`'s toolchain are the artifact contract. Do not rename them, remove the nested PICO, make `_PICO_` optional, or change compiler selection to work around an execution failure.
+- `build.sh` rebuilds the postex-loader objects on every link with the module toolchain (the `x86_64-w64-mingw32-gcc` shim, i.e. Zig clang) and `-mno-sse2`. Crystal Palace concatenates sections without preserving 16-byte `.rdata` alignment, so an aligned SSE2 constant load faults at runtime; keep the flag.
+- Diagnose execution bottom-up: (1) `loader_windows` reaches the PICO and calls it; (2) the PICO maps the masked DLL, resolves imports, runs TLS callbacks, and calls the DLL entry and exported `main`; (3) the agent's expected UUID checks in. A loader that exits before calling the PICO is a loader bug, not a producer bug.
+- The active PICO that checked in is the known-good reference. A fresh PICO from a new agent DLL differs by a few bytes because the UUID/config size changed; byte inequality is not a failure.
+- Before the first edit to `postex-loader` or `build.sh`, read `README.md` and `postex-loader/loader.spec`. The knowledge cache explains Crystal Palace as a technique; the spec is authoritative for this module's resource contract.
+
 ## Testing
 
 ```bash
