@@ -1,5 +1,17 @@
 # Changelog
 
+## [5.10.3](https://github.com/jm33-m0/emp3r0r/compare/v5.10.2...v5.10.3) (2026-11-18)
+
+
+### Bug Fixes
+
+* AI slop alters C2 address during loop for unknown reason ([7b51cf1](https://github.com/jm33-m0/emp3r0r/commit/7b51cf18ab4ba4c20e2f8878928e2aeb1ac4cbac))
+* auto-resolve shellcode producer dir ([0e99b87](https://github.com/jm33-m0/emp3r0r/commit/0e99b878f7cbc2b2dd58c442020ef7254e43aaa3))
+* avoid SSE2 ([e1af84f](https://github.com/jm33-m0/emp3r0r/commit/e1af84f4b290467624fe965338b5ad18169d842d))
+* debugger agent called too often ([77ff98d](https://github.com/jm33-m0/emp3r0r/commit/77ff98df618e9e93e841ed00c1f3e66b5cf97da9))
+* include token usage in detect_loop report ([ef0082f](https://github.com/jm33-m0/emp3r0r/commit/ef0082fb146f11af4dc03a880138ed6c050aa806))
+* norma compaction compaction not working with current tools ([39189e0](https://github.com/jm33-m0/emp3r0r/commit/39189e0a76a6172dc2878fec431dc014bb68aff4))
+
 ## [5.10.2](https://github.com/jm33-m0/emp3r0r/compare/v5.10.1...v5.10.2) (2026-11-17)
 
 
