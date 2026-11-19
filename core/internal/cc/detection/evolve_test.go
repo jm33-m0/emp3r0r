@@ -953,3 +953,99 @@ func TestToolErrorResultLogsAsErrorClass(t *testing.T) {
 		t.Fatalf("successful tool result logged as %v, want ClassToolResult", classes[1])
 	}
 }
+
+// A build failure must restore the last executing source and let the editor
+// retry the same plan. The first edit is intentionally broken; the second
+// editor session must see the restored file, not the broken tree.
+func TestEditorBuildFailureRestoresSourceAndRetries(t *testing.T) {
+	moduleDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(moduleDir, "bootstrap.c"),
+		[]byte("const char *process = \"OLD\";\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var builds atomic.Int32
+	build := func(_ string, _ map[string]string) (string, error) {
+		n := builds.Add(1)
+		if n == 2 {
+			return "compile error: bootstrap.c does not compile", errors.New("compile failed")
+		}
+		path := filepath.Join(t.TempDir(), fmt.Sprintf("loader%d.exe", n))
+		if err := os.WriteFile(path, append([]byte("MZ"+strings.Repeat("M", 40000)), byte(n)), 0o600); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("[+] generated payload: %s (10 bytes)\n", path), nil
+	}
+	server, _ := fakeEvolveSandbox(t)
+	provider := &roleScriptProvider{scripts: map[string][]llm.Message{
+		"planner": {
+			{Role: llm.RoleAssistant, Content: []llm.ContentBlock{
+				llm.TextBlock(`{"action":"test","mechanism":"self-load","prediction":"the defender behavior disappears","editor_brief":"change the default in bootstrap.c","reason":"the baseline has a real verdict"}`),
+			}},
+			{Role: llm.RoleAssistant, Content: []llm.ContentBlock{
+				llm.TextBlock(`{"action":"stop","reason":"done","final":{"summary":"retried after a broken build","edits":[],"residual":[],"cycles":2}}`),
+			}},
+		},
+		"editor": {
+			toolUseMessage("edit-broken", "EditSource", map[string]any{
+				"file": "bootstrap.c", "old_string": "OLD", "new_string": "BROKEN",
+				"reason": "introduces the broken build",
+			}),
+			toolUseMessage("cycle-broken", "DetectionCycle", map[string]any{"mechanism": "self-load", "note": "first attempt"}),
+			{Role: llm.RoleAssistant, Content: []llm.ContentBlock{llm.TextBlock(`{"summary":"build failed"}`)}},
+			toolUseMessage("edit-retry", "EditSource", map[string]any{
+				"file": "bootstrap.c", "old_string": "OLD", "new_string": "NEW",
+				"reason": "retry after the host restored the source",
+			}),
+			toolUseMessage("cycle-retry", "DetectionCycle", map[string]any{"mechanism": "self-load", "note": "retry"}),
+			{Role: llm.RoleAssistant, Content: []llm.ContentBlock{llm.TextBlock(`{"summary":"edited"}`)}},
+		},
+	}}
+	shellcode := filepath.Join(t.TempDir(), "agent.bin")
+	if err := os.WriteFile(shellcode, []byte(strings.Repeat("S", 40000)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	var (
+		logMu sync.Mutex
+		logs  strings.Builder
+	)
+	result, err := RunEvolve(ctx, EvolveConfig{
+		Provider: provider, Model: "scripted",
+		Module: "loader_windows", ModuleDir: moduleDir,
+		Shellcode: shellcode, SandboxURL: server.URL,
+		StoreRoot: t.TempDir(), Stages: []string{"dynamic"},
+		ExpectedAgentUUID: "baseline-uuid", Verify: &stubVerifyOps{},
+		Iterations: 2, Turns: 8, EditorTurns: 2, Build: build,
+		Logf: func(class logging.Class, format string, args ...any) {
+			logMu.Lock()
+			defer logMu.Unlock()
+			fmt.Fprintf(&logs, "[%v] "+format+"\n", append([]any{class}, args...)...)
+		},
+	})
+	logMu.Lock()
+	logText := logs.String()
+	logMu.Unlock()
+	if err != nil {
+		t.Fatalf("err=%v logs:\n%s", err, logText)
+	}
+	if len(result.Cycles) != 2 {
+		t.Fatalf("cycles = %d, want baseline plus retried cycle; builds=%d logs:\n%s", len(result.Cycles), builds.Load(), logText)
+	}
+	if builds.Load() != 3 {
+		t.Fatalf("builds = %d, want baseline, failed edit, retried edit", builds.Load())
+	}
+	data, err := os.ReadFile(filepath.Join(moduleDir, "bootstrap.c"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "BROKEN") {
+		t.Fatalf("broken edit survived the retry: %q; builds=%d logs:\n%s", data, builds.Load(), logText)
+	}
+	if !strings.Contains(logText, "restored source and shellcode") {
+		t.Fatalf("build failure did not restore the last executing source; logs:\n%s", logText)
+	}
+	if !strings.Contains(logText, "editor build failed (1/2)") {
+		t.Fatalf("editor was not retried after its session ended; logs:\n%s", logText)
+	}
+}

@@ -51,6 +51,12 @@ func (e *evolver) loadAttemptState(ctx context.Context) error {
 			break
 		}
 	}
+	if e.priorLastGood != nil {
+		// A resumed attempt needs a restore target before its first cycle
+		// records one. The source tree is the saved attempt state, so this
+		// baseline is exactly what a build rollback should return to.
+		e.lastExecuting = e.priorLastGood
+	}
 
 	loopIDs := uniqueLoopIDs(prior)
 	if len(loopIDs) > 0 {

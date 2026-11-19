@@ -53,16 +53,28 @@ func RenderLoopSummary(answer map[string]any, cycles []Cycle, edits []EditRecord
 			formatTokenCount(usage.Input), formatTokenCount(usage.Output), costLabel(usage))
 	}
 
-	fmt.Fprintf(&b, "\n## Changes\n\n")
-	if len(edits) == 0 {
-		fmt.Fprintf(&b, "- No source edits were recorded.\n")
-	} else {
+	fmt.Fprintf(&b, "\n## Finding-to-change map\n\n")
+	changes, newFinal := reportFindingChanges(cycles, edits)
+	if len(changes) == 0 {
+		if len(newFinal) > 0 {
+			fmt.Fprintf(&b, "- The baseline did not report a top finding; the final cycle introduced: %s\n",
+				clipUTF8(strings.Join(limitStrings(newFinal, 4), "; "), 300))
+		} else {
+			fmt.Fprintf(&b, "- The baseline did not report a top finding, so no finding mapping was possible.\n")
+		}
 		for i, edit := range edits {
-			if i >= 6 {
-				fmt.Fprintf(&b, "- and %d more\n", len(edits)-i)
+			if i >= 4 {
 				break
 			}
-			fmt.Fprintf(&b, "- `%s`: %s\n", sanitizeLine(editPath(edit)), clipUTF8(sanitizeLine(edit.Reason), 180))
+			fmt.Fprintf(&b, "- Applied edit: `%s`: %s\n", sanitizeLine(editPath(edit)), clipUTF8(sanitizeLine(edit.Reason), 160))
+		}
+	} else {
+		for i, change := range changes {
+			if i >= 4 {
+				fmt.Fprintf(&b, "- and %d more\n", len(changes)-i)
+				break
+			}
+			fmt.Fprintf(&b, "- %s: %s; %s\n", clipUTF8(change.Finding, 180), change.Final, clipUTF8(change.Change, 240))
 		}
 	}
 
@@ -111,6 +123,7 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 	}
 
 	renderFindingObjective(&b, cycles)
+	renderFindingChangeMap(&b, cycles, edits)
 
 	fmt.Fprintf(&b, "## Achieved objectives\n\n")
 	achieved := false
@@ -118,21 +131,24 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 		fmt.Fprintf(&b, "- Removed all recorded Defender verdicts (%s).\n", strings.Join(before, ", "))
 		achieved = true
 	}
-	if len(edits) > 0 {
-		for _, edit := range edits {
-			fmt.Fprintf(&b, "- `%s`: %s\n", sanitizeLine(editPath(edit)), sanitizeLine(edit.Reason))
+	changes, _ := reportFindingChanges(cycles, edits)
+	for _, change := range changes {
+		switch change.Final {
+		case "not in final top findings":
+			fmt.Fprintf(&b, "- %s: %s\n", clipUTF8(change.Finding, 220), clipUTF8(change.Change, 320))
+			achieved = true
+		case "still present":
+			fmt.Fprintf(&b, "- %s remained in the final top findings; it was not counted as removed.\n", clipUTF8(change.Finding, 220))
+			achieved = true
 		}
-		achieved = true
 	}
 	if len(cycles) > 0 {
 		last := cycles[len(cycles)-1]
 		counts := cycleFindingCounts(&last)
-		fmt.Fprintf(&b, "- Rebuilt and detonated the final payload (`%s`, high=%d, medium=%d, static=%d, total=%d, verdicts=%d, execution=%s).\n",
+		fmt.Fprintf(&b, "- Final payload: `%s` (high=%d, medium=%d, static=%d, total=%d, verdicts=%d, execution=%s).\n",
 			shortPayloadKey(last.PayloadKey), counts.High, counts.Medium, counts.Static, counts.Total, last.Verdicts, headerOrNone(last.Execution))
 		if last.Execution == executionOffline {
 			fmt.Fprintf(&b, "- Final payload did not execute; its finding counts are not comparable with an executing cycle.\n")
-		} else if last.Verdicts == 0 {
-			fmt.Fprintf(&b, "- Final cycle recorded no real Defender verdicts; remaining items are static/dynamic findings.\n")
 		}
 		if counts.Static == 0 {
 			fmt.Fprintf(&b, "- No static YARA/CheckPlz/Stringnalyzer signature finding was recorded in the final cycle.\n")
@@ -241,7 +257,7 @@ func telemetryStatsFromSummary(summary string) *TelemetryStats {
 func modelEdits(edits []EditRecord) []EditRecord {
 	out := make([]EditRecord, 0, len(edits))
 	for _, edit := range edits {
-		if editKind(edit.Kind) == EditKindModel {
+		if editKind(edit.Kind) == EditKindModel && !edit.Reverted {
 			out = append(out, edit)
 		}
 	}
@@ -401,6 +417,175 @@ func renderFindingObjective(b *strings.Builder, cycles []Cycle) {
 		fmt.Fprintf(b, " The final cycle did not execute, so its counts are not a detection result.")
 	}
 	b.WriteString("\n\n")
+}
+
+type findingChange struct {
+	Finding string
+	Final   string
+	Change  string
+}
+
+// reportFindingKey compares top-finding text across cycles without the
+// severity prefix, which can change while the rule and indicator stay the
+// same.
+func reportFindingKey(text string) string {
+	text = strings.ToLower(strings.TrimSpace(text))
+	for _, prefix := range []string{"high ", "medium ", "low ", "info "} {
+		text = strings.TrimSpace(strings.TrimPrefix(text, prefix))
+	}
+	return strings.Join(strings.Fields(text), " ")
+}
+
+func containsFindingKey(keys []string, key string) bool {
+	for _, candidate := range keys {
+		if candidate == key {
+			return true
+		}
+	}
+	return false
+}
+
+func cycleReportEdits(cycles []Cycle, edits []EditRecord, index int) []EditRecord {
+	if index < 0 || index >= len(cycles) {
+		return nil
+	}
+	var summary cycleSummary
+	if json.Unmarshal([]byte(cycles[index].Summary), &summary) == nil && len(summary.Edits) > 0 {
+		return summary.Edits
+	}
+	var fallback []EditRecord
+	for _, edit := range edits {
+		if edit.Iteration == cycles[index].Iteration {
+			fallback = append(fallback, edit)
+		}
+	}
+	return fallback
+}
+
+// reportFindingChanges maps each baseline top finding to its final status and
+// the first cycle where it was no longer reported. It deliberately says
+// "not in final top findings" rather than "removed": the stored top-finding
+// list is capped and the sandbox can vary between runs.
+func reportFindingChanges(cycles []Cycle, edits []EditRecord) ([]findingChange, []string) {
+	if len(cycles) == 0 {
+		return nil, nil
+	}
+	type cycleFindings struct {
+		keys    []string
+		summary cycleSummary
+	}
+	findings := make([]cycleFindings, len(cycles))
+	for i := range cycles {
+		var summary cycleSummary
+		_ = json.Unmarshal([]byte(cycles[i].Summary), &summary)
+		findings[i].summary = summary
+		for _, top := range summary.TopFindings {
+			if key := reportFindingKey(top); key != "" {
+				findings[i].keys = append(findings[i].keys, key)
+			}
+		}
+	}
+	finalKeys := findings[len(cycles)-1].keys
+	baselineKeys := map[string]bool{}
+	var changes []findingChange
+	for _, top := range findings[0].summary.TopFindings {
+		key := reportFindingKey(top)
+		if key == "" || baselineKeys[key] {
+			continue
+		}
+		baselineKeys[key] = true
+		if containsFindingKey(finalKeys, key) {
+			changes = append(changes, findingChange{
+				Finding: sanitizeLine(top),
+				Final:   "still present",
+				Change:  "No removal recorded; the finding is still in the final top findings.",
+			})
+			continue
+		}
+		firstAbsent := -1
+		for i := 1; i < len(cycles); i++ {
+			if !containsFindingKey(findings[i].keys, key) {
+				firstAbsent = i
+				break
+			}
+		}
+		change := findingChange{Finding: sanitizeLine(top), Final: "not in final top findings"}
+		if firstAbsent < 0 || firstAbsent >= len(cycles) {
+			change.Change = "No later cycle recorded the finding as absent."
+			changes = append(changes, change)
+			continue
+		}
+		cycle := cycles[firstAbsent]
+		summary := findings[firstAbsent].summary
+		parts := []string{fmt.Sprintf("First absent in cycle %d", cycle.Iteration)}
+		if mechanism := strings.TrimSpace(summary.Mechanism); mechanism != "" {
+			parts = append(parts, "mechanism `"+sanitizeLine(mechanism)+"`")
+		}
+		if note := strings.TrimSpace(summary.Note); note != "" {
+			parts = append(parts, "note: "+sanitizeLine(note))
+		}
+		cycleEdits := cycleReportEdits(cycles, edits, firstAbsent)
+		if len(cycleEdits) == 0 {
+			parts = append(parts, "no source edit recorded in that cycle")
+		} else {
+			for i, edit := range cycleEdits {
+				if i >= 2 {
+					parts = append(parts, fmt.Sprintf("and %d more edit(s)", len(cycleEdits)-i))
+					break
+				}
+				parts = append(parts, fmt.Sprintf("`%s`: %s", sanitizeLine(editPath(edit)), sanitizeLine(edit.Reason)))
+			}
+		}
+		change.Change = strings.Join(parts, "; ")
+		changes = append(changes, change)
+	}
+	var newFinal []string
+	for _, top := range findings[len(cycles)-1].summary.TopFindings {
+		key := reportFindingKey(top)
+		if key != "" && !baselineKeys[key] {
+			newFinal = append(newFinal, sanitizeLine(top))
+		}
+	}
+	return changes, newFinal
+}
+
+func markdownCell(text string) string {
+	text = sanitizeLine(text)
+	text = strings.ReplaceAll(text, "|", "\\|")
+	if text == "" {
+		return "—"
+	}
+	return text
+}
+
+func renderFindingChangeMap(b *strings.Builder, cycles []Cycle, edits []EditRecord) {
+	fmt.Fprintf(b, "## Finding-to-change map\n\n")
+	if len(cycles) == 0 {
+		fmt.Fprintf(b, "No cycle completed, so no finding-to-change mapping exists.\n\n")
+		return
+	}
+	changes, newFinal := reportFindingChanges(cycles, edits)
+	if len(changes) == 0 {
+		if len(newFinal) > 0 {
+			fmt.Fprintf(b, "The baseline reported no top finding. The final cycle introduced: %s.\n\n",
+				clipUTF8(strings.Join(limitStrings(newFinal, 4), "; "), 500))
+		} else {
+			fmt.Fprintf(b, "The baseline and final cycles reported no top finding, so no mapping exists.\n\n")
+		}
+		return
+	}
+	fmt.Fprintf(b, "| Baseline finding | Final status | First change / evidence |\n")
+	fmt.Fprintf(b, "| --- | --- | --- |\n")
+	for _, change := range changes {
+		fmt.Fprintf(b, "| %s | %s | %s |\n",
+			markdownCell(change.Finding), markdownCell(change.Final), markdownCell(change.Change))
+	}
+	b.WriteString("\n")
+	if len(newFinal) > 0 {
+		fmt.Fprintf(b, "New top findings in the final cycle (no baseline counterpart): %s.\n\n",
+			clipUTF8(strings.Join(limitStrings(newFinal, 4), "; "), 500))
+	}
+	fmt.Fprintf(b, "> Top findings are capped at eight per cycle. A finding absent from the final top findings is not proof of removal; use the counts above and the saved feedback for the full picture.\n\n")
 }
 
 func signedChange(delta int) string {

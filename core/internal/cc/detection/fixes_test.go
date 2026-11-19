@@ -3,6 +3,7 @@ package detection
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -439,6 +440,9 @@ func TestBuildShellcodeRunsProducerAndSwapsShellcode(t *testing.T) {
 	if e.shellcode == shellcode || !strings.HasPrefix(e.shellcode, e.cfg.StoreRoot) {
 		t.Fatalf("shellcode was not swapped: %s", e.shellcode)
 	}
+	if !e.shellcodeGenerated {
+		t.Fatal("a producer-built shellcode was not marked generated")
+	}
 	data, err := os.ReadFile(e.shellcode)
 	if err != nil {
 		t.Fatal(err)
@@ -734,7 +738,7 @@ func TestDossierCarriesMechanismAndEditReasons(t *testing.T) {
 
 func TestSummarizeCycleRecordsMechanism(t *testing.T) {
 	online := true
-	summary := summarizeCycle("loop-test", 2, Run{ID: "run-2"}, Feedback{}, "", "switch paths", "module-stomp", "agent.bin", "donut", executionVerified, &online, 3)
+	summary := summarizeCycle("loop-test", 2, Run{ID: "run-2"}, Feedback{}, "", "switch paths", "module-stomp", "agent.bin", "donut", executionVerified, &online, 3, false)
 	if summary.Mechanism != "module-stomp" || summary.Note != "switch paths" {
 		t.Fatalf("mechanism or note lost: %+v", summary)
 	}
@@ -1093,5 +1097,77 @@ func TestEditSourceRecordsEditBeforeTheFirstPayload(t *testing.T) {
 	}
 	if len(pending) != 1 {
 		t.Fatalf("pending edits = %+v", pending)
+	}
+}
+
+func TestProducerBuildFailureIsMarked(t *testing.T) {
+	producerDir := t.TempDir()
+	config := `[{"name":"donut","build":"bash ./build.sh","is_local":true,"parameters":[
+		{"name":"input","type":"string","required":true},
+		{"name":"output","type":"string"}]}]`
+	if err := os.WriteFile(filepath.Join(producerDir, "config.json"), []byte(config), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	payloadDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(payloadDir, "agent.exe"), []byte("MZagent"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	e := &evolver{
+		cfg: EvolveConfig{
+			LoopID: "loop-test", StoreRoot: t.TempDir(),
+			ProducerDirs: map[string]string{"donut": producerDir},
+			BuildProducer: func(string, string, map[string]string) (string, error) {
+				return "compile error", errors.New("compile failed")
+			},
+		},
+		logf:      func(logging.Class, string, ...any) {},
+		shellcode: filepath.Join(payloadDir, "agent.exe"),
+	}
+	if _, _, _, err := e.buildShellcodeWithProducer(context.Background(), "donut",
+		map[string]string{"input": filepath.Join(payloadDir, "agent.exe")}, "test"); !errors.Is(err, errBuildFailed) {
+		t.Fatalf("error = %v, want errBuildFailed", err)
+	}
+}
+
+func TestReportMapsBaselineFindingsToChanges(t *testing.T) {
+	baseline, _ := json.Marshal(cycleSummary{
+		TopFindings: []string{"high defender/verdict Behavior:Win32/Test.A"},
+	})
+	changed, _ := json.Marshal(cycleSummary{
+		Mechanism:   "module-stomp",
+		Note:        "self-load the loader",
+		TopFindings: []string{"medium analyzer/private-exec UNSET"},
+		Edits: []EditRecord{{
+			Module: "loader_windows", File: "loader.c", Reason: "replace remote injection",
+		}},
+	})
+	cycles := []Cycle{
+		{Iteration: 1, PayloadKey: "sha256:one", Execution: executionVerified, Summary: string(baseline)},
+		{Iteration: 2, PayloadKey: "sha256:two", Execution: executionVerified, Summary: string(changed)},
+	}
+	answer := map[string]any{"loop_id": "loop-map", "summary": "changed the loader"}
+	report := RenderLoopReport(answer, cycles, nil)
+	for _, want := range []string{
+		"## Finding-to-change map",
+		"Behavior:Win32/Test.A",
+		"not in final top findings",
+		"First absent in cycle 2",
+		"module-stomp",
+		"self-load the loader",
+		"loader_windows/loader.c",
+		"New top findings in the final cycle",
+		"private-exec UNSET",
+		"capped at eight",
+	} {
+		if !strings.Contains(report, want) {
+			t.Fatalf("report missing %q:\n%s", want, report)
+		}
+	}
+	summary := RenderLoopSummary(answer, cycles, nil)
+	if !strings.Contains(summary, "## Finding-to-change map") || !strings.Contains(summary, "Behavior:Win32/Test.A") {
+		t.Fatalf("summary lacks the finding map:\n%s", summary)
+	}
+	if strings.Contains(summary, "## Cycles") {
+		t.Fatalf("summary includes the full cycle table:\n%s", summary)
 	}
 }

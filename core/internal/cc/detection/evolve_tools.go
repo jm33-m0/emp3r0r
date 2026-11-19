@@ -324,23 +324,24 @@ func (e *evolver) buildShellcodeWithProducer(ctx context.Context, producerName s
 	}
 	e.logClass(logging.ClassBuild, "%s", buildLog)
 	if buildErr != nil {
-		return Artifact{}, nil, buildLog, fmt.Errorf("producer %s build failed: %w", producer, buildErr)
+		return Artifact{}, nil, buildLog, fmt.Errorf("%w: producer %s build failed: %w", errBuildFailed, producer, buildErr)
 	}
 	artifact, err := producerArtifact(buildLog, output)
 	if err != nil {
-		return Artifact{}, nil, buildLog, err
+		return Artifact{}, nil, buildLog, fmt.Errorf("%w: producer %s: %w", errBuildFailed, producer, err)
 	}
 	if artifact.Size < minAgentShellcodeBytes {
-		return Artifact{}, nil, buildLog, fmt.Errorf("producer output is only %d bytes; a real agent shellcode is larger", artifact.Size)
+		return Artifact{}, nil, buildLog, fmt.Errorf("%w: producer output is only %d bytes; a real agent shellcode is larger", errBuildFailed, artifact.Size)
 	}
 	if err := ensureWithin(filepath.Join(e.cfg.StoreRoot, "shellcode"), artifact.Path); err != nil {
-		return Artifact{}, nil, buildLog, fmt.Errorf("producer output escapes the detection store")
+		return Artifact{}, nil, buildLog, fmt.Errorf("%w: producer output escapes the detection store", errBuildFailed)
 	}
 	if err := e.saveShellcode(ctx, producer, artifact, flags, note); err != nil {
 		return Artifact{}, nil, buildLog, fmt.Errorf("record shellcode: %w", err)
 	}
 	oldShellcode := e.shellcode
 	e.shellcode = artifact.Path
+	e.shellcodeGenerated = true
 	e.cleanupShellcode(oldShellcode)
 	e.activeProducer = producer
 	return artifact, flags, buildLog, nil
@@ -427,6 +428,16 @@ type revertEdit struct {
 	new    string
 }
 
+// revertLoopFilter selects every attempt of the logical loop. A resumed
+// attempt must be able to undo an edit recorded by an earlier attempt.
+func (e *evolver) revertLoopFilter() (string, string) {
+	base := strings.TrimSpace(e.baseLoopID)
+	if base == "" {
+		base = strings.TrimSpace(e.cfg.LoopID)
+	}
+	return base, base + "-%"
+}
+
 func (e *evolver) revertToPayload(ctx context.Context, payloadKey string) (int, error) {
 	payloadKey = strings.TrimSpace(payloadKey)
 	id, err := payloadIDByKey(ctx, e.db.db, payloadKey)
@@ -436,10 +447,11 @@ func (e *evolver) revertToPayload(ctx context.Context, payloadKey string) (int, 
 	if id == 0 {
 		return 0, fmt.Errorf("payload %q is not recorded", payloadKey)
 	}
+	base, pattern := e.revertLoopFilter()
 	rows, err := e.db.db.QueryContext(ctx, `
 		SELECT id, COALESCE(module, ''), file, old, new FROM loop_edits
-		WHERE loop_id = ? AND next_payload_id IS NOT NULL AND next_payload_id > ?
-		ORDER BY id DESC LIMIT ?`, e.cfg.LoopID, id, maxRevertEdits+1)
+		WHERE (loop_id = ? OR loop_id LIKE ?) AND next_payload_id IS NOT NULL AND next_payload_id > ? AND reverted = 0
+		ORDER BY id DESC LIMIT ?`, base, pattern, id, maxRevertEdits+1)
 	if err != nil {
 		return 0, fmt.Errorf("read edit history: %w", err)
 	}
@@ -463,10 +475,11 @@ func (e *evolver) revertCycleEdits(ctx context.Context, payloadID int64, label s
 	if payloadID == 0 {
 		return 0, fmt.Errorf("failed payload id is required")
 	}
+	base, pattern := e.revertLoopFilter()
 	rows, err := e.db.db.QueryContext(ctx, `
 		SELECT id, COALESCE(module, ''), file, old, new FROM loop_edits
-		WHERE loop_id = ? AND next_payload_id = ?
-		ORDER BY id DESC LIMIT ?`, e.cfg.LoopID, payloadID, maxRevertEdits+1)
+		WHERE (loop_id = ? OR loop_id LIKE ?) AND next_payload_id = ? AND reverted = 0
+		ORDER BY id DESC LIMIT ?`, base, pattern, payloadID, maxRevertEdits+1)
 	if err != nil {
 		return 0, fmt.Errorf("read failed-cycle edits: %w", err)
 	}
@@ -481,6 +494,36 @@ func (e *evolver) revertCycleEdits(ctx context.Context, payloadID int64, label s
 		return 0, fmt.Errorf("more than %d edits produced payload %s; revert in smaller steps", maxRevertEdits, label)
 	}
 	return e.applyRevertEdits(ctx, edits, payloadID, label)
+}
+
+// revertPendingEdits undoes edits that never produced a payload, as happens
+// when a cycle fails to build. Those rows have no next_payload_id, so the
+// failed-cycle revert cannot find them. Only edits made after the known-good
+// payload are included; edits before the baseline are part of that baseline.
+func (e *evolver) revertPendingEdits(ctx context.Context, baseline int64, afterIteration int, label string) (int, error) {
+	if baseline == 0 {
+		return 0, fmt.Errorf("known-good payload id is required")
+	}
+	base, pattern := e.revertLoopFilter()
+	rows, err := e.db.db.QueryContext(ctx, `
+		SELECT id, COALESCE(module, ''), file, old, new FROM loop_edits
+		WHERE (loop_id = ? OR loop_id LIKE ?) AND payload_id IS NOT NULL AND payload_id >= ?
+			AND iteration > ? AND next_payload_id IS NULL AND reverted = 0 AND kind = ?
+		ORDER BY id DESC LIMIT ?`, base, pattern, baseline, afterIteration, EditKindModel, maxRevertEdits+1)
+	if err != nil {
+		return 0, fmt.Errorf("read pending edits: %w", err)
+	}
+	edits, err := scanRevertEdits(rows)
+	if err != nil {
+		return 0, err
+	}
+	if len(edits) == 0 {
+		return 0, nil
+	}
+	if len(edits) > maxRevertEdits {
+		return 0, fmt.Errorf("more than %d pending edits were made after payload %s; revert in smaller steps", maxRevertEdits, label)
+	}
+	return e.applyRevertEdits(ctx, edits, baseline, label)
 }
 
 func scanRevertEdits(rows *sql.Rows) ([]revertEdit, error) {
@@ -525,6 +568,9 @@ func (e *evolver) applyRevertEdits(ctx context.Context, edits []revertEdit, payl
 				return 0, fmt.Errorf("save revert: %w (restore %s failed: %v)", err, item.file, restoreErr)
 			}
 			return 0, fmt.Errorf("save revert: %w", err)
+		}
+		if _, err := e.db.db.ExecContext(ctx, `UPDATE loop_edits SET reverted = 1 WHERE id = ?`, item.id); err != nil {
+			return 0, fmt.Errorf("mark %s/%s reverted: %w", root.Name, item.file, err)
 		}
 		e.logClass(logging.ClassEdit, "revert %s/%s", root.Name, item.file)
 	}

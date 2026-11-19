@@ -65,7 +65,10 @@ type EditRecord struct {
 	Reason    string `json:"reason,omitempty"`
 	// Kind distinguishes a model edit from a host rollback. A restore must not
 	// be linked to the next payload or reported as the next cycle's change.
-	Kind      string    `json:"kind,omitempty"`
+	Kind string `json:"kind,omitempty"`
+	// Reverted marks a source edit that the host undid. It is not part of the
+	// final applied change set.
+	Reverted  bool      `json:"reverted,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -211,7 +214,7 @@ func editKind(kind string) string {
 	return EditKindModel
 }
 
-const editColumns = `loop_id, iteration, COALESCE(payload_id, 0), module, file, old, new, reason, kind, created_at`
+const editColumns = `loop_id, iteration, COALESCE(payload_id, 0), module, file, old, new, reason, kind, reverted, created_at`
 
 func scanEdits(rows *sql.Rows) ([]EditRecord, error) {
 	defer rows.Close()
@@ -219,11 +222,13 @@ func scanEdits(rows *sql.Rows) ([]EditRecord, error) {
 	for rows.Next() {
 		var record EditRecord
 		var created int64
+		var reverted int
 		if err := rows.Scan(&record.LoopID, &record.Iteration, &record.PayloadID,
 			&record.Module, &record.File, &record.Old, &record.New, &record.Reason,
-			&record.Kind, &created); err != nil {
+			&record.Kind, &reverted, &created); err != nil {
 			return nil, fmt.Errorf("scan edit: %w", err)
 		}
+		record.Reverted = reverted != 0
 		record.CreatedAt = time.UnixMilli(created).UTC()
 		out = append(out, record)
 	}

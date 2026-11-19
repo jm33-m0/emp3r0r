@@ -62,6 +62,9 @@ func TestLoadAttemptStateCarriesPriorAttempt(t *testing.T) {
 	if e.priorLastGood == nil || e.priorLastGood.LoopID != "loop-r1" {
 		t.Fatalf("priorLastGood = %+v, want last verified r1 cycle", e.priorLastGood)
 	}
+	if e.lastExecuting != e.priorLastGood {
+		t.Fatalf("resumed baseline = %+v, want prior last good", e.lastExecuting)
+	}
 	if got := answerString(e.priorAnswer, "summary"); got != "prior summary" {
 		t.Fatalf("prior summary = %q", got)
 	}

@@ -16,6 +16,10 @@ import (
 
 const (
 	maxEditorFailures = 3
+	// maxBuildRetries bounds editor retries after a broken build. The host
+	// restores the last executing source before each retry, so it must not
+	// spend the editor's hypothesis budget on a source tree it can repair.
+	maxBuildRetries = 2
 	// maxInfraFailures bounds consecutive empty/provider failures. They are
 	// not hypothesis failures, so they do not end the loop on the first one.
 	maxInfraFailures = 3
@@ -45,6 +49,8 @@ type coordinator struct {
 	lastDiagnosis    *debugDiagnosis
 	debugged         sync.Map
 	editorFailures   int
+	buildRetries     int
+	editorNote       string
 	infraFailures    int
 	rejectedPlans    int
 	stopResumes      int
@@ -132,6 +138,8 @@ func (c *coordinator) run(ctx context.Context) (map[string]any, error) {
 				continue
 			}
 			c.infraFailures = 0
+			c.buildRetries = 0
+			c.editorNote = ""
 		}
 		switch plan.Action {
 		case "stop":
@@ -187,6 +195,19 @@ func (c *coordinator) run(ctx context.Context) (map[string]any, error) {
 			before := c.e.iter
 			if err := c.edit(ctx, plan); err != nil {
 				c.lastEditorError = err.Error()
+				if ctx.Err() != nil {
+					return nil, ctx.Err()
+				}
+				if errors.Is(err, errBuildFailed) && c.buildRetries < maxBuildRetries {
+					c.buildRetries++
+					c.editorFailures = 0
+					c.editorNote = "The previous edit failed to build. The host restored the last executing source. Reapply a change that compiles, or choose a different fix; never resubmit DetectionCycle against a broken tree."
+					c.e.logClass(logging.ClassWarning,
+						"editor build failed (%d/%d); restored source, retrying the same plan",
+						c.buildRetries, maxBuildRetries)
+					c.pendingPlan = &plan
+					continue
+				}
 				if isInfrastructureFailure(err) {
 					c.infraFailures++
 					c.e.logClass(logging.ClassWarning, "editor infrastructure failure: %v", err)
@@ -219,6 +240,8 @@ func (c *coordinator) run(ctx context.Context) (map[string]any, error) {
 			}
 			c.lastEditorError = ""
 			c.editorFailures = 0
+			c.buildRetries = 0
+			c.editorNote = ""
 			c.infraFailures = 0
 			c.rejectedPlans = 0
 			if err := c.afterCycle(ctx, c.e.last); err != nil {
@@ -659,7 +682,7 @@ func (c *coordinator) edit(ctx context.Context, plan plannerPlan) error {
 			if errors.Is(cycleErr, ErrSandboxUnreachable) {
 				return fmt.Errorf("%w: %v", errCycleInfrastructure, cycleErr)
 			}
-			return fmt.Errorf("the editor cycle failed: %v", cycleErr)
+			return fmt.Errorf("the editor cycle failed: %w", cycleErr)
 		}
 		return fmt.Errorf("the editor returned without running DetectionCycle")
 	}
@@ -1064,7 +1087,10 @@ func (c *coordinator) editorBrief(plan plannerPlan) string {
 	fmt.Fprintf(&b, "Cycle budget: %d total; %d used; %d remain\n", c.e.cfg.Iterations, c.e.usedCycles(), max(0, c.e.cfg.Iterations-c.e.usedCycles()))
 	fmt.Fprintf(&b, "Execution gate: %s\n", c.e.executionHint())
 	if strings.EqualFold(strings.TrimSpace(c.e.activeProducer), "crystal_pack") {
-		b.WriteString("Crystal-Kit: crystal_pack PICO; the agent must be windows_dll. loader.spec binds _DLL_/_MASK_/_PICO_/_DLLARGS_; do not edit postex-loader or build.sh to fix a loader-side exit. Diagnose loader -> PICO -> agent check-in in that order.\n")
+		b.WriteString("Crystal-Kit: crystal_pack PICO; the agent must be windows_dll. loader.spec binds _DLL_/_MASK_/_PICO_/_DLLARGS_; do not edit postex-loader or build.sh to work around a loader-side exit. If a producer build fails because an earlier edit left postex-loader incomplete, restore or repair that file before running DetectionCycle. Diagnose loader -> PICO -> agent check-in in that order.\n")
+	}
+	if c.editorNote != "" {
+		fmt.Fprintf(&b, "\nHost note: %s\n", c.editorNote)
 	}
 	if hint := c.e.highRegressionHint(); hint != "" {
 		b.WriteString(hint + "\n")

@@ -270,6 +270,7 @@ type evolver struct {
 	// initialShellcodeGenerated records whether cfg.Shellcode was built by the
 	// loop, so rotation may delete the original file.
 	initialShellcodeGenerated bool
+	shellcodeGenerated        bool
 	activeProducer            string
 	expectedAgentUUID         string
 	// testedAgentUUIDs and testedShellcodes are sets shared with tool
@@ -499,6 +500,12 @@ func (e *evolver) producerNames() []string {
 // hypothesis failure.
 var ErrSandboxUnreachable = errors.New("sandbox unreachable")
 
+// errBuildFailed marks a source edit that does not compile. The host restores
+// the last executing source and lets the editor retry the same plan; unlike a
+// model or sandbox failure, this is repairable without spending the editor
+// failure budget.
+var errBuildFailed = errors.New("build failed")
+
 // waitSandbox probes the sandbox once. The failure goes straight to the model
 // instead of a host retry loop, so the loop never rebuilds or detonates again
 // without model feedback.
@@ -601,6 +608,7 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 		cfg: cfg, loop: loop, db: loop.Telemetry, logf: cfg.Logf, shellcode: cfg.Shellcode,
 		agentArtifact:             strings.TrimSpace(cfg.InitialAgentArtifact),
 		initialShellcodeGenerated: cfg.InitialShellcodeGenerated,
+		shellcodeGenerated:        cfg.InitialShellcodeGenerated,
 		activeProducer:            strings.ToLower(strings.TrimSpace(cfg.InitialProducer)),
 		expectedAgentUUID:         strings.TrimSpace(cfg.ExpectedAgentUUID),
 	}
@@ -993,43 +1001,44 @@ func parseEvolveStages(stages []string) (static, dynamic, edr bool, err error) {
 }
 
 type cycleSummary struct {
-	LoopID           string          `json:"loop_id"`
-	Iteration        int             `json:"iteration"`
-	Attempt          int             `json:"attempt,omitempty"`
-	GlobalIteration  int             `json:"global_iteration,omitempty"`
-	PayloadKey       string          `json:"payload_key"`
-	PayloadTable     string          `json:"payload_table"`
-	RunID            string          `json:"run_id"`
-	SHA256           string          `json:"sha256"`
-	Score            float64         `json:"score"`
-	Level            string          `json:"level,omitempty"`
-	Findings         int             `json:"findings"`
-	HighFindings     int             `json:"high_findings,omitempty"`
-	MediumFindings   int             `json:"medium_findings,omitempty"`
-	StaticFindings   int             `json:"static_findings,omitempty"`
-	Verdicts         []string        `json:"verdicts,omitempty"`
-	TraceID          int64           `json:"trace_id,omitempty"`
-	Events           int             `json:"telemetry_events"`
-	Telemetry        *TelemetryStats `json:"telemetry,omitempty"`
-	SourceEdits      int             `json:"source_edits"`
-	TopFindings      []string        `json:"top_findings,omitempty"`
-	BuildTail        []string        `json:"build_tail,omitempty"`
-	Edits            []EditRecord    `json:"edits,omitempty"`
-	Shellcode        string          `json:"shellcode,omitempty"`
-	Producer         string          `json:"producer,omitempty"`
-	Mechanism        string          `json:"mechanism,omitempty"`
-	Prediction       string          `json:"prediction,omitempty"`
-	PredictionResult string          `json:"prediction_result,omitempty"`
-	Observed         string          `json:"observed,omitempty"`
-	Stages           []string        `json:"stages,omitempty"`
-	Note             string          `json:"note,omitempty"`
-	Executed         bool            `json:"executed"`
-	Execution        string          `json:"execution,omitempty"`
-	AgentOnline      *bool           `json:"agent_online,omitempty"`
-	NetworkEvents    int             `json:"network_events,omitempty"`
-	SourceTreeHash   string          `json:"source_tree_hash,omitempty"`
-	Knowledge        []KnowledgeHit  `json:"knowledge,omitempty"`
-	KBRefs           []string        `json:"kb_refs,omitempty"`
+	LoopID             string          `json:"loop_id"`
+	Iteration          int             `json:"iteration"`
+	Attempt            int             `json:"attempt,omitempty"`
+	GlobalIteration    int             `json:"global_iteration,omitempty"`
+	PayloadKey         string          `json:"payload_key"`
+	PayloadTable       string          `json:"payload_table"`
+	RunID              string          `json:"run_id"`
+	SHA256             string          `json:"sha256"`
+	Score              float64         `json:"score"`
+	Level              string          `json:"level,omitempty"`
+	Findings           int             `json:"findings"`
+	HighFindings       int             `json:"high_findings,omitempty"`
+	MediumFindings     int             `json:"medium_findings,omitempty"`
+	StaticFindings     int             `json:"static_findings,omitempty"`
+	Verdicts           []string        `json:"verdicts,omitempty"`
+	TraceID            int64           `json:"trace_id,omitempty"`
+	Events             int             `json:"telemetry_events"`
+	Telemetry          *TelemetryStats `json:"telemetry,omitempty"`
+	SourceEdits        int             `json:"source_edits"`
+	TopFindings        []string        `json:"top_findings,omitempty"`
+	BuildTail          []string        `json:"build_tail,omitempty"`
+	Edits              []EditRecord    `json:"edits,omitempty"`
+	Shellcode          string          `json:"shellcode,omitempty"`
+	Producer           string          `json:"producer,omitempty"`
+	ShellcodeGenerated bool            `json:"shellcode_generated,omitempty"`
+	Mechanism          string          `json:"mechanism,omitempty"`
+	Prediction         string          `json:"prediction,omitempty"`
+	PredictionResult   string          `json:"prediction_result,omitempty"`
+	Observed           string          `json:"observed,omitempty"`
+	Stages             []string        `json:"stages,omitempty"`
+	Note               string          `json:"note,omitempty"`
+	Executed           bool            `json:"executed"`
+	Execution          string          `json:"execution,omitempty"`
+	AgentOnline        *bool           `json:"agent_online,omitempty"`
+	NetworkEvents      int             `json:"network_events,omitempty"`
+	SourceTreeHash     string          `json:"source_tree_hash,omitempty"`
+	Knowledge          []KnowledgeHit  `json:"knowledge,omitempty"`
+	KBRefs             []string        `json:"kb_refs,omitempty"`
 	// RecoveredBy, DebuggerCause, and GuestActions record a debugger-assisted
 	// execution recovery without changing the cycle's detection data.
 	RecoveredBy   string            `json:"recovered_by,omitempty"`
@@ -1114,6 +1123,9 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 		// TOFU pins the first key per UUID. The host rotates the agent before
 		// reusing a shellcode instead of letting the C2 reject the check-in.
 		if err := e.ensureFreshAgent(cycleCtx); err != nil {
+			if errors.Is(err, errBuildFailed) {
+				e.rollbackFailedBuild(iteration, err)
+			}
 			return Cycle{}, err
 		}
 	}
@@ -1156,7 +1168,8 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 	}
 	e.logClass(logging.ClassBuild, "%s", buildLog)
 	if buildErr != nil {
-		return Cycle{}, fmt.Errorf("build %s: %w\n%s", e.cfg.Module, buildErr,
+		e.rollbackFailedBuild(iteration, buildErr)
+		return Cycle{}, fmt.Errorf("%w: build %s: %w\n%s", errBuildFailed, e.cfg.Module, buildErr,
 			clipUTF8(strings.Join(lastLines(buildLog, 20), "\n"), 8000))
 	}
 	payloads := ParseGeneratedPayloads(buildLog)
@@ -1236,7 +1249,7 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 		e.logClass(logging.ClassError, "link edits: %v", err)
 	}
 	e.iter = iteration
-	summary := summarizeCycle(e.cfg.LoopID, iteration, run, feedback, buildLog, note, mechanism, shellcode, e.activeProducer, execution, online, networkEvents)
+	summary := summarizeCycle(e.cfg.LoopID, iteration, run, feedback, buildLog, note, mechanism, shellcode, e.activeProducer, execution, online, networkEvents, e.shellcodeGenerated)
 	summary.Attempt = e.attempt
 	summary.GlobalIteration = e.globalUsed + iteration
 	summary.Prediction = clip(prediction, 500)
@@ -1269,7 +1282,7 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 		e.logClass(logging.ClassError, "read edits for cycle summary: %v", err)
 	} else {
 		for _, edit := range edits {
-			if edit.Iteration != iteration || editKind(edit.Kind) != EditKindModel {
+			if edit.Iteration != iteration || editKind(edit.Kind) != EditKindModel || edit.Reverted {
 				continue
 			}
 			if len(summary.Edits) >= 24 {
@@ -1599,13 +1612,13 @@ func dynamicRegionSummary(feedback Feedback, shellcode string) []string {
 	return out
 }
 
-func summarizeCycle(loopID string, iteration int, run Run, feedback Feedback, buildLog, note, mechanism, shellcode, producer, execution string, online *bool, networkEvents int) cycleSummary {
+func summarizeCycle(loopID string, iteration int, run Run, feedback Feedback, buildLog, note, mechanism, shellcode, producer, execution string, online *bool, networkEvents int, shellcodeGenerated bool) cycleSummary {
 	summary := cycleSummary{
 		LoopID: loopID, Iteration: iteration, RunID: run.ID,
 		Mechanism: mechanism,
 		SHA256:    run.Plan.Artifact.SHA256, Score: feedback.Score, Level: sanitizeLine(feedback.Level),
 		Findings: len(feedback.Findings), SourceEdits: len(feedback.SourceEdits),
-		Shellcode: shellcode, Producer: producer, Note: note,
+		Shellcode: shellcode, Producer: producer, ShellcodeGenerated: shellcodeGenerated, Note: note,
 		Executed: execution == executionVerified, Execution: execution,
 		AgentOnline: online, NetworkEvents: networkEvents,
 	}
@@ -1917,20 +1930,67 @@ func (e *evolver) setPreservedShellcode(path string) {
 	}
 }
 
+// rollbackFailedBuild restores the last executing source when an edit breaks a
+// build. The model can then try a different change instead of leaving a broken
+// tree that aborts every later cycle. A build failure before any payload has
+// checked in has no known-good source to restore.
+func (e *evolver) rollbackFailedBuild(iteration int, cause error) {
+	if e == nil || e.lastExecuting == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := e.restoreExecutingStateFromBuild(ctx); err != nil {
+		e.logClass(logging.ClassWarning,
+			"cycle %d build failed; source rollback incomplete: %v", iteration, err)
+		return
+	}
+	causeText := "unknown error"
+	if cause != nil {
+		causeText = clip(sanitizeLine(cause.Error()), 500)
+	}
+	e.logClass(logging.ClassWarning,
+		"cycle %d build failed; restored source and shellcode from %s: %s",
+		iteration, shortPayloadKey(e.lastExecuting.PayloadKey), causeText)
+}
+
 // restoreExecutingState rolls the editable source and active shellcode back to
 // the last payload whose agent checked in. It returns an error when only part
 // of the state could be restored, so the next brief does not claim a working
 // baseline.
 func (e *evolver) restoreExecutingState(ctx context.Context) error {
+	return e.restoreExecutingStateMode(ctx, true)
+}
+
+// restoreExecutingStateFromBuild restores after an edit failed to build. The
+// failed cycle never produced a payload, so only pending edits are undone; the
+// edits that produced the executing baseline must stay in place.
+func (e *evolver) restoreExecutingStateFromBuild(ctx context.Context) error {
+	return e.restoreExecutingStateMode(ctx, false)
+}
+
+func (e *evolver) restoreExecutingStateMode(ctx context.Context, revertFailedCycle bool) error {
 	baseline := e.lastExecuting
 	if baseline == nil {
 		return fmt.Errorf("no executing baseline to restore")
 	}
 	var errs []error
-	if _, err := e.revertCycleEdits(ctx, e.lastPayloadID(), baseline.PayloadKey); err != nil {
-		e.logClass(logging.ClassWarning, "restore %s source: %v",
+	lastIteration := 0
+	if e.last != nil {
+		lastIteration = e.last.Iteration
+	}
+	if _, err := e.revertPendingEdits(ctx, baseline.PayloadID, lastIteration, baseline.PayloadKey); err != nil {
+		e.logClass(logging.ClassWarning, "restore %s pending edits: %v",
 			shortPayloadKey(baseline.PayloadKey), err)
-		errs = append(errs, fmt.Errorf("source: %w", err))
+		errs = append(errs, fmt.Errorf("pending edits: %w", err))
+	}
+	failedPayloadID := e.lastPayloadID()
+	if revertFailedCycle || (failedPayloadID != 0 && failedPayloadID != baseline.PayloadID) {
+		if _, err := e.revertCycleEdits(ctx, failedPayloadID, baseline.PayloadKey); err != nil {
+			e.logClass(logging.ClassWarning, "restore %s source: %v",
+				shortPayloadKey(baseline.PayloadKey), err)
+			errs = append(errs, fmt.Errorf("source: %w", err))
+		}
 	}
 	var summary cycleSummary
 	if err := json.Unmarshal([]byte(baseline.Summary), &summary); err != nil {
@@ -1952,6 +2012,7 @@ func (e *evolver) restoreExecutingState(ctx context.Context) error {
 				break
 			}
 			e.shellcode = path
+			e.shellcodeGenerated = summary.ShellcodeGenerated || e.initialShellcodeGenerated
 			e.activeProducer = summary.Producer
 			e.preservedShellcode = path
 			e.logClass(logging.ClassEdit, "restored shellcode %s (producer %s)", path, headerOrNone(summary.Producer))
@@ -1964,7 +2025,7 @@ func (e *evolver) restoreExecutingState(ctx context.Context) error {
 func (e *evolver) linkEdits(ctx context.Context, iteration int, payloadID int64) error {
 	_, err := e.db.db.ExecContext(ctx, `
 		UPDATE loop_edits SET next_payload_id = ?
-		WHERE loop_id = ? AND iteration = ? AND next_payload_id IS NULL AND kind = ?`,
+		WHERE loop_id = ? AND iteration = ? AND next_payload_id IS NULL AND reverted = 0 AND kind = ?`,
 		payloadID, e.cfg.LoopID, iteration, EditKindModel)
 	return err
 }

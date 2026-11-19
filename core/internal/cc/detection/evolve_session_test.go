@@ -411,3 +411,113 @@ func TestInfrastructureFailureClassification(t *testing.T) {
 		t.Fatal("contract failure was treated as infrastructure")
 	}
 }
+
+// A build can fail before any payload row exists, leaving the edit unlinked.
+// The host must revert that pending edit, not only edits linked to a payload.
+func TestRestoreRevertsUncycledBuildEdits(t *testing.T) {
+	base := t.TempDir()
+	moduleDir := filepath.Join(base, "module")
+	if err := os.MkdirAll(moduleDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	source := filepath.Join(moduleDir, "selfload.c")
+	if err := os.WriteFile(source, []byte("BROKEN"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	goodShellcode := filepath.Join(base, "good.bin")
+	if err := os.WriteFile(goodShellcode, []byte("GOOD"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	db, err := OpenTelemetryDB(filepath.Join(base, "telemetry.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	ctx := context.Background()
+	res, err := db.db.ExecContext(ctx, `INSERT INTO payloads(payload_key, sha256, module, table_name)
+		VALUES('sha256:good', 'good', 'loader_windows', 'payload_good')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	goodID, _ := res.LastInsertId()
+	if _, err := db.db.ExecContext(ctx, `INSERT INTO loop_edits(loop_id, iteration, payload_id, module, file, old, new, reason, kind)
+		VALUES('loop', 3, ?, 'loader_windows', 'selfload.c', 'GOOD', 'BROKEN', 'cycle edit', 'model')`, goodID); err != nil {
+		t.Fatal(err)
+	}
+	summary, _ := json.Marshal(cycleSummary{Shellcode: goodShellcode, Producer: "donut"})
+	e := &evolver{
+		cfg: EvolveConfig{LoopID: "loop", ModuleDir: moduleDir, StoreRoot: base},
+		db:  db, roots: mustRoots(t, moduleDir), logf: func(logging.Class, string, ...any) {},
+		shellcode: "/missing/bad.bin",
+		last:      &Cycle{ID: 2, LoopID: "loop", Iteration: 2, PayloadID: goodID, PayloadKey: "sha256:good"},
+		lastExecuting: &Cycle{
+			ID: 1, LoopID: "loop", Iteration: 1, PayloadID: goodID, PayloadKey: "sha256:good",
+			Summary: string(summary),
+		},
+	}
+	if err := e.restoreExecutingState(ctx); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "GOOD" {
+		t.Fatalf("pending build edit was not reverted: %q", data)
+	}
+	if err := e.restoreExecutingStateFromBuild(ctx); err != nil {
+		t.Fatalf("second build rollback was not idempotent: %v", err)
+	}
+}
+
+// A build failure happens before a payload row exists. Rolling back must not
+// replay the edits that produced the executing baseline itself.
+func TestBuildRollbackKeepsExecutingBaselineEdits(t *testing.T) {
+	base := t.TempDir()
+	moduleDir := filepath.Join(base, "module")
+	if err := os.MkdirAll(moduleDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	source := filepath.Join(moduleDir, "selfload.c")
+	if err := os.WriteFile(source, []byte("BASELINE"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	goodShellcode := filepath.Join(base, "good.bin")
+	if err := os.WriteFile(goodShellcode, []byte("GOOD"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	db, err := OpenTelemetryDB(filepath.Join(base, "telemetry.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	ctx := context.Background()
+	res, err := db.db.ExecContext(ctx, `INSERT INTO payloads(payload_key, sha256, module, table_name)
+		VALUES('sha256:good', 'good', 'loader_windows', 'payload_good')`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	goodID, _ := res.LastInsertId()
+	if _, err := db.db.ExecContext(ctx, `INSERT INTO loop_edits(loop_id, iteration, payload_id, next_payload_id, module, file, old, new, reason, kind)
+		VALUES('loop', 1, ?, ?, 'loader_windows', 'selfload.c', 'OLD', 'BASELINE', 'baseline edit', 'model')`, goodID, goodID); err != nil {
+		t.Fatal(err)
+	}
+	summary, _ := json.Marshal(cycleSummary{Shellcode: goodShellcode, Producer: "donut"})
+	baseline := &Cycle{
+		ID: 1, LoopID: "loop", Iteration: 1, PayloadID: goodID, PayloadKey: "sha256:good",
+		Summary: string(summary),
+	}
+	e := &evolver{
+		cfg: EvolveConfig{LoopID: "loop", ModuleDir: moduleDir, StoreRoot: base},
+		db:  db, roots: mustRoots(t, moduleDir), logf: func(logging.Class, string, ...any) {},
+		shellcode: goodShellcode, last: baseline, lastExecuting: baseline,
+	}
+	e.rollbackFailedBuild(2, errBuildFailed)
+	data, err := os.ReadFile(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "BASELINE" {
+		t.Fatalf("build rollback reverted the executing baseline edit: %q", data)
+	}
+}
