@@ -199,8 +199,9 @@ type EvolveConfig struct {
 	// permitted.
 	Verify VerifyOps
 	// FinalVerify runs once after the agent loop finishes. It polls for the
-	// expected agent, executes a small BOF, and returns its output. A failed
-	// verification marks the result and lets the caller restart the loop.
+	// expected agent and treats a live check-in as health. The sandbox may
+	// terminate the beacon before a verification BOF can run, so BOF output is
+	// diagnostic, not a health signal.
 	FinalVerify func(context.Context, string) (string, error)
 	// Audit records every C2 action the model can trigger, including denials.
 	// The caller writes it to the operator audit log.
@@ -318,7 +319,13 @@ type evolver struct {
 	cyclesDone        atomic.Int64
 	toolCalls         atomic.Int64
 	sessions          atomic.Int64
-	agentSeenOnline   atomic.Bool
+	// agentSeenOnline is the loop-wide "any agent checked in" latch used for
+	// reporting and restart decisions.
+	agentSeenOnline atomic.Bool
+	// payloadSeenOnline is scoped to the current payload. It is reset at the
+	// start of every cycle and on agent rotation, so a baseline or debugger
+	// relaunch cannot make a later failed payload look verified.
+	payloadSeenOnline atomic.Bool
 	lastExecution     atomic.Value
 	lastAgent         atomic.Value
 	// guest is the debugger's sandbox surface. Nil when SSH is not configured.
@@ -758,8 +765,12 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 			answer["payload_verification_error"] = "no expected agent UUID"
 		} else {
 			output, verifyErr := cfg.FinalVerify(ctx, e.expectedAgentUUID)
-			verified := verifyErr == nil && strings.TrimSpace(output) != ""
-			if !verified && e.guest != nil && !e.agentSeenOnline.Load() {
+			payloadSeen := e.payloadSeenOnline.Load()
+			verified := finalPayloadVerified(output, verifyErr, payloadSeen)
+			if verified && (verifyErr != nil || strings.TrimSpace(output) == "") {
+				answer["payload_verification_note"] = "this payload checked in; BOF output is not required because the sandbox terminates the beacon after the capture window"
+			}
+			if !verified && e.guest != nil && !payloadSeen {
 				// A fresh agent restart cannot fix a guest-side execution
 				// fault. Let the debugger inspect the sandbox first, then
 				// retry the final check once when it reports a fix.
@@ -1101,6 +1112,8 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 			return Cycle{}, err
 		}
 	}
+	// Health proof belongs to this payload, not to any earlier agent.
+	e.payloadSeenOnline.Store(false)
 
 	var gitCommits map[string]string
 	if e.git != nil {
@@ -1605,6 +1618,19 @@ func shortSHA(sha string) string {
 	return sha
 }
 
+// finalPayloadVerified treats a check-in from the current payload as healthy
+// even when the verification BOF produced no output. LitterBox kills the
+// beacon at the capture boundary, so a missing BOF result is not proof of a
+// failed payload. The caller passes payloadSeenOnline, never the loop-wide
+// agentSeenOnline latch, so a baseline or debugger relaunch cannot vouch for a
+// later payload.
+func finalPayloadVerified(output string, err error, payloadSeen bool) bool {
+	if err == nil && strings.TrimSpace(output) != "" {
+		return true
+	}
+	return payloadSeen
+}
+
 // shortPayloadKey abbreviates a payload key for logs and reports.
 func shortPayloadKey(key string) string {
 	return shortSHA(strings.TrimPrefix(strings.TrimSpace(key), "sha256:"))
@@ -1624,6 +1650,7 @@ func (e *evolver) watchAgentOnline(ctx context.Context, uuid string) *atomic.Boo
 			if err == nil && status != nil && status.Online {
 				seen.Store(true)
 				e.agentSeenOnline.Store(true)
+				e.payloadSeenOnline.Store(true)
 				return
 			}
 			select {
@@ -1657,6 +1684,7 @@ func (e *evolver) checkExecution(ctx context.Context, traceID int64, dynamic boo
 	if seenOnline != nil && seenOnline.Load() {
 		online := true
 		e.agentSeenOnline.Store(true)
+		e.payloadSeenOnline.Store(true)
 		return executionVerified, &online, network
 	}
 	timeout := e.executionCheckTimeout
@@ -1674,6 +1702,7 @@ func (e *evolver) checkExecution(ctx context.Context, traceID int64, dynamic boo
 		if status != nil && status.Online {
 			online := true
 			e.agentSeenOnline.Store(true)
+			e.payloadSeenOnline.Store(true)
 			return executionVerified, &online, network
 		}
 		if !time.Now().Before(deadline) {

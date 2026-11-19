@@ -117,6 +117,9 @@ func (e *evolver) generateAgentTool() tool.CoreTool {
 			}
 			e.cleanupAgentArtifact(oldArtifact)
 			if result.AgentUUID != "" {
+				if old := strings.TrimSpace(e.expectedAgentUUID); old != "" && !strings.EqualFold(old, result.AgentUUID) {
+					e.payloadSeenOnline.Store(false)
+				}
 				e.expectedAgentUUID = result.AgentUUID
 			}
 			e.audit("generate_agent", result.AgentUUID,

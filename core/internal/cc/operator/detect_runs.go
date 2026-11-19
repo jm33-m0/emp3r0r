@@ -404,8 +404,8 @@ func runDetectLoop(run *detectRun, opts detectLoopOptions, shellcode string) {
 		if result.AgentOnlineSeen {
 			// The beacon may die before the final BOF. A check-in at any point
 			// proves the payload executed, so do not restart the whole loop and
-			// discard the completed cycles just because the last BOF failed.
-			logf("final BOF verification was inconclusive, but the agent checked in; keeping the completed loop")
+			// discard the completed cycles just because the last check failed.
+			logf("final verification was inconclusive, but the agent checked in; keeping the completed loop")
 			return
 		}
 		if run.ctx.Err() != nil {

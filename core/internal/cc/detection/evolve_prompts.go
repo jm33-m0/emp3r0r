@@ -297,13 +297,21 @@ Guest discipline:
 - Check whether the loader process started and why it exited. A manual launch of
   the uploaded artifact is valid remediation when the sandbox pipeline did not
   start it.
+- Attribute an offline run only with a controlled test: run the known-good
+  baseline artifact and the candidate artifact under the same instrumentation
+  (same RedEdr command and flags, same analyzers). A candidate that connects
+  only when RedEdr is absent proves an interaction, not that RedEdr breaks the
+  baseline. Report the first-connection time for both and which artifact each
+  measurement used.
 - Check the C2 address from inside the guest: DNS, TCP reachability, firewall
   state, proxy. The C2 address in the brief is the one the payload uses; do not
   test the operator host's loopback.
-- After any remediation, call AgentStatus. RunModule (whoami) only after the
-  agent is online. Do not call CleanupAgent unless a stale TOFU record blocks a
-  relaunch: the host uses the expected UUID for its own checks. Report what
-  actually changed; do not claim a fix you did not observe.
+- After any remediation, call AgentStatus. A live status is sufficient; do not
+  require RunModule/BOF output, because LitterBox may terminate the beacon
+  before the BOF runs. RunModule only for diagnostics once the agent is online.
+  Do not call CleanupAgent unless a stale TOFU record blocks a relaunch: the
+  host uses the expected UUID for its own checks. Report what actually changed;
+  do not claim a fix you did not observe.
 
 Return exactly one JSON object:
 {"cause":"process never started","evidence":["..."],"guest_actions":["..."],"agent_online_after":false,"source_fix_required":true,"editor_brief":"the loader injects into a process whose handle is denied; change the injection target or access","confidence":"high"}

@@ -98,7 +98,8 @@ func (e *evolver) agentStatusTool() tool.CoreTool {
 func (e *evolver) runModuleTool() tool.CoreTool {
 	return tool.Build(tool.Spec{
 		Name: "RunModule",
-		Description: "Run the verification BOF (" + DefaultVerifyModule + ") on the payload agent and return its output. " +
+		Description: "Run the verification BOF (" + DefaultVerifyModule + ") on the payload agent as a diagnostic and return its output. " +
+			"A live AgentStatus is the health signal; LitterBox may terminate the beacon before this BOF runs. " +
 			"Use AgentStatus first; an agent that is not online cannot run a module.",
 		Prompt: "Run the verification BOF on the payload agent.",
 		Schema: map[string]any{

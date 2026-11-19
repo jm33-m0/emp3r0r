@@ -206,6 +206,7 @@ func (e *evolver) rotateAgent(ctx context.Context) error {
 		return fmt.Errorf("rotate agent shellcode: %w", err)
 	}
 	e.expectedAgentUUID = newUUID
+	e.payloadSeenOnline.Store(false)
 	e.cfg.AgentType = agentType
 	e.cfg.AgentArch = arch
 	if oldUUID != "" {

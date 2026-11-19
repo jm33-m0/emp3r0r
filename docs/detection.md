@@ -89,14 +89,14 @@ use the console's existing C2 connection. The loop then runs:
    detonates one cycle, and a debugger that inspects the sandbox guest when the
    payload did not execute; by default the debugger runs once at the final stop
    (`--debugger-policy final`);
-4. after the model loop finishes, run the final BOF verification exactly once. The host
-   polls once per second for the last generated agent UUID, runs a small BOF
-   such as `whoami`, and records the output. A check-in proves the loader reached
-   the agent runtime; a non-empty BOF additionally proves the agent can run code.
-   If the payload never comes online, the loop restarts with a fresh agent and
-   shellcode, up to three attempts. If the agent checked in at any point, an
-   inconclusive final BOF does not restart the loop and discard the completed
-   cycles. A restart keeps the same logical loop and the total `--iterations` budget; the
+4. after the model loop finishes, verify the last generated agent UUID exactly
+   once. The host polls once per second and treats a live C2 check-in as proof
+   that the loader reached the agent runtime. It does not require a verification
+   BOF: LitterBox terminates the beacon at the capture boundary, so a BOF may
+   never run. If the payload never comes online, the loop restarts with a fresh
+   agent and shellcode, up to three attempts. If the agent checked in at any
+   point, a missing BOF result does not restart the loop and discard the
+   completed cycles. A restart keeps the same logical loop and the total `--iterations` budget; the
    new attempt's prompt carries the prior attempts' last eight cycles, final
    answer and residuals, pending source edits, last executing payload, and
    source-tree hash;
@@ -111,7 +111,8 @@ use the console's existing C2 connection. The loop then runs:
    telemetry database, and the knowledge cache are kept;
 6. scope every C2 tool to the loop's own agent. `AgentStatus` checks only the
    expected UUID, `CleanupAgent` forgets only that UUID, and `RunModule` runs
-   only the `whoami` verification BOF with no options. Denials and dispatches
+   only the `whoami` verification BOF with no options as a diagnostic, not as a
+   health signal. Denials and dispatches
    are written to the operator audit log;
 7. after every dynamic cycle, check the cycle's generated agent with
    `AgentStatus` and record `execution=verified|offline|unverified`, the online

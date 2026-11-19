@@ -1011,8 +1011,10 @@ func mcpFinalVerify(ctx context.Context, uuid, module string) (string, error) {
 			return "", err
 		}
 		if agent != nil {
-			output, _, runErr := mcpRunVerifyModule(ctx, agent, module)
-			return output, runErr
+			// A live C2 entry is the health signal. LitterBox terminates the
+			// beacon at the capture boundary, so a BOF may never run; requiring
+			// one here would diverge from the CLI loop.
+			return fmt.Sprintf("agent %s is online", uuid), nil
 		}
 		if time.Now().After(deadline) {
 			return "", fmt.Errorf("agent %s did not come online within %s", uuid, detection.PayloadVerifyTimeout)
