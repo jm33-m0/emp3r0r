@@ -43,19 +43,26 @@ const dataPolicyPrompt = `Data policy:
   termination, name the gap and do not treat the cycle as clean.`
 
 const knowledgePrompt = `Knowledge base:
-- KnowledgeSearch, KnowledgeRead, KnowledgeStats, and KnowledgeList read the
-  trusted offline security reference cache. Use it as guidance, but it is not
-  evidence about this payload: source and telemetry win when they disagree.
-- Consult it once per mechanism, before the first edit or cycle for that
-  mechanism: classify the finding by surface (on-disk static, in-memory scan, or
-  behavioral telemetry), search two or three concrete tokens (mechanism plus the
-  exact detector/API/analyzer), read the best summary, then content only for the
-  detail the change needs. Discard hits about a different problem.
-- A missing cache or a no-hit search is a valid result: state it and continue
-  with telemetry and source evidence.
-- Notebook focus: maldev, edrdev, redteam, amsi, staticanalysis, vulndrivers,
-  crystalstardust, com, lsass, defender, mynotebook. Filter with notebook only
-  when the surface is ambiguous.
+- KnowledgeSearch searches two sources: the local methodology notebook and the
+  external security reference cache. KnowledgeRead returns either.
+- Methodology entries are the harness playbooks: offline-after-baseline,
+  instrumentation-changed, agent-not-checking-in, packed-payload-entropy,
+  static-high-regression, producer-agent-compatibility, build-failure,
+  no-comparable-baseline, and mechanism-<name> contracts. Read the entry that
+  matches the current scenario before choosing a mechanism or editing source.
+- External notebooks (maldev, edrdev, redteam, amsi, staticanalysis,
+  vulndrivers, crystalstardust, com, lsass, defender, mynotebook) hold technique
+  detail. They are guidance, not evidence about this payload; source and
+  telemetry win when they disagree.
+- Search with two or three concrete tokens: the scenario or mechanism plus the
+  exact detector, API, event, or analyzer. Read the methodology entry first,
+  then a technique summary, then content only for the detail the change needs.
+  Discard hits about a different problem.
+- The host also retrieves a few entries and puts them in the brief. Read those
+  before issuing another search; a no-hit search is a valid result.
+- KnowledgeSearch and KnowledgeRead always serve methodology entries.
+  KnowledgeStats and KnowledgeList require an external cache and are not
+  registered when it is absent.
 - Turn what you read into one falsifiable prediction per cycle and record the
   document_ref that supports it. A document is not support for an edit just
   because it shares a word with the finding.

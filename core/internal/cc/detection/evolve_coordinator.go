@@ -40,6 +40,7 @@ type coordinator struct {
 	knowledgeState string
 
 	plannerNote      string
+	knowledgeBrief   string
 	lastEditorError  string
 	lastDiagnosis    *debugDiagnosis
 	debugged         sync.Map
@@ -61,6 +62,29 @@ func newCoordinator(e *evolver, provider llm.Provider, model string, baselineJSO
 		baselineJSON:   baselineJSON,
 		knowledgeState: knowledgeState,
 	}
+}
+
+// refreshKnowledge retrieves a bounded set of reference documents for the
+// current finding and mechanism. The host does the search so a model with a
+// small read budget still starts from relevant techniques instead of guessing.
+func (c *coordinator) refreshKnowledge(ctx context.Context, mechanism string) {
+	c.knowledgeBrief = ""
+	query := c.e.knowledgeQuery(mechanism)
+	if query == "" {
+		return
+	}
+	qctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	hits := c.e.searchKnowledge(qctx, query, "", 3)
+	if len(hits) == 0 {
+		return
+	}
+	var b strings.Builder
+	for _, hit := range hits {
+		fmt.Fprintf(&b, "- %s [%s]: %s\n",
+			sanitizeLine(hit.Title), sanitizeLine(hit.DocRef), clip(sanitizeLine(hit.Snippet), 300))
+	}
+	c.knowledgeBrief = b.String()
 }
 
 func (c *coordinator) run(ctx context.Context) (map[string]any, error) {
@@ -579,6 +603,7 @@ func (c *coordinator) afterCycle(ctx context.Context, cycle *Cycle) error {
 // plan asks the coordinator worker for the next move. Parse repair continues
 // the same session, so the planner keeps the evidence it already read.
 func (c *coordinator) plan(ctx context.Context) (plannerPlan, error) {
+	c.refreshKnowledge(ctx, "")
 	ws := c.newWorkerSession(rolePlanner)
 	defer ws.close()
 	prompt := c.plannerBrief()
@@ -621,6 +646,7 @@ func (c *coordinator) planFailureFinal(text string, err error) map[string]any {
 
 func (c *coordinator) edit(ctx context.Context, plan plannerPlan) error {
 	c.currentPlan = plan
+	c.refreshKnowledge(ctx, plan.Mechanism)
 	c.e.sessionCycles.Store(0)
 	c.e.clearCycleError()
 	prompt := c.editorBrief(plan)
@@ -1030,6 +1056,18 @@ func (c *coordinator) editorBrief(plan plannerPlan) string {
 	fmt.Fprintf(&b, "Execution gate: %s\n", c.e.executionHint())
 	if strings.EqualFold(strings.TrimSpace(c.e.activeProducer), "crystal_pack") {
 		b.WriteString("Crystal-Kit: crystal_pack PICO; the agent must be windows_dll. loader.spec binds _DLL_/_MASK_/_PICO_/_DLLARGS_; do not edit postex-loader or build.sh to fix a loader-side exit. Diagnose loader -> PICO -> agent check-in in that order.\n")
+	}
+	if hint := c.e.highRegressionHint(); hint != "" {
+		b.WriteString(hint + "\n")
+	}
+	if hint := c.e.failureLayerHint(); hint != "" {
+		b.WriteString(hint + "\n")
+	}
+	if plan.Mechanism != "" {
+		b.WriteString("\n" + c.e.mechanismBrief(plan.Mechanism))
+	}
+	if c.knowledgeBrief != "" {
+		fmt.Fprintf(&b, "\nRetrieved knowledge (host-side; read a summary before searching):\n%s", c.knowledgeBrief)
 	}
 	if c.e.baselineFailure != "" {
 		fmt.Fprintf(&b, "Baseline failure: %s\n", c.e.baselineFailure)

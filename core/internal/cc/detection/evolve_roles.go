@@ -93,8 +93,11 @@ func (e *evolver) toolsFor(role evolveRole) []tool.CoreTool {
 		e.payloadsTool(),
 		e.comparePayloadsTool(),
 	}
+	// Methodology entries are built in, so search/read must be callable even
+	// when no external knowledge database is configured.
+	tools = append(tools, e.knowledgeSearchTool(), e.knowledgeReadTool())
 	if e.knowledge != nil {
-		tools = append(tools, e.knowledgeSearchTool(), e.knowledgeReadTool(), e.knowledgeStatsTool(), e.knowledgeListTool())
+		tools = append(tools, e.knowledgeStatsTool(), e.knowledgeListTool())
 	}
 	if e.git != nil {
 		tools = append(tools, e.gitHistoryTool())

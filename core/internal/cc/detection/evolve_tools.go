@@ -572,18 +572,12 @@ func (e *evolver) knowledgeSearchTool() tool.CoreTool {
 			if err := json.Unmarshal(raw, &args); err != nil {
 				return tool.Errorf("invalid arguments"), nil
 			}
-			if e.knowledge == nil {
-				return tool.Errorf("knowledge cache is empty; ask the operator to run detect_loop knowledge-sync"), nil
-			}
-			hits, err := e.knowledge.Search(ctx, args.Query, args.Notebook, args.Limit)
-			if err != nil {
-				return tool.Errorf(fmt.Sprintf("%v", err)), nil
-			}
+			hits := e.searchKnowledge(ctx, args.Query, args.Notebook, args.Limit)
 			if crystalPalaceQuery(args.Query) {
 				e.producerQueries.Store("crystal_pack", struct{}{})
 			}
 			if len(hits) == 0 {
-				return tool.Text("no cached document matched"), nil
+				return tool.Text("no cached document or methodology entry matched"), nil
 			}
 			data, _ := json.Marshal(map[string]any{
 				"query": args.Query, "hits": hits,
@@ -628,8 +622,12 @@ func (e *evolver) knowledgeReadTool() tool.CoreTool {
 			if err := json.Unmarshal(raw, &args); err != nil {
 				return tool.Errorf("invalid arguments"), nil
 			}
+			if doc, ok := methodologyDoc(args.DocumentRef); ok {
+				data, _ := json.Marshal(doc)
+				return tool.Text(string(data)), nil
+			}
 			if e.knowledge == nil {
-				return tool.Errorf("knowledge cache is empty; ask the operator to run detect_loop knowledge-sync"), nil
+				return tool.Errorf("knowledge cache is empty; methodology entries are available by methodology/ reference"), nil
 			}
 			doc, err := e.knowledge.Read(ctx, args.DocumentRef, args.Artifact, args.Offset, args.Limit)
 			if err != nil {
