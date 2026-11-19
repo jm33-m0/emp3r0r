@@ -1038,6 +1038,16 @@ type cycleSummary struct {
 	DebuggerCause string            `json:"debugger_cause,omitempty"`
 	GuestActions  []string          `json:"guest_actions,omitempty"`
 	GitCommits    map[string]string `json:"git_commits,omitempty"`
+	// InstrumentationChanged records that the sandbox delivered a different
+	// set of instrumentation features than the baseline, so an offline result
+	// is not attributable to a source edit. NewHighFindings lists high top
+	// findings that did not exist in the baseline.
+	InstrumentationChanged bool     `json:"instrumentation_changed,omitempty"`
+	InstrumentationNote    string   `json:"instrumentation_note,omitempty"`
+	NewHighFindings        []string `json:"new_high_findings,omitempty"`
+	// FailureLayer is the load-pipeline stage where an offline cycle stopped,
+	// derived from the trace categories. It is host evidence, not model prose.
+	FailureLayer string `json:"failure_layer,omitempty"`
 }
 
 func ensurePayloadPreserved(shellcode string, artifact Artifact) error {
@@ -1231,6 +1241,18 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 	summary.Observed = observedFindings(feedback)
 	summary.PredictionResult = evaluatePrediction(prediction, feedback)
 	summary.GitCommits = gitCommits
+	summary.FailureLayer = failureLayer(&summary)
+	if prev := e.baselineSummary(); prev != nil && iteration > 1 {
+		if changed, note := instrumentationDelta(prev, &summary); changed {
+			summary.InstrumentationChanged = true
+			summary.InstrumentationNote = note
+			e.logClass(logging.ClassWarning, "cycle %d: %s", iteration, note)
+		}
+		if highs := newHighFindings(prev.TopFindings, summary.TopFindings); len(highs) > 0 {
+			summary.NewHighFindings = highs
+			e.logClass(logging.ClassWarning, "cycle %d added high finding(s): %s", iteration, strings.Join(highs, ", "))
+		}
+	}
 	e.cyclesDone.Store(int64(e.globalUsed + iteration))
 	e.lastExecution.Store(summary.Execution)
 	e.lastAgent.Store(e.expectedAgentUUID)
@@ -1291,6 +1313,205 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 	// The coordinator applies the execution gate after the editor session so a
 	// debugger can inspect the guest before a non-executing cycle is reverted.
 	return cycle, nil
+}
+
+// failureLayer names the load-pipeline stage where an offline cycle stopped.
+// The categories come from the trace, so this is evidence rather than a guess
+// about which source file to edit.
+func failureLayer(summary *cycleSummary) string {
+	if summary == nil || summary.Execution == executionVerified {
+		return ""
+	}
+	if summary.InstrumentationChanged {
+		return "instrumentation"
+	}
+	if summary.Telemetry == nil {
+		return "unknown"
+	}
+	categories := summary.Telemetry.ByCategory
+	switch {
+	case categories["process"] == 0:
+		return "loader-start"
+	case categories["memory"] == 0 && categories["thread"] == 0:
+		return "payload-mapping"
+	case categories["network"] == 0:
+		return "agent-network"
+	default:
+		return "agent-checkin"
+	}
+}
+
+func failureLayerAction(layer string) string {
+	switch layer {
+	case "loader-start":
+		return "the loader process did not start; inspect the host/launch path before editing the payload or producer"
+	case "payload-mapping":
+		return "the process ran but did not map/execute the payload; test the loader-to-producer boundary first"
+	case "agent-network":
+		return "the payload executed but produced no network/check-in; inspect the agent configuration and C2 path"
+	case "agent-checkin":
+		return "network activity exists but the expected agent did not check in; inspect the agent identity and C2 verification"
+	case "instrumentation":
+		return "sandbox instrumentation changed since the baseline; stabilize it before comparing or editing source"
+	default:
+		return "the trace does not identify the stage; inspect the events before editing"
+	}
+}
+
+// knowledgeQuery builds a compact search from the last cycle's top findings and
+// mechanism. The host runs it before a worker session and puts the hits in the
+// brief, so the model is not required to spend its read budget rediscovering
+// the technique.
+func (e *evolver) knowledgeQuery(mechanism string) string {
+	if e == nil || e.last == nil {
+		return ""
+	}
+	var summary cycleSummary
+	if json.Unmarshal([]byte(e.last.Summary), &summary) != nil {
+		return ""
+	}
+	var parts []string
+	for _, finding := range summary.TopFindings {
+		text := strings.TrimSpace(finding)
+		for _, prefix := range []string{"high", "medium", "low"} {
+			text = strings.TrimSpace(strings.TrimPrefix(text, prefix))
+		}
+		if text == "" || strings.Contains(text, "analyzer/") {
+			continue
+		}
+		parts = append(parts, text)
+		if len(parts) == 2 {
+			break
+		}
+	}
+	mechanism = strings.TrimSpace(mechanism)
+	if mechanism == "" {
+		mechanism = strings.TrimSpace(summary.Mechanism)
+	}
+	if mechanism != "" {
+		parts = append(parts, mechanism)
+	}
+	if summary.Execution == executionOffline {
+		parts = append(parts, "offline")
+	}
+	if summary.InstrumentationChanged {
+		parts = append(parts, "instrumentation")
+	}
+	if summary.FailureLayer != "" {
+		parts = append(parts, strings.ReplaceAll(summary.FailureLayer, "-", " "))
+	}
+	if len(summary.NewHighFindings) > 0 {
+		parts = append(parts, "static high regression")
+	}
+	return strings.Join(parts, " ")
+}
+
+// failureLayerHint is the host-derived stage for the last offline cycle.
+func (e *evolver) failureLayerHint() string {
+	if e == nil || e.last == nil {
+		return ""
+	}
+	var summary cycleSummary
+	if json.Unmarshal([]byte(e.last.Summary), &summary) != nil || summary.FailureLayer == "" {
+		return ""
+	}
+	return "Failure layer: " + summary.FailureLayer + " — " + failureLayerAction(summary.FailureLayer)
+}
+
+// baselineSummary returns the first cycle of this loop attempt. Instrumentation
+// and static-signature comparisons use it as the reference.
+func (e *evolver) baselineSummary() *cycleSummary {
+	if e == nil || len(e.cycles) == 0 {
+		return nil
+	}
+	var summary cycleSummary
+	if json.Unmarshal([]byte(e.cycles[0].Summary), &summary) != nil {
+		return nil
+	}
+	return &summary
+}
+
+// instrumentationDelta compares the instrumentation features the sandbox
+// delivered for a cycle with the baseline. A change means an offline cycle is
+// not attributable to a source edit; the model must stabilize the guest first.
+func instrumentationDelta(baseline, current *cycleSummary) (bool, string) {
+	if baseline == nil || current == nil || baseline.Telemetry == nil || current.Telemetry == nil {
+		return false, ""
+	}
+	features := []string{"hook", "kernel", "etwti", "etw", "antimalware", "defender_trace"}
+	before := stringSet(baseline.Telemetry.Coverage.Delivered)
+	after := stringSet(current.Telemetry.Coverage.Delivered)
+	var added, removed []string
+	for _, feature := range features {
+		if after[feature] && !before[feature] {
+			added = append(added, feature)
+		}
+		if before[feature] && !after[feature] {
+			removed = append(removed, feature)
+		}
+	}
+	if len(added) == 0 && len(removed) == 0 {
+		return false, ""
+	}
+	note := "guest instrumentation changed since the baseline"
+	if len(added) > 0 {
+		note += "; added " + strings.Join(added, ", ")
+	}
+	if len(removed) > 0 {
+		note += "; removed " + strings.Join(removed, ", ")
+	}
+	note += ". The offline result is not attributable to source; stabilize the sandbox before editing"
+	return true, note
+}
+
+// newHighFindings lists high top-findings that the baseline did not have.
+func newHighFindings(baseline, current []string) []string {
+	before := map[string]bool{}
+	for _, finding := range baseline {
+		if indicator := highIndicator(finding); indicator != "" {
+			before[indicator] = true
+		}
+	}
+	seen := map[string]bool{}
+	var added []string
+	for _, finding := range current {
+		indicator := highIndicator(finding)
+		if indicator == "" || before[indicator] || seen[indicator] {
+			continue
+		}
+		seen[indicator] = true
+		added = append(added, indicator)
+	}
+	return added
+}
+
+func highIndicator(finding string) string {
+	finding = strings.TrimSpace(finding)
+	if !strings.HasPrefix(finding, "high") {
+		return ""
+	}
+	return strings.TrimSpace(strings.TrimPrefix(finding, "high"))
+}
+
+func stringSet(values []string) map[string]bool {
+	set := make(map[string]bool, len(values))
+	for _, value := range values {
+		set[strings.ToLower(strings.TrimSpace(value))] = true
+	}
+	return set
+}
+
+// highRegressionHint names the high findings an edit added. A new high is
+// worse than the baseline even when the cycle did not execute.
+func (e *evolver) highRegressionHint() string {
+	if e == nil || e.last == nil {
+		return ""
+	}
+	var summary cycleSummary
+	if json.Unmarshal([]byte(e.last.Summary), &summary) != nil || len(summary.NewHighFindings) == 0 {
+		return ""
+	}
+	return "Static regression: the last cycle added high finding(s) " + strings.Join(summary.NewHighFindings, ", ") + ". Revert that change; a new high is worse than the baseline."
 }
 
 func summarizeCycle(loopID string, iteration int, run Run, feedback Feedback, buildLog, note, mechanism, shellcode, producer, execution string, online *bool, networkEvents int) cycleSummary {
@@ -1531,6 +1752,12 @@ func summaryFindingCounts(summary cycleSummary, total int) findingCounts {
 func (e *evolver) recordExecution(cycle *Cycle, summary cycleSummary) executionGate {
 	switch summary.Execution {
 	case executionVerified:
+		// Instrumentation that changed since the baseline makes the finding
+		// counts incomparable, even when the payload checked in. Do not adopt
+		// this cycle as the baseline others restore to.
+		if summary.InstrumentationChanged {
+			return gateUnchanged
+		}
 		// A verified cycle replaces the baseline only when it does not raise
 		// high findings, static signatures, or the total finding count.
 		// Otherwise the worse payload would become the source later cycles
@@ -1672,6 +1899,12 @@ func (e *evolver) executionHint() string {
 	if e.baselineFailure != "" {
 		return "Baseline failure: " + e.baselineFailure +
 			". Diagnose it before another cycle; a failed attempt does not consume the cycle budget."
+	}
+	if e.last != nil {
+		var summary cycleSummary
+		if json.Unmarshal([]byte(e.last.Summary), &summary) == nil && summary.InstrumentationChanged {
+			return "Execution gate: " + summary.InstrumentationNote + ". The last cycle is not comparable; do not edit source until the guest instrumentation matches the baseline."
+		}
 	}
 	if e.last != nil && e.last.Execution == executionOffline && e.lastExecuting == nil {
 		return "Execution gate: the last cycle did not execute and no payload has checked in yet. Execution is unproven; do not compare these findings with an executing cycle. The guest debugger can inspect the sandbox; otherwise fix why the generated agent never checked in before changing detection code."
