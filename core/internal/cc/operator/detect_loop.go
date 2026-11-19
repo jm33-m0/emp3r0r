@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -104,8 +105,9 @@ other build inputs can execute commands with operator privileges. The prompt is
 a soft guardrail against prompt injection, not a boundary. Complete isolation
 is the only reliable control.
 
-Manage running loops with detect_loop list, detect_loop stop <loop-id> or
---all, and detect_loop prompt <loop-id> <instruction>.
+Manage running and on-disk loops with detect_loop list, resume a stopped loop
+with detect_loop resume <loop-id>, stop one with detect_loop stop <loop-id> or
+--all, and queue an instruction with detect_loop prompt <loop-id> <instruction>.
 
 Set the model through the environment:
   EMP3R0R_DETECTION_PROVIDER=openai-responses
@@ -121,6 +123,7 @@ Set the model through the environment:
 		KnowledgeSyncCmd(),
 		detectLoopStartCmd(),
 		detectLoopListCmd(),
+		detectLoopResumeCmd(),
 		detectLoopStopCmd(),
 		detectLoopPromptCmd(),
 	)
@@ -207,16 +210,12 @@ func detectLoopListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
-		Short:   "List detection loops, their attempts, status, and logs",
+		Short:   "List running and on-disk detection loops, attempts, status, and logs",
 		Args:    cobra.NoArgs,
 		Run: func(cmd *cobra.Command, _ []string) {
-			runs := listDetectRuns()
+			infos := listDetectRunInfos()
 			asJSON, _ := cmd.Flags().GetBool("json")
 			if asJSON {
-				infos := make([]detectRunInfo, 0, len(runs))
-				for _, run := range runs {
-					infos = append(infos, run.info())
-				}
 				data, err := json.MarshalIndent(infos, "", "  ")
 				if err != nil {
 					logging.Errorf("detect_loop list: %v", err)
@@ -225,17 +224,178 @@ func detectLoopListCmd() *cobra.Command {
 				cmd.Println(string(data))
 				return
 			}
-			if len(runs) == 0 {
-				logging.Infof("detect_loop: no loops are running")
+			if len(infos) == 0 {
+				logging.Infof("detect_loop: no loops are running or on disk")
 				return
 			}
-			for _, row := range detectRunRows(runs) {
+			for _, row := range detectRunInfoRows(infos) {
 				cmd.Println(row)
 			}
 		},
 	}
 	cmd.Flags().Bool("json", false, "Print the loop registry as JSON")
 	return cmd
+}
+
+func detectLoopResumeCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:     "resume <loop-id>",
+		Aliases: []string{"continue"},
+		Short:   "Resume a stopped or interrupted loop from its on-disk state",
+		Args:    cobra.ExactArgs(1),
+		Run: func(_ *cobra.Command, args []string) {
+			if loaded, err := live.LoadOperatorEnv(); err != nil {
+				logging.Warningf("detect_loop resume: load operator env: %v", err)
+			} else if loaded > 0 {
+				logging.Infof("detect_loop resume: loaded %d operator env values", loaded)
+			}
+			manifest, err := readDetectLoopManifest(args[0])
+			if err != nil {
+				if errors.Is(err, os.ErrNotExist) {
+					logging.Errorf("detect_loop resume: no on-disk state for %s; only loops started with a saved manifest can resume", args[0])
+					return
+				}
+				logging.Errorf("detect_loop resume: %v", err)
+				return
+			}
+			if manifest.Verified || !detectLoopResumable(manifest.Status) {
+				logging.Errorf("detect_loop resume: loop %s is already %s; start a new loop instead", args[0], manifest.Status)
+				return
+			}
+			baseID := strings.TrimSpace(manifest.BaseLoopID)
+			if baseID == "" {
+				baseID = manifest.LoopID
+			}
+			nextAttempt := manifest.Attempt + 1
+			if nextAttempt < 2 {
+				nextAttempt = 2
+			}
+			if run := findDetectRun(baseID); run != nil {
+				if !run.isDone() {
+					logging.Errorf("detect_loop resume: loop %s is still %s", baseID, run.status())
+					return
+				}
+				if !detectLoopResumable(run.status()) {
+					logging.Errorf("detect_loop resume: loop %s is already %s; start a new loop instead", baseID, run.status())
+					return
+				}
+			}
+			if err := removeFinishedDetectRun(baseID); err != nil {
+				logging.Errorf("detect_loop resume: %v", err)
+				return
+			}
+			if run := findDetectRun(baseID); run != nil {
+				logging.Errorf("detect_loop resume: loop %s is still %s", baseID, run.status())
+				return
+			}
+			opts := manifest.Options
+			if opts.Iterations <= 0 {
+				opts.Iterations = 3
+			}
+			if strings.TrimSpace(opts.ModuleDir) == "" {
+				logging.Errorf("detect_loop resume: the saved loop has no module directory")
+				return
+			}
+			if info, err := os.Stat(opts.ModuleDir); err != nil || !info.IsDir() {
+				logging.Errorf("detect_loop resume: module directory %q is not readable", opts.ModuleDir)
+				return
+			}
+			if !detection.ModelConfigured() {
+				logging.Errorf("detect_loop resume: no detection model configured; set EMP3R0R_DETECTION_MODEL and the provider API key")
+				return
+			}
+			currentID := fmt.Sprintf("%s-r%d", baseID, nextAttempt)
+			if resumeCycleBudgetExhausted(baseID, currentID, nextAttempt, opts.Iterations) {
+				logging.Errorf("detect_loop resume: loop %s has used its cycle budget (%d); start a new loop", baseID, opts.Iterations)
+				return
+			}
+			logPath := detectLoopLogPath(manifest.LogPath)
+			if err := os.MkdirAll(filepath.Dir(logPath), 0o700); err != nil {
+				logging.Errorf("detect_loop resume: create log directory: %v", err)
+				return
+			}
+			logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+			if err != nil {
+				logging.Errorf("detect_loop resume: open log: %v", err)
+				return
+			}
+			if err := logFile.Chmod(0o600); err != nil {
+				_ = logFile.Close()
+				logging.Errorf("detect_loop resume: secure log: %v", err)
+				return
+			}
+			logger := newLoopLogger(logFile)
+			logf := logger.printf
+			if opts.Tmux {
+				if _, tmuxErr := cli.TmuxNewPane("Detection Loop", "", "", 0, loopTailCommand(logPath)); tmuxErr != nil {
+					logging.Warningf("detect_loop resume: tmux window: %v", tmuxErr)
+				}
+			}
+			prompts := detection.NewOperatorPromptQueue()
+			run, err := registerDetectRun(baseID, prompts, logPath, logger)
+			if err != nil {
+				logger.close()
+				logging.Errorf("detect_loop resume: %v", err)
+				return
+			}
+			run.setCurrent(currentID, nextAttempt)
+			saveLoopManifest(baseID, currentID, nextAttempt, "running", opts, run)
+			logf("resuming loop %s at attempt %d", baseID, nextAttempt)
+			logging.Infof("Detection loop %s resumed at attempt %d; log: %s", baseID, nextAttempt, logPath)
+			go func() {
+				shellcode := strings.TrimSpace(opts.Shellcode)
+				if shellcode == "" || !fileExists(shellcode) {
+					if shellcode != "" && !opts.ShellcodeGenerated {
+						run.setError(fmt.Errorf("resume: operator-supplied shellcode %s is missing", shellcode))
+						saveLoopManifest(baseID, currentID, nextAttempt, "failed", opts, run)
+						run.finish()
+						return
+					}
+					logf("resuming without a usable shellcode; generating a fresh agent")
+					generated, agentArtifact, producer, agentType, agentUUID, genErr := generateAgentShellcode(opts, logf)
+					if genErr != nil {
+						run.setError(fmt.Errorf("resume shellcode generation: %w", genErr))
+						saveLoopManifest(baseID, currentID, nextAttempt, "failed", opts, run)
+						run.finish()
+						return
+					}
+					shellcode = generated
+					opts.Shellcode = generated
+					opts.AgentArtifact = agentArtifact
+					opts.ShellcodeGenerated = true
+					opts.AgentType = agentType
+					opts.ShellcodeProducer = producer
+					opts.AgentUUID = agentUUID
+					saveLoopManifest(baseID, currentID, nextAttempt, "running", opts, run)
+				}
+				runDetectLoop(run, opts, shellcode, baseID, nextAttempt, nextAttempt)
+			}()
+		},
+	}
+}
+
+// resumeCycleBudgetExhausted checks the saved cycle budget before generating a
+// new agent and shellcode. RunEvolve performs the same check later; doing it
+// here avoids touching the builder and C2 for a resumed loop that cannot run.
+func resumeCycleBudgetExhausted(baseID, currentID string, attempt, total int) bool {
+	if total <= 0 || strings.TrimSpace(baseID) == "" {
+		return false
+	}
+	db, err := detection.OpenTelemetryDB(filepath.Join(live.EmpWorkSpace, "detection", "telemetry.db"))
+	if err != nil {
+		return false
+	}
+	defer func() { _ = db.Close() }()
+	cycles, err := db.CyclesForLogicalLoop(context.Background(), baseID, currentID, attempt)
+	if err != nil {
+		return false
+	}
+	return len(cycles) >= total
+}
+
+func fileExists(path string) bool {
+	info, err := os.Stat(strings.TrimSpace(path))
+	return err == nil && info.Mode().IsRegular()
 }
 
 func detectLoopStopCmd() *cobra.Command {
@@ -519,9 +679,10 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 		logger.close()
 		return
 	}
+	saveLoopManifest(loopID, loopID, 1, "running", opts, run)
 	logging.Infof("Detection loop %s started; log: %s", loopID, logPath)
 	logging.Warningf("detect_loop: source and build edits execute on this host; review and prompt rules do not contain the model. Use complete isolation.")
-	logging.Infof("Manage with: detect_loop list | detect_loop stop %s | detect_loop prompt %s <instruction>", loopID, loopID)
+	logging.Infof("Manage with: detect_loop list | detect_loop resume %s | detect_loop stop %s | detect_loop prompt %s <instruction>", loopID, loopID, loopID)
 
 	go func() {
 		shellcode := strings.TrimSpace(opts.Shellcode)
@@ -531,6 +692,7 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 			if genErr != nil {
 				logf("shellcode generation failed: %v", genErr)
 				run.setError(genErr)
+				saveLoopManifest(loopID, loopID, 1, "failed", opts, run)
 				run.finish()
 				return
 			}
@@ -540,9 +702,12 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 			opts.AgentType = agentType
 			opts.ShellcodeProducer = producer
 			opts.AgentUUID = agentUUID
+			opts.Shellcode = generated
+			saveLoopManifest(loopID, loopID, 1, "running", opts, run)
 			logf("generated %s shellcode: %s", producer, shellcode)
 		}
-		runDetectLoop(run, opts, shellcode)
+		opts.Shellcode = shellcode
+		runDetectLoop(run, opts, shellcode, loopID, 1, 3)
 	}()
 }
 

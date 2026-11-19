@@ -2,6 +2,7 @@ package operator
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -14,6 +15,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/detection"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
+	"github.com/jm33-m0/emp3r0r/core/lib/sanitize"
 )
 
 // detectRun is one detection loop. The console owns the loop and can
@@ -51,6 +53,9 @@ type detectRunInfo struct {
 	Prompts       int       `json:"prompts"`
 	Verified      bool      `json:"verified,omitempty"`
 	Error         string    `json:"error,omitempty"`
+	OnDisk        bool      `json:"on_disk,omitempty"`
+	Resumable     bool      `json:"resumable,omitempty"`
+	ResumeAttempt int       `json:"resume_attempt,omitempty"`
 }
 
 var detectRuns sync.Map
@@ -86,6 +91,30 @@ func findDetectRun(id string) *detectRun {
 		return true
 	})
 	return found
+}
+
+// listDetectRunInfos merges the in-memory registry with manifests and reports
+// on disk. A loop that was stopped or interrupted is still visible after the
+// console restarts, and a manifest-backed loop is resumable.
+func listDetectRunInfos() []detectRunInfo {
+	var infos []detectRunInfo
+	seen := map[string]bool{}
+	for _, run := range listDetectRuns() {
+		info := run.info()
+		infos = append(infos, info)
+		seen[info.LoopID] = true
+		if info.CurrentLoopID != "" {
+			seen[info.CurrentLoopID] = true
+		}
+	}
+	infos = append(infos, onDiskLoopInfos(seen)...)
+	sort.Slice(infos, func(i, j int) bool {
+		if infos[i].StartedAt.Equal(infos[j].StartedAt) {
+			return infos[i].LoopID < infos[j].LoopID
+		}
+		return infos[i].StartedAt.Before(infos[j].StartedAt)
+	})
+	return infos
 }
 
 func listDetectRuns() []*detectRun {
@@ -164,19 +193,23 @@ func (r *detectRun) finish() {
 	})
 }
 
+func (r *detectRun) terminalStatus() string {
+	switch {
+	case r.err.Load() != nil && !r.stopped.Load():
+		return "failed"
+	case r.verified.Load():
+		return "verified"
+	case r.stopped.Load():
+		return "stopped"
+	default:
+		return "done"
+	}
+}
+
 func (r *detectRun) status() string {
 	select {
 	case <-r.done:
-		switch {
-		case r.err.Load() != nil && !r.stopped.Load():
-			return "failed"
-		case r.verified.Load():
-			return "verified"
-		case r.stopped.Load():
-			return "stopped"
-		default:
-			return "done"
-		}
+		return r.terminalStatus()
 	default:
 		if r.stopped.Load() {
 			return "stopping"
@@ -200,18 +233,22 @@ func (r *detectRun) info() detectRunInfo {
 	return info
 }
 
-func detectRunRows(runs []*detectRun) []string {
-	rows := make([]string, 0, len(runs)+1)
-	rows = append(rows, fmt.Sprintf("%-30s %-7s %-8s %-19s %-7s %s",
-		"LOOP", "ATTEMPT", "STATUS", "STARTED", "PROMPTS", "LOG"))
-	for _, run := range runs {
-		info := run.info()
+func detectRunInfoRows(infos []detectRunInfo) []string {
+	rows := make([]string, 0, len(infos)+1)
+	rows = append(rows, fmt.Sprintf("%-30s %-7s %-11s %-19s %-7s %-9s %s",
+		"LOOP", "ATTEMPT", "STATUS", "STARTED", "PROMPTS", "RESUMABLE", "LOG"))
+	for _, info := range infos {
 		started := "-"
 		if !info.StartedAt.IsZero() {
 			started = info.StartedAt.Local().Format("2006-01-02 15:04:05")
 		}
-		rows = append(rows, fmt.Sprintf("%-30s %-7d %-8s %-19s %-7d %s",
-			info.LoopID, info.Attempt, info.Status, started, info.Prompts, info.LogPath))
+		resumable := "no"
+		if info.Resumable {
+			resumable = fmt.Sprintf("yes (%d)", info.ResumeAttempt)
+		}
+		rows = append(rows, fmt.Sprintf("%-30s %-7d %-11s %-19s %-7d %-9s %s",
+			sanitize.SanitizeOneLine(info.LoopID), info.Attempt, sanitize.SanitizeOneLine(info.Status),
+			started, info.Prompts, resumable, sanitize.SanitizeOneLine(info.LogPath)))
 	}
 	return rows
 }
@@ -282,14 +319,44 @@ func appendDetectRunPrompt(id, text string) (detectRunInfo, error) {
 	return run.info(), nil
 }
 
+// removeFinishedDetectRun drops a completed registry entry so an on-disk loop
+// can be resumed in the same console process.
+func removeFinishedDetectRun(id string) error {
+	run := findDetectRun(id)
+	if run == nil {
+		return nil
+	}
+	if !run.isDone() {
+		return fmt.Errorf("loop %s is still running", run.currentLoopID())
+	}
+	detectRuns.Delete(run.id)
+	return nil
+}
+
 // runDetectLoop drives one console loop and its verification restarts.
-func runDetectLoop(run *detectRun, opts detectLoopOptions, shellcode string) {
-	defer run.finish()
+func runDetectLoop(run *detectRun, opts detectLoopOptions, shellcode, baseID string, startAttempt, maxAttempts int) {
+	if startAttempt < 1 {
+		startAttempt = 1
+	}
+	if maxAttempts < startAttempt {
+		maxAttempts = startAttempt
+	}
 	backend := liveDetectC2Backend{}
-	baseID := run.id
 	currentShellcode := shellcode
 	currentOpts := opts
 	currentID := baseID
+	if startAttempt > 1 {
+		currentID = fmt.Sprintf("%s-r%d", baseID, startAttempt)
+	}
+	run.setCurrent(currentID, startAttempt)
+	saveLoopManifest(baseID, currentID, startAttempt, "running", currentOpts, run)
+	defer func() {
+		// Persist the terminal state before closing done. A concurrent resume
+		// observes done and can register a new attempt; writing the manifest
+		// after that would overwrite the new attempt with this one.
+		saveLoopManifest(baseID, run.currentLoopID(), int(run.attempt.Load()), run.terminalStatus(), currentOpts, run)
+		run.finish()
+	}()
 	lastAgent := opts.AgentUUID
 	producers, err := detection.ParseProducerDirs(opts.Producers)
 	if err != nil {
@@ -308,13 +375,13 @@ func runDetectLoop(run *detectRun, opts detectLoopOptions, shellcode string) {
 			run.logger.printf(format, args...)
 		}
 	}
-	for attempt := 1; attempt <= 3; attempt++ {
+	for attempt := startAttempt; attempt <= maxAttempts; attempt++ {
 		if run.ctx.Err() != nil {
 			run.setError(run.ctx.Err())
 			return
 		}
-		if attempt > 1 {
-			if strings.TrimSpace(currentOpts.Shellcode) != "" {
+		if attempt > startAttempt {
+			if strings.TrimSpace(currentOpts.Shellcode) != "" && !currentOpts.ShellcodeGenerated {
 				logf("payload verification failed; --shellcode was supplied and cannot be regenerated")
 				break
 			}
@@ -326,6 +393,7 @@ func runDetectLoop(run *detectRun, opts detectLoopOptions, shellcode string) {
 				break
 			}
 			currentShellcode = nextShellcode
+			currentOpts.Shellcode = nextShellcode
 			currentOpts.AgentArtifact = agentArtifact
 			currentOpts.ShellcodeGenerated = true
 			currentOpts.AgentType = agentType
@@ -334,6 +402,7 @@ func runDetectLoop(run *detectRun, opts detectLoopOptions, shellcode string) {
 			lastAgent = agentUUID
 			currentID = fmt.Sprintf("%s-r%d", baseID, attempt)
 			run.setCurrent(currentID, attempt)
+			saveLoopManifest(baseID, currentID, attempt, "running", currentOpts, run)
 			logf("restarted loop %s with agent %s", currentID, agentUUID)
 		}
 
@@ -396,7 +465,27 @@ func runDetectLoop(run *detectRun, opts detectLoopOptions, shellcode string) {
 		run.setResult(result)
 		if result.ExpectedAgentUUID != "" {
 			lastAgent = result.ExpectedAgentUUID
+			currentOpts.AgentUUID = result.ExpectedAgentUUID
 		}
+		if result.Last != nil {
+			var last struct {
+				Shellcode          string `json:"shellcode"`
+				Producer           string `json:"producer"`
+				ShellcodeGenerated bool   `json:"shellcode_generated"`
+			}
+			if json.Unmarshal([]byte(result.Last.Summary), &last) == nil {
+				if last.Shellcode != "" {
+					currentOpts.Shellcode = last.Shellcode
+					if last.ShellcodeGenerated {
+						currentOpts.ShellcodeGenerated = true
+					}
+				}
+				if last.Producer != "" {
+					currentOpts.ShellcodeProducer = last.Producer
+				}
+			}
+		}
+		saveLoopManifest(baseID, currentID, attempt, "running", currentOpts, run)
 		printDetectRunReport(run, currentID)
 		if result.PayloadVerified {
 			return
@@ -412,6 +501,9 @@ func runDetectLoop(run *detectRun, opts detectLoopOptions, shellcode string) {
 			run.setError(run.ctx.Err())
 			return
 		}
+	}
+	if run.ctx.Err() == nil {
+		run.setError(fmt.Errorf("loop ended without a verified payload"))
 	}
 }
 
