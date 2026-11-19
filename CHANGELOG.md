@@ -1,5 +1,20 @@
 # Changelog
 
+## [5.10.4](https://github.com/jm33-m0/emp3r0r/compare/v5.10.3...v5.10.4) (2026-11-19)
+
+
+### Bug Fixes
+
+* accept a live check-in as final payload health ([f84e37d](https://github.com/jm33-m0/emp3r0r/commit/f84e37d779f715b86d4e190c7069b1d3acad6cb0))
+* attribute dynamic regions and gate medium finding ([4492354](https://github.com/jm33-m0/emp3r0r/commit/4492354d37d034b0074c9d885fe0f19f445241ce))
+* crystal-kit specific prompts ([771b7db](https://github.com/jm33-m0/emp3r0r/commit/771b7dbbe3da1504b7c6e98bd33120e7176d8f63))
+* derive producer agent type from config ([98b8fd6](https://github.com/jm33-m0/emp3r0r/commit/98b8fd67c1efa9850655139edc36422a7810ab53))
+* ease model restrictions on high-entropy static finding ([f6fb7f7](https://github.com/jm33-m0/emp3r0r/commit/f6fb7f77d70bb44f3e7c9d16d32046fd90db6cde))
+* improve methodology and KB use ([017dd86](https://github.com/jm33-m0/emp3r0r/commit/017dd864e377c02080dc2586e643ef24937ed788))
+* reject instrumentation-changed baselines ([5274dc2](https://github.com/jm33-m0/emp3r0r/commit/5274dc27f3f4b602aa5d822bcbf56cebb7754f36))
+* resume detect loops ([7eef3e8](https://github.com/jm33-m0/emp3r0r/commit/7eef3e8cb277e48412acecf1a9c10f3d5581cea8))
+* revert when build fails, stop pointless retry-abort; refine report ([b5e17ec](https://github.com/jm33-m0/emp3r0r/commit/b5e17ecb40b99f6fc5570cc17e18b6f7e7b833c3))
+
 ## [5.10.3](https://github.com/jm33-m0/emp3r0r/compare/v5.10.2...v5.10.3) (2026-11-18)
 
 
