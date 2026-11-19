@@ -9,7 +9,9 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1041,6 +1043,9 @@ type cycleSummary struct {
 	InstrumentationChanged bool     `json:"instrumentation_changed,omitempty"`
 	InstrumentationNote    string   `json:"instrumentation_note,omitempty"`
 	NewHighFindings        []string `json:"new_high_findings,omitempty"`
+	// DynamicRegions attributes executable regions in medium analyzer findings
+	// to the loader's outer PICO or the producer's inner PICO by size.
+	DynamicRegions []string `json:"dynamic_regions,omitempty"`
 	// FailureLayer is the load-pipeline stage where an offline cycle stopped,
 	// derived from the trace categories. It is host evidence, not model prose.
 	FailureLayer string `json:"failure_layer,omitempty"`
@@ -1238,10 +1243,14 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 	summary.Stages = stageNames(e.cfg.Stages)
 	summary.Observed = observedFindings(feedback)
 	summary.PredictionResult = evaluatePrediction(prediction, feedback)
+	summary.DynamicRegions = dynamicRegionSummary(feedback, shellcode)
 	summary.GitCommits = gitCommits
 	summary.FailureLayer = failureLayer(&summary)
 	if prev := e.baselineSummary(); prev != nil && iteration > 1 {
-		if changed, note := instrumentationDelta(prev, &summary); changed {
+		if earlyTermination(summary.Telemetry) {
+			e.logClass(logging.ClassWarning,
+				"cycle %d ended before dynamic analysis; instrumentation comparison skipped", iteration)
+		} else if changed, note := instrumentationDelta(prev, &summary); changed {
 			summary.InstrumentationChanged = true
 			summary.InstrumentationNote = note
 			e.logClass(logging.ClassWarning, "cycle %d: %s", iteration, note)
@@ -1416,6 +1425,21 @@ func (e *evolver) failureLayerHint() string {
 	return "Failure layer: " + summary.FailureLayer + " — " + failureLayerAction(summary.FailureLayer)
 }
 
+// dynamicRegionHint is the host-derived attribution for the last cycle's
+// executable medium findings. It tells the planner whether a region belongs to
+// the loader's outer PICO or to the producer's inner PICO.
+func (e *evolver) dynamicRegionHint() string {
+	if e == nil || e.last == nil {
+		return ""
+	}
+	var summary cycleSummary
+	if json.Unmarshal([]byte(e.last.Summary), &summary) != nil || len(summary.DynamicRegions) == 0 {
+		return ""
+	}
+	return "Dynamic regions: " + strings.Join(summary.DynamicRegions, "; ") +
+		". A region matching the active shellcode is the loader's outer PICO; an unmatched executable region is inside the producer PICO. A loader-only edit cannot remove an unmatched producer region: plan one change per owner or a producer-swap that covers both."
+}
+
 // baselineSummary returns the first cycle of this loop attempt. Instrumentation
 // and static-signature comparisons use it as the reference.
 func (e *evolver) baselineSummary() *cycleSummary {
@@ -1512,6 +1536,69 @@ func (e *evolver) highRegressionHint() string {
 	return "Static regression: the last cycle added high finding(s) " + strings.Join(summary.NewHighFindings, ", ") + ". Revert that change; a new high is worse than the baseline."
 }
 
+var dynamicRegionPattern = regexp.MustCompile(`(?i)Base:\s*(0x[0-9a-f]+).*?Size:\s*(0x[0-9a-f]+)`)
+
+// dynamicRegionSummary attributes medium analyzer regions to the loader's
+// outer PICO or to the producer's inner PICO. Region size is the only stable
+// signal: the outer PICO is the active shellcode, while the masked DLL inside
+// Crystal Palace has a different size. This is host evidence for the planner;
+// it does not claim which source line created the region.
+// earlyTermination reports that the sandbox stopped the payload before the
+// dynamic analyzers could attach. Missing providers in such a trace are a
+// consequence of the early exit, not evidence that the guest instrumentation
+// changed; treating them as a gate would block the source fix for the crash.
+func earlyTermination(stats *TelemetryStats) bool {
+	if stats == nil {
+		return false
+	}
+	for _, missing := range stats.Coverage.Missing {
+		lower := strings.ToLower(missing)
+		if strings.Contains(lower, "early termination") || strings.Contains(lower, "not started") {
+			return true
+		}
+	}
+	status := strings.ToLower(stats.Coverage.Analyzers["dynamic/analysis_metadata"])
+	return strings.Contains(status, "early termination") || strings.Contains(status, "not started")
+}
+
+func dynamicRegionSummary(feedback Feedback, shellcode string) []string {
+	shellcodeSize := int64(0)
+	if info, err := os.Stat(strings.TrimSpace(shellcode)); err == nil {
+		shellcodeSize = info.Size()
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, finding := range feedback.Findings {
+		if !strings.EqualFold(strings.TrimSpace(finding.Severity), "medium") {
+			continue
+		}
+		match := dynamicRegionPattern.FindStringSubmatch(finding.Indicator + " " + finding.Detail)
+		if match == nil {
+			continue
+		}
+		base, hexSize := match[1], match[2]
+		size, err := strconv.ParseUint(strings.TrimPrefix(strings.ToLower(hexSize), "0x"), 16, 64)
+		if err != nil || size == 0 {
+			continue
+		}
+		owner := "producer PICO (size does not match the active shellcode)"
+		if shellcodeSize > 0 && size >= uint64(shellcodeSize) && size <= uint64(shellcodeSize)+0x2000 {
+			owner = "loader outer PICO (size matches the active shellcode)"
+		}
+		key := base + ":" + hexSize
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, fmt.Sprintf("%s size=%s (%d B) tool=%s: %s",
+			sanitizeLine(base), sanitizeLine(hexSize), size, sanitizeLine(finding.Tool), owner))
+		if len(out) == 8 {
+			break
+		}
+	}
+	return out
+}
+
 func summarizeCycle(loopID string, iteration int, run Run, feedback Feedback, buildLog, note, mechanism, shellcode, producer, execution string, online *bool, networkEvents int) cycleSummary {
 	summary := cycleSummary{
 		LoopID: loopID, Iteration: iteration, RunID: run.ID,
@@ -1592,15 +1679,17 @@ func countFindings(findings []Finding) findingCounts {
 }
 
 // findingRegression reports whether current is worse than previous: high
-// findings first, then static signatures, then total findings. Severity is
-// compared lexicographically so a cycle that removes a high finding is not
-// rejected for adding a medium one.
+// findings first, then static signatures, then medium findings, then total.
+// A real medium reduction is progress even when low/other findings increase;
+// total is the final tie-breaker only when the medium count is unchanged.
 func findingRegression(previous, current findingCounts) bool {
 	switch {
 	case current.High != previous.High:
 		return current.High > previous.High
 	case current.Static != previous.Static:
 		return current.Static > previous.Static
+	case current.Medium != previous.Medium:
+		return current.Medium > previous.Medium
 	default:
 		return current.Total > previous.Total
 	}

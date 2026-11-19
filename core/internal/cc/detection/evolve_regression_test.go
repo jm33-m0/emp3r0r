@@ -3,6 +3,8 @@ package detection
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -166,5 +168,67 @@ func TestConfirmOnlineDoesNotVouchForPayload(t *testing.T) {
 	}
 	if e.payloadSeenOnline.Load() {
 		t.Fatal("debugger online check vouched for the monitored payload")
+	}
+}
+
+func TestDynamicRegionSummaryAttributesOuterAndProducer(t *testing.T) {
+	dir := t.TempDir()
+	shellcode := filepath.Join(dir, "pico.bin")
+	if err := os.WriteFile(shellcode, make([]byte, 1000), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	feedback := Feedback{Findings: []Finding{
+		{Severity: "medium", Tool: "hsb", Indicator: "Elevated unbacked execute at Base: 0x1000, Protection: 0x20, Size: 0x400"},
+		{Severity: "medium", Tool: "hsb", Indicator: "Elevated unbacked execute at Base: 0x9000, Protection: 0x20, Size: 0x8000"},
+		{Severity: "high", Tool: "pe-info", Indicator: "Base: 0x2000, Size: 0x8000"},
+	}}
+	regions := dynamicRegionSummary(feedback, shellcode)
+	if len(regions) != 2 {
+		t.Fatalf("regions = %v, want 2", regions)
+	}
+	if !strings.Contains(regions[0], "loader outer PICO") {
+		t.Fatalf("outer region not attributed: %v", regions)
+	}
+	if !strings.Contains(regions[1], "producer PICO") {
+		t.Fatalf("producer region not attributed: %v", regions)
+	}
+}
+
+func TestFindingRegressionPrefersMediumReduction(t *testing.T) {
+	base := findingCounts{High: 1, Medium: 16, Static: 0, Total: 39}
+	cases := []struct {
+		name    string
+		current findingCounts
+		want    bool
+	}{
+		{"medium reduction with more low findings", findingCounts{High: 1, Medium: 15, Static: 0, Total: 60}, false},
+		{"medium increase", findingCounts{High: 1, Medium: 17, Static: 0, Total: 39}, true},
+		{"equal medium and more total", findingCounts{High: 1, Medium: 16, Static: 0, Total: 40}, true},
+		{"equal medium and equal total", findingCounts{High: 1, Medium: 16, Static: 0, Total: 39}, false},
+		{"new static signature", findingCounts{High: 1, Medium: 0, Static: 1, Total: 0}, true},
+	}
+	for _, tc := range cases {
+		if got := findingRegression(base, tc.current); got != tc.want {
+			t.Errorf("%s: findingRegression = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestEarlyTerminationSkipsInstrumentationGate(t *testing.T) {
+	cases := []struct {
+		name  string
+		stats *TelemetryStats
+		want  bool
+	}{
+		{"missing analyzer", &TelemetryStats{Coverage: TelemetryCoverage{Missing: []string{"dynamic/analysis_metadata: early termination"}}}, true},
+		{"analyzer status", &TelemetryStats{Coverage: TelemetryCoverage{Analyzers: map[string]string{"dynamic/analysis_metadata": "early termination"}}}, true},
+		{"not started", &TelemetryStats{Coverage: TelemetryCoverage{Analyzers: map[string]string{"dynamic/analysis_metadata": "not started"}}}, true},
+		{"normal", &TelemetryStats{Coverage: TelemetryCoverage{Analyzers: map[string]string{"dynamic/analysis_metadata": "ok"}}}, false},
+		{"nil", nil, false},
+	}
+	for _, tc := range cases {
+		if got := earlyTermination(tc.stats); got != tc.want {
+			t.Errorf("%s: earlyTermination = %v, want %v", tc.name, got, tc.want)
+		}
 	}
 }

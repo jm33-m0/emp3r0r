@@ -980,6 +980,9 @@ func (c *coordinator) plannerBrief() string {
 	if hint := c.e.failureLayerHint(); hint != "" {
 		b.WriteString(hint + "\n")
 	}
+	if hint := c.e.dynamicRegionHint(); hint != "" {
+		b.WriteString(hint + "\n")
+	}
 	b.WriteString("\n" + mechanismCatalogBrief())
 	if c.knowledgeBrief != "" {
 		fmt.Fprintf(&b, "\nRetrieved knowledge (host-side; read a summary before searching):\n%s", c.knowledgeBrief)
@@ -1067,6 +1070,9 @@ func (c *coordinator) editorBrief(plan plannerPlan) string {
 		b.WriteString(hint + "\n")
 	}
 	if hint := c.e.failureLayerHint(); hint != "" {
+		b.WriteString(hint + "\n")
+	}
+	if hint := c.e.dynamicRegionHint(); hint != "" {
 		b.WriteString(hint + "\n")
 	}
 	if plan.Mechanism != "" {

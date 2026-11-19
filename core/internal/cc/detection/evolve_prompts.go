@@ -42,6 +42,11 @@ const dataPolicyPrompt = `Data policy:
   over padding. Base64/hex or compression is allowed when the loader decodes it
   and the cycle still checks in; record the size increase and any new finding.
   Do not add random padding or zero-fill only to dilute entropy.
+- A dynamic analyzer finding with no source location is not actionable until
+  attributed. Use the brief's Dynamic regions: a region matching the active
+  shellcode is the loader's outer PICO; an unmatched executable region is
+  inside the producer PICO. If both are present, one edit cannot remove both;
+  plan per owner or a producer-swap that covers both.
 - If coverage.missing is not empty, or an analyzer reports a scan error or early
   termination, name the gap and do not treat the cycle as clean.`
 
