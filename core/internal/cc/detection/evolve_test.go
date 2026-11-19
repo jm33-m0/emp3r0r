@@ -633,6 +633,7 @@ func TestEnsureFreshAgentRotatesAndCleansOldFiles(t *testing.T) {
 	}
 	e.testedShellcodes.Store(oldShellcode, struct{}{})
 	e.testedAgentUUIDs.Store("old-uuid", struct{}{})
+	e.payloadSeenOnline.Store(true)
 	if err := e.ensureFreshAgent(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -647,6 +648,9 @@ func TestEnsureFreshAgentRotatesAndCleansOldFiles(t *testing.T) {
 	}
 	if _, err := os.Stat(oldArtifact); !os.IsNotExist(err) {
 		t.Fatalf("old agent artifact still exists: %v", err)
+	}
+	if e.payloadSeenOnline.Load() {
+		t.Fatal("payload online latch survived agent rotation")
 	}
 	if _, err := os.Stat(e.shellcode); err != nil {
 		t.Fatalf("new shellcode missing: %v", err)
@@ -667,8 +671,8 @@ func TestCheckExecutionHonorsOnlineLatch(t *testing.T) {
 	if state != executionVerified || online == nil || !*online {
 		t.Fatalf("state=%q online=%v, want verified online", state, online)
 	}
-	if !e.agentSeenOnline.Load() {
-		t.Fatal("online latch was not recorded on the evolver")
+	if !e.agentSeenOnline.Load() || !e.payloadSeenOnline.Load() {
+		t.Fatal("online latches were not recorded on the evolver")
 	}
 }
 

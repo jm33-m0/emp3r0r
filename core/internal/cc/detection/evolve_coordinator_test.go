@@ -38,7 +38,7 @@ func TestWorkerToolPartition(t *testing.T) {
 		return out
 	}
 	planner := names(rolePlanner)
-	for _, want := range []string{"SourceRead", "TelemetryQuery", "AgentStatus"} {
+	for _, want := range []string{"SourceRead", "TelemetryQuery", "AgentStatus", "KnowledgeSearch", "KnowledgeRead"} {
 		if !planner[want] {
 			t.Fatalf("planner is missing %s", want)
 		}
@@ -478,8 +478,33 @@ func TestRepeatedNonImprovingMechanism(t *testing.T) {
 	}
 }
 
+func writeProducerModuleConfig(t *testing.T, name, input string) string {
+	t.Helper()
+	dir := t.TempDir()
+	body, err := json.Marshal([]map[string]any{{
+		"name": name, "build": "true", "is_local": true,
+		"parameters": []map[string]any{{"name": input, "type": "string", "required": true}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "config.json"), body, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
 func TestRotationAgentTypeFollowsProducer(t *testing.T) {
-	e := &evolver{cfg: EvolveConfig{AgentType: "windows_executable"}, activeProducer: "crystal_pack"}
+	e := &evolver{
+		cfg: EvolveConfig{
+			AgentType: "windows_executable",
+			ProducerDirs: map[string]string{
+				"crystal_pack": writeProducerModuleConfig(t, "crystal_pack", "dll"),
+				"donut":        writeProducerModuleConfig(t, "donut", "input"),
+			},
+		},
+		activeProducer: "crystal_pack",
+	}
 	if got := e.rotationAgentType(); got != "windows_dll" {
 		t.Fatalf("crystal_pack rotation type = %q, want windows_dll", got)
 	}
