@@ -114,10 +114,10 @@ func (e *evolver) ensureFreshAgent(ctx context.Context) error {
 }
 
 // rotationAgentType keeps the agent format compatible with the active
-// producer. Crystal Palace PICO wraps a DLL, so an explicit executable choice
-// must not survive a producer swap.
+// producer. The producer's declared input option decides whether the agent
+// must be an EXE or a DLL, so a producer swap does not keep a stale format.
 func (e *evolver) rotationAgentType() string {
-	if strings.EqualFold(strings.TrimSpace(e.activeProducer), "crystal_pack") {
+	if e.producerRequiresDLL(e.activeProducer) {
 		return "windows_dll"
 	}
 	agentType := strings.ToLower(strings.TrimSpace(e.cfg.AgentType))
@@ -135,16 +135,11 @@ func (e *evolver) rotationProducer(agentType string) string {
 	if active := strings.ToLower(strings.TrimSpace(e.activeProducer)); active != "" && configured(active) {
 		return active
 	}
-	if strings.EqualFold(agentType, "windows_dll") && configured("crystal_pack") &&
-		producerCanRun("crystal_pack", e.cfg.ProducerDirs["crystal_pack"]) {
-		return "crystal_pack"
-	}
-	if configured("donut") {
-		return "donut"
-	}
-	if configured("crystal_pack") &&
-		producerCanRun("crystal_pack", e.cfg.ProducerDirs["crystal_pack"]) {
-		return "crystal_pack"
+	wantDLL := strings.EqualFold(agentType, "windows_dll")
+	for _, name := range e.producerNames() {
+		if wantDLL == e.producerRequiresDLL(name) {
+			return name
+		}
 	}
 	return ""
 }

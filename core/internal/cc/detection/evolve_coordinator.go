@@ -349,11 +349,7 @@ func (c *coordinator) producerSwapTarget() string {
 		return ""
 	}
 	for _, name := range []string{"crystal_pack", "donut"} {
-		dir, ok := c.e.cfg.ProducerDirs[name]
-		if !ok || !producerCanRun(name, dir) {
-			continue
-		}
-		if !strings.EqualFold(strings.TrimSpace(c.e.activeProducer), name) {
+		if _, ok := c.e.cfg.ProducerDirs[name]; ok && !strings.EqualFold(strings.TrimSpace(c.e.activeProducer), name) {
 			return name
 		}
 	}
@@ -971,13 +967,23 @@ func (c *coordinator) plannerBrief() string {
 	fmt.Fprintf(&b, "Agent C2: %s\nExpected agent UUID: %s\nAgent type: %s\n", headerOrNone(c.e.cfg.AgentCC), headerOrNone(c.e.expectedAgentUUID), headerOrNone(c.e.cfg.AgentType))
 	fmt.Fprintf(&b, "Active shellcode: %s\nActive producer: %s\nSource roots: %s\n", c.e.shellcode, headerOrNone(c.e.activeProducer), c.e.roots.describe())
 	if target := c.producerSwapTarget(); target != "" {
-		fmt.Fprintf(&b, "Producer swap: %s is configured and not active; the swap needs GenerateAgent agent_type=windows_dll, then BuildShellcode producer=%s dll=<artifact_path>, then mechanism=producer-swap. A donut source edit is mechanism=producer, not a swap.\n",
-			target, target)
+		fmt.Fprintf(&b, "Producer swap: %s is configured and not active; %s. A source edit of the active producer is mechanism=producer, not a swap.\n",
+			target, c.e.producerSwapHelp(target))
 	}
 	fmt.Fprintf(&b, "Cycle budget: %d total; %d used; %d remain\nStages: %s\n",
 		c.e.cfg.Iterations, c.e.usedCycles(), max(0, c.e.cfg.Iterations-c.e.usedCycles()), strings.Join(stageNames(c.e.cfg.Stages), ", "))
 	fmt.Fprintf(&b, "Baseline: %s\nBaseline failure: %s\n", string(c.baselineJSON), headerOrNone(c.e.baselineFailure))
 	fmt.Fprintf(&b, "Execution gate: %s\nKnowledge cache: %s\n", c.e.executionHint(), c.knowledgeState)
+	if hint := c.e.highRegressionHint(); hint != "" {
+		b.WriteString(hint + "\n")
+	}
+	if hint := c.e.failureLayerHint(); hint != "" {
+		b.WriteString(hint + "\n")
+	}
+	b.WriteString("\n" + mechanismCatalogBrief())
+	if c.knowledgeBrief != "" {
+		fmt.Fprintf(&b, "\nRetrieved knowledge (host-side; read a summary before searching):\n%s", c.knowledgeBrief)
+	}
 	switch {
 	case c.e.guest == nil:
 		b.WriteString("Guest debugger: disabled (no --guest-ssh); execution=offline cannot be diagnosed inside the VM.\n")

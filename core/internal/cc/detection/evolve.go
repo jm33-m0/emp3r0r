@@ -485,21 +485,6 @@ func (e *evolver) producerNames() []string {
 	return slices.Sorted(maps.Keys(e.cfg.ProducerDirs))
 }
 
-// producerCanRun reports whether a configured producer has the host
-// prerequisites its build script needs. crystal_pack links through Crystal
-// Palace and therefore needs a Java runtime; donut has no such dependency
-// beyond its own build directory.
-func producerCanRun(name, dir string) bool {
-	switch strings.ToLower(strings.TrimSpace(name)) {
-	case "crystal_pack":
-		return modules.CrystalPackAvailable(dir)
-	case "donut":
-		return strings.TrimSpace(dir) != ""
-	default:
-		return false
-	}
-}
-
 // ErrSandboxUnreachable means the LitterBox endpoint is not answering. The
 // loop cannot build or detonate until it returns; this is a host outage, not a
 // hypothesis failure.

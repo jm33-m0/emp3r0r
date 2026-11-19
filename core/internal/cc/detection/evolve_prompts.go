@@ -156,9 +156,10 @@ Decision rules:
 - A cycle that only changes imports, strings, section names, encoding, or
   packing is static hygiene, not a new loading path. Label it as such.
 - mechanism=producer edits the current producer's source. mechanism=producer-swap
-  changes the wrapper itself: call GenerateAgent with agent_type=windows_dll,
-  then BuildShellcode with producer=crystal_pack and dll=<artifact_path>. Do not
-  label a donut source edit as a producer swap.
+  changes the wrapper itself: the brief's mechanism contract states the
+  producer's declared input option and the agent type it requires. Call
+  GenerateAgent for that agent type, then BuildShellcode with that input. Do not
+  label a source edit of the current producer as a swap.
 - If two verified cycles did not reduce high findings or static signatures and
   the current producer is still donut, plan one producer-swap before repeating
   the same mechanism.
