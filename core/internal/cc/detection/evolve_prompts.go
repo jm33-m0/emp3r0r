@@ -37,8 +37,11 @@ const dataPolicyPrompt = `Data policy:
   empty) or a real defender verdict. A finding with no source location cannot
   be fixed by editing this module; report it as a residual with evidence.
   High static findings (.rdata entropy, checksum) and analyzer matches on the
-  embedded shellcode are residuals unless a producer change removes them.
-  Do not game static checks with size-inflating encoding or padding.
+  embedded shellcode are actionable when the producer can change the container
+  or encoding. Prefer a container change (overlay, resource, or section move)
+  over padding. Base64/hex or compression is allowed when the loader decodes it
+  and the cycle still checks in; record the size increase and any new finding.
+  Do not add random padding or zero-fill only to dilute entropy.
 - If coverage.missing is not empty, or an analyzer reports a scan error or early
   termination, name the gap and do not treat the cycle as clean.`
 
@@ -155,6 +158,11 @@ Decision rules:
   residual is explained with evidence.
 - A cycle that only changes imports, strings, section names, encoding, or
   packing is static hygiene, not a new loading path. Label it as such.
+- A high static finding in a producer-owned container (for example, .rdata
+  entropy from an embedded encrypted blob) is mechanism=producer, not
+  static-hygiene. A container change is preferred; encoding is allowed when the
+  loader decodes it and the agent still checks in. Report size growth and any
+  new finding.
 - mechanism=producer edits the current producer's source. mechanism=producer-swap
   changes the wrapper itself: the brief's mechanism contract states the
   producer's declared input option and the agent type it requires. Call

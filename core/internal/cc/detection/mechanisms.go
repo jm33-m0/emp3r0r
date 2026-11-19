@@ -92,6 +92,7 @@ var mechanismSpecs = map[string]mechanismSpec{
 			"The producer must stay compatible with the active agent type.",
 			"Rebuild and inspect the generated artifact before the cycle.",
 			"Producer edits cannot fix a loader that never reaches the producer artifact.",
+			"Static container findings such as section entropy can be changed here; include the loader-side decoder and verify check-in.",
 		},
 		Signals:      []string{"build log", "artifact type/size", "payload mapping", "network/check-in"},
 		Verification: "the new artifact is the active shellcode and the agent checks in",
