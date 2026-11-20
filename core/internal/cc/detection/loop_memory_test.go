@@ -141,3 +141,65 @@ func TestLoopMemoryRecordsAfterProductionGateOrder(t *testing.T) {
 		t.Fatalf("techniques = %+v, want one recorded technique after the production gate order", techniques)
 	}
 }
+
+func TestLoopMemoryRecordsStaticHygieneBacklog(t *testing.T) {
+	db, err := OpenTelemetryDB(filepath.Join(t.TempDir(), "telemetry.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	ctx := context.Background()
+
+	previous := cycleSummary{
+		Execution:      executionVerified,
+		StaticFindings: 3,
+		Hygiene: []hygieneFinding{
+			{Rule: "pe/checksum", Indicator: "PE checksum", Severity: "medium"},
+			{Rule: "pe/sections", Indicator: "Non-standard PE sections", Severity: "medium"},
+			{Rule: "pe/entropy", Indicator: ".rdata", Severity: "high"},
+		},
+		TopFindings: []string{"medium Elevated unbacked execute at Base: 000001dd60300000, Protection: 00000020, Size: 000000000039c000"},
+		Telemetry:   &TelemetryStats{Coverage: TelemetryCoverage{Delivered: []string{"etw", "etwti"}}},
+	}
+	encoded, _ := json.Marshal(previous)
+	e := &evolver{cfg: EvolveConfig{LoopID: "loop-memory"}, db: db, logf: func(logging.Class, string, ...any) {}}
+	e.cycles = []Cycle{{ID: 1, LoopID: "loop-memory", Iteration: 1, Execution: executionVerified, Summary: string(encoded)}}
+	e.lastComparable = &e.cycles[0]
+	e.lastExecuting = &e.cycles[0]
+	if err := db.SaveEdit(ctx, EditRecord{
+		LoopID: "loop-memory", Iteration: 2, Module: "loader_windows", File: "build.sh",
+		Old: "checksum = 0", New: "checksum = fixed", Reason: "post-link PE hygiene", Kind: EditKindModel,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	current := cycleSummary{
+		Execution:      executionVerified,
+		Mechanism:      "static-hygiene",
+		StaticFindings: 1,
+		Hygiene: []hygieneFinding{
+			{Rule: "pe/entropy", Indicator: ".rdata", Severity: "high"},
+		},
+		TopFindings: []string{"medium Elevated unbacked execute at Base: 0000025d6ba60000, Protection: 00000020, Size: 000000000039c000"},
+		Telemetry:   &TelemetryStats{Coverage: TelemetryCoverage{Delivered: []string{"etw", "etwti"}}},
+	}
+	e.lastComparison = &e.cycles[0]
+	e.recordTechniqueMemory(ctx, Cycle{LoopID: "loop-memory", Iteration: 2, Execution: executionVerified, Findings: 1, TraceID: 8}, current, gateExecuting)
+
+	for _, rule := range []string{"pe/checksum", "pe/sections"} {
+		techniques, err := e.memorySearch(ctx, rule, "", "", 5)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(techniques) != 1 {
+			t.Fatalf("%s: techniques = %+v, want the static-hygiene technique", rule, techniques)
+		}
+	}
+	var volatile int
+	if err := db.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM loop_memory_findings WHERE indicator LIKE '%Elevated unbacked execute%'`).Scan(&volatile); err != nil {
+		t.Fatal(err)
+	}
+	if volatile != 0 {
+		t.Fatalf("volatile dynamic finding was recorded %d time(s)", volatile)
+	}
+}

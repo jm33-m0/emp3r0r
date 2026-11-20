@@ -209,8 +209,10 @@ Decision rules:
 - The static hygiene backlog is unaddressed work. If it lists a deterministic
   item (pe/checksum, pe/sections, pe/import), plan static-hygiene for it before
   another dynamic mechanism. Do not tune a build option while a cheap hygiene
-  item is open. Producer-owned entropy remains mechanism=producer, not
-  static-hygiene.
+  item is open. The finding's source decides ownership: a region produced by
+  the loader's own build (loader_windows/build.sh, selfload, pack, or the
+  embedded blob it writes) is loader-owned and stays static-hygiene; only a
+  region produced by the active producer's PICO/shellcode is mechanism=producer.
 - action=debug when the last cycle reported execution=offline or the sandbox did
   not execute the payload, and a debugger is available. Give it the specific
   question to answer. Do not spend a debug turn when the payload executed.
@@ -223,11 +225,14 @@ Decision rules:
   residual is explained with evidence.
 - A cycle that only changes imports, strings, section names, encoding, or
   packing is static hygiene, not a new loading path. Label it as such.
-- A high static finding in a producer-owned container (for example, .rdata
-  entropy from an embedded encrypted blob) is mechanism=producer, not
-  static-hygiene. A container change is preferred; encoding is allowed when the
-  loader decodes it and the agent still checks in. Report size growth and any
-  new finding.
+- A high static finding is classified by the source of the detected region.
+  .rdata entropy from the loader's own embedded encrypted blob (the source
+  points at loader_windows/build.sh, selfload, pack, or the blob it writes) is
+  a loader container problem: plan static-hygiene and change the container
+  (encoding, layout, post-link pass). Only a region produced by the active
+  producer's PICO/shellcode is mechanism=producer. A container change is
+  preferred; encoding is allowed when the loader decodes it and the agent still
+  checks in. Report size growth and any new finding.
 - mechanism=producer edits the current producer's source. mechanism=producer-swap
   changes the wrapper itself: the brief's mechanism contract states the
   producer's declared input option and the agent type it requires. Call

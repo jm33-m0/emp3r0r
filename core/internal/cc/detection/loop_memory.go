@@ -101,11 +101,86 @@ func memorySeverityRank(severity string) int {
 	}
 }
 
-// diffMemoryFindings returns the top findings a cycle removed and added
-// relative to its comparison baseline.
-func diffMemoryFindings(previous, current cycleSummary) (removed, added []memoryFinding) {
-	before := memoryFindings(previous)
-	after := memoryFindings(current)
+// memoryStaticFindings returns the static hygiene surface of a cycle: the
+// dedicated hygiene backlog plus any static finding that reached the top list.
+// Some deterministic rules (pe/checksum, pe/sections) never enter the top
+// eight, so the backlog is the authoritative source for them.
+func memoryStaticFindings(summary cycleSummary) map[string]memoryFinding {
+	out := map[string]memoryFinding{}
+	for _, item := range summary.Hygiene {
+		finding, ok := parseMemoryFinding(item.Rule + " " + item.Indicator)
+		if !ok {
+			continue
+		}
+		if strings.TrimSpace(item.Severity) != "" {
+			finding.Severity = strings.ToLower(item.Severity)
+		}
+		finding.Stage = string(StageStatic)
+		out[finding.key()] = finding
+	}
+	for _, top := range summary.TopFindings {
+		finding, ok := parseMemoryFinding(top)
+		if !ok || finding.Stage != string(StageStatic) {
+			continue
+		}
+		if existing, ok := out[finding.key()]; !ok || memorySeverityRank(finding.Severity) > memorySeverityRank(existing.Severity) {
+			out[finding.key()] = finding
+		}
+	}
+	return out
+}
+
+// memoryDynamicFindings returns the stable dynamic/telemetry rules. Analyzer
+// summaries with no rule and address-specific lines ("Base: 0x...", size,
+// protection) are not usable technique targets: they change every run.
+func memoryDynamicFindings(summary cycleSummary) map[string]memoryFinding {
+	out := map[string]memoryFinding{}
+	for _, top := range summary.TopFindings {
+		finding, ok := parseMemoryFinding(top)
+		if !ok || finding.Rule == "" {
+			continue
+		}
+		if finding.Stage != string(StageTelemetry) && finding.Stage != string(StageDynamic) &&
+			!strings.HasPrefix(finding.Rule, "analyzer/dynamic") {
+			continue
+		}
+		if memoryVolatileFinding(finding) {
+			continue
+		}
+		out[finding.key()] = finding
+	}
+	return out
+}
+
+func memoryVolatileFinding(finding memoryFinding) bool {
+	text := strings.ToLower(finding.Rule + " " + finding.Indicator)
+	for _, marker := range []string{"base:", "protection:", "size:", "at base"} {
+		if strings.Contains(text, marker) {
+			return true
+		}
+	}
+	for _, field := range strings.Fields(text) {
+		if len(field) >= 10 && strings.HasPrefix(field, "0x") {
+			return true
+		}
+	}
+	return false
+}
+
+// diffMemoryFindings returns the findings a cycle removed and added relative
+// to its comparison baseline. A static-hygiene cycle only claims static rules;
+// a dynamic change under a static edit is not the edit's effect.
+func diffMemoryFindings(previous, current cycleSummary, mechanism string) (removed, added []memoryFinding) {
+	before := memoryStaticFindings(previous)
+	after := memoryStaticFindings(current)
+	if !strings.EqualFold(strings.TrimSpace(mechanism), "static-hygiene") {
+		for key, finding := range memoryDynamicFindings(previous) {
+			before[key] = finding
+		}
+		for key, finding := range memoryDynamicFindings(current) {
+			after[key] = finding
+		}
+	}
 	for key, finding := range before {
 		if _, ok := after[key]; !ok {
 			finding.Direction = "removed"
@@ -193,7 +268,8 @@ func (e *evolver) recordTechniqueMemory(ctx context.Context, cycle Cycle, summar
 	}
 	previousCounts := cycleFindingCounts(previous)
 	currentCounts := summaryFindingCounts(summary, cycle.Findings)
-	removed, added := diffMemoryFindings(previousSummary, summary)
+	mechanism := strings.TrimSpace(summary.Mechanism)
+	removed, added := diffMemoryFindings(previousSummary, summary, mechanism)
 	if len(removed) == 0 && len(added) == 0 {
 		return
 	}
@@ -275,7 +351,6 @@ func (e *evolver) recordTechniqueMemory(ctx context.Context, cycle Cycle, summar
 		note += strings.Join(reasons, " | ")
 	}
 	note = clipUTF8(note, 4000)
-	mechanism := strings.TrimSpace(summary.Mechanism)
 	name := memoryTechniqueName(mechanism, target, direction, files)
 	score := memoryScore(previousCounts, currentCounts)
 	win, loss := 0, 0
