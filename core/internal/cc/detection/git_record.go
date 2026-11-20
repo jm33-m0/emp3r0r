@@ -180,7 +180,7 @@ func (g *gitRecorder) Log(ctx context.Context, root sourceRoot, limit int) (stri
 	}
 	defer iter.Close()
 	var b strings.Builder
-	for n := 0; n < limit; n++ {
+	for range limit {
 		if err := ctx.Err(); err != nil {
 			return "", err
 		}

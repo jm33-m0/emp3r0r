@@ -578,6 +578,7 @@ func (c *coordinator) afterCycle(ctx context.Context, cycle *Cycle) error {
 			baseline = c.e.comparisonBaseline()
 		}
 		c.lastDiagnosis = nil
+		c.e.restoreErr = nil
 		retained := "no clean baseline exists"
 		previous := findingCounts{}
 		current := summaryFindingCounts(summary, cycle.Findings)
@@ -589,10 +590,11 @@ func (c *coordinator) afterCycle(ctx context.Context, cycle *Cycle) error {
 				cycle.Iteration, previous.High, current.High, previous.Medium, current.Medium,
 				previous.Static, current.Static, previous.Total, current.Total, retained)
 		}
+		quotedLoopID := strings.ReplaceAll(sanitizeLine(c.e.cfg.LoopID), "'", "''")
 		c.plannerNote = fmt.Sprintf("Cycle %d regressed (high findings %d -> %d, medium findings %d -> %d, static findings %d -> %d, total %d -> %d); the host kept the cycle's source edits and left the finding baseline at %s. The edits are recorded in loop_edits, iteration %d, with their old/new text: keep the part that removed a finding and change only the part that raised the regressed count (SELECT file, reason, old, new FROM loop_edits WHERE loop_id = '%s' AND iteration = %d). Do not repeat the exact change.",
 			cycle.Iteration, previous.High, current.High, previous.Medium, current.Medium,
 			previous.Static, current.Static, previous.Total, current.Total, retained,
-			cycle.Iteration, c.e.cfg.LoopID, cycle.Iteration)
+			cycle.Iteration, quotedLoopID, cycle.Iteration)
 		return nil
 	}
 	if gate != gateRestore {

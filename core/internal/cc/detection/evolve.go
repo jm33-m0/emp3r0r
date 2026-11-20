@@ -2028,7 +2028,7 @@ func findingRegression(previous, current findingCounts) bool {
 	if current.HygieneHigh > previous.HygieneHigh || current.DetectionHigh > previous.DetectionHigh {
 		return true
 	}
-	if score := memoryScore(previous, current); score != 0 {
+	if score := findingScore(previous, current); score != 0 {
 		return score < 0
 	}
 	return current.StableTotal > previous.StableTotal

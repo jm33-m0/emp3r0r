@@ -7,6 +7,18 @@ import (
 	"testing"
 )
 
+func TestPruneArtifactsNegativeLimit(t *testing.T) {
+	dir := t.TempDir()
+	artifact := filepath.Join(dir, "artifact.json")
+	if err := os.WriteFile(artifact, []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	(&Store{}).pruneArtifacts(dir, -1)
+	if _, err := os.Stat(artifact); !os.IsNotExist(err) {
+		t.Fatalf("negative limit did not prune the artifact: %v", err)
+	}
+}
+
 func TestPruneArtifactsWithNonJSONEntries(t *testing.T) {
 	dir := t.TempDir()
 	artifact := filepath.Join(dir, "artifact.json")

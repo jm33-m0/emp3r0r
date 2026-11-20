@@ -677,6 +677,14 @@ func cycleReportEdits(cycles []Cycle, edits []EditRecord, index int) []EditRecor
 	return fallback
 }
 
+// reportAttributableFinding reports whether a top-finding line can be tied to
+// a source edit. Address-specific dynamic lines and lines without a stable
+// rule are observations, not a rule the loop can patch.
+func reportAttributableFinding(top string) bool {
+	finding, ok := parseMemoryFinding(top)
+	return ok && finding.Rule != "" && !memoryVolatileFinding(finding)
+}
+
 // reportFindingChanges maps each baseline top finding to its final status and
 // the first cycle where it was no longer reported. It deliberately says
 // "not in final top findings" rather than "removed": the stored top-finding
@@ -706,6 +714,9 @@ func reportFindingChanges(cycles []Cycle, finalIndex int, edits []EditRecord) ([
 	for _, top := range findings[0].summary.TopFindings {
 		key := reportFindingKey(top)
 		if key == "" || baselineKeys[key] {
+			continue
+		}
+		if !reportAttributableFinding(top) {
 			continue
 		}
 		baselineKeys[key] = true

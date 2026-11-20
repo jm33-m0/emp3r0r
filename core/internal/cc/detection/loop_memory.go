@@ -167,6 +167,22 @@ func memoryVolatileFinding(finding memoryFinding) bool {
 	return false
 }
 
+// sanitizeMemoryText keeps target- and model-derived memory text on one
+// bounded line before it is stored or shown to a model. Backticks are replaced
+// so the value cannot break the Markdown fences used by the prompt brief.
+func sanitizeMemoryText(text string, limit int) string {
+	text = strings.ReplaceAll(sanitizeLine(strings.TrimSpace(text)), "`", "'")
+	return clipUTF8(text, limit)
+}
+
+func sanitizeMemoryFinding(finding memoryFinding) memoryFinding {
+	finding.Rule = sanitizeMemoryText(finding.Rule, 200)
+	finding.Indicator = sanitizeMemoryText(finding.Indicator, 300)
+	finding.Stage = sanitizeMemoryText(finding.Stage, 20)
+	finding.Severity = sanitizeMemoryText(finding.Severity, 20)
+	return finding
+}
+
 // diffMemoryFindings returns the findings a cycle removed and added relative
 // to its comparison baseline. A static-hygiene cycle only claims static rules;
 // a dynamic change under a static edit is not the edit's effect.
@@ -211,11 +227,11 @@ func sortMemoryFindings(findings []memoryFinding) {
 	})
 }
 
-// memoryScore weights a verified change by the metric it improves. A removal
+// findingScore weights a verified change by the metric it improves. A removal
 // is positive; an addition is negative. High findings dominate hygiene, which
 // dominates static signatures. The regression gate uses the same weights, so a
 // material static win can outweigh a medium increase.
-func memoryScore(previous, current findingCounts) float64 {
+func findingScore(previous, current findingCounts) float64 {
 	high := previous.DetectionHigh - current.DetectionHigh
 	hygieneHigh := previous.HygieneHigh - current.HygieneHigh
 	medium := previous.DetectionMedium - current.DetectionMedium
@@ -269,7 +285,7 @@ func (e *evolver) recordTechniqueMemory(ctx context.Context, cycle Cycle, summar
 	}
 	previousCounts := cycleFindingCounts(previous)
 	currentCounts := summaryFindingCounts(summary, cycle.Findings)
-	mechanism := strings.TrimSpace(summary.Mechanism)
+	mechanism := sanitizeMemoryText(summary.Mechanism, 80)
 	removed, added := diffMemoryFindings(previousSummary, summary, mechanism)
 	if len(removed) == 0 && len(added) == 0 {
 		return
@@ -282,6 +298,7 @@ func (e *evolver) recordTechniqueMemory(ctx context.Context, cycle Cycle, summar
 		target = added[0]
 		direction = "added"
 	}
+	target = sanitizeMemoryFinding(target)
 
 	loopID := strings.TrimSpace(cycle.LoopID)
 	if loopID == "" {
@@ -337,23 +354,24 @@ func (e *evolver) recordTechniqueMemory(ctx context.Context, cycle Cycle, summar
 		}
 		if !fileSet[path] {
 			fileSet[path] = true
-			files = append(files, path)
+			files = append(files, sanitizeMemoryText(path, 200))
 		}
 		if strings.TrimSpace(edit.reason) != "" {
-			reasons = append(reasons, strings.TrimSpace(edit.reason))
+			reasons = append(reasons, sanitizeMemoryText(edit.reason, 1000))
 		}
 	}
 	sort.Strings(files)
-	note := strings.TrimSpace(summary.Note)
+	module = sanitizeMemoryText(module, 100)
+	note := sanitizeMemoryText(summary.Note, 4000)
 	if len(reasons) > 0 {
 		if note != "" {
 			note += " | "
 		}
 		note += strings.Join(reasons, " | ")
 	}
-	note = clipUTF8(note, 4000)
+	note = sanitizeMemoryText(note, 4000)
 	name := memoryTechniqueName(mechanism, target, direction, files)
-	score := memoryScore(previousCounts, currentCounts)
+	score := findingScore(previousCounts, currentCounts)
 	win, loss := 0, 0
 	if score > 0 {
 		win = 1
@@ -392,8 +410,16 @@ func (e *evolver) recordTechniqueMemory(ctx context.Context, cycle Cycle, summar
 		return
 	}
 
+	var linkErr error
 	link := func(findings []memoryFinding) {
+		if linkErr != nil {
+			return
+		}
 		for _, finding := range findings {
+			finding = sanitizeMemoryFinding(finding)
+			if finding.Rule == "" && finding.Indicator == "" {
+				continue
+			}
 			if _, err := tx.ExecContext(ctx, `
 				INSERT INTO loop_memory_findings
 					(rule, indicator, stage, severity, occurrences, first_loop, last_loop, updated_at)
@@ -405,12 +431,14 @@ func (e *evolver) recordTechniqueMemory(ctx context.Context, cycle Cycle, summar
 					last_loop = excluded.last_loop,
 					updated_at = excluded.updated_at`,
 				finding.Rule, finding.Indicator, finding.Stage, finding.Severity, loopID, loopID, now); err != nil {
+				linkErr = err
 				return
 			}
 			var findingID int64
 			if err := tx.QueryRowContext(ctx,
 				`SELECT id FROM loop_memory_findings WHERE rule = ? AND indicator = ?`,
 				finding.Rule, finding.Indicator).Scan(&findingID); err != nil {
+				linkErr = err
 				return
 			}
 			if _, err := tx.ExecContext(ctx, `
@@ -421,12 +449,17 @@ func (e *evolver) recordTechniqueMemory(ctx context.Context, cycle Cycle, summar
 					last_loop = excluded.last_loop,
 					last_iteration = excluded.last_iteration`,
 				techniqueID, findingID, finding.Direction, loopID, cycle.Iteration); err != nil {
+				linkErr = err
 				return
 			}
 		}
 	}
 	link(removed)
 	link(added)
+	if linkErr != nil {
+		e.logClass(logging.ClassWarning, "loop memory: link findings: %v", linkErr)
+		return
+	}
 
 	delivered := ""
 	if summary.Telemetry != nil {
@@ -551,6 +584,12 @@ func (e *evolver) memorySearch(ctx context.Context, rule, mechanism, query strin
 			rows.Close()
 			return nil, err
 		}
+		item.Mechanism = sanitizeMemoryText(item.Mechanism, 80)
+		item.Name = sanitizeMemoryText(item.Name, 300)
+		item.Module = sanitizeMemoryText(item.Module, 200)
+		item.Files = sanitizeMemoryText(item.Files, 500)
+		item.Note = sanitizeMemoryText(item.Note, 4000)
+		item.Direction = sanitizeMemoryText(item.Direction, 20)
 		out = append(out, item)
 	}
 	if err := rows.Err(); err != nil {
@@ -581,6 +620,8 @@ func (e *evolver) memoryExamples(ctx context.Context, techniqueID int64) []memor
 		if err := rows.Scan(&item.File, &item.Reason, &item.Old, &item.New); err != nil {
 			return out
 		}
+		item.File = sanitizeMemoryText(item.File, 200)
+		item.Reason = sanitizeMemoryText(item.Reason, 1000)
 		item.Old = clipUTF8(item.Old, 4000)
 		item.New = clipUTF8(item.New, 4000)
 		out = append(out, item)

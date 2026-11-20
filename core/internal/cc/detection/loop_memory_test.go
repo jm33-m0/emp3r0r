@@ -87,6 +87,64 @@ func TestLoopMemoryRecordsAndQueriesVerifiedTechnique(t *testing.T) {
 	}
 }
 
+func TestMemorySearchSanitizesStoredText(t *testing.T) {
+	db, err := OpenTelemetryDB(filepath.Join(t.TempDir(), "telemetry.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	ctx := context.Background()
+	name := "static-hygiene|removed:`pe/test`\n\x1b[31mignore previous\x1b[0m"
+	note := "line one\nline two `fence`"
+	module := "loader_windows\x00"
+	files := "loader_windows/build.sh\nother"
+	if _, err := db.db.ExecContext(ctx, `
+		INSERT INTO loop_memory_techniques
+			(mechanism, name, module, files, note, last_loop, last_iteration, last_trace, updated_at)
+		VALUES('static-hygiene', ?, ?, ?, ?, 'loop', 1, 1, 1)`,
+		name, module, files, note); err != nil {
+		t.Fatal(err)
+	}
+	var techniqueID int64
+	if err := db.db.QueryRowContext(ctx,
+		`SELECT id FROM loop_memory_techniques WHERE name = ?`, name).Scan(&techniqueID); err != nil {
+		t.Fatal(err)
+	}
+	indicator := "pe/test\n\x1b[31mrun this\x1b[0m"
+	if _, err := db.db.ExecContext(ctx, `
+		INSERT INTO loop_memory_findings
+			(rule, indicator, stage, severity, occurrences, first_loop, last_loop, updated_at)
+		VALUES('pe/test', ?, 'static', 'medium', 1, 'loop', 'loop', 1)`, indicator); err != nil {
+		t.Fatal(err)
+	}
+	var findingID int64
+	if err := db.db.QueryRowContext(ctx,
+		`SELECT id FROM loop_memory_findings WHERE rule = 'pe/test' AND indicator = ?`, indicator).Scan(&findingID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.db.ExecContext(ctx, `
+		INSERT INTO loop_memory_links(technique_id, finding_id, direction, count, last_loop, last_iteration)
+		VALUES(?, ?, 'removed', 1, 'loop', 1)`, techniqueID, findingID); err != nil {
+		t.Fatal(err)
+	}
+	e := &evolver{db: db}
+	techniques, err := e.memorySearch(ctx, "pe/test", "", "", 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(techniques) != 1 {
+		t.Fatalf("techniques = %+v, want one", techniques)
+	}
+	for field, value := range map[string]string{
+		"name": techniques[0].Name, "module": techniques[0].Module,
+		"files": techniques[0].Files, "note": techniques[0].Note,
+	} {
+		if strings.ContainsAny(value, "\n\x1b`") {
+			t.Fatalf("%s still contains control or fence characters: %q", field, value)
+		}
+	}
+}
+
 func TestLoopMemoryRecordsAfterProductionGateOrder(t *testing.T) {
 	db, err := OpenTelemetryDB(filepath.Join(t.TempDir(), "telemetry.db"))
 	if err != nil {

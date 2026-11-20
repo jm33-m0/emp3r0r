@@ -290,6 +290,9 @@ func artifactFile(path string) string {
 }
 
 func (s *Store) pruneArtifacts(dir string, limit int) {
+	if limit < 0 {
+		limit = 0
+	}
 	entries, err := os.ReadDir(dir)
 	if err != nil || len(entries) <= limit {
 		return
