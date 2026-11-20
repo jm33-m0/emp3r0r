@@ -33,6 +33,9 @@ const (
 	maxTelemetryEvents = 200000
 	// maxTelemetryFindings bounds the deterministic findings from one trace.
 	maxTelemetryFindings = 32
+	// maxDefenderSummaryEvents bounds the Defender threat summaries lifted from
+	// one RedEdr analyzer block; the block is target-controlled.
+	maxDefenderSummaryEvents = 64
 	// maxQueryRows and maxQueryCellBytes bound a model-issued SQL query.
 	maxQueryRows      = 500
 	maxQueryCellBytes = 8 << 10
@@ -1859,6 +1862,7 @@ func parseTelemetryValue(value any, sourceHint string) (parsedTelemetry, error) 
 func collectTelemetryObjects(value any) []map[string]any {
 	seen := map[string]bool{}
 	var out []map[string]any
+	defenderSummaries := 0
 	var walk func(any)
 	walk = func(value any) {
 		switch typed := value.(type) {
@@ -1880,6 +1884,29 @@ func collectTelemetryObjects(value any) []map[string]any {
 				}
 				return
 			}
+			// RedEdr keeps the Defender threat verdicts in a summary list that
+			// has no top-level ETW envelope. Lift the real threats so the
+			// verdict finding is not lost when the raw events are only noise.
+			if events, ok := typed["defender_events"].([]any); ok {
+				for _, item := range events {
+					if defenderSummaries >= maxDefenderSummaryEvents {
+						break
+					}
+					event, ok := item.(map[string]any)
+					if !ok || !defenderSummaryIsThreat(event) {
+						continue
+					}
+					synthetic := syntheticDefenderSummary(event)
+					encoded, _ := json.Marshal(synthetic)
+					key := string(encoded)
+					if seen[key] {
+						continue
+					}
+					seen[key] = true
+					out = append(out, synthetic)
+					defenderSummaries++
+				}
+			}
 			for _, key := range []string{"events", "findings", "rededr", "raw_output", "data"} {
 				if child, ok := typed[key]; ok {
 					walk(child)
@@ -1888,6 +1915,53 @@ func collectTelemetryObjects(value any) []map[string]any {
 		}
 	}
 	walk(value)
+	return out
+}
+
+// defenderSummaryIsThreat keeps the Defender summary entries that represent a
+// real threat. is_threat is authoritative; an explicit verdict is a fallback
+// for exports that omit it.
+func defenderSummaryIsThreat(event map[string]any) bool {
+	if isThreat, ok := event["is_threat"].(bool); ok && isThreat {
+		return true
+	}
+	return !ignoredDefenderVerdict(jsonString(event["verdict"]))
+}
+
+func ignoredDefenderVerdict(verdict string) bool {
+	switch strings.ToLower(strings.TrimSpace(verdict)) {
+	case "", "null", "none", "n/a", "unsupported", "false", "0":
+		return true
+	}
+	return false
+}
+
+// syntheticDefenderSummary turns one RedEdr defender summary entry into the
+// event shape the normalizer and the verdict finding expect.
+func syntheticDefenderSummary(event map[string]any) map[string]any {
+	name := clipUTF8(sanitizeLine(clipUTF8(jsonString(event["event"]), 512)), 160)
+	if name == "" {
+		name = "Defender threat"
+	}
+	verdict := clipUTF8(sanitizeLine(clipUTF8(jsonString(event["verdict"]), 256)), 80)
+	label := name
+	if !ignoredDefenderVerdict(verdict) {
+		label = "Defender: " + verdict + " (" + name + ")"
+	}
+	out := map[string]any{
+		"type":        "defender_summary",
+		"event":       label,
+		"provider":    clipUTF8(sanitizeLine(clipUTF8(jsonString(event["provider"]), 256)), 80),
+		"verdict":     verdict,
+		"is_threat":   true,
+		"scan_target": clipUTF8(sanitizeLine(clipUTF8(jsonString(event["scan_target"]), 1024)), 300),
+	}
+	if value, ok := event["time"]; ok {
+		out["time"] = value
+	}
+	if value, ok := event["event_id"]; ok {
+		out["etw_event_id"] = value
+	}
 	return out
 }
 

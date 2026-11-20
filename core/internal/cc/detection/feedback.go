@@ -21,6 +21,10 @@ const (
 	maxGenericNodes        = 20000
 	maxGenericFindings     = 200
 	maxStringAnalyzerItems = 8
+	maxInfoDetectionNotes  = 32
+	maxInfoImports         = 64
+	maxInfoSections        = 64
+	maxInfoRiskFactors     = 32
 )
 
 // SourceLocation is one place in the module source a detection maps to.
@@ -42,6 +46,10 @@ type Finding struct {
 	Detail    string           `json:"detail,omitempty"`
 	Executes  bool             `json:"executes"`
 	Sources   []SourceLocation `json:"sources,omitempty"`
+	// SourceHint is an internal search string for build-level findings whose
+	// indicator does not appear verbatim in the module source, such as a PE
+	// checksum. It is never serialized.
+	SourceHint string `json:"-"`
 }
 
 // SourceEdit is an actionable pointer for a module source change.
@@ -142,6 +150,14 @@ func BuildFeedback(run Run) Feedback {
 	for _, finding := range parseInfo(run.Info) {
 		addFinding(&fb, finding, locator.locate)
 	}
+	for _, finding := range parseRiskFactors(run.Risk.Factors) {
+		// A real Defender event is stronger evidence than the aggregate risk
+		// factor; do not report the same detection twice.
+		if finding.Rule == "defender/verdict" && hasFindingRule(fb.Findings, "defender/verdict") {
+			continue
+		}
+		addFinding(&fb, finding, locator.locate)
+	}
 	if len(fb.Findings) == 0 {
 		fb.Notes = append(fb.Notes, "no indicator was extracted from the completed stages")
 	}
@@ -175,7 +191,13 @@ func addFinding(fb *Feedback, finding Finding, locate func(string) []SourceLocat
 		}
 	}
 	finding.Severity = normalizeSeverity(finding.Severity)
-	finding.Sources = locate(finding.Indicator)
+	if len(finding.Sources) == 0 {
+		needle := finding.Indicator
+		if finding.SourceHint != "" {
+			needle = finding.SourceHint
+		}
+		finding.Sources = locate(needle)
+	}
 	if len(finding.Sources) == 0 {
 		fb.Unmatched++
 		if len(fb.Notes) < 10 {
@@ -198,6 +220,22 @@ func addFinding(fb *Feedback, finding Finding, locate func(string) []SourceLocat
 func suggestion(finding Finding) string {
 	switch finding.Stage {
 	case StageStatic:
+		if strings.EqualFold(finding.Tool, "pe-info") {
+			switch finding.Rule {
+			case "pe/checksum":
+				return "Patch the PE checksum after the link step in build.sh, then rebuild and verify the checksum is valid."
+			case "pe/sections":
+				return "Rename or merge the non-standard PE section, then rebuild and verify the loader still finds its data."
+			case "pe/injection":
+				return "Remove the injection-capable import sequence or resolve it at runtime, then rebuild and verify execution."
+			case "pe/import":
+				return "Remove the unnecessary import or resolve it at runtime, then rebuild and verify execution."
+			case "pe/entropy":
+				return "Move the high-entropy container or change its packing; do not add padding only to dilute entropy."
+			default:
+				return "Remove or reshape the static indicator, then rebuild and verify the loader still executes."
+			}
+		}
 		switch strings.ToLower(finding.Tool) {
 		case "yara":
 			return "Remove, reshape, or encrypt the matched literal; confirm the rule no longer matches after a rebuild."
@@ -337,6 +375,9 @@ func parseStatic(raw json.RawMessage) []Finding {
 			}
 		}
 	}
+	for i := range findings {
+		findings[i].Stage = StageStatic
+	}
 	return findings
 }
 
@@ -408,8 +449,9 @@ func decodeMaybeBase64(text string) string {
 	return string(decoded)
 }
 
-// parseInfo extracts suspicious imports and entropy flags from the uploaded
-// file metadata.
+// parseInfo extracts static hygiene findings from the uploaded file metadata.
+// The source is target-controlled, so every string is bounded and sanitized by
+// addFinding before it reaches the model or the database.
 func parseInfo(raw json.RawMessage) []Finding {
 	if len(raw) == 0 {
 		return nil
@@ -422,39 +464,203 @@ func parseInfo(raw json.RawMessage) []Finding {
 	if pe == nil {
 		return nil
 	}
-	var findings []Finding
-	if imports, ok := pe["suspicious_imports"].([]any); ok {
-		for _, entry := range imports {
-			imp, ok := entry.(map[string]any)
-			if !ok {
-				continue
+	findings := make([]Finding, 0, 8)
+	seen := map[string]struct{}{}
+	add := func(finding Finding) {
+		finding.Tool = "pe-info"
+		finding.Stage = StageStatic
+		key := strings.ToLower(strings.TrimSpace(finding.Rule)) + "|" + strings.ToLower(strings.TrimSpace(finding.Indicator))
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		findings = append(findings, finding)
+	}
+	checksumFinding := func(detail string) Finding {
+		return Finding{
+			Severity:   "medium",
+			Rule:       "pe/checksum",
+			Indicator:  "PE checksum",
+			Detail:     clipUTF8(sanitizeLine(clipUTF8(detail, 1024)), 300),
+			SourceHint: "OUTPUT_ABS",
+		}
+	}
+
+	if checksum, ok := pe["checksum_info"].(map[string]any); ok {
+		valid, hasValid := checksum["is_valid"].(bool)
+		needsUpdate, _ := checksum["needs_update"].(bool)
+		stored := clipUTF8(sanitizeLine(clipUTF8(jsonString(checksum["stored_checksum"]), 128)), 32)
+		calculated := clipUTF8(sanitizeLine(clipUTF8(jsonString(checksum["calculated_checksum"]), 128)), 32)
+		if (hasValid && !valid) || needsUpdate {
+			detail := "PE checksum is missing or invalid"
+			if stored != "" || calculated != "" {
+				detail = fmt.Sprintf("stored checksum %s, calculated %s",
+					firstNonEmpty(stored, "unknown"), firstNonEmpty(calculated, "unknown"))
 			}
-			fn, _ := imp["function"].(string)
-			dll, _ := imp["dll"].(string)
-			if fn == "" {
-				continue
-			}
-			findings = append(findings, Finding{
-				Tool: "pe-info", Severity: "medium", Indicator: fn,
-				Detail: "suspicious import from " + dll,
+			add(checksumFinding(detail))
+		}
+	}
+
+	for i, item := range anySlice(pe["detection_notes"]) {
+		if i >= maxInfoDetectionNotes {
+			break
+		}
+		note, ok := item.(string)
+		if !ok || strings.TrimSpace(note) == "" {
+			continue
+		}
+		note = clipUTF8(note, 4096)
+		lower := strings.ToLower(note)
+		switch {
+		case strings.Contains(lower, "checksum") &&
+			(strings.Contains(lower, "invalid") || strings.Contains(lower, "mismatch") || strings.Contains(lower, "missing")):
+			add(checksumFinding(note))
+		case strings.Contains(lower, "non-standard pe section") || strings.Contains(lower, "nonstandard pe section"):
+			add(Finding{
+				Severity:   "medium",
+				Rule:       "pe/sections",
+				Indicator:  "Non-standard PE sections",
+				Detail:     clipUTF8(sanitizeLine(note), 300),
+				SourceHint: ".section",
+			})
+		case strings.Contains(lower, "process injection"):
+			add(Finding{
+				Severity:   "medium",
+				Rule:       "pe/injection",
+				Indicator:  "Process injection capabilities",
+				Detail:     clipUTF8(sanitizeLine(note), 300),
+				SourceHint: "VirtualAllocEx",
 			})
 		}
 	}
-	for _, section := range anySlice(pe["sections"]) {
+
+	for i, entry := range anySlice(pe["suspicious_imports"]) {
+		if i >= maxInfoImports {
+			break
+		}
+		imp, ok := entry.(map[string]any)
+		if !ok {
+			continue
+		}
+		fn, _ := imp["function"].(string)
+		dll, _ := imp["dll"].(string)
+		fn = clipUTF8(sanitizeLine(clipUTF8(fn, 512)), 200)
+		dll = clipUTF8(sanitizeLine(clipUTF8(dll, 512)), 200)
+		if fn == "" {
+			continue
+		}
+		add(Finding{
+			Severity:   "medium",
+			Rule:       "pe/import",
+			Indicator:  fn,
+			Detail:     "suspicious import from " + dll,
+			SourceHint: fn,
+		})
+	}
+
+	for i, section := range anySlice(pe["sections"]) {
+		if i >= maxInfoSections {
+			break
+		}
 		sec, ok := section.(map[string]any)
 		if !ok {
 			continue
 		}
-		entropy, _ := sec["entropy"].(float64)
 		name, _ := sec["name"].(string)
-		if entropy > 7.5 && name != "" {
-			findings = append(findings, Finding{
-				Tool: "pe-info", Severity: "high", Indicator: name,
-				Detail: fmt.Sprintf("section entropy %.2f", entropy),
+		name = clipUTF8(sanitizeLine(clipUTF8(name, 256)), 64)
+		entropy, ok := numberValue(sec["entropy"])
+		if !ok || entropy < 7.5 || name == "" {
+			continue
+		}
+		add(Finding{
+			Severity:   "high",
+			Rule:       "pe/entropy",
+			Indicator:  name,
+			Detail:     fmt.Sprintf("section entropy %.2f", entropy),
+			SourceHint: name,
+		})
+	}
+	return findings
+}
+
+// parseRiskFactors turns the sandbox's aggregate risk factors into the same
+// first-class findings as the detailed analyzer output. The strings are
+// target-controlled, so only known patterns are promoted and every detail is
+// bounded.
+func parseRiskFactors(factors []string) []Finding {
+	findings := make([]Finding, 0, 4)
+	seen := map[string]struct{}{}
+	add := func(finding Finding) {
+		key := strings.ToLower(strings.TrimSpace(finding.Rule)) + "|" + strings.ToLower(strings.TrimSpace(finding.Indicator))
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		findings = append(findings, finding)
+	}
+	for i, factor := range factors {
+		if i >= maxInfoRiskFactors {
+			break
+		}
+		factor = strings.TrimSpace(sanitizeLine(clipUTF8(factor, 4096)))
+		if factor == "" {
+			continue
+		}
+		lower := strings.ToLower(factor)
+		switch {
+		case strings.Contains(lower, "checksum") &&
+			(strings.Contains(lower, "mismatch") || strings.Contains(lower, "invalid") || strings.Contains(lower, "missing")):
+			add(Finding{
+				Stage: StageStatic, Tool: "pe-info", Severity: "medium",
+				Rule: "pe/checksum", Indicator: "PE checksum",
+				Detail: clipUTF8(factor, 300), SourceHint: "OUTPUT_ABS",
+			})
+		case strings.Contains(lower, "non-standard pe section") || strings.Contains(lower, "nonstandard pe section"):
+			add(Finding{
+				Stage: StageStatic, Tool: "pe-info", Severity: "medium",
+				Rule: "pe/sections", Indicator: "Non-standard PE sections",
+				Detail: clipUTF8(factor, 300), SourceHint: ".section",
+			})
+		case strings.Contains(lower, "process injection"):
+			add(Finding{
+				Stage: StageStatic, Tool: "pe-info", Severity: "medium",
+				Rule: "pe/injection", Indicator: "Process injection capabilities",
+				Detail: clipUTF8(factor, 300), SourceHint: "VirtualAllocEx",
+			})
+		case strings.Contains(lower, "defender") &&
+			(strings.Contains(lower, "flagged") || strings.Contains(lower, "verdict") || strings.Contains(lower, "threat")):
+			add(Finding{
+				Stage: StageTelemetry, Tool: "defender", Severity: "critical",
+				Rule: "defender/verdict", Indicator: "Defender threat verdict",
+				Detail: clipUTF8(factor, 300),
 			})
 		}
 	}
 	return findings
+}
+
+func hasFindingRule(findings []Finding, rule string) bool {
+	for _, finding := range findings {
+		if strings.EqualFold(finding.Rule, rule) {
+			return true
+		}
+	}
+	return false
+}
+
+func numberValue(value any) (float64, bool) {
+	switch typed := value.(type) {
+	case float64:
+		return typed, true
+	case json.Number:
+		parsed, err := typed.Float64()
+		return parsed, err == nil
+	case int:
+		return float64(typed), true
+	case int64:
+		return float64(typed), true
+	}
+	return 0, false
 }
 
 func anySlice(value any) []any {

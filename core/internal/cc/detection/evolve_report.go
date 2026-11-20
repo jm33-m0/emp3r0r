@@ -150,7 +150,7 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 		if last.Execution == executionOffline {
 			fmt.Fprintf(&b, "- Final payload did not execute; its finding counts are not comparable with an executing cycle.\n")
 		}
-		if counts.Static == 0 {
+		if counts.Static == 0 && last.Execution == executionVerified {
 			fmt.Fprintf(&b, "- No static YARA/CheckPlz/Stringnalyzer signature finding was recorded in the final cycle.\n")
 		}
 		achieved = true

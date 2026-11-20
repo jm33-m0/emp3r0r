@@ -511,6 +511,9 @@ func sortedKeys(values map[string]bool) []string {
 // into one or more normalized events. One loaded_dll query expands into one
 // event per DLL so every module the payload loaded is queryable.
 func normalizeTelemetryObject(source string, object map[string]any) []telemetryEvent {
+	if strings.EqualFold(strings.TrimSpace(jsonString(object["type"])), "defender_summary") {
+		return []telemetryEvent{normalizeDefenderSummaryEvent(object)}
+	}
 	if strings.Contains(strings.ToLower(source), "defender") || isDefenderObserver(object) {
 		return []telemetryEvent{normalizeDefenderObserverEvent(object)}
 	}
@@ -526,6 +529,30 @@ func normalizeTelemetryObject(source string, object map[string]any) []telemetryE
 		return []telemetryEvent{normalizeHookEvent(object)}
 	}
 	return []telemetryEvent{normalizeETWEvent(object)}
+}
+
+// normalizeDefenderSummaryEvent carries a real Defender verdict from the
+// analyzer summary into the same event model as the raw ETW stream. Severity
+// is critical so telemetrySignal keeps it after attribution, even when the
+// capture has no payload PEB.
+func normalizeDefenderSummaryEvent(object map[string]any) telemetryEvent {
+	name := strings.TrimSpace(jsonString(object["event"]))
+	if name == "" {
+		name = "Defender threat"
+	}
+	return telemetryEvent{
+		Type:      "defender",
+		EventKey:  telemetryObjectKey(encodeObject(object), ""),
+		Event:     name,
+		Provider:  firstString(object, "provider"),
+		Category:  "defender",
+		Operation: "scan",
+		Severity:  "critical",
+		Signal:    "verdict",
+		Path:      firstString(object, "scan_target"),
+		Attrs:     encodeObject(object),
+		TS:        telemetryTime(object),
+	}
 }
 
 func normalizeQueryEvents(object map[string]any) []telemetryEvent {

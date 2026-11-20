@@ -1645,6 +1645,17 @@ func summarizeCycle(loopID string, iteration int, run Run, feedback Feedback, bu
 			}
 		}
 	}
+	if len(summary.Verdicts) < 8 {
+		for _, finding := range feedback.Findings {
+			if finding.Rule != "defender/verdict" {
+				continue
+			}
+			summary.Verdicts = appendUnique(summary.Verdicts, sanitizeLine(finding.Indicator))
+			if len(summary.Verdicts) >= 8 {
+				break
+			}
+		}
+	}
 	for _, finding := range feedback.Findings {
 		summary.TopFindings = append(summary.TopFindings,
 			clipUTF8(fmt.Sprintf("%s %s %s", sanitizeLine(finding.Severity), sanitizeLine(finding.Rule),
