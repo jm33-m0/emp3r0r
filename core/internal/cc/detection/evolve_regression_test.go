@@ -195,17 +195,21 @@ func TestDynamicRegionSummaryAttributesOuterAndProducer(t *testing.T) {
 }
 
 func TestFindingRegressionPrefersMediumReduction(t *testing.T) {
-	base := findingCounts{High: 1, Medium: 16, Static: 0, Total: 39}
+	base := findingCounts{
+		High: 1, Medium: 16, Static: 0, Total: 39,
+		DetectionHigh: 1, DetectionMedium: 16, StableTotal: 39,
+	}
 	cases := []struct {
 		name    string
 		current findingCounts
 		want    bool
 	}{
-		{"medium reduction with more low findings", findingCounts{High: 1, Medium: 15, Static: 0, Total: 60}, false},
-		{"medium increase", findingCounts{High: 1, Medium: 17, Static: 0, Total: 39}, true},
-		{"equal medium and more total", findingCounts{High: 1, Medium: 16, Static: 0, Total: 40}, true},
-		{"equal medium and equal total", findingCounts{High: 1, Medium: 16, Static: 0, Total: 39}, false},
-		{"new static signature", findingCounts{High: 1, Medium: 0, Static: 1, Total: 0}, true},
+		{"medium reduction with more low findings", findingCounts{High: 1, Medium: 15, Static: 0, Total: 60, DetectionHigh: 1, DetectionMedium: 15, StableTotal: 60}, false},
+		{"medium increase", findingCounts{High: 1, Medium: 17, Static: 0, Total: 39, DetectionHigh: 1, DetectionMedium: 17, StableTotal: 39}, true},
+		{"equal medium and more total", findingCounts{High: 1, Medium: 16, Static: 0, Total: 40, DetectionHigh: 1, DetectionMedium: 16, StableTotal: 40}, true},
+		{"equal medium and equal total", findingCounts{High: 1, Medium: 16, Static: 0, Total: 39, DetectionHigh: 1, DetectionMedium: 16, StableTotal: 39}, false},
+		{"context medium increase is not progress", findingCounts{High: 1, Medium: 20, Static: 0, Total: 45, DetectionHigh: 1, DetectionMedium: 16, StableTotal: 39}, false},
+		{"new static high signature", findingCounts{High: 2, Medium: 0, Static: 1, Total: 0, DetectionHigh: 1, HygieneHigh: 1, HygieneStatic: 1, StableTotal: 2}, true},
 	}
 	for _, tc := range cases {
 		if got := findingRegression(base, tc.current); got != tc.want {

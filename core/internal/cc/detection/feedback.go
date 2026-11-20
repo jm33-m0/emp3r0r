@@ -52,6 +52,46 @@ type Finding struct {
 	SourceHint string `json:"-"`
 }
 
+type findingClass int
+
+const (
+	findingDetection findingClass = iota
+	findingHygiene
+	findingContext
+)
+
+// classifyFinding separates a real detection from static hygiene and from
+// build-random context. The regression gate and top-finding view use this
+// split; the raw high/medium totals remain available for reporting.
+func classifyFinding(finding Finding) findingClass {
+	switch finding.Stage {
+	case StageDynamic, StageEDR:
+		return findingDetection
+	case StageStatic:
+		if strings.EqualFold(finding.Tool, "stringnalyzer") {
+			return findingContext
+		}
+		return findingHygiene
+	case StageTelemetry:
+		rule := strings.ToLower(strings.TrimSpace(finding.Rule))
+		switch {
+		case rule == "defender/verdict":
+			return findingDetection
+		case rule == "defender/scan",
+			rule == "telemetry/coverage",
+			rule == "telemetry/attribution":
+			return findingContext
+		case strings.HasPrefix(rule, "analyzer/static/"), rule == "analyzer/info":
+			return findingHygiene
+		case strings.HasPrefix(rule, "analyzer/dynamic/"), strings.HasPrefix(rule, "telemetry/"):
+			return findingDetection
+		default:
+			return findingDetection
+		}
+	}
+	return findingDetection
+}
+
 // SourceEdit is an actionable pointer for a module source change.
 type SourceEdit struct {
 	File    string `json:"file"`

@@ -223,6 +223,38 @@ func TestStaticFindingCounts(t *testing.T) {
 	if counts.Static != 2 || counts.High != 2 || counts.Medium != 1 || counts.Total != 3 {
 		t.Fatalf("counts = %+v", counts)
 	}
+	if counts.DetectionHigh != 1 || counts.HygieneHigh != 1 || counts.HygieneMedium != 1 || counts.HygieneStatic != 2 || counts.StableTotal != 3 {
+		t.Fatalf("split counts = %+v", counts)
+	}
+}
+
+func TestCountFindingsSeparatesContext(t *testing.T) {
+	findings := []Finding{
+		{Stage: StageTelemetry, Tool: "telemetry", Severity: "critical", Rule: "defender/verdict", Indicator: "Defender threat verdict"},
+		{Stage: StageStatic, Tool: "pe-info", Severity: "high", Rule: "pe/entropy", Indicator: ".rdata"},
+		{Stage: StageStatic, Tool: "stringnalyzer", Severity: "medium", Indicator: ".rUJzD"},
+		{Stage: StageTelemetry, Tool: "telemetry", Severity: "low", Rule: "telemetry/coverage", Indicator: "missing analyzer"},
+	}
+	counts := countFindings(findings)
+	if counts.High != 2 || counts.Medium != 1 || counts.Static != 2 || counts.Total != 4 {
+		t.Fatalf("raw counts = %+v", counts)
+	}
+	if counts.DetectionHigh != 1 || counts.HygieneHigh != 1 || counts.HygieneStatic != 1 || counts.StableTotal != 2 {
+		t.Fatalf("split counts = %+v", counts)
+	}
+}
+
+func TestSummarizeCycleTopFindingsExcludeContext(t *testing.T) {
+	summary := summarizeCycle("loop", 1, Run{ID: "run"}, Feedback{Findings: []Finding{
+		{Stage: StageStatic, Tool: "stringnalyzer", Severity: "medium", Indicator: ".rUJzD"},
+		{Stage: StageStatic, Tool: "pe-info", Severity: "medium", Rule: "pe/checksum", Indicator: "PE checksum"},
+	}}, "", "", "self-load", "agent.bin", "donut", executionVerified, nil, 0, false)
+	if len(summary.TopFindings) != 1 || !strings.Contains(summary.TopFindings[0], "pe/checksum") {
+		t.Fatalf("top findings = %+v, want only the stable hygiene finding", summary.TopFindings)
+	}
+	if len(summary.Hygiene) != 1 || summary.Hygiene[0].Rule != "pe/checksum" {
+		t.Fatalf("hygiene = %+v", summary.Hygiene)
+	}
 }
 
 func TestReportDoesNotClaimNoStaticWhenStaticExists(t *testing.T) {

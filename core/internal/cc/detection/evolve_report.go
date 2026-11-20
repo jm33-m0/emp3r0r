@@ -45,6 +45,9 @@ func RenderLoopSummary(answer map[string]any, cycles []Cycle, edits []EditRecord
 		fmt.Fprintf(&b, "**High findings:** %d → %d | **Static findings:** %d → %d | **Total findings:** %d → %d | **Verdicts:** %d → %d | **Cycles:** %d\n",
 			firstCounts.High, lastCounts.High, firstCounts.Static, lastCounts.Static,
 			firstCounts.Total, lastCounts.Total, first.Verdicts, last.Verdicts, len(cycles))
+		fmt.Fprintf(&b, "**Detection high:** %d → %d | **Hygiene high:** %d → %d | **Detection medium:** %d → %d | **Hygiene medium:** %d → %d\n",
+			firstCounts.DetectionHigh, lastCounts.DetectionHigh, firstCounts.HygieneHigh, lastCounts.HygieneHigh,
+			firstCounts.DetectionMedium, lastCounts.DetectionMedium, firstCounts.HygieneMedium, lastCounts.HygieneMedium)
 		var finalSummary cycleSummary
 		if json.Unmarshal([]byte(last.Summary), &finalSummary) == nil {
 			if len(finalSummary.Hygiene) > 0 {
@@ -556,7 +559,12 @@ func renderFindingObjective(b *strings.Builder, cycles []Cycle, finalIndex int) 
 	fmt.Fprintf(b, "| Metric | Baseline | Final | Change |\n")
 	fmt.Fprintf(b, "| --- | ---: | ---: | ---: |\n")
 	fmt.Fprintf(b, "| High findings | %d | %d | %s |\n", before.High, after.High, signedChange(after.High-before.High))
+	fmt.Fprintf(b, "| Detection high | %d | %d | %s |\n", before.DetectionHigh, after.DetectionHigh, signedChange(after.DetectionHigh-before.DetectionHigh))
+	fmt.Fprintf(b, "| Hygiene high | %d | %d | %s |\n", before.HygieneHigh, after.HygieneHigh, signedChange(after.HygieneHigh-before.HygieneHigh))
+	fmt.Fprintf(b, "| Detection medium | %d | %d | %s |\n", before.DetectionMedium, after.DetectionMedium, signedChange(after.DetectionMedium-before.DetectionMedium))
+	fmt.Fprintf(b, "| Hygiene medium | %d | %d | %s |\n", before.HygieneMedium, after.HygieneMedium, signedChange(after.HygieneMedium-before.HygieneMedium))
 	fmt.Fprintf(b, "| Static findings | %d | %d | %s |\n", before.Static, after.Static, signedChange(after.Static-before.Static))
+	fmt.Fprintf(b, "| Stable findings | %d | %d | %s |\n", before.StableTotal, after.StableTotal, signedChange(after.StableTotal-before.StableTotal))
 	fmt.Fprintf(b, "| Total findings | %d | %d | %s |\n", before.Total, after.Total, signedChange(after.Total-before.Total))
 	fmt.Fprintf(b, "| Defender verdicts | %d | %d | %s |\n", first.Verdicts, last.Verdicts, signedChange(last.Verdicts-first.Verdicts))
 	fmt.Fprintf(b, "\nExecuting cycles: %d/%d.", executing, len(cycles))

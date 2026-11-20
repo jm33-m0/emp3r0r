@@ -1028,32 +1028,39 @@ type hygieneFinding struct {
 }
 
 type cycleSummary struct {
-	LoopID             string           `json:"loop_id"`
-	Iteration          int              `json:"iteration"`
-	Attempt            int              `json:"attempt,omitempty"`
-	GlobalIteration    int              `json:"global_iteration,omitempty"`
-	PayloadKey         string           `json:"payload_key"`
-	PayloadTable       string           `json:"payload_table"`
-	RunID              string           `json:"run_id"`
-	SHA256             string           `json:"sha256"`
-	Score              float64          `json:"score"`
-	Level              string           `json:"level,omitempty"`
-	Findings           int              `json:"findings"`
-	HighFindings       int              `json:"high_findings,omitempty"`
-	MediumFindings     int              `json:"medium_findings,omitempty"`
-	StaticFindings     int              `json:"static_findings,omitempty"`
-	Verdicts           []string         `json:"verdicts,omitempty"`
-	TraceID            int64            `json:"trace_id,omitempty"`
-	Events             int              `json:"telemetry_events"`
-	Telemetry          *TelemetryStats  `json:"telemetry,omitempty"`
-	SourceEdits        int              `json:"source_edits"`
-	TopFindings        []string         `json:"top_findings,omitempty"`
-	Hygiene            []hygieneFinding `json:"hygiene,omitempty"`
-	BuildTail          []string         `json:"build_tail,omitempty"`
-	Edits              []EditRecord     `json:"edits,omitempty"`
-	Shellcode          string           `json:"shellcode,omitempty"`
-	Producer           string           `json:"producer,omitempty"`
-	ShellcodeGenerated bool             `json:"shellcode_generated,omitempty"`
+	LoopID              string           `json:"loop_id"`
+	Iteration           int              `json:"iteration"`
+	Attempt             int              `json:"attempt,omitempty"`
+	GlobalIteration     int              `json:"global_iteration,omitempty"`
+	PayloadKey          string           `json:"payload_key"`
+	PayloadTable        string           `json:"payload_table"`
+	RunID               string           `json:"run_id"`
+	SHA256              string           `json:"sha256"`
+	Score               float64          `json:"score"`
+	Level               string           `json:"level,omitempty"`
+	Findings            int              `json:"findings"`
+	HighFindings        int              `json:"high_findings,omitempty"`
+	MediumFindings      int              `json:"medium_findings,omitempty"`
+	StaticFindings      int              `json:"static_findings,omitempty"`
+	DetectionClassified bool             `json:"detection_classified,omitempty"`
+	DetectionHigh       int              `json:"detection_high,omitempty"`
+	DetectionMedium     int              `json:"detection_medium,omitempty"`
+	HygieneHigh         int              `json:"hygiene_high,omitempty"`
+	HygieneMedium       int              `json:"hygiene_medium,omitempty"`
+	HygieneStatic       int              `json:"hygiene_static,omitempty"`
+	StableTotal         int              `json:"stable_total,omitempty"`
+	Verdicts            []string         `json:"verdicts,omitempty"`
+	TraceID             int64            `json:"trace_id,omitempty"`
+	Events              int              `json:"telemetry_events"`
+	Telemetry           *TelemetryStats  `json:"telemetry,omitempty"`
+	SourceEdits         int              `json:"source_edits"`
+	TopFindings         []string         `json:"top_findings,omitempty"`
+	Hygiene             []hygieneFinding `json:"hygiene,omitempty"`
+	BuildTail           []string         `json:"build_tail,omitempty"`
+	Edits               []EditRecord     `json:"edits,omitempty"`
+	Shellcode           string           `json:"shellcode,omitempty"`
+	Producer            string           `json:"producer,omitempty"`
+	ShellcodeGenerated  bool             `json:"shellcode_generated,omitempty"`
 	// BuildOptions and ProducerOptions are the effective build state for the
 	// cycle. They are restored with the last executing payload, so a build
 	// option that regressed cannot leak into a later cycle.
@@ -1652,6 +1659,10 @@ func summarizeCycle(loopID string, iteration int, run Run, feedback Feedback, bu
 	}
 	counts := countFindings(feedback.Findings)
 	summary.HighFindings, summary.MediumFindings, summary.StaticFindings = counts.High, counts.Medium, counts.Static
+	summary.DetectionClassified = true
+	summary.DetectionHigh, summary.DetectionMedium = counts.DetectionHigh, counts.DetectionMedium
+	summary.HygieneHigh, summary.HygieneMedium = counts.HygieneHigh, counts.HygieneMedium
+	summary.HygieneStatic, summary.StableTotal = counts.HygieneStatic, counts.StableTotal
 	if run.Telemetry != nil {
 		summary.PayloadKey = run.Telemetry.PayloadKey
 		summary.PayloadTable = run.Telemetry.PayloadTable
@@ -1686,6 +1697,9 @@ func summarizeCycle(loopID string, iteration int, run Run, feedback Feedback, bu
 		}
 	}
 	for _, finding := range feedback.Findings {
+		if classifyFinding(finding) == findingContext {
+			continue
+		}
 		summary.TopFindings = append(summary.TopFindings,
 			clipUTF8(fmt.Sprintf("%s %s %s", sanitizeLine(finding.Severity), sanitizeLine(finding.Rule),
 				sanitizeLine(finding.Indicator)), 500))
@@ -1861,40 +1875,75 @@ type findingCounts struct {
 	Medium int
 	Static int
 	Total  int
+	// Detection and hygiene are disjoint; context findings (build-random
+	// stringnalyzer output, coverage/attribution notes) are excluded from the
+	// stable comparison.
+	DetectionHigh   int
+	DetectionMedium int
+	HygieneHigh     int
+	HygieneMedium   int
+	HygieneStatic   int
+	StableTotal     int
 }
 
-// countFindings classifies one feedback set. Static findings are the
-// YARA/CheckPlz/Stringnalyzer stage matches, whatever their severity.
+// countFindings classifies one feedback set. Detection and hygiene are the
+// stable classes; context findings are counted in the raw totals but never in
+// the comparison.
 func countFindings(findings []Finding) findingCounts {
 	counts := findingCounts{Total: len(findings)}
 	for _, finding := range findings {
-		switch strings.ToLower(strings.TrimSpace(finding.Severity)) {
+		severity := strings.ToLower(strings.TrimSpace(finding.Severity))
+		class := classifyFinding(finding)
+		switch severity {
 		case "critical", "high":
 			counts.High++
+			switch class {
+			case findingDetection:
+				counts.DetectionHigh++
+			case findingHygiene:
+				counts.HygieneHigh++
+			}
 		case "medium":
 			counts.Medium++
+			switch class {
+			case findingDetection:
+				counts.DetectionMedium++
+			case findingHygiene:
+				counts.HygieneMedium++
+			}
 		}
 		if finding.Stage == StageStatic {
 			counts.Static++
+		}
+		if class == findingHygiene {
+			counts.HygieneStatic++
+		}
+		if class != findingContext {
+			counts.StableTotal++
 		}
 	}
 	return counts
 }
 
-// findingRegression reports whether current is worse than previous: high
-// findings first, then static findings, then medium findings, then total.
-// A real medium reduction is progress even when low/other findings increase;
-// total is the final tie-breaker only when the medium count is unchanged.
+// findingRegression reports whether current is worse than previous. Detection
+// findings lead, static hygiene is a non-regression bound, and build-random
+// context never decides a regression.
 func findingRegression(previous, current findingCounts) bool {
 	switch {
-	case current.High != previous.High:
-		return current.High > previous.High
-	case current.Static != previous.Static:
-		return current.Static > previous.Static
-	case current.Medium != previous.Medium:
-		return current.Medium > previous.Medium
+	case current.HygieneHigh > previous.HygieneHigh:
+		return true
+	case current.DetectionHigh != previous.DetectionHigh:
+		return current.DetectionHigh > previous.DetectionHigh
+	case current.DetectionMedium != previous.DetectionMedium:
+		return current.DetectionMedium > previous.DetectionMedium
+	case current.HygieneMedium > previous.HygieneMedium:
+		return true
+	case current.HygieneStatic != previous.HygieneStatic:
+		return current.HygieneStatic > previous.HygieneStatic
+	case current.StableTotal != previous.StableTotal:
+		return current.StableTotal > previous.StableTotal
 	default:
-		return current.Total > previous.Total
+		return false
 	}
 }
 
@@ -2041,15 +2090,34 @@ func cycleFindingCounts(cycle *Cycle) findingCounts {
 	if json.Unmarshal([]byte(cycle.Summary), &summary) != nil {
 		return counts
 	}
-	counts.High, counts.Medium, counts.Static = summary.HighFindings, summary.MediumFindings, summary.StaticFindings
-	return counts
+	return countsFromSummary(summary, cycle.Findings)
 }
 
 func summaryFindingCounts(summary cycleSummary, total int) findingCounts {
-	return findingCounts{
+	return countsFromSummary(summary, total)
+}
+
+func countsFromSummary(summary cycleSummary, total int) findingCounts {
+	counts := findingCounts{
 		High: summary.HighFindings, Medium: summary.MediumFindings,
 		Static: summary.StaticFindings, Total: total,
 	}
+	if summary.DetectionClassified {
+		counts.DetectionHigh = summary.DetectionHigh
+		counts.DetectionMedium = summary.DetectionMedium
+		counts.HygieneHigh = summary.HygieneHigh
+		counts.HygieneMedium = summary.HygieneMedium
+		counts.HygieneStatic = summary.HygieneStatic
+		counts.StableTotal = summary.StableTotal
+		return counts
+	}
+	// Older summaries have no class split. Treat their high/medium/static
+	// counts as the stable set so a resumed loop keeps the previous gate.
+	counts.DetectionHigh = counts.High
+	counts.DetectionMedium = counts.Medium
+	counts.HygieneStatic = counts.Static
+	counts.StableTotal = total
+	return counts
 }
 
 // recordExecution updates the last-executing state without touching the
@@ -3110,10 +3178,13 @@ func feedbackSummary(feedback Feedback, runID, payloadKey string, edits []EditRe
 		"run_id": runID, "payload_key": payloadKey,
 		"findings": len(feedback.Findings), "high_findings": counts.High,
 		"medium_findings": counts.Medium, "static_findings": counts.Static,
-		"source_edits": len(feedback.SourceEdits),
-		"score":        feedback.Score, "level": feedback.Level,
+		"detection_high": counts.DetectionHigh, "detection_medium": counts.DetectionMedium,
+		"hygiene_high": counts.HygieneHigh, "hygiene_medium": counts.HygieneMedium,
+		"hygiene_static": counts.HygieneStatic,
+		"source_edits":   len(feedback.SourceEdits),
+		"score":          feedback.Score, "level": feedback.Level,
 	}
-	if counts.Static > 0 {
+	if counts.HygieneStatic > 0 {
 		out["hygiene"] = hygieneSummary(feedback.Findings)
 	}
 	if feedback.Telemetry != nil {
