@@ -31,8 +31,43 @@ func TestCyclePreconditionsRejectsNoOp(t *testing.T) {
 	summary, _ := json.Marshal(cycleSummary{SourceTreeHash: e.sourceTreeHash, Shellcode: e.shellcode})
 	e.last = &Cycle{Iteration: 1, Summary: string(summary)}
 	err := e.cyclePreconditions("self-load")
-	if err == nil || !strings.Contains(err.Error(), "no source, shellcode, or build option change") {
+	if err == nil || !strings.Contains(err.Error(), "no source or design change") {
 		t.Fatalf("error = %v, want no-op rejection", err)
+	}
+}
+
+func TestCyclePreconditionsRejectsShellcodeOnlyChange(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "loader.c"), []byte("int main(void){return 0;}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	e := &evolver{roots: newSingleRoot(dir), shellcode: "new-agent.bin"}
+	e.sourceTreeHash = e.computeSourceTreeHash()
+	summary, _ := json.Marshal(cycleSummary{SourceTreeHash: e.sourceTreeHash, Shellcode: "old-agent.bin"})
+	e.last = &Cycle{Iteration: 1, Summary: string(summary)}
+	err := e.cyclePreconditions("self-load")
+	if err == nil || !strings.Contains(err.Error(), "no source or design change") {
+		t.Fatalf("error = %v, want shellcode-only rotation rejected", err)
+	}
+}
+
+func TestBindCycleMechanismUsesPlan(t *testing.T) {
+	e := &evolver{plannedMechanism: "build-flags"}
+	if _, err := e.bindCycleMechanism("other"); err == nil {
+		t.Fatal("editor relabeled the planned mechanism")
+	}
+	got, err := e.bindCycleMechanism("BUILD-FLAGS")
+	if err != nil || got != "build-flags" {
+		t.Fatalf("bound mechanism = %q, err = %v", got, err)
+	}
+	got, err = e.bindCycleMechanism("")
+	if err != nil || got != "build-flags" {
+		t.Fatalf("empty mechanism = %q, err = %v", got, err)
+	}
+	e.plannedMechanism = ""
+	got, err = e.bindCycleMechanism("")
+	if err != nil || got != "other" {
+		t.Fatalf("unplanned empty mechanism = %q, err = %v", got, err)
 	}
 }
 

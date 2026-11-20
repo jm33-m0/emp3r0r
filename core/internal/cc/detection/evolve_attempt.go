@@ -191,6 +191,44 @@ func (e *evolver) computeSourceTreeHash() string {
 	return "sha256:" + hex.EncodeToString(h.Sum(nil))
 }
 
+// designKey identifies the payload design independently of the shellcode.
+// Shellcode rotation is required by TOFU, so it is deliberately excluded; a
+// cycle must change source, build options, producer options, producer, or
+// agent type to be a new hypothesis.
+func designKey(sourceHash string, buildOpts, producerOpts map[string]string, producer, agentType string) string {
+	payload, err := json.Marshal(struct {
+		SourceTreeHash  string            `json:"source_tree_hash"`
+		BuildOptions    map[string]string `json:"build_options"`
+		ProducerOptions map[string]string `json:"producer_options"`
+		Producer        string            `json:"producer"`
+		AgentType       string            `json:"agent_type"`
+	}{
+		SourceTreeHash:  sourceHash,
+		BuildOptions:    canonicalStringMap(buildOpts),
+		ProducerOptions: canonicalStringMap(producerOpts),
+		Producer:        strings.ToLower(strings.TrimSpace(producer)),
+		AgentType:       strings.ToLower(strings.TrimSpace(agentType)),
+	})
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(payload)
+	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
+func canonicalStringMap(in map[string]string) map[string]string {
+	out := make(map[string]string, len(in))
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
+}
+
+func (e *evolver) designKey() string {
+	return designKey(e.computeSourceTreeHash(), e.buildOptionsSnapshot(),
+		e.activeProducerOptions(), e.activeProducer, e.cfg.AgentType)
+}
+
 // walkSourceFiles visits source-like regular files under dir. The source hash
 // and the git recorder share this filter, so the committed tree and the
 // no-op guard always describe the same files.

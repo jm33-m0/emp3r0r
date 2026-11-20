@@ -286,6 +286,10 @@ type evolver struct {
 	shellSeq     int
 	knowledge    *KnowledgeDB
 	lastAnswer   map[string]any
+	// plannedMechanism is the planner's mechanism for the active editor plan.
+	// DetectionCycle refuses a different label so the progress gate compares
+	// like with like.
+	plannedMechanism string
 	// producerReads and producerQueries record the module-reading done before
 	// a PICO-contract edit. The map keys are "module|path" and "module".
 	producerReads   sync.Map
@@ -1062,6 +1066,7 @@ type cycleSummary struct {
 	AgentOnline      *bool             `json:"agent_online,omitempty"`
 	NetworkEvents    int               `json:"network_events,omitempty"`
 	SourceTreeHash   string            `json:"source_tree_hash,omitempty"`
+	DesignKey        string            `json:"design_key,omitempty"`
 	Knowledge        []KnowledgeHit    `json:"knowledge,omitempty"`
 	KBRefs           []string          `json:"kb_refs,omitempty"`
 	// RecoveredBy, DebuggerCause, and GuestActions record a debugger-assisted
@@ -1295,6 +1300,7 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 	e.lastAgent.Store(e.expectedAgentUUID)
 	e.sourceTreeHash = e.computeSourceTreeHash()
 	summary.SourceTreeHash = e.sourceTreeHash
+	summary.DesignKey = designKey(e.sourceTreeHash, summary.BuildOptions, summary.ProducerOptions, summary.Producer, e.cfg.AgentType)
 	if edits, err := e.db.LoopEdits(cycleCtx, e.cfg.LoopID); err != nil {
 		e.logClass(logging.ClassError, "read edits for cycle summary: %v", err)
 	} else {
@@ -2472,8 +2478,8 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 		Description: "Rebuild the module from its current source and detonate the artifact in the sandbox. " +
 			"The full feedback, build log, and telemetry are stored in SQLite; this returns a bounded summary. " +
 			"The host checks the generated agent with AgentStatus and reports execution=verified, offline, or unverified. " +
-			"Call it after a source edit, shellcode build, or build-option change with one falsifiable prediction; a cycle with no source, " +
-			"shellcode, or build-option change is rejected.",
+			"Call it after a source or design change with one falsifiable prediction; a cycle with no source, build-option, producer, or agent change " +
+			"is rejected. The mechanism must match the planner's mechanism.",
 		Prompt: "Build and run one detection cycle.",
 		Schema: map[string]any{
 			"type": "object",
@@ -2510,9 +2516,9 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 			if e.usedCycles() >= e.cfg.Iterations {
 				return tool.Errorf(fmt.Sprintf("iteration limit reached (%d); return the final JSON", e.cfg.Iterations)), nil
 			}
-			mechanism := clip(args.Mechanism, 80)
-			if strings.TrimSpace(mechanism) == "" {
-				mechanism = "other"
+			mechanism, err := e.bindCycleMechanism(args.Mechanism)
+			if err != nil {
+				return tool.Errorf(fmt.Sprintf("%v", err)), nil
 			}
 			if err := e.cyclePreconditions(mechanism); err != nil {
 				return tool.Errorf(fmt.Sprintf("%v", err)), nil

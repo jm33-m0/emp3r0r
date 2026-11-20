@@ -310,11 +310,12 @@ Work loop:
    cycles made no high-finding, static-finding, or verdict progress.
    mechanism=producer-swap is
    rejected unless the active shellcode producer changed. Do not call
-   DetectionCycle without a source, shellcode, or build-option change: the host
-   rejects no-op cycles. A second DetectionCycle in the same session is
-   rejected. The host ends your session as soon as the cycle returns; do not
-   continue analyzing after it. The coordinator decides when the guest debugger
-   runs.
+   DetectionCycle without a source or design change: fresh shellcode alone is
+   not a change, and the host rejects no-op cycles. Use the planner's mechanism
+   exactly; the host rejects a different label. A second DetectionCycle in the
+   same session is rejected. The host ends your session as soon as the cycle
+   returns; do not continue analyzing after it. The coordinator decides when the
+   guest debugger runs.
 8. The host checks the generated agent after every dynamic cycle and records
    execution=verified, offline, or unverified. Do not spend turns polling. An
    offline cycle is not a comparable detection result: the host ends the editor

@@ -666,6 +666,8 @@ func (c *coordinator) planFailureFinal(text string, err error) map[string]any {
 func (c *coordinator) edit(ctx context.Context, plan plannerPlan) error {
 	c.currentPlan = plan
 	c.refreshKnowledge(ctx, plan.Mechanism)
+	c.e.plannedMechanism = plan.Mechanism
+	defer func() { c.e.plannedMechanism = "" }()
 	c.e.sessionCycles.Store(0)
 	c.e.clearCycleError()
 	prompt := c.editorBrief(plan)

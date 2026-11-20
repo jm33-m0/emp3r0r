@@ -20,10 +20,13 @@ func (e *evolver) cyclePreconditions(mechanism string) error {
 	}
 	var last cycleSummary
 	if json.Unmarshal([]byte(e.last.Summary), &last) == nil && last.SourceTreeHash != "" {
-		current := e.computeSourceTreeHash()
-		if current != "" && current == last.SourceTreeHash && e.activeShellcode() == last.Shellcode &&
-			!e.buildOptionsChangedFrom(last) {
-			return fmt.Errorf("no source, shellcode, or build option change since cycle %d; edit the module, build new shellcode, or change a build option before another cycle", e.last.Iteration)
+		lastKey := last.DesignKey
+		if lastKey == "" {
+			lastKey = designKey(last.SourceTreeHash, last.BuildOptions, last.ProducerOptions, last.Producer, e.cfg.AgentType)
+		}
+		currentKey := e.designKey()
+		if lastKey != "" && currentKey != "" && lastKey == currentKey {
+			return fmt.Errorf("no source or design change since cycle %d; edit the module, change a build/producer option, or change the producer/agent before another cycle", e.last.Iteration)
 		}
 	}
 	cycles := e.recentCycles(2)
@@ -42,6 +45,21 @@ func (e *evolver) cyclePreconditions(mechanism string) error {
 		return fmt.Errorf("the last two predictions for mechanism %q were not observed; change the mechanism or the predicted behavior", mechanism)
 	}
 	return nil
+}
+
+func (e *evolver) bindCycleMechanism(requested string) (string, error) {
+	requested = clip(strings.TrimSpace(requested), 80)
+	planned := clip(strings.TrimSpace(e.plannedMechanism), 80)
+	if planned == "" {
+		if requested == "" {
+			return "other", nil
+		}
+		return requested, nil
+	}
+	if requested != "" && !strings.EqualFold(requested, planned) {
+		return "", fmt.Errorf("mechanism %q does not match the plan's %q; return to the planner if the hypothesis changed", requested, planned)
+	}
+	return planned, nil
 }
 
 func stageNames(stages []string) []string {
