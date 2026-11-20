@@ -56,8 +56,9 @@ const knowledgePrompt = `Knowledge base:
 - Methodology entries are the harness playbooks: offline-after-baseline,
   instrumentation-changed, agent-not-checking-in, packed-payload-entropy,
   static-high-regression, producer-agent-compatibility, build-failure,
-  no-comparable-baseline, and mechanism-<name> contracts. Read the entry that
-  matches the current scenario before choosing a mechanism or editing source.
+  build-option-tuning, crystal-palace-link-options, no-comparable-baseline, and
+  mechanism-<name> contracts. Read the entry that matches the current scenario
+  before choosing a mechanism or editing source.
 - External notebooks (maldev, edrdev, redteam, amsi, staticanalysis,
   vulndrivers, crystalstardust, com, lsass, defender, mynotebook) hold technique
   detail. They are guidance, not evidence about this payload; source and
@@ -84,14 +85,27 @@ const crystalKitPrompt = `Crystal-Kit (crystal_pack) contract:
   windows_dll; never wrap a windows_executable agent or substitute donut.
 - The PICO is the postex-loader linked by postex-loader/loader.spec. The spec
   binds four resources by name: _DLL_, _MASK_, _PICO_, _DLLARGS_. The marker
-  names, section names, the spec, and build.sh's toolchain are the artifact
-  contract. Do not rename them, remove the nested PICO, make _PICO_ optional,
-  or change compiler selection unless a PICO-level failure proves that exact
-  change.
+  names, section names, the resource bindings, and the object toolchain are the
+  artifact contract. Do not rename them, remove the nested PICO, make _PICO_
+  optional, or change compiler selection unless a PICO-level failure proves that
+  exact change.
+- Crystal Palace is a linker, and its build options are a tuning surface.
+  link_options adds BTF transforms to both PICOs: +optimize, +disco, +gofirst,
+  +mutate, +shatter, +blockparty, +regdance, +relax, +unwind. The spec may also
+  change its make pic/make object options and use linker verbs such as ised,
+  rule, dfr, mask, encode, prepend, strip, linkpost, attach, preserve, and
+  optout. Change these, not the Makefile, when the evasive property is
+  linker-level.
+- The Makefile and common.mk compile flags are correctness fixes: -mno-sse2
+  prevents an aligned SSE2 load from faulting after Crystal Palace concatenates
+  sections, and -fno-jump-tables, -fno-builtin, -fno-sanitize, and
+  -fno-stack-protector keep references Crystal Palace cannot relocate out of
+  the objects. Do not change them to chase a detection. If a build or runtime
+  failure proves an exact flag is wrong, say so and change that one flag.
 - build.sh rebuilds the postex-loader objects on every link with the module
   toolchain (the x86_64-w64-mingw32-gcc shim, i.e. Zig clang) and -mno-sse2.
-  Crystal Palace does not preserve 16-byte .rdata alignment, so an aligned SSE2
-  constant load faults at runtime; keep -mno-sse2.
+  Keep that toolchain selection; change link_options or the spec when the PICO
+  needs different linker transforms.
 - Diagnose execution bottom-up before editing the producer:
   1. loader_windows: does the loader reach the PICO? A loader that exits before
      mapping and calling the PICO is a loader bug. The verified self-load path is
@@ -108,8 +122,37 @@ const crystalKitPrompt = `Crystal-Kit (crystal_pack) contract:
   for "Crystal Palace PICO postex loader resource markers" and SourceRead
   README.md and postex-loader/loader.spec. The KB explains the technique, not
   this module's resource contract; the repo spec is authoritative.
-- Never fix a loader-side execution failure by editing postex-loader or
+- Never fix a loader-side execution failure by editing postex-loader source or
   build.sh. Revert the producer to its baseline first.`
+
+const buildOptionsPrompt = `Build options:
+- Build options are part of the payload design, not harness knobs. config.json
+  declares them and the build script consumes them; BuildOptions lists the
+  effective values and choices, sets them, or resets them to the module default.
+  The host records the effective options in every cycle and restores the last
+  executing values with the shellcode on a rollback.
+- loader_windows exposes format (service, exe, dll), inject (apc, ct, self),
+  process, process-args, smw (on, off), verify-ms, and key. The host fills
+  shellcode, output, and arch. Changing inject changes the loading path:
+  self removes the stage DLL and child process; apc changes the remote thread
+  and APC telemetry; ct changes the thread creation signal. format, process,
+  and smw change the host image, the child process, and the call-stack/ETW-TI
+  surface. A build-option change is a valid cycle change; name the resulting
+  path in the mechanism when injection changes, otherwise use mechanism=build-flags.
+- BuildShellcode options are the producer's build options. They persist for the
+  active producer and are reused when the host rotates the agent, so a wrapper
+  change survives rotation. Passing new options overrides the stored values;
+  BuildOptions persists them without a build.
+- Crystal Palace is a linker: link_options applies BTF transforms to both PICOs
+  and the spec may change make options and linker verbs. These are producer
+  build options, mechanism=producer, not source redesigns.
+- Change one option, or one combined option set, per cycle and predict its
+  observable effect. A build option that regresses is reverted by
+  RevertToPayload or by the execution gate. debug is a diagnostic build, not
+  evasion; revert it before measuring detection. Do not change
+  Makefile compile flags to chase a detection; they are correctness fixes. Do
+  not use a build option to drop the payload: the host rejects an artifact too
+  small to contain the active shellcode.`
 
 const hostLimitsPrompt = `Host-enforced limits:
 - The host blocks further read-only calls after the role's read budget and forces the required output at the session budget. The brief states the limits that apply; do not estimate remaining calls or stop early because of an assumed budget. Call a tool until the host blocks it.
@@ -133,7 +176,7 @@ selects the hypothesis.
 
 ` + dataPolicyPrompt + `
 
-` + knowledgePrompt + crystalKitPrompt + hostLimitsPrompt + `
+` + knowledgePrompt + crystalKitPrompt + buildOptionsPrompt + hostLimitsPrompt + `
 
 Decision rules:
 - Do not read source to design the edit; the editor does that. Choose one
@@ -147,10 +190,18 @@ Decision rules:
 - action=test when an actionable finding remains and the cycle budget has room.
   Choose one mechanism and one falsifiable prediction. Name the concrete
   loading path (self-load, remote-apc, remote-thread, section-map, module-stomp,
-  pe-image, producer, producer-swap, static-hygiene, other), not an incidental
-  file change.
+  pe-image, producer, producer-swap, build-flags, static-hygiene, other), not an
+  incidental file change.
   Give the editor a brief that states what to change and why. The editor may
   need many EditSource calls; that is expected.
+- Build options are a hypothesis dimension. When the finding or dynamic profile
+  points at the host container, the injection/child-process surface, the
+  sacrificial process, or call-stack spoofing, tell the editor which BuildOptions
+  values to test. Use the resulting loading path as the mechanism when inject
+  changes, otherwise mechanism=build-flags. For a producer wrapper change such
+  as Crystal Palace link options, use mechanism=producer and name the options.
+  Do not spend cycles polishing source when one build option selects the
+  behavior under test.
 - action=debug when the last cycle reported execution=offline or the sandbox did
   not execute the payload, and a debugger is available. Give it the specific
   question to answer. Do not spend a debug turn when the payload executed.
@@ -209,7 +260,7 @@ module source, rebuilding, and re-testing.
 
 ` + dataPolicyPrompt + `
 
-` + knowledgePrompt + crystalKitPrompt + hostLimitsPrompt + `
+` + knowledgePrompt + crystalKitPrompt + buildOptionsPrompt + hostLimitsPrompt + `
 
 Work loop:
 1. Read the planner brief and the dossier. Inspect the relevant source and
@@ -222,49 +273,61 @@ Work loop:
    Update every default that controls the behavior, not a dead copy.
    Use module=<name> to edit a producer or read a read-only dependency.
    If the planner asked for a revert, call RevertToPayload before editing.
-3. The shellcode producer is part of the design. Edit the configured producer
+3. Build options are part of the design. Call BuildOptions with no options to
+   see the declared values and choices, then set the option the hypothesis
+   needs. loader_windows can change format, inject, process, process-args, smw,
+   and verify-ms; the host fills shellcode, output, and arch. A build option
+   change is a complete change for DetectionCycle, so do not add a source edit
+   just to satisfy the no-op check. Change one option set per cycle and predict
+   its effect.
+4. The shellcode producer is part of the design. Edit the configured producer
    (donut, crystal_pack), then call BuildShellcode. The output replaces the
    shellcode every later cycle loads. A producer change is the right move when
-   the signal is a signature or layout in the generated blob.
-4. GenerateAgent rebuilds the Go agent itself. Its artifact can be wrapped by
+   the signal is a signature or layout in the generated blob. Producer options
+   persist for the active producer and survive rotation; Crystal Palace
+   link_options are build options, not a source redesign.
+5. GenerateAgent rebuilds the Go agent itself. Its artifact can be wrapped by
    donut or crystal_pack. Switching agent type or producer is a design change,
    not a replacement of the agent payload: the new artifact is a freshly built
    agent with the same configuration. Never shrink the shellcode or build a
    loader that skips the payload; the host rejects an artifact too small to
    contain the active shellcode.
-5. Every dynamic cycle needs a fresh agent identity and shellcode. The host
+6. Every dynamic cycle needs a fresh agent identity and shellcode. The host
    rotates them before a cycle that would reuse the active shellcode or UUID;
    you may rotate explicitly with GenerateAgent and BuildShellcode. Never reuse
    a shellcode that a previous cycle already ran.
-6. Call DetectionCycle exactly once, with the planner's mechanism and one
+7. Call DetectionCycle exactly once, with the planner's mechanism and one
    falsifiable prediction. The host records the prediction, observed result, and
    prediction_result, and refuses a third cycle on a mechanism whose last two
    cycles made no high-finding, static-signature, or verdict progress.
    mechanism=producer-swap is
    rejected unless the active shellcode producer changed. Do not call
-   DetectionCycle without a source or shellcode change: the host rejects no-op
-   cycles. A second DetectionCycle in the same session is rejected. The host
-   ends your session as soon as the cycle returns; do not continue analyzing
-   after it. The coordinator decides when the guest debugger runs.
-7. The host checks the generated agent after every dynamic cycle and records
+   DetectionCycle without a source, shellcode, or build-option change: the host
+   rejects no-op cycles. A second DetectionCycle in the same session is
+   rejected. The host ends your session as soon as the cycle returns; do not
+   continue analyzing after it. The coordinator decides when the guest debugger
+   runs.
+8. The host checks the generated agent after every dynamic cycle and records
    execution=verified, offline, or unverified. Do not spend turns polling. An
    offline cycle is not a comparable detection result: the host ends the editor
    session and restores the last clean baseline. With --debugger-policy cycle
    the guest debugger runs immediately; with final (the default) it runs once at
    the stop. If the debugger says the cause is source-level, fix that cause; do
    not change detection code for an execution failure.
-8. A cycle marked recovered_by=guest-debugger did not execute in the monitored
+9. A cycle marked recovered_by=guest-debugger did not execute in the monitored
    run; the host keeps it offline and does not use its findings or source as a
    baseline. Continue from the debugger brief and plan another cycle after the
    execution fix.
-9. ComparePayloads the previous and new payloads. A cycle with a coverage gap
+10. ComparePayloads the previous and new payloads. A cycle with a coverage gap
    (failed analyzer, early termination, missing telemetry) is not comparable;
    do not treat it as clean or as an improvement.
-10. If a cycle regresses, revert before trying another hypothesis. Do not edit
-   tests, generated artifacts, or read-only roots. Do not remove externally
-   required functionality or invalidate config.json, the documented flags,
-   opsec metadata, or the build entrypoint; the host rejects edits that remove
-   a documented module, option, or declared choice. Internal APIs, file layout,
+11. If a cycle regresses, revert before trying another hypothesis. RevertToPayload
+   restores source, shellcode, producer options, and build options; BuildOptions
+   reset restores one option to the module default. Do not edit tests, generated
+   artifacts, or read-only roots. Do not remove externally required
+   functionality or invalidate config.json, the documented flags, opsec
+   metadata, or the build entrypoint; the host rejects edits that remove a
+   documented module, option, or declared choice. Internal APIs, file layout,
    and component boundaries may change.
 
 Time discipline: the host stops a session that completes no cycle within the

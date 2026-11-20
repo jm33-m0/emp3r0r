@@ -697,7 +697,7 @@ func TestRenderLoopReport(t *testing.T) {
 	}})
 	for _, want := range []string{
 		"# Detection loop `loop-test`", "## Outcome", "removed the verdict",
-		"## Achieved objectives", "build.sh", "switch the default process",
+		"## Findings status", "build.sh", "switch the default process",
 		"## Cycles", "payload_abcdef0123456789", "## Residual findings",
 		"## Source history", "loader_windows",
 	} {

@@ -93,6 +93,7 @@ var mechanismSpecs = map[string]mechanismSpec{
 			"Rebuild and inspect the generated artifact before the cycle.",
 			"Producer edits cannot fix a loader that never reaches the producer artifact.",
 			"Static container findings such as section entropy can be changed here; include the loader-side decoder and verify check-in.",
+			"The producer's build options are part of a producer change. Use BuildOptions or BuildShellcode options; Crystal Palace link options add the linker's own evasion passes.",
 		},
 		Signals:      []string{"build log", "artifact type/size", "payload mapping", "network/check-in"},
 		Verification: "the new artifact is the active shellcode and the agent checks in",
@@ -107,6 +108,18 @@ var mechanismSpecs = map[string]mechanismSpec{
 		},
 		Signals:      []string{"agent type", "producer input option", "active shellcode", "network/check-in"},
 		Verification: "the new producer's artifact is active and the expected agent checks in",
+	},
+	"build-flags": {
+		Name: "build-flags", Layer: "loader",
+		Summary: "Change the payload module's declared build options instead of its C source.",
+		Constraints: []string{
+			"Use BuildOptions to list and set the loader's format, inject, process, process-args, smw, or verify-ms; the host fills shellcode, output, and arch.",
+			"A changed inject value changes the loading path: self is self-load, apc is remote-apc, ct is remote-thread. Label the resulting path when that is the hypothesis.",
+			"Use build-flags for a non-path option such as format, process, or smw; do not label a source redesign as a build option change.",
+			"One build option per cycle unless the options are one combined design, and state the option values in the prediction.",
+		},
+		Signals:      []string{"build log options", "child process/thread/APC events", "ETW-TI call stack", "network/check-in"},
+		Verification: "the cycle summary records the new options and the expected agent checks in",
 	},
 	"static-hygiene": {
 		Name: "static-hygiene", Layer: "hygiene",

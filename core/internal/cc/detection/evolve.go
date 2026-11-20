@@ -277,9 +277,15 @@ type evolver struct {
 	// goroutines; sync.Map publishes immutable membership.
 	testedAgentUUIDs sync.Map
 	testedShellcodes sync.Map
-	shellSeq         int
-	knowledge        *KnowledgeDB
-	lastAnswer       map[string]any
+	// buildOpts holds the payload module's effective build flags for the next
+	// cycle; producerOpts holds each producer's non-path options, keyed by
+	// producer and option name. Both are copied into the cycle summary so a
+	// rollback restores the last executing build state.
+	buildOpts    sync.Map
+	producerOpts sync.Map
+	shellSeq     int
+	knowledge    *KnowledgeDB
+	lastAnswer   map[string]any
 	// producerReads and producerQueries record the module-reading done before
 	// a PICO-contract edit. The map keys are "module|path" and "module".
 	producerReads   sync.Map
@@ -615,6 +621,7 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 	if e.logf == nil {
 		e.logf = func(logging.Class, string, ...any) {}
 	}
+	e.initBuildOptions(initialBuildOptions(cfg))
 	switch {
 	case cfg.GuestRunner != nil:
 		e.guest = cfg.GuestRunner
@@ -1026,19 +1033,24 @@ type cycleSummary struct {
 	Shellcode          string          `json:"shellcode,omitempty"`
 	Producer           string          `json:"producer,omitempty"`
 	ShellcodeGenerated bool            `json:"shellcode_generated,omitempty"`
-	Mechanism          string          `json:"mechanism,omitempty"`
-	Prediction         string          `json:"prediction,omitempty"`
-	PredictionResult   string          `json:"prediction_result,omitempty"`
-	Observed           string          `json:"observed,omitempty"`
-	Stages             []string        `json:"stages,omitempty"`
-	Note               string          `json:"note,omitempty"`
-	Executed           bool            `json:"executed"`
-	Execution          string          `json:"execution,omitempty"`
-	AgentOnline        *bool           `json:"agent_online,omitempty"`
-	NetworkEvents      int             `json:"network_events,omitempty"`
-	SourceTreeHash     string          `json:"source_tree_hash,omitempty"`
-	Knowledge          []KnowledgeHit  `json:"knowledge,omitempty"`
-	KBRefs             []string        `json:"kb_refs,omitempty"`
+	// BuildOptions and ProducerOptions are the effective build state for the
+	// cycle. They are restored with the last executing payload, so a build
+	// option that regressed cannot leak into a later cycle.
+	BuildOptions     map[string]string `json:"build_options"`
+	ProducerOptions  map[string]string `json:"producer_options"`
+	Mechanism        string            `json:"mechanism,omitempty"`
+	Prediction       string            `json:"prediction,omitempty"`
+	PredictionResult string            `json:"prediction_result,omitempty"`
+	Observed         string            `json:"observed,omitempty"`
+	Stages           []string          `json:"stages,omitempty"`
+	Note             string            `json:"note,omitempty"`
+	Executed         bool              `json:"executed"`
+	Execution        string            `json:"execution,omitempty"`
+	AgentOnline      *bool             `json:"agent_online,omitempty"`
+	NetworkEvents    int               `json:"network_events,omitempty"`
+	SourceTreeHash   string            `json:"source_tree_hash,omitempty"`
+	Knowledge        []KnowledgeHit    `json:"knowledge,omitempty"`
+	KBRefs           []string          `json:"kb_refs,omitempty"`
 	// RecoveredBy, DebuggerCause, and GuestActions record a debugger-assisted
 	// execution recovery without changing the cycle's detection data.
 	RecoveredBy   string            `json:"recovered_by,omitempty"`
@@ -1142,20 +1154,10 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 		}
 	}
 	shellcode := e.activeShellcode()
-	flags := map[string]string{
-		"shellcode": shellcode,
-		"format":    e.cfg.Format,
-		"arch":      "x64",
-		"smw":       e.cfg.SMW,
-	}
-	if e.cfg.Inject != "" {
-		flags["inject"] = e.cfg.Inject
-	}
-	if e.cfg.Process != "" {
-		flags["process"] = e.cfg.Process
-	}
-	e.logClass(logging.ClassCycle, "cycle %d (attempt %d, global %d): building %s (shellcode %s)",
-		iteration, e.attempt, e.globalUsed+iteration, e.cfg.Module, shellcode)
+	buildOptions := e.buildOptionsSnapshot()
+	flags := e.payloadBuildFlags(shellcode)
+	e.logClass(logging.ClassCycle, "cycle %d (attempt %d, global %d): building %s (shellcode %s, options %s)",
+		iteration, e.attempt, e.globalUsed+iteration, e.cfg.Module, shellcode, formatBuildOptions(buildOptions))
 	build := e.cfg.Build
 	if build == nil {
 		build = func(dir string, values map[string]string) (string, error) {
@@ -1250,6 +1252,8 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 	}
 	e.iter = iteration
 	summary := summarizeCycle(e.cfg.LoopID, iteration, run, feedback, buildLog, note, mechanism, shellcode, e.activeProducer, execution, online, networkEvents, e.shellcodeGenerated)
+	summary.BuildOptions = buildOptions
+	summary.ProducerOptions = e.activeProducerOptions()
 	summary.Attempt = e.attempt
 	summary.GlobalIteration = e.globalUsed + iteration
 	summary.Prediction = clip(prediction, 500)
@@ -2007,6 +2011,7 @@ func (e *evolver) restoreExecutingStateMode(ctx context.Context, revertFailedCyc
 	if err := json.Unmarshal([]byte(baseline.Summary), &summary); err != nil {
 		errs = append(errs, fmt.Errorf("baseline summary: %w", err))
 	} else {
+		e.summaryBuildOptions(&summary)
 		path := strings.TrimSpace(summary.Shellcode)
 		switch {
 		case path == "":
@@ -2158,6 +2163,10 @@ func (e *evolver) dossier() string {
 	}
 	fmt.Fprintf(&b, "- active shellcode: %s\n", e.shellcode)
 	fmt.Fprintf(&b, "- active shellcode producer: %s\n", headerOrNone(e.activeProducer))
+	fmt.Fprintf(&b, "- build options: %s\n", formatBuildOptions(e.buildOptionsSnapshot()))
+	if producer := strings.TrimSpace(e.activeProducer); producer != "" {
+		fmt.Fprintf(&b, "- producer options (%s): %s\n", producer, formatBuildOptions(e.activeProducerOptions()))
+	}
 	if names := e.producerNames(); len(names) > 0 {
 		fmt.Fprintf(&b, "- producers: %s\n", strings.Join(names, ", "))
 	}
@@ -2182,6 +2191,11 @@ func (e *evolver) dossier() string {
 			cycle.Findings, summary.HighFindings, summary.MediumFindings, summary.StaticFindings, cycle.Verdicts,
 			headerOrNone(summary.Execution), summary.NetworkEvents,
 			headerOrNone(filepath.Base(summary.Shellcode)), joinOrNone(files))
+		if len(summary.BuildOptions) > 0 || len(summary.ProducerOptions) > 0 {
+			fmt.Fprintf(&b, "  build: %s; producer %s: %s\n",
+				formatBuildOptions(summary.BuildOptions), headerOrNone(summary.Producer),
+				formatBuildOptions(summary.ProducerOptions))
+		}
 		if summary.RecoveredBy != "" {
 			fmt.Fprintf(&b, "  recovered_by=%s cause=%s\n", summary.RecoveredBy, clip(sanitizeLine(summary.DebuggerCause), 240))
 		}
@@ -2352,8 +2366,8 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 		Description: "Rebuild the module from its current source and detonate the artifact in the sandbox. " +
 			"The full feedback, build log, and telemetry are stored in SQLite; this returns a bounded summary. " +
 			"The host checks the generated agent with AgentStatus and reports execution=verified, offline, or unverified. " +
-			"Call it after a source edit or shellcode build with one falsifiable prediction; a cycle with no source or " +
-			"shellcode change is rejected.",
+			"Call it after a source edit, shellcode build, or build-option change with one falsifiable prediction; a cycle with no source, " +
+			"shellcode, or build-option change is rejected.",
 		Prompt: "Build and run one detection cycle.",
 		Schema: map[string]any{
 			"type": "object",
@@ -2362,7 +2376,7 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 					"type": "string",
 					"enum": []string{
 						"baseline", "self-load", "remote-apc", "remote-thread",
-						"section-map", "module-stomp", "pe-image", "producer", "producer-swap", "static-hygiene", "other",
+						"section-map", "module-stomp", "pe-image", "producer", "producer-swap", "build-flags", "static-hygiene", "other",
 					},
 					"description": "Execution mechanism or producer under test. " +
 						"Use a different value when you change the loading path; reuse it only when refining the same mechanism. " +
@@ -2434,6 +2448,9 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 				"iterations":       e.cfg.Iterations,
 				"remaining_cycles": max(0, e.cfg.Iterations-e.usedCycles()),
 				"active_shellcode": e.shellcode,
+				"active_producer":  e.activeProducer,
+				"build_options":    e.buildOptionsSnapshot(),
+				"producer_options": e.activeProducerOptions(),
 				"message":          message,
 			}
 			if prompts := e.takeOperatorPrompts(); len(prompts) > 0 {

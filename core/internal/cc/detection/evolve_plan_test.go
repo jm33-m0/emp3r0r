@@ -31,8 +31,31 @@ func TestCyclePreconditionsRejectsNoOp(t *testing.T) {
 	summary, _ := json.Marshal(cycleSummary{SourceTreeHash: e.sourceTreeHash, Shellcode: e.shellcode})
 	e.last = &Cycle{Iteration: 1, Summary: string(summary)}
 	err := e.cyclePreconditions("self-load")
-	if err == nil || !strings.Contains(err.Error(), "no source or shellcode change") {
+	if err == nil || !strings.Contains(err.Error(), "no source, shellcode, or build option change") {
 		t.Fatalf("error = %v, want no-op rejection", err)
+	}
+}
+
+func TestCyclePreconditionsAcceptsBuildOptionChange(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "loader.c"), []byte("int main(void){return 0;}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	e := &evolver{roots: newSingleRoot(dir), shellcode: "agent.bin"}
+	e.sourceTreeHash = e.computeSourceTreeHash()
+	summary, _ := json.Marshal(cycleSummary{
+		SourceTreeHash: e.sourceTreeHash,
+		Shellcode:      e.shellcode,
+		BuildOptions:   map[string]string{"format": "exe"},
+	})
+	e.last = &Cycle{Iteration: 1, Summary: string(summary)}
+	e.buildOpts.Store("format", "service")
+	if err := e.cyclePreconditions("build-flags"); err != nil {
+		t.Fatalf("build option change rejected: %v", err)
+	}
+	e.replaceBuildOptions(map[string]string{"format": "exe"})
+	if err := e.cyclePreconditions("build-flags"); err == nil {
+		t.Fatal("identical build options were accepted as a change")
 	}
 }
 

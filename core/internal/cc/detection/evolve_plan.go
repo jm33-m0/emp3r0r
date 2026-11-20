@@ -21,8 +21,9 @@ func (e *evolver) cyclePreconditions(mechanism string) error {
 	var last cycleSummary
 	if json.Unmarshal([]byte(e.last.Summary), &last) == nil && last.SourceTreeHash != "" {
 		current := e.computeSourceTreeHash()
-		if current != "" && current == last.SourceTreeHash && e.activeShellcode() == last.Shellcode {
-			return fmt.Errorf("no source or shellcode change since cycle %d; edit the module or build new shellcode before another cycle", e.last.Iteration)
+		if current != "" && current == last.SourceTreeHash && e.activeShellcode() == last.Shellcode &&
+			!e.buildOptionsChangedFrom(last) {
+			return fmt.Errorf("no source, shellcode, or build option change since cycle %d; edit the module, build new shellcode, or change a build option before another cycle", e.last.Iteration)
 		}
 	}
 	cycles := e.recentCycles(2)

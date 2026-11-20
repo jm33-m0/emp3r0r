@@ -66,6 +66,13 @@
         "default": "",
         "type": "string",
         "required": false
+      },
+      {
+        "name": "link_options",
+        "description": "Crystal Palace BTF transforms applied to both PICOs before export: a space-separated list of +optimize, +disco, +gofirst, +mutate, +shatter, +blockparty, +regdance, +relax, +unwind. Leave empty for the spec's own options. These are linker evasion transforms, not compiler flags; +shatter and +unwind are incompatible.",
+        "default": "",
+        "type": "string",
+        "required": false
       }
     ]
   }

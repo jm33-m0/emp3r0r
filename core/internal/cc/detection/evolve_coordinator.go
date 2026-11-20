@@ -556,13 +556,13 @@ func (c *coordinator) afterCycle(ctx context.Context, cycle *Cycle) error {
 				restore += " (restore incomplete: " + clip(err.Error(), 300) + ")"
 			}
 			c.e.logClass(logging.ClassWarning,
-				"cycle %d regressed (high %d -> %d, static %d -> %d, total %d -> %d); restored %s",
-				cycle.Iteration, previous.High, current.High, previous.Static, current.Static,
-				previous.Total, current.Total, lastGoodRef(baseline))
+				"cycle %d regressed (high %d -> %d, medium %d -> %d, static %d -> %d, total %d -> %d); restored %s",
+				cycle.Iteration, previous.High, current.High, previous.Medium, current.Medium,
+				previous.Static, current.Static, previous.Total, current.Total, lastGoodRef(baseline))
 		}
-		c.plannerNote = fmt.Sprintf("Cycle %d regressed (high findings %d -> %d, static signatures %d -> %d, total %d -> %d); the host restored %s. Do not repeat this change: test a different producer or mechanism, or stop with the evidence.",
-			cycle.Iteration, previous.High, current.High, previous.Static, current.Static,
-			previous.Total, current.Total, restore)
+		c.plannerNote = fmt.Sprintf("Cycle %d regressed (high findings %d -> %d, medium findings %d -> %d, static signatures %d -> %d, total %d -> %d); the host restored %s. Do not repeat this change: test a different producer or mechanism, or stop with the evidence.",
+			cycle.Iteration, previous.High, current.High, previous.Medium, current.Medium,
+			previous.Static, current.Static, previous.Total, current.Total, restore)
 		return nil
 	}
 	if gate != gateRestore {
@@ -989,6 +989,12 @@ func (c *coordinator) plannerBrief() string {
 	fmt.Fprintf(&b, "Module: %s\nModule source: %s\nGoal: %s\n", c.e.cfg.Module, c.e.cfg.ModuleDir, headerOrNone(c.e.cfg.Goal))
 	fmt.Fprintf(&b, "Agent C2: %s\nExpected agent UUID: %s\nAgent type: %s\n", headerOrNone(c.e.cfg.AgentCC), headerOrNone(c.e.expectedAgentUUID), headerOrNone(c.e.cfg.AgentType))
 	fmt.Fprintf(&b, "Active shellcode: %s\nActive producer: %s\nSource roots: %s\n", c.e.shellcode, headerOrNone(c.e.activeProducer), c.e.roots.describe())
+	fmt.Fprintf(&b, "Build options: %s\nProducer options (%s): %s\n",
+		formatBuildOptions(c.e.buildOptionsSnapshot()), headerOrNone(c.e.activeProducer),
+		formatBuildOptions(c.e.activeProducerOptions()))
+	if choices := c.e.buildOptionChoiceBrief(); choices != "" {
+		fmt.Fprintf(&b, "Build option choices: %s\n", choices)
+	}
 	if target := c.producerSwapTarget(); target != "" {
 		fmt.Fprintf(&b, "Producer swap: %s is configured and not active; %s. A source edit of the active producer is mechanism=producer, not a swap.\n",
 			target, c.e.producerSwapHelp(target))
@@ -1086,6 +1092,9 @@ func (c *coordinator) editorBrief(plan plannerPlan) string {
 	}
 	fmt.Fprintf(&b, "Cycle budget: %d total; %d used; %d remain\n", c.e.cfg.Iterations, c.e.usedCycles(), max(0, c.e.cfg.Iterations-c.e.usedCycles()))
 	fmt.Fprintf(&b, "Execution gate: %s\n", c.e.executionHint())
+	fmt.Fprintf(&b, "Build options: %s\nProducer options (%s): %s\n",
+		formatBuildOptions(c.e.buildOptionsSnapshot()), headerOrNone(c.e.activeProducer),
+		formatBuildOptions(c.e.activeProducerOptions()))
 	if strings.EqualFold(strings.TrimSpace(c.e.activeProducer), "crystal_pack") {
 		b.WriteString("Crystal-Kit: crystal_pack PICO; the agent must be windows_dll. loader.spec binds _DLL_/_MASK_/_PICO_/_DLLARGS_; do not edit postex-loader or build.sh to work around a loader-side exit. If a producer build fails because an earlier edit left postex-loader incomplete, restore or repair that file before running DetectionCycle. Diagnose loader -> PICO -> agent check-in in that order.\n")
 	}

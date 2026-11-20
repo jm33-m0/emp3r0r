@@ -22,11 +22,12 @@ ror13 hashes — **no `--gmh`/`--gpa` addresses are required**.
 crystal_pack --dll /path/to/postex.dll
 crystal_pack --dll /path/to/postex.dll --output /path/to/postex.pico.bin
 crystal_pack --dll /path/to/postex.dll --args "sekurlsa::logonpasswords exit"
+crystal_pack --dll /path/to/postex.dll --link-options "+optimize +disco +shatter +regdance"
 ```
 
 - `--dll` is the local PE/DLL to wrap.
-- `--args` is baked into the PICO at link time and delivered to the DLL's
-  `DllMain` via `lpReserved` when no runtime args are supplied.
+- `--args` is baked into the PICO at link time and delivered to the DLL's `DllMain` via `lpReserved` when no runtime args are supplied.
+- `--link-options` applies Crystal Palace BTF transforms to both PICOs before export. The accepted values are `+optimize`, `+disco`, `+gofirst`, `+mutate`, `+shatter`, `+blockparty`, `+regdance`, `+relax`, and `+unwind`. `+optimize` removes unreferenced functions, `+gofirst` keeps `go()` first, `+disco` randomizes function order, `+blockparty` randomizes basic blocks within functions, `+shatter` randomizes basic blocks program wide, `+regdance` randomizes non-volatile registers, and `+mutate` rewrites instructions with constants from a fixed seed. `+unwind` and `+shatter` are incompatible. Leave the flag unset to use the spec's own options.
 
 ### 2. Run a PICO on the agent (`crystal_kit`, agent-side)
 
@@ -93,8 +94,10 @@ bash make_all.sh
 ## Detection loop contract
 
 - `crystal_pack` takes a `windows_dll` agent. Never wrap a `windows_executable` agent or use donut as a substitute when the loop's producer is `crystal_pack`.
-- The generated PICO is the `postex-loader` linked by `postex-loader/loader.spec`. The spec binds `_DLL_`, `_MASK_`, `_PICO_`, and `_DLLARGS_` by name; those markers, the section names, the spec, and `build.sh`'s toolchain are the artifact contract. Do not rename them, remove the nested PICO, make `_PICO_` optional, or change compiler selection to work around an execution failure.
-- `build.sh` rebuilds the postex-loader objects on every link with the module toolchain (the `x86_64-w64-mingw32-gcc` shim, i.e. Zig clang) and `-mno-sse2`. Crystal Palace concatenates sections without preserving 16-byte `.rdata` alignment, so an aligned SSE2 constant load faults at runtime; keep the flag.
+- The generated PICO is the `postex-loader` linked by `postex-loader/loader.spec`. The spec binds `_DLL_`, `_MASK_`, `_PICO_`, and `_DLLARGS_` by name; those markers, the section names, and `build.sh`'s toolchain are the artifact contract. Do not rename them, remove the nested PICO, or make `_PICO_` optional.
+- Crystal Palace is the linker, and its build options are a tuning surface. `--link-options` (or `link_options` in `config.json`) applies BTF transforms to both PICOs; the spec may also change its `make pic`/`make object` options and use linker verbs such as `ised`, `rule`, `dfr`, `mask`, `encode`, `prepend`, `strip`, `linkpost`, `attach`, `preserve`, and `optout`. Change these instead of the Makefile.
+- `common.mk` and the `Makefile` compile flags are correctness fixes. `-mno-sse2` keeps an aligned SSE2 constant load from faulting after Crystal Palace concatenates sections without preserving 16-byte `.rdata` alignment; `-fno-jump-tables`, `-fno-builtin`, `-fno-sanitize`, and `-fno-stack-protector` keep references Crystal Palace cannot relocate out of the objects. Do not change them for evasion.
+- `build.sh` rebuilds the postex-loader objects on every link with the module toolchain (the `x86_64-w64-mingw32-gcc` shim, i.e. Zig clang) and `-mno-sse2`. Keep that toolchain selection.
 - Diagnose execution bottom-up: (1) `loader_windows` reaches the PICO and calls it; (2) the PICO maps the masked DLL, resolves imports, runs TLS callbacks, and calls the DLL entry and exported `main`; (3) the agent's expected UUID checks in. A loader that exits before calling the PICO is a loader bug, not a producer bug.
 - The active PICO that checked in is the known-good reference. A fresh PICO from a new agent DLL differs by a few bytes because the UUID/config size changed; byte inequality is not a failure.
 - Before the first edit to `postex-loader` or `build.sh`, read `README.md` and `postex-loader/loader.spec`. The knowledge cache explains Crystal Palace as a technique; the spec is authoritative for this module's resource contract.

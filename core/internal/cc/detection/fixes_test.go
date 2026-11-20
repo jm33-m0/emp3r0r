@@ -1171,3 +1171,36 @@ func TestReportMapsBaselineFindingsToChanges(t *testing.T) {
 		t.Fatalf("summary includes the full cycle table:\n%s", summary)
 	}
 }
+
+func TestReportUsesLastExecutingPayloadAfterRejectedCycle(t *testing.T) {
+	baseline, _ := json.Marshal(cycleSummary{HighFindings: 1, MediumFindings: 14, TopFindings: []string{"high .rdata"}})
+	good, _ := json.Marshal(cycleSummary{HighFindings: 1, MediumFindings: 13, TopFindings: []string{"high .rdata"}})
+	worse, _ := json.Marshal(cycleSummary{HighFindings: 1, MediumFindings: 15, TopFindings: []string{"high .rdata"}})
+	cycles := []Cycle{
+		{Iteration: 1, PayloadKey: "sha256:base", Findings: 44, Execution: executionVerified, Summary: string(baseline)},
+		{Iteration: 2, PayloadKey: "sha256:good", Findings: 42, Execution: executionVerified, Summary: string(good)},
+		{Iteration: 3, PayloadKey: "sha256:worse", Findings: 44, Execution: executionVerified, Summary: string(worse)},
+	}
+	answer := map[string]any{
+		"loop_id":                "loop-final",
+		"summary":                "stopped",
+		"last_executing_payload": "sha256:good",
+	}
+	report := RenderLoopReport(answer, cycles, nil)
+	for _, want := range []string{
+		"| Total findings | 44 | 42 | -2 |",
+		"Final payload: `good` (high=1, medium=13, static=0, total=42",
+		"The last attempted cycle (3) was rejected or restored",
+	} {
+		if !strings.Contains(report, want) {
+			t.Fatalf("report missing %q:\n%s", want, report)
+		}
+	}
+	summary := RenderLoopSummary(answer, cycles, nil)
+	if !strings.Contains(summary, "**Total findings:** 44 → 42") {
+		t.Fatalf("summary does not use the last executing payload:\n%s", summary)
+	}
+	if strings.Contains(summary, "44 → 44") {
+		t.Fatalf("summary shows the rejected cycle as final:\n%s", summary)
+	}
+}

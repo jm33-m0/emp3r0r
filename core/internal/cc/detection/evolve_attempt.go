@@ -82,8 +82,15 @@ func (e *evolver) loadAttemptState(ctx context.Context) error {
 	sort.SliceStable(e.pendingEdits, func(i, j int) bool {
 		return e.pendingEdits[i].CreatedAt.After(e.pendingEdits[j].CreatedAt)
 	})
-	e.log("attempt %d (%s): carried %d prior cycles, %d pending edits, last executing payload %s",
-		e.attempt, attemptLabel(e.attempt), len(e.priorCycles), len(e.pendingEdits), lastGoodRef(e.priorLastGood))
+	if len(e.priorCycles) > 0 {
+		var summary cycleSummary
+		if json.Unmarshal([]byte(e.priorCycles[len(e.priorCycles)-1].Summary), &summary) == nil {
+			e.summaryBuildOptions(&summary)
+		}
+	}
+	e.log("attempt %d (%s): carried %d prior cycles, %d pending edits, last executing payload %s, build options %s",
+		e.attempt, attemptLabel(e.attempt), len(e.priorCycles), len(e.pendingEdits), lastGoodRef(e.priorLastGood),
+		formatBuildOptions(e.buildOptionsSnapshot()))
 	return nil
 }
 

@@ -30,6 +30,8 @@ artifact. The module runner passes every non-internal flag through unchanged, so
 a new option must be added to both `config.json` and `build.sh`, with a matching
 `--flag` case in the parser.
 
+The detection loop treats these flags as build options. `BuildOptions` can change `format`, `inject`, `process`, `process-args`, `smw`, `verify-ms`, `key`, and `debug` between cycles without editing source; the host fills `shellcode`, `output`, and `arch`, and the cycle summary records the effective values so a rollback restores them. `inject` selects the loading path (`self` is in-process, `apc` is early-bird, `ct` is `CreateRemoteThread`), `format` selects the host container, `process` selects the sacrificial image, and `smw` selects call-stack spoofing. Change one option set per cycle and verify that the expected agent checks in.
+
 `--inject apc` and `--inject ct` build the host in two layers: the loader DLL is
 RC4-encrypted and embedded in the host with `.incbin` through `stage_data.S`.
 `format` selects the host container (`service`, `exe`, or `dll`). Keep the

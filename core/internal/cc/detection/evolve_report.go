@@ -31,7 +31,7 @@ func RenderLoopSummary(answer map[string]any, cycles []Cycle, edits []EditRecord
 	mechanism := answerString(answer, "mechanism")
 	if mechanism == "" && len(cycles) > 0 {
 		var last cycleSummary
-		if json.Unmarshal([]byte(cycles[len(cycles)-1].Summary), &last) == nil {
+		if json.Unmarshal([]byte(cycles[reportFinalIndex(cycles, answer)].Summary), &last) == nil {
 			mechanism = last.Mechanism
 		}
 	}
@@ -39,13 +39,17 @@ func RenderLoopSummary(answer map[string]any, cycles []Cycle, edits []EditRecord
 		fmt.Fprintf(&b, "**Mechanism:** `%s`\n", sanitizeLine(mechanism))
 	}
 	if len(cycles) > 0 {
-		first, last := cycles[0], cycles[len(cycles)-1]
+		finalIndex := reportFinalIndex(cycles, answer)
+		first, last := cycles[0], cycles[finalIndex]
 		firstCounts, lastCounts := cycleFindingCounts(&first), cycleFindingCounts(&last)
 		fmt.Fprintf(&b, "**High findings:** %d → %d | **Static signatures:** %d → %d | **Total findings:** %d → %d | **Verdicts:** %d → %d | **Cycles:** %d\n",
 			firstCounts.High, lastCounts.High, firstCounts.Static, lastCounts.Static,
 			firstCounts.Total, lastCounts.Total, first.Verdicts, last.Verdicts, len(cycles))
 		if last.Execution == executionOffline {
 			fmt.Fprintf(&b, "\n> The final cycle did not execute; its finding counts are not comparable with an executing cycle.\n")
+		}
+		if finalIndex != len(cycles)-1 {
+			fmt.Fprintf(&b, "\n> The last attempted cycle was rejected or restored; the final counts are the last executing payload.\n")
 		}
 	}
 	if usage, ok := tokenUsageFromAnswer(answer); ok {
@@ -54,7 +58,7 @@ func RenderLoopSummary(answer map[string]any, cycles []Cycle, edits []EditRecord
 	}
 
 	fmt.Fprintf(&b, "\n## Finding-to-change map\n\n")
-	changes, newFinal := reportFindingChanges(cycles, edits)
+	changes, newFinal := reportFindingChanges(cycles, reportFinalIndex(cycles, answer), edits)
 	if len(changes) == 0 {
 		if len(newFinal) > 0 {
 			fmt.Fprintf(&b, "- The baseline did not report a top finding; the final cycle introduced: %s\n",
@@ -122,28 +126,29 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 		fmt.Fprintf(&b, "> The agent's final text was not the requested JSON object: %s\n\n", parseErr)
 	}
 
-	renderFindingObjective(&b, cycles)
-	renderFindingChangeMap(&b, cycles, edits)
+	finalIndex := reportFinalIndex(cycles, answer)
+	renderFindingObjective(&b, cycles, finalIndex)
+	renderFindingChangeMap(&b, cycles, finalIndex, edits)
 
-	fmt.Fprintf(&b, "## Achieved objectives\n\n")
+	fmt.Fprintf(&b, "## Findings status\n\n")
 	achieved := false
 	if len(before) > 0 && len(after) == 0 {
 		fmt.Fprintf(&b, "- Removed all recorded Defender verdicts (%s).\n", strings.Join(before, ", "))
 		achieved = true
 	}
-	changes, _ := reportFindingChanges(cycles, edits)
+	changes, _ := reportFindingChanges(cycles, finalIndex, edits)
 	for _, change := range changes {
 		switch change.Final {
 		case "not in final top findings":
-			fmt.Fprintf(&b, "- %s: %s\n", clipUTF8(change.Finding, 220), clipUTF8(change.Change, 320))
+			fmt.Fprintf(&b, "- %s: not in the final top findings. %s\n", clipUTF8(change.Finding, 220), clipUTF8(change.Change, 320))
 			achieved = true
 		case "still present":
 			fmt.Fprintf(&b, "- %s remained in the final top findings; it was not counted as removed.\n", clipUTF8(change.Finding, 220))
 			achieved = true
 		}
 	}
-	if len(cycles) > 0 {
-		last := cycles[len(cycles)-1]
+	if finalIndex >= 0 {
+		last := cycles[finalIndex]
 		counts := cycleFindingCounts(&last)
 		fmt.Fprintf(&b, "- Final payload: `%s` (high=%d, medium=%d, static=%d, total=%d, verdicts=%d, execution=%s).\n",
 			shortPayloadKey(last.PayloadKey), counts.High, counts.Medium, counts.Static, counts.Total, last.Verdicts, headerOrNone(last.Execution))
@@ -152,6 +157,9 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 		}
 		if counts.Static == 0 && last.Execution == executionVerified {
 			fmt.Fprintf(&b, "- No static YARA/CheckPlz/Stringnalyzer signature finding was recorded in the final cycle.\n")
+		}
+		if finalIndex != len(cycles)-1 {
+			fmt.Fprintf(&b, "- The last attempted cycle (%d) was rejected or restored; the counts above are the last executing payload.\n", cycles[len(cycles)-1].Iteration)
 		}
 		achieved = true
 	}
@@ -178,6 +186,31 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 				headerOrNone(cycle.Execution), cycle.TraceID)
 		}
 		b.WriteString("\n")
+	}
+
+	if len(cycles) > 0 {
+		var optionRows []string
+		for _, cycle := range cycles {
+			var summary cycleSummary
+			if json.Unmarshal([]byte(cycle.Summary), &summary) != nil {
+				continue
+			}
+			if len(summary.BuildOptions) == 0 && len(summary.ProducerOptions) == 0 {
+				continue
+			}
+			row := fmt.Sprintf("- Cycle %d: build options `%s`", cycle.Iteration, sanitizeLine(formatBuildOptions(summary.BuildOptions)))
+			if summary.Producer != "" {
+				row += fmt.Sprintf("; producer `%s` options `%s`", sanitizeLine(summary.Producer), sanitizeLine(formatBuildOptions(summary.ProducerOptions)))
+			}
+			optionRows = append(optionRows, row)
+		}
+		if len(optionRows) > 0 {
+			fmt.Fprintf(&b, "## Build options\n\n")
+			for _, row := range optionRows {
+				fmt.Fprintf(&b, "%s\n", row)
+			}
+			b.WriteString("\n")
+		}
 	}
 
 	if len(cycles) > 0 {
@@ -393,11 +426,35 @@ func renderGitHistory(b *strings.Builder, answer map[string]any) {
 
 // renderFindingObjective puts the loop's actual objective before the change
 // log: high findings, static signatures, total findings, and real verdicts.
-func renderFindingObjective(b *strings.Builder, cycles []Cycle) {
+// reportFinalIndex picks the payload whose findings the report should show.
+// A rejected cycle can still have run in the sandbox, so execution=verified
+// alone is not enough: answer.last_executing_payload is the payload the host
+// restored and the one the final check verified.
+func reportFinalIndex(cycles []Cycle, answer map[string]any) int {
 	if len(cycles) == 0 {
+		return -1
+	}
+	key := strings.TrimSpace(answerString(answer, "last_executing_payload"))
+	if key != "" {
+		for i := len(cycles) - 1; i >= 0; i-- {
+			if cycles[i].PayloadKey == key && cycles[i].Execution == executionVerified {
+				return i
+			}
+		}
+	}
+	for i := len(cycles) - 1; i >= 0; i-- {
+		if cycles[i].Execution == executionVerified {
+			return i
+		}
+	}
+	return len(cycles) - 1
+}
+
+func renderFindingObjective(b *strings.Builder, cycles []Cycle, finalIndex int) {
+	if len(cycles) == 0 || finalIndex < 0 || finalIndex >= len(cycles) {
 		return
 	}
-	first, last := cycles[0], cycles[len(cycles)-1]
+	first, last := cycles[0], cycles[finalIndex]
 	before, after := cycleFindingCounts(&first), cycleFindingCounts(&last)
 	executing := 0
 	for i := range cycles {
@@ -415,6 +472,9 @@ func renderFindingObjective(b *strings.Builder, cycles []Cycle) {
 	fmt.Fprintf(b, "\nExecuting cycles: %d/%d.", executing, len(cycles))
 	if last.Execution != executionVerified {
 		fmt.Fprintf(b, " The final cycle did not execute, so its counts are not a detection result.")
+	}
+	if finalIndex != len(cycles)-1 {
+		fmt.Fprintf(b, " The last attempted cycle (%d) was rejected or restored; the final column is the last executing payload.", cycles[len(cycles)-1].Iteration)
 	}
 	b.WriteString("\n\n")
 }
@@ -466,8 +526,8 @@ func cycleReportEdits(cycles []Cycle, edits []EditRecord, index int) []EditRecor
 // the first cycle where it was no longer reported. It deliberately says
 // "not in final top findings" rather than "removed": the stored top-finding
 // list is capped and the sandbox can vary between runs.
-func reportFindingChanges(cycles []Cycle, edits []EditRecord) ([]findingChange, []string) {
-	if len(cycles) == 0 {
+func reportFindingChanges(cycles []Cycle, finalIndex int, edits []EditRecord) ([]findingChange, []string) {
+	if len(cycles) == 0 || finalIndex < 0 || finalIndex >= len(cycles) {
 		return nil, nil
 	}
 	type cycleFindings struct {
@@ -485,7 +545,7 @@ func reportFindingChanges(cycles []Cycle, edits []EditRecord) ([]findingChange, 
 			}
 		}
 	}
-	finalKeys := findings[len(cycles)-1].keys
+	finalKeys := findings[finalIndex].keys
 	baselineKeys := map[string]bool{}
 	var changes []findingChange
 	for _, top := range findings[0].summary.TopFindings {
@@ -504,6 +564,9 @@ func reportFindingChanges(cycles []Cycle, edits []EditRecord) ([]findingChange, 
 		}
 		firstAbsent := -1
 		for i := 1; i < len(cycles); i++ {
+			if cycles[i].Execution != executionVerified {
+				continue
+			}
 			if !containsFindingKey(findings[i].keys, key) {
 				firstAbsent = i
 				break
@@ -540,7 +603,7 @@ func reportFindingChanges(cycles []Cycle, edits []EditRecord) ([]findingChange, 
 		changes = append(changes, change)
 	}
 	var newFinal []string
-	for _, top := range findings[len(cycles)-1].summary.TopFindings {
+	for _, top := range findings[finalIndex].summary.TopFindings {
 		key := reportFindingKey(top)
 		if key != "" && !baselineKeys[key] {
 			newFinal = append(newFinal, sanitizeLine(top))
@@ -558,13 +621,13 @@ func markdownCell(text string) string {
 	return text
 }
 
-func renderFindingChangeMap(b *strings.Builder, cycles []Cycle, edits []EditRecord) {
+func renderFindingChangeMap(b *strings.Builder, cycles []Cycle, finalIndex int, edits []EditRecord) {
 	fmt.Fprintf(b, "## Finding-to-change map\n\n")
-	if len(cycles) == 0 {
+	if len(cycles) == 0 || finalIndex < 0 || finalIndex >= len(cycles) {
 		fmt.Fprintf(b, "No cycle completed, so no finding-to-change mapping exists.\n\n")
 		return
 	}
-	changes, newFinal := reportFindingChanges(cycles, edits)
+	changes, newFinal := reportFindingChanges(cycles, finalIndex, edits)
 	if len(changes) == 0 {
 		if len(newFinal) > 0 {
 			fmt.Fprintf(b, "The baseline reported no top finding. The final cycle introduced: %s.\n\n",

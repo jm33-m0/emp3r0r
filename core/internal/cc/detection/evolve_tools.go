@@ -34,7 +34,9 @@ func (e *evolver) buildShellcodeTool() tool.CoreTool {
 		Description: "Run a configured shellcode producer module (donut or crystal_pack) with validated options. " +
 			"The output is written under the detection store and becomes the shellcode every later DetectionCycle loads. " +
 			"Call GenerateAgent first when a dynamic cycle needs a fresh agent UUID; reusing a shellcode violates TOFU. " +
-			"Editing the producer module first (module=\"donut\") changes how the generator itself behaves. " +
+			"Editing the producer module first (module=\"donut\") changes how the generator itself behaves; its build options, " +
+			"including Crystal Palace link options, are changed with BuildShellcode options or the BuildOptions tool. " +
+			"Options persist for the active producer and are reused when the host rotates the agent, so a wrapper change is not lost. " +
 			"crystal_pack requires a DLL: call GenerateAgent with agent_type=windows_dll and pass its artifact_path as the dll option.",
 		Prompt: "Build shellcode with a producer module.",
 		Schema: map[string]any{
@@ -70,14 +72,15 @@ func (e *evolver) buildShellcodeTool() tool.CoreTool {
 				return tool.Errorf(fmt.Sprintf("%v", err)), nil
 			}
 			out := map[string]any{
-				"producer":   e.activeProducer,
-				"path":       artifact.Path,
-				"sha256":     artifact.SHA256,
-				"size":       artifact.Size,
-				"active":     true,
-				"message":    "the next DetectionCycle builds the loader with this shellcode",
-				"options":    sanitizeProducerOptions(flags),
-				"build_tail": lastLines(buildLog, 12),
+				"producer":          e.activeProducer,
+				"path":              artifact.Path,
+				"sha256":            artifact.SHA256,
+				"size":              artifact.Size,
+				"active":            true,
+				"message":           "the next DetectionCycle builds the loader with this shellcode",
+				"options":           sanitizeProducerOptions(flags),
+				"persisted_options": e.activeProducerOptions(),
+				"build_tail":        lastLines(buildLog, 12),
 			}
 			data, _ := json.Marshal(out)
 			return tool.Text(string(data)), nil
@@ -288,6 +291,7 @@ func (e *evolver) buildShellcodeWithProducer(ctx context.Context, producerName s
 	if err != nil {
 		return Artifact{}, nil, "", err
 	}
+	supplied = e.mergeProducerOptions(producer, supplied)
 	flags, err := validateProducerOptions(producer, options, supplied, inputName)
 	if err != nil {
 		return Artifact{}, nil, "", err
@@ -339,6 +343,7 @@ func (e *evolver) buildShellcodeWithProducer(ctx context.Context, producerName s
 	if err := e.saveShellcode(ctx, producer, artifact, flags, note); err != nil {
 		return Artifact{}, nil, buildLog, fmt.Errorf("record shellcode: %w", err)
 	}
+	e.rememberProducerOptions(producer, flags, inputName)
 	oldShellcode := e.shellcode
 	e.shellcode = artifact.Path
 	e.shellcodeGenerated = true
@@ -387,7 +392,7 @@ func (e *evolver) revertPayloadTool() tool.CoreTool {
 	return tool.Build(tool.Spec{
 		Name: "RevertToPayload",
 		Description: "Undo every recorded source edit made after the selected payload, restoring the source and producer " +
-			"state that produced it. Use it after a cycle regresses before trying another hypothesis. Then call DetectionCycle.",
+			"state that produced it, including that payload's build and producer options. Use it after a cycle regresses before trying another hypothesis. Then call DetectionCycle.",
 		Prompt: "Revert source edits to an earlier payload.",
 		Schema: map[string]any{
 			"type": "object",
@@ -406,14 +411,23 @@ func (e *evolver) revertPayloadTool() tool.CoreTool {
 			if err := json.Unmarshal(raw, &args); err != nil {
 				return tool.Errorf("invalid arguments"), nil
 			}
-			reverted, err := e.revertToPayload(ctx, args.PayloadKey)
+			reverted, optionsRestored, err := e.revertToPayload(ctx, args.PayloadKey)
 			if err != nil {
 				return tool.Errorf(fmt.Sprintf("%v", err)), nil
 			}
+			message := "source restored; call DetectionCycle to verify"
+			if optionsRestored {
+				if reverted == 0 {
+					message = "build options restored to the selected payload; call DetectionCycle to verify"
+				} else {
+					message = "source and build options restored; call DetectionCycle to verify"
+				}
+			}
 			data, _ := json.Marshal(map[string]any{
-				"payload":  args.PayloadKey,
-				"reverted": reverted,
-				"message":  "source restored; call DetectionCycle to verify",
+				"payload":          args.PayloadKey,
+				"reverted":         reverted,
+				"options_restored": optionsRestored,
+				"message":          message,
 			})
 			return tool.Text(string(data)), nil
 		},
@@ -438,14 +452,18 @@ func (e *evolver) revertLoopFilter() (string, string) {
 	return base, base + "-%"
 }
 
-func (e *evolver) revertToPayload(ctx context.Context, payloadKey string) (int, error) {
+func (e *evolver) revertToPayload(ctx context.Context, payloadKey string) (int, bool, error) {
 	payloadKey = strings.TrimSpace(payloadKey)
 	id, err := payloadIDByKey(ctx, e.db.db, payloadKey)
 	if err != nil {
-		return 0, err
+		return 0, false, err
 	}
 	if id == 0 {
-		return 0, fmt.Errorf("payload %q is not recorded", payloadKey)
+		return 0, false, fmt.Errorf("payload %q is not recorded", payloadKey)
+	}
+	target, err := e.cycleSummaryForPayload(ctx, payloadKey)
+	if err != nil {
+		return 0, false, err
 	}
 	base, pattern := e.revertLoopFilter()
 	rows, err := e.db.db.QueryContext(ctx, `
@@ -453,19 +471,48 @@ func (e *evolver) revertToPayload(ctx context.Context, payloadKey string) (int, 
 		WHERE (loop_id = ? OR loop_id LIKE ?) AND next_payload_id IS NOT NULL AND next_payload_id > ? AND reverted = 0
 		ORDER BY id DESC LIMIT ?`, base, pattern, id, maxRevertEdits+1)
 	if err != nil {
-		return 0, fmt.Errorf("read edit history: %w", err)
+		return 0, false, fmt.Errorf("read edit history: %w", err)
 	}
 	edits, err := scanRevertEdits(rows)
 	if err != nil {
-		return 0, err
+		return 0, false, err
 	}
+	optionsChanged := target != nil && e.buildOptionsChangedFrom(*target)
 	if len(edits) == 0 {
-		return 0, fmt.Errorf("no recorded edits were made after payload %q", payloadKey)
+		if optionsChanged {
+			e.summaryBuildOptions(target)
+			e.logClass(logging.ClassEdit, "restored build options from payload %s", payloadKey)
+			return 0, true, nil
+		}
+		return 0, false, fmt.Errorf("no recorded edits or build option changes were made after payload %q", payloadKey)
 	}
 	if len(edits) > maxRevertEdits {
-		return 0, fmt.Errorf("more than %d edits were made after payload %q; revert in smaller steps", maxRevertEdits, payloadKey)
+		return 0, false, fmt.Errorf("more than %d edits were made after payload %q; revert in smaller steps", maxRevertEdits, payloadKey)
 	}
-	return e.applyRevertEdits(ctx, edits, e.lastPayloadID(), payloadKey)
+	reverted, err := e.applyRevertEdits(ctx, edits, e.lastPayloadID(), payloadKey)
+	if err != nil {
+		return 0, false, err
+	}
+	if target != nil {
+		e.summaryBuildOptions(target)
+	}
+	return reverted, optionsChanged, nil
+}
+
+// cycleSummaryForPayload returns the summary of the newest cycle that produced
+// a payload, so a revert restores the build state that ran it.
+func (e *evolver) cycleSummaryForPayload(ctx context.Context, payloadKey string) (*cycleSummary, error) {
+	cycles, err := e.db.CyclesForPayload(ctx, payloadKey)
+	if err != nil {
+		return nil, err
+	}
+	for i := len(cycles) - 1; i >= 0; i-- {
+		var summary cycleSummary
+		if json.Unmarshal([]byte(cycles[i].Summary), &summary) == nil {
+			return &summary, nil
+		}
+	}
+	return nil, nil
 }
 
 // revertCycleEdits undoes only the edits linked to one failed payload. The

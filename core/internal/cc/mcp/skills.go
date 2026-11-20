@@ -296,6 +296,8 @@ Workspace source edits and detection integration
   itself is detected; renaming or hiding the same behavior is not a fix.
   Check RedEdr and the type='analysis' analyzers before concluding a run is
   clean.
+  The loop can change declared build options before choosing a source edit:
+  module build flags and producer or linker options are part of the design.
   Rebuild and compare the new score and findings. Do not detonate dynamic or
   EDR stages unless the operator asked for it and approve_execution is set.
 - detection_feedback analyze=true asks the configured detection analyst for

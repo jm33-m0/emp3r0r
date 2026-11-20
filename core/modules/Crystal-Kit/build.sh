@@ -23,6 +23,7 @@ fi
 DLL=""
 OUTPUT=""
 ARGS=""
+LINK_OPTIONS=""
 JAVA="${JAVA:-}"
 
 print_usage() {
@@ -34,6 +35,12 @@ options:
   --output <path>  output .bin shellcode (default: <dll>.pico.bin)
   --args <string>  optional args baked into the PICO (delivered to DllMain
                    as lpReserved when no runtime args are supplied)
+  --link-options <string>
+                   Crystal Palace BTF transforms applied to both PICOs
+                   before export: a space-separated list of +optimize, +disco,
+                   +gofirst, +mutate, +shatter, +blockparty, +regdance, +relax,
+                   +unwind (default: the spec's own options). These are linker
+                   evasion transforms, not compiler flags.
 EOF
 }
 
@@ -58,7 +65,7 @@ abspath() {
 # does this flag consume a value?
 needs_value() {
   case "$1" in
-    --dll|--input|--input-dll|--dll-path|--output|--out|--output-file|--args)
+    --dll|--input|--input-dll|--dll-path|--output|--out|--output-file|--args|--link-options|--link_options)
       return 0 ;;
   esac
   return 1
@@ -70,7 +77,50 @@ set_opt() {
     --dll|--input|--input-dll|--dll-path) DLL="$val" ;;
     --output|--out|--output-file) OUTPUT="$val" ;;
     --args) ARGS="$val" ;;
+    --link-options|--link_options) LINK_OPTIONS="$val" ;;
   esac
+}
+
+# validate_link_options keeps the value to the BTF option set. The value is
+# inserted into a copied spec, so no other spec command can be smuggled in.
+validate_link_options() {
+  [ -z "$LINK_OPTIONS" ] && return 0
+  if ! printf '%s' "$LINK_OPTIONS" | grep -Eq '^[+A-Za-z0-9_ -]+$'; then
+    echo "[-] --link-options contains an unsupported character" >&2
+    exit 1
+  fi
+  for opt in $LINK_OPTIONS; do
+    case "$opt" in
+      +optimize|+disco|+gofirst|+mutate|+shatter|+blockparty|+regdance|+relax|+unwind) ;;
+      *)
+        echo "[-] unknown Crystal Palace link option: $opt" >&2
+        echo "    valid: +optimize +disco +gofirst +mutate +shatter +blockparty +regdance +relax +unwind" >&2
+        exit 1
+        ;;
+    esac
+  done
+}
+
+# prepare_link_spec copies the two specs and the objects they reference into a
+# temporary tree and inserts the requested BTF options before each export.
+# Crystal Palace resolves spec paths relative to the spec file, so the tree
+# keeps the same layout: postex/bin next to the specs and libtcg one level up.
+prepare_link_spec() {
+  local work="$1"
+  mkdir -p "$work/postex"
+  cp -R "$POSTEX_DIR/bin" "$work/postex/bin"
+  cp "$LIBTCG" "$work/libtcg.x64.zip"
+  for spec in loader.spec pico.spec; do
+    awk -v opts="$LINK_OPTIONS" '
+      { line[NR] = $0; if ($0 ~ /^[[:space:]]*export[[:space:]]*$/) last = NR }
+      END {
+        for (i = 1; i <= NR; i++) {
+          if (i == last) print "    options " opts
+          print line[i]
+        }
+      }' "$POSTEX_DIR/$spec" > "$work/postex/$spec"
+  done
+  printf '%s' "$work/postex/loader.spec"
 }
 
 # ---- parse args (order independent) ----
@@ -99,6 +149,8 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+validate_link_options
 
 # ---- validate ----
 if [ -z "$DLL" ]; then
@@ -183,17 +235,23 @@ make -C "$POSTEX_DIR" clean all CC_64="$CC_64" NASM="$NASM"
 
 # ---- bake optional args into a dll_args section ----
 ARGS_FILE="$(mktemp)"
-trap 'rm -f "$ARGS_FILE"' EXIT
+SPEC_RUN="$SPEC"
+if [ -n "$LINK_OPTIONS" ]; then
+  SPEC_WORK="$(mktemp -d)"
+  SPEC_RUN="$(prepare_link_spec "$SPEC_WORK")"
+fi
+trap 'rm -f "$ARGS_FILE"; [ -n "${SPEC_WORK:-}" ] && rm -rf "$SPEC_WORK"' EXIT
 printf '%s\0' "$ARGS" > "$ARGS_FILE"
 
 # ---- link ----
 echo "[+] Crystal-Kit: converting DLL to PICO shellcode"
 echo "    DLL:     $DLL_ABS"
-echo "    Spec:    $SPEC"
+echo "    Spec:    $SPEC_RUN"
 echo "    Args:    ${ARGS:-<none>}"
+echo "    Link:    ${LINK_OPTIONS:-spec defaults}"
 echo "    Output:  $OUTPUT_ABS"
 
-"$JAVA" -jar "$CRYSTALPALACE_JAR" link "$SPEC" "$DLL_ABS" "$OUTPUT_ABS" "%ARGFILE=$ARGS_FILE"
+"$JAVA" -jar "$CRYSTALPALACE_JAR" link "$SPEC_RUN" "$DLL_ABS" "$OUTPUT_ABS" "%ARGFILE=$ARGS_FILE"
 
 if [ -f "$OUTPUT_ABS" ]; then
   SIZE="$(wc -c < "$OUTPUT_ABS" | tr -d '[:space:]')"

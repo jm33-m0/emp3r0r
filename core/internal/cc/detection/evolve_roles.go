@@ -108,7 +108,7 @@ func (e *evolver) toolsFor(role evolveRole) []tool.CoreTool {
 			tools = append(tools, e.agentStatusTool())
 		}
 	case roleEditor:
-		tools = append(tools, e.editSourceTool(), e.buildShellcodeTool(), e.revertPayloadTool(), e.detectionCycleTool())
+		tools = append(tools, e.editSourceTool(), e.buildOptionsTool(), e.buildShellcodeTool(), e.revertPayloadTool(), e.detectionCycleTool())
 		if e.cfg.BuildAgent != nil {
 			tools = append(tools, e.generateAgentTool())
 		}
@@ -185,7 +185,7 @@ func readOnlyToolName(name string) bool {
 // guest. A call to one of these ends the read-only streak.
 func mutatingToolName(name string) bool {
 	switch name {
-	case "EditSource", "BuildShellcode", "RevertToPayload", "DetectionCycle",
+	case "EditSource", "BuildOptions", "BuildShellcode", "RevertToPayload", "DetectionCycle",
 		"GenerateAgent", "RunModule", "CleanupAgent":
 		return true
 	}
