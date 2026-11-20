@@ -174,8 +174,8 @@ func TestDefenderSummaryVerdicts(t *testing.T) {
 			sawHit = true
 		}
 	}
-	if verdicts != 2 {
-		t.Fatalf("verdict events = %d, want 2: %+v", verdicts, parsed.Events)
+	if verdicts != 1 {
+		t.Fatalf("verdict events = %d, want 1 real HIT: %+v", verdicts, parsed.Events)
 	}
 	if !sawHit {
 		t.Fatalf("HIT verdict missing: %+v", parsed.Events)

@@ -216,6 +216,36 @@ func BuildFeedback(run Run) Feedback {
 	return fb
 }
 
+// telemetrySourceHint points a RedEdr behavioral finding at the loader API
+// that produced it. The literal may not exist when the loader uses a direct
+// syscall, so a missing match is not a reason to drop the finding.
+func telemetrySourceHint(finding Finding) string {
+	if finding.Stage != StageTelemetry {
+		return ""
+	}
+	switch strings.ToLower(strings.TrimSpace(finding.Rule)) {
+	case "telemetry/cross-process-write":
+		return "WriteVirtualMemory"
+	case "telemetry/cross-process-protect", "telemetry/self-protect":
+		return "VirtualProtect"
+	case "telemetry/thread-suspend":
+		return "SuspendThread"
+	case "telemetry/remote-thread":
+		return "CreateRemoteThread"
+	case "telemetry/child-process":
+		return "CreateProcess"
+	case "telemetry/process-access":
+		return "OpenProcess"
+	case "telemetry/thread-access":
+		return "OpenThread"
+	case "telemetry/cross-process-alloc":
+		return "VirtualAllocEx"
+	case "telemetry/map-view":
+		return "MapViewOfFile"
+	}
+	return ""
+}
+
 func addFinding(fb *Feedback, finding Finding, locate func(string) []SourceLocation) {
 	if len(fb.Findings) >= maxFeedbackFindings {
 		return
@@ -231,6 +261,9 @@ func addFinding(fb *Feedback, finding Finding, locate func(string) []SourceLocat
 		}
 	}
 	finding.Severity = normalizeSeverity(finding.Severity)
+	if finding.SourceHint == "" {
+		finding.SourceHint = telemetrySourceHint(finding)
+	}
 	if len(finding.Sources) == 0 {
 		needle := finding.Indicator
 		if finding.SourceHint != "" {

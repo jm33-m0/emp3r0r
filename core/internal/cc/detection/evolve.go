@@ -2590,6 +2590,12 @@ func actionableFinding(finding Finding) bool {
 	if finding.Rule == "defender/verdict" {
 		return true
 	}
+	if finding.Stage == StageTelemetry && actionableTelemetryRule(finding.Rule) {
+		switch finding.Severity {
+		case "critical", "high", "medium":
+			return true
+		}
+	}
 	if len(finding.Sources) == 0 {
 		return false
 	}
@@ -2597,9 +2603,32 @@ func actionableFinding(finding Finding) bool {
 		(finding.Stage == StageTelemetry && finding.Severity == "medium")
 }
 
+// actionableTelemetryRule names the RedEdr behaviors an EDR can act on. A
+// generic analyzer summary or an instrumentation note is not in this set.
+func actionableTelemetryRule(rule string) bool {
+	switch strings.ToLower(strings.TrimSpace(rule)) {
+	case "telemetry/cross-process-write",
+		"telemetry/cross-process-protect",
+		"telemetry/cross-process-alloc",
+		"telemetry/self-protect",
+		"telemetry/thread-suspend",
+		"telemetry/remote-thread",
+		"telemetry/child-process",
+		"telemetry/process-access",
+		"telemetry/thread-access",
+		"telemetry/map-view",
+		"telemetry/file-write",
+		"telemetry/network",
+		"telemetry/hook":
+		return true
+	}
+	return false
+}
+
 // hasActionableFindings reports whether another source edit could plausibly
-// remove a remaining finding. Unmatched medium findings have no source
-// location, so they are residuals rather than work.
+// remove a remaining finding. Behavioral RedEdr findings are actionable even
+// when a literal source match is unavailable; unmatched analyzer summaries
+// are residuals rather than work.
 func hasActionableFindings(findings []Finding) bool {
 	for _, finding := range findings {
 		if actionableFinding(finding) {

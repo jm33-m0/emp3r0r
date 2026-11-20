@@ -1667,19 +1667,25 @@ func (t *TelemetryDB) Findings(ctx context.Context, traceID int64) ([]Finding, e
 		}
 	}
 
-	// Kernel-callback thread creation in a process other than the caller is a
-	// remote-thread indicator independent of the ETW-TI view.
+	// Thread creation in a process other than the caller is a remote-thread
+	// indicator. RedEdr exports Kernel-Process thread events as type=etw, so
+	// the category/operation pair is the stable filter; type=kernel would miss
+	// every observed remote thread.
 	if payloadPID != 0 {
-		threads, err := t.rows(ctx, `SELECT pid, actor_pid, target_tid, stack FROM events
-			WHERE trace_pk = ? AND type = 'kernel' AND category = 'thread' AND operation = 'start'
+		threads, err := t.rows(ctx, `SELECT pid, actor_pid, target_tid, tid, stack FROM events
+			WHERE trace_pk = ? AND category = 'thread' AND operation = 'start'
 			AND actor_pid = ? AND pid <> ? ORDER BY id LIMIT 20`, traceID, payloadPID, payloadPID)
 		if err != nil {
 			return nil, err
 		}
 		for _, row := range threads {
+			tid := row.int("target_tid")
+			if tid == 0 {
+				tid = row.int("tid")
+			}
 			add("medium", "telemetry/remote-thread", "CreateRemoteThread",
-				fmt.Sprintf("kernel callback observed thread creation in remote process %d (tid=%d) stack=%s",
-					row.int("pid"), row.int("target_tid"), row.string("stack")))
+				fmt.Sprintf("ETW observed thread creation in remote process %d (tid=%d) stack=%s",
+					row.int("pid"), tid, row.string("stack")))
 			break
 		}
 	}
@@ -1918,13 +1924,10 @@ func collectTelemetryObjects(value any) []map[string]any {
 	return out
 }
 
-// defenderSummaryIsThreat keeps the Defender summary entries that represent a
-// real threat. is_threat is authoritative; an explicit verdict is a fallback
-// for exports that omit it.
+// defenderSummaryIsThreat keeps only entries with a real verdict. is_threat is
+// also set on cache/bookkeeping events whose verdict is "unsupported"; those
+// are related telemetry, not independent detections.
 func defenderSummaryIsThreat(event map[string]any) bool {
-	if isThreat, ok := event["is_threat"].(bool); ok && isThreat {
-		return true
-	}
 	return !ignoredDefenderVerdict(jsonString(event["verdict"]))
 }
 

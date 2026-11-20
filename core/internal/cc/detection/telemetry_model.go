@@ -1063,11 +1063,14 @@ var windowsSystemModules = map[string]struct{}{
 
 func looksLikeScanner(name string) bool {
 	lower := strings.ToLower(strings.ReplaceAll(name, "/", `\`))
+	// The payload runs from the sandbox upload directory. Only the analyzer
+	// install and its binaries are ambient; the whole LitterBox tree is not.
 	return strings.Contains(lower, "msmpeng") || strings.Contains(lower, "mpengine") ||
 		strings.Contains(lower, "mssense") || strings.Contains(lower, "windefend") ||
-		strings.Contains(lower, "rededr") || strings.Contains(lower, `\litterbox\`) ||
-		strings.Contains(lower, `\scanners\`) || strings.Contains(lower, "pe-sieve") ||
-		strings.Contains(lower, "hollowshunter") || strings.Contains(lower, "moneta")
+		strings.Contains(lower, "rededr") || strings.Contains(lower, `\litterbox\scanners\`) ||
+		strings.Contains(lower, `\scanners\`) || strings.Contains(lower, `\litterbox\rededr\`) ||
+		strings.Contains(lower, "pe-sieve") || strings.Contains(lower, "hollowshunter") ||
+		strings.Contains(lower, "moneta")
 }
 
 // ambientRuntimeModules are compiler and compatibility runtimes that Windows
@@ -1088,7 +1091,7 @@ func isAmbientImage(image, role, stack string) bool {
 		return true
 	}
 	lower := strings.ToLower(strings.ReplaceAll(image, "/", `\`))
-	if strings.Contains(lower, `\rededr\`) || strings.Contains(lower, `\litterbox\`) ||
+	if strings.Contains(lower, `\rededr\`) || strings.Contains(lower, `\litterbox\scanners\`) ||
 		strings.Contains(lower, `\scanners\`) {
 		return true
 	}
@@ -1100,7 +1103,7 @@ func isAmbientImage(image, role, stack string) bool {
 		return true
 	}
 	stackLower := strings.ToLower(stack)
-	return strings.Contains(stackLower, "rededr") || strings.Contains(stackLower, "litterbox")
+	return strings.Contains(stackLower, "rededr") || strings.Contains(stackLower, `\scanners\`)
 }
 
 // deriveTelemetryFromStored re-normalizes one stored attrs blob. It is used by

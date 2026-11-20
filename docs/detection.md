@@ -399,9 +399,7 @@ operation, source coverage, payload attribution, and a signal class:
   `ambient`, or `unknown`.
 - `signal`: `signal`, `verdict`, `scan`, `info`, `unattributed`, `baseline`, or
   `noise`.
-- Ambient instrument images such as `RedEdrDll.dll`, `LitterBox\Scanners`, and
-  MSVC runtimes are stored as `signal=noise`. The feedback view and the
-  actionable-finding check skip them, so they cannot trigger another cycle.
+- Ambient instrument images such as `RedEdrDll.dll`, `LitterBox\Scanners`, and MSVC runtimes are stored as `signal=noise`. The feedback view and the actionable-finding check skip them, so they cannot trigger another cycle. The payload's own `LitterBox\Uploads` path is the sample, not an analyzer, and is attributed normally.
 - An event whose payload attribution failed but whose operation is
   high-value—ETW-TI memory write/protect/map/allocate or process creation—is
   stored as `signal=unattributed`, not `noise`. Unattributed ETW-TI memory
@@ -422,9 +420,7 @@ ETW-TI writes/protects/suspends, self-modifying memory, kernel and ntdll hooks,
 audit API calls, child processes, user-writable images and modules, file
 writes, network flows, Defender verdicts, and sandbox analyzers that report
 high or medium findings (`rule = analyzer/<analyzer>`). The findings are materialized in
-the `findings` table. The loop treats a finding as actionable only when it maps
-to module source or is a real verdict; unmatched findings are reported as
-residuals instead of driving another cycle. Analyzer status and errors are
+the `findings` table. The loop treats a behavioral RedEdr finding (cross-process write/protect, thread suspend, remote thread, child process, or audited handle access) as actionable even when no literal source line matches; analyzer summaries still require a source match or a real verdict, and unmatched analyzer findings remain residuals. Analyzer status and errors are
 recorded in `traces.coverage.analyzers` and surface as `coverage.missing`
 entries, so a failed scan is never reported as a clean cycle. A zero verdict
 count is not treated as safe; actionable high/medium findings remain until the
