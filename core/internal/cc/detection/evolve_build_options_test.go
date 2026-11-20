@@ -54,6 +54,7 @@ func newBuildOptionTestEvolver(t *testing.T) *evolver {
 	e := &evolver{
 		cfg: EvolveConfig{
 			LoopID: "loop", Module: "loader_windows", ModuleDir: moduleDir,
+			StoreRoot:    t.TempDir(),
 			ProducerDirs: map[string]string{"crystal_pack": producerDir},
 		},
 		logf: func(logging.Class, string, ...any) {},
@@ -183,15 +184,40 @@ func TestPayloadBuildFlagsProtectHostValues(t *testing.T) {
 		"format": "exe", "inject": "self", "shellcode": "/tmp/evil.bin",
 		"output": "/tmp/evil.exe", "arch": "x86",
 	})
-	flags := e.payloadBuildFlags("agent.bin")
+	flags := e.payloadBuildFlags("agent.bin", 1)
 	if flags["shellcode"] != "agent.bin" || flags["arch"] != "x64" {
 		t.Fatalf("host values overwritten: %+v", flags)
 	}
-	if _, ok := flags["output"]; ok {
-		t.Fatalf("host output override leaked: %+v", flags)
+	if flags["output"] == "/tmp/evil.exe" {
+		t.Fatalf("model output override leaked: %+v", flags)
+	}
+	if !strings.HasPrefix(flags["output"], filepath.Join(e.cfg.StoreRoot, "artifacts")) {
+		t.Fatalf("host output is not inside the store: %+v", flags)
 	}
 	if flags["format"] != "exe" || flags["inject"] != "self" {
 		t.Fatalf("model options missing: %+v", flags)
+	}
+}
+
+func TestDetonationArtifactPathIsShortAndUnique(t *testing.T) {
+	e := newBuildOptionTestEvolver(t)
+	e.cfg.LoopID = "loop-20261120-025101"
+	first := e.detonationArtifactPath(1, "exe")
+	second := e.detonationArtifactPath(2, "exe")
+	dll := e.detonationArtifactPath(1, "dll")
+	if first == second {
+		t.Fatalf("cycles share artifact path %q", first)
+	}
+	if filepath.Ext(first) != ".exe" || filepath.Ext(dll) != ".dll" {
+		t.Fatalf("wrong extension: exe=%q dll=%q", first, dll)
+	}
+	for _, path := range []string{first, second, dll} {
+		if base := filepath.Base(path); len(base) > 32 {
+			t.Fatalf("artifact name %q is too long for RedEdr's 128-character target limit", base)
+		}
+		if !strings.HasPrefix(path, filepath.Join(e.cfg.StoreRoot, "artifacts")) {
+			t.Fatalf("artifact %q escapes the store", path)
+		}
 	}
 }
 

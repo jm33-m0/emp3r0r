@@ -1185,7 +1185,7 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 	}
 	shellcode := e.activeShellcode()
 	buildOptions := e.buildOptionsSnapshot()
-	flags := e.payloadBuildFlags(shellcode)
+	flags := e.payloadBuildFlags(shellcode, iteration)
 	e.logClass(logging.ClassCycle, "cycle %d (attempt %d, global %d): building %s (shellcode %s, options %s)",
 		iteration, e.attempt, e.globalUsed+iteration, e.cfg.Module, shellcode, formatBuildOptions(buildOptions))
 	build := e.cfg.Build

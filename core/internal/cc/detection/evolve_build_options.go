@@ -2,6 +2,8 @@ package detection
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -65,9 +67,9 @@ func (e *evolver) initBuildOptions(opts map[string]string) {
 }
 
 // payloadBuildFlags layers the model-chosen options over the host-owned
-// shellcode and arch values. Host values win so a restored or malformed option
-// map cannot redirect a build.
-func (e *evolver) payloadBuildFlags(shellcode string) map[string]string {
+// shellcode, arch, and output values. Host values win so a restored or
+// malformed option map cannot redirect a build.
+func (e *evolver) payloadBuildFlags(shellcode string, iteration int) map[string]string {
 	flags := map[string]string{}
 	for name, value := range e.buildOptionsSnapshot() {
 		if strings.TrimSpace(value) == "" {
@@ -81,7 +83,35 @@ func (e *evolver) payloadBuildFlags(shellcode string) map[string]string {
 	}
 	flags["shellcode"] = shellcode
 	flags["arch"] = "x64"
+	if e.cfg.StoreRoot != "" && strings.EqualFold(e.cfg.Module, "loader_windows") {
+		format := flags["format"]
+		if strings.TrimSpace(format) == "" {
+			format = e.cfg.Format
+		}
+		flags[buildOptionOutput] = e.detonationArtifactPath(iteration, format)
+	}
 	return flags
+}
+
+// detonationArtifactPath returns the host-owned output path for a loader
+// build. The module derives its default name from the shellcode basename, and
+// the first cycle's shellcode carries the full agent artifact name. RedEdr's
+// kernel driver rejects target filenames of 128 wide characters or more, and
+// LitterBox prefixes the uploaded file with a 32-character digest, so that
+// default name silently disables kernel and hook telemetry for the baseline
+// only. The loop supplies a short, per-cycle name instead.
+func (e *evolver) detonationArtifactPath(iteration int, format string) string {
+	ext := ".exe"
+	if strings.EqualFold(strings.TrimSpace(format), "dll") {
+		ext = ".dll"
+	}
+	root := e.cfg.StoreRoot
+	if abs, err := filepath.Abs(root); err == nil {
+		root = abs
+	}
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s/%d", e.cfg.LoopID, e.attempt)))
+	dir := filepath.Join(root, "artifacts", sanitizeName(e.cfg.Module))
+	return filepath.Join(dir, fmt.Sprintf("sc-%s-%d%s", hex.EncodeToString(sum[:3]), iteration, ext))
 }
 
 func (e *evolver) buildOptionsSnapshot() map[string]string {
