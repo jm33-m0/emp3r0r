@@ -213,7 +213,8 @@ func sortMemoryFindings(findings []memoryFinding) {
 
 // memoryScore weights a verified change by the metric it improves. A removal
 // is positive; an addition is negative. High findings dominate hygiene, which
-// dominates static signatures, matching the loop's comparison order.
+// dominates static signatures. The regression gate uses the same weights, so a
+// material static win can outweigh a medium increase.
 func memoryScore(previous, current findingCounts) float64 {
 	high := previous.DetectionHigh - current.DetectionHigh
 	hygieneHigh := previous.HygieneHigh - current.HygieneHigh

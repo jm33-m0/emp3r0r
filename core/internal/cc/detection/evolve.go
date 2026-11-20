@@ -2019,26 +2019,19 @@ func countFindings(findings []Finding) findingCounts {
 	return counts
 }
 
-// findingRegression reports whether current is worse than previous. Detection
-// findings lead, static hygiene is a non-regression bound, and build-random
-// context never decides a regression.
+// findingRegression reports whether current is worse than previous. A new
+// detection or hygiene high is always a regression. With the high counts
+// unchanged, the weighted finding score decides, so a material static or
+// hygiene win can outweigh a medium increase; an exact score tie falls back to
+// the stable total. Build-random context never decides a regression.
 func findingRegression(previous, current findingCounts) bool {
-	switch {
-	case current.HygieneHigh > previous.HygieneHigh:
+	if current.HygieneHigh > previous.HygieneHigh || current.DetectionHigh > previous.DetectionHigh {
 		return true
-	case current.DetectionHigh != previous.DetectionHigh:
-		return current.DetectionHigh > previous.DetectionHigh
-	case current.DetectionMedium != previous.DetectionMedium:
-		return current.DetectionMedium > previous.DetectionMedium
-	case current.HygieneMedium > previous.HygieneMedium:
-		return true
-	case current.HygieneStatic != previous.HygieneStatic:
-		return current.HygieneStatic > previous.HygieneStatic
-	case current.StableTotal != previous.StableTotal:
-		return current.StableTotal > previous.StableTotal
-	default:
-		return false
 	}
+	if score := memoryScore(previous, current); score != 0 {
+		return score < 0
+	}
+	return current.StableTotal > previous.StableTotal
 }
 
 // findingsImproved is the inverse comparison used by the mechanism gate.

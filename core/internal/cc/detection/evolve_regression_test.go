@@ -262,6 +262,27 @@ func TestFindingRegressionPrefersMediumReduction(t *testing.T) {
 	}
 }
 
+func TestStaticWinCountsAsProgress(t *testing.T) {
+	previous := findingCounts{
+		DetectionHigh: 2, DetectionMedium: 13, HygieneMedium: 8, Static: 24, StableTotal: 44,
+	}
+	current := findingCounts{
+		DetectionHigh: 2, DetectionMedium: 16, HygieneMedium: 6, Static: 7, StableTotal: 30,
+	}
+	if findingRegression(previous, current) {
+		t.Fatal("a 17-finding static win was treated as a regression")
+	}
+	if !findingsImproved(previous, current) {
+		t.Fatal("a 17-finding static win was not counted as progress")
+	}
+	if !findingRegression(
+		findingCounts{DetectionHigh: 1, Static: 100, StableTotal: 200},
+		findingCounts{DetectionHigh: 2, Static: 0, StableTotal: 2},
+	) {
+		t.Fatal("a new detection high was accepted despite the static win")
+	}
+}
+
 func TestEarlyTerminationSkipsInstrumentationGate(t *testing.T) {
 	cases := []struct {
 		name  string
