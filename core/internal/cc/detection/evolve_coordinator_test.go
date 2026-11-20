@@ -380,6 +380,7 @@ func TestVerifiedFindingRegressionKeepsBaseline(t *testing.T) {
 		t.Fatalf("an equal-findings cycle was not adopted: %+v", e.lastExecuting)
 	}
 	e.lastExecuting = &Cycle{ID: 4, Findings: 10, Summary: `{"execution":"verified","high_findings":0,"static_findings":0}`}
+	e.lastComparable = e.lastExecuting
 	gate = e.recordExecution(&Cycle{ID: 5, Findings: 10, Summary: `{"execution":"verified","high_findings":0,"static_findings":1}`},
 		cycleSummary{Execution: executionVerified, HighFindings: 0, StaticFindings: 1})
 	if gate != gateRegressed {

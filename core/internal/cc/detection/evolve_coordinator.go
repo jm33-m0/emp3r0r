@@ -399,6 +399,11 @@ func (c *coordinator) repeatedNonImprovingMechanism(candidate string) bool {
 		lastSummary.Mechanism != candidate {
 		return false
 	}
+	// A cycle with a coverage gap cannot demonstrate progress. Do not let it
+	// reset the mechanism-repetition guard.
+	if !coverageComplete(previousSummary) || !coverageComplete(lastSummary) {
+		return true
+	}
 	if last.Verdicts < previous.Verdicts {
 		return false
 	}
@@ -543,8 +548,12 @@ func (c *coordinator) afterCycle(ctx context.Context, cycle *Cycle) error {
 		c.plannerNote = "Execution is blocked: the host could not establish a usable execution path. Return action=stop with the final JSON."
 		return nil
 	}
+	if summary.Execution == executionVerified && !coverageComplete(summary) && gate != gateRegressed {
+		c.plannerNote = fmt.Sprintf("Cycle %d executed but coverage is incomplete: %s. Its finding counts are not comparable and did not replace the finding baseline; fix the analyzer coverage or treat the residuals as unresolved.",
+			cycle.Iteration, clip(strings.Join(summary.CoverageMissing, "; "), 600))
+	}
 	if gate == gateRegressed {
-		baseline := c.e.lastExecuting
+		baseline := c.e.comparisonBaseline()
 		c.lastDiagnosis = nil
 		restore := "no clean baseline exists"
 		previous := findingCounts{}
@@ -552,7 +561,7 @@ func (c *coordinator) afterCycle(ctx context.Context, cycle *Cycle) error {
 		if baseline != nil {
 			restore = lastGoodRef(baseline)
 			previous = cycleFindingCounts(baseline)
-			if err := c.e.restoreExecutingState(ctx); err != nil {
+			if err := c.e.restoreExecutingStateTo(ctx, baseline, true); err != nil {
 				restore += " (restore incomplete: " + clip(err.Error(), 300) + ")"
 			}
 			c.e.logClass(logging.ClassWarning,
@@ -1017,6 +1026,9 @@ func (c *coordinator) plannerBrief() string {
 	if hint := c.e.failureLayerHint(); hint != "" {
 		b.WriteString(hint + "\n")
 	}
+	if hint := c.e.coverageHint(); hint != "" {
+		b.WriteString(hint + "\n")
+	}
 	if hint := c.e.dynamicRegionHint(); hint != "" {
 		b.WriteString(hint + "\n")
 	}
@@ -1119,6 +1131,9 @@ func (c *coordinator) editorBrief(plan plannerPlan) string {
 		b.WriteString(hint + "\n")
 	}
 	if hint := c.e.failureLayerHint(); hint != "" {
+		b.WriteString(hint + "\n")
+	}
+	if hint := c.e.coverageHint(); hint != "" {
 		b.WriteString(hint + "\n")
 	}
 	if hint := c.e.dynamicRegionHint(); hint != "" {

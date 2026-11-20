@@ -46,8 +46,13 @@ func RenderLoopSummary(answer map[string]any, cycles []Cycle, edits []EditRecord
 			firstCounts.High, lastCounts.High, firstCounts.Static, lastCounts.Static,
 			firstCounts.Total, lastCounts.Total, first.Verdicts, last.Verdicts, len(cycles))
 		var finalSummary cycleSummary
-		if json.Unmarshal([]byte(last.Summary), &finalSummary) == nil && len(finalSummary.Hygiene) > 0 {
-			fmt.Fprintf(&b, "**Static hygiene:** %d open\n", len(finalSummary.Hygiene))
+		if json.Unmarshal([]byte(last.Summary), &finalSummary) == nil {
+			if len(finalSummary.Hygiene) > 0 {
+				fmt.Fprintf(&b, "**Static hygiene:** %d open\n", len(finalSummary.Hygiene))
+			}
+			if len(finalSummary.CoverageMissing) > 0 {
+				fmt.Fprintf(&b, "**Coverage:** incomplete (%d missing analyzer(s))\n", len(finalSummary.CoverageMissing))
+			}
 		}
 		if last.Execution == executionOffline {
 			fmt.Fprintf(&b, "\n> The final cycle did not execute; its finding counts are not comparable with an executing cycle.\n")
@@ -163,8 +168,14 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 			fmt.Fprintf(&b, "- No static YARA/CheckPlz/Stringnalyzer signature finding was recorded in the final cycle.\n")
 		}
 		var finalSummary cycleSummary
-		if json.Unmarshal([]byte(last.Summary), &finalSummary) == nil && len(finalSummary.Hygiene) > 0 {
-			fmt.Fprintf(&b, "- Static hygiene backlog: %d item(s) remain; see the Static hygiene table.\n", len(finalSummary.Hygiene))
+		if json.Unmarshal([]byte(last.Summary), &finalSummary) == nil {
+			if len(finalSummary.Hygiene) > 0 {
+				fmt.Fprintf(&b, "- Static hygiene backlog: %d item(s) remain; see the Static hygiene table.\n", len(finalSummary.Hygiene))
+			}
+			if len(finalSummary.CoverageMissing) > 0 {
+				fmt.Fprintf(&b, "- Final payload coverage is incomplete: %s. Its finding counts are not a clean result.\n",
+					clipUTF8(sanitizeLine(strings.Join(finalSummary.CoverageMissing, "; ")), 500))
+			}
 		}
 		if finalIndex != len(cycles)-1 {
 			fmt.Fprintf(&b, "- The last attempted cycle (%d) was rejected or restored; the counts above are the last executing payload.\n", cycles[len(cycles)-1].Iteration)
@@ -224,7 +235,7 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 	renderHygieneBacklog(&b, cycles, finalIndex)
 
 	if len(cycles) > 0 {
-		if stats := telemetryStatsFromSummary(cycles[len(cycles)-1].Summary); stats != nil {
+		if stats := telemetryStatsFromSummary(cycles[finalIndex].Summary); stats != nil {
 			fmt.Fprintf(&b, "## Telemetry coverage\n\n")
 			fmt.Fprintf(&b, "| Events | Payload events | Signal events | Findings |\n")
 			fmt.Fprintf(&b, "| ---: | ---: | ---: | ---: |\n")
@@ -551,6 +562,11 @@ func renderFindingObjective(b *strings.Builder, cycles []Cycle, finalIndex int) 
 	fmt.Fprintf(b, "\nExecuting cycles: %d/%d.", executing, len(cycles))
 	if last.Execution != executionVerified {
 		fmt.Fprintf(b, " The final cycle did not execute, so its counts are not a detection result.")
+	}
+	var finalSummary cycleSummary
+	if json.Unmarshal([]byte(last.Summary), &finalSummary) == nil && len(finalSummary.CoverageMissing) > 0 {
+		fmt.Fprintf(b, " The final payload has incomplete coverage: %s; its counts are not a clean result.",
+			clipUTF8(sanitizeLine(strings.Join(finalSummary.CoverageMissing, "; ")), 400))
 	}
 	if finalIndex != len(cycles)-1 {
 		fmt.Fprintf(b, " The last attempted cycle (%d) was rejected or restored; the final column is the last executing payload.", cycles[len(cycles)-1].Iteration)

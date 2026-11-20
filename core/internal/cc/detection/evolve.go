@@ -297,6 +297,10 @@ type evolver struct {
 	baselineFailure string
 	operatorPrompts *OperatorPromptQueue
 	lastExecuting   *Cycle
+	// lastComparable is the newest verified payload with complete analyzer
+	// coverage. Finding comparisons use it instead of an executing payload
+	// whose telemetry was incomplete.
+	lastComparable *Cycle
 	// executionCheckTimeout overrides PayloadVerifyTimeout in tests.
 	executionCheckTimeout time.Duration
 
@@ -1067,6 +1071,7 @@ type cycleSummary struct {
 	NetworkEvents    int               `json:"network_events,omitempty"`
 	SourceTreeHash   string            `json:"source_tree_hash,omitempty"`
 	DesignKey        string            `json:"design_key,omitempty"`
+	CoverageMissing  []string          `json:"coverage_missing,omitempty"`
 	Knowledge        []KnowledgeHit    `json:"knowledge,omitempty"`
 	KBRefs           []string          `json:"kb_refs,omitempty"`
 	// RecoveredBy, DebuggerCause, and GuestActions record a debugger-assisted
@@ -1653,6 +1658,7 @@ func summarizeCycle(loopID string, iteration int, run Run, feedback Feedback, bu
 		summary.TraceID = run.Telemetry.TraceID
 		summary.Events = run.Telemetry.Events
 		summary.Telemetry = run.Telemetry.Stats
+		summary.CoverageMissing = coverageMissing(run.Telemetry.Coverage)
 		if summary.Telemetry == nil {
 			summary.Telemetry = &TelemetryStats{
 				TraceID: run.Telemetry.TraceID, Events: run.Telemetry.Events,
@@ -1785,6 +1791,66 @@ func (e *evolver) hygieneLines() []string {
 		out = append(out, formatHygiene(item))
 	}
 	return out
+}
+
+// coverageMissing bounds the analyzer failures carried into a cycle summary.
+// A missing analyzer means the cycle cannot be compared with a complete run.
+func coverageMissing(coverage TelemetryCoverage) []string {
+	out := make([]string, 0, len(coverage.Missing))
+	seen := map[string]struct{}{}
+	for _, item := range coverage.Missing {
+		item = clipUTF8(sanitizeLine(item), 300)
+		if item == "" {
+			continue
+		}
+		if _, ok := seen[item]; ok {
+			continue
+		}
+		seen[item] = struct{}{}
+		out = append(out, item)
+		if len(out) >= 16 {
+			break
+		}
+	}
+	return out
+}
+
+func coverageComplete(summary cycleSummary) bool {
+	return len(summary.CoverageMissing) == 0
+}
+
+// comparisonBaseline returns the newest payload whose findings can be
+// compared. An executing payload with a coverage gap is still the restore
+// target, but it cannot reset the finding baseline.
+func (e *evolver) comparisonBaseline() *Cycle {
+	if e.lastComparable != nil {
+		return e.lastComparable
+	}
+	cycle := e.lastExecuting
+	if cycle == nil {
+		return nil
+	}
+	var summary cycleSummary
+	if json.Unmarshal([]byte(cycle.Summary), &summary) == nil && !coverageComplete(summary) {
+		return nil
+	}
+	return cycle
+}
+
+func (e *evolver) coverageHint() string {
+	cycle := e.last
+	if cycle == nil {
+		cycle = e.lastExecuting
+	}
+	if cycle == nil {
+		return ""
+	}
+	var summary cycleSummary
+	if json.Unmarshal([]byte(cycle.Summary), &summary) != nil || coverageComplete(summary) {
+		return ""
+	}
+	return fmt.Sprintf("Coverage gap in cycle %d: %s. Its finding counts are not comparable; fix the analyzer coverage or treat the residuals as unresolved.",
+		cycle.Iteration, clip(strings.Join(summary.CoverageMissing, "; "), 600))
 }
 
 // findingCounts is the metric the loop optimizes: high-severity findings,
@@ -1998,17 +2064,21 @@ func (e *evolver) recordExecution(cycle *Cycle, summary cycleSummary) executionG
 		if summary.InstrumentationChanged {
 			return gateUnchanged
 		}
-		// A verified cycle replaces the baseline only when it does not raise
-		// high findings, static findings, or the total finding count.
-		// Otherwise the worse payload would become the source later cycles
-		// restore to.
-		if previous := e.lastExecuting; previous != nil && previous.ID != 0 {
+		// A verified cycle replaces the comparable baseline only when it has
+		// complete analyzer coverage and does not raise high findings, static
+		// findings, or the total finding count. A coverage gap is an
+		// infrastructure result, not a detection result.
+		if previous := e.comparisonBaseline(); previous != nil && previous.ID != 0 {
 			if findingRegression(cycleFindingCounts(previous), summaryFindingCounts(summary, cycle.Findings)) {
 				return gateRegressed
 			}
 		}
 		e.lastExecuting = cycle
 		e.setPreservedShellcode(summary.Shellcode)
+		if !coverageComplete(summary) {
+			return gateUnchanged
+		}
+		e.lastComparable = cycle
 		e.restoreErr = nil
 		return gateExecuting
 	case executionStatic, executionUnverified:
@@ -2083,18 +2153,20 @@ func (e *evolver) rollbackFailedBuild(iteration int, cause error) {
 // of the state could be restored, so the next brief does not claim a working
 // baseline.
 func (e *evolver) restoreExecutingState(ctx context.Context) error {
-	return e.restoreExecutingStateMode(ctx, true)
+	return e.restoreExecutingStateTo(ctx, e.lastExecuting, true)
 }
 
 // restoreExecutingStateFromBuild restores after an edit failed to build. The
 // failed cycle never produced a payload, so only pending edits are undone; the
 // edits that produced the executing baseline must stay in place.
 func (e *evolver) restoreExecutingStateFromBuild(ctx context.Context) error {
-	return e.restoreExecutingStateMode(ctx, false)
+	return e.restoreExecutingStateTo(ctx, e.lastExecuting, false)
 }
 
-func (e *evolver) restoreExecutingStateMode(ctx context.Context, revertFailedCycle bool) error {
-	baseline := e.lastExecuting
+// restoreExecutingStateTo restores an explicit baseline. A regression uses the
+// last comparable payload, not a newer executing payload whose coverage was
+// incomplete.
+func (e *evolver) restoreExecutingStateTo(ctx context.Context, baseline *Cycle, revertFailedCycle bool) error {
 	if baseline == nil {
 		return fmt.Errorf("no executing baseline to restore")
 	}
@@ -2307,6 +2379,9 @@ func (e *evolver) dossier() string {
 			fmt.Fprintf(&b, "  build: %s; producer %s: %s\n",
 				formatBuildOptions(summary.BuildOptions), headerOrNone(summary.Producer),
 				formatBuildOptions(summary.ProducerOptions))
+		}
+		if len(summary.CoverageMissing) > 0 {
+			fmt.Fprintf(&b, "  coverage: missing %s\n", clip(strings.Join(summary.CoverageMissing, "; "), 400))
 		}
 		if summary.RecoveredBy != "" {
 			fmt.Fprintf(&b, "  recovered_by=%s cause=%s\n", summary.RecoveredBy, clip(sanitizeLine(summary.DebuggerCause), 240))

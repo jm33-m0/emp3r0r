@@ -57,6 +57,16 @@ func (e *evolver) loadAttemptState(ctx context.Context) error {
 		// baseline is exactly what a build rollback should return to.
 		e.lastExecuting = e.priorLastGood
 	}
+	for i := len(prior) - 1; i >= 0; i-- {
+		if prior[i].Execution != executionVerified && !(prior[i].Execution == "" && prior[i].Executed) {
+			continue
+		}
+		var summary cycleSummary
+		if json.Unmarshal([]byte(prior[i].Summary), &summary) == nil && coverageComplete(summary) {
+			e.lastComparable = &prior[i]
+			break
+		}
+	}
 
 	loopIDs := uniqueLoopIDs(prior)
 	if len(loopIDs) > 0 {
