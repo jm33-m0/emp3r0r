@@ -309,6 +309,9 @@ func (s *Store) pruneArtifacts(dir string, limit int) {
 		}
 		items = append(items, artifactEntry{path: filepath.Join(dir, entry.Name()), mod: info.ModTime()})
 	}
+	if len(items) <= limit {
+		return
+	}
 	sort.Slice(items, func(i, j int) bool { return items[i].mod.After(items[j].mod) })
 	for _, item := range items[limit:] {
 		_ = os.Remove(item.path)

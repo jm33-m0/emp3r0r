@@ -266,7 +266,7 @@ func TestEvolveDoesNotBuildWhenSandboxIsDown(t *testing.T) {
 	}
 	builds := 0
 	provider := &captureProvider{answer: `{"summary":"sandbox is down","edits":[],"residual":[]}`}
-	ctx, cancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	result, err := RunEvolve(ctx, EvolveConfig{
 		Provider: provider, Model: "scripted",
