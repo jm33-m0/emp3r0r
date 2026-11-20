@@ -130,7 +130,10 @@ use the console's existing C2 connection. The loop then runs:
    `recovered_by=guest-debugger`: a manual run does not turn an
    unattributed trace into a finding baseline, and the source is not kept. A
    verified cycle that raises high findings, static signatures, or total
-   findings is recorded, reverted, and reported to the planner instead of becoming the new baseline. If no payload has ever checked in and the debugger cannot repair
+   findings is recorded and reported to the planner instead of becoming the
+   new baseline; the host keeps its source edits so the next cycle can build
+   on the parts that worked and change only the part that raised the
+   regressed count. If no payload has ever checked in and the debugger cannot repair
    it, the loop stops and reports the execution failure instead of spending
    more cycles on a payload that never ran;
 8. write the final JSON and all cycles to the loop tables.

@@ -559,23 +559,20 @@ func (c *coordinator) afterCycle(ctx context.Context, cycle *Cycle) error {
 			baseline = c.e.comparisonBaseline()
 		}
 		c.lastDiagnosis = nil
-		restore := "no clean baseline exists"
+		retained := "no clean baseline exists"
 		previous := findingCounts{}
 		current := summaryFindingCounts(summary, cycle.Findings)
 		if baseline != nil {
-			restore = lastGoodRef(baseline)
+			retained = lastGoodRef(baseline)
 			previous = cycleFindingCounts(baseline)
-			if err := c.e.restoreExecutingStateTo(ctx, baseline, true); err != nil {
-				restore += " (restore incomplete: " + clip(err.Error(), 300) + ")"
-			}
 			c.e.logClass(logging.ClassWarning,
-				"cycle %d regressed (high %d -> %d, medium %d -> %d, static %d -> %d, total %d -> %d); restored %s",
+				"cycle %d regressed (high %d -> %d, medium %d -> %d, static %d -> %d, total %d -> %d); source edits retained; finding baseline remains %s",
 				cycle.Iteration, previous.High, current.High, previous.Medium, current.Medium,
-				previous.Static, current.Static, previous.Total, current.Total, lastGoodRef(baseline))
+				previous.Static, current.Static, previous.Total, current.Total, retained)
 		}
-		c.plannerNote = fmt.Sprintf("Cycle %d regressed (high findings %d -> %d, medium findings %d -> %d, static findings %d -> %d, total %d -> %d); the host restored %s. The reverted edit is recorded in loop_edits, iteration %d, with its old/new text: reuse the part that removed a finding and change only the part that raised the regressed count (SELECT file, reason, old, new FROM loop_edits WHERE loop_id = '%s' AND iteration = %d). Do not repeat the exact change.",
+		c.plannerNote = fmt.Sprintf("Cycle %d regressed (high findings %d -> %d, medium findings %d -> %d, static findings %d -> %d, total %d -> %d); the host kept the cycle's source edits and left the finding baseline at %s. The edits are recorded in loop_edits, iteration %d, with their old/new text: keep the part that removed a finding and change only the part that raised the regressed count (SELECT file, reason, old, new FROM loop_edits WHERE loop_id = '%s' AND iteration = %d). Do not repeat the exact change.",
 			cycle.Iteration, previous.High, current.High, previous.Medium, current.Medium,
-			previous.Static, current.Static, previous.Total, current.Total, restore,
+			previous.Static, current.Static, previous.Total, current.Total, retained,
 			cycle.Iteration, c.e.cfg.LoopID, cycle.Iteration)
 		return nil
 	}

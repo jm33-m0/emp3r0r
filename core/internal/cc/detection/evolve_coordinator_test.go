@@ -360,6 +360,40 @@ func TestDebuggerPolicyNormalization(t *testing.T) {
 	}
 }
 
+func TestRegressedCycleKeepsSourceEdits(t *testing.T) {
+	db, err := OpenTelemetryDB(filepath.Join(t.TempDir(), "telemetry.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	baseline := &Cycle{
+		ID: 1, LoopID: "loop-retain", PayloadID: 1, PayloadKey: "sha256:good", Findings: 10,
+		Summary: `{"execution":"verified","high_findings":0,"static_findings":0,"telemetry":{"coverage":{"delivered":["etw"]}}}`,
+	}
+	current := &Cycle{
+		ID: 2, LoopID: "loop-retain", PayloadID: 2, PayloadKey: "sha256:worse", Iteration: 2, Findings: 10,
+		Summary: `{"execution":"verified","high_findings":1,"static_findings":0,"telemetry":{"coverage":{"delivered":["etw"]}}}`,
+	}
+	e := &evolver{
+		cfg: EvolveConfig{LoopID: "loop-retain"}, db: db, last: current,
+		lastExecuting: baseline, lastComparable: baseline,
+		logf: func(logging.Class, string, ...any) {},
+	}
+	c := &coordinator{e: e}
+	if err := c.afterCycle(context.Background(), current); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(c.plannerNote, "kept the cycle's source edits") {
+		t.Fatalf("planner note did not retain the source: %q", c.plannerNote)
+	}
+	if strings.Contains(c.plannerNote, "host restored") {
+		t.Fatalf("planner note still claims a restore: %q", c.plannerNote)
+	}
+	if e.restoreErr != nil {
+		t.Fatalf("regression attempted a restore: %v", e.restoreErr)
+	}
+}
+
 func TestVerifiedFindingRegressionKeepsBaseline(t *testing.T) {
 	e := &evolver{logf: func(logging.Class, string, ...any) {}}
 	e.lastExecuting = &Cycle{ID: 1, PayloadKey: "sha256:good", Findings: 10, Summary: `{"execution":"verified","high_findings":2,"static_findings":1}`}
