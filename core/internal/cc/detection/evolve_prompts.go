@@ -55,7 +55,7 @@ const knowledgePrompt = `Knowledge base:
   external security reference cache. KnowledgeRead returns either.
 - Methodology entries are the harness playbooks: offline-after-baseline,
   instrumentation-changed, agent-not-checking-in, packed-payload-entropy,
-  static-high-regression, producer-agent-compatibility, build-failure,
+  static-high-regression, pe-checksum, producer-agent-compatibility, build-failure,
   build-option-tuning, crystal-palace-link-options, no-comparable-baseline, and
   mechanism-<name> contracts. Read the entry that matches the current scenario
   before choosing a mechanism or editing source.
@@ -202,6 +202,11 @@ Decision rules:
   as Crystal Palace link options, use mechanism=producer and name the options.
   Do not spend cycles polishing source when one build option selects the
   behavior under test.
+- The static hygiene backlog is unaddressed work. If it lists a deterministic
+  item (pe/checksum, pe/sections, pe/import), plan static-hygiene for it before
+  another dynamic mechanism. Do not tune a build option while a cheap hygiene
+  item is open. Producer-owned entropy remains mechanism=producer, not
+  static-hygiene.
 - action=debug when the last cycle reported execution=offline or the sandbox did
   not execute the payload, and a debugger is available. Give it the specific
   question to answer. Do not spend a debug turn when the payload executed.
@@ -224,11 +229,11 @@ Decision rules:
   producer's declared input option and the agent type it requires. Call
   GenerateAgent for that agent type, then BuildShellcode with that input. Do not
   label a source edit of the current producer as a swap.
-- If two verified cycles did not reduce high findings or static signatures and
+- If two verified cycles did not reduce high findings or static findings and
   the current producer is still donut, plan one producer-swap before repeating
   the same mechanism.
 - If the last two cycles used the same mechanism and did not remove a real
-  verdict or reduce high findings or static signatures, choose a different
+  verdict or reduce high findings or static findings, choose a different
   mechanism or record
   the concrete constraint that makes every alternative infeasible. The host
   refuses a third cycle on a mechanism whose last two cycles made no progress.
@@ -280,6 +285,9 @@ Work loop:
    change is a complete change for DetectionCycle, so do not add a source edit
    just to satisfy the no-op check. Change one option set per cycle and predict
    its effect.
+   Fix the static hygiene backlog first when it lists a deterministic item.
+   pe/checksum and pe/sections are build/source fixes; use the listed source
+   hint, not BuildOptions. Do not edit generated artifacts.
 4. The shellcode producer is part of the design. Edit the configured producer
    (donut, crystal_pack), then call BuildShellcode. The output replaces the
    shellcode every later cycle loads. A producer change is the right move when
@@ -299,7 +307,7 @@ Work loop:
 7. Call DetectionCycle exactly once, with the planner's mechanism and one
    falsifiable prediction. The host records the prediction, observed result, and
    prediction_result, and refuses a third cycle on a mechanism whose last two
-   cycles made no high-finding, static-signature, or verdict progress.
+   cycles made no high-finding, static-finding, or verdict progress.
    mechanism=producer-swap is
    rejected unless the active shellcode producer changed. Do not call
    DetectionCycle without a source, shellcode, or build-option change: the host

@@ -55,7 +55,7 @@ func TestUsageReportAndCost(t *testing.T) {
 	report := RenderLoopReport(answer, cycles, nil)
 	for _, want := range []string{
 		"## Findings objective", "| High findings | 2 | 0 | -2 |",
-		"| Static signatures | 3 | 0 | -3 |", "## Model usage", "| planner |", "$10.86",
+		"| Static findings | 3 | 0 | -3 |", "## Model usage", "| planner |", "$10.86",
 		"No static YARA/CheckPlz",
 	} {
 		if !strings.Contains(report, want) {
@@ -66,7 +66,7 @@ func TestUsageReportAndCost(t *testing.T) {
 		t.Fatalf("report still headlines the sandbox score:\n%s", report)
 	}
 	summary := RenderLoopSummary(answer, cycles, nil)
-	for _, want := range []string{"**High findings:** 2 → 0", "**Static signatures:** 3 → 0", "**Tokens:** 20.99M in / 1.86M out", "**Estimated cost:** $90.87"} {
+	for _, want := range []string{"**High findings:** 2 → 0", "**Static findings:** 3 → 0", "**Tokens:** 20.99M in / 1.86M out", "**Estimated cost:** $90.87"} {
 		if !strings.Contains(summary, want) {
 			t.Fatalf("summary missing %q:\n%s", want, summary)
 		}

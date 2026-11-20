@@ -247,6 +247,86 @@ func TestReportDoesNotClaimNoStaticWhenStaticExists(t *testing.T) {
 	}
 }
 
+func TestHygieneSummaryKeepsStableStaticFindings(t *testing.T) {
+	findings := []Finding{
+		{
+			Stage: StageStatic, Tool: "pe-info", Severity: "medium", Rule: "pe/checksum",
+			Indicator: "PE checksum", Detail: "stored checksum 0x0, calculated 0x92d8ef",
+			Sources: []SourceLocation{{File: "build.sh", Line: 12}},
+		},
+		{Stage: StageStatic, Tool: "pe-info", Severity: "high", Rule: "pe/entropy", Indicator: ".rdata"},
+		{Stage: StageStatic, Tool: "stringnalyzer", Severity: "medium", Indicator: ".rUJzD"},
+		{Stage: StageTelemetry, Tool: "defender", Severity: "critical", Rule: "defender/verdict", Indicator: "Defender threat verdict"},
+	}
+	items := hygieneSummary(findings)
+	if len(items) != 2 {
+		t.Fatalf("hygiene items = %+v, want checksum and entropy", items)
+	}
+	if items[0].Rule != "pe/checksum" || items[0].Source != "build.sh:12" {
+		t.Fatalf("checksum item = %+v", items[0])
+	}
+	if items[1].Rule != "pe/entropy" || items[1].Indicator != ".rdata" {
+		t.Fatalf("entropy item = %+v", items[1])
+	}
+	for _, item := range items {
+		if item.Indicator == ".rUJzD" {
+			t.Fatalf("stringnalyzer indicator entered the stable backlog: %+v", items)
+		}
+	}
+	if line := formatHygiene(items[0]); !strings.Contains(line, "pe/checksum") || !strings.Contains(line, "build.sh:12") {
+		t.Fatalf("formatted hygiene = %q", line)
+	}
+}
+
+func TestHygieneBacklogPrefersLastExecutingPayload(t *testing.T) {
+	good, _ := json.Marshal(cycleSummary{Hygiene: []hygieneFinding{{Rule: "pe/checksum", Indicator: "PE checksum"}}})
+	bad, _ := json.Marshal(cycleSummary{Hygiene: []hygieneFinding{{Rule: "pe/entropy", Indicator: ".zdata"}}})
+	e := &evolver{
+		last:          &Cycle{Summary: string(bad)},
+		lastExecuting: &Cycle{Summary: string(good)},
+	}
+	lines := e.hygieneLines()
+	if len(lines) != 1 || !strings.Contains(lines[0], "pe/checksum") {
+		t.Fatalf("hygiene backlog = %+v, want the last executing payload", lines)
+	}
+}
+
+func TestRenderLoopReportShowsHygieneBacklog(t *testing.T) {
+	first, _ := json.Marshal(cycleSummary{
+		Execution:      executionVerified,
+		StaticFindings: 2,
+		Hygiene: []hygieneFinding{
+			{Rule: "pe/checksum", Indicator: "PE checksum", Severity: "medium", Source: "build.sh:12"},
+			{Rule: "pe/entropy", Indicator: ".rdata", Severity: "high"},
+		},
+	})
+	final, _ := json.Marshal(cycleSummary{
+		Execution:      executionVerified,
+		StaticFindings: 1,
+		Hygiene:        []hygieneFinding{{Rule: "pe/entropy", Indicator: ".rdata", Severity: "high"}},
+	})
+	cycles := []Cycle{
+		{Iteration: 1, PayloadKey: "sha256:first", Execution: executionVerified, Summary: string(first)},
+		{Iteration: 2, PayloadKey: "sha256:final", Execution: executionVerified, Summary: string(final)},
+	}
+	report := RenderLoopReport(map[string]any{"loop_id": "loop-hygiene"}, cycles, nil)
+	for _, want := range []string{
+		"## Static hygiene",
+		"`pe/checksum PE checksum`",
+		"not in final payload",
+		"`pe/entropy .rdata`",
+		"present",
+	} {
+		if !strings.Contains(report, want) {
+			t.Fatalf("report missing %q:\n%s", want, report)
+		}
+	}
+	summary := RenderLoopSummary(map[string]any{"loop_id": "loop-hygiene"}, cycles, nil)
+	if !strings.Contains(summary, "**Static hygiene:** 1 open") {
+		t.Fatalf("summary missing hygiene count:\n%s", summary)
+	}
+}
+
 func assertFindingRule(t *testing.T, findings []Finding, rule string, stage StageKind, severity string) Finding {
 	t.Helper()
 	for _, finding := range findings {

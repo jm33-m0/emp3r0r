@@ -42,9 +42,13 @@ func RenderLoopSummary(answer map[string]any, cycles []Cycle, edits []EditRecord
 		finalIndex := reportFinalIndex(cycles, answer)
 		first, last := cycles[0], cycles[finalIndex]
 		firstCounts, lastCounts := cycleFindingCounts(&first), cycleFindingCounts(&last)
-		fmt.Fprintf(&b, "**High findings:** %d → %d | **Static signatures:** %d → %d | **Total findings:** %d → %d | **Verdicts:** %d → %d | **Cycles:** %d\n",
+		fmt.Fprintf(&b, "**High findings:** %d → %d | **Static findings:** %d → %d | **Total findings:** %d → %d | **Verdicts:** %d → %d | **Cycles:** %d\n",
 			firstCounts.High, lastCounts.High, firstCounts.Static, lastCounts.Static,
 			firstCounts.Total, lastCounts.Total, first.Verdicts, last.Verdicts, len(cycles))
+		var finalSummary cycleSummary
+		if json.Unmarshal([]byte(last.Summary), &finalSummary) == nil && len(finalSummary.Hygiene) > 0 {
+			fmt.Fprintf(&b, "**Static hygiene:** %d open\n", len(finalSummary.Hygiene))
+		}
 		if last.Execution == executionOffline {
 			fmt.Fprintf(&b, "\n> The final cycle did not execute; its finding counts are not comparable with an executing cycle.\n")
 		}
@@ -158,6 +162,10 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 		if counts.Static == 0 && last.Execution == executionVerified {
 			fmt.Fprintf(&b, "- No static YARA/CheckPlz/Stringnalyzer signature finding was recorded in the final cycle.\n")
 		}
+		var finalSummary cycleSummary
+		if json.Unmarshal([]byte(last.Summary), &finalSummary) == nil && len(finalSummary.Hygiene) > 0 {
+			fmt.Fprintf(&b, "- Static hygiene backlog: %d item(s) remain; see the Static hygiene table.\n", len(finalSummary.Hygiene))
+		}
 		if finalIndex != len(cycles)-1 {
 			fmt.Fprintf(&b, "- The last attempted cycle (%d) was rejected or restored; the counts above are the last executing payload.\n", cycles[len(cycles)-1].Iteration)
 		}
@@ -212,6 +220,8 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 			b.WriteString("\n")
 		}
 	}
+
+	renderHygieneBacklog(&b, cycles, finalIndex)
 
 	if len(cycles) > 0 {
 		if stats := telemetryStatsFromSummary(cycles[len(cycles)-1].Summary); stats != nil {
@@ -424,8 +434,77 @@ func renderGitHistory(b *strings.Builder, answer map[string]any) {
 	b.WriteString("\n")
 }
 
+// renderHygieneBacklog shows stable static findings across the executing
+// payloads. It stops at the final executing cycle; rejected attempts are not a
+// hygiene baseline.
+func renderHygieneBacklog(b *strings.Builder, cycles []Cycle, finalIndex int) {
+	if len(cycles) == 0 || finalIndex < 0 || finalIndex >= len(cycles) {
+		return
+	}
+	type row struct {
+		item        hygieneFinding
+		first, last int
+		final       bool
+	}
+	rows := map[string]*row{}
+	order := make([]string, 0, 8)
+	for i := 0; i <= finalIndex && i < len(cycles); i++ {
+		var summary cycleSummary
+		if json.Unmarshal([]byte(cycles[i].Summary), &summary) != nil {
+			continue
+		}
+		for _, item := range summary.Hygiene {
+			key := hygieneKey(item)
+			if key == "|" {
+				continue
+			}
+			entry, ok := rows[key]
+			if !ok {
+				if len(order) >= 32 {
+					continue
+				}
+				entry = &row{item: item, first: i, last: i}
+				rows[key] = entry
+				order = append(order, key)
+			} else {
+				entry.item = item
+				entry.last = i
+			}
+			if i == finalIndex {
+				entry.final = true
+			}
+		}
+	}
+	if len(order) == 0 {
+		return
+	}
+	b.WriteString("## Static hygiene\n\n")
+	b.WriteString("Stable pe/*, YARA, and CheckPlz findings; stringnalyzer indicators are omitted because they change per build.\n\n")
+	b.WriteString("| Finding | Severity | First seen | Last seen | Final status | Source |\n")
+	b.WriteString("| --- | --- | ---: | ---: | --- | --- |\n")
+	for _, key := range order {
+		entry := rows[key]
+		finding := strings.TrimSpace(strings.Join([]string{entry.item.Rule, entry.item.Indicator}, " "))
+		if finding == "" {
+			continue
+		}
+		status := "not in final payload"
+		if entry.final {
+			status = "present"
+		}
+		source := entry.item.Source
+		if source == "" {
+			source = "—"
+		}
+		fmt.Fprintf(b, "| `%s` | %s | %d | %d | %s | %s |\n",
+			markdownCell(finding), markdownCell(entry.item.Severity), cycles[entry.first].Iteration,
+			cycles[entry.last].Iteration, markdownCell(status), markdownCell(source))
+	}
+	b.WriteString("\n")
+}
+
 // renderFindingObjective puts the loop's actual objective before the change
-// log: high findings, static signatures, total findings, and real verdicts.
+// log: high findings, static findings, total findings, and real verdicts.
 // reportFinalIndex picks the payload whose findings the report should show.
 // A rejected cycle can still have run in the sandbox, so execution=verified
 // alone is not enough: answer.last_executing_payload is the payload the host
@@ -466,7 +545,7 @@ func renderFindingObjective(b *strings.Builder, cycles []Cycle, finalIndex int) 
 	fmt.Fprintf(b, "| Metric | Baseline | Final | Change |\n")
 	fmt.Fprintf(b, "| --- | ---: | ---: | ---: |\n")
 	fmt.Fprintf(b, "| High findings | %d | %d | %s |\n", before.High, after.High, signedChange(after.High-before.High))
-	fmt.Fprintf(b, "| Static signatures | %d | %d | %s |\n", before.Static, after.Static, signedChange(after.Static-before.Static))
+	fmt.Fprintf(b, "| Static findings | %d | %d | %s |\n", before.Static, after.Static, signedChange(after.Static-before.Static))
 	fmt.Fprintf(b, "| Total findings | %d | %d | %s |\n", before.Total, after.Total, signedChange(after.Total-before.Total))
 	fmt.Fprintf(b, "| Defender verdicts | %d | %d | %s |\n", first.Verdicts, last.Verdicts, signedChange(last.Verdicts-first.Verdicts))
 	fmt.Fprintf(b, "\nExecuting cycles: %d/%d.", executing, len(cycles))

@@ -132,6 +132,26 @@ var methodologyEntries = []methodologyEntry{
 		Verification: "the new high is gone and the baseline high set is unchanged",
 	},
 	{
+		ID:       "pe-checksum",
+		Title:    "A PE checksum or header hygiene finding",
+		Tags:     []string{"pe", "checksum", "hygiene", "static", "header", "loader", "sections", "imports"},
+		Scenario: "The static info analyzer reports an invalid PE checksum, a non-standard section, or an injection-capable import that is not required by the design.",
+		Steps: []string{
+			"Read the Static hygiene backlog in the brief; pe/* findings are stable across builds and carry a source hint.",
+			"For pe/checksum, edit the loader build script after the final link to compute and write the PE optional-header CheckSum field, then rebuild from source.",
+			"For pe/sections, rename or merge the custom section while preserving the linker symbols and the loader's access to the data.",
+			"For pe/import, remove the unnecessary import or resolve it at runtime; verify the loader still reaches the payload.",
+			"Run one static-hygiene cycle and confirm the targeted rule disappears without a new high finding or an execution regression.",
+		},
+		Constraints: []string{
+			"Do not edit generated artifacts or tests; fix the build or source and rebuild.",
+			"Do not pre-patch the loader from the host; the model owns the source change.",
+			"Do not add padding, random bytes, or dead code to change a score.",
+			"A checksum fix must not change the loading path; verify the agent still checks in.",
+		},
+		Verification: "the targeted pe/* finding is absent and the expected agent still checks in",
+	},
+	{
 		ID:       "producer-agent-compatibility",
 		Title:    "Choosing the agent type for a shellcode producer",
 		Tags:     []string{"producer", "agent", "dll", "exe", "shellcode", "build"},

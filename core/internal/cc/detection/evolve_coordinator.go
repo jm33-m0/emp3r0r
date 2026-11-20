@@ -560,7 +560,7 @@ func (c *coordinator) afterCycle(ctx context.Context, cycle *Cycle) error {
 				cycle.Iteration, previous.High, current.High, previous.Medium, current.Medium,
 				previous.Static, current.Static, previous.Total, current.Total, lastGoodRef(baseline))
 		}
-		c.plannerNote = fmt.Sprintf("Cycle %d regressed (high findings %d -> %d, medium findings %d -> %d, static signatures %d -> %d, total %d -> %d); the host restored %s. Do not repeat this change: test a different producer or mechanism, or stop with the evidence.",
+		c.plannerNote = fmt.Sprintf("Cycle %d regressed (high findings %d -> %d, medium findings %d -> %d, static findings %d -> %d, total %d -> %d); the host restored %s. Do not repeat this change: test a different producer or mechanism, or stop with the evidence.",
 			cycle.Iteration, previous.High, current.High, previous.Medium, current.Medium,
 			previous.Static, current.Static, previous.Total, current.Total, restore)
 		return nil
@@ -995,6 +995,12 @@ func (c *coordinator) plannerBrief() string {
 	if choices := c.e.buildOptionChoiceBrief(); choices != "" {
 		fmt.Fprintf(&b, "Build option choices: %s\n", choices)
 	}
+	if backlog := c.e.hygieneLines(); len(backlog) > 0 {
+		b.WriteString("Static hygiene backlog (stable; fix deterministic items before dynamic tuning):\n")
+		for _, item := range backlog {
+			fmt.Fprintf(&b, "- %s\n", item)
+		}
+	}
 	if target := c.producerSwapTarget(); target != "" {
 		fmt.Fprintf(&b, "Producer swap: %s is configured and not active; %s. A source edit of the active producer is mechanism=producer, not a swap.\n",
 			target, c.e.producerSwapHelp(target))
@@ -1095,6 +1101,12 @@ func (c *coordinator) editorBrief(plan plannerPlan) string {
 	fmt.Fprintf(&b, "Build options: %s\nProducer options (%s): %s\n",
 		formatBuildOptions(c.e.buildOptionsSnapshot()), headerOrNone(c.e.activeProducer),
 		formatBuildOptions(c.e.activeProducerOptions()))
+	if backlog := c.e.hygieneLines(); len(backlog) > 0 {
+		b.WriteString("Static hygiene backlog (fix with EditSource; pe/checksum and pe/sections are build/source fixes, not BuildOptions):\n")
+		for _, item := range backlog {
+			fmt.Fprintf(&b, "- %s\n", item)
+		}
+	}
 	if strings.EqualFold(strings.TrimSpace(c.e.activeProducer), "crystal_pack") {
 		b.WriteString("Crystal-Kit: crystal_pack PICO; the agent must be windows_dll. loader.spec binds _DLL_/_MASK_/_PICO_/_DLLARGS_; do not edit postex-loader or build.sh to work around a loader-side exit. If a producer build fails because an earlier edit left postex-loader incomplete, restore or repair that file before running DetectionCycle. Diagnose loader -> PICO -> agent check-in in that order.\n")
 	}

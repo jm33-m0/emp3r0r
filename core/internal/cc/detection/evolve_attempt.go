@@ -82,9 +82,16 @@ func (e *evolver) loadAttemptState(ctx context.Context) error {
 	sort.SliceStable(e.pendingEdits, func(i, j int) bool {
 		return e.pendingEdits[i].CreatedAt.After(e.pendingEdits[j].CreatedAt)
 	})
-	if len(e.priorCycles) > 0 {
+	// Restore the build state of the payload later cycles can actually return
+	// to, not the newest attempted cycle. A rejected or offline last cycle must
+	// not seed the resumed attempt with options that never executed.
+	restoreCycle := e.priorLastGood
+	if restoreCycle == nil && len(e.priorCycles) > 0 {
+		restoreCycle = &e.priorCycles[len(e.priorCycles)-1]
+	}
+	if restoreCycle != nil {
 		var summary cycleSummary
-		if json.Unmarshal([]byte(e.priorCycles[len(e.priorCycles)-1].Summary), &summary) == nil {
+		if json.Unmarshal([]byte(restoreCycle.Summary), &summary) == nil {
 			e.summaryBuildOptions(&summary)
 		}
 	}

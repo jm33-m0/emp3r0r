@@ -123,12 +123,14 @@ var mechanismSpecs = map[string]mechanismSpec{
 	},
 	"static-hygiene": {
 		Name: "static-hygiene", Layer: "hygiene",
-		Summary: "Remove strings, imports, section names, or other static surface.",
+		Summary: "Remove strings, imports, section names, PE header hygiene, or other static surface.",
 		Constraints: []string{
+			"PE checksum, non-standard sections, and unnecessary imports are deterministic; use the source hint in the hygiene backlog and fix the build or source.",
+			"Patch a PE checksum after the final link, not in a generated artifact, and rebuild from source.",
 			"Static hygiene does not change the loading path and cannot fix dynamic execution failures.",
 			"Do not add literals or code to chase an entropy finding; that adds new static findings.",
 		},
-		Signals:      []string{"static analyzers", "section entropy", "imports/strings"},
+		Signals:      []string{"static analyzers", "pe/checksum", "pe/sections", "pe/import", "section entropy", "imports/strings"},
 		Verification: "the targeted static finding disappears without a new high finding or an execution regression",
 	},
 	"other": {

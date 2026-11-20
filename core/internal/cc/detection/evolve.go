@@ -1007,32 +1007,45 @@ func parseEvolveStages(stages []string) (static, dynamic, edr bool, err error) {
 	return set["static"], set["dynamic"], set["edr"], nil
 }
 
+// hygieneFinding is one stable static-hygiene item the planner can act on.
+// Stringnalyzer indicators are excluded from this list because their names
+// change with every build; the top-finding view still carries them.
+type hygieneFinding struct {
+	Rule      string `json:"rule,omitempty"`
+	Tool      string `json:"tool,omitempty"`
+	Severity  string `json:"severity,omitempty"`
+	Indicator string `json:"indicator"`
+	Detail    string `json:"detail,omitempty"`
+	Source    string `json:"source,omitempty"`
+}
+
 type cycleSummary struct {
-	LoopID             string          `json:"loop_id"`
-	Iteration          int             `json:"iteration"`
-	Attempt            int             `json:"attempt,omitempty"`
-	GlobalIteration    int             `json:"global_iteration,omitempty"`
-	PayloadKey         string          `json:"payload_key"`
-	PayloadTable       string          `json:"payload_table"`
-	RunID              string          `json:"run_id"`
-	SHA256             string          `json:"sha256"`
-	Score              float64         `json:"score"`
-	Level              string          `json:"level,omitempty"`
-	Findings           int             `json:"findings"`
-	HighFindings       int             `json:"high_findings,omitempty"`
-	MediumFindings     int             `json:"medium_findings,omitempty"`
-	StaticFindings     int             `json:"static_findings,omitempty"`
-	Verdicts           []string        `json:"verdicts,omitempty"`
-	TraceID            int64           `json:"trace_id,omitempty"`
-	Events             int             `json:"telemetry_events"`
-	Telemetry          *TelemetryStats `json:"telemetry,omitempty"`
-	SourceEdits        int             `json:"source_edits"`
-	TopFindings        []string        `json:"top_findings,omitempty"`
-	BuildTail          []string        `json:"build_tail,omitempty"`
-	Edits              []EditRecord    `json:"edits,omitempty"`
-	Shellcode          string          `json:"shellcode,omitempty"`
-	Producer           string          `json:"producer,omitempty"`
-	ShellcodeGenerated bool            `json:"shellcode_generated,omitempty"`
+	LoopID             string           `json:"loop_id"`
+	Iteration          int              `json:"iteration"`
+	Attempt            int              `json:"attempt,omitempty"`
+	GlobalIteration    int              `json:"global_iteration,omitempty"`
+	PayloadKey         string           `json:"payload_key"`
+	PayloadTable       string           `json:"payload_table"`
+	RunID              string           `json:"run_id"`
+	SHA256             string           `json:"sha256"`
+	Score              float64          `json:"score"`
+	Level              string           `json:"level,omitempty"`
+	Findings           int              `json:"findings"`
+	HighFindings       int              `json:"high_findings,omitempty"`
+	MediumFindings     int              `json:"medium_findings,omitempty"`
+	StaticFindings     int              `json:"static_findings,omitempty"`
+	Verdicts           []string         `json:"verdicts,omitempty"`
+	TraceID            int64            `json:"trace_id,omitempty"`
+	Events             int              `json:"telemetry_events"`
+	Telemetry          *TelemetryStats  `json:"telemetry,omitempty"`
+	SourceEdits        int              `json:"source_edits"`
+	TopFindings        []string         `json:"top_findings,omitempty"`
+	Hygiene            []hygieneFinding `json:"hygiene,omitempty"`
+	BuildTail          []string         `json:"build_tail,omitempty"`
+	Edits              []EditRecord     `json:"edits,omitempty"`
+	Shellcode          string           `json:"shellcode,omitempty"`
+	Producer           string           `json:"producer,omitempty"`
+	ShellcodeGenerated bool             `json:"shellcode_generated,omitempty"`
 	// BuildOptions and ProducerOptions are the effective build state for the
 	// cycle. They are restored with the last executing payload, so a build
 	// option that regressed cannot leak into a later cycle.
@@ -1668,6 +1681,7 @@ func summarizeCycle(loopID string, iteration int, run Run, feedback Feedback, bu
 			break
 		}
 	}
+	summary.Hygiene = hygieneSummary(feedback.Findings)
 	lines := strings.Split(strings.TrimSpace(buildLog), "\n")
 	if len(lines) > 15 {
 		lines = lines[len(lines)-15:]
@@ -1676,6 +1690,95 @@ func summarizeCycle(loopID string, iteration int, run Run, feedback Feedback, bu
 		summary.BuildTail = append(summary.BuildTail, clipUTF8(line, 500))
 	}
 	return summary
+}
+
+// hygieneSummary keeps the stable static findings the model can fix. The
+// stringnalyzer output is deliberately excluded: its section and string names
+// change on every build, so it is evidence about this artifact, not a backlog
+// item that can be driven to zero.
+func hygieneSummary(findings []Finding) []hygieneFinding {
+	out := make([]hygieneFinding, 0, 8)
+	seen := map[string]struct{}{}
+	for _, finding := range findings {
+		if finding.Stage != StageStatic || strings.EqualFold(finding.Tool, "stringnalyzer") {
+			continue
+		}
+		indicator := clipUTF8(sanitizeLine(finding.Indicator), 300)
+		if indicator == "" {
+			continue
+		}
+		item := hygieneFinding{
+			Rule:      clipUTF8(sanitizeLine(finding.Rule), 200),
+			Tool:      clipUTF8(sanitizeLine(finding.Tool), 80),
+			Severity:  clipUTF8(sanitizeLine(finding.Severity), 20),
+			Indicator: indicator,
+			Detail:    clipUTF8(sanitizeLine(finding.Detail), 300),
+		}
+		if len(finding.Sources) > 0 {
+			source := finding.Sources[0]
+			file := clipUTF8(sanitizeLine(filepath.ToSlash(source.File)), 200)
+			item.Source = fmt.Sprintf("%s:%d", file, source.Line)
+		}
+		key := hygieneKey(item)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, item)
+		if len(out) >= 16 {
+			break
+		}
+	}
+	return out
+}
+
+func hygieneKey(item hygieneFinding) string {
+	return strings.ToLower(strings.TrimSpace(item.Rule)) + "|" + strings.ToLower(strings.TrimSpace(item.Indicator))
+}
+
+func formatHygiene(item hygieneFinding) string {
+	parts := make([]string, 0, 3)
+	if item.Severity != "" {
+		parts = append(parts, item.Severity)
+	}
+	if item.Rule != "" {
+		parts = append(parts, item.Rule)
+	}
+	parts = append(parts, item.Indicator)
+	line := strings.Join(parts, " ")
+	if item.Source != "" {
+		line += " (" + item.Source + ")"
+	}
+	return clipUTF8(line, 300)
+}
+
+// hygieneBacklog reads the stable static findings from the payload later
+// cycles restore to, not from a rejected attempt whose state was discarded.
+func (e *evolver) hygieneBacklog() []hygieneFinding {
+	cycle := e.lastExecuting
+	if cycle == nil {
+		cycle = e.last
+	}
+	if cycle == nil {
+		return nil
+	}
+	var summary cycleSummary
+	if json.Unmarshal([]byte(cycle.Summary), &summary) != nil {
+		return nil
+	}
+	return summary.Hygiene
+}
+
+func (e *evolver) hygieneLines() []string {
+	items := e.hygieneBacklog()
+	out := make([]string, 0, len(items))
+	for i, item := range items {
+		if i >= 8 {
+			break
+		}
+		out = append(out, formatHygiene(item))
+	}
+	return out
 }
 
 // findingCounts is the metric the loop optimizes: high-severity findings,
@@ -1688,7 +1791,7 @@ type findingCounts struct {
 	Total  int
 }
 
-// countFindings classifies one feedback set. Static signatures are the
+// countFindings classifies one feedback set. Static findings are the
 // YARA/CheckPlz/Stringnalyzer stage matches, whatever their severity.
 func countFindings(findings []Finding) findingCounts {
 	counts := findingCounts{Total: len(findings)}
@@ -1707,7 +1810,7 @@ func countFindings(findings []Finding) findingCounts {
 }
 
 // findingRegression reports whether current is worse than previous: high
-// findings first, then static signatures, then medium findings, then total.
+// findings first, then static findings, then medium findings, then total.
 // A real medium reduction is progress even when low/other findings increase;
 // total is the final tie-breaker only when the medium count is unchanged.
 func findingRegression(previous, current findingCounts) bool {
@@ -1890,7 +1993,7 @@ func (e *evolver) recordExecution(cycle *Cycle, summary cycleSummary) executionG
 			return gateUnchanged
 		}
 		// A verified cycle replaces the baseline only when it does not raise
-		// high findings, static signatures, or the total finding count.
+		// high findings, static findings, or the total finding count.
 		// Otherwise the worse payload would become the source later cycles
 		// restore to.
 		if previous := e.lastExecuting; previous != nil && previous.ID != 0 {
@@ -2166,6 +2269,9 @@ func (e *evolver) dossier() string {
 	fmt.Fprintf(&b, "- build options: %s\n", formatBuildOptions(e.buildOptionsSnapshot()))
 	if producer := strings.TrimSpace(e.activeProducer); producer != "" {
 		fmt.Fprintf(&b, "- producer options (%s): %s\n", producer, formatBuildOptions(e.activeProducerOptions()))
+	}
+	if backlog := e.hygieneLines(); len(backlog) > 0 {
+		fmt.Fprintf(&b, "- static hygiene backlog: %s\n", strings.Join(backlog, " | "))
 	}
 	if names := e.producerNames(); len(names) > 0 {
 		fmt.Fprintf(&b, "- producers: %s\n", strings.Join(names, ", "))
@@ -2925,6 +3031,9 @@ func feedbackSummary(feedback Feedback, runID, payloadKey string, edits []EditRe
 		"medium_findings": counts.Medium, "static_findings": counts.Static,
 		"source_edits": len(feedback.SourceEdits),
 		"score":        feedback.Score, "level": feedback.Level,
+	}
+	if counts.Static > 0 {
+		out["hygiene"] = hygieneSummary(feedback.Findings)
 	}
 	if feedback.Telemetry != nil {
 		telemetry := map[string]any{
