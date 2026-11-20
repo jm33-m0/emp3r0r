@@ -1,5 +1,31 @@
 # Changelog
 
+## [5.11.0](https://github.com/jm33-m0/emp3r0r/compare/v5.10.4...v5.11.0) (2026-11-20)
+
+
+### Features
+
+* retain verified cycles and record loop ([9fa4c0c](https://github.com/jm33-m0/emp3r0r/commit/9fa4c0c0c7df370e405c3b4a78678093284e9fc9))
+
+
+### Bug Fixes
+
+* `producer-swap` causing failed cycle ([a4a0070](https://github.com/jm33-m0/emp3r0r/commit/a4a007097f3ec37b99cc1ded76c29bb8410bd626))
+* attribute litterbox uploads and surface rededr behavior ([ffcc451](https://github.com/jm33-m0/emp3r0r/commit/ffcc451483dcc583dcf39399312bbbc3793a6844))
+* bound artifact pruning; fix baseline test ([83cc168](https://github.com/jm33-m0/emp3r0r/commit/83cc1689722f8b99f2d158b1732c9842f72ddb58))
+* don't drop static hygiene fixes ([1afc4b4](https://github.com/jm33-m0/emp3r0r/commit/1afc4b439b140536f04e37087686e2c6ae9566fb))
+* gate cycles on design changes and planned mechanism ([26925e0](https://github.com/jm33-m0/emp3r0r/commit/26925e0a3ee52bc74317524b68fb69a6602e602e))
+* gate finding comparisons on analyzer coverage ([0dcfc59](https://github.com/jm33-m0/emp3r0r/commit/0dcfc5993f627af837647179b1320708e6e735fe))
+* harden loop memory and reporting ([4f63080](https://github.com/jm33-m0/emp3r0r/commit/4f630803593a24ad4bed6d4fba5d2a0c0c28cbfd))
+* keep artifact names short ([f51c6aa](https://github.com/jm33-m0/emp3r0r/commit/f51c6aa83ed4257659c6bd49f32f7be8fe2d4097))
+* keep detection loop readme summary high-level ([fb3b7c1](https://github.com/jm33-m0/emp3r0r/commit/fb3b7c1e3214c81328fb5a6d259df8ad98fe3f52))
+* retain source edits on regression ([f2550b2](https://github.com/jm33-m0/emp3r0r/commit/f2550b26e30479f1013f23efe85c3909034806ee))
+* split detection and static hygiene objectives ([e08b599](https://github.com/jm33-m0/emp3r0r/commit/e08b599240d560b29d82c9404ce0ed753c3a241a))
+* static hygiene techniques ([8efbcf2](https://github.com/jm33-m0/emp3r0r/commit/8efbcf27933ea7446c9c633e49b366f2aa7d6170))
+* support tuning build and producer options in detection loop ([5909c0c](https://github.com/jm33-m0/emp3r0r/commit/5909c0c88a4e1d5c5b4e29ad0c16a715f8030a4f))
+* surface static hygiene and defender verdicts ([e65475c](https://github.com/jm33-m0/emp3r0r/commit/e65475c55c19cec705fe7c918ea9176dbd3a8f4b))
+* track static hygiene as a first-class backlog ([ca0a21f](https://github.com/jm33-m0/emp3r0r/commit/ca0a21f0d4519d3cd47f75ccc218b9399980c868))
+
 ## [5.10.4](https://github.com/jm33-m0/emp3r0r/compare/v5.10.3...v5.10.4) (2026-11-19)
 
 
