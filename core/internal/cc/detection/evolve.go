@@ -301,6 +301,16 @@ type evolver struct {
 	// coverage. Finding comparisons use it instead of an executing payload
 	// whose telemetry was incomplete.
 	lastComparable *Cycle
+	// regressionBaseline is the cycle the last verified regression was
+	// measured against. It can be an executing cycle that was held because its
+	// instrumentation set had not yet repeated, so the coordinator restores it
+	// instead of the older comparable baseline.
+	regressionBaseline *Cycle
+	// lastComparison is the cycle the last verified cycle was compared with.
+	// The current cycle is already appended to e.cycles when the gate runs, so
+	// the memory recorder must use this value instead of scanning for a
+	// same-instrumentation cycle and finding the current cycle itself.
+	lastComparison *Cycle
 	// executionCheckTimeout overrides PayloadVerifyTimeout in tests.
 	executionCheckTimeout time.Duration
 
@@ -1293,7 +1303,7 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 	summary.DynamicRegions = dynamicRegionSummary(feedback, shellcode)
 	summary.GitCommits = gitCommits
 	summary.FailureLayer = failureLayer(&summary)
-	if prev := e.baselineSummary(); prev != nil && iteration > 1 {
+	if prev := e.previousInstrumentationSummary(); prev != nil && iteration > 1 {
 		if earlyTermination(summary.Telemetry) {
 			e.logClass(logging.ClassWarning,
 				"cycle %d ended before dynamic analysis; instrumentation comparison skipped", iteration)
@@ -1302,9 +1312,14 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 			summary.InstrumentationNote = note
 			e.logClass(logging.ClassWarning, "cycle %d: %s", iteration, note)
 		}
-		if highs := newHighFindings(prev.TopFindings, summary.TopFindings); len(highs) > 0 {
-			summary.NewHighFindings = highs
-			e.logClass(logging.ClassWarning, "cycle %d added high finding(s): %s", iteration, strings.Join(highs, ", "))
+		// A high that appears only because the sandbox started delivering a
+		// new source is not a payload change. Compare highs only within one
+		// instrumentation era, the same way finding counts are compared.
+		if !summary.InstrumentationChanged {
+			if highs := newHighFindings(prev.TopFindings, summary.TopFindings); len(highs) > 0 {
+				summary.NewHighFindings = highs
+				e.logClass(logging.ClassWarning, "cycle %d added high finding(s): %s", iteration, strings.Join(highs, ", "))
+			}
 		}
 	}
 	e.cyclesDone.Store(int64(e.globalUsed + iteration))
@@ -1407,7 +1422,7 @@ func failureLayerAction(layer string) string {
 	case "agent-checkin":
 		return "network activity exists but the expected agent did not check in; inspect the agent identity and C2 verification"
 	case "instrumentation":
-		return "sandbox instrumentation changed since the baseline; stabilize it before comparing or editing source"
+		return "the sandbox delivered a different instrumentation set; cycles across the change are not comparable, and the next verified cycle establishes a new baseline"
 	default:
 		return "the trace does not identify the stage; inspect the events before editing"
 	}
@@ -1488,17 +1503,25 @@ func (e *evolver) dynamicRegionHint() string {
 		". A region matching the active shellcode is the loader's outer PICO; an unmatched executable region is inside the producer PICO. A loader-only edit cannot remove an unmatched producer region: plan one change per owner or a producer-swap that covers both."
 }
 
-// baselineSummary returns the first cycle of this loop attempt. Instrumentation
-// and static-signature comparisons use it as the reference.
-func (e *evolver) baselineSummary() *cycleSummary {
-	if e == nil || len(e.cycles) == 0 {
+// previousInstrumentationSummary returns the last cycle whose telemetry can be
+// used for an instrumentation comparison. A run that ended before dynamic
+// analysis is skipped; any other run, including an offline one, observed the
+// same guest and can confirm whether a delivered set is stable.
+func (e *evolver) previousInstrumentationSummary() *cycleSummary {
+	if e == nil {
 		return nil
 	}
-	var summary cycleSummary
-	if json.Unmarshal([]byte(e.cycles[0].Summary), &summary) != nil {
-		return nil
+	for i := len(e.cycles) - 1; i >= 0; i-- {
+		var summary cycleSummary
+		if json.Unmarshal([]byte(e.cycles[i].Summary), &summary) != nil {
+			continue
+		}
+		if summary.Telemetry == nil || earlyTermination(summary.Telemetry) {
+			continue
+		}
+		return &summary
 	}
-	return &summary
+	return nil
 }
 
 // instrumentationDelta compares the instrumentation features the sandbox
@@ -1523,15 +1546,48 @@ func instrumentationDelta(baseline, current *cycleSummary) (bool, string) {
 	if len(added) == 0 && len(removed) == 0 {
 		return false, ""
 	}
-	note := "guest instrumentation changed since the baseline"
+	note := "guest instrumentation changed since the previous verified cycle"
 	if len(added) > 0 {
 		note += "; added " + strings.Join(added, ", ")
 	}
 	if len(removed) > 0 {
 		note += "; removed " + strings.Join(removed, ", ")
 	}
-	note += ". The offline result is not attributable to source; stabilize the sandbox before editing"
+	note += ". Cycles across the change are not comparable"
 	return true, note
+}
+
+// instrumentationComparable reports whether two cycles were observed under the
+// same delivered instrumentation. A cycle without telemetry is treated as
+// unknown and comparable, which preserves the pre-telemetry behaviour for
+// static cycles and older summaries.
+func instrumentationComparable(previous *Cycle, current *cycleSummary) bool {
+	if previous == nil || current == nil {
+		return false
+	}
+	var prev cycleSummary
+	if json.Unmarshal([]byte(previous.Summary), &prev) != nil || prev.Telemetry == nil || current.Telemetry == nil {
+		return true
+	}
+	return sameDelivered(&prev, current)
+}
+
+// sameDelivered compares the telemetry features two reports delivered.
+func sameDelivered(a, b *cycleSummary) bool {
+	if a == nil || b == nil || a.Telemetry == nil || b.Telemetry == nil {
+		return false
+	}
+	before := stringSet(a.Telemetry.Coverage.Delivered)
+	after := stringSet(b.Telemetry.Coverage.Delivered)
+	if len(before) != len(after) {
+		return false
+	}
+	for feature := range before {
+		if !after[feature] {
+			return false
+		}
+	}
+	return true
 }
 
 // newHighFindings lists high top-findings that the baseline did not have.
@@ -1851,6 +1907,44 @@ func (e *evolver) comparisonBaseline() *Cycle {
 	return cycle
 }
 
+// comparisonBaselineFor returns the newest verified cycle with complete
+// coverage and the same delivered instrumentation as the current one. A cycle
+// that was held because its set was new becomes the comparison target as soon
+// as the set repeats, so a trade-off that removed findings is not thrown away
+// by restoring an older era.
+func (e *evolver) comparisonBaselineFor(current *Cycle, summary *cycleSummary) *Cycle {
+	if e == nil || summary == nil || summary.Telemetry == nil {
+		return e.comparisonBaseline()
+	}
+	for i := len(e.cycles) - 1; i >= 0; i-- {
+		cycle := &e.cycles[i]
+		if sameCycle(cycle, current) {
+			continue
+		}
+		if cycle.Execution != executionVerified {
+			continue
+		}
+		var prior cycleSummary
+		if json.Unmarshal([]byte(cycle.Summary), &prior) != nil || prior.Telemetry == nil || !coverageComplete(prior) {
+			continue
+		}
+		if sameDelivered(&prior, summary) {
+			return cycle
+		}
+	}
+	return e.comparisonBaseline()
+}
+
+func sameCycle(a, b *Cycle) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	if a.ID != 0 && b.ID != 0 {
+		return a.ID == b.ID
+	}
+	return a.LoopID == b.LoopID && a.Iteration == b.Iteration && a.PayloadKey == b.PayloadKey
+}
+
 func (e *evolver) coverageHint() string {
 	cycle := e.last
 	if cycle == nil {
@@ -2126,24 +2220,28 @@ func countsFromSummary(summary cycleSummary, total int) findingCounts {
 func (e *evolver) recordExecution(cycle *Cycle, summary cycleSummary) executionGate {
 	switch summary.Execution {
 	case executionVerified:
-		// Instrumentation that changed since the baseline makes the finding
-		// counts incomparable, even when the payload checked in. Do not adopt
-		// this cycle as the baseline others restore to.
-		if summary.InstrumentationChanged {
-			return gateUnchanged
-		}
-		// A verified cycle replaces the comparable baseline only when it has
-		// complete analyzer coverage and does not raise high findings, static
-		// findings, or the total finding count. A coverage gap is an
-		// infrastructure result, not a detection result.
-		if previous := e.comparisonBaseline(); previous != nil && previous.ID != 0 {
+		// A verified cycle always becomes the restore target, even when the
+		// guest delivered a different instrumentation set. Findings are only
+		// compared against a baseline observed under the same set; a changed
+		// set starts a new comparison era instead of pinning the loop to its
+		// first cycle forever.
+		e.regressionBaseline = nil
+		previous := e.comparisonBaselineFor(cycle, &summary)
+		e.lastComparison = previous
+		if previous != nil && previous.ID != 0 && instrumentationComparable(previous, &summary) {
 			if findingRegression(cycleFindingCounts(previous), summaryFindingCounts(summary, cycle.Findings)) {
+				e.regressionBaseline = previous
 				return gateRegressed
 			}
 		}
 		e.lastExecuting = cycle
 		e.setPreservedShellcode(summary.Shellcode)
-		if !coverageComplete(summary) {
+		// A changed delivered set is one observation, not a new era. Keep the
+		// source and the executing state, but do not replace the comparison
+		// baseline until the next cycle confirms the same set; a one-off
+		// RedEdr source loss must not become the baseline, and a trade-off that
+		// removed real findings must not be reverted on that first sighting.
+		if summary.InstrumentationChanged || !coverageComplete(summary) {
 			return gateUnchanged
 		}
 		e.lastComparable = cycle
@@ -2164,7 +2262,11 @@ func (e *evolver) recordExecution(cycle *Cycle, summary cycleSummary) executionG
 // configured. The coordinator uses recordExecution and restores only after the
 // guest diagnosis.
 func (e *evolver) applyExecutionGate(ctx context.Context, cycle *Cycle, summary cycleSummary) {
-	switch e.recordExecution(cycle, summary) {
+	gate := e.recordExecution(cycle, summary)
+	if cycle != nil {
+		e.recordTechniqueMemory(ctx, *cycle, summary, gate)
+	}
+	switch gate {
 	case gateBlocked:
 		return
 	case gateRestore:
@@ -2332,7 +2434,13 @@ func (e *evolver) executionHint() string {
 	if e.last != nil {
 		var summary cycleSummary
 		if json.Unmarshal([]byte(e.last.Summary), &summary) == nil && summary.InstrumentationChanged {
-			return "Execution gate: " + summary.InstrumentationNote + ". The last cycle is not comparable; do not edit source until the guest instrumentation matches the baseline."
+			hint := "Instrumentation gate: " + summary.InstrumentationNote + "."
+			if summary.Execution == executionVerified {
+				hint += " Compare only against cycles observed under the same delivered set; the source is kept, but this run does not replace the baseline until the next run confirms the same set."
+			} else {
+				hint += " The cycle did not execute; fix the execution path before editing detection code."
+			}
+			return hint
 		}
 	}
 	if e.last != nil && e.last.Execution == executionOffline && e.lastExecuting == nil {
@@ -2651,7 +2759,8 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 			"The full feedback, build log, and telemetry are stored in SQLite; this returns a bounded summary. " +
 			"The host checks the generated agent with AgentStatus and reports execution=verified, offline, or unverified. " +
 			"Call it after a source or design change with one falsifiable prediction; a cycle with no source, build-option, producer, or agent change " +
-			"is rejected. The mechanism must match the planner's mechanism.",
+			"is rejected. The mechanism must match the planner's mechanism. The note is stored in loop memory as the technique recipe, so make it " +
+			"actionable: the rule it targets and the implementation detail a later cycle needs.",
 		Prompt: "Build and run one detection cycle.",
 		Schema: map[string]any{
 			"type": "object",
@@ -2667,7 +2776,7 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 						"producer edits the current producer source; producer-swap changes the wrapper and requires a different active producer. " +
 						"Name the concrete mechanism, not an incidental file or import change.",
 				},
-				"note":       map[string]any{"type": "string", "description": "What this cycle is testing."},
+				"note":       map[string]any{"type": "string", "description": "What this cycle is testing and the actionable recipe for the technique; the host stores it in loop memory."},
 				"prediction": map[string]any{"type": "string", "description": "One falsifiable prediction for this cycle: the expected analyzer, event, verdict, or absence of one. The host records it with the observed result."},
 			},
 			"required": []string{"mechanism"},

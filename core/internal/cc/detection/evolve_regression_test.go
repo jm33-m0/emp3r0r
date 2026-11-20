@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
 func TestInstrumentationDelta(t *testing.T) {
@@ -142,15 +144,57 @@ func TestFinalPayloadVerifiedTreatsLiveCheckInAsHealthy(t *testing.T) {
 	}
 }
 
-func TestRecordExecutionRejectsChangedInstrumentation(t *testing.T) {
-	e := &evolver{lastExecuting: &Cycle{ID: 1, PayloadKey: "sha256:good", Findings: 10}}
-	gate := e.recordExecution(&Cycle{ID: 2, PayloadKey: "sha256:weak", Findings: 10}, cycleSummary{
+func TestRecordExecutionHoldsChangedInstrumentation(t *testing.T) {
+	good := &Cycle{
+		ID: 1, PayloadKey: "sha256:good", Findings: 10,
+		Summary: `{"execution":"verified","high_findings":1,"telemetry":{"coverage":{"delivered":["etw"]}}}`,
+	}
+	e := &evolver{lastExecuting: good, lastComparable: good}
+	next := &Cycle{ID: 2, PayloadKey: "sha256:weak", Findings: 10}
+	gate := e.recordExecution(next, cycleSummary{
 		Execution:              executionVerified,
 		InstrumentationChanged: true,
-		HighFindings:           0,
+		HighFindings:           5,
+		StaticFindings:         31,
+		Telemetry:              &TelemetryStats{Coverage: TelemetryCoverage{Delivered: []string{"etw", "etwti"}}},
 	})
-	if gate != gateUnchanged || e.lastExecuting == nil || e.lastExecuting.ID != 1 {
-		t.Fatalf("instrumentation-changed cycle was adopted: gate=%v last=%+v", gate, e.lastExecuting)
+	if gate != gateUnchanged {
+		t.Fatalf("gate = %v, want gateUnchanged for the first observation of a new instrumentation set", gate)
+	}
+	if e.lastExecuting != next {
+		t.Fatalf("held cycle is not the restore target: %+v", e.lastExecuting)
+	}
+	if e.lastComparable != good {
+		t.Fatalf("held cycle replaced the comparable baseline: %+v", e.lastComparable)
+	}
+}
+
+func TestRegressionGateUsesSameInstrumentationEra(t *testing.T) {
+	e := &evolver{logf: func(logging.Class, string, ...any) {}}
+	e.cycles = []Cycle{
+		{ID: 1, Summary: `{"execution":"verified","high_findings":1,"telemetry":{"coverage":{"delivered":["etw"]}}}`},
+		{ID: 2, Summary: `{"execution":"verified","high_findings":1,"telemetry":{"coverage":{"delivered":["etw","etwti"]}}}`},
+	}
+	e.lastExecuting = &e.cycles[1]
+	e.lastComparable = &e.cycles[1]
+
+	prev := e.previousInstrumentationSummary()
+	if prev == nil || len(prev.Telemetry.Coverage.Delivered) != 2 {
+		t.Fatalf("instrumentation reference = %+v, want the newest verified cycle", prev)
+	}
+	stable := &cycleSummary{Telemetry: &TelemetryStats{Coverage: TelemetryCoverage{Delivered: []string{"etw", "etwti"}}}}
+	if changed, note := instrumentationDelta(prev, stable); changed {
+		t.Fatalf("stable instrumentation reported a change: %q", note)
+	}
+
+	next := &Cycle{ID: 3, Summary: `{"execution":"verified","high_findings":2,"telemetry":{"coverage":{"delivered":["etw","etwti"]}}}`}
+	gate := e.recordExecution(next, cycleSummary{
+		Execution:    executionVerified,
+		HighFindings: 2,
+		Telemetry:    &TelemetryStats{Coverage: TelemetryCoverage{Delivered: []string{"etw", "etwti"}}},
+	})
+	if gate != gateRegressed {
+		t.Fatalf("gate = %v, want gateRegressed inside the new instrumentation era", gate)
 	}
 }
 
@@ -234,5 +278,88 @@ func TestEarlyTerminationSkipsInstrumentationGate(t *testing.T) {
 		if got := earlyTermination(tc.stats); got != tc.want {
 			t.Errorf("%s: earlyTermination = %v, want %v", tc.name, got, tc.want)
 		}
+	}
+}
+
+func TestChangedInstrumentationHeldThenConfirmed(t *testing.T) {
+	good := &Cycle{ID: 1, Findings: 10, Summary: `{"execution":"verified","high_findings":1,"static_findings":29,"telemetry":{"coverage":{"delivered":["etw","etwti"]}}}`}
+	e := &evolver{lastExecuting: good, lastComparable: good}
+	first := &Cycle{ID: 2, Findings: 10, Summary: `{"execution":"verified","high_findings":1,"static_findings":31,"telemetry":{"coverage":{"delivered":["etw"]}}}`}
+	gate := e.recordExecution(first, cycleSummary{
+		Execution:              executionVerified,
+		InstrumentationChanged: true,
+		HighFindings:           1,
+		StaticFindings:         31,
+		Telemetry:              &TelemetryStats{Coverage: TelemetryCoverage{Delivered: []string{"etw"}}},
+	})
+	if gate != gateUnchanged || e.lastComparable != good {
+		t.Fatalf("first observation of a new set was adopted: gate=%v baseline=%+v", gate, e.lastComparable)
+	}
+
+	e.cycles = []Cycle{*good, *first}
+	prev := e.previousInstrumentationSummary()
+	if prev == nil || len(prev.Telemetry.Coverage.Delivered) != 1 {
+		t.Fatalf("instrumentation reference = %+v, want the last usable cycle", prev)
+	}
+	stable := &cycleSummary{Telemetry: &TelemetryStats{Coverage: TelemetryCoverage{Delivered: []string{"etw"}}}}
+	if changed, note := instrumentationDelta(prev, stable); changed {
+		t.Fatalf("a repeated set was reported as a change: %q", note)
+	}
+
+	confirmed := &Cycle{ID: 3, Findings: 10, Summary: `{"execution":"verified","high_findings":1,"static_findings":31,"telemetry":{"coverage":{"delivered":["etw"]}}}`}
+	gate = e.recordExecution(confirmed, cycleSummary{
+		Execution:      executionVerified,
+		HighFindings:   1,
+		StaticFindings: 31,
+		Telemetry:      &TelemetryStats{Coverage: TelemetryCoverage{Delivered: []string{"etw"}}},
+	})
+	if gate != gateExecuting {
+		t.Fatalf("gate = %v, want gateExecuting once the set repeated", gate)
+	}
+	if e.lastComparable != confirmed {
+		t.Fatalf("confirmed set did not become the baseline: %+v", e.lastComparable)
+	}
+}
+
+func TestHeldCycleIsRegressionBaselineWhenSetRepeats(t *testing.T) {
+	e := &evolver{logf: func(logging.Class, string, ...any) {}}
+	e.cycles = []Cycle{
+		{ID: 1, Execution: executionVerified, Summary: `{"execution":"verified","high_findings":1,"static_findings":29,"telemetry":{"coverage":{"delivered":["etw","etwti"]}}}`},
+		{ID: 2, Execution: executionVerified, Summary: `{"execution":"verified","high_findings":1,"static_findings":31,"telemetry":{"coverage":{"delivered":["etw"]}}}`},
+	}
+	e.lastExecuting = &e.cycles[1]
+	e.lastComparable = &e.cycles[0]
+	next := &Cycle{ID: 3, Execution: executionVerified, Summary: `{"execution":"verified","high_findings":2,"static_findings":31,"telemetry":{"coverage":{"delivered":["etw"]}}}`}
+	gate := e.recordExecution(next, cycleSummary{
+		Execution:      executionVerified,
+		HighFindings:   2,
+		StaticFindings: 31,
+		Telemetry:      &TelemetryStats{Coverage: TelemetryCoverage{Delivered: []string{"etw"}}},
+	})
+	if gate != gateRegressed {
+		t.Fatalf("gate = %v, want gateRegressed against the held cycle", gate)
+	}
+	if e.regressionBaseline == nil || e.regressionBaseline.ID != 2 {
+		t.Fatalf("regression baseline = %+v, want the held cycle 2", e.regressionBaseline)
+	}
+}
+
+func TestComparisonBaselineExcludesCurrentCycle(t *testing.T) {
+	e := &evolver{logf: func(logging.Class, string, ...any) {}}
+	e.cycles = []Cycle{
+		{ID: 1, LoopID: "loop", Iteration: 1, Execution: executionVerified, Summary: `{"execution":"verified","high_findings":1,"telemetry":{"coverage":{"delivered":["etw"]}}}`},
+		{ID: 2, LoopID: "loop", Iteration: 2, Execution: executionVerified, Summary: `{"execution":"verified","high_findings":2,"telemetry":{"coverage":{"delivered":["etw"]}}}`},
+	}
+	e.last = &e.cycles[1]
+	gate := e.recordExecution(&e.cycles[1], cycleSummary{
+		Execution:    executionVerified,
+		HighFindings: 2,
+		Telemetry:    &TelemetryStats{Coverage: TelemetryCoverage{Delivered: []string{"etw"}}},
+	})
+	if gate != gateRegressed {
+		t.Fatalf("gate = %v, want gateRegressed against cycle 1, not a self-comparison", gate)
+	}
+	if e.lastComparison == nil || e.lastComparison.ID != 1 {
+		t.Fatalf("comparison = %+v, want cycle 1", e.lastComparison)
 	}
 }

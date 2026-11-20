@@ -216,6 +216,69 @@ CREATE TABLE IF NOT EXISTS loop_shellcodes (
 );
 CREATE INDEX IF NOT EXISTS loop_shellcodes_loop ON loop_shellcodes(loop_id, id);
 
+CREATE TABLE IF NOT EXISTS loop_memory_findings (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	rule TEXT NOT NULL DEFAULT '',
+	indicator TEXT NOT NULL DEFAULT '',
+	stage TEXT NOT NULL DEFAULT '',
+	severity TEXT NOT NULL DEFAULT '',
+	occurrences INTEGER NOT NULL DEFAULT 0,
+	first_loop TEXT NOT NULL DEFAULT '',
+	last_loop TEXT NOT NULL DEFAULT '',
+	updated_at INTEGER NOT NULL DEFAULT 0,
+	UNIQUE(rule, indicator)
+);
+CREATE INDEX IF NOT EXISTS loop_memory_findings_rule ON loop_memory_findings(rule);
+
+CREATE TABLE IF NOT EXISTS loop_memory_techniques (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	mechanism TEXT NOT NULL DEFAULT '',
+	name TEXT NOT NULL DEFAULT '',
+	module TEXT NOT NULL DEFAULT '',
+	files TEXT NOT NULL DEFAULT '',
+	note TEXT NOT NULL DEFAULT '',
+	samples INTEGER NOT NULL DEFAULT 0,
+	wins INTEGER NOT NULL DEFAULT 0,
+	losses INTEGER NOT NULL DEFAULT 0,
+	avg_score REAL NOT NULL DEFAULT 0,
+	best_score REAL NOT NULL DEFAULT 0,
+	last_score REAL NOT NULL DEFAULT 0,
+	last_loop TEXT NOT NULL DEFAULT '',
+	last_iteration INTEGER NOT NULL DEFAULT 0,
+	last_trace INTEGER NOT NULL DEFAULT 0,
+	updated_at INTEGER NOT NULL DEFAULT 0,
+	UNIQUE(mechanism, name)
+);
+CREATE TABLE IF NOT EXISTS loop_memory_links (
+	technique_id INTEGER NOT NULL REFERENCES loop_memory_techniques(id),
+	finding_id INTEGER NOT NULL REFERENCES loop_memory_findings(id),
+	direction TEXT NOT NULL DEFAULT 'removed',
+	count INTEGER NOT NULL DEFAULT 0,
+	last_loop TEXT NOT NULL DEFAULT '',
+	last_iteration INTEGER NOT NULL DEFAULT 0,
+	PRIMARY KEY (technique_id, finding_id, direction)
+);
+CREATE TABLE IF NOT EXISTS loop_memory_evidence (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	technique_id INTEGER NOT NULL REFERENCES loop_memory_techniques(id),
+	loop_id TEXT NOT NULL DEFAULT '',
+	iteration INTEGER NOT NULL DEFAULT 0,
+	trace_id INTEGER NOT NULL DEFAULT 0,
+	score REAL NOT NULL DEFAULT 0,
+	execution TEXT NOT NULL DEFAULT '',
+	coverage TEXT NOT NULL DEFAULT '',
+	note TEXT NOT NULL DEFAULT '',
+	created_at INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS loop_memory_edits (
+	technique_id INTEGER NOT NULL REFERENCES loop_memory_techniques(id),
+	edit_id INTEGER NOT NULL,
+	PRIMARY KEY (technique_id, edit_id)
+);
+CREATE INDEX IF NOT EXISTS loop_memory_links_finding ON loop_memory_links(finding_id, direction);
+CREATE INDEX IF NOT EXISTS loop_memory_evidence_technique ON loop_memory_evidence(technique_id);
+CREATE INDEX IF NOT EXISTS loop_memory_edits_technique ON loop_memory_edits(technique_id);
+
 CREATE TABLE IF NOT EXISTS loop_workers (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
 	loop_id TEXT NOT NULL,

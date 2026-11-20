@@ -60,6 +60,17 @@ func RenderLoopSummary(answer map[string]any, cycles []Cycle, edits []EditRecord
 		if last.Execution == executionOffline {
 			fmt.Fprintf(&b, "\n> The final cycle did not execute; its finding counts are not comparable with an executing cycle.\n")
 		}
+		if removed, added := deliveredDiff(cycleDelivered(first), cycleDelivered(last)); len(removed) > 0 || len(added) > 0 {
+			fmt.Fprintf(&b, "\n> **Counts are not comparable:** cycle 1 delivered `%s`; cycle %d delivered `%s`",
+				strings.Join(cycleDelivered(first), ", "), last.Iteration, strings.Join(cycleDelivered(last), ", "))
+			if len(removed) > 0 {
+				fmt.Fprintf(&b, " (removed `%s`)", strings.Join(removed, ", "))
+			}
+			if len(added) > 0 {
+				fmt.Fprintf(&b, " (added `%s`)", strings.Join(added, ", "))
+			}
+			fmt.Fprintf(&b, ". Telemetry findings that vanished with a removed source were not observed, not evaded.\n")
+		}
 		if finalIndex != len(cycles)-1 {
 			fmt.Fprintf(&b, "\n> The last attempted cycle was rejected or restored; the final counts are the last executing payload.\n")
 		}
@@ -568,6 +579,17 @@ func renderFindingObjective(b *strings.Builder, cycles []Cycle, finalIndex int) 
 	fmt.Fprintf(b, "| Total findings | %d | %d | %s |\n", before.Total, after.Total, signedChange(after.Total-before.Total))
 	fmt.Fprintf(b, "| Defender verdicts | %d | %d | %s |\n", first.Verdicts, last.Verdicts, signedChange(last.Verdicts-first.Verdicts))
 	fmt.Fprintf(b, "\nExecuting cycles: %d/%d.", executing, len(cycles))
+	if removed, added := deliveredDiff(cycleDelivered(first), cycleDelivered(last)); len(removed) > 0 || len(added) > 0 {
+		fmt.Fprintf(b, "\n\n> **Counts are not comparable:** cycle 1 delivered `%s`; cycle %d delivered `%s`",
+			strings.Join(cycleDelivered(first), ", "), last.Iteration, strings.Join(cycleDelivered(last), ", "))
+		if len(removed) > 0 {
+			fmt.Fprintf(b, " (removed `%s`)", strings.Join(removed, ", "))
+		}
+		if len(added) > 0 {
+			fmt.Fprintf(b, " (added `%s`)", strings.Join(added, ", "))
+		}
+		fmt.Fprintf(b, ". Telemetry findings that vanished with a removed source were not observed, not evaded.\n")
+	}
 	if last.Execution != executionVerified {
 		fmt.Fprintf(b, " The final cycle did not execute, so its counts are not a detection result.")
 	}
@@ -606,6 +628,36 @@ func containsFindingKey(keys []string, key string) bool {
 		}
 	}
 	return false
+}
+
+func cycleDelivered(cycle Cycle) []string {
+	var summary cycleSummary
+	if json.Unmarshal([]byte(cycle.Summary), &summary) != nil || summary.Telemetry == nil {
+		return nil
+	}
+	return summary.Telemetry.Coverage.Delivered
+}
+
+func deliveredDiff(baseline, current []string) (removed, added []string) {
+	before := stringSet(baseline)
+	after := stringSet(current)
+	for feature := range before {
+		if !after[feature] {
+			removed = append(removed, feature)
+		}
+	}
+	for feature := range after {
+		if !before[feature] {
+			added = append(added, feature)
+		}
+	}
+	sort.Strings(removed)
+	sort.Strings(added)
+	return removed, added
+}
+
+func telemetryFinding(text string) bool {
+	return strings.Contains(text, "telemetry/")
 }
 
 func cycleReportEdits(cycles []Cycle, edits []EditRecord, index int) []EditRecord {
@@ -657,6 +709,7 @@ func reportFindingChanges(cycles []Cycle, finalIndex int, edits []EditRecord) ([
 			continue
 		}
 		baselineKeys[key] = true
+		change := findingChange{Finding: sanitizeLine(top), Final: "not in final top findings"}
 		if containsFindingKey(finalKeys, key) {
 			changes = append(changes, findingChange{
 				Finding: sanitizeLine(top),
@@ -675,7 +728,6 @@ func reportFindingChanges(cycles []Cycle, finalIndex int, edits []EditRecord) ([
 				break
 			}
 		}
-		change := findingChange{Finding: sanitizeLine(top), Final: "not in final top findings"}
 		if firstAbsent < 0 || firstAbsent >= len(cycles) {
 			change.Change = "No later cycle recorded the finding as absent."
 			changes = append(changes, change)
@@ -683,6 +735,20 @@ func reportFindingChanges(cycles []Cycle, finalIndex int, edits []EditRecord) ([
 		}
 		cycle := cycles[firstAbsent]
 		summary := findings[firstAbsent].summary
+		if telemetryFinding(top) {
+			if removed, _ := deliveredDiff(cycleDelivered(cycles[0]), cycleDelivered(cycle)); len(removed) > 0 {
+				change.Change = fmt.Sprintf("Not attributable: cycle %d was captured without `%s`; the telemetry finding was not observed.",
+					cycle.Iteration, strings.Join(removed, ", "))
+				changes = append(changes, change)
+				continue
+			}
+		}
+		if strings.Contains(key, "pe/entropy") && strings.Contains(strings.ToLower(summary.Note), "overlay") {
+			change.Change = fmt.Sprintf("Section entropy is no longer reported because the blob moved to a PE overlay in cycle %d; pe-info does not scan overlays, so this is an analyzer blind spot rather than a reduction in the blob's entropy.",
+				cycle.Iteration)
+			changes = append(changes, change)
+			continue
+		}
 		parts := []string{fmt.Sprintf("First absent in cycle %d", cycle.Iteration)}
 		if mechanism := strings.TrimSpace(summary.Mechanism); mechanism != "" {
 			parts = append(parts, "mechanism `"+sanitizeLine(mechanism)+"`")

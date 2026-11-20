@@ -89,6 +89,7 @@ func (e *evolver) toolsFor(role evolveRole) []tool.CoreTool {
 		moduleReadTool(e.roots, e),
 		moduleSearchTool(e.roots),
 		analystTelemetryTool(e.db),
+		e.loopMemoryTool(),
 		e.inspectFeedbackTool(),
 		e.payloadsTool(),
 		e.comparePayloadsTool(),

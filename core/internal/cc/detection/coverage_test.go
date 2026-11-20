@@ -68,3 +68,30 @@ func TestRenderLoopReportWarnsAboutCoverage(t *testing.T) {
 		t.Fatalf("summary does not warn about coverage:\n%s", executive)
 	}
 }
+
+func TestReportMarksInstrumentationAndOverlayBlindSpots(t *testing.T) {
+	reportCycle := func(iteration int, delivered []string, tops []string, note string, high, static int) Cycle {
+		summary, err := json.Marshal(cycleSummary{
+			Execution:      executionVerified,
+			TopFindings:    tops,
+			Note:           note,
+			HighFindings:   high,
+			StaticFindings: static,
+			Telemetry:      &TelemetryStats{Coverage: TelemetryCoverage{Delivered: delivered}},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return Cycle{LoopID: "loop", Iteration: iteration, Execution: executionVerified, Findings: len(tops), Summary: string(summary)}
+	}
+	cycles := []Cycle{
+		reportCycle(1, []string{"etw", "etwti"}, []string{"high telemetry/thread-suspend SuspendThread", "high pe/entropy .rdata"}, "baseline", 2, 29),
+		reportCycle(2, []string{"etw"}, []string{"high telemetry/process-access OpenProcess"}, "Container move: RC4 key+ciphertext appended as a PE overlay", 1, 31),
+	}
+	out := RenderLoopSummary(map[string]any{"loop_id": "loop"}, cycles, nil)
+	for _, want := range []string{"Counts are not comparable", "removed `etwti`", "Not attributable", "analyzer blind spot"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("summary missing %q:\n%s", want, out)
+		}
+	}
+}

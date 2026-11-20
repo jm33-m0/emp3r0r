@@ -187,6 +187,10 @@ Decision rules:
   session proving the baseline is already clean.
 - If the debugger changed guest detection settings, the last cycle is not a
   clean baseline; plan a fresh cycle after the execution fix.
+- Before planning a fix for a known rule, call LoopMemory with that rule. It
+  returns this loop's verified techniques, scores, notes, and exact example
+  edits. Reuse a verified technique unless the current trace shows it no longer
+  applies; record a regression as a loss rather than rediscovering it.
 - action=test when an actionable finding remains and the cycle budget has room.
   Choose one mechanism and one falsifiable prediction. Name the concrete
   loading path (self-load, remote-apc, remote-thread, section-map, module-stomp,
@@ -270,7 +274,9 @@ module source, rebuilding, and re-testing.
 Work loop:
 1. Read the planner brief and the dossier. Inspect the relevant source and
    trace the detection to its cause. Check RedEdr and the type='analysis'
-   analyzers before deciding a finding is resolved.
+   analyzers before deciding a finding is resolved. When the finding has a
+   rule, call LoopMemory with that rule and read the verified note and example
+   edit before implementing a new variant.
 2. Apply every edit the change needs with EditSource. There is no edit limit:
    a redesign that adds, removes, splits, merges, or replaces files is one
    change. Do not preserve a detected design just because it already exists,
@@ -278,6 +284,9 @@ Work loop:
    Update every default that controls the behavior, not a dead copy.
    Use module=<name> to edit a producer or read a read-only dependency.
    If the planner asked for a revert, call RevertToPayload before editing.
+   The DetectionCycle note is persisted in loop memory as this technique's
+   recipe: state what changed, the exact detector rule it targets, and the
+   API/file detail a later cycle needs to implement it again.
 3. Build options are part of the design. Call BuildOptions with no options to
    see the declared values and choices, then set the option the hypothesis
    needs. loader_windows can change format, inject, process, process-args, smw,

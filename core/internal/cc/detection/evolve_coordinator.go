@@ -540,6 +540,7 @@ func (c *coordinator) afterCycle(ctx context.Context, cycle *Cycle) error {
 		summary.Execution = cycle.Execution
 	}
 	gate := c.e.recordExecution(cycle, summary)
+	c.e.recordTechniqueMemory(ctx, *cycle, summary, gate)
 	if gate == gateExecuting {
 		c.lastDiagnosis = nil
 		c.forcedFixes = 0
@@ -553,7 +554,10 @@ func (c *coordinator) afterCycle(ctx context.Context, cycle *Cycle) error {
 			cycle.Iteration, clip(strings.Join(summary.CoverageMissing, "; "), 600))
 	}
 	if gate == gateRegressed {
-		baseline := c.e.comparisonBaseline()
+		baseline := c.e.regressionBaseline
+		if baseline == nil {
+			baseline = c.e.comparisonBaseline()
+		}
 		c.lastDiagnosis = nil
 		restore := "no clean baseline exists"
 		previous := findingCounts{}
@@ -569,9 +573,10 @@ func (c *coordinator) afterCycle(ctx context.Context, cycle *Cycle) error {
 				cycle.Iteration, previous.High, current.High, previous.Medium, current.Medium,
 				previous.Static, current.Static, previous.Total, current.Total, lastGoodRef(baseline))
 		}
-		c.plannerNote = fmt.Sprintf("Cycle %d regressed (high findings %d -> %d, medium findings %d -> %d, static findings %d -> %d, total %d -> %d); the host restored %s. Do not repeat this change: test a different producer or mechanism, or stop with the evidence.",
+		c.plannerNote = fmt.Sprintf("Cycle %d regressed (high findings %d -> %d, medium findings %d -> %d, static findings %d -> %d, total %d -> %d); the host restored %s. The reverted edit is recorded in loop_edits, iteration %d, with its old/new text: reuse the part that removed a finding and change only the part that raised the regressed count (SELECT file, reason, old, new FROM loop_edits WHERE loop_id = '%s' AND iteration = %d). Do not repeat the exact change.",
 			cycle.Iteration, previous.High, current.High, previous.Medium, current.Medium,
-			previous.Static, current.Static, previous.Total, current.Total, restore)
+			previous.Static, current.Static, previous.Total, current.Total, restore,
+			cycle.Iteration, c.e.cfg.LoopID, cycle.Iteration)
 		return nil
 	}
 	if gate != gateRestore {
@@ -1032,6 +1037,9 @@ func (c *coordinator) plannerBrief() string {
 	if hint := c.e.dynamicRegionHint(); hint != "" {
 		b.WriteString(hint + "\n")
 	}
+	if memory := c.e.loopMemoryBrief(); memory != "" {
+		b.WriteString(memory + "\n")
+	}
 	b.WriteString("\n" + mechanismCatalogBrief())
 	if c.knowledgeBrief != "" {
 		fmt.Fprintf(&b, "\nRetrieved knowledge (host-side; read a summary before searching):\n%s", c.knowledgeBrief)
@@ -1138,6 +1146,9 @@ func (c *coordinator) editorBrief(plan plannerPlan) string {
 	}
 	if hint := c.e.dynamicRegionHint(); hint != "" {
 		b.WriteString(hint + "\n")
+	}
+	if memory := c.e.loopMemoryBrief(); memory != "" {
+		b.WriteString(memory + "\n")
 	}
 	if plan.Mechanism != "" {
 		b.WriteString("\n" + c.e.mechanismBrief(plan.Mechanism))
