@@ -239,8 +239,10 @@ Decision rules:
   GenerateAgent for that agent type, then BuildShellcode with that input. Do not
   label a source edit of the current producer as a swap.
 - If two verified cycles did not reduce high findings or static findings and
-  the current producer is still donut, plan one producer-swap before repeating
-  the same mechanism.
+  the brief names a configured producer that is not active, plan one
+  producer-swap before repeating the same mechanism. If no such producer is
+  named, producer-swap is unavailable: use mechanism=producer on the active
+  producer, or another available mechanism.
 - If the last two cycles used the same mechanism and did not remove a real
   verdict or reduce high findings or static findings, choose a different
   mechanism or record

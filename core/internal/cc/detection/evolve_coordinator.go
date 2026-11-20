@@ -181,6 +181,18 @@ func (c *coordinator) run(ctx context.Context) (map[string]any, error) {
 				c.plannerNote = "the cycle budget is exhausted; return action=stop with the final JSON"
 				continue
 			}
+			if c.producerSwapUnavailable(plan.Mechanism) {
+				c.rejectedPlans++
+				c.plannerNote = fmt.Sprintf("mechanism=producer-swap is unavailable: configured producers are %s and no producer other than the active %s is configured. Choose mechanism=producer to edit the active producer, or another available mechanism; do not ask the editor to swap in a producer the loop does not have.",
+					strings.Join(c.e.producerNames(), ", "), headerOrNone(c.e.activeProducer))
+				c.e.logClass(logging.ClassWarning, "planner chose producer-swap without a configured alternative")
+				if c.rejectedPlans >= maxRejectedPlans {
+					final := c.coordinatorStopFinal("the planner chose producer-swap with no configured alternative producer")
+					c.finalDiagnosis(ctx, final)
+					return final, nil
+				}
+				continue
+			}
 			if c.repeatedNonImprovingMechanism(plan.Mechanism) {
 				c.rejectedPlans++
 				c.plannerNote = fmt.Sprintf("The last two cycles used mechanism %q without a high-finding, static-signature, or verdict improvement. Choose a different mechanism or producer-swap, or action=stop.", plan.Mechanism)
@@ -377,6 +389,13 @@ func (c *coordinator) producerSwapTarget() string {
 		}
 	}
 	return ""
+}
+
+// producerSwapUnavailable reports a plan that asks for a producer swap with no
+// configured producer other than the active one. Reject it before the editor
+// starts; the editor cannot install a producer the loop does not have.
+func (c *coordinator) producerSwapUnavailable(mechanism string) bool {
+	return strings.EqualFold(strings.TrimSpace(mechanism), "producer-swap") && c.producerSwapTarget() == ""
 }
 
 // repeatedNonImprovingMechanism enforces the planner rule that two cycles of
@@ -1017,6 +1036,9 @@ func (c *coordinator) plannerBrief() string {
 	if target := c.producerSwapTarget(); target != "" {
 		fmt.Fprintf(&b, "Producer swap: %s is configured and not active; %s. A source edit of the active producer is mechanism=producer, not a swap.\n",
 			target, c.e.producerSwapHelp(target))
+	} else {
+		fmt.Fprintf(&b, "Producer swap: unavailable; configured producers are %s. No producer other than the active %s is configured, so mechanism=producer-swap cannot execute. Use mechanism=producer for a source edit of the active producer, or another available mechanism.\n",
+			strings.Join(c.e.producerNames(), ", "), headerOrNone(c.e.activeProducer))
 	}
 	fmt.Fprintf(&b, "Cycle budget: %d total; %d used; %d remain\nStages: %s\n",
 		c.e.cfg.Iterations, c.e.usedCycles(), max(0, c.e.cfg.Iterations-c.e.usedCycles()), strings.Join(stageNames(c.e.cfg.Stages), ", "))

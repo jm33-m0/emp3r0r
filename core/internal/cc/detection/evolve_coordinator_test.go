@@ -360,6 +360,20 @@ func TestDebuggerPolicyNormalization(t *testing.T) {
 	}
 }
 
+func TestProducerSwapUnavailableWithoutSecondProducer(t *testing.T) {
+	e := &evolver{
+		cfg:            EvolveConfig{ProducerDirs: map[string]string{"donut": "/tmp/donut"}},
+		activeProducer: "donut",
+	}
+	c := &coordinator{e: e}
+	if !c.producerSwapUnavailable("producer-swap") {
+		t.Fatal("producer-swap was accepted with only the active producer configured")
+	}
+	if c.producerSwapUnavailable("producer") {
+		t.Fatal("a source edit of the active producer was treated as an impossible swap")
+	}
+}
+
 func TestRegressedCycleKeepsSourceEdits(t *testing.T) {
 	db, err := OpenTelemetryDB(filepath.Join(t.TempDir(), "telemetry.db"))
 	if err != nil {
