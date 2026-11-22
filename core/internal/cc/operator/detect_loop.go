@@ -328,6 +328,7 @@ func detectLoopResumeCmd() *cobra.Command {
 			} else if opts.AgentType == "" || opts.AgentType == "auto" {
 				opts.AgentType = "windows_executable"
 			}
+			applyDetectLoopLabs(&opts)
 			if strings.TrimSpace(opts.ModuleDir) == "" {
 				logging.Errorf("detect_loop resume: the saved loop has no module directory")
 				return
@@ -570,6 +571,39 @@ type detectLoopOptions struct {
 	RenderWidth         int
 }
 
+// applyDetectLoopLabs fills the loop's lab and guest settings from the
+// operator file. Resume paths use it too, because saved manifests predate a lab
+// entry or carry an empty guest field.
+func applyDetectLoopLabs(opts *detectLoopOptions) {
+	labs, err := detection.LoadLabs(filepath.Join(live.EmpWorkSpace, "detection"))
+	if err != nil {
+		logging.Warningf("detect_loop: load labs: %v", err)
+		return
+	}
+	lab := labs.ForPlatform(opts.Platform)
+	if strings.TrimSpace(opts.Sandbox) == "" {
+		opts.Sandbox = lab.URL
+	}
+	if strings.TrimSpace(opts.GuestSSH) == "" {
+		opts.GuestSSH = lab.GuestSSH
+	}
+	if strings.TrimSpace(opts.GuestSSHKey) == "" {
+		opts.GuestSSHKey = lab.GuestSSHKey
+	}
+	if strings.TrimSpace(opts.GuestSSHExclude) == "" {
+		opts.GuestSSHExclude = lab.GuestSSHExclude
+	}
+	if strings.TrimSpace(opts.GuestSSHKnownHosts) == "" {
+		opts.GuestSSHKnownHosts = lab.GuestSSHKnownHosts
+	}
+	if strings.TrimSpace(opts.GuestSSHFingerprint) == "" {
+		opts.GuestSSHFingerprint = lab.GuestSSHFingerprint
+	}
+	if !opts.GuestSSHInsecure {
+		opts.GuestSSHInsecure = lab.GuestSSHInsecure
+	}
+}
+
 // detectLoopWindowTitle gives each loop its own tmux window name. The loop ID
 // is the stable identity; values from resume arguments are reduced to a safe
 // tmux label instead of being passed through as format syntax.
@@ -677,32 +711,7 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 	opts.Platform = detection.PlatformForModule(opts.Module)
-	labs, labErr := detection.LoadLabs(filepath.Join(live.EmpWorkSpace, "detection"))
-	if labErr != nil {
-		logging.Warningf("detect_loop: load labs: %v", labErr)
-	}
-	lab := labs.ForPlatform(opts.Platform)
-	if strings.TrimSpace(opts.Sandbox) == "" {
-		opts.Sandbox = lab.URL
-	}
-	if strings.TrimSpace(opts.GuestSSH) == "" {
-		opts.GuestSSH = lab.GuestSSH
-	}
-	if strings.TrimSpace(opts.GuestSSHKey) == "" {
-		opts.GuestSSHKey = lab.GuestSSHKey
-	}
-	if strings.TrimSpace(opts.GuestSSHExclude) == "" {
-		opts.GuestSSHExclude = lab.GuestSSHExclude
-	}
-	if strings.TrimSpace(opts.GuestSSHKnownHosts) == "" {
-		opts.GuestSSHKnownHosts = lab.GuestSSHKnownHosts
-	}
-	if strings.TrimSpace(opts.GuestSSHFingerprint) == "" {
-		opts.GuestSSHFingerprint = lab.GuestSSHFingerprint
-	}
-	if !opts.GuestSSHInsecure {
-		opts.GuestSSHInsecure = lab.GuestSSHInsecure
-	}
+	applyDetectLoopLabs(&opts)
 	if opts.AgentType = strings.ToLower(strings.TrimSpace(opts.AgentType)); opts.AgentType == "" {
 		opts.AgentType = "auto"
 	}
