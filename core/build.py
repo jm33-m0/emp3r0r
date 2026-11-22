@@ -351,20 +351,20 @@ def validate_build_value(value: str, label: str) -> str:
     return value
 
 
-def resolve_magic_string() -> str:
+def resolve_magic_string(persist: bool = True) -> str:
     """Return the MagicString to embed, keeping it stable across builds.
 
     Precedence:
       1. EMP3R0R_MAGIC_STRING, an explicit value (useful in CI, or when the
-         store lives outside the build container); it is persisted so later
-         builds keep it;
+         store lives outside the build container); persisted unless disabled;
       2. the persisted store (~/.emp3r0r/magic_string), reused as-is;
-      3. a freshly generated value, persisted for the next build.
+      3. a freshly generated value, persisted unless disabled.
     """
     if env := os.environ.get("EMP3R0R_MAGIC_STRING", "").strip():
         env = validate_build_value(env, "MagicString")
         log_info("Using MagicString from EMP3R0R_MAGIC_STRING")
-        persist_magic_string(env)
+        if persist:
+            persist_magic_string(env)
         return env
 
     if MAGIC_STRING_FILE.is_file():
@@ -375,8 +375,9 @@ def resolve_magic_string() -> str:
         log_warn(f"{MAGIC_STRING_FILE} is empty; generating a new MagicString")
 
     value = hashlib.sha256(os.urandom(32)).hexdigest()
-    persist_magic_string(value)
-    log_success(f"Generated a new MagicString and stored it in {MAGIC_STRING_FILE}")
+    if persist:
+        persist_magic_string(value)
+        log_success(f"Generated a new MagicString and stored it in {MAGIC_STRING_FILE}")
     return validate_build_value(value, "MagicString")
 
 
@@ -2141,7 +2142,11 @@ def build_single_payload(args: argparse.Namespace) -> None:
         # These link against libc through zig; pure Go does not need a C compiler.
         check_zig()
 
-    magic_str = args.payload_magic_string or resolve_magic_string()
+    magic_str = (
+        validate_build_value(args.payload_magic_string, "MagicString")
+        if args.payload_magic_string
+        else resolve_magic_string(persist=False)
+    )
     version = get_version(core_dir)
     ldflags = (
         f"-v -X 'github.com/jm33-m0/emp3r0r/core/internal/def.MagicString={magic_str}' "
