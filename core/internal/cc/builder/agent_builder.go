@@ -10,7 +10,6 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/uuid"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
@@ -266,29 +265,12 @@ func GenerateAgentArtifact(opts AgentConfig, payloadType, archChoice string, sig
 	return result, nil
 }
 
-// GenerateAgentWorkflow builds an agent and wraps Linux SO payloads with
-// malasada. Windows callers use GenerateAgentArtifact and choose the donut or
-// crystal_pack producer module explicitly.
+// GenerateAgentWorkflow builds an agent artifact. Shellcode wrapping belongs
+// to the producer modules: donut for Windows PE and malasada for a Linux SO.
 func GenerateAgentWorkflow(opts AgentConfig, payloadType, archChoice string, signAgentFn func(uuid string) (string, error)) (*GenerateAgentWorkflowResult, error) {
 	result, err := GenerateAgentArtifact(opts, payloadType, archChoice, signAgentFn)
 	if err != nil {
 		return nil, err
 	}
-
-	workflowResult := &GenerateAgentWorkflowResult{
-		BuildResult: result,
-	}
-
-	// 4. Generate shellcode for Linux SO. Windows callers choose the
-	// donut/crystal_pack producer module explicitly.
-	if payloadType == PayloadTypeLinuxSO {
-		err = tools.MalasadaConvert2Shellcode(result.OutputFile, "main", true)
-		if err != nil {
-			workflowResult.ShellcodeErr = fmt.Errorf("malasada failed: %w", err)
-		} else {
-			workflowResult.ShellcodeFile = result.OutputFile + ".bin"
-		}
-	}
-
-	return workflowResult, nil
+	return &GenerateAgentWorkflowResult{BuildResult: result}, nil
 }

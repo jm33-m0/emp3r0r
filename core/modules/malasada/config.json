@@ -1,0 +1,46 @@
+[
+  {
+    "name": "malasada",
+    "build": "bash ./build.sh",
+    "author": "sliverarmory, jm33-ng",
+    "date": "2026-11-22",
+    "comment": "Convert a Linux ELF shared object into position-independent malasada shellcode",
+    "help": "Wrap a Linux ELF shared object as malasada raw PIC: a stage0 loader plus the shared object, optionally aPLib-compressed. The converter source is editable, so the detection loop can change its ELF patching, stage0 selection, or compression when a Linux sandbox detects that surface.",
+    "examples": [
+      "malasada --input /path/to/agent.so --output /path/to/agent.bin",
+      "malasada --input /path/to/agent.so --call-export main --compress on"
+    ],
+    "is_local": true,
+    "platform": "Linux",
+    "path": "",
+    "parameters": [
+      {
+        "name": "input",
+        "description": "Linux ELF shared object to convert (C2 local path)",
+        "default": "",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "output",
+        "description": "Output raw PIC .bin (default: <input>.malasada.bin)",
+        "default": "",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "call-export",
+        "description": "Exported symbol the stage0 stub calls (the C agent exports main)",
+        "default": "main",
+        "type": "string"
+      },
+      {
+        "name": "compress",
+        "description": "aPLib-compress the shared object before embedding",
+        "default": "on",
+        "choices": ["on", "off"],
+        "type": "cstr"
+      }
+    ]
+  }
+]

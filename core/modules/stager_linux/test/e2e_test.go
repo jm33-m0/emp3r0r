@@ -31,9 +31,9 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/network"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/paths"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/jobs"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/server"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -171,8 +171,8 @@ func buildAgentSharedLibrary(t *testing.T) string {
 		// latter activates main_cgo_shared.go, which exports the `main` symbol
 		// malasada's stage0 calls after reflective loading), and the same
 		// MagicString/Version ldflags. lld leaves the amd64 .init_array addend
-		// only in the RELA entry, which tools.ConvertSharedObjectToShellcode
-		// materializes; testing with the host gcc would miss that.
+		// only in the RELA entry, which the malasada converter materializes;
+		// testing with the host gcc would miss that.
 		//
 		// This test binary is the C2, so it must share the payload's
 		// MagicString (the static PSK used for check-in): pass its embedded
@@ -684,16 +684,19 @@ func runAgentEndToEndLifecycle(t *testing.T, mode string, opts stagerOpts) {
 	// The stage0 entry convention matches downloader.c:
 	//   typedef void (*stage1_entry)(void *base_addr, size_t total_size);
 	// -----------------------------------------------------------------------
-	malasadaPayload, err := tools.ConvertSharedObjectToShellcode(patchedSOPath, "main", true)
+	payloadPath := filepath.Join(tmpDir, "agent_payload.bin")
+	producerDir := filepath.Join("..", "..", "malasada")
+	buildLog, err := modules.BuildLocalModuleAt(producerDir, "malasada", map[string]string{
+		"input": patchedSOPath, "output": payloadPath, "call-export": "main", "compress": "on",
+	})
 	if err != nil {
-		t.Fatalf("tools.ConvertSharedObjectToShellcode failed: %v", err)
+		t.Fatalf("malasada producer failed: %v\n%s", err, buildLog)
+	}
+	malasadaPayload, err := os.ReadFile(payloadPath)
+	if err != nil {
+		t.Fatalf("read malasada payload: %v", err)
 	}
 	logging.Infof("Malasada payload size: %d bytes", len(malasadaPayload))
-
-	payloadPath := filepath.Join(tmpDir, "agent_payload.bin")
-	if err := os.WriteFile(payloadPath, malasadaPayload, 0o644); err != nil {
-		t.Fatalf("Failed to write malasada payload: %v", err)
-	}
 	logging.Successf("Malasada payload ready")
 
 	// -----------------------------------------------------------------------

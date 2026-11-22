@@ -40,7 +40,7 @@ C2_SRC = ../../c_agent/src
 # read-only. core/build.py records the pinned stage0 size next to this Makefile
 # because the installed operator bundle does not ship vendor/. A source
 # checkout may instead read the vendored binary directly.
-MALASADA_STAGE0_BIN ?= ../../vendor/github.com/sliverarmory/malasada/internal/stage0/stage0_linux_amd64.bin
+MALASADA_STAGE0_BIN ?= ../malasada/src/internal/stage0/stage0_linux_amd64.bin
 -include malasada_stage0_len.mk
 MALASADA_STAGE0_LEN ?= $(shell wc -c < $(MALASADA_STAGE0_BIN) 2>/dev/null || echo 0)
 COMMON_CFLAGS += -DMALASADA_STAGE0_LEN=$(MALASADA_STAGE0_LEN)

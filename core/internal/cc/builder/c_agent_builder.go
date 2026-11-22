@@ -6,9 +6,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/google/uuid"
-	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/tools"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/cagent"
@@ -37,9 +37,10 @@ var (
 	// of the Go agent's ArchListAll so C-only toolchain targets can be added
 	// without widening what the Go builder accepts.
 	CAgentArches = []string{"amd64", "386", "arm", "arm64", "riscv64"}
-	// CAgentFormats selects the artifact the build produces: a hosted
+	// CAgentFormats selects the artifact the build prepares: a hosted
 	// executable, a shared object (dlopen/injection), or the shared object
-	// wrapped as malasada raw PIC (shellcode).
+	// that the malasada producer wraps as raw PIC. The builder never runs the
+	// producer itself.
 	CAgentFormats = []string{"exe", "so", "shellcode"}
 )
 
@@ -188,9 +189,9 @@ func validateCAgentProviders(p CAgentProviders) error {
 	if p.Format != "" && !slices.Contains(CAgentFormats, p.Format) {
 		return fmt.Errorf("invalid format %q (available: %v)", p.Format, CAgentFormats)
 	}
-	// malasada's stage0 resolves glibc's ld-linux by hardcoded path for x86_64,
-	// so raw PIC is glibc/amd64-only. The shared objects themselves are fine on
-	// every supported C agent target.
+	// The malasada stage0 resolves glibc's ld-linux by hardcoded path for
+	// x86_64, so the wrapped PIC is glibc/amd64-only. The shared objects
+	// themselves are fine on every supported C agent target.
 	if p.Format == "shellcode" {
 		if p.Libc == "musl" {
 			return fmt.Errorf("raw PIC (malasada) is glibc-only; use format=exe or so with libc=musl")
@@ -239,6 +240,14 @@ func cAgentBuildArgs(srcDir, configSrc string, p CAgentProviders) []string {
 // embedded config is encrypted under the same MagicString the C2 is using and
 // the C agent talks to exactly the same C2.
 func GenerateCAgentWorkflow(opts AgentConfig, providers CAgentProviders, signAgentFn func(uuid string) (string, error)) (*BuildAgentResult, error) {
+	return GenerateCAgentWorkflowAt(cAgentSourceDir(), opts, providers, signAgentFn)
+}
+
+// GenerateCAgentWorkflowAt builds the C agent from an explicit source tree.
+// The detection loop passes the repository or installed core/c_agent directory
+// it exposes to the model, so an agent source edit is built and detonated
+// instead of a stale installed copy.
+func GenerateCAgentWorkflowAt(sourceDir string, opts AgentConfig, providers CAgentProviders, signAgentFn func(uuid string) (string, error)) (*BuildAgentResult, error) {
 	if err := validateCAgentProviders(providers); err != nil {
 		return nil, err
 	}
@@ -246,7 +255,7 @@ func GenerateCAgentWorkflow(opts AgentConfig, providers CAgentProviders, signAge
 		return nil, fmt.Errorf("configure agent: %w", err)
 	}
 
-	srcDir := cAgentSourceDir()
+	srcDir := strings.TrimSpace(sourceDir)
 	if !util.IsFileExist(filepath.Join(srcDir, "Makefile")) {
 		return nil, fmt.Errorf("C agent source not found at %s (rebuild the operator kit)", srcDir)
 	}
@@ -307,8 +316,13 @@ func GenerateCAgentWorkflow(opts AgentConfig, providers CAgentProviders, signAge
 		return nil, fmt.Errorf("build C agent: %w\n%s", buildErr, out)
 	}
 
-	// The executable and the shared object are distinct make outputs; raw PIC is
-	// the shared object wrapped by malasada.
+	// The executable and the shared object are distinct make outputs. A raw PIC
+	// request builds the shared object that the malasada producer wraps; this
+	// builder never runs the producer itself.
+	requestedShellcode := providers.Format == "shellcode"
+	if requestedShellcode {
+		providers.Format = "so"
+	}
 	built := filepath.Join(buildDir, "agent")
 	if cAgentMakeTarget(providers.Format) == "so" {
 		built = filepath.Join(buildDir, "agent.so")
@@ -318,22 +332,9 @@ func GenerateCAgentWorkflow(opts AgentConfig, providers CAgentProviders, signAge
 	}
 
 	outFile := filepath.Join(live.EmpWorkSpace, cAgentArtifactName(providers, live.RuntimeConfig, agentUUID))
-	var data []byte
-	switch providers.Format {
-	case "so":
-		if data, err = os.ReadFile(built); err != nil {
-			return nil, fmt.Errorf("read built C agent: %w", err)
-		}
-	case "shellcode":
-		// malasada turns the PIC shared object into a loader-wrapped raw PIC
-		// blob; the exported entry is main (see agent.c).
-		if data, err = tools.ConvertSharedObjectToShellcode(built, "main", true); err != nil {
-			return nil, fmt.Errorf("convert C agent to shellcode: %w", err)
-		}
-	default:
-		if data, err = os.ReadFile(built); err != nil {
-			return nil, fmt.Errorf("read built C agent: %w", err)
-		}
+	data, err := os.ReadFile(built)
+	if err != nil {
+		return nil, fmt.Errorf("read built C agent: %w", err)
 	}
 	if err := os.WriteFile(outFile, data, 0o755); err != nil {
 		return nil, fmt.Errorf("write C agent: %w", err)

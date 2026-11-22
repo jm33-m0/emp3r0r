@@ -110,6 +110,8 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 			if payloadType == builder.PayloadTypeLinuxSO {
 				logging.Infof("Look into stager module to deliver this shellcode")
 			}
+		} else if payloadType == builder.PayloadTypeLinuxSO {
+			logging.Infof("Linux shellcode is not generated automatically; run the malasada module with %s as input", result.OutputFile)
 		} else if payloadType == builder.PayloadTypeWindowsExecutable || payloadType == builder.PayloadTypeWindowsDLL {
 			logging.Infof("Windows shellcode is not generated automatically; run the donut module with %s as input", result.OutputFile)
 		}

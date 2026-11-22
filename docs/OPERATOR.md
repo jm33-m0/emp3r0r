@@ -308,7 +308,9 @@ generate_c --cc your.domain.com --doh https://1.1.1.1/dns-query
 # musl target (Alpine and other musl hosts); dynload follows the library
 generate_c --type musl --arch arm64 --cc your.domain.com
 # artifact formats: exe (default), so (dlopen/injection), shellcode (malasada PIC)
+# shellcode builds the shared object and runs the editable malasada producer
 generate_c --cc your.domain.com --format so
+generate_c --cc your.domain.com --format shellcode
 # beacon cadence: awake poll window and self-reported offline grace
 generate_c --cc your.domain.com --interval 60 --jitter 50 --poll-window 5 --offline-grace 0
 ```

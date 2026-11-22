@@ -185,6 +185,11 @@ func moduleBuildEnvFrom(binDir, zig string, extra []string) ([]string, error) {
 		}
 	}
 	pathEntries := []string{binDir, filepath.Dir(zig)}
+	goRoot := filepath.Join(live.EmpDataDir, "go")
+	if info, err := os.Stat(filepath.Join(goRoot, "bin", "go")); err == nil && info.Mode().IsRegular() {
+		pathEntries = append(pathEntries, filepath.Join(goRoot, "bin"))
+		merged["GOROOT"] = goRoot
+	}
 	if oldPath := merged["PATH"]; oldPath != "" {
 		pathEntries = append(pathEntries, oldPath)
 	}

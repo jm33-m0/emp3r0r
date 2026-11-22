@@ -297,9 +297,9 @@ func elfInterp(path string) (string, error) {
 	return "", nil
 }
 
-// TestGenerateCAgentFormats exercises the shared-object and raw-PIC formats for
-// real: the `.so` must be a PIC ET_DYN exporting `main`, and the shellcode must
-// be malasada-wrapped (not the bare ELF).
+// TestGenerateCAgentFormats exercises the shared-object formats for real: the
+// `.so` must be a PIC ET_DYN exporting `main`. A shellcode request produces the
+// same `.so`; the malasada producer module wraps it.
 func TestGenerateCAgentFormats(t *testing.T) {
 	setupCAgentBuildEnv(t)
 
@@ -329,18 +329,15 @@ func TestGenerateCAgentFormats(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateCAgentWorkflow(shellcode): %v", err)
 	}
-	if !strings.HasSuffix(sc.OutputFile, ".bin") {
-		t.Fatalf("shellcode output name = %q, want .bin", sc.OutputFile)
+	if !strings.HasSuffix(sc.OutputFile, ".so") {
+		t.Fatalf("shellcode input artifact = %q, want .so", sc.OutputFile)
 	}
 	data, err := os.ReadFile(sc.OutputFile)
 	if err != nil {
-		t.Fatalf("read shellcode: %v", err)
+		t.Fatalf("read shellcode input: %v", err)
 	}
-	if len(data) == 0 {
-		t.Fatal("shellcode is empty")
-	}
-	if bytes.HasPrefix(data, []byte{0x7f, 'E', 'L', 'F'}) {
-		t.Fatal("shellcode is a bare ELF, want malasada-wrapped raw PIC")
+	if len(data) == 0 || !bytes.HasPrefix(data, []byte{0x7f, 'E', 'L', 'F'}) {
+		t.Fatal("shellcode input is not an ELF shared object")
 	}
 }
 

@@ -150,13 +150,14 @@ Agent builds
 - generate builds a Go agent on this operator host. type is linux_executable,
   linux_so (default), windows_executable, or windows_dll. arch must be valid
   for that type. It does not need a target.
-- Windows executable and DLL builds automatically run Donut and return
-  shellcode_file, the .bin to feed to a Windows loader. Do not run Donut
-  yourself and do not wrap the DLL by hand.
-- Linux SO builds are also converted to shellcode automatically.
+- Windows executable and DLL builds return the PE. Run the donut or
+  crystal_pack producer module to get the .bin for a Windows loader.
+- Linux SO builds return the shared object. Run the malasada producer module to
+  get the raw PIC for stager_linux.
 - generate_c builds the C agent. type selects the libc ABI (glibc or musl),
   not the artifact kind; format selects exe, so, or shellcode. format=shellcode
-  is glibc/amd64-only. It does not need a target.
+  is glibc/amd64-only and runs the editable malasada producer. It does not need
+  a target.
 - Omit cc to use the C2 address configured on this operator. Never substitute
   127.0.0.1 or an example address. Pass cc only when the operator asks for a
   different address. The result reports the address used. If the operator has
@@ -169,7 +170,7 @@ Linux C agent
 - generate_c with type=glibc, arch=amd64, format=shellcode, then run_module
   stager_linux with agent-pic=<output_file>. module_help stager_linux returns
   the formats, download mode, option defaults, and output rules.
-- The shellcode is position-independent data, not an ELF. Its transport
+- The shellcode is malasada raw PIC, not an ELF. Its transport
   library must exist on the target: libcurl (the generate_c default) or
   http_raw when the target may lack it. That is not an operator-host concern.
 
