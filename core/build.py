@@ -2070,6 +2070,34 @@ def prepare_go_agent_source(core_dir: pathlib.Path, temp_dir: pathlib.Path) -> N
             )
 
 
+def prepare_malasada_dependencies(temp_dir: pathlib.Path) -> None:
+    """Resolve malasada's Go module dependencies into the staged module tree.
+
+    The repository keeps only malasada's own source and go.mod/go.sum. Running
+    ``go mod vendor`` on the staged copy gives the installed operator kit a
+    self-contained offline build without committing third-party trees to git.
+    """
+    src_dir = temp_dir / "modules" / "malasada" / "src"
+    if not (src_dir / "go.mod").is_file():
+        return
+    if IS_DRY_RUN:
+        log_warn("[DRY-RUN] would resolve malasada Go dependencies")
+        return
+    go_root = locate_go_root()
+    go_bin = str(go_root / "bin" / "go") if go_root is not None else shutil.which("go")
+    if not go_bin:
+        log_warn("Go was not found; skipping malasada dependency vendoring")
+        return
+    env = os.environ.copy()
+    if go_root is not None:
+        env["GOROOT"] = str(go_root)
+    env["GOTOOLCHAIN"] = "local"
+    log_info(f"Resolving malasada Go dependencies in {src_dir}...")
+    res = run_cmd([go_bin, "mod", "vendor"], cwd=src_dir, env=env, check=False)
+    if res.returncode != 0:
+        log_error("Failed to resolve malasada Go dependencies with 'go mod vendor'")
+
+
 def prepare_misc_files(core_dir: pathlib.Path, temp_dir: pathlib.Path) -> None:
     log_info("Preparing misc files")
     for name in ["tmux", "modules", "c_agent", "emp3r0r"]:
@@ -2086,6 +2114,7 @@ def prepare_misc_files(core_dir: pathlib.Path, temp_dir: pathlib.Path) -> None:
             else:
                 copy2_atomic(src, temp_dir / name)
 
+    prepare_malasada_dependencies(temp_dir)
     build_py = core_dir / "build.py"
     if build_py.exists():
         copy2_atomic(build_py, temp_dir / "build.py")

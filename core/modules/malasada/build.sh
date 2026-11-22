@@ -70,8 +70,13 @@ trap 'chmod -R u+w "$BUILDDIR" 2>/dev/null || true; rm -rf "$BUILDDIR"' EXIT
 echo "[+] Building malasada converter from $SRC_DIR"
 (
 	cd "$SRC_DIR"
-	export GOTOOLCHAIN=local GOPROXY=off GOFLAGS=-mod=mod CGO_ENABLED=0
-	export GOCACHE="$BUILDDIR/go-cache" GOPATH="$BUILDDIR/gopath"
+	export GOTOOLCHAIN=local CGO_ENABLED=0
+	export GOCACHE="$BUILDDIR/go-cache"
+	if [[ -d "$SRC_DIR/vendor" ]]; then
+		export GOPROXY=off GOFLAGS=-mod=vendor GOPATH="$BUILDDIR/gopath"
+	else
+		export GOFLAGS=-mod=readonly
+	fi
 	"$GO_BIN" build -trimpath -o "$BUILDDIR/malasada" ./cmd/malasada
 )
 

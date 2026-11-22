@@ -4,10 +4,7 @@ The Linux shellcode producer. It converts an ELF shared object into a
 position-independent blob: a 64-bit stage0 loader followed by the original
 shared object (optionally aPLib-compressed).
 
-The converter is Go source under `src/`, vendored from
-[sliverarmory/malasada](https://github.com/sliverarmory/malasada) with the local
-`go-keystone` and `wazero` packages under `src/third_party/`. A build compiles
-the current tree, so a detection-loop edit to `src/` changes the next blob.
+The converter is Go source under `src/`, vendored from [sliverarmory/malasada](https://github.com/sliverarmory/malasada). Its Go module dependencies (`go-keystone`, `wazero`, `golang.org/x/sys`) are declared in `src/go.mod` and resolved into `src/vendor/` by `core/build.py` during installation so operator kits build offline without committing third-party trees to the repository. A build compiles the current tree, so a detection-loop edit to `src/` changes the next blob.
 
 ## Inputs
 
