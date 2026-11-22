@@ -37,7 +37,8 @@ const linuxDataPolicyPrompt = `Data policy:
 const linuxPayloadPrompt = `Linux payload contract:
 - The payload module is stager_linux; it builds an executable ELF from its own
   source and embeds a raw C agent PIC.
-- The C agent source is the separate writable c_agent root. Agent behavior
+- The C agent source is the separate writable agent source root, normally
+  c_agent. Agent behavior
   (transport, syscalls, strings, anti-debug, memory behavior) lives there. The
   stager owns loading, the embedded PIC, the sleep mask, and supervision.
 - GenerateAgent builds a fresh C agent shared object (linux_so) from c_agent
@@ -122,7 +123,7 @@ Work loop:
    Tracee event to the code that produced it.
 2. Apply every edit the change needs with EditSource. There is no edit limit; a
    redesign that adds, removes, splits, merges, or replaces files is one change.
-   Use module=c_agent for the agent tree. Update every default that controls the
+   Use the agent source root named in the brief (default c_agent) for the agent tree. Update every default that controls the
    behavior, not a dead copy. Do not edit tests, generated artifacts, or
    read-only roots.
 3. For an agent edit, call GenerateAgent after the edit, then BuildShellcode

@@ -167,8 +167,8 @@ const goAgentPrompt = `Go agent source:
 - The Go agent is a separate writable go_agent root. Transport, syscalls,
   strings, anti-debug, and memory behavior that belong to the agent live there,
   not in loader_windows.
-- Use EditSource module=go_agent for agent changes, then GenerateAgent to
-  rebuild the EXE or DLL from that source. The loader module still owns loading,
+- Use the writable agent source root named in the brief (default go_agent) with
+  EditSource, then GenerateAgent to rebuild the EXE or DLL from that source. The loader module still owns loading,
   injection, and the wrapper.`
 
 const plannerSystemPrompt = `You are the planner and coordinator of an autonomous detection loop for the
@@ -321,8 +321,8 @@ Work loop:
    the signal is a signature or layout in the generated blob. Producer options
    persist for the active producer and survive rotation; Crystal Palace
    link_options are build options, not a source redesign.
-5. GenerateAgent rebuilds the Go agent from the editable go_agent source. Its
-   artifact can be wrapped by donut or crystal_pack. Switching agent type or producer is a design change,
+5. GenerateAgent rebuilds the Go agent from the editable agent source root named
+   in the brief (default go_agent). Its artifact can be wrapped by donut or crystal_pack. Switching agent type or producer is a design change,
    not a replacement of the agent payload: the new artifact is a freshly built
    agent with the same configuration. Never shrink the shellcode or build a
    loader that skips the payload; the host rejects an artifact too small to

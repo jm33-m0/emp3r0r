@@ -1023,6 +1023,9 @@ func (c *coordinator) plannerBrief() string {
 	fmt.Fprintf(&b, "Module: %s\nModule source: %s\nGoal: %s\n", c.e.cfg.Module, c.e.cfg.ModuleDir, headerOrNone(c.e.cfg.Goal))
 	fmt.Fprintf(&b, "Agent C2: %s\nExpected agent UUID: %s\nAgent type: %s\n", headerOrNone(c.e.cfg.AgentCC), headerOrNone(c.e.expectedAgentUUID), headerOrNone(c.e.cfg.AgentType))
 	fmt.Fprintf(&b, "Active shellcode: %s\nActive producer: %s\nSource roots: %s\n", c.e.shellcode, headerOrNone(c.e.activeProducer), c.e.roots.describe())
+	if agentSource := c.e.agentSourceBrief(); agentSource != "" {
+		b.WriteString(agentSource + "\n")
+	}
 	fmt.Fprintf(&b, "Build options: %s\nProducer options (%s): %s\n",
 		formatBuildOptions(c.e.buildOptionsSnapshot()), headerOrNone(c.e.activeProducer),
 		formatBuildOptions(c.e.activeProducerOptions()))
@@ -1141,6 +1144,9 @@ func (c *coordinator) editorBrief(plan plannerPlan) string {
 	}
 	fmt.Fprintf(&b, "Cycle budget: %d total; %d used; %d remain\n", c.e.cfg.Iterations, c.e.usedCycles(), max(0, c.e.cfg.Iterations-c.e.usedCycles()))
 	fmt.Fprintf(&b, "Execution gate: %s\n", c.e.executionHint())
+	if agentSource := c.e.agentSourceBrief(); agentSource != "" {
+		b.WriteString(agentSource + "\n")
+	}
 	fmt.Fprintf(&b, "Build options: %s\nProducer options (%s): %s\n",
 		formatBuildOptions(c.e.buildOptionsSnapshot()), headerOrNone(c.e.activeProducer),
 		formatBuildOptions(c.e.activeProducerOptions()))

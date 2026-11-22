@@ -574,6 +574,47 @@ func (e *evolver) root(name string) (sourceRoot, error) {
 	return e.roots.pick(name)
 }
 
+// agentSourceBrief names the actual writable agent root. A custom
+// --agent-source-dir can have a different root name, and the Windows Go source
+// is mirrored as go_agent; the model must not have to infer either from the
+// static prompt.
+func (e *evolver) agentSourceBrief() string {
+	if e.roots == nil {
+		return ""
+	}
+	expected := ""
+	if e.platform() == platformLinux {
+		expected = strings.TrimSpace(e.cfg.AgentSourceDir)
+	} else {
+		expected = DefaultGoAgentSourceDir(e.cfg.ModuleDir)
+	}
+	if expected != "" {
+		for _, name := range e.roots.names {
+			root := e.roots.roots[name]
+			if !root.Writable {
+				continue
+			}
+			if sameSourceDir(root.Dir, expected) {
+				return fmt.Sprintf("Agent source root: %s=%s (edit). Edit this root for agent behavior, then call GenerateAgent to rebuild it.", name, root.Dir)
+			}
+		}
+	}
+	return ""
+}
+
+func sameSourceDir(a, b string) bool {
+	a, b = filepath.Clean(strings.TrimSpace(a)), filepath.Clean(strings.TrimSpace(b))
+	if a == "" || b == "" {
+		return false
+	}
+	if a == b {
+		return true
+	}
+	realA, errA := filepath.EvalSymlinks(a)
+	realB, errB := filepath.EvalSymlinks(b)
+	return errA == nil && errB == nil && realA == realB
+}
+
 func (e *evolver) producer(name string) (string, string, error) {
 	name = strings.ToLower(strings.TrimSpace(name))
 	dir, ok := e.cfg.ProducerDirs[name]
