@@ -66,7 +66,7 @@ func TestUsageReportAndCost(t *testing.T) {
 		t.Fatalf("report still headlines the sandbox score:\n%s", report)
 	}
 	summary := RenderLoopSummary(answer, cycles, nil)
-	for _, want := range []string{"**High findings:** 2 → 0", "**Static findings:** 3 → 0", "**Tokens:** 20.99M in / 1.86M out", "**Estimated cost:** $90.87"} {
+	for _, want := range []string{"| High findings | 2 | 0 | -2 |", "| Static findings | 3 | 0 | -3 |", "| Tokens | 20.99M in / 1.86M out |", "| Estimated cost | $90.87 |"} {
 		if !strings.Contains(summary, want) {
 			t.Fatalf("summary missing %q:\n%s", want, summary)
 		}
@@ -84,7 +84,7 @@ func TestUsageReportWithoutPricing(t *testing.T) {
 			t.Fatalf("report missing %q:\n%s", want, report)
 		}
 	}
-	if !strings.Contains(RenderLoopSummary(answer, []Cycle{testReportCycle(1, 0, 0, 1, executionVerified, 0)}, nil), "**Estimated cost:** unconfigured") {
+	if !strings.Contains(RenderLoopSummary(answer, []Cycle{testReportCycle(1, 0, 0, 1, executionVerified, 0)}, nil), "| Estimated cost | unconfigured |") {
 		t.Fatal("summary does not mark the cost unconfigured")
 	}
 }

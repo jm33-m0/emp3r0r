@@ -55,8 +55,8 @@ func TestReportUsesLastVerifiedVerdictFreePayload(t *testing.T) {
 	}
 	executive := RenderLoopSummary(answer, cycles, nil)
 	for _, want := range []string{
-		"**High findings:** 3 → 0",
-		"**Verdicts:** 0 → 0",
+		"| High findings | 3 | 0 | -3 |",
+		"| Defender verdicts | 0 | 0 | 0 |",
 		"finding baseline is cycle 20 (`verdict`",
 	} {
 		if !strings.Contains(executive, want) {

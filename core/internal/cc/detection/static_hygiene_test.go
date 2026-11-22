@@ -354,7 +354,7 @@ func TestRenderLoopReportShowsHygieneBacklog(t *testing.T) {
 		}
 	}
 	summary := RenderLoopSummary(map[string]any{"loop_id": "loop-hygiene"}, cycles, nil)
-	if !strings.Contains(summary, "**Static hygiene:** 1 open") {
+	if !strings.Contains(summary, "| Static hygiene | 1 open |") {
 		t.Fatalf("summary missing hygiene count:\n%s", summary)
 	}
 }

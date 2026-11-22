@@ -774,7 +774,7 @@ func TestRenderLoopSummaryIsCompact(t *testing.T) {
 	}
 	edits := []EditRecord{{Module: "loader_windows", File: "loader.c", Reason: "replace remote injection"}}
 	out := RenderLoopSummary(answer, cycles, edits)
-	for _, want := range []string{"**Mechanism:** `self-load`", "**High findings:** 0 → 0", "**Static findings:** 0 → 0", "**Total findings:** 57 → 50", "loader_windows/loader.c", "Donutloader YARA"} {
+	for _, want := range []string{"**Mechanism:** `self-load`", "| High findings | 0 | 0 | 0 |", "| Static findings | 0 | 0 | 0 |", "| Total findings | 57 | 50 | -7 |", "loader_windows/loader.c", "Donutloader YARA"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("summary missing %q:\n%s", want, out)
 		}
@@ -1197,7 +1197,7 @@ func TestReportUsesLastExecutingPayloadAfterRejectedCycle(t *testing.T) {
 		}
 	}
 	summary := RenderLoopSummary(answer, cycles, nil)
-	if !strings.Contains(summary, "**Total findings:** 44 → 42") {
+	if !strings.Contains(summary, "| Total findings | 44 | 42 | -2 |") {
 		t.Fatalf("summary does not use the last executing payload:\n%s", summary)
 	}
 	if strings.Contains(summary, "44 → 44") {

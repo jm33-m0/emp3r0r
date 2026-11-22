@@ -37,7 +37,7 @@ func RenderLoopSummary(answer map[string]any, cycles []Cycle, edits []EditRecord
 	if summary == "" {
 		summary = "The agent did not return a final summary."
 	}
-	fmt.Fprintf(&b, "**Outcome:** %s\n\n", clipUTF8(summary, 700))
+	fmt.Fprintf(&b, "**Outcome:** %s\n\n", clipProse(summary, 700))
 
 	mechanism := answerString(answer, "mechanism")
 	if mechanism == "" && len(cycles) > 0 {
@@ -47,26 +47,46 @@ func RenderLoopSummary(answer map[string]any, cycles []Cycle, edits []EditRecord
 		}
 	}
 	if mechanism != "" {
-		fmt.Fprintf(&b, "**Mechanism:** `%s`\n", sanitizeLine(mechanism))
+		fmt.Fprintf(&b, "**Mechanism:** `%s`\n\n", sanitizeLine(mechanism))
 	}
 	if len(cycles) > 0 {
 		finalIndex := reportFinalIndex(cycles, answer)
 		first, last := cycles[0], cycles[finalIndex]
 		firstCounts, lastCounts := cycleFindingCounts(&first), cycleFindingCounts(&last)
-		fmt.Fprintf(&b, "**High findings:** %d → %d | **Static findings:** %d → %d | **Total findings:** %d → %d | **Verdicts:** %d → %d | **Cycles:** %d\n",
-			firstCounts.High, lastCounts.High, firstCounts.Static, lastCounts.Static,
-			firstCounts.Total, lastCounts.Total, first.Verdicts, last.Verdicts, len(cycles))
-		fmt.Fprintf(&b, "**Detection high:** %d → %d | **Hygiene high:** %d → %d | **Detection medium:** %d → %d | **Hygiene medium:** %d → %d\n",
-			firstCounts.DetectionHigh, lastCounts.DetectionHigh, firstCounts.HygieneHigh, lastCounts.HygieneHigh,
-			firstCounts.DetectionMedium, lastCounts.DetectionMedium, firstCounts.HygieneMedium, lastCounts.HygieneMedium)
+		verdictLabel := "Defender verdicts"
+		if reportPlatform(cycles) == platformLinux {
+			verdictLabel = "Falco verdicts"
+		}
+		executing := 0
+		for i := range cycles {
+			if cycles[i].Execution == executionVerified {
+				executing++
+			}
+		}
+		fmt.Fprintf(&b, "| Metric | Baseline | Final | Change |\n")
+		fmt.Fprintf(&b, "| --- | ---: | ---: | ---: |\n")
+		fmt.Fprintf(&b, "| High findings | %d | %d | %s |\n", firstCounts.High, lastCounts.High, signedChange(lastCounts.High-firstCounts.High))
+		fmt.Fprintf(&b, "| Detection high | %d | %d | %s |\n", firstCounts.DetectionHigh, lastCounts.DetectionHigh, signedChange(lastCounts.DetectionHigh-firstCounts.DetectionHigh))
+		fmt.Fprintf(&b, "| Hygiene high | %d | %d | %s |\n", firstCounts.HygieneHigh, lastCounts.HygieneHigh, signedChange(lastCounts.HygieneHigh-firstCounts.HygieneHigh))
+		fmt.Fprintf(&b, "| Detection medium | %d | %d | %s |\n", firstCounts.DetectionMedium, lastCounts.DetectionMedium, signedChange(lastCounts.DetectionMedium-firstCounts.DetectionMedium))
+		fmt.Fprintf(&b, "| Hygiene medium | %d | %d | %s |\n", firstCounts.HygieneMedium, lastCounts.HygieneMedium, signedChange(lastCounts.HygieneMedium-firstCounts.HygieneMedium))
+		fmt.Fprintf(&b, "| Static findings | %d | %d | %s |\n", firstCounts.Static, lastCounts.Static, signedChange(lastCounts.Static-firstCounts.Static))
+		fmt.Fprintf(&b, "| Total findings | %d | %d | %s |\n", firstCounts.Total, lastCounts.Total, signedChange(lastCounts.Total-firstCounts.Total))
+		fmt.Fprintf(&b, "| %s | %d | %d | %s |\n\n", verdictLabel, firstCounts.Verdicts, lastCounts.Verdicts, signedChange(lastCounts.Verdicts-firstCounts.Verdicts))
 		var finalSummary cycleSummary
-		if json.Unmarshal([]byte(last.Summary), &finalSummary) == nil {
-			if len(finalSummary.Hygiene) > 0 {
-				fmt.Fprintf(&b, "**Static hygiene:** %d open\n", len(finalSummary.Hygiene))
-			}
-			if len(finalSummary.CoverageMissing) > 0 {
-				fmt.Fprintf(&b, "**Coverage:** incomplete (%d missing analyzer(s))\n", len(finalSummary.CoverageMissing))
-			}
+		_ = json.Unmarshal([]byte(last.Summary), &finalSummary)
+		fmt.Fprintf(&b, "| Run | Value |\n| --- | --- |\n")
+		fmt.Fprintf(&b, "| Cycles | %d |\n", len(cycles))
+		fmt.Fprintf(&b, "| Verified | %d/%d |\n", executing, len(cycles))
+		if len(finalSummary.Hygiene) > 0 {
+			fmt.Fprintf(&b, "| Static hygiene | %d open |\n", len(finalSummary.Hygiene))
+		}
+		if len(finalSummary.CoverageMissing) > 0 {
+			fmt.Fprintf(&b, "| Coverage | incomplete (%d missing analyzer(s)) |\n", len(finalSummary.CoverageMissing))
+		}
+		if usage, ok := tokenUsageFromAnswer(answer); ok {
+			fmt.Fprintf(&b, "| Tokens | %s in / %s out |\n", formatTokenCount(usage.Input), formatTokenCount(usage.Output))
+			fmt.Fprintf(&b, "| Estimated cost | %s |\n", costLabel(usage))
 		}
 		if last.Execution == executionOffline {
 			fmt.Fprintf(&b, "\n> The final cycle did not execute; its finding counts are not comparable with an executing cycle.\n")
@@ -92,10 +112,10 @@ func RenderLoopSummary(answer map[string]any, cycles []Cycle, edits []EditRecord
 				baseline.Iteration, shortPayloadKey(baseline.PayloadKey), baseline.Verdicts,
 				baselineCounts.High, baselineCounts.Medium, baselineCounts.Total)
 		}
-	}
-	if usage, ok := tokenUsageFromAnswer(answer); ok {
-		fmt.Fprintf(&b, "**Tokens:** %s in / %s out | **Estimated cost:** %s\n",
-			formatTokenCount(usage.Input), formatTokenCount(usage.Output), costLabel(usage))
+	} else if usage, ok := tokenUsageFromAnswer(answer); ok {
+		fmt.Fprintf(&b, "| Run | Value |\n| --- | --- |\n")
+		fmt.Fprintf(&b, "| Tokens | %s in / %s out |\n", formatTokenCount(usage.Input), formatTokenCount(usage.Output))
+		fmt.Fprintf(&b, "| Estimated cost | %s |\n\n", costLabel(usage))
 	}
 
 	fmt.Fprintf(&b, "\n## Finding-to-change map\n\n")
@@ -111,7 +131,7 @@ func RenderLoopSummary(answer map[string]any, cycles []Cycle, edits []EditRecord
 			if i >= 4 {
 				break
 			}
-			fmt.Fprintf(&b, "- Applied edit: `%s`: %s\n", sanitizeLine(editPath(edit)), clipUTF8(sanitizeLine(edit.Reason), 160))
+			fmt.Fprintf(&b, "- Applied edit: `%s`: %s\n", sanitizeLine(editPath(edit)), clipProse(sanitizeLine(edit.Reason), 160))
 		}
 	} else {
 		for i, change := range changes {
@@ -119,7 +139,7 @@ func RenderLoopSummary(answer map[string]any, cycles []Cycle, edits []EditRecord
 				fmt.Fprintf(&b, "- and %d more\n", len(changes)-i)
 				break
 			}
-			fmt.Fprintf(&b, "- %s: %s; %s\n", clipUTF8(change.Finding, 180), change.Final, clipUTF8(change.Change, 240))
+			fmt.Fprintf(&b, "- %s: %s; %s\n", clipProse(change.Finding, 180), change.Final, clipProse(change.Change, 240))
 		}
 	}
 
@@ -133,7 +153,7 @@ func RenderLoopSummary(answer map[string]any, cycles []Cycle, edits []EditRecord
 				fmt.Fprintf(&b, "- and %d more\n", len(residual)-i)
 				break
 			}
-			fmt.Fprintf(&b, "- %s\n", clipUTF8(item, 180))
+			fmt.Fprintf(&b, "- %s\n", clipProse(item, 180))
 		}
 	}
 	return b.String()
@@ -241,12 +261,12 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 	if len(cycles) == 0 {
 		fmt.Fprintf(&b, "No cycle completed.\n\n")
 	} else {
-		fmt.Fprintf(&b, "| # | Payload | SHA-256 | High | Medium | Static | Total | Verdicts | Execution | Trace |\n")
-		fmt.Fprintf(&b, "| ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | ---: |\n")
+		fmt.Fprintf(&b, "| # | Payload | High | Medium | Static | Total | Verdicts | Execution | Trace |\n")
+		fmt.Fprintf(&b, "| ---: | --- | ---: | ---: | ---: | ---: | ---: | --- | ---: |\n")
 		for _, cycle := range cycles {
 			counts := cycleFindingCounts(&cycle)
-			fmt.Fprintf(&b, "| %d | `%s` | `%s` | %d | %d | %d | %d | %d | %s | %d |\n",
-				cycle.Iteration, cycle.PayloadKey, shortPayloadKey(cycle.PayloadKey),
+			fmt.Fprintf(&b, "| %d | `%s` | %d | %d | %d | %d | %d | %s | %d |\n",
+				cycle.Iteration, shortPayloadKey(cycle.PayloadKey),
 				counts.High, counts.Medium, counts.Static, counts.Total, cycle.Verdicts,
 				headerOrNone(cycle.Execution), cycle.TraceID)
 		}
@@ -364,6 +384,19 @@ func modelEdits(edits []EditRecord) []EditRecord {
 	return out
 }
 
+// clipProse shortens a summary without cutting a word in half. The full
+// report keeps the complete text; only the compact executive summary clips.
+func clipProse(text string, limit int) string {
+	if limit <= 0 || len(text) <= limit {
+		return text
+	}
+	cut := clipUTF8(text, limit)
+	if index := strings.LastIndexAny(cut, " \t\n"); index > 0 {
+		cut = strings.TrimRight(cut[:index], " \t\n,;:-")
+	}
+	return cut + "…"
+}
+
 func answerString(answer map[string]any, key string) string {
 	value, _ := answer[key].(string)
 	return sanitizeMultiline(value)
@@ -461,7 +494,7 @@ func renderGitHistory(b *strings.Builder, answer map[string]any) {
 	if dir == "" {
 		return
 	}
-	fmt.Fprintf(b, "## Source history\n\n")
+	fmt.Fprintf(b, "\n## Source history\n\n")
 	fmt.Fprintf(b, "Shadow repository: `%s`\n\n", sanitizeLine(dir))
 	heads := make(map[string]string)
 	switch value := answer["git_heads"].(type) {

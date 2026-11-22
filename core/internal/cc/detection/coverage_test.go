@@ -64,7 +64,7 @@ func TestRenderLoopReportWarnsAboutCoverage(t *testing.T) {
 		t.Fatalf("report does not warn about coverage:\n%s", report)
 	}
 	executive := RenderLoopSummary(map[string]any{"loop_id": "loop-coverage"}, cycles, nil)
-	if !strings.Contains(executive, "**Coverage:** incomplete") {
+	if !strings.Contains(executive, "| Coverage | incomplete") {
 		t.Fatalf("summary does not warn about coverage:\n%s", executive)
 	}
 }
