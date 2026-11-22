@@ -26,7 +26,7 @@ import (
 
 const (
 	// TelemetrySchemaVersion is the SQLite schema version this package writes.
-	TelemetrySchemaVersion = 2
+	TelemetrySchemaVersion = 3
 	// maxTelemetryBytes bounds one imported telemetry file.
 	maxTelemetryBytes = 64 << 20
 	// maxTelemetryEvents bounds one trace.
@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS traces (
 	external_id TEXT NOT NULL DEFAULT '',
 	module TEXT NOT NULL DEFAULT '',
 	artifact_sha256 TEXT NOT NULL DEFAULT '',
+	platform TEXT NOT NULL DEFAULT '',
 	source TEXT NOT NULL,
 	captured_at INTEGER NOT NULL DEFAULT 0,
 	path TEXT NOT NULL DEFAULT '',
@@ -369,6 +370,7 @@ func OpenTelemetryDB(path string) (*TelemetryDB, error) {
 	// per-payload views are created when the next trace is imported.
 	for _, column := range []struct{ table, name, typ string }{
 		{"traces", "payload_id", "INTEGER REFERENCES payloads(id)"},
+		{"traces", "platform", "TEXT NOT NULL DEFAULT ''"},
 		{"traces", "payload_pid", "INTEGER"},
 		{"traces", "payload_image", "TEXT NOT NULL DEFAULT ''"},
 		{"traces", "attribution", "TEXT NOT NULL DEFAULT ''"},
@@ -460,6 +462,7 @@ type ImportOptions struct {
 	RunID          string
 	Module         string
 	ArtifactSHA256 string
+	Platform       string
 	Source         string
 	Path           string
 	// ParentKey links a rebuilt payload to the payload it replaced.
@@ -502,6 +505,7 @@ type TelemetryTrace struct {
 	PayloadID    int64             `json:"payload_id"`
 	PayloadKey   string            `json:"payload_key,omitempty"`
 	PayloadTable string            `json:"payload_table,omitempty"`
+	Platform     string            `json:"platform,omitempty"`
 	Source       string            `json:"source"`
 	ExternalID   string            `json:"external_id,omitempty"`
 	Events       int               `json:"events"`
@@ -520,6 +524,7 @@ type TelemetryRun struct {
 	PayloadID    int64             `json:"payload_id,omitempty"`
 	PayloadKey   string            `json:"payload_key,omitempty"`
 	PayloadTable string            `json:"payload_table,omitempty"`
+	Platform     string            `json:"platform,omitempty"`
 	Source       string            `json:"source"`
 	Events       int               `json:"events"`
 	First        time.Time         `json:"first,omitempty"`
@@ -581,6 +586,7 @@ type telemetryEvent struct {
 
 type parsedTelemetry struct {
 	Source       string
+	Platform     string
 	ExternalID   string
 	Meta         map[string]any
 	Events       []telemetryEvent
@@ -627,6 +633,9 @@ func (t *TelemetryDB) importParsed(ctx context.Context, parsed parsedTelemetry, 
 		return TelemetryTrace{}, fmt.Errorf("encode telemetry coverage: %w", err)
 	}
 	meta["source"] = parsed.Source
+	if parsed.Platform != "" {
+		meta["platform"] = parsed.Platform
+	}
 	meta["events"] = len(parsed.Events)
 	meta["first"] = parsed.First
 	meta["last"] = parsed.Last
@@ -658,11 +667,18 @@ func (t *TelemetryDB) importParsed(ctx context.Context, parsed parsedTelemetry, 
 		opts.RunID, parsed.Source, externalID); err != nil {
 		return TelemetryTrace{}, fmt.Errorf("replace telemetry trace: %w", err)
 	}
+	platform := firstNonEmpty(strings.TrimSpace(opts.Platform), parsed.Platform)
+	if platform == "" && strings.EqualFold(opts.Module, "stager_linux") {
+		platform = platformLinux
+	}
+	if platform != "" {
+		meta["platform"] = platform
+	}
 	result, err := tx.ExecContext(ctx,
-		`INSERT INTO traces(payload_id, run_id, external_id, module, artifact_sha256, source, captured_at, path,
+		`INSERT INTO traces(payload_id, run_id, external_id, module, artifact_sha256, platform, source, captured_at, path,
 		 meta, payload_pid, payload_image, attribution, coverage, event_count, findings_count, findings_computed)
-		 VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
-		payload.ID, opts.RunID, externalID, opts.Module, opts.ArtifactSHA256, parsed.Source,
+		 VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0)`,
+		payload.ID, opts.RunID, externalID, opts.Module, opts.ArtifactSHA256, platform, parsed.Source,
 		captured.UnixMilli(), opts.Path, string(metaJSON), nullableInt(parsed.PayloadPID),
 		parsed.PayloadImage, parsed.Attribution, string(coverageJSON), len(parsed.Events))
 	if err != nil {
@@ -709,6 +725,7 @@ func (t *TelemetryDB) importParsed(ctx context.Context, parsed parsedTelemetry, 
 		PayloadID:    payload.ID,
 		PayloadKey:   payload.Key,
 		PayloadTable: payload.Table,
+		Platform:     platform,
 		Source:       parsed.Source,
 		ExternalID:   externalID,
 		Events:       len(parsed.Events),
@@ -775,7 +792,11 @@ func (t *TelemetryDB) ImportSandbox(ctx context.Context, results SandboxResults,
 		parsed   parsedTelemetry
 		warnings []string
 	)
+	linuxSandbox := false
 	if len(results.Dynamic) > 0 {
+		if _, ok, _ := parsePenguinBoxDynamic(results.Dynamic); ok {
+			linuxSandbox = true
+		}
 		fromDynamic, err := parseTelemetry(results.Dynamic, opts.Source)
 		switch {
 		case err == nil:
@@ -788,7 +809,14 @@ func (t *TelemetryDB) ImportSandbox(ctx context.Context, results SandboxResults,
 		}
 	}
 	parsed.Source = opts.Source
-	parsed.Events = append(parsed.Events, sandboxAnalysisEvents(results, opts.Source)...)
+	if linuxSandbox {
+		// Tracee and Falco events are the dynamic result. Only the static and
+		// optional analyzer blocks are additional analysis events.
+		slim := SandboxResults{Static: results.Static, HolyGrail: results.HolyGrail, EDR: results.EDR}
+		parsed.Events = append(parsed.Events, sandboxAnalysisEvents(slim, opts.Source)...)
+	} else {
+		parsed.Events = append(parsed.Events, sandboxAnalysisEvents(results, opts.Source)...)
+	}
 	if len(parsed.Events) == 0 {
 		return TelemetryTrace{}, fmt.Errorf("sandbox results carry no telemetry events")
 	}
@@ -1278,6 +1306,11 @@ func (t *TelemetryDB) Findings(ctx context.Context, traceID int64) ([]Finding, e
 		addSignal(severity, rule, indicator, detail, "signal")
 	}
 
+	platform := metaString(meta, "platform")
+	if platform == platformLinux {
+		t.addLinuxFindings(ctx, traceID, add)
+	}
+
 	// Defender verdicts and scan engagement. Internal Bm* plumbing is noise;
 	// behavior-monitor engagement is signal about how hard the engine looked.
 	defender, err := t.rows(ctx, `SELECT event, pid, path, image, severity, signal, attrs FROM events
@@ -1398,6 +1431,9 @@ func (t *TelemetryDB) Findings(ctx context.Context, traceID int64) ([]Finding, e
 	seenProcess := map[string]struct{}{}
 	for _, row := range processes {
 		child := row.int("pid")
+		if child == payloadPID {
+			continue
+		}
 		image := row.string("image")
 		key := fmt.Sprintf("%d|%s", child, image)
 		if _, ok := seenProcess[key]; ok {
@@ -1405,14 +1441,18 @@ func (t *TelemetryDB) Findings(ctx context.Context, traceID int64) ([]Finding, e
 		}
 		seenProcess[key] = struct{}{}
 		severity := "medium"
-		if image == "" || !isWindowsImagePath(image) {
+		if image == "" || !isSystemExecutable(image, platform) {
 			severity = "high"
 		}
 		detail := fmt.Sprintf("payload created process %d from %s", child, firstNonEmpty(image, "an unknown image"))
 		if command := row.string("command"); command != "" {
 			detail += ": " + command
 		}
-		add(severity, "telemetry/child-process", "CreateProcessW", detail)
+		indicator := "CreateProcessW"
+		if platform == platformLinux {
+			indicator = "execve"
+		}
+		add(severity, "telemetry/child-process", indicator, detail)
 	}
 
 	// File activity outside Windows directories.
@@ -1443,6 +1483,14 @@ func (t *TelemetryDB) Findings(ctx context.Context, traceID int64) ([]Finding, e
 			indicator = "DeleteFileW"
 		case "rename":
 			indicator = "MoveFileExW"
+		}
+		if platform == platformLinux {
+			switch operation {
+			case "write", "delete", "rename":
+			default:
+				continue
+			}
+			indicator = operation
 		}
 		add("medium", "telemetry/file-write", indicator,
 			fmt.Sprintf("payload performed %s on %s", row.string("event"), path))
@@ -1586,6 +1634,7 @@ func (t *TelemetryDB) Findings(ctx context.Context, traceID int64) ([]Finding, e
 	memory, err := t.rows(ctx, `SELECT event, operation, pid, target_pid, target_image, size,
 		protection, bytes, status, stack FROM events
 		WHERE trace_pk = ? AND category = 'memory'
+		AND provider LIKE 'Microsoft-Windows-Threat-Intelligence%'
 		AND payload_role IN ('payload', 'payload-child') ORDER BY id LIMIT 2000`, traceID)
 	if err != nil {
 		return nil, err
@@ -1897,6 +1946,12 @@ func parseTelemetry(data []byte, sourceHint string) (parsedTelemetry, error) {
 	// partial first event and drop the rest.
 	if trimmed[0] == '{' || trimmed[0] == '[' {
 		if json.Valid(trimmed) {
+			if parsed, ok, err := parsePenguinBoxDynamic(trimmed); ok {
+				if err != nil {
+					return parsedTelemetry{}, err
+				}
+				return parsed, nil
+			}
 			if value, err := decodeJSON(trimmed); err == nil {
 				if parsed, parseErr := parseTelemetryValue(value, sourceHint); parseErr == nil {
 					return parsed, nil
@@ -2043,7 +2098,8 @@ func decodeTelemetryLines(raw string) []map[string]any {
 			continue
 		}
 		object, ok := decoded.(map[string]any)
-		if !ok || (!isRedEdrEvent(object) && !isDefenderObserver(object)) {
+		if !ok || (!isRedEdrEvent(object) && !isDefenderObserver(object) &&
+			!isFalcoEvent(object) && !isTraceeEvent(object)) {
 			continue
 		}
 		out = append(out, object)
@@ -2057,13 +2113,20 @@ func parseTelemetryMaps(maps []map[string]any, sourceHint string) (parsedTelemet
 	}
 	source := strings.ToLower(strings.TrimSpace(sourceHint))
 	if source == "" || source == "auto" {
-		if isDefenderObserver(maps[0]) {
+		switch {
+		case isFalcoEvent(maps[0]) || isTraceeEvent(maps[0]):
+			source = "penguinbox"
+		case isDefenderObserver(maps[0]):
 			source = "defender_observer"
-		} else {
+		default:
 			source = "rededr"
 		}
 	}
 	parsed := parsedTelemetry{Source: source, Meta: map[string]any{}}
+	if source == "penguinbox" || source == "tracee" || source == "falco" {
+		parsed.Platform = platformLinux
+		parsed.Meta["platform"] = platformLinux
+	}
 	for _, object := range maps {
 		if eventType, _ := object["type"].(string); strings.EqualFold(strings.TrimSpace(eventType), "meta") {
 			for key, value := range object {
@@ -2075,6 +2138,18 @@ func parseTelemetryMaps(maps []map[string]any, sourceHint string) (parsedTelemet
 		switch {
 		case isDefenderObserver(object):
 			normalizerSource = "defender_observer"
+		case isFalcoEvent(object):
+			for _, event := range normalizeFalcoEvent(object) {
+				event.Source = source
+				parsed.Events = append(parsed.Events, event)
+			}
+			continue
+		case isTraceeEvent(object):
+			for _, event := range []telemetryEvent{normalizeTraceeEvent(object)} {
+				event.Source = source
+				parsed.Events = append(parsed.Events, event)
+			}
+			continue
 		case isRedEdrEvent(object):
 			normalizerSource = "rededr"
 		}

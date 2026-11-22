@@ -43,8 +43,9 @@ func (a *Actions) detectionTools() map[string]Tool {
 					Name:        "detection_plan",
 					Description: "Build the detection test plan for a loader_windows or stager_linux artifact without running anything. Returns the artifact hash and size, the sandbox capabilities, every static/dynamic/EDR stage with its scanner, whether it executes the payload, whether it needs approval, and the module source files feedback can point at. The artifact must come from a recorded build of that module; omit artifact to use the newest one.",
 					Parameters: ObjectSchema(map[string]any{
-						"module":   StringProp("Module name: loader_windows or stager_linux"),
-						"artifact": StringProp("Artifact path from a recorded build. Omit to use the newest recorded artifact."),
+						"module":    StringProp("Module name: loader_windows or stager_linux"),
+						"artifact":  StringProp("Artifact path from a recorded build. Omit to use the newest recorded artifact."),
+						"agent_src": StringProp("Editable C agent source for stager_linux; defaults to the sibling c_agent tree."),
 					}, "module"),
 				},
 			},
@@ -58,8 +59,9 @@ func (a *Actions) detectionTools() map[string]Tool {
 					Name:        "detection_run",
 					Description: "Upload a recorded module artifact to the LitterBox sandbox and run the selected stages. stages defaults to static; static is passive, dynamic and EDR detonate the payload and require approve_execution=true. Returns the plan, stage statuses, risk score, and source-mapped feedback. Screened and audited; no stage touches a target.",
 					Parameters: ObjectSchema(map[string]any{
-						"module":   StringProp("Module name: loader_windows or stager_linux"),
-						"artifact": StringProp("Artifact path from a recorded build. Omit to use the newest recorded artifact."),
+						"module":    StringProp("Module name: loader_windows or stager_linux"),
+						"artifact":  StringProp("Artifact path from a recorded build. Omit to use the newest recorded artifact."),
+						"agent_src": StringProp("Editable C agent source for stager_linux; defaults to the sibling c_agent tree."),
 						"stages": map[string]any{
 							"type":        "array",
 							"items":       map[string]any{"type": "string", "enum": []string{"static", "dynamic", "edr"}},
@@ -94,14 +96,14 @@ func (a *Actions) detectionTools() map[string]Tool {
 				Type: "function",
 				Function: FunctionDef{
 					Name:        "detection_telemetry_import",
-					Description: "Import ETW/Defender telemetry into the detection SQLite database. Reads a RedEdr JSON array or JSONL, a LitterBox dynamic result (merging findings.events and raw_output, including kernel callbacks, ntdll hooks, PEB/loaded-DLL queries, and ETW-TI), or DefenderObserver JSONL from path or url. A url must use the configured sandbox origin; redirects may not leave it. Associate it with a recorded module build with module and optional artifact; returns the trace id, payload attribution, source coverage, normalized event counts, and deterministic findings. Query the result with detection_query.",
+					Description: "Import Windows or Linux telemetry into the detection SQLite database. Reads a RedEdr JSON array or JSONL, a LitterBox dynamic result (merging findings.events and raw_output, including kernel callbacks, ntdll hooks, PEB/loaded-DLL queries, and ETW-TI), DefenderObserver JSONL, a PenguinBox dynamic result, or a Tracee/Falco JSONL stream from path or url. A url must use the configured sandbox origin; redirects may not leave it. Associate it with a recorded module build with module and optional artifact; returns the trace id, platform, payload attribution, source coverage, normalized event counts, and deterministic findings. Query the result with detection_query.",
 					Parameters: ObjectSchema(map[string]any{
 						"path":     StringProp("Local telemetry file. Mutually exclusive with url."),
 						"url":      StringProp("HTTP(S) telemetry URL on the configured sandbox origin. Mutually exclusive with path."),
 						"module":   StringProp("Optional module name (loader_windows or stager_linux) to associate with the trace."),
 						"artifact": StringProp("Optional recorded module artifact; defaults to the newest build when module is set."),
 						"run_id":   StringProp("Optional detection run ID to associate with the trace."),
-						"source":   StringProp("Format hint: rededr, defender_observer, or litterbox-rededr. Auto-detected by default."),
+						"source":   StringProp("Format hint: rededr, defender_observer, litterbox-rededr, penguinbox, tracee, or falco. Auto-detected by default."),
 					}),
 				},
 			},
@@ -142,12 +144,14 @@ func (a *Actions) detectionTools() map[string]Tool {
 				Type: "function",
 				Function: FunctionDef{
 					Name:        "detection_loop",
-					Description: "Run the autonomous Norma detection loop: build loader_windows from a source directory, detonate it in LitterBox, import every saved analyzer result (RedEdr, Moneta, pe-sieve, HollowsHunter, HSB, Patriot, Blender, YARA, CheckPlz, HolyGrail, and EDR profiles) into SQLite, edit module or producer source or build options, rebuild, and compare payloads. A planner chooses the hypothesis, an editor applies the edits and runs one cycle, and a debugger inspects the guest over SSH when guest_ssh or the detection environment is configured. Pass agent_uuid for live C2 verification; otherwise the loop records execution=unverified and builds fresh agents for later cycles. When telemetry shows the loader, shellcode producer, wrapper, or injection path is detected, the planner may choose another mechanism. Full feedback, build logs, and per-payload telemetry stay in SQLite. Requires approve_execution=true. This edits module source and runs model-chosen builds with operator privileges; run it on a dedicated, disposable VM.",
+					Description: "Run the autonomous Norma detection loop for loader_windows or stager_linux. It builds the selected module from a source directory, detonates it in LitterBox (Windows) or PenguinBox (Linux), imports every saved analyzer result (Windows: RedEdr, Moneta, pe-sieve, HollowsHunter, HSB, Patriot, Blender, YARA, CheckPlz, HolyGrail, and EDR profiles; Linux: Tracee, Falco, ELF, and YARA) into SQLite, edits module, agent, or producer source or build options, rebuilds, and compares payloads. A planner chooses the hypothesis, an editor applies the edits and runs one cycle, and a debugger inspects the Windows guest over SSH when guest_ssh or the detection environment is configured. Pass agent_uuid for live C2 verification; otherwise the loop records execution=unverified and builds fresh agents for later cycles. When telemetry shows the loader, shellcode producer, wrapper, or injection path is detected, the planner may choose another mechanism. Full feedback, build logs, and per-payload telemetry stay in SQLite. Requires approve_execution=true. This edits module source and runs model-chosen builds with operator privileges; run it on a dedicated, disposable VM.",
 					Parameters: ObjectSchema(map[string]any{
-						"module_dir":           StringProp("loader_windows source directory."),
-						"shellcode":            StringProp("Go agent shellcode path. Generate it first with generate --type windows_executable."),
-						"agent_uuid":           StringProp("UUID of the generated agent wrapped in the shellcode. Required for execution=verified checks and final verification."),
-						"agent_type":           StringProp("Agent payload type used for rotation: windows_executable (default) or windows_dll."),
+						"module":               StringProp("Payload module: loader_windows (default) or stager_linux."),
+						"module_dir":           StringProp("Module source directory; defaults to the installed module path."),
+						"agent_src":            StringProp("Editable C agent source for stager_linux; defaults to the sibling c_agent tree."),
+						"shellcode":            StringProp("Windows agent shellcode, or the C agent PIC for stager_linux."),
+						"agent_uuid":           StringProp("UUID of the generated agent wrapped in the payload. Required for execution=verified checks and final verification."),
+						"agent_type":           StringProp("Agent payload type used for rotation: windows_executable (default), windows_dll, or linux_so."),
 						"arch":                 StringProp("Agent architecture for rotation. Default amd64."),
 						"guest_ssh":            StringProp("Sandbox guest SSH endpoint user@host:port; enables the debugger (env EMP3R0R_DETECTION_GUEST_SSH)."),
 						"guest_ssh_key":        StringProp("Sandbox-only SSH private key (env EMP3R0R_DETECTION_GUEST_SSH_KEY)."),
@@ -166,11 +170,11 @@ func (a *Actions) detectionTools() map[string]Tool {
 						"iterations":           IntegerProp("Maximum cycles including baseline. Default 3."),
 						"stages":               map[string]any{"type": "array", "items": map[string]any{"type": "string", "enum": []string{"static", "dynamic"}}, "description": "Stages; dynamic is required."},
 						"process":              StringProp("Sacrificial process override; omit to let the source default control it."),
-						"format":               StringProp("Loader host format: exe, service, or dll."),
+						"format":               StringProp("Windows loader host format: exe, service, or dll. stager_linux always builds an executable."),
 						"inject":               StringProp("Injection override; omit to let the module default control it."),
 						"smw":                  StringProp("on or off."),
-						"producers":            map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Shellcode producer modules as name or name=dir; a bare name uses the installed module; defaults to the installed donut and crystal_pack."},
-						"read_roots":           map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Read-only source roots; defaults to the loader's shared build inputs."},
+						"producers":            map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Windows shellcode producer modules as name or name=dir; a bare name uses the installed module. stager_linux always uses the shipped malasada module and rejects this field."},
+						"read_roots":           map[string]any{"type": "array", "items": map[string]any{"type": "string"}, "description": "Read-only source roots; defaults to the loader's shared build inputs. stager_linux adds c_agent as a writable root."},
 						"turns":                IntegerProp("Maximum Norma turns per session. Default 60."),
 						"approve_execution":    BooleanProp("Allow the loop to detonate the payload and edit module source."),
 					}, "module_dir", "shellcode", "approve_execution"),
@@ -240,6 +244,7 @@ type detectionArgs struct {
 	SQL                string   `json:"sql"`
 	LoopID             string   `json:"loop_id"`
 	ModuleDir          string   `json:"module_dir"`
+	AgentSrc           string   `json:"agent_src"`
 	Shellcode          string   `json:"shellcode"`
 	AgentUUID          string   `json:"agent_uuid"`
 	AgentType          string   `json:"agent_type"`
@@ -270,6 +275,29 @@ type detectionArgs struct {
 	To                 string   `json:"to"`
 }
 
+// resolveDetectionAgentSourceDir selects the editable C agent tree. The loop
+// owns the default; an explicit path is accepted only for the C agent payload.
+func resolveDetectionAgentSourceDir(args detectionArgs, moduleDir, platform string) (string, error) {
+	requested := strings.TrimSpace(args.AgentSrc)
+	if platform != "linux" {
+		if requested != "" {
+			return "", fmt.Errorf("agent_src is only supported for stager_linux")
+		}
+		return "", nil
+	}
+	dir := detection.DefaultAgentSourceDir(moduleDir)
+	if requested != "" {
+		if len(requested) > maxDetectionArtifactPath {
+			return "", fmt.Errorf("agent_src is too long")
+		}
+		dir = detection.ExpandHomePath(requested)
+	}
+	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+		return "", fmt.Errorf("C agent source directory %q is not readable", dir)
+	}
+	return dir, nil
+}
+
 func (a *Actions) detectionPlan(ctx context.Context, raw json.RawMessage) (any, error) {
 	var args detectionArgs
 	if err := json.Unmarshal(raw, &args); err != nil {
@@ -282,11 +310,16 @@ func (a *Actions) detectionPlan(ctx context.Context, raw json.RawMessage) (any, 
 	if a.Detection == nil {
 		return nil, fmt.Errorf("detection loop is not configured")
 	}
+	agentSourceDir, err := resolveDetectionAgentSourceDir(args, mod.Path, detection.PlatformForModule(mod.Name))
+	if err != nil {
+		return nil, err
+	}
 	plan, err := a.Detection.CreatePlan(ctx, detection.Request{
-		Module:       mod.Name,
-		ModuleDir:    mod.Path,
-		Platform:     mod.Platform,
-		ArtifactPath: artifact.Path,
+		Module:         mod.Name,
+		ModuleDir:      mod.Path,
+		AgentSourceDir: agentSourceDir,
+		Platform:       mod.Platform,
+		ArtifactPath:   artifact.Path,
 	})
 	if err != nil {
 		return nil, err
@@ -330,11 +363,16 @@ func (a *Actions) detectionRun(ctx context.Context, raw json.RawMessage) (any, e
 		return actionBlocked("detection_run", command, mod.Name, nil, review, decision, auditErr), nil
 	}
 
+	agentSourceDir, err := resolveDetectionAgentSourceDir(args, mod.Path, detection.PlatformForModule(mod.Name))
+	if err != nil {
+		return nil, err
+	}
 	plan, err := a.Detection.CreatePlan(ctx, detection.Request{
-		Module:       mod.Name,
-		ModuleDir:    mod.Path,
-		Platform:     mod.Platform,
-		ArtifactPath: artifact.Path,
+		Module:         mod.Name,
+		ModuleDir:      mod.Path,
+		AgentSourceDir: agentSourceDir,
+		Platform:       mod.Platform,
+		ArtifactPath:   artifact.Path,
 	})
 	if err != nil {
 		return a.actionResultWithFlags("detection_run", command, mod.Name, nil, nil, review, decision, auditErr, "", err, false), nil
@@ -498,11 +536,16 @@ func (a *Actions) attachDetection(ctx context.Context, mod *def.ModuleConfig, bu
 		return map[string]any{"error": err.Error()}
 	}
 	planCtx, cancelPlan := context.WithTimeout(ctx, 15*time.Second)
+	agentSourceDir := ""
+	if detection.PlatformForModule(mod.Name) == "linux" {
+		agentSourceDir = detection.DefaultAgentSourceDir(mod.Path)
+	}
 	plan, err := a.Detection.CreatePlan(planCtx, detection.Request{
-		Module:       mod.Name,
-		ModuleDir:    mod.Path,
-		Platform:     mod.Platform,
-		ArtifactPath: artifact.Path,
+		Module:         mod.Name,
+		ModuleDir:      mod.Path,
+		AgentSourceDir: agentSourceDir,
+		Platform:       mod.Platform,
+		ArtifactPath:   artifact.Path,
 	})
 	cancelPlan()
 	if err != nil {
@@ -683,9 +726,9 @@ func (a *Actions) detectionImport(ctx context.Context, raw json.RawMessage) (any
 	}
 	source := strings.ToLower(strings.TrimSpace(args.Source))
 	switch source {
-	case "", "rededr", "defender_observer", "litterbox-rededr":
+	case "", "rededr", "defender_observer", "litterbox-rededr", "penguinbox", "tracee", "falco":
 	default:
-		return nil, fmt.Errorf("unknown source %q; use rededr, defender_observer, or litterbox-rededr", args.Source)
+		return nil, fmt.Errorf("unknown source %q; use rededr, defender_observer, litterbox-rededr, penguinbox, tracee, or falco", args.Source)
 	}
 	opts := detection.ImportOptions{
 		RunID:  strings.TrimSpace(args.RunID),
@@ -801,10 +844,18 @@ func (a *Actions) detectionLoop(ctx context.Context, raw json.RawMessage) (any, 
 	if module == "" {
 		module = "loader_windows"
 	}
+	if !detection.Covered(module) {
+		return nil, fmt.Errorf("module %q has no detection loop; use loader_windows or stager_linux", module)
+	}
 	if moduleDir == "" {
 		if mod, ok := def.GetModule(module); ok && mod != nil {
 			moduleDir = mod.Path
 		}
+	}
+	platform := detection.PlatformForModule(module)
+	agentSourceDir, err := resolveDetectionAgentSourceDir(args, moduleDir, platform)
+	if err != nil {
+		return nil, err
 	}
 	command := fmt.Sprintf("detection_loop %s %s", sanitize.SanitizeOneLine(module), sanitize.SanitizeOneLine(shellcode))
 	review := def.OpsecReview{
@@ -823,20 +874,35 @@ func (a *Actions) detectionLoop(ctx context.Context, raw json.RawMessage) (any, 
 	}
 	loopCtx, cancel := context.WithTimeout(ctx, 60*time.Minute)
 	defer cancel()
-	producers, err := detection.ParseProducerDirs(args.Producers)
-	if err != nil {
-		return nil, err
-	}
-	if len(producers) == 0 {
-		producers = detection.DefaultProducerDirs()
+	var producers map[string]string
+	if platform == "linux" {
+		if len(args.Producers) > 0 {
+			return nil, fmt.Errorf("stager_linux always uses the shipped malasada producer; remove producers")
+		}
+		malasadaDir := detection.LinuxProducerDir(moduleDir)
+		if malasadaDir == "" {
+			return nil, fmt.Errorf("the shipped malasada producer was not found; install the operator kit")
+		}
+		producers = map[string]string{"malasada": malasadaDir}
+	} else {
+		producers, err = detection.ParseProducerDirs(args.Producers)
+		if err != nil {
+			return nil, err
+		}
+		if len(producers) == 0 {
+			producers = detection.DefaultProducerDirs()
+		}
 	}
 	readRoots := args.ReadRoots
 	if len(readRoots) == 0 {
 		readRoots = detection.DefaultReadRoots(moduleDir)
 	}
-	guest, err := mcpGuestConfig(args)
-	if err != nil {
-		return nil, err
+	var guest *detection.GuestSSHConfig
+	if platform == "windows" {
+		guest, err = mcpGuestConfig(args)
+		if err != nil {
+			return nil, err
+		}
 	}
 	var verify detection.VerifyOps
 	if strings.TrimSpace(args.AgentUUID) != "" {
@@ -844,7 +910,11 @@ func (a *Actions) detectionLoop(ctx context.Context, raw json.RawMessage) (any, 
 	}
 	agentType := strings.TrimSpace(args.AgentType)
 	if agentType == "" {
-		agentType = "windows_executable"
+		if platform == "linux" {
+			agentType = "linux_so"
+		} else {
+			agentType = "windows_executable"
+		}
 	}
 	arch := strings.TrimSpace(args.Arch)
 	if arch == "" {
@@ -852,6 +922,7 @@ func (a *Actions) detectionLoop(ctx context.Context, raw json.RawMessage) (any, 
 	}
 	cfg := detection.EvolveConfig{
 		Module: module, ModuleDir: moduleDir, Shellcode: shellcode,
+		Platform: platform, AgentSourceDir: agentSourceDir,
 		SandboxURL: a.Detection.Client.URL(), StoreRoot: a.Detection.Store.Root,
 		Process: args.Process, Format: args.Format, Inject: args.Inject, SMW: args.SMW,
 		ProducerDirs: producers, ReadRoots: readRoots,
@@ -1035,6 +1106,30 @@ func (a *Actions) buildDetectionAgent(opts detection.AgentBuildOptions) (*detect
 	agentCfg := builder.AgentConfig{}
 	if cc := strings.TrimSpace(a.DefaultCC); cc != "" {
 		agentCfg.CCAddress = &cc
+	}
+	if opts.Platform == "linux" {
+		providers := builder.CAgentProviders{Format: "so", Arch: opts.Arch, Libc: "glibc"}
+		agentCfg.IsStager = true
+		res, err := builder.GenerateCAgentWorkflowAt(opts.SourceDir, agentCfg, providers, client.SignAgent)
+		if err != nil {
+			logging.Warningf("detection_loop: signed C agent generation failed (%v); building without a C2 signature", err)
+			res, err = builder.GenerateCAgentWorkflowAt(opts.SourceDir, agentCfg, providers, nil)
+		}
+		if err != nil {
+			return nil, err
+		}
+		if res == nil || strings.TrimSpace(res.OutputFile) == "" {
+			return nil, fmt.Errorf("C agent build produced no artifact")
+		}
+		artifact, err := detection.InspectArtifact(res.OutputFile)
+		if err != nil {
+			return nil, err
+		}
+		return &detection.AgentBuildResult{
+			ArtifactPath: res.OutputFile,
+			Type:         "linux_so", Arch: opts.Arch, Platform: "linux",
+			AgentUUID: res.AgentUUID, SHA256: artifact.SHA256, Size: artifact.Size,
+		}, nil
 	}
 	res, err := builder.GenerateAgentArtifact(agentCfg, opts.Type, opts.Arch, client.SignAgent)
 	if err != nil {

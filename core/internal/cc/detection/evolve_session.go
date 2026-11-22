@@ -72,7 +72,7 @@ type workerSession struct {
 func (c *coordinator) newWorkerSession(role evolveRole) *workerSession {
 	opts := agentcore.Options{
 		Provider:               c.provider,
-		SystemPrompt:           []string{roleSystemPrompt(role)},
+		SystemPrompt:           []string{c.e.systemPrompt(role)},
 		Tools:                  c.e.toolsFor(role),
 		PermissionMode:         permission.ModeDontAsk,
 		Hooks:                  c.e.hooksFor(role),

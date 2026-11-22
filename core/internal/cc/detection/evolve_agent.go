@@ -117,6 +117,9 @@ func (e *evolver) ensureFreshAgent(ctx context.Context) error {
 // producer. The producer's declared input option decides whether the agent
 // must be an EXE or a DLL, so a producer swap does not keep a stale format.
 func (e *evolver) rotationAgentType() string {
+	if e.platform() == platformLinux {
+		return "linux_so"
+	}
 	if e.producerRequiresDLL(e.activeProducer) {
 		return "windows_dll"
 	}
@@ -128,6 +131,12 @@ func (e *evolver) rotationAgentType() string {
 }
 
 func (e *evolver) rotationProducer(agentType string) string {
+	if e.platform() == platformLinux {
+		if _, ok := e.cfg.ProducerDirs["malasada"]; ok {
+			return "malasada"
+		}
+		return ""
+	}
 	configured := func(name string) bool {
 		_, ok := e.cfg.ProducerDirs[name]
 		return ok
@@ -161,7 +170,9 @@ func (e *evolver) rotateAgent(ctx context.Context) error {
 	oldUUID := strings.TrimSpace(e.expectedAgentUUID)
 	e.logClass(logging.ClassCycle, "rotating test agent: building a fresh %s/%s agent (previous %s)",
 		agentType, arch, headerOrNone(oldUUID))
-	result, err := e.cfg.BuildAgent(AgentBuildOptions{Type: agentType, Arch: arch})
+	result, err := e.cfg.BuildAgent(AgentBuildOptions{
+		Type: agentType, Arch: arch, Platform: e.platform(), SourceDir: e.cfg.AgentSourceDir,
+	})
 	if err != nil {
 		return fmt.Errorf("rotate agent: %w", err)
 	}
@@ -221,6 +232,10 @@ func (e *evolver) rotateAgent(ctx context.Context) error {
 	e.cleanupShellcode(oldShellcode)
 	e.audit("generate_agent", newUUID,
 		fmt.Sprintf("rotation type=%s arch=%s artifact=%s", agentType, arch, artifactPath))
-	e.logClass(logging.ClassCycle, "rotated test agent to %s (producer %s)", newUUID, producer)
+	if producer != "" {
+		e.logClass(logging.ClassCycle, "rotated test agent to %s (producer %s)", newUUID, producer)
+	} else {
+		e.logClass(logging.ClassCycle, "rotated test agent to %s", newUUID)
+	}
 	return nil
 }

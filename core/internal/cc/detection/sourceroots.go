@@ -31,7 +31,7 @@ func ParseProducerDirs(entries []string) (map[string]string, error) {
 		dir = strings.TrimSpace(dir)
 		if !ok {
 			// A bare name selects the installed producer module.
-			installed, exists := DefaultProducerDirs()[name]
+			installed, exists := allDefaultProducerDirs()[name]
 			if !exists {
 				return nil, fmt.Errorf("producer %q is not installed; pass name=dir", name)
 			}
@@ -49,8 +49,42 @@ func ParseProducerDirs(entries []string) (map[string]string, error) {
 // DefaultProducerDirs returns the installed shellcode-producer modules. The
 // loop exposes them for editing and for BuildShellcode.
 func DefaultProducerDirs() map[string]string {
+	return producerDirsFor("donut", "crystal_pack")
+}
+
+// allDefaultProducerDirs resolves any installed Windows producer by bare name.
+// malasada is not a selectable producer: stager_linux always uses the shipped
+// module, so it cannot be replaced with a path.
+func allDefaultProducerDirs() map[string]string {
+	return producerDirsFor("donut", "crystal_pack")
+}
+
+// DefaultLinuxProducerDirs returns the installed Linux shellcode producer. The
+// C agent is built as a shared object and wrapped by malasada.
+func DefaultLinuxProducerDirs() map[string]string {
+	return producerDirsFor("malasada")
+}
+
+// LinuxProducerDir returns the shipped malasada module for a source checkout
+// or an installed operator kit. It is resolved from the module, never from a
+// --producer path.
+func LinuxProducerDir(moduleDir string) string {
+	if dir := DefaultLinuxProducerDirs()["malasada"]; dir != "" {
+		return dir
+	}
+	if strings.TrimSpace(moduleDir) == "" {
+		return ""
+	}
+	candidate := filepath.Join(filepath.Dir(filepath.Clean(moduleDir)), "malasada")
+	if info, err := os.Stat(filepath.Join(candidate, "config.json")); err == nil && info.Mode().IsRegular() {
+		return candidate
+	}
+	return ""
+}
+
+func producerDirsFor(names ...string) map[string]string {
 	out := map[string]string{}
-	for _, name := range []string{"donut", "crystal_pack"} {
+	for _, name := range names {
 		if mod, ok := def.GetModule(name); ok && mod != nil && strings.TrimSpace(mod.Path) != "" {
 			out[name] = mod.Path
 		}
@@ -59,21 +93,34 @@ func DefaultProducerDirs() map[string]string {
 }
 
 // DefaultReadRoots returns the shared build inputs a module links but does not
-// own. They are read-only source roots for the model.
+// own. They are read-only source roots for the model. A Linux loop edits the
+// whole C agent tree as a writable root, so it does not list its subdirectories
+// here.
 func DefaultReadRoots(moduleDir string) []string {
 	parent := filepath.Dir(moduleDir)
 	root := filepath.Dir(parent)
+	dirs := []string{filepath.Join(parent, "common")}
+	if !strings.EqualFold(filepath.Base(moduleDir), "stager_linux") {
+		dirs = append(dirs,
+			filepath.Join(root, "c_agent", "src", "util"),
+			filepath.Join(root, "c_agent", "include", "util"),
+		)
+	}
 	var roots []string
-	for _, dir := range []string{
-		filepath.Join(parent, "common"),
-		filepath.Join(root, "c_agent", "src", "util"),
-		filepath.Join(root, "c_agent", "include", "util"),
-	} {
+	for _, dir := range dirs {
 		if info, err := os.Stat(dir); err == nil && info.IsDir() {
 			roots = append(roots, dir)
 		}
 	}
 	return roots
+}
+
+// DefaultAgentSourceDir returns the C agent tree next to a module directory.
+// The repository keeps core/modules/stager_linux and core/c_agent as siblings,
+// and the installed operator kit preserves the same layout.
+func DefaultAgentSourceDir(moduleDir string) string {
+	modules := filepath.Dir(filepath.Clean(moduleDir))
+	return filepath.Join(filepath.Dir(modules), "c_agent")
 }
 
 // sourceRoot is one directory the detection agent may read. Writable roots are

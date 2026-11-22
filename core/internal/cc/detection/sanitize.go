@@ -92,6 +92,7 @@ func SanitizeTelemetryTrace(trace *TelemetryTrace) {
 	if trace == nil {
 		return
 	}
+	trace.Platform = sanitizeLine(trace.Platform)
 	trace.Source = sanitizeLine(trace.Source)
 	trace.PayloadKey = sanitizeLine(trace.PayloadKey)
 	trace.PayloadTable = sanitizeLine(trace.PayloadTable)
@@ -105,6 +106,7 @@ func sanitizeTelemetryRun(run *TelemetryRun) {
 	if run == nil {
 		return
 	}
+	run.Platform = sanitizeLine(run.Platform)
 	run.Source = sanitizeLine(run.Source)
 	run.PayloadKey = sanitizeLine(run.PayloadKey)
 	run.PayloadTable = sanitizeLine(run.PayloadTable)

@@ -1061,7 +1061,7 @@ func (c *coordinator) plannerBrief() string {
 	if memory := c.e.loopMemoryBrief(); memory != "" {
 		b.WriteString(memory + "\n")
 	}
-	b.WriteString("\n" + mechanismCatalogBrief())
+	b.WriteString("\n" + c.e.mechanismCatalogBrief())
 	if c.knowledgeBrief != "" {
 		fmt.Fprintf(&b, "\nRetrieved knowledge (host-side; read a summary before searching):\n%s", c.knowledgeBrief)
 	}

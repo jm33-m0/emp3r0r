@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+* detection loop: run `stager_linux` with an embedded C agent PIC, PenguinBox Tracee/Falco telemetry, Linux findings, and platform-tagged traces
+* malasada: move the Linux shellcode converter into an editable producer module and ship the Go toolchain in the operator kit
+
 ## [5.11.0](https://github.com/jm33-m0/emp3r0r/compare/v5.10.4...v5.11.0) (2026-11-20)
 
 

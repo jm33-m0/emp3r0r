@@ -32,7 +32,20 @@ func prepareTelemetry(parsed *parsedTelemetry) {
 		parsed.Meta = map[string]any{}
 	}
 	parsed.Events = dedupeTelemetryEvents(parsed.Events)
-	parsed.PayloadPID, parsed.PayloadImage, parsed.Attribution = identifyPayload(parsed.Events, parsed.Source)
+	if parsed.PayloadPID != 0 {
+		if parsed.Attribution == "" {
+			parsed.Attribution = "container"
+		}
+	} else if parsed.Platform == platformLinux || strings.EqualFold(parsed.Source, "penguinbox") {
+		parsed.PayloadPID, parsed.PayloadImage = penguinBoxPayloadIdentity(parsed.Events, 0)
+		if parsed.PayloadPID != 0 {
+			parsed.Attribution = "container"
+		} else {
+			parsed.Attribution = "unknown"
+		}
+	} else {
+		parsed.PayloadPID, parsed.PayloadImage, parsed.Attribution = identifyPayload(parsed.Events, parsed.Source)
+	}
 	processes, children := buildProcessMap(parsed.Events)
 	for i := range parsed.Events {
 		event := &parsed.Events[i]
@@ -46,7 +59,9 @@ func prepareTelemetry(parsed *parsedTelemetry) {
 	for i := range parsed.Events {
 		classifyTelemetryEvent(&parsed.Events[i], parsed.PayloadPID, parsed.PayloadImage, children, processes)
 	}
+	presetCoverage := parsed.Coverage
 	parsed.Coverage = buildTelemetryCoverage(parsed.Events, parsed.Meta)
+	mergeTelemetryCoverage(&parsed.Coverage, presetCoverage)
 	parsed.First = time.Time{}
 	parsed.Last = time.Time{}
 	for _, event := range parsed.Events {
@@ -300,6 +315,8 @@ func telemetryRole(event *telemetryEvent, payloadPID int64, payloadImage string,
 	switch {
 	case actor == payloadPID:
 		return "payload"
+	case subject == payloadPID && (event.Category == "process" || event.Category == "falco"):
+		return "payload"
 	case subject == payloadPID:
 		return "payload-target"
 	case children[actor], children[subject]:
@@ -386,6 +403,50 @@ func defenderEventSignal(event string) string {
 	return "scan"
 }
 
+// mergeTelemetryCoverage keeps source-reported expectations and delivery
+// counts that the generic event scan cannot infer, such as Tracee and Falco
+// coverage from PenguinBox.
+func mergeTelemetryCoverage(dst *TelemetryCoverage, src TelemetryCoverage) {
+	if dst == nil {
+		return
+	}
+	for _, name := range src.Delivered {
+		if !containsFold(dst.Delivered, name) {
+			dst.Delivered = append(dst.Delivered, name)
+		}
+	}
+	for _, name := range src.Expected {
+		if !containsFold(dst.Expected, name) {
+			dst.Expected = append(dst.Expected, name)
+		}
+	}
+	for _, name := range src.Missing {
+		if !containsFold(dst.Missing, name) {
+			dst.Missing = append(dst.Missing, name)
+		}
+	}
+	if dst.Analyzers == nil && len(src.Analyzers) > 0 {
+		dst.Analyzers = map[string]string{}
+	}
+	for name, status := range src.Analyzers {
+		if _, ok := dst.Analyzers[name]; !ok {
+			dst.Analyzers[name] = status
+		}
+	}
+	sort.Strings(dst.Delivered)
+	sort.Strings(dst.Expected)
+	sort.Strings(dst.Missing)
+}
+
+func containsFold(values []string, want string) bool {
+	for _, value := range values {
+		if strings.EqualFold(value, want) {
+			return true
+		}
+	}
+	return false
+}
+
 func buildTelemetryCoverage(events []telemetryEvent, meta map[string]any) TelemetryCoverage {
 	coverage := TelemetryCoverage{
 		Providers:  map[string]int{},
@@ -460,9 +521,20 @@ func recordAnalyzerCoverage(coverage *TelemetryCoverage, event telemetryEvent) {
 	_ = json.Unmarshal([]byte(event.Attrs), &attrs)
 	status := "ok"
 	if value, ok := attrs["errors"]; ok && value != nil {
-		text := strings.TrimSpace(fmt.Sprintf("%v", value))
-		if text != "" && text != "<nil>" {
-			status = "failed: " + clip(text, 160)
+		switch typed := value.(type) {
+		case []any:
+			if len(typed) > 0 {
+				status = "failed: " + clip(fmt.Sprintf("%v", typed), 160)
+			}
+		case map[string]any:
+			if len(typed) > 0 {
+				status = "failed: " + clip(fmt.Sprintf("%v", typed), 160)
+			}
+		default:
+			text := strings.TrimSpace(fmt.Sprintf("%v", value))
+			if text != "" && text != "<nil>" {
+				status = "failed: " + clip(text, 160)
+			}
 		}
 	}
 	if value, ok := attrs["status"].(string); ok && strings.EqualFold(value, "failed") && status == "ok" {
@@ -1031,10 +1103,38 @@ func isSystemImage(path string) bool {
 	if !strings.Contains(normalized, `\`) {
 		return isWindowsSystemModule(normalized)
 	}
-	return strings.Contains(normalized, `\windows\`) ||
+	if strings.Contains(normalized, `\windows\`) ||
 		strings.Contains(normalized, `\program files\`) ||
 		strings.Contains(normalized, `\programdata\microsoft\windows defender\`) ||
-		strings.Contains(normalized, `\systemroot\`)
+		strings.Contains(normalized, `\systemroot\`) {
+		return true
+	}
+	linux := strings.ToLower(strings.ReplaceAll(path, `\`, "/"))
+	for _, prefix := range []string{"/usr/", "/bin/", "/sbin/", "/lib/", "/lib64/", "/etc/"} {
+		if strings.HasPrefix(linux, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// isSystemExecutable reports whether an executed image is a normal system
+// binary. The platform split keeps a Linux payload's /usr/bin exec baseline
+// while a payload that drops and runs a file in /tmp or /home stays a signal.
+func isSystemExecutable(path, platform string) bool {
+	lower := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(path), `\`, "/"))
+	if platform == platformLinux {
+		if lower == "" {
+			return false
+		}
+		for _, prefix := range []string{"/usr/", "/bin/", "/sbin/", "/lib/", "/lib64/"} {
+			if strings.HasPrefix(lower, prefix) {
+				return true
+			}
+		}
+		return false
+	}
+	return isWindowsImagePath(path)
 }
 
 func isWindowsSystemModule(name string) bool {
@@ -1194,6 +1294,22 @@ func migrateTelemetrySchema(db *sql.DB) error {
 	if version >= TelemetrySchemaVersion {
 		return nil
 	}
+	if version >= 2 {
+		// v3 only adds traces.platform, which ensureColumn already created.
+		// Backfill it from the module instead of re-running the v2 event scan.
+		tx, err := db.Begin()
+		if err != nil {
+			return fmt.Errorf("begin telemetry migration: %w", err)
+		}
+		defer tx.Rollback()
+		if _, err := tx.Exec(`UPDATE traces SET platform = 'linux' WHERE module = 'stager_linux' AND platform = ''`); err != nil {
+			return fmt.Errorf("backfill telemetry platform: %w", err)
+		}
+		if _, err := tx.Exec(fmt.Sprintf(`PRAGMA user_version = %d`, TelemetrySchemaVersion)); err != nil {
+			return fmt.Errorf("write telemetry schema version: %w", err)
+		}
+		return tx.Commit()
+	}
 	tx, err := db.Begin()
 	if err != nil {
 		return fmt.Errorf("begin telemetry migration: %w", err)
@@ -1225,6 +1341,9 @@ func migrateTelemetrySchema(db *sql.DB) error {
 		if err := migrateTraceEvents(tx, trace.id, trace.source, trace.meta); err != nil {
 			return err
 		}
+	}
+	if _, err := tx.Exec(`UPDATE traces SET platform = 'linux' WHERE module = 'stager_linux' AND platform = ''`); err != nil {
+		return fmt.Errorf("backfill telemetry platform: %w", err)
 	}
 	if _, err := tx.Exec(fmt.Sprintf(`PRAGMA user_version = %d`, TelemetrySchemaVersion)); err != nil {
 		return fmt.Errorf("write telemetry schema version: %w", err)

@@ -133,6 +133,28 @@ var mechanismSpecs = map[string]mechanismSpec{
 		Signals:      []string{"static analyzers", "pe/checksum", "pe/sections", "pe/import", "section entropy", "imports/strings"},
 		Verification: "the targeted static finding disappears without a new high finding or an execution regression",
 	},
+	"stager": {
+		Name: "stager", Layer: "stager",
+		Summary: "Change the Linux stager source or its build options: transport, packing, sleep mask, dynload, hash style, ECH, or supervision.",
+		Constraints: []string{
+			"The stager must produce an executable ELF because the Linux sandbox runs it directly; raw and packed shellcode need a loader this loop does not build.",
+			"The embedded C agent PIC is host-filled; a stager change must keep the agent entry and its identity contract intact.",
+			"`format` and `agent-pic` are host-managed build options; change the stager's transport, unpacker, mask, dynload-mode, hash-style, ECH, or supervision through BuildOptions or source.",
+		},
+		Signals:      []string{"ELF structure and strings", "process exec and file events", "network connect", "Falco exec/memfd/ptrace rules", "agent check-in"},
+		Verification: "the stager builds an executable that starts the agent and the expected UUID checks in",
+	},
+	"agent": {
+		Name: "agent", Layer: "agent",
+		Summary: "Change the C agent source, then rebuild the PIC that stager_linux embeds.",
+		Constraints: []string{
+			"The C agent source tree is the writable c_agent root; the stager module does not contain the agent behavior.",
+			"Call GenerateAgent after agent edits so the new PIC has a fresh UUID and is the payload under test.",
+			"An agent change cannot fix a stager that never starts the PIC; use stager for that failure.",
+		},
+		Signals:      []string{"agent source diff", "runtime syscalls and strings", "Falco rules", "network/check-in"},
+		Verification: "the rebuilt PIC is embedded, the stager runs, and the expected UUID checks in",
+	},
 	"other": {
 		Name: "other", Layer: "other",
 		Summary: "A mechanism not covered by the catalog.",
@@ -192,7 +214,9 @@ func (e *evolver) mechanismSpecFor(name string) mechanismSpec {
 	}
 	if input, err := producerInputName(producer, declared); err == nil {
 		spec.Constraints = append(spec.Constraints, fmt.Sprintf("active producer %s declares input option %q", producer, input))
-		if input == "dll" {
+		if e.platform() == platformLinux {
+			spec.Constraints = append(spec.Constraints, "this producer takes the C agent shared object and emits raw PIC for stager_linux")
+		} else if input == "dll" {
 			spec.Constraints = append(spec.Constraints, "this producer requires agent_type=windows_dll")
 		} else {
 			spec.Constraints = append(spec.Constraints, "this producer takes a PE input; keep the agent type compatible")
@@ -205,10 +229,17 @@ func (e *evolver) mechanismSpecFor(name string) mechanismSpec {
 // methodology/mechanism-<name>; the host injects the selected contract for the
 // editor instead of repeating every mechanism in the prompt.
 func mechanismCatalogBrief() string {
+	return mechanismCatalogBriefFor(platformWindows)
+}
+
+func mechanismCatalogBriefFor(platform string) string {
 	var b strings.Builder
 	b.WriteString("Mechanism catalog (read methodology/mechanism-<name> for limits):\n")
 	for _, name := range mechanismNames() {
 		if name == "other" {
+			continue
+		}
+		if platform == platformLinux && !linuxMechanism(name) {
 			continue
 		}
 		spec := mechanismSpecs[name]
@@ -217,8 +248,36 @@ func mechanismCatalogBrief() string {
 	return b.String()
 }
 
+func (e *evolver) mechanismCatalogBrief() string {
+	return mechanismCatalogBriefFor(e.platform())
+}
+
+func linuxMechanism(name string) bool {
+	switch name {
+	case "stager", "agent", "producer", "build-flags", "static-hygiene", "other":
+		return true
+	}
+	return false
+}
+
 // mechanismBrief is the selected mechanism's contract for the editor.
 func (e *evolver) mechanismBrief(name string) string {
+	if e.platform() == platformLinux {
+		switch normalizeMechanism(name) {
+		case "build-flags":
+			return "Selected mechanism: build-flags (layer stager)\n" +
+				"Change one declared stager_linux option set instead of its source.\n" +
+				"Constraints: format and agent-pic are host-owned; transport, unpacker, mask, dynload-mode, hash-style, ECH, and supervision are design choices. Keep format=executable.\n" +
+				"Signals to inspect: build log options, ELF structure/strings, process/file/network events, Falco rules, agent check-in.\n" +
+				"Verification: the cycle summary records the new options and the expected UUID checks in."
+		case "static-hygiene":
+			return "Selected mechanism: static-hygiene (layer hygiene)\n" +
+				"Remove ELF, YARA, string, or section surface the static analyzers report.\n" +
+				"Constraints: fix the build or source; do not pad or add random bytes to dilute entropy. A static hygiene change does not fix an execution failure.\n" +
+				"Signals to inspect: elf/* findings, YARA matches, suspicious strings, section/permission layout.\n" +
+				"Verification: the targeted static finding disappears without a new high finding or an execution regression."
+		}
+	}
 	spec := e.mechanismSpecFor(name)
 	var b strings.Builder
 	fmt.Fprintf(&b, "Selected mechanism: %s (layer %s)\n", spec.Name, spec.Layer)
@@ -237,6 +296,9 @@ func (e *evolver) mechanismBrief(name string) string {
 // for a producer target, using that module's declared input option. It keeps
 // the swap instructions general instead of assuming one producer's input.
 func (e *evolver) producerSwapHelp(name string) string {
+	if e.platform() == platformLinux {
+		return "Linux uses the malasada producer; call GenerateAgent then BuildShellcode producer=malasada input=<artifact_path>, then mechanism=producer"
+	}
 	name = strings.ToLower(strings.TrimSpace(name))
 	dir := strings.TrimSpace(e.cfg.ProducerDirs[name])
 	if name == "" || dir == "" {
@@ -275,6 +337,9 @@ func (e *evolver) producerRequiresDLL(name string) bool {
 // input option. It is the general replacement for hardcoding one producer's
 // input format.
 func (e *evolver) producerAgentType(name string) string {
+	if e.platform() == platformLinux {
+		return "linux_so"
+	}
 	name = strings.ToLower(strings.TrimSpace(name))
 	dir := strings.TrimSpace(e.cfg.ProducerDirs[name])
 	if name == "" || dir == "" {

@@ -147,7 +147,11 @@ func BuildFeedback(run Run) Feedback {
 	if run.Risk.Level == "" {
 		fb.Notes = append(fb.Notes, "the sandbox did not return a risk assessment")
 	}
-	locator := newLocator(newSourceIndex(run.Plan.ModuleDir))
+	index := newSourceIndex(run.Plan.ModuleDir)
+	if dir := strings.TrimSpace(run.Plan.AgentSourceDir); dir != "" && dir != run.Plan.ModuleDir {
+		index.addRoot(filepath.Base(dir), dir)
+	}
+	locator := newLocator(index)
 
 	if run.Telemetry != nil {
 		for _, finding := range run.Telemetry.Findings {
@@ -233,6 +237,9 @@ func telemetrySourceHint(finding Finding) string {
 	case "telemetry/remote-thread":
 		return "CreateRemoteThread"
 	case "telemetry/child-process":
+		if strings.EqualFold(finding.Indicator, "execve") {
+			return "execve"
+		}
 		return "CreateProcess"
 	case "telemetry/process-access":
 		return "OpenProcess"
@@ -242,6 +249,38 @@ func telemetrySourceHint(finding Finding) string {
 		return "VirtualAllocEx"
 	case "telemetry/map-view":
 		return "MapViewOfFile"
+	case "telemetry/memfd":
+		return "memfd_create"
+	case "telemetry/ptrace":
+		return "ptrace"
+	case "telemetry/process-vm":
+		return "process_vm"
+	case "telemetry/exec-memory":
+		return "PROT_EXEC"
+	case "telemetry/kernel-module":
+		return "init_module"
+	case "telemetry/namespace":
+		return "unshare"
+	}
+	rule := strings.ToLower(strings.TrimSpace(finding.Rule))
+	if strings.HasPrefix(rule, "falco/") {
+		indicator := strings.ToLower(finding.Indicator)
+		switch {
+		case strings.Contains(indicator, "memfd"):
+			return "memfd_create"
+		case strings.Contains(indicator, "ptrace"):
+			return "ptrace"
+		case strings.Contains(indicator, "map") || strings.Contains(indicator, "proc"):
+			return "/proc/self/maps"
+		case strings.Contains(indicator, "connect") || strings.Contains(indicator, "network"):
+			return "connect"
+		case strings.Contains(indicator, "module"):
+			return "init_module"
+		case strings.Contains(indicator, "namespace") || strings.Contains(indicator, "mount"):
+			return "unshare"
+		case strings.Contains(indicator, "exec") || strings.Contains(indicator, "shell"):
+			return "execve"
+		}
 	}
 	return ""
 }
@@ -293,6 +332,18 @@ func addFinding(fb *Feedback, finding Finding, locate func(string) []SourceLocat
 func suggestion(finding Finding) string {
 	switch finding.Stage {
 	case StageStatic:
+		if strings.EqualFold(finding.Tool, "elf") {
+			switch {
+			case strings.HasPrefix(finding.Rule, "elf/executable-stack"):
+				return "Remove the executable-stack request from the link step; a payload must not need an executable stack."
+			case strings.HasPrefix(finding.Rule, "elf/rwx-segment"):
+				return "Split the read/write/execute segment during the build; no loadable segment should be W and X at once."
+			case strings.HasPrefix(finding.Rule, "elf/string"):
+				return "Remove, reshape, or derive the flagged literal at runtime; confirm the static string disappears after a rebuild."
+			default:
+				return "Fix the ELF build or layout the analyzer reported; verify the stager still executes and the agent checks in."
+			}
+		}
 		if strings.EqualFold(finding.Tool, "pe-info") {
 			switch finding.Rule {
 			case "pe/checksum":
@@ -394,6 +445,25 @@ func parseStatic(raw json.RawMessage) []Finding {
 						findings = append(findings, Finding{Tool: "yara", Severity: severity, Rule: match.Rule, Indicator: text, Detail: detail})
 					}
 				}
+			}
+		}
+	}
+
+	if elfRaw, ok := top["elf"]; ok {
+		var report struct {
+			Findings []struct {
+				Severity  string `json:"severity"`
+				Rule      string `json:"rule"`
+				Indicator string `json:"indicator"`
+				Detail    string `json:"detail"`
+			} `json:"findings"`
+		}
+		if json.Unmarshal(elfRaw, &report) == nil {
+			for _, item := range report.Findings {
+				findings = append(findings, Finding{
+					Tool: "elf", Severity: item.Severity, Rule: item.Rule,
+					Indicator: firstNonEmpty(item.Indicator, item.Rule), Detail: item.Detail,
+				})
 			}
 		}
 	}
@@ -874,9 +944,17 @@ type sourceIndex struct {
 
 func newSourceIndex(dir string) *sourceIndex {
 	index := &sourceIndex{}
+	index.addRoot("", dir)
+	return index
+}
+
+// addRoot walks one source tree into the shared index. A non-empty prefix
+// names the source root so a feedback location from the C agent tree is
+// distinguishable from the stager module path.
+func (idx *sourceIndex) addRoot(prefix, dir string) {
 	dir = strings.TrimSpace(dir)
 	if dir == "" {
-		return index
+		return
 	}
 	total := 0
 	_ = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
@@ -893,7 +971,7 @@ func newSourceIndex(dir string) *sourceIndex {
 		if !info.Mode().IsRegular() {
 			return nil
 		}
-		if info.Size() > maxSourceFileBytes || len(index.files) >= maxSourceFiles || total > maxSourceTotalBytes {
+		if info.Size() > maxSourceFileBytes || len(idx.files) >= maxSourceFiles || total > maxSourceTotalBytes {
 			return nil
 		}
 		data, err := readBoundedSource(path)
@@ -904,15 +982,15 @@ func newSourceIndex(dir string) *sourceIndex {
 		if err != nil {
 			rel = name
 		}
+		rel = filepath.ToSlash(filepath.Join(prefix, rel))
 		total += len(data)
-		index.files = append(index.files, sourceFile{
-			rel:   filepath.ToSlash(rel),
+		idx.files = append(idx.files, sourceFile{
+			rel:   rel,
 			lines: strings.Split(string(data), "\n"),
 		})
 		return nil
 	})
-	sort.Slice(index.files, func(i, j int) bool { return index.files[i].rel < index.files[j].rel })
-	return index
+	sort.Slice(idx.files, func(i, j int) bool { return idx.files[i].rel < idx.files[j].rel })
 }
 
 // locator bounds how much source text one feedback pass inspects and caches

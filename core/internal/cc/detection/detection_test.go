@@ -86,7 +86,7 @@ func TestBuildPlanSeparatesPassiveAndActiveStages(t *testing.T) {
 	}
 }
 
-func TestBuildPlanLinuxSkipsDetonation(t *testing.T) {
+func TestBuildPlanLinuxRunsDetonation(t *testing.T) {
 	dir := t.TempDir()
 	artifact := filepath.Join(dir, "stager.bin")
 	if err := os.WriteFile(artifact, []byte("\x7fELFpayload"), 0o600); err != nil {
@@ -94,15 +94,40 @@ func TestBuildPlanLinuxSkipsDetonation(t *testing.T) {
 	}
 	health := Health{
 		Available: true,
-		Scanners:  []Scanner{{Group: "static", Name: "yara", Status: "ok", Enabled: true, Exists: true}, {Group: "dynamic", Name: "pe_sieve", Status: "ok", Enabled: true, Exists: true}},
+		Scanners:  []Scanner{{Group: "static", Name: "yara", Status: "ok", Enabled: true, Exists: true}, {Group: "dynamic", Name: "tracee", Status: "ok", Enabled: true, Exists: true}},
 	}
 	plan, err := BuildPlan(Request{Module: "stager_linux", ModuleDir: dir, Platform: "Linux", ArtifactPath: artifact}, health)
 	if err != nil {
 		t.Fatal(err)
 	}
+	runnable := false
+	for _, stage := range plan.Stages {
+		if stage.Kind == StageDynamic {
+			runnable = stage.Runnable && stage.Executes && stage.RequiresApproval
+		}
+	}
+	if !runnable {
+		t.Fatalf("Linux dynamic stage is not runnable: %+v", plan.Stages)
+	}
+}
+
+func TestBuildPlanUnknownPlatformSkipsDetonation(t *testing.T) {
+	dir := t.TempDir()
+	artifact := filepath.Join(dir, "sample.bin")
+	if err := os.WriteFile(artifact, []byte("MZpayload"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	health := Health{
+		Available: true,
+		Scanners:  []Scanner{{Group: "dynamic", Name: "pe_sieve", Status: "ok", Enabled: true, Exists: true}},
+	}
+	plan, err := BuildPlan(Request{Module: "custom", ModuleDir: dir, Platform: "freebsd", ArtifactPath: artifact}, health)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, stage := range plan.Stages {
 		if stage.Kind == StageDynamic && stage.Runnable {
-			t.Fatalf("dynamic stage must not run a Linux artifact: %+v", stage)
+			t.Fatalf("dynamic stage ran on an unsupported platform: %+v", stage)
 		}
 	}
 }

@@ -29,22 +29,31 @@ const (
 // buildShellcodeTool runs a configured shellcode producer module with validated
 // options and makes its artifact the shellcode for the next loader build.
 func (e *evolver) buildShellcodeTool() tool.CoreTool {
+	description := "Run a configured shellcode producer module (donut or crystal_pack) with validated options. " +
+		"The output is written under the detection store and becomes the shellcode every later DetectionCycle loads. " +
+		"Call GenerateAgent first when a dynamic cycle needs a fresh agent UUID; reusing a shellcode violates TOFU. " +
+		"Editing the producer module first (module=\"donut\") changes how the generator itself behaves; its build options, " +
+		"including Crystal Palace link options, are changed with BuildShellcode options or the BuildOptions tool. " +
+		"Options persist for the active producer and are reused when the host rotates the agent, so a wrapper change is not lost. " +
+		"crystal_pack requires a DLL: call GenerateAgent with agent_type=windows_dll and pass its artifact_path as the dll option."
+	producerDescription := "Producer module name: donut or crystal_pack."
+	if e.platform() == platformLinux {
+		description = "Run the malasada producer on the C agent shared object. " +
+			"It writes a raw PIC blob under the detection store and makes it the shellcode every later DetectionCycle embeds in stager_linux. " +
+			"Call GenerateAgent first for a fresh UUID and pass its artifact_path as the input option. " +
+			"Editing malasada source changes its ELF patching or stage0 behavior; options are call-export and compress."
+		producerDescription = "Producer module name: malasada."
+	}
 	return tool.Build(tool.Spec{
-		Name: "BuildShellcode",
-		Description: "Run a configured shellcode producer module (donut or crystal_pack) with validated options. " +
-			"The output is written under the detection store and becomes the shellcode every later DetectionCycle loads. " +
-			"Call GenerateAgent first when a dynamic cycle needs a fresh agent UUID; reusing a shellcode violates TOFU. " +
-			"Editing the producer module first (module=\"donut\") changes how the generator itself behaves; its build options, " +
-			"including Crystal Palace link options, are changed with BuildShellcode options or the BuildOptions tool. " +
-			"Options persist for the active producer and are reused when the host rotates the agent, so a wrapper change is not lost. " +
-			"crystal_pack requires a DLL: call GenerateAgent with agent_type=windows_dll and pass its artifact_path as the dll option.",
-		Prompt: "Build shellcode with a producer module.",
+		Name:        "BuildShellcode",
+		Description: description,
+		Prompt:      "Build shellcode with a producer module.",
 		Schema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"producer": map[string]any{
 					"type":        "string",
-					"description": "Producer module name: donut or crystal_pack.",
+					"description": producerDescription,
 				},
 				"options": map[string]any{
 					"type":                 "object",
@@ -71,13 +80,17 @@ func (e *evolver) buildShellcodeTool() tool.CoreTool {
 			if err != nil {
 				return tool.Errorf(fmt.Sprintf("%v", err)), nil
 			}
+			message := "the next DetectionCycle builds the loader with this shellcode"
+			if e.platform() == platformLinux {
+				message = "the next DetectionCycle embeds this PIC in stager_linux"
+			}
 			out := map[string]any{
 				"producer":          e.activeProducer,
 				"path":              artifact.Path,
 				"sha256":            artifact.SHA256,
 				"size":              artifact.Size,
 				"active":            true,
-				"message":           "the next DetectionCycle builds the loader with this shellcode",
+				"message":           message,
 				"options":           sanitizeProducerOptions(flags),
 				"persisted_options": e.activeProducerOptions(),
 				"build_tail":        lastLines(buildLog, 12),
@@ -205,9 +218,9 @@ func (e *evolver) producerInput(producer, inputName, value string) (string, erro
 		return "", fmt.Errorf("input %q is not a regular file", input)
 	}
 	switch strings.ToLower(filepath.Ext(abs)) {
-	case ".exe", ".dll", ".bin":
+	case ".exe", ".dll", ".bin", ".so", ".elf":
 	default:
-		return "", fmt.Errorf("input %q must be a PE or shellcode file", input)
+		return "", fmt.Errorf("input %q must be a PE, ELF shared object, or shellcode file", input)
 	}
 	base, err := filepath.Abs(e.payloadDir())
 	if err != nil {

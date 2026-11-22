@@ -58,25 +58,27 @@ type SandboxPlan struct {
 
 // Plan is the detection test plan for one artifact.
 type Plan struct {
-	Version       int         `json:"version"`
-	Module        string      `json:"module"`
-	ModuleDir     string      `json:"module_dir,omitempty"`
-	Platform      string      `json:"platform"`
-	Artifact      Artifact    `json:"artifact"`
-	CreatedAt     time.Time   `json:"created_at"`
-	Sandbox       SandboxPlan `json:"sandbox"`
-	Stages        []Stage     `json:"stages"`
-	SourceTargets []string    `json:"source_targets,omitempty"`
-	Notes         []string    `json:"notes,omitempty"`
+	Version        int         `json:"version"`
+	Module         string      `json:"module"`
+	ModuleDir      string      `json:"module_dir,omitempty"`
+	AgentSourceDir string      `json:"agent_source_dir,omitempty"`
+	Platform       string      `json:"platform"`
+	Artifact       Artifact    `json:"artifact"`
+	CreatedAt      time.Time   `json:"created_at"`
+	Sandbox        SandboxPlan `json:"sandbox"`
+	Stages         []Stage     `json:"stages"`
+	SourceTargets  []string    `json:"source_targets,omitempty"`
+	Notes          []string    `json:"notes,omitempty"`
 }
 
 // Request describes a plan to build.
 type Request struct {
-	Module       string
-	ModuleDir    string
-	Platform     string
-	ArtifactPath string
-	Flags        map[string]string
+	Module         string
+	ModuleDir      string
+	AgentSourceDir string
+	Platform       string
+	ArtifactPath   string
+	Flags          map[string]string
 }
 
 // InspectArtifact hashes one built payload and classifies its container.
@@ -153,12 +155,13 @@ func BuildPlan(req Request, health Health) (Plan, error) {
 	}
 
 	plan := Plan{
-		Version:   PlanVersion,
-		Module:    module,
-		ModuleDir: req.ModuleDir,
-		Platform:  platform,
-		Artifact:  artifact,
-		CreatedAt: time.Now().UTC(),
+		Version:        PlanVersion,
+		Module:         module,
+		ModuleDir:      req.ModuleDir,
+		AgentSourceDir: req.AgentSourceDir,
+		Platform:       platform,
+		Artifact:       artifact,
+		CreatedAt:      time.Now().UTC(),
 		Sandbox: SandboxPlan{
 			URL:          health.URL,
 			Available:    health.Available,
@@ -187,8 +190,8 @@ func BuildPlan(req Request, health Health) (Plan, error) {
 		switch {
 		case !health.Available:
 			stage.Reason = "sandbox is unreachable"
-		case platform != "windows":
-			stage.Reason = "dynamic analysis detonates Windows payloads only"
+		case platform != "windows" && platform != "linux":
+			stage.Reason = "dynamic analysis does not support the " + platform + " platform"
 		default:
 			stage.Runnable = true
 		}
@@ -201,7 +204,7 @@ func BuildPlan(req Request, health Health) (Plan, error) {
 		case !health.Available:
 			stage.Reason = "sandbox is unreachable"
 		case platform != "windows":
-			stage.Reason = "EDR detonation runs Windows payloads only"
+			stage.Reason = "EDR profiles are unavailable for " + platform + " payloads"
 		default:
 			stage.Runnable = true
 		}

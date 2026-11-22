@@ -71,15 +71,34 @@ func (e *evolver) initBuildOptions(opts map[string]string) {
 // malformed option map cannot redirect a build.
 func (e *evolver) payloadBuildFlags(shellcode string, iteration int) map[string]string {
 	flags := map[string]string{}
+	declared, _ := moduleOptions(e.cfg.ModuleDir, e.cfg.Module)
 	for name, value := range e.buildOptionsSnapshot() {
 		if strings.TrimSpace(value) == "" {
 			continue
 		}
-		switch strings.ToLower(name) {
-		case "shellcode", "output", "arch":
+		key := strings.ToLower(name)
+		switch key {
+		case "shellcode", "output", "arch", "agent-pic":
 			continue
 		}
-		flags[name] = value
+		// A resumed loop can carry options from a different payload design.
+		// Never pass an option the module does not declare.
+		if declared != nil {
+			if opt, ok := declared[key]; !ok || opt == nil {
+				continue
+			}
+		}
+		flags[key] = value
+	}
+	if e.platform() == platformLinux {
+		flags["agent-pic"] = shellcode
+		// The Linux detonation container executes an ELF; the stager's raw and
+		// packed formats are shellcode for a loader that this loop does not
+		// build, and a shared object has no entry point. The model can change
+		// stager source and build options, not the artifact contract the
+		// sandbox needs to run it.
+		flags["format"] = "executable"
+		return flags
 	}
 	flags["shellcode"] = shellcode
 	flags["arch"] = "x64"
@@ -224,6 +243,9 @@ func (e *evolver) hostOwnedBuildOption(module string, declared def.ModOptions, n
 		return true
 	}
 	if strings.EqualFold(module, e.cfg.Module) {
+		if e.platform() == platformLinux {
+			return name == "shellcode" || name == "agent-pic" || name == "format" || name == buildOptionArch
+		}
 		return name == "shellcode" || name == buildOptionArch
 	}
 	input, err := producerInputName(module, declared)
@@ -338,20 +360,29 @@ func clipOptionText(text string, limit int) string {
 // recorded in the cycle summary, counted as a change by DetectionCycle, and
 // restored with the last executing payload.
 func (e *evolver) buildOptionsTool() tool.CoreTool {
+	description := "List or change build options for the next build. Options are the parameters declared in the module's config.json; " +
+		"unknown names, invalid choices, and host-filled values are rejected. loader_windows options change the host container, " +
+		"injection path, sacrificial process, and call-stack spoofing; producer options change the wrapper, for example Crystal Palace " +
+		"link options. Call with no options to list effective values and choices. `reset` removes an override so the module's own " +
+		"default applies. A build-option change is a valid change for DetectionCycle and is recorded and restored per cycle."
+	moduleDescription := "Writable source root: the payload module (default), donut, or crystal_pack."
+	if e.platform() == platformLinux {
+		description = "List or change stager_linux build options. The module's config.json declares transport, unpacker, sleep mask, " +
+			"dynload mode, hash style, ECH, and supervision. format and agent-pic are host-owned: PenguinBox executes an ELF and the host " +
+			"embeds the generated C agent PIC. Call with no options to list effective values and choices; `reset` restores one default. " +
+			"A build-option change is a valid change for DetectionCycle and is recorded and restored per cycle."
+		moduleDescription = "Writable source root: the payload module (default) or malasada."
+	}
 	return tool.Build(tool.Spec{
-		Name: "BuildOptions",
-		Description: "List or change build options for the next build. Options are the parameters declared in the module's config.json; " +
-			"unknown names, invalid choices, and host-filled values are rejected. loader_windows options change the host container, " +
-			"injection path, sacrificial process, and call-stack spoofing; producer options change the wrapper, for example Crystal Palace " +
-			"link options. Call with no options to list effective values and choices. `reset` removes an override so the module's own " +
-			"default applies. A build-option change is a valid change for DetectionCycle and is recorded and restored per cycle.",
-		Prompt: "List or change build options.",
+		Name:        "BuildOptions",
+		Description: description,
+		Prompt:      "List or change build options.",
 		Schema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"module": map[string]any{
 					"type":        "string",
-					"description": "Writable source root: the payload module (default), donut, or crystal_pack.",
+					"description": moduleDescription,
 				},
 				"options": map[string]any{
 					"type":                 "object",

@@ -251,6 +251,7 @@ func (l *Loop) RunPlan(ctx context.Context, plan Plan, opts RunOptions) (Run, er
 				RunID:          run.ID,
 				Module:         plan.Module,
 				ArtifactSHA256: plan.Artifact.SHA256,
+				Platform:       plan.Platform,
 				Source:         "sandbox",
 				ParentKey:      opts.ParentKey,
 			})
@@ -260,7 +261,7 @@ func (l *Loop) RunPlan(ctx context.Context, plan Plan, opts RunOptions) (Run, er
 				run.Telemetry = &TelemetryRun{
 					TraceID: trace.ID, PayloadID: trace.PayloadID,
 					PayloadKey: trace.PayloadKey, PayloadTable: trace.PayloadTable,
-					Source: trace.Source, Events: trace.Events,
+					Platform: trace.Platform, Source: trace.Source, Events: trace.Events,
 					First: trace.First, Last: trace.Last,
 					PayloadPID: trace.PayloadPID, PayloadImage: trace.PayloadImage,
 					Attribution: trace.Attribution, Coverage: trace.Coverage,
@@ -276,7 +277,11 @@ func (l *Loop) RunPlan(ctx context.Context, plan Plan, opts RunOptions) (Run, er
 					run.Telemetry.Stats = &stats
 				}
 				if trace.Attribution == "unknown" {
-					run.Notes = append(run.Notes, "telemetry: no payload PEB was captured; the trace cannot be attributed to the sample")
+					if plan.Platform == "linux" {
+						run.Notes = append(run.Notes, "telemetry: no payload process was identified; the trace cannot be attributed to the sample")
+					} else {
+						run.Notes = append(run.Notes, "telemetry: no payload PEB was captured; the trace cannot be attributed to the sample")
+					}
 				}
 				if len(trace.Coverage.Missing) > 0 {
 					run.Notes = append(run.Notes,

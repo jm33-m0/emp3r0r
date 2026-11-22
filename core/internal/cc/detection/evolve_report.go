@@ -10,6 +10,17 @@ import (
 	"strings"
 )
 
+// reportPlatform reads the sandbox runtime from the first cycle summary.
+func reportPlatform(cycles []Cycle) string {
+	for _, cycle := range cycles {
+		var summary cycleSummary
+		if json.Unmarshal([]byte(cycle.Summary), &summary) == nil && summary.Platform != "" {
+			return summary.Platform
+		}
+	}
+	return platformWindows
+}
+
 // RenderLoopSummary returns a compact Markdown summary for the operator
 // console. The full report remains next to it for the log pane and the report
 // file.
@@ -140,8 +151,12 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 
 	before := answerStrings(answer, "verdicts_before")
 	after := answerStrings(answer, "verdicts_after")
+	verdictLabel := "Real Defender verdicts"
+	if reportPlatform(cycles) == platformLinux {
+		verdictLabel = "High-confidence Falco alerts"
+	}
 	if len(before) > 0 || len(after) > 0 {
-		fmt.Fprintf(&b, "| Real Defender verdicts | Value |\n| --- | --- |\n")
+		fmt.Fprintf(&b, "| %s | Value |\n| --- | --- |\n", verdictLabel)
 		fmt.Fprintf(&b, "| Before | %s |\n", verdictCell(before))
 		fmt.Fprintf(&b, "| After | %s |\n\n", verdictCell(after))
 	}
@@ -156,7 +171,7 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 	fmt.Fprintf(&b, "## Findings status\n\n")
 	achieved := false
 	if len(before) > 0 && len(after) == 0 {
-		fmt.Fprintf(&b, "- Removed all recorded Defender verdicts (%s).\n", strings.Join(before, ", "))
+		fmt.Fprintf(&b, "- Removed all recorded %s (%s).\n", strings.ToLower(verdictLabel), strings.Join(before, ", "))
 		achieved = true
 	}
 	changes, _ := reportFindingChanges(cycles, finalIndex, edits)
@@ -504,7 +519,11 @@ func renderHygieneBacklog(b *strings.Builder, cycles []Cycle, finalIndex int) {
 		return
 	}
 	b.WriteString("## Static hygiene\n\n")
-	b.WriteString("Stable pe/*, YARA, and CheckPlz findings; stringnalyzer indicators are omitted because they change per build.\n\n")
+	if reportPlatform(cycles) == platformLinux {
+		b.WriteString("Stable elf/*, YARA, and string findings; stringnalyzer indicators are omitted because they change per build.\n\n")
+	} else {
+		b.WriteString("Stable pe/*, YARA, and CheckPlz findings; stringnalyzer indicators are omitted because they change per build.\n\n")
+	}
 	b.WriteString("| Finding | Severity | First seen | Last seen | Final status | Source |\n")
 	b.WriteString("| --- | --- | ---: | ---: | --- | --- |\n")
 	for _, key := range order {
@@ -577,7 +596,11 @@ func renderFindingObjective(b *strings.Builder, cycles []Cycle, finalIndex int) 
 	fmt.Fprintf(b, "| Static findings | %d | %d | %s |\n", before.Static, after.Static, signedChange(after.Static-before.Static))
 	fmt.Fprintf(b, "| Stable findings | %d | %d | %s |\n", before.StableTotal, after.StableTotal, signedChange(after.StableTotal-before.StableTotal))
 	fmt.Fprintf(b, "| Total findings | %d | %d | %s |\n", before.Total, after.Total, signedChange(after.Total-before.Total))
-	fmt.Fprintf(b, "| Defender verdicts | %d | %d | %s |\n", first.Verdicts, last.Verdicts, signedChange(last.Verdicts-first.Verdicts))
+	verdictLabel := "Defender verdicts"
+	if reportPlatform(cycles) == platformLinux {
+		verdictLabel = "Falco verdicts"
+	}
+	fmt.Fprintf(b, "| %s | %d | %d | %s |\n", verdictLabel, first.Verdicts, last.Verdicts, signedChange(last.Verdicts-first.Verdicts))
 	fmt.Fprintf(b, "\nExecuting cycles: %d/%d.", executing, len(cycles))
 	if removed, added := deliveredDiff(cycleDelivered(first), cycleDelivered(last)); len(removed) > 0 || len(added) > 0 {
 		fmt.Fprintf(b, "\n\n> **Counts are not comparable:** cycle 1 delivered `%s`; cycle %d delivered `%s`",

@@ -1,6 +1,8 @@
 package detection
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
@@ -40,5 +42,39 @@ func TestParseProducerDirsKeepsExplicitDir(t *testing.T) {
 	}
 	if got["donut"] != "/opt/donut" {
 		t.Fatalf("donut dir = %q, want /opt/donut", got["donut"])
+	}
+}
+
+func TestLinuxProducerDirUsesSiblingWhenNotInstalled(t *testing.T) {
+	previous, hadPrevious := def.Modules.Load("malasada")
+	def.Modules.Delete("malasada")
+	t.Cleanup(func() {
+		if hadPrevious {
+			def.Modules.Store("malasada", previous)
+			return
+		}
+		def.Modules.Delete("malasada")
+	})
+
+	root := t.TempDir()
+	moduleDir := filepath.Join(root, "core", "modules", "stager_linux")
+	malasadaDir := filepath.Join(root, "core", "modules", "malasada")
+	if err := os.MkdirAll(moduleDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(malasadaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(malasadaDir, "config.json"), []byte("{}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := LinuxProducerDir(moduleDir); got != malasadaDir {
+		t.Fatalf("LinuxProducerDir = %q, want %q", got, malasadaDir)
+	}
+}
+
+func TestParseProducerDirsDoesNotResolveMalasada(t *testing.T) {
+	if _, err := ParseProducerDirs([]string{"malasada"}); err == nil {
+		t.Fatal("malasada was accepted as a selectable producer")
 	}
 }

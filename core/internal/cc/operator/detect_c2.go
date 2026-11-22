@@ -19,11 +19,8 @@ import (
 // actions.
 type liveDetectC2Backend struct{}
 
-func (liveDetectC2Backend) GenerateAgent(ccAddress, agentType, arch string) (*detection.AgentBuildResult, error) {
-	return generateDetectionAgentWithCC(ccAddress, detection.AgentBuildOptions{
-		Type: agentType,
-		Arch: arch,
-	})
+func (liveDetectC2Backend) GenerateAgent(ccAddress string, opts detection.AgentBuildOptions) (*detection.AgentBuildResult, error) {
+	return generateDetectionAgentWithCC(ccAddress, opts)
 }
 
 // liveAgentByUUID resolves one agent from the live C2 registry.
@@ -142,6 +139,38 @@ func runVerifyModuleOnC2(ctx context.Context, agent *def.Emp3r0rAgent, module st
 	}
 }
 
+// generateDetectionCAgent builds the C agent PIC that stager_linux embeds.
+// It uses the source tree the loop exposes to the model, so edits to the C
+// agent are part of the payload under test.
+func generateDetectionCAgent(agentCfg builder.AgentConfig, opts detection.AgentBuildOptions) (*detection.AgentBuildResult, error) {
+	providers := builder.CAgentProviders{
+		Format: "so",
+		Arch:   opts.Arch,
+		Libc:   "glibc",
+	}
+	agentCfg.IsStager = true
+	res, err := builder.GenerateCAgentWorkflowAt(opts.SourceDir, agentCfg, providers, client.SignAgent)
+	if err != nil {
+		logging.Warningf("detect_loop: signed C agent generation failed (%v); building without a C2 signature", err)
+		res, err = builder.GenerateCAgentWorkflowAt(opts.SourceDir, agentCfg, providers, nil)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if res == nil || strings.TrimSpace(res.OutputFile) == "" {
+		return nil, fmt.Errorf("C agent build produced no artifact")
+	}
+	artifact, err := detection.InspectArtifact(res.OutputFile)
+	if err != nil {
+		return nil, err
+	}
+	return &detection.AgentBuildResult{
+		ArtifactPath: res.OutputFile, ShellcodePath: res.OutputFile,
+		Type: "linux_so", Arch: opts.Arch, Platform: "linux",
+		AgentUUID: res.AgentUUID, SHA256: artifact.SHA256, Size: artifact.Size,
+	}, nil
+}
+
 func generateDetectionAgentWithCC(ccAddress string, opts detection.AgentBuildOptions) (*detection.AgentBuildResult, error) {
 	// Serialize builder mutations across concurrent console requests.
 	generationMu.Lock()
@@ -150,6 +179,9 @@ func generateDetectionAgentWithCC(ccAddress string, opts detection.AgentBuildOpt
 	agentCfg := builder.AgentConfig{}
 	if cc := strings.TrimSpace(ccAddress); cc != "" {
 		agentCfg.CCAddress = &cc
+	}
+	if opts.Platform == "linux" {
+		return generateDetectionCAgent(agentCfg, opts)
 	}
 	res, err := builder.GenerateAgentArtifact(agentCfg, opts.Type, opts.Arch, client.SignAgent)
 	if err != nil {

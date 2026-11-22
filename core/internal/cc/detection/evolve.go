@@ -217,23 +217,62 @@ type EvolveConfig struct {
 	AgentType string
 	AgentArch string
 	AgentCC   string
+	// Platform selects the payload model. Empty derives it from Module:
+	// loader_windows is Windows, stager_linux is Linux.
+	Platform string
+	// AgentSourceDir is the editable C agent tree the agent builder consumes.
+	// Linux uses it now; a future Windows C agent builder can use the same
+	// field. It is a writable source root, so an agent edit is part of the
+	// payload design. Empty derives it from ModuleDir.
+	AgentSourceDir string
 }
 
-// AgentBuildOptions describes one real agent rebuild. Only the Windows payload
-// types are accepted because loader_windows is x64 PE-only.
+const (
+	platformWindows = "windows"
+	platformLinux   = "linux"
+)
+
+// platformForModule maps the payload module to the runtime platform whose
+// sandbox executes it.
+func platformForModule(module string) string {
+	switch strings.ToLower(strings.TrimSpace(module)) {
+	case "stager_linux":
+		return platformLinux
+	default:
+		return platformWindows
+	}
+}
+
+// PlatformForModule is the operator-facing form of platformForModule.
+func PlatformForModule(module string) string { return platformForModule(module) }
+
+func (e *evolver) platform() string {
+	if p := strings.ToLower(strings.TrimSpace(e.cfg.Platform)); p != "" {
+		return p
+	}
+	return platformForModule(e.cfg.Module)
+}
+
+// AgentBuildOptions describes one real agent rebuild. Windows loops build a Go
+// EXE or DLL and wrap it with a producer; a Linux loop builds the C agent PIC
+// that stager_linux embeds.
 type AgentBuildOptions struct {
-	Type string
-	Arch string
+	Type      string
+	Arch      string
+	Platform  string
+	SourceDir string
 }
 
-// AgentBuildResult is the freshly generated agent artifact and its shellcode.
-// ArtifactPath is the EXE or DLL; ShellcodePath is the Donut/PICO blob the
-// loader embeds.
+// AgentBuildResult is the freshly generated agent artifact and the blob the
+// payload module embeds. For Windows, ArtifactPath is the EXE or DLL and
+// ShellcodePath is the producer output. For Linux, ArtifactPath and
+// ShellcodePath are the C agent PIC.
 type AgentBuildResult struct {
 	ArtifactPath  string
 	ShellcodePath string
 	Type          string
 	Arch          string
+	Platform      string
 	AgentUUID     string
 	SHA256        string
 	Size          int64
@@ -415,6 +454,11 @@ func (e *evolver) payloadDir() string {
 	if strings.TrimSpace(e.agentArtifact) != "" {
 		return filepath.Dir(e.agentArtifact)
 	}
+	if e.platform() == platformLinux {
+		if root := e.artifactRoot(); root != "" {
+			return root
+		}
+	}
 	return filepath.Dir(e.activeShellcode())
 }
 
@@ -440,6 +484,11 @@ func (e *evolver) audit(action, target, detail string) {
 func (e *evolver) sourceRoots() *sourceRoots {
 	roots := []sourceRoot{{Name: e.cfg.Module, Dir: e.cfg.ModuleDir, Writable: true}}
 	used := map[string]bool{e.cfg.Module: true}
+	if dir := strings.TrimSpace(e.cfg.AgentSourceDir); dir != "" {
+		name := dependencyRootName(filepath.Base(dir), used)
+		roots = append(roots, sourceRoot{Name: name, Dir: dir, Writable: true})
+		used[name] = true
+	}
 	for name, dir := range e.cfg.ProducerDirs {
 		roots = append(roots, sourceRoot{Name: name, Dir: dir, Writable: true})
 		used[name] = true
@@ -878,12 +927,17 @@ func normalizeEvolveConfig(cfg *EvolveConfig) error {
 	if !Covered(cfg.Module) {
 		return fmt.Errorf("module %q is not covered by the detection loop", cfg.Module)
 	}
-	// The autonomous loop passes loader_windows flags (shellcode, format, smw)
-	// and requires the sandbox to execute a Windows PE. stager_linux has a
-	// different flag set and no runnable dynamic stage here.
-	if cfg.Module != "loader_windows" {
-		return fmt.Errorf("the autonomous detection loop currently supports loader_windows only")
+	platform := strings.ToLower(strings.TrimSpace(cfg.Platform))
+	if platform == "" {
+		platform = platformForModule(cfg.Module)
 	}
+	if platform != platformWindows && platform != platformLinux {
+		return fmt.Errorf("platform must be windows or linux")
+	}
+	if platform != platformForModule(cfg.Module) {
+		return fmt.Errorf("module %q is a %s payload", cfg.Module, platformForModule(cfg.Module))
+	}
+	cfg.Platform = platform
 	cfg.ModuleDir = strings.TrimSpace(cfg.ModuleDir)
 	if cfg.ModuleDir == "" {
 		return fmt.Errorf("module source directory is required")
@@ -901,49 +955,89 @@ func normalizeEvolveConfig(cfg *EvolveConfig) error {
 	if cfg.StoreRoot == "" {
 		return fmt.Errorf("detection store root is required")
 	}
-	if cfg.Guest != nil {
-		if err := cfg.Guest.normalize(cfg.StoreRoot); err != nil {
-			return fmt.Errorf("guest SSH: %w", err)
+	if platform == platformLinux {
+		if cfg.Guest != nil {
+			return fmt.Errorf("guest SSH is the Windows debugger; Linux detonations are observed through the sandbox API")
 		}
+		cfg.AgentSourceDir = strings.TrimSpace(cfg.AgentSourceDir)
+		if cfg.AgentSourceDir == "" {
+			cfg.AgentSourceDir = DefaultAgentSourceDir(cfg.ModuleDir)
+		}
+		if info, err := os.Stat(cfg.AgentSourceDir); err != nil || !info.IsDir() {
+			return fmt.Errorf("C agent source directory %q is not readable", cfg.AgentSourceDir)
+		}
+		cfg.AgentType = "linux_so"
+		cfg.AgentArch = "amd64"
+		cfg.Format = "executable"
+		cfg.SMW = ""
+		cfg.Process = ""
+		cfg.Inject = ""
+		malasadaDir := LinuxProducerDir(cfg.ModuleDir)
+		for name, dir := range cfg.ProducerDirs {
+			name = strings.ToLower(strings.TrimSpace(name))
+			if name != "malasada" {
+				return fmt.Errorf("producer %q is not supported for stager_linux; use the shipped malasada module", name)
+			}
+			if malasadaDir == "" {
+				return fmt.Errorf("stager_linux requires the shipped malasada producer")
+			}
+			if !strings.EqualFold(filepath.Clean(strings.TrimSpace(dir)), filepath.Clean(malasadaDir)) {
+				return fmt.Errorf("malasada is shipped with emp3r0r; remove the custom producer path")
+			}
+		}
+		if cfg.BuildAgent != nil && malasadaDir == "" {
+			return fmt.Errorf("stager_linux requires the shipped malasada producer; install the operator kit")
+		}
+		if malasadaDir == "" {
+			cfg.ProducerDirs = nil
+		} else {
+			cfg.ProducerDirs = map[string]string{"malasada": malasadaDir}
+		}
+	} else {
+		if cfg.Guest != nil {
+			if err := cfg.Guest.normalize(cfg.StoreRoot); err != nil {
+				return fmt.Errorf("guest SSH: %w", err)
+			}
+		}
+		if cfg.Format == "" {
+			cfg.Format = "exe"
+		}
+		// An empty inject or process flag means "use the module's own default",
+		// so a source edit to that default is testable without the harness
+		// overriding it on every build.
+		if cfg.SMW == "" {
+			cfg.SMW = "on"
+		}
+		producers := make(map[string]string, len(cfg.ProducerDirs))
+		for name, dir := range cfg.ProducerDirs {
+			name = strings.ToLower(strings.TrimSpace(name))
+			switch name {
+			case "donut", "crystal_pack":
+			default:
+				return fmt.Errorf("producer %q is not supported; use donut or crystal_pack", name)
+			}
+			dir = strings.TrimSpace(dir)
+			if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+				return fmt.Errorf("producer %s directory %q is not readable", name, dir)
+			}
+			producers[name] = dir
+		}
+		cfg.AgentType = strings.ToLower(strings.TrimSpace(cfg.AgentType))
+		if cfg.AgentType == "" || cfg.AgentType == "auto" {
+			cfg.AgentType = "windows_executable"
+		}
+		if cfg.AgentType != "windows_executable" && cfg.AgentType != "windows_dll" {
+			return fmt.Errorf("agent type must be windows_executable or windows_dll")
+		}
+		cfg.AgentArch = strings.ToLower(strings.TrimSpace(cfg.AgentArch))
+		if cfg.AgentArch == "" {
+			cfg.AgentArch = "amd64"
+		}
+		cfg.ProducerDirs = producers
 	}
 	if cfg.LoopID == "" {
 		cfg.LoopID = "loop-" + time.Now().UTC().Format("20060102-150405")
 	}
-	if cfg.Format == "" {
-		cfg.Format = "exe"
-	}
-	// An empty inject or process flag means "use the module's own default", so
-	// a source edit to that default is testable without the harness overriding
-	// it on every build.
-	if cfg.SMW == "" {
-		cfg.SMW = "on"
-	}
-	producers := make(map[string]string, len(cfg.ProducerDirs))
-	for name, dir := range cfg.ProducerDirs {
-		name = strings.ToLower(strings.TrimSpace(name))
-		switch name {
-		case "donut", "crystal_pack":
-		default:
-			return fmt.Errorf("producer %q is not supported; use donut or crystal_pack", name)
-		}
-		dir = strings.TrimSpace(dir)
-		if info, err := os.Stat(dir); err != nil || !info.IsDir() {
-			return fmt.Errorf("producer %s directory %q is not readable", name, dir)
-		}
-		producers[name] = dir
-	}
-	cfg.AgentType = strings.ToLower(strings.TrimSpace(cfg.AgentType))
-	if cfg.AgentType == "" || cfg.AgentType == "auto" {
-		cfg.AgentType = "windows_executable"
-	}
-	if cfg.AgentType != "windows_executable" && cfg.AgentType != "windows_dll" {
-		return fmt.Errorf("agent type must be windows_executable or windows_dll")
-	}
-	cfg.AgentArch = strings.ToLower(strings.TrimSpace(cfg.AgentArch))
-	if cfg.AgentArch == "" {
-		cfg.AgentArch = "amd64"
-	}
-	cfg.ProducerDirs = producers
 	roots := make([]string, 0, len(cfg.ReadRoots))
 	for _, dir := range cfg.ReadRoots {
 		dir = strings.TrimSpace(dir)
@@ -1110,6 +1204,8 @@ type cycleSummary struct {
 	// FailureLayer is the load-pipeline stage where an offline cycle stopped,
 	// derived from the trace categories. It is host evidence, not model prose.
 	FailureLayer string `json:"failure_layer,omitempty"`
+	// Platform is the sandbox runtime that produced the trace.
+	Platform string `json:"platform,omitempty"`
 }
 
 func ensurePayloadPreserved(shellcode string, artifact Artifact) error {
@@ -1233,7 +1329,8 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 	}
 	plan, err := e.loop.CreatePlan(cycleCtx, Request{
 		Module: e.cfg.Module, ModuleDir: e.cfg.ModuleDir,
-		ArtifactPath: artifact.Path,
+		AgentSourceDir: e.cfg.AgentSourceDir,
+		ArtifactPath:   artifact.Path,
 	})
 	if err != nil {
 		return Cycle{}, err
@@ -1274,9 +1371,15 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 	// Re-running the same payload without model feedback only repeats the
 	// failure, so the trace is kept and reported instead of retried here.
 	if run.Telemetry.Attribution == "unknown" {
-		e.logClass(logging.ClassWarning,
-			"run %s has no payload PEB; keeping trace %d (%d events) for the model",
-			headerOrNone(run.ID), run.Telemetry.TraceID, run.Telemetry.Events)
+		if e.platform() == platformLinux {
+			e.logClass(logging.ClassWarning,
+				"run %s has no payload process; keeping trace %d (%d events) for the model",
+				headerOrNone(run.ID), run.Telemetry.TraceID, run.Telemetry.Events)
+		} else {
+			e.logClass(logging.ClassWarning,
+				"run %s has no payload PEB; keeping trace %d (%d events) for the model",
+				headerOrNone(run.ID), run.Telemetry.TraceID, run.Telemetry.Events)
+		}
 	}
 	feedback := BuildFeedback(run)
 	if (dynamic || edr) && !run.Executed {
@@ -1703,6 +1806,27 @@ func dynamicRegionSummary(feedback Feedback, shellcode string) []string {
 	return out
 }
 
+// verdictFindings returns the sandbox's named verdicts. Windows uses Defender
+// threat verdicts; Linux uses high/critical Falco alerts.
+func verdictFindings(platform string, findings []Finding, limit int) []string {
+	var out []string
+	for _, finding := range findings {
+		match := finding.Rule == "defender/verdict"
+		if platform == platformLinux {
+			match = strings.HasPrefix(strings.ToLower(strings.TrimSpace(finding.Rule)), "falco/") &&
+				(finding.Severity == "critical" || finding.Severity == "high")
+		}
+		if !match {
+			continue
+		}
+		out = appendUnique(out, sanitizeLine(finding.Indicator))
+		if len(out) >= limit {
+			break
+		}
+	}
+	return out
+}
+
 func summarizeCycle(loopID string, iteration int, run Run, feedback Feedback, buildLog, note, mechanism, shellcode, producer, execution string, online *bool, networkEvents int, shellcodeGenerated bool) cycleSummary {
 	summary := cycleSummary{
 		LoopID: loopID, Iteration: iteration, RunID: run.ID,
@@ -1724,6 +1848,7 @@ func summarizeCycle(loopID string, iteration int, run Run, feedback Feedback, bu
 		summary.PayloadTable = run.Telemetry.PayloadTable
 		summary.TraceID = run.Telemetry.TraceID
 		summary.Events = run.Telemetry.Events
+		summary.Platform = run.Telemetry.Platform
 		summary.Telemetry = run.Telemetry.Stats
 		summary.CoverageMissing = coverageMissing(run.Telemetry.Coverage)
 		if summary.Telemetry == nil {
@@ -1732,24 +1857,14 @@ func summarizeCycle(loopID string, iteration int, run Run, feedback Feedback, bu
 				Findings: len(run.Telemetry.Findings), Coverage: run.Telemetry.Coverage,
 			}
 		}
-		for _, finding := range run.Telemetry.Findings {
-			if finding.Rule == "defender/verdict" {
-				summary.Verdicts = appendUnique(summary.Verdicts, sanitizeLine(finding.Indicator))
-				if len(summary.Verdicts) >= 8 {
-					break
-				}
-			}
-		}
+		summary.Verdicts = verdictFindings(run.Telemetry.Platform, run.Telemetry.Findings, 8)
+	}
+	if summary.Platform == "" && run.Plan.Platform != "" {
+		summary.Platform = run.Plan.Platform
 	}
 	if len(summary.Verdicts) < 8 {
-		for _, finding := range feedback.Findings {
-			if finding.Rule != "defender/verdict" {
-				continue
-			}
-			summary.Verdicts = appendUnique(summary.Verdicts, sanitizeLine(finding.Indicator))
-			if len(summary.Verdicts) >= 8 {
-				break
-			}
+		for _, verdict := range verdictFindings(summary.Platform, feedback.Findings, 8) {
+			summary.Verdicts = appendUnique(summary.Verdicts, verdict)
 		}
 	}
 	for _, finding := range feedback.Findings {
@@ -2720,10 +2835,17 @@ func actionableTelemetryRule(rule string) bool {
 		"telemetry/map-view",
 		"telemetry/file-write",
 		"telemetry/network",
-		"telemetry/hook":
+		"telemetry/hook",
+		"telemetry/memfd",
+		"telemetry/ptrace",
+		"telemetry/process-vm",
+		"telemetry/exec-memory",
+		"telemetry/kernel-module",
+		"telemetry/namespace",
+		"telemetry/writable-exec":
 		return true
 	}
-	return false
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(rule)), "falco/")
 }
 
 // hasActionableFindings reports whether another source edit could plausibly
@@ -2746,24 +2868,33 @@ func (e *evolver) verifyEnabled() bool {
 }
 
 func (e *evolver) detectionCycleTool() tool.CoreTool {
-	return tool.Build(tool.Spec{
-		Name: "DetectionCycle",
-		Description: "Rebuild the module from its current source and detonate the artifact in the sandbox. " +
-			"The full feedback, build log, and telemetry are stored in SQLite; this returns a bounded summary. " +
+	description := "Rebuild the module from its current source and detonate the artifact in the sandbox. " +
+		"The full feedback, build log, and telemetry are stored in SQLite; this returns a bounded summary. " +
+		"The host checks the generated agent with AgentStatus and reports execution=verified, offline, or unverified. " +
+		"Call it after a source or design change with one falsifiable prediction; a cycle with no source, build-option, producer, or agent change " +
+		"is rejected. The mechanism must match the planner's mechanism. The note is stored in loop memory as the technique recipe, so make it " +
+		"actionable: the rule it targets and the implementation detail a later cycle needs."
+	mechanisms := []string{
+		"baseline", "self-load", "remote-apc", "remote-thread",
+		"section-map", "module-stomp", "pe-image", "producer", "producer-swap", "build-flags", "static-hygiene", "other",
+	}
+	if e.platform() == platformLinux {
+		description = "Rebuild stager_linux and detonate its ELF in PenguinBox. " +
+			"The C agent PIC and Tracee/Falco telemetry are stored in SQLite; this returns a bounded summary. " +
 			"The host checks the generated agent with AgentStatus and reports execution=verified, offline, or unverified. " +
-			"Call it after a source or design change with one falsifiable prediction; a cycle with no source, build-option, producer, or agent change " +
-			"is rejected. The mechanism must match the planner's mechanism. The note is stored in loop memory as the technique recipe, so make it " +
-			"actionable: the rule it targets and the implementation detail a later cycle needs.",
-		Prompt: "Build and run one detection cycle.",
+			"Call it after an edit to stager_linux or c_agent, a GenerateAgent rebuild, or a BuildOptions change, with one falsifiable prediction."
+		mechanisms = []string{"baseline", "stager", "agent", "producer", "build-flags", "static-hygiene", "other"}
+	}
+	return tool.Build(tool.Spec{
+		Name:        "DetectionCycle",
+		Description: description,
+		Prompt:      "Build and run one detection cycle.",
 		Schema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"mechanism": map[string]any{
 					"type": "string",
-					"enum": []string{
-						"baseline", "self-load", "remote-apc", "remote-thread",
-						"section-map", "module-stomp", "pe-image", "producer", "producer-swap", "build-flags", "static-hygiene", "other",
-					},
+					"enum": mechanisms,
 					"description": "Execution mechanism or producer under test. " +
 						"Use a different value when you change the loading path; reuse it only when refining the same mechanism. " +
 						"producer edits the current producer source; producer-swap changes the wrapper and requires a different active producer. " +

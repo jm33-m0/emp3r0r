@@ -115,9 +115,12 @@ func (e *evolver) toolsFor(role evolveRole) []tool.CoreTool {
 		}
 	case roleDebugger:
 		if e.verifyEnabled() {
-			tools = append(tools, e.agentStatusTool(), e.runModuleTool(), e.cleanupAgentTool())
+			tools = append(tools, e.agentStatusTool(), e.cleanupAgentTool())
+			if e.platform() == platformWindows {
+				tools = append(tools, e.runModuleTool())
+			}
 		}
-		if e.guest != nil {
+		if e.guest != nil && e.platform() == platformWindows {
 			tools = append(tools, e.guestSSHTool())
 		}
 	}

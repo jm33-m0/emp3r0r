@@ -363,11 +363,14 @@ func runDetectLoop(run *detectRun, opts detectLoopOptions, shellcode, baseID str
 		run.setError(fmt.Errorf("producer paths: %w", err))
 		return
 	}
-	guest, err := opts.guestConfig()
-	if err != nil {
-		run.setError(fmt.Errorf("guest SSH: %w", err))
-		logging.Errorf("detect_loop: %v", err)
-		return
+	var guest *detection.GuestSSHConfig
+	if opts.Platform != "linux" {
+		guest, err = opts.guestConfig()
+		if err != nil {
+			run.setError(fmt.Errorf("guest SSH: %w", err))
+			logging.Errorf("detect_loop: %v", err)
+			return
+		}
 	}
 
 	logf := func(format string, args ...any) {
@@ -408,7 +411,8 @@ func runDetectLoop(run *detectRun, opts detectLoopOptions, shellcode, baseID str
 
 		cfg := detection.EvolveConfig{
 			LoopID: currentID, BaseLoopID: baseID, Attempt: attempt,
-			Module: "loader_windows", ModuleDir: currentOpts.ModuleDir,
+			Module: currentOpts.Module, ModuleDir: currentOpts.ModuleDir,
+			Platform: currentOpts.Platform, AgentSourceDir: currentOpts.AgentSourceDir,
 			Shellcode: currentShellcode, InitialAgentArtifact: currentOpts.AgentArtifact,
 			InitialShellcodeGenerated: currentOpts.ShellcodeGenerated,
 			SandboxURL:                currentOpts.Sandbox,
@@ -435,7 +439,7 @@ func runDetectLoop(run *detectRun, opts detectLoopOptions, shellcode, baseID str
 			AgentArch: currentOpts.Arch, AgentCC: currentOpts.CC,
 			Prompts: run.prompts,
 			BuildAgent: func(buildOpts detection.AgentBuildOptions) (*detection.AgentBuildResult, error) {
-				return backend.GenerateAgent(currentOpts.CC, buildOpts.Type, buildOpts.Arch)
+				return backend.GenerateAgent(currentOpts.CC, buildOpts)
 			},
 			Verify: backend,
 			FinalVerify: func(ctx context.Context, uuid string) (string, error) {

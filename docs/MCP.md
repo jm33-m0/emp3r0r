@@ -29,7 +29,7 @@ description or module manifest in the same change.
 | `internal/cc/mcp/generate.go` | Go and C agent builders. |
 | `internal/cc/mcp/detection.go` | Sandbox detection plans, runs, and source-mapped feedback. |
 | `internal/cc/mcp/opsec.go` | Deterministic OPSEC capability review. |
-| `internal/cc/detection/` | LitterBox client, plan/run/feedback engine, and the Norma analyst. |
+| `internal/cc/detection/` | LitterBox/PenguinBox client, plan/run/feedback engine, telemetry normalization, the autonomous loop, and the Norma analyst. |
 | `internal/cc/mcp/audit.go` | Pre- and post-execution audit records. |
 | `internal/cc/mcp/executor.go` | Production bridge to the operator client and builders. |
 
