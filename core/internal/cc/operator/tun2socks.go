@@ -167,7 +167,7 @@ func StartTun2Socks(opts Tun2SocksOptions) (Tun2SocksState, error) {
 	}
 	tun2socksMu.Unlock()
 
-	inet4 := []netip.Prefix{}
+	var inet4 []netip.Prefix
 	if p, err := netip.ParsePrefix(addr); err == nil {
 		inet4 = []netip.Prefix{p}
 	} else {

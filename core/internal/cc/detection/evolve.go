@@ -782,7 +782,6 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 
 	knowledgeState := "unavailable; ask the operator to run detect_loop knowledge-sync"
 	if e.knowledge != nil {
-		knowledgeState = "available: " + e.knowledge.Path() + " (KnowledgeSearch, KnowledgeRead, KnowledgeStats, KnowledgeList)"
 		if stats, statsErr := e.knowledge.Stats(ctx); statsErr == nil {
 			switch {
 			case stats.Documents == 0:
@@ -964,7 +963,7 @@ func normalizeEvolveConfig(cfg *EvolveConfig) error {
 			cfg.AgentSourceDir = DefaultAgentSourceDir(cfg.ModuleDir)
 		}
 		if info, err := os.Stat(cfg.AgentSourceDir); err != nil || !info.IsDir() {
-			return fmt.Errorf("C agent source directory %q is not readable", cfg.AgentSourceDir)
+			return fmt.Errorf("c agent source directory %q is not readable", cfg.AgentSourceDir)
 		}
 		cfg.AgentType = "linux_so"
 		cfg.AgentArch = "amd64"

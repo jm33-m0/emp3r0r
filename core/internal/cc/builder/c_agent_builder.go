@@ -103,7 +103,7 @@ func stageCAgentSource(srcDir, dstDir string) error {
 	for _, name := range []string{"Makefile", "src", "include", "vendor"} {
 		src := filepath.Join(srcDir, name)
 		if !util.IsExist(src) {
-			return fmt.Errorf("C agent source %s is missing %s (rebuild the operator kit)", srcDir, name)
+			return fmt.Errorf("c agent source %s is missing %s (rebuild the operator kit)", srcDir, name)
 		}
 		if err := copyStageSource(src, filepath.Join(dstDir, name)); err != nil {
 			return fmt.Errorf("stage C agent %s: %w", name, err)

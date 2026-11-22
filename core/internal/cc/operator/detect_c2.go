@@ -158,7 +158,7 @@ func generateDetectionCAgent(agentCfg builder.AgentConfig, opts detection.AgentB
 		return nil, err
 	}
 	if res == nil || strings.TrimSpace(res.OutputFile) == "" {
-		return nil, fmt.Errorf("C agent build produced no artifact")
+		return nil, fmt.Errorf("c agent build produced no artifact")
 	}
 	artifact, err := detection.InspectArtifact(res.OutputFile)
 	if err != nil {

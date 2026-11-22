@@ -72,20 +72,6 @@ func parseMemoryFinding(text string) (memoryFinding, bool) {
 	return memoryFinding{Rule: rule, Indicator: indicator, Stage: stage, Severity: severity}, true
 }
 
-func memoryFindings(summary cycleSummary) map[string]memoryFinding {
-	out := map[string]memoryFinding{}
-	for _, top := range summary.TopFindings {
-		finding, ok := parseMemoryFinding(top)
-		if !ok {
-			continue
-		}
-		if existing, ok := out[finding.key()]; !ok || memorySeverityRank(finding.Severity) > memorySeverityRank(existing.Severity) {
-			out[finding.key()] = finding
-		}
-	}
-	return out
-}
-
 func memorySeverityRank(severity string) int {
 	switch strings.ToLower(severity) {
 	case "critical":
@@ -290,7 +276,7 @@ func (e *evolver) recordTechniqueMemory(ctx context.Context, cycle Cycle, summar
 	if len(removed) == 0 && len(added) == 0 {
 		return
 	}
-	target := memoryFinding{Rule: "finding", Indicator: "no top-finding change"}
+	var target memoryFinding
 	direction := "removed"
 	if len(removed) > 0 {
 		target = removed[0]
