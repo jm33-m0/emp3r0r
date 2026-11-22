@@ -339,13 +339,17 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
         (data_dir / "emp3r0r-cc").chmod(0o755)
         (data_dir / "emp3r0r-cat").chmod(0o755)
 
-        for d in ["build", "modules", "c_agent", "tmux", "zig", "nasm", "go", "garble", "go_agent"]:
-            src_d = kit_dir / "lib" / "emp3r0r" / d
-            if src_d.is_dir():
+        for name in ["build", "modules", "c_agent", "tmux", "zig", "nasm", "go", "garble", "go_agent"]:
+            src_path = kit_dir / "lib" / "emp3r0r" / name
+            dst_path = data_dir / name
+            if src_path.is_dir():
                 shutil.copytree(
-                    src_d, data_dir / d, dirs_exist_ok=True, copy_function=copy2_atomic
+                    src_path, dst_path, dirs_exist_ok=True, copy_function=copy2_atomic
                 )
-                log_info(f"Installed {d}")
+                log_info(f"Installed {name}")
+            elif src_path.is_file():
+                copy2_atomic(src_path, dst_path)
+                log_info(f"Installed {name}")
 
         # zig is used as the C module cross compiler; point it at /usr/local/bin.
         link_usr_local_bin(data_dir / "zig" / "zig")

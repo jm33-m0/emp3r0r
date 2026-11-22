@@ -1727,17 +1727,20 @@ def package_operator_bundle(prefix: str, core_dir: pathlib.Path) -> None:
         else:
             log_warn(f"emp3r0r-listener not found at {listener_src}; skipping")
 
-        for d in ["build", "modules", "c_agent", "tmux", "zig", "nasm", "go", "garble", "go_agent"]:
-            src_dir = lib_src / d
-            if src_dir.is_dir():
+        for name in ["build", "modules", "c_agent", "tmux", "zig", "nasm", "go", "garble", "go_agent"]:
+            src_path = lib_src / name
+            dst_path = kit_dir / "lib" / "emp3r0r" / name
+            if src_path.is_dir():
                 shutil.copytree(
-                    src_dir,
-                    kit_dir / "lib" / "emp3r0r" / d,
+                    src_path,
+                    dst_path,
                     dirs_exist_ok=True,
                     copy_function=copy2_atomic,
                 )
+            elif src_path.is_file():
+                copy2_atomic(src_path, dst_path)
             else:
-                log_warn(f"{src_dir} not found; operator package may be incomplete")
+                log_warn(f"{src_path} not found; operator package may be incomplete")
 
         # The installed build/ may predate the current source tree (e.g. a
         # --package-operator run after a source-only build), so refresh the
