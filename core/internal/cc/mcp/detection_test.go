@@ -298,3 +298,17 @@ func TestDetectionLoopRequiresApproval(t *testing.T) {
 		t.Fatal("detection_loop ran without approve_execution")
 	}
 }
+
+func TestMCPVerifyRejectsAgentOutsideLoop(t *testing.T) {
+	verify := mcpVerifyOps{}
+	uuid := "00000000-0000-4000-8000-000000000001"
+	if _, err := verify.AgentStatus(context.Background(), uuid); err == nil {
+		t.Fatal("AgentStatus accepted an agent outside the loop")
+	}
+	if _, err := verify.RunVerifyModule(context.Background(), uuid, "whoami"); err == nil {
+		t.Fatal("RunVerifyModule accepted an agent outside the loop")
+	}
+	if err := verify.ForgetAgent(context.Background(), uuid); err == nil {
+		t.Fatal("ForgetAgent accepted an agent outside the loop")
+	}
+}

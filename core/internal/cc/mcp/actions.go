@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/google/uuid"
+
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/detection"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/operator"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/opsec"
@@ -65,6 +67,40 @@ type Actions struct {
 	// generateMu serializes agent builds: the builder mutates the shared
 	// runtime config and the on-disk operator config.
 	generateMu sync.Mutex
+
+	// loopAgents bounds C2 verification and cleanup to agents this MCP
+	// session generated. The model must not be able to nominate an arbitrary
+	// fleet agent as the loop's payload.
+	loopAgentsMu sync.Mutex
+	loopAgents   map[string]struct{}
+}
+
+func (a *Actions) rememberLoopAgent(agentUUID string) {
+	parsed, err := uuid.Parse(strings.TrimSpace(agentUUID))
+	if err != nil {
+		return
+	}
+	agentUUID = parsed.String()
+	a.loopAgentsMu.Lock()
+	defer a.loopAgentsMu.Unlock()
+	if a.loopAgents == nil {
+		a.loopAgents = map[string]struct{}{}
+	}
+	if len(a.loopAgents) >= 256 {
+		a.loopAgents = map[string]struct{}{}
+	}
+	a.loopAgents[agentUUID] = struct{}{}
+}
+
+func (a *Actions) loopOwnsAgent(agentUUID string) bool {
+	parsed, err := uuid.Parse(strings.TrimSpace(agentUUID))
+	if err != nil {
+		return false
+	}
+	a.loopAgentsMu.Lock()
+	defer a.loopAgentsMu.Unlock()
+	_, ok := a.loopAgents[parsed.String()]
+	return ok
 }
 
 // Tools returns the action tools keyed by MCP name.

@@ -120,11 +120,13 @@ Dynamic results feed the telemetry SQLite database. Each artifact gets a
 `payloads` row and a `payload_<hash>` view containing only that payload's
 events; `detection_payloads` and `detection_compare` expose the list and diff.
 `detection_loop` runs the autonomous Norma loop and edits module source, so it
-requires `approve_execution=true`. It accepts `agent_uuid` for live C2
-verification, `guest_ssh`/`guest_ssh_key` for the sandbox debugger, and the
-decision-window overrides; it builds fresh agents for rotation with the same
-builder as `generate`. Without `agent_uuid` the loop records
-`execution=unverified`; without guest SSH the debugger is disabled.
+requires `approve_execution=true`. It accepts `agent_uuid` only when that UUID
+was returned by `generate` or `generate_c` in the same MCP session, and it
+builds fresh agents for rotation with the same builder. The Windows guest
+debugger uses only `EMP3R0R_DETECTION_GUEST_SSH*` operator configuration; tool
+arguments cannot redirect the SSH key or host. Without a loop-generated
+`agent_uuid` the loop records `execution=unverified`; without configured guest
+SSH the debugger is disabled.
 `detection_query` opens a read-only connection and accepts one SELECT or WITH
 statement; it rejects comments, extra statements, PRAGMAs, writes, and schema
 keywords. Keep the analyst's `TelemetryQuery` tool on the same path.

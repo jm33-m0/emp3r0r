@@ -118,9 +118,11 @@ Targets and jobs
   for raw fields. detection_telemetry_import ingests offline sandbox, RedEdr,
   or DefenderObserver data. detection_feedback reports the delta against the
   previous artifact.
-- detection_loop runs the autonomous Norma loop for loader_windows: build,
-  detonate, query SQLite, edit source, rebuild, and compare. It requires
-  approve_execution=true and edits module source on the operator host. Do not
+- detection_loop runs the autonomous Norma loop for loader_windows or
+  stager_linux: build, detonate, query SQLite, edit source, rebuild, and
+  compare. It requires approve_execution=true and edits module source on the
+  operator host. For C2 verification, pass only an agent_uuid returned by
+  generate or generate_c in this MCP session. Do not
   treat the loader or its Donut shellcode as fixed: when the signal is in the
   shellcode producer, wrapper, injection path, or packaging, test another
   mechanism such as Crystal Palace/Crystal-Kit PICO, a different loader, or a

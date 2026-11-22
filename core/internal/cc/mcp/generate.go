@@ -291,6 +291,7 @@ func (a *Actions) runGoBuild(spec *goBuildSpec) map[string]any {
 	outputFile := ""
 	size := 0
 	if res != nil && res.BuildResult != nil {
+		a.rememberLoopAgent(res.BuildResult.AgentUUID)
 		result["agent_uuid"] = res.BuildResult.AgentUUID
 		result["output_file"] = res.BuildResult.OutputFile
 		result["stub_file"] = res.BuildResult.StubFile
@@ -527,6 +528,7 @@ func (a *Actions) runCBuild(spec *cBuildSpec) map[string]any {
 	outputFile := ""
 	size := 0
 	if res != nil {
+		a.rememberLoopAgent(res.AgentUUID)
 		result["agent_uuid"] = res.AgentUUID
 		result["output_file"] = res.OutputFile
 		result["source_dir"] = res.StubFile
