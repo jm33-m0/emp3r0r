@@ -3,6 +3,7 @@ package detection
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -161,6 +162,25 @@ func TestPenguinBoxPayloadIdentityUsesGuestPID(t *testing.T) {
 	})[999])
 	if pid != 42 || image != "/payload" {
 		t.Fatalf("identity = %d %q, want 42 /payload", pid, image)
+	}
+}
+
+func TestPenguinBoxDynamicCapsEvents(t *testing.T) {
+	var b strings.Builder
+	b.WriteString(`{"run":{"run_id":"cap-test"},"findings":{"events":[`)
+	for i := 0; i <= maxTelemetryEvents; i++ {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		fmt.Fprintf(&b, `{"eventName":"openat","eventId":%d,"processId":42}`, i)
+	}
+	b.WriteString(`]}}`)
+	_, ok, err := parsePenguinBoxDynamic([]byte(b.String()))
+	if !ok {
+		t.Fatal("expected PenguinBox dynamic format to be recognized")
+	}
+	if err == nil || !strings.Contains(err.Error(), "exceeds") {
+		t.Fatalf("parsePenguinBoxDynamic err = %v, want event cap error", err)
 	}
 }
 

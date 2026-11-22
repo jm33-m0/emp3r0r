@@ -151,6 +151,9 @@ func parsePenguinBoxDynamic(data []byte) (parsedTelemetry, bool, error) {
 				if _, ok := seen[event.EventKey]; ok {
 					continue
 				}
+				if len(parsed.Events) >= maxTelemetryEvents {
+					return parsedTelemetry{}, true, fmt.Errorf("telemetry exceeds %d events", maxTelemetryEvents)
+				}
 				seen[event.EventKey] = struct{}{}
 				parsed.Events = append(parsed.Events, event)
 			}
@@ -164,6 +167,9 @@ func parsePenguinBoxDynamic(data []byte) (parsedTelemetry, bool, error) {
 					continue
 				}
 				seen[event.EventKey] = struct{}{}
+			}
+			if len(parsed.Events) >= maxTelemetryEvents {
+				return parsedTelemetry{}, true, fmt.Errorf("telemetry exceeds %d events", maxTelemetryEvents)
 			}
 			deliveredTracee = true
 			parsed.Events = append(parsed.Events, event)
