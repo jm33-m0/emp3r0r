@@ -2,10 +2,15 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net"
+	"sync"
 	"testing"
+	"time"
 
+	"github.com/fxamacker/cbor/v2"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/base/agents"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/internal/transport"
@@ -188,4 +193,148 @@ func TestProcessKeyExchangeNoMidSessionReKey(t *testing.T) {
 	if len(reply3) == 0 || sk3 != nil {
 		t.Fatalf("keep-alive should reply with random data and no session key (reply=%d, key=%d)", len(reply3), len(sk3))
 	}
+}
+
+type blockingFirstWriteConn struct {
+	net.Conn
+	once    sync.Once
+	started chan struct{}
+	release chan struct{}
+}
+
+func (c *blockingFirstWriteConn) Write(p []byte) (int, error) {
+	c.once.Do(func() {
+		close(c.started)
+		<-c.release
+	})
+	return c.Conn.Write(p)
+}
+
+// TestMessageTunnelDefersConnPublishUntilPFSHandshake verifies that
+// handleMessageTunnelStream does not publish ctrl.Conn until the initial ECDH
+// handshake reply has been written and the tunnel has switched to its ephemeral
+// PFS session key. A concurrent command issued while the handshake is in flight
+// is queued and delivered after TagHandshake under the PFS key instead of being
+// written ahead of TagHandshake under the static PSK.
+func TestMessageTunnelDefersConnPublishUntilPFSHandshake(t *testing.T) {
+	const uuid = "pfs-publish-race-agent"
+	_, _, cleanup := setupMessageTunnelTest(t, uuid)
+	defer cleanup()
+
+	rawClient, rawServer := net.Pipe()
+	gate := &blockingFirstWriteConn{
+		Conn:    rawServer,
+		started: make(chan struct{}),
+		release: make(chan struct{}),
+	}
+	serverSecure := transport.NewSecureConn(gate)
+	clientSecure := transport.NewSecureConn(rawClient)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	tunnelDone := startMessageTunnel(serverSecure, cbor.NewDecoder(serverSecure), "127.0.0.1:1", ctx, uuid)
+	defer stopMessageTunnel(t, tunnelDone, cancel, serverSecure, clientSecure)
+
+	clientKey, err := transport.GenerateEphemeralKeyPair()
+	if err != nil {
+		t.Fatalf("GenerateEphemeralKeyPair: %v", err)
+	}
+	offer := transport.SerializePublicKey(&clientKey.PublicKey)
+
+	clientEnc := cbor.NewEncoder(clientSecure)
+	if err := clientEnc.Encode(&def.MsgTunData{
+		JobID:          "hello-job",
+		CmdSlice:       []string{"hello"},
+		EphemPublicKey: offer,
+	}); err != nil {
+		t.Fatalf("send initial hello: %v", err)
+	}
+
+	select {
+	case <-gate.started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for server handshake reply write")
+	}
+
+	if _, ctrl, found := agents.RuntimeControlByUUID(uuid); found && ctrl != nil && ctrl.Conn != nil {
+		close(gate.release)
+		t.Fatal("ctrl.Conn was published before initial PFS handshake completed")
+	}
+
+	const jobID = socksProxyTokenPrefix + "race-job"
+	live.CmdTime.Store(jobID, time.Now())
+	t.Cleanup(func() {
+		live.CmdTime.Delete(jobID)
+		live.CmdResults.Delete(jobID)
+		agentCommandQueues.Delete(uuid)
+	})
+
+	agent := agents.GetAgentByUUID(uuid)
+	if agent == nil {
+		close(gate.release)
+		t.Fatal("agent not found in registry during handshake")
+	}
+	if err := sendAgentCommandOrQueue("!proxy_start --token socks5-race --target 127.0.0.1:1", jobID, agent); err != nil {
+		close(gate.release)
+		t.Fatalf("sendAgentCommandOrQueue during handshake: %v", err)
+	}
+
+	close(gate.release)
+
+	// The very first frame on the tunnel must be TagHandshake (encrypted with
+	// the static PSK), never the concurrent command.
+	clientDec := cbor.NewDecoder(clientSecure)
+	var first def.MsgTunData
+	if err := clientDec.Decode(&first); err != nil {
+		t.Fatalf("decode first server frame: %v", err)
+	}
+	if first.Tag != def.TagHandshake {
+		t.Fatalf("first server frame tag = %q (cmd=%v), want %q", first.Tag, first.CmdSlice, def.TagHandshake)
+	}
+
+	serverPub, err := transport.DeserializePublicKey(first.Response)
+	if err != nil {
+		t.Fatalf("deserialize server ephemeral public key: %v", err)
+	}
+	shared, err := transport.PerformECDH(clientKey, serverPub)
+	if err != nil {
+		t.Fatalf("PerformECDH: %v", err)
+	}
+	sessionKey, err := transport.DeriveSessionKey(shared, uuid)
+	if err != nil {
+		t.Fatalf("DeriveSessionKey: %v", err)
+	}
+	clientSecure.SetKey(sessionKey)
+
+	// Subsequent frames are encrypted with the ephemeral PFS key and must
+	// deliver the queued command.
+	gotCmd := false
+	for range 4 {
+		var m def.MsgTunData
+		if err := clientDec.Decode(&m); err != nil {
+			t.Fatalf("decode post-handshake frame: %v", err)
+		}
+		if m.JobID == jobID {
+			gotCmd = true
+			break
+		}
+	}
+	if !gotCmd {
+		t.Fatalf("queued command %q was not delivered after PFS handshake", jobID)
+	}
+
+	// Replying under the ephemeral PFS key must be decrypted cleanly by the
+	// server without tearing down the tunnel.
+	if err := clientEnc.Encode(&def.MsgTunData{JobID: jobID, Response: []byte("relay-ok")}); err != nil {
+		t.Fatalf("send command response under PFS key: %v", err)
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if got, ok := live.CmdResultString(jobID); ok && got == "relay-ok" {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("server did not record PFS-encrypted command response for %q", jobID)
 }

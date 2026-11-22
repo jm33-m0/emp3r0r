@@ -220,6 +220,7 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 			// Agent authentication is payload-authoritative via MsgAuth.
 			// Announce an agent only once per registry lifetime. Reconnects after
 			// a masked sleep, and re-check-ins, must stay silent.
+			isHello := msg.Response == nil && len(msg.CmdSlice) > 0
 			existing, known := live.LookupAgent(agent.UUID)
 			announce := !known || !existing.Announced
 			rec := &live.AgentRecord{Agent: agent}
@@ -242,11 +243,20 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 			if logging.Level >= 4 {
 				logging.Debugf("handleMessageTunnel: authenticated frame uuid=%s tag=%q cmd=%d resp=%d job=%q", util.AgentRef(authAgentUUID), msg.Tag, len(msg.CmdSlice), len(msg.Response), msg.JobID)
 			}
-			// Point the copy at this tunnel, then publish it.
-			rec.Control.Conn = secureConn
-			rec.Control.Ctx = ctx
-			rec.Control.Cancel = cancel
 			markAgentReconnected(agent.UUID)
+			// Do not publish secureConn while an initial PFS handshake is still
+			// in flight: a concurrent SendCmd would write onto the tunnel with
+			// the static PSK ahead of TagHandshake and desynchronize the key
+			// switch.
+			if isHello && !pfsEstablished {
+				rec.Control.Conn = nil
+				rec.Control.Ctx = nil
+				rec.Control.Cancel = nil
+			} else {
+				rec.Control.Conn = secureConn
+				rec.Control.Ctx = ctx
+				rec.Control.Cancel = cancel
+			}
 			live.PublishAgent(rec)
 
 			// Any authenticated frame (keep-alive hello OR command response)
@@ -266,7 +276,7 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 			// but it's used to tell CC that agent is alive
 			// here we just respond to keep-alive if it matches any criteria
 			// or if it's explicitly a hello
-			if msg.Response == nil && len(msg.CmdSlice) > 0 {
+			if isHello {
 				if logging.Level >= 4 {
 					logging.Debugf("handleMessageTunnel: hello received uuid=%s job=%q cmd=%d", util.AgentRef(authAgentUUID), msg.JobID, len(msg.CmdSlice))
 				}
@@ -366,8 +376,23 @@ func handleMessageTunnelStream(secureConn *transport.SecureConn, dec *cbor.Decod
 					}
 				}
 
-				// Deliver any commands queued while the agent had no live tunnel.
+				// Deliver any commands queued while the agent had no live tunnel,
+				// then publish the re-keyed tunnel so subsequent live commands
+				// use the ephemeral PFS key. Drain once more after publishing to
+				// pick up commands queued concurrently with publication.
 				if err == nil {
+					drainQueuedCommands(agent.UUID, encoder)
+					liveRec := &live.AgentRecord{
+						Agent:     rec.Agent,
+						Announced: rec.Announced,
+						Control: &live.AgentControl{
+							Index:  rec.Control.Index,
+							Conn:   secureConn,
+							Ctx:    ctx,
+							Cancel: cancel,
+						},
+					}
+					live.PublishAgent(liveRec)
 					drainQueuedCommands(agent.UUID, encoder)
 				}
 
