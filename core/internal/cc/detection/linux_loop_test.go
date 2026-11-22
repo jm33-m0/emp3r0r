@@ -184,6 +184,15 @@ func TestPenguinBoxDynamicCapsEvents(t *testing.T) {
 	}
 }
 
+func TestTraceeArgIntRejectsInt64Overflow(t *testing.T) {
+	if got := traceeArgInt(map[string]any{"size": "0x7fffffffffffffff"}, "size"); got != 0x7fffffffffffffff {
+		t.Fatalf("max int64 = %d, want %d", got, int64(0x7fffffffffffffff))
+	}
+	if got := traceeArgInt(map[string]any{"size": "0x8000000000000000"}, "size"); got != 0 {
+		t.Fatalf("overflow uint64 = %d, want 0", got)
+	}
+}
+
 func TestLabTelemetryV1UsesOneEnvelope(t *testing.T) {
 	payload := []byte(`{
   "schema":"emp3r0r.telemetry/v1","lab":"lab-box","platform":"linux",

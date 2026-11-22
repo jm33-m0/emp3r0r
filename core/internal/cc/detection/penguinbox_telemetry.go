@@ -637,15 +637,12 @@ func traceeArg(object map[string]any, names ...string) string {
 }
 
 func traceeArgInt(object map[string]any, names ...string) int64 {
-	value := traceeArg(object, names...)
+	value := strings.TrimSpace(traceeArg(object, names...))
 	if value == "" {
 		return 0
 	}
-	if parsed, err := strconv.ParseInt(strings.TrimSpace(value), 0, 64); err == nil {
+	if parsed, err := strconv.ParseInt(value, 0, 64); err == nil {
 		return parsed
-	}
-	if parsed, err := strconv.ParseUint(strings.TrimSpace(value), 0, 64); err == nil {
-		return int64(parsed)
 	}
 	return 0
 }
