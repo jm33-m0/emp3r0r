@@ -10,6 +10,7 @@ import (
 
 	"github.com/Autumn-27/norma/permission"
 	"github.com/Autumn-27/norma/tool"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/builder"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
@@ -54,6 +55,21 @@ func (e *evolver) generateAgentTool() tool.CoreTool {
 					"enum":        []string{"amd64"},
 					"description": archDescription,
 				},
+				"glibc_version": map[string]any{
+					"type":        "string",
+					"enum":        builder.CAgentGlibcVersions,
+					"description": "Linux C agent: oldest glibc ABI. Default 2.17 for portability; 2.34 requires public dynload.",
+				},
+				"dynload": map[string]any{
+					"type":        "string",
+					"enum":        builder.CAgentDynloadModes,
+					"description": "Linux C agent: auto tries libc_dl then public dlopen; public is 2.34+ only.",
+				},
+				"libc": map[string]any{
+					"type":        "string",
+					"enum":        builder.CAgentLibcs,
+					"description": "Linux C agent libc ABI. musl forces public dynload.",
+				},
 				"note": map[string]any{"type": "string", "description": "What this agent build is testing."},
 			},
 		},
@@ -62,9 +78,12 @@ func (e *evolver) generateAgentTool() tool.CoreTool {
 		},
 		Run: func(ctx context.Context, raw json.RawMessage, _ *tool.ToolContext) (tool.Result, error) {
 			var args struct {
-				AgentType string `json:"agent_type"`
-				Arch      string `json:"arch"`
-				Note      string `json:"note"`
+				AgentType    string `json:"agent_type"`
+				Arch         string `json:"arch"`
+				GlibcVersion string `json:"glibc_version"`
+				Dynload      string `json:"dynload"`
+				Libc         string `json:"libc"`
+				Note         string `json:"note"`
 			}
 			if err := json.Unmarshal(raw, &args); err != nil {
 				return tool.Errorf("invalid arguments"), nil
@@ -103,9 +122,36 @@ func (e *evolver) generateAgentTool() tool.CoreTool {
 			if e.cfg.BuildAgent == nil {
 				return tool.Errorf("agent generation is not configured for this loop"), nil
 			}
+			glibc := strings.TrimSpace(args.GlibcVersion)
+			dynload := strings.TrimSpace(args.Dynload)
+			libc := strings.TrimSpace(args.Libc)
+			if e.platform() == platformLinux {
+				if glibc == "" {
+					glibc = e.agentGlibc
+				}
+				if dynload == "" {
+					dynload = e.agentDynload
+				}
+				if libc == "" {
+					libc = e.agentLibc
+				}
+				if glibc == "" {
+					glibc = builder.CAgentGlibcVersions[0]
+				}
+				if dynload == "" {
+					dynload = builder.CAgentDynloadModes[0]
+				}
+				if libc == "" {
+					libc = builder.CAgentLibcs[0]
+				}
+				if !containsString(builder.CAgentGlibcVersions, glibc) || !containsString(builder.CAgentDynloadModes, dynload) || !containsString(builder.CAgentLibcs, libc) {
+					return tool.Errorf("invalid glibc_version, dynload, or libc"), nil
+				}
+			}
 			e.logClass(logging.ClassBuild, "GenerateAgent: %s/%s", agentType, arch)
 			result, err := e.cfg.BuildAgent(AgentBuildOptions{
 				Type: agentType, Arch: arch, Platform: e.platform(), SourceDir: e.cfg.AgentSourceDir,
+				Glibc: glibc, Dynload: dynload, Libc: libc,
 			})
 			if err != nil {
 				return tool.Errorf(fmt.Sprintf("generate agent: %v", err)), nil
@@ -135,6 +181,10 @@ func (e *evolver) generateAgentTool() tool.CoreTool {
 			e.agentArtifact = artifact
 			e.cfg.AgentType = agentType
 			e.cfg.AgentArch = arch
+			if e.platform() == platformLinux {
+				e.agentGlibc, e.agentDynload, e.agentLibc = glibc, dynload, libc
+				e.cfg.AgentGlibc, e.cfg.AgentDynload, e.cfg.AgentLibc = glibc, dynload, libc
+			}
 			// A repeated UUID with a new runtime key is rejected by TOFU. Forget
 			// the previous test agent before switching the loop to this build.
 			if old := e.expectedAgentUUID; old != "" && old != result.AgentUUID {
@@ -170,4 +220,13 @@ func (e *evolver) generateAgentTool() tool.CoreTool {
 			return tool.Text(string(data)), nil
 		},
 	})
+}
+
+func containsString(values []string, value string) bool {
+	for _, candidate := range values {
+		if candidate == value {
+			return true
+		}
+	}
+	return false
 }

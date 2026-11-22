@@ -130,7 +130,7 @@ TRANSPORT_SRC = transport_$(TRANSPORT).c
 # from libc.so.6.
 #   public  = dlopen/dlsym/dlclose (glibc >= 2.34)
 #   libc_dl = __libc_dlopen_mode/__libc_dlsym/__libc_dlclose (glibc < 2.34)
-DYNLOAD_MODE ?= public
+DYNLOAD_MODE ?= auto
 ifeq ($(DYNLOAD_MODE), libc_dl)
   DYNLOAD_MODE_CFLAG = -DDYNLOAD_MODE=1
   # __libc_dlopen_mode/__libc_dlsym/__libc_dlclose have been in libc since

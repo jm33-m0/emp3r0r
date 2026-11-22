@@ -155,6 +155,9 @@ func addDetectLoopFlags(cmd *cobra.Command) {
 	cmd.Flags().String("shellcode", "", "Windows x64 PIC shellcode or the Linux C agent PIC; generated when omitted")
 	cmd.Flags().String("agent-type", "auto", "Agent payload type: auto, windows_executable, windows_dll, or linux_so")
 	cmd.Flags().String("arch", "amd64", "Agent architecture")
+	cmd.Flags().String("agent-glibc", "2.17", "Linux C agent oldest glibc ABI: 2.17 or 2.34")
+	cmd.Flags().String("agent-dynload", "auto", "Linux C agent dynload mode: auto, libc_dl, or public")
+	cmd.Flags().String("agent-libc", "glibc", "Linux C agent libc: glibc or musl")
 	cmd.Flags().String("cc", "", "C2 address for the generated agent; defaults to the configured address and is used verbatim")
 	cmd.Flags().String("sandbox", "", "LitterBox-compatible lab URL; defaults to the platform entry in labs.json")
 	cmd.Flags().Int("iterations", 3, "Maximum detection cycles across attempts, including each baseline")
@@ -530,6 +533,9 @@ type detectLoopOptions struct {
 	AgentUUID           string
 	AgentType           string
 	Arch                string
+	AgentGlibc          string
+	AgentDynload        string
+	AgentLibc           string
 	CC                  string
 	Sandbox             string
 	Iterations          int
@@ -645,6 +651,9 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 	opts.Shellcode, _ = cmd.Flags().GetString("shellcode")
 	opts.AgentType, _ = cmd.Flags().GetString("agent-type")
 	opts.Arch, _ = cmd.Flags().GetString("arch")
+	opts.AgentGlibc, _ = cmd.Flags().GetString("agent-glibc")
+	opts.AgentDynload, _ = cmd.Flags().GetString("agent-dynload")
+	opts.AgentLibc, _ = cmd.Flags().GetString("agent-libc")
 	opts.CC, _ = cmd.Flags().GetString("cc")
 	opts.Sandbox, _ = cmd.Flags().GetString("sandbox")
 	opts.Iterations, _ = cmd.Flags().GetInt("iterations")
@@ -971,9 +980,21 @@ func generateLinuxAgentShellcode(opts detectLoopOptions, logf func(string, ...an
 		cc := strings.TrimSpace(opts.CC)
 		agentCfg.CCAddress = &cc
 	}
+	libc := strings.TrimSpace(opts.AgentLibc)
+	if libc == "" {
+		libc = "glibc"
+	}
+	glibc := strings.TrimSpace(opts.AgentGlibc)
+	if glibc == "" {
+		glibc = "2.17"
+	}
+	dynload := strings.TrimSpace(opts.AgentDynload)
+	if dynload == "" {
+		dynload = "auto"
+	}
 	providers := builder.CAgentProviders{
-		Format: "so", Arch: opts.Arch, Libc: "glibc",
-		Glibc: "2.17", Dynload: "auto",
+		Format: "so", Arch: opts.Arch, Libc: libc,
+		Glibc: glibc, Dynload: dynload,
 	}
 	logf("C agent source: %s", sourceDir)
 	generationMu.Lock()

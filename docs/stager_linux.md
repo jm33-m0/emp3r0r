@@ -32,8 +32,9 @@ three places.
   `emp3r0r-listener`.
 - `unpacker` selects the RC4 or LZSS stub. Keep both stubs symmetric with the
   packers; a mismatch yields a stager that downloads but never starts.
-- `dynload-mode` selects the glibc ABI (`public` for 2.34+, `libc_dl` for older
-  glibc). `hash-style` must match the target loader.
+- `dynload-mode` selects the glibc ABI: `auto` (default; links 2.17 and tries
+  `libc_dl` then public `dlopen`), `libc_dl` for older glibc, or `public` for
+  2.34+ only. `hash-style` must match the target loader.
 - `supervise` requires a stager-built agent so identity survives restarts.
 
 ## Tests

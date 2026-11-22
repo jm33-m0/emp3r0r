@@ -218,6 +218,12 @@ type EvolveConfig struct {
 	AgentType string
 	AgentArch string
 	AgentCC   string
+	// AgentGlibc, AgentDynload, and AgentLibc are the Linux C agent provider
+	// choices used by GenerateAgent and automatic rotation. Empty values keep
+	// glibc, 2.17, and auto.
+	AgentGlibc   string
+	AgentDynload string
+	AgentLibc    string
 	// Platform selects the payload model. Empty derives it from Module:
 	// loader_windows is Windows, stager_linux is Linux.
 	Platform string
@@ -271,6 +277,11 @@ type AgentBuildOptions struct {
 	Arch      string
 	Platform  string
 	SourceDir string
+	// Glibc, Dynload, and Libc select the Linux C agent compatibility build.
+	// Empty values keep the builder defaults: glibc, 2.17, and auto.
+	Glibc   string
+	Dynload string
+	Libc    string
 }
 
 // AgentBuildResult is the freshly generated agent artifact and the blob the
@@ -322,6 +333,9 @@ type evolver struct {
 	shellcodeGenerated        bool
 	activeProducer            string
 	expectedAgentUUID         string
+	agentGlibc                string
+	agentDynload              string
+	agentLibc                 string
 	// testedAgentUUIDs and testedShellcodes are sets shared with tool
 	// goroutines; sync.Map publishes immutable membership.
 	testedAgentUUIDs sync.Map
@@ -744,6 +758,9 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 		shellcodeGenerated:        cfg.InitialShellcodeGenerated,
 		activeProducer:            strings.ToLower(strings.TrimSpace(cfg.InitialProducer)),
 		expectedAgentUUID:         strings.TrimSpace(cfg.ExpectedAgentUUID),
+		agentGlibc:                strings.TrimSpace(cfg.AgentGlibc),
+		agentDynload:              strings.TrimSpace(cfg.AgentDynload),
+		agentLibc:                 strings.TrimSpace(cfg.AgentLibc),
 	}
 	if e.logf == nil {
 		e.logf = func(logging.Class, string, ...any) {}

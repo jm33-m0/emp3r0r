@@ -172,6 +172,7 @@ func (e *evolver) rotateAgent(ctx context.Context) error {
 		agentType, arch, headerOrNone(oldUUID))
 	result, err := e.cfg.BuildAgent(AgentBuildOptions{
 		Type: agentType, Arch: arch, Platform: e.platform(), SourceDir: e.cfg.AgentSourceDir,
+		Glibc: e.agentGlibc, Dynload: e.agentDynload, Libc: e.agentLibc,
 	})
 	if err != nil {
 		return fmt.Errorf("rotate agent: %w", err)

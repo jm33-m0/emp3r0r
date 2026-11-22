@@ -8,6 +8,7 @@
 * detection loop: debug Linux payloads over PenguinBox SSH with bash commands and Linux file reads
 * Go agent: build on demand from shipped go_agent source with build.py and garble; generate enables tags for selected P2P, channel, DoH, ECH, and custom transport features
 * operator kit: ship garble, the Go toolchain, and editable go_agent source; skip prebuilt agent stubs by default
+* detection loop: default stager dynload to auto/glibc 2.17, expose C agent glibc/dynload options, and add glibc plus container-host DNS knowledge
 * C agent: default glibc builds to ABI 2.17 with `DYNLOAD_MODE=auto` so one artifact loads on old and current hosts
 * detection loop: run `stager_linux` with an embedded C agent PIC, PenguinBox Tracee/Falco telemetry, Linux findings, and platform-tagged traces
 * malasada: move the Linux shellcode converter into an editable producer module and ship the Go toolchain in the operator kit

@@ -143,10 +143,24 @@ func runVerifyModuleOnC2(ctx context.Context, agent *def.Emp3r0rAgent, module st
 // It uses the source tree the loop exposes to the model, so edits to the C
 // agent are part of the payload under test.
 func generateDetectionCAgent(agentCfg builder.AgentConfig, opts detection.AgentBuildOptions) (*detection.AgentBuildResult, error) {
+	libc := strings.TrimSpace(opts.Libc)
+	if libc == "" {
+		libc = "glibc"
+	}
+	glibc := strings.TrimSpace(opts.Glibc)
+	if glibc == "" {
+		glibc = "2.17"
+	}
+	dynload := strings.TrimSpace(opts.Dynload)
+	if dynload == "" {
+		dynload = "auto"
+	}
 	providers := builder.CAgentProviders{
-		Format: "so",
-		Arch:   opts.Arch,
-		Libc:   "glibc",
+		Format:  "so",
+		Arch:    opts.Arch,
+		Libc:    libc,
+		Glibc:   glibc,
+		Dynload: dynload,
 	}
 	agentCfg.IsStager = true
 	res, err := builder.GenerateCAgentWorkflowAt(opts.SourceDir, agentCfg, providers, client.SignAgent)

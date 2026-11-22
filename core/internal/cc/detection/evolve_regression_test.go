@@ -84,12 +84,14 @@ func TestKnowledgeQueryUsesLastFindings(t *testing.T) {
 
 func TestMethodologySearch(t *testing.T) {
 	cases := map[string]string{
-		"offline baseline execution":  "methodology/offline-after-baseline",
-		"rededr hook instrumentation": "methodology/instrumentation-changed",
-		"rdata entropy packed":        "methodology/packed-payload-entropy",
-		"agent dll producer":          "methodology/producer-agent-compatibility",
-		"rededr loadlibrary deadlock": "methodology/sandbox-rededr-hook-deadlock",
-		"module stomp":                "methodology/mechanism-module-stomp",
+		"offline baseline execution":         "methodology/offline-after-baseline",
+		"rededr hook instrumentation":        "methodology/instrumentation-changed",
+		"rdata entropy packed":               "methodology/packed-payload-entropy",
+		"agent dll producer":                 "methodology/producer-agent-compatibility",
+		"rededr loadlibrary deadlock":        "methodology/sandbox-rededr-hook-deadlock",
+		"module stomp":                       "methodology/mechanism-module-stomp",
+		"glibc dynload compatibility":        "methodology/linux-glibc-dynload",
+		"host.containers.internal podman c2": "methodology/container-host-dns",
 	}
 	for query, want := range cases {
 		hits := methodologySearch(query, 5)

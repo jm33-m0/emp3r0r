@@ -56,11 +56,33 @@ const linuxPayloadPrompt = `Linux payload contract:
   dynload-mode, hash-style, ECH, and supervision are design choices; format and
   agent-pic are host-owned. Change one option set per cycle and predict its
   effect.
-- The C agent is linked against the host's available libc ABI at build time and
-  resolves libcrypto/libcurl at runtime. Keep it buildable on this host.
+- The C agent must stay compatible with the target glibc and keep resolving
+  libcrypto/libcurl at runtime. Keep it buildable on this host.
 - Do not remove the C2 check-in path, the module's config.json, its documented
   options, or its build entrypoint to hide a behavior. Internal file layout and
   APIs may change.`
+
+const linuxCompatibilityPrompt = `Linux compatibility:
+- glibc ABI and dynload mode are build options, not incidental toolchain
+  details. For an unknown target, use glibc 2.17 with dynload auto: the binary
+  links against the old ABI, tries libc_dl first, and falls back to public
+  dlopen/dlsym/dlclose at runtime.
+- public dlopen/dlsym/dlclose moved into libc.so.6 in glibc 2.34. public is for
+  a known 2.34+ target only. libc_dl is for a known older target only.
+- Read the current values before a compatibility change: BuildOptions lists the
+  stager's dynload-mode; GenerateAgent exposes the C agent's glibc_version,
+  dynload, and libc. Set stager BuildOptions dynload-mode=auto, and call
+  GenerateAgent with glibc_version=2.17, dynload=auto, libc=glibc.
+- musl only provides the public dl* symbols; riscv64 must use musl. Do not mix
+  a glibc 2.34/public stager with a 2.17/auto C agent when the target is older.
+- A compatibility failure is an execution failure, not a detection result.
+  Verify the agent checks in after the change.
+- Container C2: start from the Agent C2 address in the brief. Do not probe a
+  list of guesses. From the guest, check host.containers.internal first for
+  Podman, then host.docker.internal for Docker. If neither resolves, read the
+  default gateway from ip route. Test exactly one reachable host and port, then
+  rebuild the agent with that cc value. 127.0.0.1 is the sandbox itself, and
+  10.0.2.2 is a QEMU gateway, not the container host.`
 
 const linuxPlannerSystemPrompt = `You are the planner and coordinator of an autonomous detection loop for the
 emp3r0r Linux payload. You do not edit source, build, or detonate. You read the
@@ -75,6 +97,8 @@ evidence and direct one of two workers:
 ` + linuxDataPolicyPrompt + `
 
 ` + linuxPayloadPrompt + `
+
+` + linuxCompatibilityPrompt + `
 
 ` + knowledgePrompt + `
 
@@ -114,6 +138,8 @@ source, rebuilding, and re-testing.
 ` + linuxDataPolicyPrompt + `
 
 ` + linuxPayloadPrompt + `
+
+` + linuxCompatibilityPrompt + `
 
 ` + knowledgePrompt + `
 
@@ -173,10 +199,12 @@ Debug discipline:
 - Check whether the agent process exists, whether its exec is under the
   container entrypoint, and whether it attempted a connect to the configured C2.
   A missing Falco alert is not proof of a clean run; confirm Tracee coverage.
-- Check the C2 address from the guest's perspective. PenguinBox runs in a
-  Podman container, so reach the operator host with host.containers.internal
-  (or its guest-visible address), not 10.0.2.2; that address is the PenguinBox
-  container's QEMU gateway. A loopback address is not reachable from the guest.
+- Check the C2 address from the guest's perspective. Do not probe a list of
+  guesses. Try host.containers.internal first for Podman, then
+  host.docker.internal for Docker; if neither resolves, use the default gateway
+  from ip route. 10.0.2.2 is the PenguinBox QEMU gateway, not the container
+  host, and a loopback address is not reachable from the guest. Test one
+  candidate, then rebuild the agent with that cc value.
 - After any remediation, call AgentStatus. A live status is sufficient; do not
   require a BOF. RunModule is not available on Linux. Do not claim a fix you did
   not observe.

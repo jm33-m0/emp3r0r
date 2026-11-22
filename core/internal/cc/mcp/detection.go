@@ -153,6 +153,9 @@ func (a *Actions) detectionTools() map[string]Tool {
 						"agent_uuid":           StringProp("UUID of the generated agent wrapped in the payload. Required for execution=verified checks and final verification."),
 						"agent_type":           StringProp("Agent payload type used for rotation: windows_executable (default), windows_dll, or linux_so."),
 						"arch":                 StringProp("Agent architecture for rotation. Default amd64."),
+						"agent_glibc":          StringProp("Linux C agent oldest glibc ABI for rotation: 2.17 (default) or 2.34."),
+						"agent_dynload":        StringProp("Linux C agent dynload mode for rotation: auto (default), libc_dl, or public."),
+						"agent_libc":           StringProp("Linux C agent libc for rotation: glibc (default) or musl."),
 						"planner_timeout":      IntegerProp("Planner decision window in seconds. Default 600."),
 						"editor_timeout":       IntegerProp("Editor decision window in seconds. Default 900."),
 						"cycle_timeout":        IntegerProp("Build/detonate/verify deadline in seconds. Default 3600."),
@@ -245,6 +248,9 @@ type detectionArgs struct {
 	AgentUUID          string   `json:"agent_uuid"`
 	AgentType          string   `json:"agent_type"`
 	Arch               string   `json:"arch"`
+	AgentGlibc         string   `json:"agent_glibc"`
+	AgentDynload       string   `json:"agent_dynload"`
+	AgentLibc          string   `json:"agent_libc"`
 	GuestSSH           string   `json:"guest_ssh"`
 	GuestSSHKey        string   `json:"guest_ssh_key"`
 	GuestSSHExclude    string   `json:"guest_ssh_exclude"`
@@ -981,6 +987,7 @@ func (a *Actions) detectionLoop(ctx context.Context, raw json.RawMessage) (any, 
 		Stages: args.Stages, Iterations: args.Iterations, Turns: args.Turns, Git: true,
 		ExpectedAgentUUID: strings.TrimSpace(args.AgentUUID),
 		AgentType:         agentType, AgentArch: arch, AgentCC: strings.TrimSpace(a.DefaultCC),
+		AgentGlibc: args.AgentGlibc, AgentDynload: args.AgentDynload, AgentLibc: args.AgentLibc,
 		Guest: guest, Verify: verify, DebuggerPolicy: args.DebuggerPolicy,
 		Pricing: detection.TokenPricing{
 			InputPerMillion: args.InputPrice, OutputPerMillion: args.OutputPrice,
@@ -1175,9 +1182,21 @@ func (a *Actions) buildDetectionAgent(opts detection.AgentBuildOptions) (*detect
 		agentCfg.CCAddress = &cc
 	}
 	if opts.Platform == "linux" {
+		libc := strings.TrimSpace(opts.Libc)
+		if libc == "" {
+			libc = "glibc"
+		}
+		glibc := strings.TrimSpace(opts.Glibc)
+		if glibc == "" {
+			glibc = "2.17"
+		}
+		dynload := strings.TrimSpace(opts.Dynload)
+		if dynload == "" {
+			dynload = "auto"
+		}
 		providers := builder.CAgentProviders{
-			Format: "so", Arch: opts.Arch, Libc: "glibc",
-			Glibc: "2.17", Dynload: "auto",
+			Format: "so", Arch: opts.Arch, Libc: libc,
+			Glibc: glibc, Dynload: dynload,
 		}
 		agentCfg.IsStager = true
 		res, err := builder.GenerateCAgentWorkflowAt(opts.SourceDir, agentCfg, providers, client.SignAgent)
