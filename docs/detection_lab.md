@@ -14,7 +14,7 @@ The endpoint must expose the LitterBox routes:
 - `GET /api/edr/profiles`
 - `GET /api/rules`
 
-The default endpoints are `http://127.0.0.1:1337` for Windows and `http://127.0.0.1:1338` for Linux. `EMP3R0R_DETECTION_SANDBOX` overrides both. The CLI `--sandbox` flag selects one explicitly. A payload module opts into the loop with `"detection": true` in its manifest and declares its runtime platform with `"platform": "Linux"` or `"platform": "Windows"`.
+The default endpoints are `http://127.0.0.1:1337` for Windows and `http://127.0.0.1:1338` for Linux. Both live in `<workspace>/detection/labs.json`; `EMP3R0R_DETECTION_SANDBOX` remains a legacy override for both, and the CLI `--sandbox` flag selects one explicitly. A payload module opts into the loop with `"detection": true` in its manifest and declares its runtime platform with `"platform": "Linux"` or `"platform": "Windows"`.
 
 ## Sensor-neutral telemetry
 
@@ -89,8 +89,8 @@ Sensors should put native fields the common model cannot represent in `attrs`. T
 
 ## Defaults and configuration
 
-- `EMP3R0R_DETECTION_SANDBOX` selects the lab URL.
-- Without that variable, Windows defaults to `http://127.0.0.1:1337` and Linux defaults to `http://127.0.0.1:1338`.
+- `<workspace>/detection/labs.json` holds the Windows and Linux lab entries; missing fields use `http://127.0.0.1:1337` and `http://127.0.0.1:1338`.
+- `EMP3R0R_DETECTION_LABS` selects a different labs file; `EMP3R0R_DETECTION_SANDBOX` remains a legacy URL override for both entries.
 - `EMP3R0R_DETECTION_PLATFORM` selects the MCP process default platform; the loop still derives the platform from the selected module.
 - `--sandbox` overrides the URL for one CLI loop.
 - `/health` is authoritative for which static, dynamic, and EDR sensors are available. The plan is built from that inventory, not from a hardcoded sensor list.

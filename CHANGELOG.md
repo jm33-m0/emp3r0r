@@ -4,6 +4,9 @@
 
 ### Features
 
+* detection loop: keep Windows and Linux labs in one `labs.json`, select the platform lab per module, and place guest SSH for both in the same file
+* detection loop: debug Linux payloads over PenguinBox SSH with bash commands and Linux file reads
+* C agent: default glibc builds to ABI 2.17 with `DYNLOAD_MODE=auto` so one artifact loads on old and current hosts
 * detection loop: run `stager_linux` with an embedded C agent PIC, PenguinBox Tracee/Falco telemetry, Linux findings, and platform-tagged traces
 * malasada: move the Linux shellcode converter into an editable producer module and ship the Go toolchain in the operator kit
 

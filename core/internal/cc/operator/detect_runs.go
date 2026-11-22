@@ -363,14 +363,11 @@ func runDetectLoop(run *detectRun, opts detectLoopOptions, shellcode, baseID str
 		run.setError(fmt.Errorf("producer paths: %w", err))
 		return
 	}
-	var guest *detection.GuestSSHConfig
-	if opts.Platform != "linux" {
-		guest, err = opts.guestConfig()
-		if err != nil {
-			run.setError(fmt.Errorf("guest SSH: %w", err))
-			logging.Errorf("detect_loop: %v", err)
-			return
-		}
+	guest, err := opts.guestConfig()
+	if err != nil {
+		run.setError(fmt.Errorf("guest SSH: %w", err))
+		logging.Errorf("detect_loop: %v", err)
+		return
 	}
 
 	logf := func(format string, args ...any) {

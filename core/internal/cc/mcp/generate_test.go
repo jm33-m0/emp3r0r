@@ -114,7 +114,7 @@ func TestNewCBuildSpecDefaults(t *testing.T) {
 	}
 	want := builder.CAgentProviders{
 		Crypto: builder.CAgentCryptoProviders[0], Gzip: builder.CAgentGzipProviders[0],
-		Transport: "libcurl", Dynload: "libc_dl", Glibc: builder.CAgentGlibcVersions[0],
+		Transport: "libcurl", Dynload: "auto", Glibc: builder.CAgentGlibcVersions[0],
 		Libc: builder.CAgentLibcs[0], Arch: builder.CAgentArches[0],
 		Format: builder.CAgentFormats[0], Bof: "1", Rvvm: "1",
 	}

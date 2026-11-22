@@ -58,14 +58,14 @@ func TestGuestSSHKeyPermissions(t *testing.T) {
 
 func TestValidateGuestExcludePath(t *testing.T) {
 	for _, path := range []string{`C:\LitterBox\emp-debug`, `D:\stage`, `C:\LitterBox\Config`, `C:\LitterBox\Uploads`} {
-		if err := validateGuestExcludePath(path); err != nil {
+		if err := validateGuestExcludePath(path, platformWindows); err != nil {
 			t.Fatalf("valid path rejected: %v", err)
 		}
 	}
 	for _, path := range []string{
 		`C:\`, `relative\stage`, `C:\Windows\System32\..\stage`, `C:\Stage` + "\x00",
 	} {
-		if err := validateGuestExcludePath(path); err == nil {
+		if err := validateGuestExcludePath(path, platformWindows); err == nil {
 			t.Fatalf("invalid path accepted: %q", path)
 		}
 	}
@@ -186,5 +186,25 @@ func TestGuestSSHToolRequiresConfig(t *testing.T) {
 	}
 	if !strings.Contains(res.Flatten(), "not configured") {
 		t.Fatalf("result = %s", res.Flatten())
+	}
+}
+
+func TestLinuxGuestConfigStagingPath(t *testing.T) {
+	key := filepath.Join(t.TempDir(), "guest_key")
+	if err := os.WriteFile(key, []byte("key"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := GuestSSHConfig{Platform: platformLinux, Host: "127.0.0.1", Port: 2223, User: "penguinbox", KeyPath: key}
+	if err := cfg.normalize(t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	if cfg.ExcludePath != guestStageDirLinux {
+		t.Fatalf("linux staging path = %q, want %q", cfg.ExcludePath, guestStageDirLinux)
+	}
+	if err := validateGuestExcludePath("/tmp/../etc", platformLinux); err == nil {
+		t.Fatal("Linux traversal path accepted")
+	}
+	if err := validateGuestExcludePath("relative", platformLinux); err == nil {
+		t.Fatal("relative Linux staging path accepted")
 	}
 }

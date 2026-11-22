@@ -120,7 +120,7 @@ func (e *evolver) toolsFor(role evolveRole) []tool.CoreTool {
 				tools = append(tools, e.runModuleTool())
 			}
 		}
-		if e.guest != nil && e.platform() == platformWindows {
+		if e.guest != nil {
 			tools = append(tools, e.guestSSHTool())
 		}
 	}

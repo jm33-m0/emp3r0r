@@ -12,10 +12,29 @@ The lab API and the sensor-neutral `emp3r0r.telemetry/v1` envelope are specified
 
 ## Prerequisites
 
-- A reachable LitterBox API. The default is `http://127.0.0.1:1337`. Set
-  `EMP3R0R_DETECTION_SANDBOX` to use another URL.
-- For Linux, a reachable PenguinBox API with the same contract, normally through
-  its SSH tunnel (`127.0.0.1:1338`; pass `--sandbox 127.0.0.1:1338`). PenguinBox
+- Both lab endpoints live in one operator file,
+  `<workspace>/detection/labs.json` (`~/.emp3r0r/detection/labs.json` by
+  default). The Windows lab defaults to `http://127.0.0.1:1337` and the Linux
+  lab to `http://127.0.0.1:1338`; each entry can override its URL and guest
+  SSH settings:
+  ```json
+  {
+    "windows": {
+      "url": "http://127.0.0.1:1337",
+      "guest_ssh": "litterbox@127.0.0.1:2222",
+      "guest_ssh_key": "~/.ssh/litterbox-vm_ed25519"
+    },
+    "linux": {
+      "url": "http://127.0.0.1:1338",
+      "guest_ssh": "penguinbox@127.0.0.1:2223",
+      "guest_ssh_key": "~/penguinbox/storage/penguinbox/ssh/id_ed25519"
+    }
+  }
+  ```
+  The MCP server reads it at startup and the console reads it for each new loop; restart the MCP server after editing it.
+  `EMP3R0R_DETECTION_LABS` overrides the path and
+  `EMP3R0R_DETECTION_SANDBOX` remains a legacy global URL override.
+- A Linux lab needs the PenguinBox API, normally through its SSH tunnel. It
   reports Tracee and Falco under dynamic scanners and has no EDR profiles.
 - The sandbox reports its scanners and EDR profiles through `/health`; a
   scanner that is missing or disabled is omitted from the plan.
@@ -93,10 +112,11 @@ existing C2 connection.
 For `stager_linux` the loop builds a fresh C agent shared object from the
 editable `c_agent` tree (default: the sibling `core/c_agent`), wraps it with the
 editable malasada producer, and embeds the PIC in an executable `stager_linux`
-build. Both the C agent and malasada are writable source roots, so agent and
+build. The default C agent build uses glibc 2.17 and `DYNLOAD_MODE=auto`, so the
+same artifact loads `libcrypto`/`libcurl` on older and current glibc hosts. Both the C agent and malasada are writable source roots, so agent and
 wrapper edits are part of the payload under test. `--agent-type` is always
 `linux_so`; the host fixes `format=executable`, and raw, packed, shared-object,
-`inject`, `smw`, and the Windows guest debugger paths do not apply. The operator
+`inject`, `smw`, and the Windows-specific guest-defense paths do not apply. The operator
 kit ships the pinned Go toolchain under
 `lib/emp3r0r/go` so malasada rebuilds on the operator host. The sandbox executes
 the ELF in a PenguinBox guest, and the loop imports Tracee syscall/LSM events and
@@ -192,7 +212,7 @@ Old read-only detection tool results (`SourceRead`, `SourceSearch`, `TelemetryQu
 
 For `stager_linux`, `BuildOptions` changes the stager's declared transport, unpacker, sleep mask, dynload mode, hash style, ECH, and supervision options. The host fills `agent-pic` and fixes `format=executable`, because PenguinBox executes the ELF directly. Agent behavior is changed in the writable C agent root (`--agent-source-dir`, default the sibling `c_agent`); call `GenerateAgent` after those edits to build a fresh `linux_so`, then `BuildShellcode producer=malasada input=<artifact_path>` to produce the PIC with a new UUID. The malasada module is editable like donut, so the loop can change its ELF patching, stage0, or compression when telemetry points at the wrapper.
 
-A Linux cycle uses the mechanisms `stager`, `agent`, `producer`, `build-flags`, `static-hygiene`, or `other`. The producer mechanism edits the editable malasada source; `BuildShellcode producer=malasada input=<artifact_path>` rebuilds it. The debugger has `AgentStatus` and `CleanupAgent` but no `RunModule`, `GuestSSH`, or Windows BOF path.
+A Linux cycle uses the mechanisms `stager`, `agent`, `producer`, `build-flags`, `static-hygiene`, or `other`. The producer mechanism edits the editable malasada source; `BuildShellcode producer=malasada input=<artifact_path>` rebuilds it. The debugger has `AgentStatus`, `CleanupAgent`, and `GuestSSH` for the PenguinBox guest over bash; `RunModule` and the Windows BOF path are absent.
 
 `BuildOptions` lists the payload module's declared build options, sets them, or resets them to the module default. The editor can change `format`, `inject`, `process`, `process-args`, `smw`, `verify-ms`, and `key` for `loader_windows`; the host fills `shellcode`, `output`, and `arch`. A build-option change is a complete change for `DetectionCycle`, so it does not need a source edit, and the effective values are recorded in every cycle summary. The execution gate and `RevertToPayload` restore the last executing build options with the source and shellcode. For a producer, `BuildShellcode` options persist for the active producer and are reused on agent rotation; `BuildOptions module=crystal_pack` persists them without rebuilding. `crystal_pack` also accepts `link_options`, which applies Crystal Palace BTF transforms to both PICOs.
 
@@ -204,7 +224,7 @@ A Linux cycle uses the mechanisms `stager`, `agent`, `producer`, `build-flags`, 
 
 ### Guest debugging
 
-Guest SSH is the Windows debugger. A Linux loop has no guest SSH; it observes execution through the PenguinBox result and the C2 agent check-in. Select the Linux path with `--module stager_linux`; do not pass `--guest-ssh`.
+Guest SSH is available for both labs. The Windows debugger uses PowerShell and Defender exclusions in LitterBox; the Linux debugger uses bash commands and a staging directory in PenguinBox. Select the Linux path with `--module stager_linux`; the Linux lab entry supplies its SSH endpoint and key.
 
 The debugger worker is enabled only when the operator supplies the sandbox guest's SSH endpoint and key:
 
@@ -213,11 +233,11 @@ detect_loop --guest-ssh litterbox@127.0.0.1:2222 \
   --guest-ssh-key ~/.ssh/litterbox-vm_ed25519
 ```
 
-There is no implicit host. `EMP3R0R_DETECTION_GUEST_SSH` and `EMP3R0R_DETECTION_GUEST_SSH_KEY` provide the same values. Authentication is public-key only; password authentication and agent forwarding are never used. The host key is recorded on first use in `<store>/guest_known_hosts` and fails closed on a change; `--guest-ssh-fingerprint SHA256:...` pins it instead.
+There is no implicit host. Without the CLI flags, the matching platform entry in `labs.json` supplies `guest_ssh` and `guest_ssh_key`; the legacy `EMP3R0R_DETECTION_GUEST_SSH` and `EMP3R0R_DETECTION_GUEST_SSH_KEY` variables remain a fallback for the CLI. Authentication is public-key only; password authentication and agent forwarding are never used. The host key is recorded on first use in `<store>/guest_known_hosts` and fails closed on a change; `--guest-ssh-fingerprint SHA256:...` pins it instead.
 
-`--guest-ssh-exclude` sets the debug staging directory and the Defender exclusion (default `C:\LitterBox\emp-debug`). The coordinator verifies the exclusion before every debugger session, and the debugger may also call `GuestSSH action=ensure_exclusion`; the check adds the exclusion only when it is missing. The debugger may change guest detection settings (Defender, firewall/ASR, RedEdr, analyzers) when they block execution or observation and records every change in `guest_actions`; such a cycle is debug-assisted, not a clean evasion baseline. The guest is the disposable sandbox: commands and file writes inside it are not restricted. The tool's only host-side credential is the configured SSH key; it exposes no other host paths and keeps no guest evidence on the host. The host boundary is the sandbox-only SSH key and host-key verification.
+`--guest-ssh-exclude` sets the debug staging directory. On Windows it is also the Defender exclusion (default `C:\LitterBox\emp-debug`); on Linux it is created with `mkdir` (default `/tmp/emp3r0r-debug`). The coordinator prepares staging before every debugger session, and the debugger may also call `GuestSSH action=ensure_exclusion`. The debugger may change guest detection settings (Windows: Defender, firewall/ASR, RedEdr; Linux: analyzers and services) when they block execution or observation and records every change in `guest_actions`; such a cycle is debug-assisted, not a clean evasion baseline. The guest is the disposable sandbox: commands and file writes inside it are not restricted. The tool's only host-side credential is the configured SSH key; it exposes no other host paths and keeps no guest evidence on the host. The host boundary is the sandbox-only SSH key and host-key verification.
 
-The debugger may launch a tool or artifact, kill a stuck process, read WER and Defender logs, collect a dump, and test C2 reachability from inside the guest. It cannot edit module source; when the cause is a crash or a rejected injection, it returns `source_fix_required=true` and a brief for the editor. A guest-side repair is confirmed by the host with a fresh `AgentStatus` poll, never by model text. The confirmation is recorded as `recovered_by=guest-debugger`; the cycle stays offline because the monitored run did not produce an attributable trace, so it is not a finding baseline.
+The debugger may launch a tool or artifact, kill a stuck process, read guest logs, collect a dump, and test C2 reachability from inside the guest. It cannot edit module source; when the cause is a crash or a rejected injection, it returns `source_fix_required=true` and a brief for the editor. A guest-side repair is confirmed by the host with a fresh `AgentStatus` poll, never by model text. The confirmation is recorded as `recovered_by=guest-debugger`; the cycle stays offline because the monitored run did not produce an attributable trace, so it is not a finding baseline.
 
 ### Managing loops
 
@@ -255,7 +275,7 @@ disposable VM or container:
 
 - give it no host credentials, no production C2 server keys, and no access to
   the operator's home directory or SSH agent;
-- when the debugger is enabled, use a sandbox-only SSH key: the debugger can change guest detection settings and run commands as needed to make the payload observable, the key is its only host-side file, and it is scoped to the LitterBox guest, never a target;
+- when the debugger is enabled, use a sandbox-only SSH key: the debugger can change guest detection settings and run commands as needed to make the payload observable, the key is its only host-side file, and it is scoped to the LitterBox or PenguinBox guest, never a target;
 - restrict egress to the model provider and the LitterBox sandbox;
 - rebuild or discard the VM after a run instead of reusing a workstation;
 - keep the model provider's data handling in mind: source excerpts, build logs,
@@ -352,8 +372,7 @@ is enabled, agent checks and rebuilds use the console's existing C2 connection
 verification). `AgentStatus`, `RunModule`, and `CleanupAgent` are only
 registered when verification is configured. MCP `detection_loop` accepts an `agent_uuid` only when `generate` or
 `generate_c` returned it in the same MCP session; it runs the same checks.
-Without it the loop records `execution=unverified`. `GuestSSH` is registered only when `--guest-ssh` is
-configured. MCP `detection_loop` does not accept guest SSH overrides; set `EMP3R0R_DETECTION_GUEST_SSH` and `EMP3R0R_DETECTION_GUEST_SSH_KEY` in the operator environment.
+Without it the loop records `execution=unverified`. `GuestSSH` is registered when the CLI supplies `--guest-ssh` or the matching `labs.json` entry supplies `guest_ssh` and `guest_ssh_key`. MCP `detection_loop` does not accept guest SSH overrides; set `guest_ssh` and `guest_ssh_key` in the matching Windows or Linux entry of `labs.json`.
 The sandbox is probed once, and a detection failure is not retried by the host: its error, build tail, stage errors, and trace identity are given to the model, which can inspect the source and telemetry and call `DetectionCycle` after a fix. A build failure is different: when an edit breaks the build and a verified baseline exists, the host restores the last executing source, shellcode, and build options, including source edits that never produced a payload, then allows up to two retries of the same plan with the restored tree. A build failure before any payload has checked in has no verified baseline to restore. A baseline failure therefore starts the model session instead of rebuilding the same payload again, and a failed attempt does not consume the cycle budget. Model-session failures, empty turns, and provider errors back off and continue the same session; after a bounded number of restarts the step is reported as an infrastructure failure, not as a failed hypothesis. A trace without a payload PEB is recorded and kept for the model with the `telemetry/attribution` finding instead of being detonated again. One build/detonate/verify cycle is bounded by `--cycle-timeout` (default 60m). A planner or editor session that completes no cycle within its decision window is continued with a forced answer, not restarted; the loop continues. A sandbox outage fails the cycle before any model session: a baseline outage returns immediately, and a mid-loop outage retries the same plan with bounded backoff. When the debugger identifies a source-level execution fault, a planner stop is converted into one editor cycle for that fix, bounded to two attempts. One model session is bounded by `--session-timeout` (default 2h), and a session with no tool call by `--tool-idle-timeout` (default 30m). An in-flight tool suspends the idle check and an in-flight cycle is bounded by its own deadline. `--timeout 0` (the default) means no loop-wide deadline. A final answer that is not the requested JSON object is stored as the summary with `parse_error` instead of ending the run. The loop writes the full Markdown report to `<workspace>/detection/reports/<loop>.md` and a compact executive summary to `<loop>-summary.md`, emits the full report through the tmux log pane when the loop finishes, and stores the report in `loop_results.report`. If the loop is stopped or fails before the final answer, it writes a partial report and summary from the cycles completed so far. The operator console prints the rendered executive summary, not the raw report.
 
 Loop timestamps use local time. A `[progress]` heartbeat is written every two minutes with elapsed time, cycles used, tool calls, sessions, input/output and cache tokens, the estimated cost, the last terminal reason, last execution state, and the expected agent UUID, so a long model session is visibly alive. Cost is shown as `unconfigured` until the price flags are set. The final report and its executive summary lead with high findings, static signatures, total findings, and Defender verdicts, then map each baseline top finding to its final status and the first cycle/edit where it stopped appearing. Top findings are capped at eight per cycle, so absence from the final list is reported as "not in final top findings", not as proof of removal. Per-role token usage, the estimated cost, and the detailed edit log follow; the sandbox risk score is not the optimization target.

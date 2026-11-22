@@ -156,7 +156,7 @@ func addDetectLoopFlags(cmd *cobra.Command) {
 	cmd.Flags().String("agent-type", "auto", "Agent payload type: auto, windows_executable, windows_dll, or linux_so")
 	cmd.Flags().String("arch", "amd64", "Agent architecture")
 	cmd.Flags().String("cc", "", "C2 address for the generated agent; defaults to the configured address and is used verbatim")
-	cmd.Flags().String("sandbox", "", "LitterBox-compatible lab URL; defaults to EMP3R0R_DETECTION_SANDBOX or the platform local port (Linux 1338, Windows 1337)")
+	cmd.Flags().String("sandbox", "", "LitterBox-compatible lab URL; defaults to the platform entry in labs.json")
 	cmd.Flags().Int("iterations", 3, "Maximum detection cycles across attempts, including each baseline")
 	cmd.Flags().StringSlice("stages", []string{"static", "dynamic"}, "Stages to run: static, dynamic, edr")
 	cmd.Flags().String("process", "", "Override the sacrificial process; empty uses the module default")
@@ -182,9 +182,9 @@ func addDetectLoopFlags(cmd *cobra.Command) {
 	cmd.Flags().Float64("cache-read-price", 0, "USD per 1M cache-read tokens for the cost estimate; 0 leaves the rate unset")
 	cmd.Flags().Float64("cache-write-price", 0, "USD per 1M cache-write tokens for the cost estimate; 0 leaves the rate unset")
 	cmd.Flags().StringToString("worker-model", nil, "Per-worker model override, for example planner=...,editor=...,debugger=...")
-	cmd.Flags().String("guest-ssh", "", "Sandbox guest SSH endpoint as user@host:port; enables the debugger worker (env EMP3R0R_DETECTION_GUEST_SSH)")
-	cmd.Flags().String("guest-ssh-key", "", "Sandbox-only SSH private key (env EMP3R0R_DETECTION_GUEST_SSH_KEY)")
-	cmd.Flags().String("guest-ssh-exclude", "", "Defender exclusion and debug staging path (default C:\\LitterBox\\emp-debug; env EMP3R0R_DETECTION_GUEST_SSH_EXCLUDE)")
+	cmd.Flags().String("guest-ssh", "", "Sandbox guest SSH endpoint as user@host:port; defaults to guest_ssh in labs.json")
+	cmd.Flags().String("guest-ssh-key", "", "Sandbox-only SSH private key; defaults to guest_ssh_key in labs.json")
+	cmd.Flags().String("guest-ssh-exclude", "", "Defender exclusion and debug staging path; defaults to guest_ssh_exclude in labs.json")
 	cmd.Flags().String("guest-ssh-known-hosts", "", "TOFU known-hosts file; defaults under the detection store")
 	cmd.Flags().String("guest-ssh-fingerprint", "", "Pin the guest host key as SHA256:...")
 	cmd.Flags().Bool("guest-ssh-insecure", false, "Disable guest host-key verification (not recommended)")
@@ -363,7 +363,7 @@ func detectLoopResumeCmd() *cobra.Command {
 			logger := newLoopLogger(logFile)
 			logf := logger.printf
 			if opts.Tmux {
-				if _, tmuxErr := cli.TmuxNewPane("Detection Loop", "", "", 0, loopTailCommand(logPath)); tmuxErr != nil {
+				if _, tmuxErr := cli.TmuxNewPane(detectLoopWindowTitle(currentID), "", "", 0, loopTailCommand(logPath)); tmuxErr != nil {
 					logging.Warningf("detect_loop resume: tmux window: %v", tmuxErr)
 				}
 			}
@@ -570,6 +570,31 @@ type detectLoopOptions struct {
 	RenderWidth         int
 }
 
+// detectLoopWindowTitle gives each loop its own tmux window name. The loop ID
+// is the stable identity; values from resume arguments are reduced to a safe
+// tmux label instead of being passed through as format syntax.
+func detectLoopWindowTitle(loopID string) string {
+	label := sanitize.SanitizeOneLine(strings.TrimSpace(loopID))
+	label = strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+			return r
+		case r == '-', r == '_', r == '.':
+			return r
+		default:
+			return '-'
+		}
+	}, label)
+	label = strings.Trim(label, "-.")
+	if label == "" {
+		label = "loop"
+	}
+	if len(label) > 48 {
+		label = label[:48]
+	}
+	return "detect " + label
+}
+
 func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 	// The console loads operator.env at startup, but a long-lived console
 	// must see guest SSH values added for a new loop. The loader never
@@ -652,8 +677,31 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 	opts.Platform = detection.PlatformForModule(opts.Module)
+	labs, labErr := detection.LoadLabs(filepath.Join(live.EmpWorkSpace, "detection"))
+	if labErr != nil {
+		logging.Warningf("detect_loop: load labs: %v", labErr)
+	}
+	lab := labs.ForPlatform(opts.Platform)
 	if strings.TrimSpace(opts.Sandbox) == "" {
-		opts.Sandbox = detection.DefaultSandboxURLForPlatform(opts.Platform)
+		opts.Sandbox = lab.URL
+	}
+	if strings.TrimSpace(opts.GuestSSH) == "" {
+		opts.GuestSSH = lab.GuestSSH
+	}
+	if strings.TrimSpace(opts.GuestSSHKey) == "" {
+		opts.GuestSSHKey = lab.GuestSSHKey
+	}
+	if strings.TrimSpace(opts.GuestSSHExclude) == "" {
+		opts.GuestSSHExclude = lab.GuestSSHExclude
+	}
+	if strings.TrimSpace(opts.GuestSSHKnownHosts) == "" {
+		opts.GuestSSHKnownHosts = lab.GuestSSHKnownHosts
+	}
+	if strings.TrimSpace(opts.GuestSSHFingerprint) == "" {
+		opts.GuestSSHFingerprint = lab.GuestSSHFingerprint
+	}
+	if !opts.GuestSSHInsecure {
+		opts.GuestSSHInsecure = lab.GuestSSHInsecure
 	}
 	if opts.AgentType = strings.ToLower(strings.TrimSpace(opts.AgentType)); opts.AgentType == "" {
 		opts.AgentType = "auto"
@@ -741,7 +789,9 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 		logging.Errorf("detect_loop: create log directory: %v", err)
 		return
 	}
-	logPath := filepath.Join(logDir, "detect-loop-"+time.Now().UTC().Format("20060102-150405")+".log")
+	loopStamp := time.Now().UTC().Format("20060102-150405")
+	loopID := "loop-" + loopStamp
+	logPath := filepath.Join(logDir, "detect-loop-"+loopStamp+".log")
 	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		logging.Errorf("detect_loop: open log: %v", err)
@@ -751,7 +801,7 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 	logf := logger.printf
 
 	if opts.Tmux {
-		window, tmuxErr := cli.TmuxNewPane("Detection Loop", "", "", 0, loopTailCommand(logPath))
+		window, tmuxErr := cli.TmuxNewPane(detectLoopWindowTitle(loopID), "", "", 0, loopTailCommand(logPath))
 		if tmuxErr != nil {
 			logging.Warningf("detect_loop: tmux window: %v", tmuxErr)
 		} else {
@@ -764,7 +814,6 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 		logf("no detection model configured; set EMP3R0R_DETECTION_MODEL and the provider API key")
 		return
 	}
-	loopID := "loop-" + time.Now().UTC().Format("20060102-150405")
 	prompts := detection.NewOperatorPromptQueue()
 	run, err := registerDetectRun(loopID, prompts, logPath, logger)
 	if err != nil {
@@ -780,7 +829,7 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 	go func() {
 		shellcode := strings.TrimSpace(opts.Shellcode)
 		if shellcode == "" {
-			logf("generating real Go agent shellcode (%s/%s)", opts.AgentType, opts.Arch)
+			logf("generating agent shellcode (%s/%s)", opts.AgentType, opts.Arch)
 			generated, agentArtifact, producer, agentType, agentUUID, genErr := generateAgentShellcode(opts, logf)
 			if genErr != nil {
 				logf("shellcode generation failed: %v", genErr)
@@ -825,7 +874,7 @@ func (opts detectLoopOptions) guestConfig() (*detection.GuestSSHConfig, error) {
 	}
 	exclude := envOr(opts.GuestSSHExclude, "EMP3R0R_DETECTION_GUEST_SSH_EXCLUDE")
 	return &detection.GuestSSHConfig{
-		Host: host, Port: port, User: user, KeyPath: key,
+		Platform: opts.Platform, Host: host, Port: port, User: user, KeyPath: key,
 		KnownHostsPath: detection.ExpandHomePath(opts.GuestSSHKnownHosts),
 		Fingerprint:    strings.TrimSpace(opts.GuestSSHFingerprint),
 		Insecure:       opts.GuestSSHInsecure,
@@ -913,7 +962,10 @@ func generateLinuxAgentShellcode(opts detectLoopOptions, logf func(string, ...an
 		cc := strings.TrimSpace(opts.CC)
 		agentCfg.CCAddress = &cc
 	}
-	providers := builder.CAgentProviders{Format: "so", Arch: opts.Arch, Libc: "glibc"}
+	providers := builder.CAgentProviders{
+		Format: "so", Arch: opts.Arch, Libc: "glibc",
+		Glibc: "2.17", Dynload: "auto",
+	}
 	logf("C agent source: %s", sourceDir)
 	generationMu.Lock()
 	result, err := builder.GenerateCAgentWorkflowAt(sourceDir, agentCfg, providers, client.SignAgent)

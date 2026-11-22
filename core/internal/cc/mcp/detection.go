@@ -144,7 +144,7 @@ func (a *Actions) detectionTools() map[string]Tool {
 				Type: "function",
 				Function: FunctionDef{
 					Name:        "detection_loop",
-					Description: "Run the autonomous Norma detection loop for loader_windows or stager_linux. It builds the selected module from a source directory, detonates it in LitterBox (Windows) or PenguinBox (Linux), imports every saved analyzer result (Windows: RedEdr, Moneta, pe-sieve, HollowsHunter, HSB, Patriot, Blender, YARA, CheckPlz, HolyGrail, and EDR profiles; Linux: Tracee, Falco, ELF, and YARA) into SQLite, edits module, agent, or producer source or build options, rebuilds, and compares payloads. A planner chooses the hypothesis, an editor applies the edits and runs one cycle, and a debugger inspects the Windows guest over SSH when the operator configured EMP3R0R_DETECTION_GUEST_SSH. Pass agent_uuid for live C2 verification; otherwise the loop records execution=unverified and builds fresh agents for later cycles. When telemetry shows the loader, shellcode producer, wrapper, or injection path is detected, the planner may choose another mechanism. Full feedback, build logs, and per-payload telemetry stay in SQLite. Requires approve_execution=true. This edits module source and runs model-chosen builds with operator privileges; run it on a dedicated, disposable VM.",
+					Description: "Run the autonomous Norma detection loop for loader_windows or stager_linux. It builds the selected module from a source directory, detonates it in LitterBox (Windows) or PenguinBox (Linux), imports every saved analyzer result (Windows: RedEdr, Moneta, pe-sieve, HollowsHunter, HSB, Patriot, Blender, YARA, CheckPlz, HolyGrail, and EDR profiles; Linux: Tracee, Falco, ELF, and YARA) into SQLite, edits module, agent, or producer source or build options, rebuilds, and compares payloads. A planner chooses the hypothesis, an editor applies the edits and runs one cycle, and a debugger inspects the Windows or Linux guest over SSH when the matching labs.json entry configured guest SSH. Pass agent_uuid for live C2 verification; otherwise the loop records execution=unverified and builds fresh agents for later cycles. When telemetry shows the loader, shellcode producer, wrapper, or injection path is detected, the planner may choose another mechanism. Full feedback, build logs, and per-payload telemetry stay in SQLite. Requires approve_execution=true. This edits module source and runs model-chosen builds with operator privileges; run it on a dedicated, disposable VM.",
 					Parameters: ObjectSchema(map[string]any{
 						"module":               StringProp("Payload module: loader_windows (default) or stager_linux."),
 						"module_dir":           StringProp("Module source directory; defaults to the installed module path."),
@@ -358,7 +358,7 @@ func (a *Actions) detectionPlan(ctx context.Context, raw json.RawMessage) (any, 
 		Module:         mod.Name,
 		ModuleDir:      mod.Path,
 		AgentSourceDir: agentSourceDir,
-		Platform:       mod.Platform,
+		Platform:       detection.PlatformForModule(mod.Name),
 		ArtifactPath:   artifact.Path,
 	})
 	if err != nil {
@@ -411,7 +411,7 @@ func (a *Actions) detectionRun(ctx context.Context, raw json.RawMessage) (any, e
 		Module:         mod.Name,
 		ModuleDir:      mod.Path,
 		AgentSourceDir: agentSourceDir,
-		Platform:       mod.Platform,
+		Platform:       detection.PlatformForModule(mod.Name),
 		ArtifactPath:   artifact.Path,
 	})
 	if err != nil {
@@ -584,7 +584,7 @@ func (a *Actions) attachDetection(ctx context.Context, mod *def.ModuleConfig, bu
 		Module:         mod.Name,
 		ModuleDir:      mod.Path,
 		AgentSourceDir: agentSourceDir,
-		Platform:       mod.Platform,
+		Platform:       detection.PlatformForModule(mod.Name),
 		ArtifactPath:   artifact.Path,
 	})
 	cancelPlan()
@@ -819,7 +819,7 @@ func (a *Actions) detectionImport(ctx context.Context, raw json.RawMessage) (any
 	} else {
 		fetchCtx, fetchCancel := context.WithTimeout(ctx, 90*time.Second)
 		var data []byte
-		data, err = detection.FetchTelemetry(fetchCtx, rawURL, a.Detection.Client.URL())
+		data, err = detection.FetchTelemetry(fetchCtx, rawURL, a.Detection.ClientFor(detection.PlatformForModule(module)).URL())
 		fetchCancel()
 		if err == nil {
 			opts.Path = rawURL
@@ -941,12 +941,9 @@ func (a *Actions) detectionLoop(ctx context.Context, raw json.RawMessage) (any, 
 		return nil, fmt.Errorf("read_roots are operator configuration and cannot be set by the tool")
 	}
 	readRoots := detection.DefaultReadRoots(moduleDir)
-	var guest *detection.GuestSSHConfig
-	if platform == "windows" {
-		guest, err = mcpGuestConfig(args)
-		if err != nil {
-			return nil, err
-		}
+	guest, err := mcpGuestConfig(args, a.Detection.LabFor(platform), platform)
+	if err != nil {
+		return nil, err
 	}
 	var verify detection.VerifyOps
 	if agentUUID := strings.TrimSpace(args.AgentUUID); agentUUID != "" {
@@ -978,7 +975,7 @@ func (a *Actions) detectionLoop(ctx context.Context, raw json.RawMessage) (any, 
 		Module: module, ModuleDir: moduleDir, Shellcode: shellcode,
 		InitialAgentArtifact: initialAgentArtifact,
 		Platform:             platform, AgentSourceDir: agentSourceDir,
-		SandboxURL: a.Detection.Client.URL(), StoreRoot: a.Detection.Store.Root,
+		SandboxURL: a.Detection.ClientFor(platform).URL(), StoreRoot: a.Detection.Store.Root,
 		Process: args.Process, Format: args.Format, Inject: args.Inject, SMW: args.SMW,
 		ProducerDirs: producers, ReadRoots: readRoots,
 		Stages: args.Stages, Iterations: args.Iterations, Turns: args.Turns, Git: true,
@@ -1178,7 +1175,10 @@ func (a *Actions) buildDetectionAgent(opts detection.AgentBuildOptions) (*detect
 		agentCfg.CCAddress = &cc
 	}
 	if opts.Platform == "linux" {
-		providers := builder.CAgentProviders{Format: "so", Arch: opts.Arch, Libc: "glibc"}
+		providers := builder.CAgentProviders{
+			Format: "so", Arch: opts.Arch, Libc: "glibc",
+			Glibc: "2.17", Dynload: "auto",
+		}
 		agentCfg.IsStager = true
 		res, err := builder.GenerateCAgentWorkflowAt(opts.SourceDir, agentCfg, providers, client.SignAgent)
 		if err != nil {
@@ -1228,32 +1228,23 @@ func (a *Actions) buildDetectionAgent(opts detection.AgentBuildOptions) (*detect
 
 // mcpGuestConfig resolves the debugger endpoint from operator configuration.
 // The guest is the sandbox VM; tool arguments must not redirect the SSH key.
-func mcpGuestConfig(args detectionArgs) (*detection.GuestSSHConfig, error) {
+func mcpGuestConfig(args detectionArgs, lab detection.LabConfig, platform string) (*detection.GuestSSHConfig, error) {
 	if strings.TrimSpace(args.GuestSSH) != "" || strings.TrimSpace(args.GuestSSHKey) != "" ||
 		strings.TrimSpace(args.GuestSSHExclude) != "" {
-		return nil, fmt.Errorf("guest SSH is operator configuration; set EMP3R0R_DETECTION_GUEST_SSH* instead of tool arguments")
+		return nil, fmt.Errorf("guest SSH is operator configuration; set it in the %s lab entry in labs.json", platform)
 	}
-	endpoint := strings.TrimSpace(os.Getenv("EMP3R0R_DETECTION_GUEST_SSH"))
-	key := strings.TrimSpace(os.Getenv("EMP3R0R_DETECTION_GUEST_SSH_KEY"))
-	if endpoint == "" && key == "" {
-		return nil, nil
-	}
-	if endpoint == "" || key == "" {
-		return nil, fmt.Errorf("guest SSH requires both EMP3R0R_DETECTION_GUEST_SSH and EMP3R0R_DETECTION_GUEST_SSH_KEY")
-	}
-	user, host, port, err := detection.ParseGuestSSHEndpoint(endpoint)
+	guest, err := lab.GuestConfig(platform)
 	if err != nil {
 		return nil, err
 	}
-	key = detection.ExpandHomePath(key)
-	if info, err := os.Stat(key); err != nil || !info.Mode().IsRegular() {
-		return nil, fmt.Errorf("guest SSH key %q is not readable", key)
+	if guest == nil {
+		return nil, nil
 	}
-	return &detection.GuestSSHConfig{
-		Host: host, Port: port, User: user, KeyPath: key,
-		ExcludePath: strings.TrimSpace(os.Getenv("EMP3R0R_DETECTION_GUEST_SSH_EXCLUDE")),
-		Timeout:     60 * time.Second,
-	}, nil
+	if info, err := os.Stat(guest.KeyPath); err != nil || !info.Mode().IsRegular() {
+		return nil, fmt.Errorf("guest SSH key %q is not readable", guest.KeyPath)
+	}
+	guest.Timeout = 60 * time.Second
+	return guest, nil
 }
 
 func (a *Actions) detectionPayloads(ctx context.Context, raw json.RawMessage) (any, error) {

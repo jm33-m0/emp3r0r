@@ -22,10 +22,11 @@ var (
 	CAgentCryptoProviders    = []string{"openssl", "mbedtls"}
 	CAgentGzipProviders      = []string{"miniz", "none"}
 	CAgentTransportProviders = []string{"libcurl", "http_raw", "libssl", "tor"}
-	// DYNLOAD_MODE picks the libc symbols dynload resolves: libc_dl
-	// (__libc_dlopen_mode, glibc < 2.34), public (dlopen, glibc >= 2.34) or
-	// auto (libc_dl with a runtime fallback to the public names).
-	CAgentDynloadModes = []string{"libc_dl", "public", "auto"}
+	// DYNLOAD_MODE picks the libc symbols dynload resolves: auto
+	// (libc_dl with a runtime fallback to the public names), libc_dl
+	// (__libc_dlopen_mode, glibc < 2.34), or public (dlopen, glibc >= 2.34).
+	// auto is the portable default; it works on both older and newer glibc.
+	CAgentDynloadModes = []string{"auto", "libc_dl", "public"}
 	// GLIBC_VERSION pins the oldest glibc ABI to link against. It is
 	// independent of DYNLOAD_MODE; 2.17 is the oldest the project supports.
 	CAgentGlibcVersions = []string{"2.17", "2.34"}

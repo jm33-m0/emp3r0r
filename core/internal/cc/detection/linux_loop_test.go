@@ -282,7 +282,8 @@ func TestLinuxSourceRootsAndTools(t *testing.T) {
 			Module: "stager_linux", ModuleDir: moduleDir, AgentSourceDir: agentDir,
 			Platform: platformLinux,
 		},
-		logf: func(logging.Class, string, ...any) {},
+		guest: &guestSSH{cfg: GuestSSHConfig{Platform: platformLinux, Host: "127.0.0.1", Port: 2223, User: "penguinbox"}},
+		logf:  func(logging.Class, string, ...any) {},
 	}
 	e.roots = e.sourceRoots()
 	if _, err := e.roots.pick("c_agent"); err != nil {
@@ -299,7 +300,24 @@ func TestLinuxSourceRootsAndTools(t *testing.T) {
 	for _, candidate := range e.toolsFor(roleDebugger) {
 		debugger[candidate.Name()] = true
 	}
-	if debugger["RunModule"] || debugger["GuestSSH"] {
-		t.Fatalf("Linux debugger registered Windows tools: %v", debugger)
+	if debugger["RunModule"] {
+		t.Fatalf("Linux debugger registered the Windows module runner: %v", debugger)
+	}
+	if !debugger["GuestSSH"] {
+		t.Fatalf("Linux debugger did not register GuestSSH: %v", debugger)
+	}
+}
+
+func TestLinuxDebuggerAvailableWithGuest(t *testing.T) {
+	e := &evolver{
+		cfg: EvolveConfig{
+			Platform: platformLinux, DebuggerPolicy: debuggerPolicyCycle, Iterations: 2,
+		},
+		guest: &guestSSH{cfg: GuestSSHConfig{Platform: platformLinux, Host: "127.0.0.1", Port: 2223, User: "penguinbox"}},
+		logf:  func(logging.Class, string, ...any) {},
+	}
+	c := newCoordinator(e, nil, "scripted", nil, "")
+	if !c.debuggerAvailableFor(&Cycle{ID: 1}) {
+		t.Fatal("Linux debugger was not available with a configured guest and cycle policy")
 	}
 }

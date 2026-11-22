@@ -12,6 +12,7 @@ import (
 type LoopConfig struct {
 	SandboxURL string
 	Platform   string
+	Labs       LabsConfig
 	StoreRoot  string
 	// AnalystFactory builds an analyst rooted at one module directory. It may
 	// return (nil, nil) when no model is configured.
@@ -21,6 +22,8 @@ type LoopConfig struct {
 // Loop owns the sandbox client, the run store, and the optional analyst.
 type Loop struct {
 	Client         *Client
+	Clients        map[string]*Client
+	Labs           LabsConfig
 	Store          *Store
 	Telemetry      *TelemetryDB
 	AnalystFactory func(workingDir string, telemetry *TelemetryDB) (*Analyst, error)
@@ -28,15 +31,36 @@ type Loop struct {
 
 // NewLoop validates the sandbox URL and prepares the store.
 func NewLoop(cfg LoopConfig) (*Loop, error) {
-	if strings.TrimSpace(cfg.SandboxURL) == "" {
-		cfg.SandboxURL = DefaultSandboxURLForPlatform(cfg.Platform)
+	labs := cfg.Labs
+	if labs.Windows.URL == "" {
+		labs.Windows.URL = DefaultSandboxURLForPlatform(platformWindows)
 	}
-	client, err := NewClient(cfg.SandboxURL)
-	if err != nil {
-		return nil, err
+	if labs.Linux.URL == "" {
+		labs.Linux.URL = DefaultSandboxURLForPlatform(platformLinux)
+	}
+	if strings.TrimSpace(cfg.SandboxURL) != "" {
+		// An explicit single URL is an operator override for this loop.
+		labs.Windows.URL = cfg.SandboxURL
+		labs.Linux.URL = cfg.SandboxURL
+	}
+	clients := make(map[string]*Client, 2)
+	for _, platform := range []string{platformWindows, platformLinux} {
+		lab := labs.ForPlatform(platform)
+		client, err := NewClient(lab.URL)
+		if err != nil {
+			return nil, fmt.Errorf("%s lab: %w", platform, err)
+		}
+		clients[platform] = client
+	}
+	defaultPlatform := strings.ToLower(strings.TrimSpace(cfg.Platform))
+	client := clients[defaultPlatform]
+	if client == nil {
+		client = clients[platformWindows]
 	}
 	loop := &Loop{
 		Client:         client,
+		Clients:        clients,
+		Labs:           labs,
 		Store:          NewStore(cfg.StoreRoot),
 		AnalystFactory: cfg.AnalystFactory,
 	}
@@ -50,14 +74,33 @@ func NewLoop(cfg LoopConfig) (*Loop, error) {
 	return loop, nil
 }
 
-// Available probes the sandbox and returns its current capability set.
+// ClientFor returns the configured lab for a platform, falling back to the
+// loop's default client for compatibility with single-lab callers.
+func (l *Loop) ClientFor(platform string) *Client {
+	if client := l.Clients[strings.ToLower(strings.TrimSpace(platform))]; client != nil {
+		return client
+	}
+	return l.Client
+}
+
+// LabFor returns the platform lab configuration.
+func (l *Loop) LabFor(platform string) LabConfig {
+	return l.Labs.ForPlatform(platform)
+}
+
+// Available probes the default lab and returns its current capability set.
 func (l *Loop) Available(ctx context.Context) Health {
 	return l.Client.Probe(ctx)
 }
 
+// AvailableFor probes the lab selected by the payload platform.
+func (l *Loop) AvailableFor(ctx context.Context, platform string) Health {
+	return l.ClientFor(platform).Probe(ctx)
+}
+
 // CreatePlan probes the sandbox and builds the deterministic plan.
 func (l *Loop) CreatePlan(ctx context.Context, req Request) (Plan, error) {
-	health := l.Client.Probe(ctx)
+	health := l.ClientFor(req.Platform).Probe(ctx)
 	return BuildPlan(req, health)
 }
 

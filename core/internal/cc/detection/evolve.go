@@ -593,7 +593,7 @@ var errBuildFailed = errors.New("build failed")
 // instead of a host retry loop, so the loop never rebuilds or detonates again
 // without model feedback.
 func (e *evolver) waitSandbox(ctx context.Context) (Health, error) {
-	health := e.loop.Available(ctx)
+	health := e.loop.AvailableFor(ctx, e.platform())
 	if health.Available {
 		return health, nil
 	}
@@ -964,10 +964,13 @@ func normalizeEvolveConfig(cfg *EvolveConfig) error {
 	if cfg.StoreRoot == "" {
 		return fmt.Errorf("detection store root is required")
 	}
-	if platform == platformLinux {
-		if cfg.Guest != nil {
-			return fmt.Errorf("guest SSH is the Windows debugger; Linux detonations are observed through the sandbox API")
+	if cfg.Guest != nil {
+		cfg.Guest.Platform = platform
+		if err := cfg.Guest.normalize(cfg.StoreRoot); err != nil {
+			return fmt.Errorf("guest SSH: %w", err)
 		}
+	}
+	if platform == platformLinux {
 		cfg.AgentSourceDir = strings.TrimSpace(cfg.AgentSourceDir)
 		if cfg.AgentSourceDir == "" {
 			cfg.AgentSourceDir = DefaultAgentSourceDir(cfg.ModuleDir)
@@ -1003,11 +1006,6 @@ func normalizeEvolveConfig(cfg *EvolveConfig) error {
 			cfg.ProducerDirs = map[string]string{"malasada": malasadaDir}
 		}
 	} else {
-		if cfg.Guest != nil {
-			if err := cfg.Guest.normalize(cfg.StoreRoot); err != nil {
-				return fmt.Errorf("guest SSH: %w", err)
-			}
-		}
 		if cfg.Format == "" {
 			cfg.Format = "exe"
 		}

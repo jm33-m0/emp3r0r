@@ -113,6 +113,7 @@ func (l *Loop) RunPlan(ctx context.Context, plan Plan, opts RunOptions) (Run, er
 	if opts.EDRTimeout <= 0 {
 		opts.EDRTimeout = defaultEDRTimeout
 	}
+	client := l.ClientFor(plan.Platform)
 	run := Run{
 		ID:        newRunID(plan.Module, plan.Artifact.SHA256),
 		Module:    plan.Module,
@@ -164,7 +165,7 @@ func (l *Loop) RunPlan(ctx context.Context, plan Plan, opts RunOptions) (Run, er
 		return l.Store.Save(run)
 	}
 
-	upload, err := l.Client.Upload(ctx, plan.Artifact.Path)
+	upload, err := client.Upload(ctx, plan.Artifact.Path)
 	if err != nil {
 		return fail(fmt.Errorf("upload artifact: %w", err))
 	}
@@ -186,7 +187,7 @@ func (l *Loop) RunPlan(ctx context.Context, plan Plan, opts RunOptions) (Run, er
 		case StageStatic:
 			if !staticDone {
 				stageCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
-				staticRaw, staticErr = l.Client.Analyze(stageCtx, upload.MD5, StageStatic, true)
+				staticRaw, staticErr = client.Analyze(stageCtx, upload.MD5, StageStatic, true)
 				cancel()
 				staticDone = true
 			}
@@ -195,7 +196,7 @@ func (l *Loop) RunPlan(ctx context.Context, plan Plan, opts RunOptions) (Run, er
 			run.Executed = true
 			if !dynamicDone {
 				stageCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
-				dynamicRaw, dynamicErr = l.Client.Analyze(stageCtx, upload.MD5, StageDynamic, true)
+				dynamicRaw, dynamicErr = client.Analyze(stageCtx, upload.MD5, StageDynamic, true)
 				cancel()
 				dynamicDone = true
 			}
@@ -203,7 +204,7 @@ func (l *Loop) RunPlan(ctx context.Context, plan Plan, opts RunOptions) (Run, er
 		case StageEDR:
 			run.Executed = true
 			stageCtx, cancel := context.WithTimeout(ctx, opts.EDRTimeout+30*time.Second)
-			raw, stageErr = l.Client.AnalyzeEDR(stageCtx, stage.Tool, upload.MD5, opts.EDRTimeout)
+			raw, stageErr = client.AnalyzeEDR(stageCtx, stage.Tool, upload.MD5, opts.EDRTimeout)
 			cancel()
 		default:
 			stageErr = fmt.Errorf("unknown stage %q", stage.Kind)
@@ -218,14 +219,14 @@ func (l *Loop) RunPlan(ctx context.Context, plan Plan, opts RunOptions) (Run, er
 		run.Stages = append(run.Stages, result)
 	}
 
-	if info, err := l.Client.Info(ctx, upload.MD5); err == nil {
+	if info, err := client.Info(ctx, upload.MD5); err == nil {
 		run.Info = trimRaw(info)
 	}
-	if risk, err := l.Client.Risk(ctx, upload.MD5); err == nil {
+	if risk, err := client.Risk(ctx, upload.MD5); err == nil {
 		run.Risk = risk
 	}
 	if l.Telemetry != nil && len(selected) > 0 {
-		results := l.Client.FetchResults(ctx, upload.MD5, staticRaw, dynamicRaw)
+		results := client.FetchResults(ctx, upload.MD5, staticRaw, dynamicRaw)
 		if !opts.Dynamic || !dynamicDone || dynamicErr != nil {
 			results.Dynamic = nil
 		}

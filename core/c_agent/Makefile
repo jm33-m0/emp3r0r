@@ -70,7 +70,7 @@ LIBC ?= glibc
 ifeq ($(LIBC),musl)
   DYNLOAD_MODE ?= public
 else
-  DYNLOAD_MODE ?= libc_dl
+  DYNLOAD_MODE ?= auto
 endif
 
 ifeq ($(DYNLOAD_MODE),public)
@@ -86,9 +86,8 @@ endif
 
 # The two glibc knobs are independent: a binary linked for an older ABI still
 # runs on newer glibc, and any symbol set can be paired with any target version.
-# The default glibc pair (2.17 + libc_dl) covers the widest range of old
-# systems; use DYNLOAD_MODE=auto to build one binary that loads on both old and
-# new glibc.
+# The default glibc pair (2.17 + auto) covers old and current hosts with one
+# binary: auto tries libc_dl and falls back to the public dlopen names.
 
 # musl has no __libc_dlopen_mode/__libc_dlsym/__libc_dlclose: the public
 # dlopen/dlsym/dlclose are exported by the loader/libc segment itself (see

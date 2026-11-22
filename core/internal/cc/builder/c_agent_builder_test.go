@@ -181,7 +181,7 @@ func TestCAgentArtifactName(t *testing.T) {
 
 	// Empty provider fields must describe the Makefile defaults, not an empty
 	// or timestamped name.
-	wantDefault := "c_agent_linux_amd64_exe_glibc-2.17_libcurl_openssl_miniz_libc-dl_11111111"
+	wantDefault := "c_agent_linux_amd64_exe_glibc-2.17_libcurl_openssl_miniz_auto_11111111"
 	if got := cAgentArtifactName(CAgentProviders{}, nil, agentUUID); got != wantDefault {
 		t.Fatalf("default artifact name = %q, want %q", got, wantDefault)
 	}

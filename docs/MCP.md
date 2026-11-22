@@ -122,9 +122,9 @@ events; `detection_payloads` and `detection_compare` expose the list and diff.
 `detection_loop` runs the autonomous Norma loop and edits module source, so it
 requires `approve_execution=true`. It accepts `agent_uuid` only when that UUID
 was returned by `generate` or `generate_c` in the same MCP session, and it
-builds fresh agents for rotation with the same builder. The Windows guest
-debugger uses only `EMP3R0R_DETECTION_GUEST_SSH*` operator configuration; tool
-arguments cannot redirect the SSH key or host. Without a loop-generated
+builds fresh agents for rotation with the same builder. The guest
+debugger uses the `guest_ssh` and `guest_ssh_key` fields in the matching Windows
+or Linux `labs.json` entry; tool arguments cannot redirect the SSH key or host. Without a loop-generated
 `agent_uuid` the loop records `execution=unverified`; without configured guest
 SSH the debugger is disabled.
 `detection_query` opens a read-only connection and accepts one SELECT or WITH

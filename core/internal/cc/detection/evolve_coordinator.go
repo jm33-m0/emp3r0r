@@ -440,7 +440,7 @@ func (c *coordinator) finalDiagnosis(ctx context.Context, final map[string]any) 
 	if c.debuggerPolicy() != debuggerPolicyFinal || c.finalDebugDone {
 		return
 	}
-	if c.e.platform() != platformWindows || c.e.guest == nil || c.debuggerRemaining() <= 0 {
+	if c.e.guest == nil || c.debuggerRemaining() <= 0 {
 		return
 	}
 	if c.e.last == nil || c.e.last.Execution == executionVerified || c.e.last.Execution == executionStatic {
@@ -500,7 +500,7 @@ func (c *coordinator) debuggerAvailable() bool {
 }
 
 func (c *coordinator) debuggerAvailableFor(cycle *Cycle) bool {
-	if c.e.platform() != platformWindows || c.e.guest == nil || c.debuggerRemaining() <= 0 {
+	if c.e.guest == nil || c.debuggerRemaining() <= 0 {
 		return false
 	}
 	if c.debuggerPolicy() != debuggerPolicyCycle {
@@ -521,9 +521,6 @@ func (c *coordinator) debuggerUnavailableReason() string {
 }
 
 func (c *coordinator) debuggerUnavailableFor(cycle *Cycle) string {
-	if c.e.platform() != platformWindows {
-		return "guest SSH is the Windows debugger; Linux uses sandbox telemetry"
-	}
 	if c.e.guest == nil {
 		return "guest SSH is not configured"
 	}
@@ -735,9 +732,6 @@ type debugRequest struct {
 }
 
 func (c *coordinator) debug(ctx context.Context, req debugRequest) (*debugDiagnosis, error) {
-	if c.e.platform() != platformWindows {
-		return nil, fmt.Errorf("guest SSH is the Windows debugger; Linux uses sandbox telemetry")
-	}
 	if c.e.guest == nil {
 		return nil, fmt.Errorf("guest SSH is not configured")
 	}
@@ -756,13 +750,13 @@ func (c *coordinator) debug(ctx context.Context, req debugRequest) (*debugDiagno
 	var exclusion string
 	status, exclusionErr := c.e.guest.EnsureExclusion(ctx)
 	if exclusionErr != nil {
-		exclusion = "verification failed: " + clip(exclusionErr.Error(), 400)
+		exclusion = "staging preparation failed: " + clip(exclusionErr.Error(), 400)
 	} else {
 		exclusion = fmt.Sprintf("%s present (added=%v)", status.Path, status.Added)
 		c.e.audit("guest_exclusion", c.e.guestAddr(), fmt.Sprintf("path=%s added=%v", status.Path, status.Added))
 	}
-	c.e.logClass(logging.ClassLine, "guest debug exclusion: %s", exclusion)
-	prompt := c.debuggerBrief(ctx, req.Trigger, req.Cycle) + "\nGuest exclusion: " + exclusion
+	c.e.logClass(logging.ClassLine, "guest debug staging: %s", exclusion)
+	prompt := c.debuggerBrief(ctx, req.Trigger, req.Cycle) + "\nGuest staging: " + exclusion
 	ws := c.newWorkerSession(roleDebugger)
 	defer ws.close()
 	for attempt := 0; ; attempt++ {
@@ -1236,6 +1230,6 @@ func (c *coordinator) debuggerBrief(ctx context.Context, trigger string, cycle *
 	}
 	fmt.Fprintf(&b, "\nDossier:\n%s\n", c.e.dossier())
 	fmt.Fprintf(&b, "Host limits: %s; %d debugger turns; %s decision window. ", limitCalls(c.e.cfg.DebuggerToolBudget, "no total tool cap"), c.turns(roleDebugger), c.sessionTimeout(roleDebugger))
-	b.WriteString("\nStart with GuestSSH action=ensure_exclusion, then inspect the guest. This is the only debugger pass for this cycle. Do not repeat a command that already failed.")
+	b.WriteString("\nStart with GuestSSH action=ensure_exclusion, then inspect the guest (Defender exclusion on Windows, staging directory on Linux). This is the only debugger pass for this cycle. Do not repeat a command that already failed.")
 	return b.String()
 }

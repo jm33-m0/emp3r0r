@@ -141,7 +141,7 @@ make -C core/c_agent coverage        # gcov coverage
 ```
 
 `ARCH` selects `amd64`, `386`, `arm`, `arm64`, or `riscv64`; `riscv64`
-requires `LIBC=musl`. `GLIBC_VERSION` and `DYNLOAD_MODE` tune the glibc build.
+requires `LIBC=musl`. `GLIBC_VERSION` and `DYNLOAD_MODE` tune the glibc build; the defaults are `2.17` and `auto`, which loads on both older and current glibc.
 
 ```sh
 make -C core/c_agent agent ARCH=arm64 LIBC=musl
