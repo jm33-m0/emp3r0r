@@ -122,8 +122,28 @@ func goAgentPayloadKind(payloadType string) string {
 	}
 }
 
+// minimalBuildEnv keeps provider credentials and unrelated operator state out
+// of build.py and the compiler processes. The build gets only the variables it
+// needs to locate tools, temporary files, and the shipped toolchain.
+func minimalBuildEnv() []string {
+	allowed := map[string]bool{
+		"PATH": true, "HOME": true, "TMPDIR": true, "TEMP": true, "TMP": true,
+		"LANG": true, "LC_ALL": true, "LC_CTYPE": true, "TZ": true,
+		"EMP3R0R_GARBLE": true, "EMP3R0R_DISABLE_GARBLE": true,
+		"SSL_CERT_FILE": true, "SSL_CERT_DIR": true,
+	}
+	var env []string
+	for _, kv := range os.Environ() {
+		key, _, ok := strings.Cut(kv, "=")
+		if ok && allowed[key] {
+			env = append(env, kv)
+		}
+	}
+	return env
+}
+
 func goAgentBuildEnv() []string {
-	env := os.Environ()
+	env := minimalBuildEnv()
 	goRoot := filepath.Join(live.EmpDataDir, GoAgentToolchainDirName)
 	cache := filepath.Join(live.EmpWorkSpace, ".go-cache")
 	_ = os.MkdirAll(cache, 0o700)

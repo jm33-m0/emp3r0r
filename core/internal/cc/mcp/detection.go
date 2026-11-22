@@ -16,6 +16,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/operator"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 	"github.com/jm33-m0/emp3r0r/core/lib/sanitize"
 )
@@ -751,6 +752,47 @@ func stageSummaries(run detection.Run) []map[string]any {
 	return out
 }
 
+// resolveTelemetryImportPath confines file imports to the detection store. The
+// model can name a file, but must not turn the import tool into a reader for
+// arbitrary operator files.
+func (a *Actions) resolveTelemetryImportPath(path string) (string, error) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return "", nil
+	}
+	if a.Detection == nil || a.Detection.Store == nil || strings.TrimSpace(a.Detection.Store.Root) == "" {
+		return "", fmt.Errorf("detection store is not configured")
+	}
+	root, err := filepath.Abs(a.Detection.Store.Root)
+	if err != nil {
+		return "", fmt.Errorf("resolve detection store: %w", err)
+	}
+	candidate, err := filepath.Abs(filepath.Clean(path))
+	if err != nil {
+		return "", fmt.Errorf("resolve telemetry path: %w", err)
+	}
+	info, err := os.Lstat(candidate)
+	if err != nil {
+		return "", fmt.Errorf("telemetry path: %w", err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		return "", fmt.Errorf("telemetry path must be a regular file under the detection store")
+	}
+	realCandidate, err := filepath.EvalSymlinks(candidate)
+	if err != nil {
+		return "", fmt.Errorf("resolve telemetry path: %w", err)
+	}
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", fmt.Errorf("resolve detection store: %w", err)
+	}
+	rel, err := filepath.Rel(realRoot, realCandidate)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return "", fmt.Errorf("telemetry path must be under %s", root)
+	}
+	return realCandidate, nil
+}
+
 func (a *Actions) detectionImport(ctx context.Context, raw json.RawMessage) (any, error) {
 	var args detectionArgs
 	if err := json.Unmarshal(raw, &args); err != nil {
@@ -769,6 +811,13 @@ func (a *Actions) detectionImport(ctx context.Context, raw json.RawMessage) (any
 	}
 	if len(path) > maxDetectionArtifactPath || len(rawURL) > maxDetectionTelemetryURL {
 		return nil, fmt.Errorf("telemetry location is too long")
+	}
+	if path != "" {
+		resolved, err := a.resolveTelemetryImportPath(path)
+		if err != nil {
+			return nil, err
+		}
+		path = resolved
 	}
 	source := strings.ToLower(strings.TrimSpace(args.Source))
 	switch source {
@@ -821,11 +870,11 @@ func (a *Actions) detectionImport(ctx context.Context, raw json.RawMessage) (any
 		err   error
 	)
 	if path != "" {
-		trace, err = a.Detection.Telemetry.ImportFile(importCtx, filepath.Clean(path), opts)
+		trace, err = a.Detection.Telemetry.ImportFile(importCtx, path, opts)
 	} else {
 		fetchCtx, fetchCancel := context.WithTimeout(ctx, 90*time.Second)
 		var data []byte
-		data, err = detection.FetchTelemetry(fetchCtx, rawURL, a.Detection.ClientFor(detection.PlatformForModule(module)).URL())
+		data, err = detection.FetchTelemetry(fetchCtx, rawURL, a.Detection.ClientFor("windows").URL(), a.Detection.ClientFor("linux").URL())
 		fetchCancel()
 		if err == nil {
 			opts.Path = rawURL
@@ -864,6 +913,53 @@ func (a *Actions) detectionQuery(ctx context.Context, raw json.RawMessage) (any,
 	return result, nil
 }
 
+// resolveMCPShellcodePath confines the MCP loop to operator payload files. The
+// model may choose a generated artifact, but not read an arbitrary host file
+// through the loader or sandbox.
+func (a *Actions) resolveMCPShellcodePath(path string) (string, error) {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return "", fmt.Errorf("shellcode path is required")
+	}
+	if a.Detection == nil || a.Detection.Store == nil {
+		return "", fmt.Errorf("detection store is not configured")
+	}
+	abs, err := filepath.Abs(filepath.Clean(path))
+	if err != nil {
+		return "", fmt.Errorf("resolve shellcode path: %w", err)
+	}
+	info, err := os.Lstat(abs)
+	if err != nil {
+		return "", fmt.Errorf("shellcode path: %w", err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		return "", fmt.Errorf("shellcode path must be a regular file")
+	}
+	switch strings.ToLower(filepath.Ext(abs)) {
+	case ".bin", ".so", ".dll", ".exe":
+	default:
+		return "", fmt.Errorf("shellcode path must be a .bin, .so, .dll, or .exe payload")
+	}
+	real, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		return "", fmt.Errorf("resolve shellcode path: %w", err)
+	}
+	for _, root := range []string{a.Detection.Store.Root, live.EmpWorkSpace} {
+		if strings.TrimSpace(root) == "" {
+			continue
+		}
+		realRoot, err := filepath.EvalSymlinks(root)
+		if err != nil {
+			continue
+		}
+		rel, err := filepath.Rel(realRoot, real)
+		if err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+			return real, nil
+		}
+	}
+	return "", fmt.Errorf("shellcode path must be under the detection store or operator workspace")
+}
+
 func (a *Actions) detectionLoop(ctx context.Context, raw json.RawMessage) (any, error) {
 	var args detectionArgs
 	if err := json.Unmarshal(raw, &args); err != nil {
@@ -886,6 +982,11 @@ func (a *Actions) detectionLoop(ctx context.Context, raw json.RawMessage) (any, 
 	if len(shellcode) > maxDetectionArtifactPath {
 		return nil, fmt.Errorf("shellcode path is too long")
 	}
+	resolvedShellcode, err := a.resolveMCPShellcodePath(shellcode)
+	if err != nil {
+		return nil, err
+	}
+	shellcode = resolvedShellcode
 	module := strings.ToLower(strings.TrimSpace(args.Module))
 	if module == "" {
 		module = "loader_windows"
@@ -893,7 +994,7 @@ func (a *Actions) detectionLoop(ctx context.Context, raw json.RawMessage) (any, 
 	if !detection.Covered(module) {
 		return nil, fmt.Errorf("module %q has no detection loop; use loader_windows or stager_linux", module)
 	}
-	moduleDir, err := resolveMCPModuleDir(module, moduleDir)
+	moduleDir, err = resolveMCPModuleDir(module, moduleDir)
 	if err != nil {
 		return nil, err
 	}
@@ -1194,6 +1295,7 @@ func (a *Actions) buildDetectionAgent(opts detection.AgentBuildOptions) (*detect
 		if dynload == "" {
 			dynload = "auto"
 		}
+		dynload = builder.CAgentDynloadForLibc(libc, dynload, false)
 		providers := builder.CAgentProviders{
 			Format: "so", Arch: opts.Arch, Libc: libc,
 			Glibc: glibc, Dynload: dynload,

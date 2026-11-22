@@ -62,7 +62,7 @@ unreachable, the block says `sandbox-unavailable` and carries the plan;
 | `detection_run`              | Upload the artifact and run selected stages: `static`, `dynamic`, `edr`. Default `static`.                  |
 | `detection_feedback`         | Return score, findings, source locations, pending stages, prior-run comparison, and optional analyst edits. |
 | `detection_runs`             | List recorded runs, newest first, with telemetry trace and event counts.                                    |
-| `detection_telemetry_import` | Import RedEdr or DefenderObserver telemetry from a local file or the configured sandbox origin.             |
+| `detection_telemetry_import` | Import RedEdr or DefenderObserver telemetry from a file under the detection store or a configured sandbox origin.             |
 | `detection_query`            | Run one read-only SELECT over the telemetry database (500 rows maximum).                                    |
 | `detection_loop`             | Run the autonomous Norma loop with planner, editor, and debugger workers: build, detonate, edit source, rebuild, compare. Needs approval. |
 | `detection_payloads`         | List payloads with their per-payload SQLite view, parent, score, and verdict count.                         |
@@ -445,9 +445,10 @@ trace is tagged `platform=linux` and attributed to the guest process that
 executed the payload.
 
 `detection_telemetry_import` accepts `path` or `url` plus optional `module`,
-`artifact`, `run_id`, and `source`. A `url` must use the configured LitterBox
-origin, and redirects may not leave it; save remote telemetry locally and pass
-`path` instead. `detection_run` imports every saved sandbox result
+`artifact`, `run_id`, and `source`. A `path` must be a regular file under the
+detection store; symlinks and operator files elsewhere are rejected. A `url`
+must use one of the configured lab origins, and redirects may not leave it;
+save remote telemetry under the detection store and pass `path` instead. `detection_run` imports every saved sandbox result
 automatically when a selected stage completes.
 
 Every JSON event from RedEdr is stored, including `findings.events`,

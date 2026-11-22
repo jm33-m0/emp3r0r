@@ -1110,16 +1110,23 @@ func strongerSeverity(current, candidate string) string {
 // FetchTelemetry downloads one telemetry URL from the configured sandbox
 // origin. Redirects may not leave that origin: telemetry import is reachable
 // from an injected model turn, so it must not become an SSRF pivot.
-func FetchTelemetry(ctx context.Context, rawURL, allowedOrigin string) ([]byte, error) {
-	origin, err := url.Parse(strings.TrimSpace(allowedOrigin))
-	if err != nil {
-		return nil, fmt.Errorf("parse telemetry origin: %w", err)
+func FetchTelemetry(ctx context.Context, rawURL string, allowedOrigins ...string) ([]byte, error) {
+	origins := make([]*url.URL, 0, len(allowedOrigins))
+	for _, raw := range allowedOrigins {
+		origin, err := url.Parse(strings.TrimSpace(raw))
+		if err != nil {
+			return nil, fmt.Errorf("parse telemetry origin: %w", err)
+		}
+		if (origin.Scheme != "http" && origin.Scheme != "https") || origin.Host == "" {
+			return nil, fmt.Errorf("telemetry origin is invalid")
+		}
+		if origin.User != nil {
+			return nil, fmt.Errorf("telemetry origin must not carry credentials")
+		}
+		origins = append(origins, origin)
 	}
-	if (origin.Scheme != "http" && origin.Scheme != "https") || origin.Host == "" {
-		return nil, fmt.Errorf("telemetry origin is invalid")
-	}
-	if origin.User != nil {
-		return nil, fmt.Errorf("telemetry origin must not carry credentials")
+	if len(origins) == 0 {
+		return nil, fmt.Errorf("telemetry origin is not configured")
 	}
 	parsed, err := url.Parse(strings.TrimSpace(rawURL))
 	if err != nil {
@@ -1134,8 +1141,15 @@ func FetchTelemetry(ctx context.Context, rawURL, allowedOrigin string) ([]byte, 
 	if parsed.User != nil {
 		return nil, fmt.Errorf("telemetry URL must not carry credentials")
 	}
-	if !sameOrigin(origin, parsed) {
-		return nil, fmt.Errorf("telemetry URL must use the configured sandbox origin %s", origin.Host)
+	var matched *url.URL
+	for _, origin := range origins {
+		if sameOrigin(origin, parsed) {
+			matched = origin
+			break
+		}
+	}
+	if matched == nil {
+		return nil, fmt.Errorf("telemetry URL must use a configured sandbox origin")
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, parsed.String(), nil)
 	if err != nil {
@@ -1147,7 +1161,7 @@ func FetchTelemetry(ctx context.Context, rawURL, allowedOrigin string) ([]byte, 
 			if len(via) >= 5 {
 				return fmt.Errorf("too many telemetry redirects")
 			}
-			if req.URL.User != nil || !sameOrigin(origin, req.URL) {
+			if req.URL.User != nil || !sameOrigin(matched, req.URL) {
 				return fmt.Errorf("telemetry redirect left the sandbox origin")
 			}
 			return nil

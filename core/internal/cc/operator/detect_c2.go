@@ -155,6 +155,7 @@ func generateDetectionCAgent(agentCfg builder.AgentConfig, opts detection.AgentB
 	if dynload == "" {
 		dynload = "auto"
 	}
+	dynload = builder.CAgentDynloadForLibc(libc, dynload, false)
 	providers := builder.CAgentProviders{
 		Format:  "so",
 		Arch:    opts.Arch,

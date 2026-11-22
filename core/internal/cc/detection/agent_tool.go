@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/Autumn-27/norma/permission"
@@ -144,7 +145,8 @@ func (e *evolver) generateAgentTool() tool.CoreTool {
 				if libc == "" {
 					libc = builder.CAgentLibcs[0]
 				}
-				if !containsString(builder.CAgentGlibcVersions, glibc) || !containsString(builder.CAgentDynloadModes, dynload) || !containsString(builder.CAgentLibcs, libc) {
+				dynload = builder.CAgentDynloadForLibc(libc, dynload, false)
+				if !slices.Contains(builder.CAgentGlibcVersions, glibc) || !slices.Contains(builder.CAgentDynloadModes, dynload) || !slices.Contains(builder.CAgentLibcs, libc) {
 					return tool.Errorf("invalid glibc_version, dynload, or libc"), nil
 				}
 			}
@@ -220,13 +222,4 @@ func (e *evolver) generateAgentTool() tool.CoreTool {
 			return tool.Text(string(data)), nil
 		},
 	})
-}
-
-func containsString(values []string, value string) bool {
-	for _, candidate := range values {
-		if candidate == value {
-			return true
-		}
-	}
-	return false
 }

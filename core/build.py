@@ -316,10 +316,10 @@ def get_version(core_dir: pathlib.Path) -> str:
     # the container build) pins it even when the source is read elsewhere. Dev
     # checkouts without the constant fall back to git.
     version = (
-        os.environ.get("EMP3R0R_VERSION", "").strip()
-        or read_release_version(core_dir)
-        or get_git_version()
-    )
+        validate_build_value(os.environ.get("EMP3R0R_VERSION", ""), "EMP3R0R_VERSION")
+        if os.environ.get("EMP3R0R_VERSION", "").strip()
+        else ""
+    ) or read_release_version(core_dir) or get_git_version()
     return f"{version}-{build_time}"
 
 
@@ -343,6 +343,14 @@ def persist_magic_string(value: str) -> None:
         log_warn(f"Could not persist MagicString to {MAGIC_STRING_FILE}: {e}")
 
 
+def validate_build_value(value: str, label: str) -> str:
+    """Reject values interpolated into go build shell/ldflags."""
+    value = value.strip()
+    if not value or not re.fullmatch(r"[A-Za-z0-9._:+/-]{1,256}", value):
+        log_error(f"{label} contains characters that are unsafe in a build command")
+    return value
+
+
 def resolve_magic_string() -> str:
     """Return the MagicString to embed, keeping it stable across builds.
 
@@ -354,12 +362,14 @@ def resolve_magic_string() -> str:
       3. a freshly generated value, persisted for the next build.
     """
     if env := os.environ.get("EMP3R0R_MAGIC_STRING", "").strip():
+        env = validate_build_value(env, "MagicString")
         log_info("Using MagicString from EMP3R0R_MAGIC_STRING")
         persist_magic_string(env)
         return env
 
     if MAGIC_STRING_FILE.is_file():
         if value := MAGIC_STRING_FILE.read_text(encoding="utf-8").strip():
+            value = validate_build_value(value, "MagicString")
             log_info(f"Reusing MagicString from {MAGIC_STRING_FILE}")
             return value
         log_warn(f"{MAGIC_STRING_FILE} is empty; generating a new MagicString")
@@ -367,7 +377,7 @@ def resolve_magic_string() -> str:
     value = hashlib.sha256(os.urandom(32)).hexdigest()
     persist_magic_string(value)
     log_success(f"Generated a new MagicString and stored it in {MAGIC_STRING_FILE}")
-    return value
+    return validate_build_value(value, "MagicString")
 
 
 def check_required_go() -> str:

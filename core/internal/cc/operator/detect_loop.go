@@ -166,7 +166,7 @@ func addDetectLoopFlags(cmd *cobra.Command) {
 	cmd.Flags().String("format", "exe", "Windows loader host format: exe, service, or dll; stager_linux always builds an executable")
 	cmd.Flags().String("inject", "", "Override the injection method; empty uses the module default")
 	cmd.Flags().String("smw", "on", "SilentMoonwalk: on or off")
-	cmd.Flags().StringSlice("producer", nil, "Shellcode producer as name or name=path (donut, crystal_pack, malasada, name=/path); a bare name uses the installed module")
+	cmd.Flags().StringSlice("producer", nil, "Shellcode producer as name or name=path (donut, crystal_pack, name=/path); a bare name uses the installed module")
 	cmd.Flags().StringSlice("read-root", nil, "Read-only source root the model may inspect (repeatable)")
 	cmd.Flags().String("knowledge", "", "Knowledge cache path; defaults to <detection store>/knowledge.db")
 	cmd.Flags().Int("turns", 60, "Default per-worker turn cap; overridden by the role flags")
@@ -992,6 +992,7 @@ func generateLinuxAgentShellcode(opts detectLoopOptions, logf func(string, ...an
 	if dynload == "" {
 		dynload = "auto"
 	}
+	dynload = builder.CAgentDynloadForLibc(libc, dynload, false)
 	providers := builder.CAgentProviders{
 		Format: "so", Arch: opts.Arch, Libc: libc,
 		Glibc: glibc, Dynload: dynload,

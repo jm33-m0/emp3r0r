@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -17,6 +18,8 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/lib/coffloader"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
+
+var moduleParameterName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`)
 
 // ReadConfigs reads config.json which may define one or more modules.
 //
@@ -156,6 +159,9 @@ func ReadConfigs(file string) (configs []*def.ModuleConfig, err error) {
 		for _, p := range raw.Parameters {
 			if p.Name == "" {
 				continue
+			}
+			if !moduleParameterName.MatchString(p.Name) {
+				return nil, fmt.Errorf("module %q: invalid parameter name %q", raw.Name, p.Name)
 			}
 			if seenParams[p.Name] {
 				logging.Warningf("Module '%s' config warning: duplicate parameter '%s' defined", raw.Name, p.Name)

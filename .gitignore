@@ -70,6 +70,7 @@ peda*
 *.x86_64
 *.hex
 *.bin
+!core/modules/malasada/src/internal/stage0/*.bin
 
 # Debug files
 *.dSYM/

@@ -201,7 +201,10 @@ func TestDetectionFeedbackReportsMissingAnalyst(t *testing.T) {
 func TestDetectionTelemetryImportAndQuery(t *testing.T) {
 	server, _ := fakeDetectionSandbox(t)
 	actions := detectionTestActions(t, server.URL)
-	path := filepath.Join(t.TempDir(), "rededr.json")
+	if err := os.MkdirAll(actions.Detection.Store.Root, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(actions.Detection.Store.Root, "rededr.json")
 	fixture := `[{"type":"meta","trace_id":9,"event_time":134382680038271379},
 	 {"type":"etw","event":"ProcessStartStart ","etw_provider_name":"Microsoft-Windows-Kernel-Process",
 	  "etw_pid":100,"processid":200,"imagename":"\\Device\\HarddiskVolume3\\Users\\x\\Temp\\a.exe",
