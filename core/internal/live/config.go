@@ -80,6 +80,15 @@ func SetRuntimeConfig(c *def.Config) {
 }
 
 func DownloadExtractConfig(url string, downloader func(string, string) error) (err error) {
+	// A local operator can share the server's workspace and its already-written
+	// config. Skip the WireGuard file fetch in that explicit local mode; a
+	// remote operator still downloads its own bundle.
+	if !IsServer && os.Getenv("EMP3R0R_WORKSPACE") != "" {
+		if util.IsFileExist(filepath.Join(EmpWorkSpace, "emp3r0r.json")) {
+			logging.Infof("Local C2 workspace; reusing %s", filepath.Join(EmpWorkSpace, "emp3r0r.json"))
+			return nil
+		}
+	}
 	// Use a client-only destination to avoid clobbering the server's copy when running locally
 	configTarPath := EmpConfigTar
 	if !IsServer {
