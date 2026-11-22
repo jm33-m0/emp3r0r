@@ -150,6 +150,20 @@ func TestPenguinBoxDynamicParsesTraceeAndFalco(t *testing.T) {
 	}
 }
 
+func TestPenguinBoxPayloadIdentityUsesGuestPID(t *testing.T) {
+	events := []telemetryEvent{
+		{PID: 999, Event: "sched_process_exec", Process: "unrelated", Image: "/unrelated", Category: "process", Operation: "create"},
+		{PID: 42, Event: "sched_process_exec", Process: "payload", Image: "/payload", Category: "process", Operation: "create"},
+	}
+	pid, image := penguinBoxPayloadIdentity(events, penguinBoxHostPIDMap([]any{
+		map[string]any{"eventName": "sched_process_exec", "processId": float64(999), "hostProcessId": float64(999)},
+		map[string]any{"eventName": "sched_process_exec", "processId": float64(42), "hostProcessId": float64(999)},
+	})[999])
+	if pid != 42 || image != "/payload" {
+		t.Fatalf("identity = %d %q, want 42 /payload", pid, image)
+	}
+}
+
 func TestTraceeSocketClassification(t *testing.T) {
 	unixEvent := normalizeTraceeEvent(map[string]any{
 		"eventName": "security_socket_connect",

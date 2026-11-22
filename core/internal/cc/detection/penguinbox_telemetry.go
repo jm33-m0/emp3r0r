@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -171,7 +172,11 @@ func parsePenguinBoxDynamic(data []byte) (parsedTelemetry, bool, error) {
 	if len(parsed.Events) == 0 {
 		return parsedTelemetry{}, true, errors.New("PenguinBox dynamic result has no Tracee or Falco events")
 	}
-	parsed.PayloadPID, parsed.PayloadImage = penguinBoxPayloadIdentity(parsed.Events, run.PayloadPID)
+	payloadPID := int64(0)
+	if guestPID, ok := hostPIDs[run.PayloadPID]; ok {
+		payloadPID = guestPID
+	}
+	parsed.PayloadPID, parsed.PayloadImage = penguinBoxPayloadIdentity(parsed.Events, payloadPID)
 	parsed.Events = penguinBoxTrimStartupEvents(parsed.Events, parsed.PayloadPID)
 	parsed.Attribution = "container"
 	if parsed.PayloadImage == "" {
@@ -202,12 +207,18 @@ func parsePenguinBoxDynamic(data []byte) (parsedTelemetry, bool, error) {
 // reports host PIDs while Tracee processId is namespace-local, so a role check
 // must translate before attribution.
 func penguinBoxHostPIDMap(rawEvents []any) map[int64]int64 {
-	out := map[int64]int64{}
+	objects := make([]map[string]any, 0, len(rawEvents))
 	for _, raw := range rawEvents {
-		object, ok := raw.(map[string]any)
-		if !ok {
-			continue
+		if object, ok := raw.(map[string]any); ok {
+			objects = append(objects, object)
 		}
+	}
+	return penguinBoxHostPIDMapObjects(objects)
+}
+
+func penguinBoxHostPIDMapObjects(objects []map[string]any) map[int64]int64 {
+	out := map[int64]int64{}
+	for _, object := range objects {
 		host := firstInt(object, "hostProcessId")
 		pid := firstInt(object, "processId")
 		if host != 0 && pid != 0 && host != pid {
@@ -244,7 +255,7 @@ func penguinBoxTrimStartupEvents(events []telemetryEvent, payloadPID int64) []te
 	out := events[:0]
 	for _, event := range events {
 		if event.PID == payloadPID && event.TS.Before(start) && event.Provider != "falco" &&
-			!(event.Operation == "create" && event.Event == "sched_process_exec") {
+			(event.Operation != "create" || event.Event != "sched_process_exec") {
 			continue
 		}
 		out = append(out, event)
@@ -253,12 +264,13 @@ func penguinBoxTrimStartupEvents(events []telemetryEvent, payloadPID int64) []te
 }
 
 // penguinBoxPayloadIdentity finds the payload process inside the guest. The
-// run's payload_pid comes from podman inspect and is a host PID, so it must not
-// be compared with guest Tracee process IDs. The container entrypoint is the
-// payload itself, so the first exec of the payload path is the identity.
-func penguinBoxPayloadIdentity(events []telemetryEvent, hostPID int64) (int64, string) {
+// run's payload_pid comes from podman inspect and is a host PID; callers map it
+// through Tracee's hostProcessId/processId pairs before calling this function.
+// The container entrypoint is the payload itself, so the first exec of the
+// payload path is the fallback identity.
+func penguinBoxPayloadIdentity(events []telemetryEvent, payloadPID int64) (int64, string) {
 	for _, event := range events {
-		if hostPID != 0 && event.PID == hostPID {
+		if payloadPID != 0 && event.PID == payloadPID {
 			return event.PID, event.Image
 		}
 	}
@@ -637,11 +649,16 @@ func traceeEndpoint(value string) (string, int64) {
 	if value == "" {
 		return "", 0
 	}
-	if strings.Contains(value, ":") {
-		host, port, _ := strings.Cut(value, ":")
-		host = strings.Trim(host, "[]")
+	if host, port, err := net.SplitHostPort(value); err == nil {
 		parsed, _ := strconv.ParseInt(strings.TrimSpace(port), 10, 64)
 		return host, parsed
+	}
+	if strings.Count(value, ":") > 1 {
+		return strings.Trim(value, "[]"), 0
+	}
+	if host, port, ok := strings.Cut(value, ":"); ok {
+		parsed, _ := strconv.ParseInt(strings.TrimSpace(port), 10, 64)
+		return strings.Trim(host, "[]"), parsed
 	}
 	return value, 0
 }

@@ -785,6 +785,13 @@ func (t *TelemetryDB) ImportSandbox(ctx context.Context, results SandboxResults,
 	if results.Empty() {
 		return TelemetryTrace{}, fmt.Errorf("sandbox results are empty")
 	}
+	total := len(results.Info) + len(results.Static) + len(results.Dynamic) + len(results.HolyGrail)
+	for _, block := range results.EDR {
+		total += len(block)
+	}
+	if total > maxTelemetryBytes {
+		return TelemetryTrace{}, fmt.Errorf("sandbox results exceed %d bytes", maxTelemetryBytes)
+	}
 	if strings.TrimSpace(opts.Source) == "" {
 		opts.Source = "sandbox"
 	}
@@ -794,13 +801,11 @@ func (t *TelemetryDB) ImportSandbox(ctx context.Context, results SandboxResults,
 	)
 	linuxSandbox := false
 	if len(results.Dynamic) > 0 {
-		if _, ok, _ := parsePenguinBoxDynamic(results.Dynamic); ok {
-			linuxSandbox = true
-		}
 		fromDynamic, err := parseTelemetry(results.Dynamic, opts.Source)
 		switch {
 		case err == nil:
 			parsed = fromDynamic
+			linuxSandbox = parsed.Platform == platformLinux
 		case !json.Valid(results.Dynamic):
 			// Valid JSON without RedEdr events is a normal analyzer-only
 			// result. Malformed JSON is not, and would otherwise drop the
@@ -2127,6 +2132,10 @@ func parseTelemetryMaps(maps []map[string]any, sourceHint string) (parsedTelemet
 		parsed.Platform = platformLinux
 		parsed.Meta["platform"] = platformLinux
 	}
+	var hostPIDs map[int64]int64
+	if parsed.Platform == platformLinux {
+		hostPIDs = penguinBoxHostPIDMapObjects(maps)
+	}
 	for _, object := range maps {
 		if eventType, _ := object["type"].(string); strings.EqualFold(strings.TrimSpace(eventType), "meta") {
 			for key, value := range object {
@@ -2141,12 +2150,23 @@ func parseTelemetryMaps(maps []map[string]any, sourceHint string) (parsedTelemet
 		case isFalcoEvent(object):
 			for _, event := range normalizeFalcoEvent(object) {
 				event.Source = source
+				if hostPIDs != nil {
+					event.PID = penguinBoxGuestPID(hostPIDs, event.PID)
+					event.ActorPID = event.PID
+					event.ParentPID = penguinBoxGuestPID(hostPIDs, event.ParentPID)
+				}
+				if len(parsed.Events) >= maxTelemetryEvents {
+					return parsedTelemetry{}, fmt.Errorf("telemetry exceeds %d events", maxTelemetryEvents)
+				}
 				parsed.Events = append(parsed.Events, event)
 			}
 			continue
 		case isTraceeEvent(object):
 			for _, event := range []telemetryEvent{normalizeTraceeEvent(object)} {
 				event.Source = source
+				if len(parsed.Events) >= maxTelemetryEvents {
+					return parsedTelemetry{}, fmt.Errorf("telemetry exceeds %d events", maxTelemetryEvents)
+				}
 				parsed.Events = append(parsed.Events, event)
 			}
 			continue
