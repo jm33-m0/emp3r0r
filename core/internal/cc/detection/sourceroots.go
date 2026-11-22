@@ -31,7 +31,7 @@ func ParseProducerDirs(entries []string) (map[string]string, error) {
 		dir = strings.TrimSpace(dir)
 		if !ok {
 			// A bare name selects the installed producer module.
-			installed, exists := allDefaultProducerDirs()[name]
+			installed, exists := DefaultProducerDirs()[name]
 			if !exists {
 				return nil, fmt.Errorf("producer %q is not installed; pass name=dir", name)
 			}
@@ -49,13 +49,6 @@ func ParseProducerDirs(entries []string) (map[string]string, error) {
 // DefaultProducerDirs returns the installed shellcode-producer modules. The
 // loop exposes them for editing and for BuildShellcode.
 func DefaultProducerDirs() map[string]string {
-	return producerDirsFor("donut", "crystal_pack")
-}
-
-// allDefaultProducerDirs resolves any installed Windows producer by bare name.
-// malasada is not a selectable producer: stager_linux always uses the shipped
-// module, so it cannot be replaced with a path.
-func allDefaultProducerDirs() map[string]string {
 	return producerDirsFor("donut", "crystal_pack")
 }
 

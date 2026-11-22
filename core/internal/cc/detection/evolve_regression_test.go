@@ -71,6 +71,24 @@ func TestMechanismCatalogIsGeneral(t *testing.T) {
 	}
 }
 
+func TestMechanismCatalogFiltersByPlatform(t *testing.T) {
+	linux := mechanismCatalogBriefFor(platformLinux)
+	for _, want := range []string{"stager", "agent", "producer", "build-flags", "static-hygiene"} {
+		if !strings.Contains(linux, want) {
+			t.Errorf("Linux mechanism catalog missing %s: %s", want, linux)
+		}
+	}
+	for _, unwanted := range []string{"self-load", "module-stomp", "remote-apc"} {
+		if strings.Contains(linux, unwanted) {
+			t.Errorf("Linux mechanism catalog contains Windows mechanism %s", unwanted)
+		}
+	}
+	windows := mechanismCatalogBriefFor(platformWindows)
+	if strings.Contains(windows, "stager") || !strings.Contains(windows, "self-load") {
+		t.Errorf("Windows mechanism catalog = %s", windows)
+	}
+}
+
 func TestKnowledgeQueryUsesLastFindings(t *testing.T) {
 	e := &evolver{last: &Cycle{Summary: `{"top_findings":["high  .rdata","medium analyzer/dynamic/hsb","medium  callstack private memory"],"mechanism":"section-map"}`}}
 	got := e.knowledgeQuery("")

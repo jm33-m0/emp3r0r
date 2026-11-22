@@ -216,9 +216,7 @@ func BuildAgent(cfg AgentBuildConfig, runtimeConfig *def.Config) (*BuildAgentRes
 
 // GenerateAgentWorkflowResult contains complete build and post-processing results
 type GenerateAgentWorkflowResult struct {
-	BuildResult   *BuildAgentResult
-	ShellcodeFile string
-	ShellcodeErr  error
+	BuildResult *BuildAgentResult
 }
 
 // GenerateAgentArtifact builds the agent PE/DLL/SO and stops there. Shellcode

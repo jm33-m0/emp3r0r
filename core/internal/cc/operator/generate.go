@@ -103,14 +103,7 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 			logging.Infof("  Routing uses each peer's advertised transport when this agent can dial it")
 		}
 
-		if res.ShellcodeErr != nil {
-			logging.Warningf("%v", res.ShellcodeErr)
-		} else if res.ShellcodeFile != "" {
-			logging.Successf("Generated shellcode: %s (%d bytes)", res.ShellcodeFile, util.FileSize(res.ShellcodeFile))
-			if payloadType == builder.PayloadTypeLinuxSO {
-				logging.Infof("Look into stager module to deliver this shellcode")
-			}
-		} else if payloadType == builder.PayloadTypeLinuxSO {
+		if payloadType == builder.PayloadTypeLinuxSO {
 			logging.Infof("Linux shellcode is not generated automatically; run the malasada module with %s as input", result.OutputFile)
 		} else if payloadType == builder.PayloadTypeWindowsExecutable || payloadType == builder.PayloadTypeWindowsDLL {
 			logging.Infof("Windows shellcode is not generated automatically; run the donut module with %s as input", result.OutputFile)

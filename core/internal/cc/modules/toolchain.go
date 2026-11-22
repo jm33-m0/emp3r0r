@@ -176,11 +176,23 @@ func moduleBuildEnvRiscv() ([]string, error) {
 	})
 }
 
+// sensitiveBuildEnv keeps provider credentials out of module build scripts.
+// Module builds need the host toolchain, not the operator's model, lab, or
+// package credentials.
+func sensitiveBuildEnv(key string) bool {
+	switch key {
+	case "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY",
+		"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "GITHUB_TOKEN", "GH_TOKEN":
+		return true
+	}
+	return strings.HasPrefix(key, "EMP3R0R_DETECTION_") || strings.HasPrefix(key, "PENGUINBOX_")
+}
+
 func moduleBuildEnvFrom(binDir, zig string, extra []string) ([]string, error) {
 	merged := make(map[string]string)
 	for _, kv := range os.Environ() {
 		key, value, ok := strings.Cut(kv, "=")
-		if ok {
+		if ok && !sensitiveBuildEnv(key) {
 			merged[key] = value
 		}
 	}

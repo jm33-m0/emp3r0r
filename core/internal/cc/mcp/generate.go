@@ -298,12 +298,7 @@ func (a *Actions) runGoBuild(spec *goBuildSpec) map[string]any {
 		result["config_size"] = res.BuildResult.ConfigSize
 		outputFile = res.BuildResult.OutputFile
 		size = res.BuildResult.ConfigSize
-		if res.ShellcodeFile != "" {
-			result["shellcode_file"] = res.ShellcodeFile
-		}
-		if res.ShellcodeErr != nil {
-			result["shellcode_error"] = res.ShellcodeErr.Error()
-		} else if spec.PayloadType == builder.PayloadTypeLinuxSO {
+		if spec.PayloadType == builder.PayloadTypeLinuxSO {
 			result["shellcode_note"] = "run the malasada producer module with output_file as input"
 		}
 	}

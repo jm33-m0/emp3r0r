@@ -13,6 +13,13 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		fmt.Fprintf(os.Stderr, "[-] %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	var (
 		callExport = flag.String("call-export", malasada.DefaultCallExport, "exported symbol called by the stage0 stub")
 		output     = flag.String("o", "", "output raw PIC file (default: <input>.bin)")
@@ -25,7 +32,7 @@ func main() {
 	flag.Parse()
 	if flag.NArg() != 1 {
 		flag.Usage()
-		os.Exit(2)
+		return fmt.Errorf("expected one input file")
 	}
 	input := flag.Arg(0)
 	if *output == "" {
@@ -33,39 +40,35 @@ func main() {
 	}
 	so, err := os.ReadFile(input)
 	if err != nil {
-		fail("read %s: %v", input, err)
+		return fmt.Errorf("read %s: %w", input, err)
 	}
 	fixed, err := materializeInitArray(so)
 	if err != nil {
-		fail("materialize init array: %v", err)
+		return fmt.Errorf("materialize init array: %w", err)
 	}
 	tmp, err := os.CreateTemp("", "")
 	if err != nil {
-		fail("create temp input: %v", err)
+		return fmt.Errorf("create temp input: %w", err)
 	}
 	tmpPath := tmp.Name()
-	defer os.Remove(tmpPath)
+	defer func() { _ = os.Remove(tmpPath) }()
 	if _, err := tmp.Write(fixed); err != nil {
-		tmp.Close()
-		fail("write temp input: %v", err)
+		_ = tmp.Close()
+		return fmt.Errorf("write temp input: %w", err)
 	}
 	if err := tmp.Close(); err != nil {
-		fail("close temp input: %v", err)
+		return fmt.Errorf("close temp input: %w", err)
 	}
 	blob, err := malasada.ConvertSharedObject(tmpPath, *callExport, *compress)
 	if err != nil {
-		fail("convert %s: %v", input, err)
+		return fmt.Errorf("convert %s: %w", input, err)
 	}
 	if err := os.MkdirAll(filepath.Dir(*output), 0o755); err != nil {
-		fail("create output directory: %v", err)
+		return fmt.Errorf("create output directory: %w", err)
 	}
 	if err := os.WriteFile(*output, blob, 0o600); err != nil {
-		fail("write %s: %v", *output, err)
+		return fmt.Errorf("write %s: %w", *output, err)
 	}
 	fmt.Printf("[+] generated payload: %s (%d bytes)\n", *output, len(blob))
-}
-
-func fail(format string, args ...any) {
-	fmt.Fprintf(os.Stderr, "[-] "+format+"\n", args...)
-	os.Exit(1)
+	return nil
 }

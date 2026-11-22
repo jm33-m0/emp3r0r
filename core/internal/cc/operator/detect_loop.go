@@ -331,7 +331,10 @@ func detectLoopResumeCmd() *cobra.Command {
 			} else if opts.AgentType == "" || opts.AgentType == "auto" {
 				opts.AgentType = "windows_executable"
 			}
-			applyDetectLoopLabs(&opts)
+			if err := applyDetectLoopLabs(&opts); err != nil {
+				logging.Errorf("detect_loop resume: load labs: %v", err)
+				return
+			}
 			if strings.TrimSpace(opts.ModuleDir) == "" {
 				logging.Errorf("detect_loop resume: the saved loop has no module directory")
 				return
@@ -580,11 +583,10 @@ type detectLoopOptions struct {
 // applyDetectLoopLabs fills the loop's lab and guest settings from the
 // operator file. Resume paths use it too, because saved manifests predate a lab
 // entry or carry an empty guest field.
-func applyDetectLoopLabs(opts *detectLoopOptions) {
+func applyDetectLoopLabs(opts *detectLoopOptions) error {
 	labs, err := detection.LoadLabs(filepath.Join(live.EmpWorkSpace, "detection"))
 	if err != nil {
-		logging.Warningf("detect_loop: load labs: %v", err)
-		return
+		return err
 	}
 	lab := labs.ForPlatform(opts.Platform)
 	if strings.TrimSpace(opts.Sandbox) == "" {
@@ -608,6 +610,7 @@ func applyDetectLoopLabs(opts *detectLoopOptions) {
 	if !opts.GuestSSHInsecure {
 		opts.GuestSSHInsecure = lab.GuestSSHInsecure
 	}
+	return nil
 }
 
 // detectLoopWindowTitle gives each loop its own tmux window name. The loop ID
@@ -720,7 +723,10 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 	opts.Platform = detection.PlatformForModule(opts.Module)
-	applyDetectLoopLabs(&opts)
+	if err := applyDetectLoopLabs(&opts); err != nil {
+		logging.Errorf("detect_loop: load labs: %v", err)
+		return
+	}
 	if opts.AgentType = strings.ToLower(strings.TrimSpace(opts.AgentType)); opts.AgentType == "" {
 		opts.AgentType = "auto"
 	}

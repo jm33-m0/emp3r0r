@@ -46,9 +46,9 @@ const linuxPayloadPrompt = `Linux payload contract:
   as the raw PIC that stager_linux embeds. The host rotates both before a cycle
   that would reuse a UUID or PIC.
 - malasada is a producer module with its own editable source under
-  core/modules/malasada. Its ELF patching, stage0 choice, and compression are
-  part of the payload design, so edit that source when a Falco or Tracee finding
-  comes from the stage0 or ELF layout.
+  core/modules/malasada. Its ELF patching and compression are part of the
+  payload design, so edit that source when a Falco or Tracee finding comes from
+  the ELF layout.
 - The host fills agent-pic and fixes format=executable: PenguinBox executes the
   ELF directly. Do not switch to raw, packed, or so; those need a loader this
   loop does not build.

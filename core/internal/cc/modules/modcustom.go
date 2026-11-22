@@ -446,11 +446,12 @@ func handleInMemoryModule(ctx *c2context.C2Context, config def.ModuleConfig, pay
 		}
 	}
 
-	hostedName, err = safeComponent(hostedName)
+	safeName, err := safeComponent(hostedName)
 	if err != nil {
 		logging.Errorf("Module %s: %v", config.Name, err)
 		return ""
 	}
+	hostedName = safeName
 
 	// Multi-file modules: host every companion file (all entries except the
 	// selected payload) and tell the agent where to cache them in memfs.
@@ -980,7 +981,9 @@ func syncModuleSources(src, dst string) error {
 // and update ModuleHelpers, ModuleDocs
 func InitModules() {
 	if !util.IsExist(paths.WWWRoot) {
-		os.MkdirAll(paths.WWWRoot, 0o700)
+		if err := os.MkdirAll(paths.WWWRoot, 0o700); err != nil {
+			logging.Warningf("create module hosting root: %v", err)
+		}
 	}
 
 	// build the module registries from the same scan, so every loaded config

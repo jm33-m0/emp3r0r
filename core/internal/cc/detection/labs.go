@@ -62,11 +62,18 @@ func LoadLabs(storeRoot string) (LabsConfig, error) {
 	if path == "" {
 		return labs, nil
 	}
-	data, err := os.ReadFile(path)
+	info, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return labs, nil
 		}
+		return LabsConfig{}, fmt.Errorf("stat labs file %s: %w", path, err)
+	}
+	if !info.Mode().IsRegular() || info.Size() > 64<<10 {
+		return LabsConfig{}, fmt.Errorf("labs file %s must be a regular file no larger than 64 KiB", path)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
 		return LabsConfig{}, fmt.Errorf("read labs file %s: %w", path, err)
 	}
 	var overlay LabsConfig
@@ -98,6 +105,10 @@ func LoadLabs(storeRoot string) (LabsConfig, error) {
 	}
 	merge(&labs.Windows, overlay.Windows)
 	merge(&labs.Linux, overlay.Linux)
+	if value := strings.TrimSpace(os.Getenv("EMP3R0R_DETECTION_SANDBOX")); value != "" {
+		labs.Windows.URL = value
+		labs.Linux.URL = value
+	}
 	return labs, nil
 }
 

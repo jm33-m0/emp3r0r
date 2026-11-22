@@ -20,7 +20,9 @@ func TestApplyDetectLoopLabsOnResume(t *testing.T) {
 		t.Fatal(err)
 	}
 	opts := detectLoopOptions{Platform: "linux"}
-	applyDetectLoopLabs(&opts)
+	if err := applyDetectLoopLabs(&opts); err != nil {
+		t.Fatal(err)
+	}
 	if opts.Sandbox != "http://127.0.0.1:1338" || opts.GuestSSH != "penguinbox@127.0.0.1:2223" || opts.GuestSSHKey != "/tmp/penguinbox-key" {
 		t.Fatalf("resume lab hydration = %+v", opts)
 	}
