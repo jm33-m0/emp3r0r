@@ -36,10 +36,10 @@ func TestBuildGoAgentStubInvokesShippedBuilder(t *testing.T) {
 	live.EmpWorkSpace = t.TempDir()
 	t.Cleanup(func() { live.EmpWorkSpace = oldWS })
 	source := t.TempDir()
-	script := `import pathlib, sys
+	script := `import os, pathlib, sys
 args = sys.argv[1:]
 out = args[args.index("--payload-output") + 1]
-pathlib.Path(out).write_text(" ".join(args))
+pathlib.Path(out).write_text(" ".join(args) + " MAGIC=" + os.environ.get("EMP3R0R_MAGIC_STRING", ""))
 `
 	if err := os.WriteFile(filepath.Join(source, GoAgentBuildScript), []byte(script), 0o700); err != nil {
 		t.Fatal(err)
@@ -58,7 +58,7 @@ pathlib.Path(out).write_text(" ".join(args))
 		t.Fatal(err)
 	}
 	got := string(data)
-	for _, want := range []string{"--payload-kind cgo", "--agent-tags with_mesh with_kcp", "--payload-magic-string"} {
+	for _, want := range []string{"--payload-kind cgo", "--agent-tags with_mesh with_kcp", "MAGIC="} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("builder args = %q, missing %q", got, want)
 		}

@@ -336,7 +336,7 @@ func (g *guestSSH) rememberHostKey(fingerprint string) error {
 	if err != nil {
 		return fmt.Errorf("open guest known hosts: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	if _, err := file.WriteString(line); err != nil {
 		return fmt.Errorf("record guest host key: %w", err)
 	}
@@ -371,7 +371,7 @@ func (g *guestSSH) exec(ctx context.Context, command string, timeout time.Durati
 		g.dropConn()
 		return GuestExecResult{}, fmt.Errorf("open guest session: %w", err)
 	}
-	defer session.Close()
+	defer func() { _ = session.Close() }()
 	stdout := &limitedWriter{limit: g.cfg.MaxOutput}
 	stderr := &limitedWriter{limit: g.cfg.MaxOutput / 4}
 	session.Stdout = stdout

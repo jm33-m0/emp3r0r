@@ -48,7 +48,7 @@ func GoAgentSourceDir() (string, error) {
 			}
 		}
 	}
-	return "", fmt.Errorf("Go agent source tree not found under %s or %s", candidates[0], candidates[1])
+	return "", fmt.Errorf("go agent source tree not found under %s or %s", candidates[0], candidates[1])
 }
 
 // BuildGoAgentStub compiles the agent from source with the shipped build.py and
@@ -70,7 +70,7 @@ func BuildGoAgentStub(cfg AgentBuildConfig, sourceDir, stubFile string) error {
 	if err != nil {
 		return fmt.Errorf("create Go agent build directory: %w", err)
 	}
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 	tmpFile := filepath.Join(tmpDir, "agent")
 	kind := goAgentPayloadKind(cfg.PayloadType)
 	if kind == "" {
@@ -82,7 +82,6 @@ func BuildGoAgentStub(cfg AgentBuildConfig, sourceDir, stubFile string) error {
 		"--payload-os", PayloadGOOS(cfg.PayloadType),
 		"--payload-arch", cfg.Arch,
 		"--payload-output", tmpFile,
-		"--payload-magic-string", def.MagicString,
 	}
 	if tags := strings.TrimSpace(strings.Join(cfg.BuildTags, " ")); tags != "" {
 		args = append(args, "--agent-tags", tags)
@@ -93,7 +92,9 @@ func BuildGoAgentStub(cfg AgentBuildConfig, sourceDir, stubFile string) error {
 	defer cancel()
 	cmd := exec.CommandContext(buildCtx, python, args...)
 	cmd.Dir = sourceDir
-	cmd.Env = goAgentBuildEnv()
+	env := goAgentBuildEnv()
+	env = setEnv(env, "EMP3R0R_MAGIC_STRING", def.MagicString)
+	cmd.Env = env
 	output, runErr := cmd.CombinedOutput()
 	if runErr != nil {
 		return fmt.Errorf("build Go agent: %w: %s", runErr, clipBuildOutput(output))
