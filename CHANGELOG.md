@@ -13,6 +13,38 @@
 * detection loop: run `stager_linux` with an embedded C agent PIC, PenguinBox Tracee/Falco telemetry, Linux findings, and platform-tagged traces
 * malasada: move the Linux shellcode converter into an editable producer module and ship the Go toolchain in the operator kit
 
+## [5.12.0](https://github.com/jm33-m0/emp3r0r/compare/v5.11.0...v5.12.0) (2026-11-22)
+
+
+### Features
+
+* **agent:** build Go payloads on demand from shipped source ([5de8ca7](https://github.com/jm33-m0/emp3r0r/commit/5de8ca775f720a26f175d1deb9d36b6d9ba9de2c))
+* **detection:** add Linux glibc and container host guidance ([f00d372](https://github.com/jm33-m0/emp3r0r/commit/f00d372f5b519746a4e79a5095399b4e534fe798))
+* **detection:** coexist platform labs and name loop windows ([6321b77](https://github.com/jm33-m0/emp3r0r/commit/6321b77481683a4b9ec4d33971035d5adeb55d2e))
+* **detection:** expose Go agent source to loop workers ([12613b9](https://github.com/jm33-m0/emp3r0r/commit/12613b96c75313249351398623f396e951e8fee1))
+* **detection:** run Linux payloads in PenguinBox ([65f89b0](https://github.com/jm33-m0/emp3r0r/commit/65f89b0f09cb4d4e09cfbdb9229856a0b280d8de))
+* **detection:** standardize lab telemetry and defaults ([e56a30b](https://github.com/jm33-m0/emp3r0r/commit/e56a30b70608ab33122db96ae178943ea32c8353))
+* **malasada:** ship editable Linux shellcode producer ([648952b](https://github.com/jm33-m0/emp3r0r/commit/648952bfd094ae30fef074e5b6c45dc62c44f94a))
+
+
+### Bug Fixes
+
+* **builder:** filter credentials from C agent build env ([d5c6673](https://github.com/jm33-m0/emp3r0r/commit/d5c6673ca8d1bacb9c2e65f8d13c18f78220cd0f))
+* **build:** keep magic string out of agent build argv ([fa941e5](https://github.com/jm33-m0/emp3r0r/commit/fa941e587cae356b8f40cc298da901ee561d5d3b))
+* **build:** package garble as a file ([8d96c70](https://github.com/jm33-m0/emp3r0r/commit/8d96c7000a37d1bc263022c84e0c85056174b37b))
+* **build:** validate payload magic string and skip persist ([572e01f](https://github.com/jm33-m0/emp3r0r/commit/572e01f5f2bc98f855c3f6dfca52262e538d4b77))
+* **detection:** bound imports and translate Falco PIDs ([599c7b0](https://github.com/jm33-m0/emp3r0r/commit/599c7b03d667edefeeb26efe69b003f4766d6bad))
+* **detection:** cap PenguinBox dynamic telemetry events ([9d1c944](https://github.com/jm33-m0/emp3r0r/commit/9d1c9444a04ccc30f92832a6e529fbfddffbc99e))
+* **detection:** fix Linux mechanisms and host routing ([f5c2081](https://github.com/jm33-m0/emp3r0r/commit/f5c20810ea0e4e8c9794ed7d8b7c0e7fef50f6aa))
+* **detection:** hydrate labs when resuming loops ([3f9c03c](https://github.com/jm33-m0/emp3r0r/commit/3f9c03cc430c1c6f09ace952aa0157f04e87891d))
+* **detection:** name active agent source root to workers ([91fb3b4](https://github.com/jm33-m0/emp3r0r/commit/91fb3b46463e57baf52d5ce53e1ea3fd99ae025d))
+* harden detection build and import paths ([d14b47d](https://github.com/jm33-m0/emp3r0r/commit/d14b47d5804c8ca493bcbf55e47570877b1a4430))
+* **mcp:** scope detection loop trust and inputs ([9912963](https://github.com/jm33-m0/emp3r0r/commit/99129636368e65270f8cb2c369272e34d01de04f))
+* **operator:** reuse explicit local workspace config ([74c3785](https://github.com/jm33-m0/emp3r0r/commit/74c3785440c6db01eb56a526696f57f2f6bb0016))
+* platform-neutral agent-source support in loop ([dec2fd4](https://github.com/jm33-m0/emp3r0r/commit/dec2fd4a53dfc7cb12774f3650c64437c1a08c99))
+* **stager_linux:** fix payload-host regex and malasada wrapping in e2e tests ([f616e45](https://github.com/jm33-m0/emp3r0r/commit/f616e45dea50dcdd96c21125135dbcec90174b90))
+* validate stager/malasada options and reject MCP .so symlinks ([15665fa](https://github.com/jm33-m0/emp3r0r/commit/15665fa3a1fabfe6e2485d630ec268b6d91e4fc8))
+
 ## [5.11.0](https://github.com/jm33-m0/emp3r0r/compare/v5.10.4...v5.11.0) (2026-11-20)
 
 
