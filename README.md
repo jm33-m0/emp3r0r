@@ -156,7 +156,7 @@ A final host-side check polls for the generated agent UUID and, on Windows, opti
 
 #### Modular agent builds
 
-Agent features are selected at build time with `with_*` tags, including the [agent transport](#listeners-and-transport). The installer builds a slim kit by default: Linux and Windows amd64 agents with plain HTTP polling and no optional subsystems. `--full` builds every target and every feature. `--agent-tags` selects an exact feature set, and `--list-agent-tags` prints the available tags.
+Agent features are selected at build time with `with_*` tags, including the [agent transport](#listeners-and-transport). The kit ships the Go toolchain, garble, and the editable `go_agent` source; `generate` builds an agent on demand with only the feature tags selected by its options. `--full`/`--targets` still control prebuilt release artifacts, and `--agent-tags` selects their exact feature set; `--list-agent-tags` prints the available tags.
 
 C2 server binaries keep the full feature set, so one server can handle every agent variant.
 

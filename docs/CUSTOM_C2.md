@@ -80,7 +80,7 @@ python3 core/build.py --build --agent-tags 'with_transport_tor'
 Or with the installer:
 
 ```bash
-./install.py --agent-tags 'with_transport_tor'
+./install.py --prebuilt-agents --agent-tags 'with_transport_tor'
 ```
 
 Only the agent needs this tag. The C2 binary does not.

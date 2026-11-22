@@ -499,6 +499,15 @@ func (e *evolver) sourceRoots() *sourceRoots {
 		roots = append(roots, sourceRoot{Name: name, Dir: dir, Writable: true})
 		used[name] = true
 	}
+	if e.platform() == platformWindows {
+		if dir := DefaultGoAgentSourceDir(e.cfg.ModuleDir); strings.TrimSpace(dir) != "" {
+			if info, err := os.Stat(dir); err == nil && info.IsDir() {
+				name := dependencyRootName("go_agent", used)
+				roots = append(roots, sourceRoot{Name: name, Dir: dir, Writable: true})
+				used[name] = true
+			}
+		}
+	}
 	for name, dir := range e.cfg.ProducerDirs {
 		roots = append(roots, sourceRoot{Name: name, Dir: dir, Writable: true})
 		used[name] = true

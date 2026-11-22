@@ -1050,14 +1050,17 @@ func loadModFromDirs() {
 			}
 		}
 	}
-	// c_agent is referenced from a module dir as ../../c_agent, so it is
-	// mirrored next to the workspace's modules/ directory, not inside it.
-	for _, mod_search_dir := range live.ModuleDirs {
-		src := filepath.Clean(filepath.Join(mod_search_dir, "..", "c_agent"))
-		dst := filepath.Join(live.EmpWorkSpace, "c_agent")
-		if util.IsExist(src) && src != dst && !util.IsExist(dst) {
-			_ = os.MkdirAll(filepath.Dir(dst), 0o700)
-			_ = util.Copy(src, dst)
+	// c_agent and go_agent are referenced from a module dir as ../../<name>,
+	// so they are mirrored next to the workspace's modules/ directory, not
+	// inside it. An existing workspace copy wins so loop edits survive restarts.
+	for _, shared := range []string{"c_agent", "go_agent"} {
+		for _, mod_search_dir := range live.ModuleDirs {
+			src := filepath.Clean(filepath.Join(mod_search_dir, "..", shared))
+			dst := filepath.Join(live.EmpWorkSpace, shared)
+			if util.IsExist(src) && src != dst && !util.IsExist(dst) {
+				_ = os.MkdirAll(filepath.Dir(dst), 0o700)
+				_ = util.Copy(src, dst)
+			}
 		}
 	}
 

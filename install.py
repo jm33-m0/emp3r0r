@@ -339,7 +339,7 @@ def do_operator_install(kit_dir: pathlib.Path, prefix_path: pathlib.Path) -> Non
         (data_dir / "emp3r0r-cc").chmod(0o755)
         (data_dir / "emp3r0r-cat").chmod(0o755)
 
-        for d in ["build", "modules", "c_agent", "tmux", "zig", "nasm"]:
+        for d in ["build", "modules", "c_agent", "tmux", "zig", "nasm", "go", "garble", "go_agent"]:
             src_d = kit_dir / "lib" / "emp3r0r" / d
             if src_d.is_dir():
                 shutil.copytree(
@@ -840,6 +840,11 @@ def parse_args() -> argparse.Namespace:
         help="Skip Docker build; reinstall from the last cached build",
     )
     parser.add_argument(
+        "--prebuilt-agents",
+        action="store_true",
+        help="Also prebuild release agent stubs; by default agents are built on demand",
+    )
+    parser.add_argument(
         "--operator-image",
         action="store_true",
         help="Also build/export the operator container image",
@@ -976,6 +981,8 @@ def main() -> None:
     build_arg = "--install"
     if args.debug:
         build_arg = "--debug"
+    if not args.prebuilt_agents:
+        build_arg += " --dynamic-agents"
 
     disable_garble = args.disable_garble
     if disable_garble:

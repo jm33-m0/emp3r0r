@@ -123,6 +123,14 @@ func DefaultAgentSourceDir(moduleDir string) string {
 	return filepath.Join(filepath.Dir(modules), "c_agent")
 }
 
+// DefaultGoAgentSourceDir returns the editable Go agent tree next to a module
+// directory. The workspace and installed kit both keep modules/ and go_agent/
+// as siblings.
+func DefaultGoAgentSourceDir(moduleDir string) string {
+	modules := filepath.Dir(filepath.Clean(moduleDir))
+	return filepath.Join(filepath.Dir(modules), "go_agent")
+}
+
 // sourceRoot is one directory the detection agent may read. Writable roots are
 // module directories the agent may edit; read-only roots are shared build
 // inputs such as modules/common.

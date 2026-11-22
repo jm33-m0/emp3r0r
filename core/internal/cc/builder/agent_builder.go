@@ -93,8 +93,9 @@ type AgentBuildConfig struct {
 	PayloadType  string
 	Arch         string
 	WorkSpace    string
-	AgentUUID    string // Provided by operator (generated locally)
-	AgentUUIDSig string // Provided by operator (signed by server)
+	AgentUUID    string   // Provided by operator (generated locally)
+	AgentUUIDSig string   // Provided by operator (signed by server)
+	BuildTags    []string // Optional Go build tags selected from the agent config
 }
 
 // GenerateFilePaths determines stub and output file paths. The output name is
@@ -184,8 +185,13 @@ func BuildAgent(cfg AgentBuildConfig, runtimeConfig *def.Config) (*BuildAgentRes
 	// 1. Generate file paths
 	stubFile, outFile := GenerateFilePaths(cfg, runtimeConfig)
 
-	// 2. Check stub exists
-	if !util.IsExist(stubFile) {
+	// 2. Build the stub from the shipped source. The prebuilt stub is only a
+	// fallback for an operator kit that predates the dynamic builder.
+	if sourceDir, err := GoAgentSourceDir(); err == nil {
+		if err := BuildGoAgentStub(cfg, sourceDir, stubFile); err != nil {
+			return nil, fmt.Errorf("build Go agent: %w", err)
+		}
+	} else if !util.IsExist(stubFile) {
 		return nil, fmt.Errorf("stub file not found: %s", stubFile)
 	}
 
@@ -256,6 +262,7 @@ func GenerateAgentArtifact(opts AgentConfig, payloadType, archChoice string, sig
 		WorkSpace:    live.EmpWorkSpace,
 		AgentUUID:    agentUUID,
 		AgentUUIDSig: sig,
+		BuildTags:    AgentBuildTags(live.RuntimeConfig),
 	}
 
 	result, err := BuildAgent(buildCfg, live.RuntimeConfig)

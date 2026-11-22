@@ -392,14 +392,18 @@ def check_required_go() -> str:
 
     goroot = pathlib.Path("/usr/local/go")
     official_go = goroot / "bin" / "go"
+    shipped_root = os.environ.get("EMP3R0R_GOROOT", "").strip()
+    shipped_go = pathlib.Path(shipped_root) / "bin" / "go" if shipped_root else None
     gopath = pathlib.Path(os.environ.get("GOPATH", pathlib.Path.home() / "go"))
 
-    # Only pin GOROOT when the canonical /usr/local/go is a real toolchain.
-    # Hosts where Go lives elsewhere (e.g. actions/setup-go under
-    # /opt/hostedtoolcache) would otherwise export a nonexistent GOROOT and
-    # every subsequent go invocation would fail; respect the toolchain's own
-    # GOROOT in that case.
-    if official_go.is_file() and os.access(official_go, os.X_OK):
+    # Prefer the GOROOT selected by the operator kit. Otherwise pin the
+    # canonical /usr/local/go only when it is a real toolchain: hosts where Go
+    # lives elsewhere (e.g. actions/setup-go under /opt/hostedtoolcache) would
+    # otherwise export a nonexistent GOROOT and every go invocation would fail.
+    if shipped_go is not None and shipped_go.is_file() and os.access(shipped_go, os.X_OK):
+        os.environ["GOROOT"] = shipped_root
+        actual_go = str(shipped_go)
+    elif official_go.is_file() and os.access(official_go, os.X_OK):
         os.environ["GOROOT"] = str(goroot)
         actual_go = str(official_go)
     else:
@@ -653,6 +657,28 @@ def install_go(target_dir: pathlib.Path | None = None) -> pathlib.Path | None:
         log_warn(f"Copied Go from {root} but {go_bin} is missing")
         return None
     return go_bin
+
+
+def install_garble(target_dir: pathlib.Path) -> pathlib.Path | None:
+    """Ship the garble binary used by on-demand Go agent builds."""
+    custom = os.environ.get("EMP3R0R_GARBLE", "").strip()
+    candidate = os.path.expanduser(custom) if custom else "garble"
+    garble = shutil.which(candidate)
+    if not garble:
+        log_warn("garble was not found; on-demand Go agents will build without obfuscation")
+        return None
+    dst = target_dir / "garble"
+    log_info(f"Copying garble from {garble} to {dst}...")
+    if IS_DRY_RUN:
+        log_warn("[DRY-RUN] would copy garble")
+        return None
+    try:
+        copy2_atomic(garble, dst)
+        dst.chmod(0o755)
+    except OSError as e:
+        log_warn(f"Could not copy garble from {garble}: {e}")
+        return None
+    return dst
 
 
 def check_build_toolchain() -> None:
@@ -1180,6 +1206,10 @@ def resolve_target_filter(args: "argparse.Namespace") -> frozenset[str]:
       4. EMP3R0R_TARGETS env var
       5. Empty set (build all)
     """
+    if getattr(args, "dynamic_agents", False):
+        log_info("Dynamic agents: skipping prebuilt agent stubs; go_agent is shipped for build.py")
+        return frozenset({"_dynamic/_dynamic"})
+
     if getattr(args, "lightweight", False) or os.environ.get(
         "EMP3R0R_LIGHTWEIGHT", "0"
     ).lower() in ("1", "true", "yes"):
@@ -1697,7 +1727,7 @@ def package_operator_bundle(prefix: str, core_dir: pathlib.Path) -> None:
         else:
             log_warn(f"emp3r0r-listener not found at {listener_src}; skipping")
 
-        for d in ["build", "modules", "c_agent", "tmux", "zig", "nasm", "go"]:
+        for d in ["build", "modules", "c_agent", "tmux", "zig", "nasm", "go", "garble", "go_agent"]:
             src_dir = lib_src / d
             if src_dir.is_dir():
                 shutil.copytree(
@@ -1843,6 +1873,13 @@ def do_install(prefix: str, temp_dir: pathlib.Path, core_dir: pathlib.Path) -> N
                 dirs_exist_ok=True,
                 copy_function=copy2_atomic,
             )
+        if (temp_dir / "go_agent").is_dir():
+            shutil.copytree(
+                temp_dir / "go_agent",
+                data_dir / "go_agent",
+                dirs_exist_ok=True,
+                copy_function=copy2_atomic,
+            )
 
         for stub in temp_dir.glob("stub*"):
             copy2_atomic(stub, build_dir / stub.name)
@@ -1887,6 +1924,7 @@ def do_install(prefix: str, temp_dir: pathlib.Path, core_dir: pathlib.Path) -> N
     # Go ships with emp3r0r so the editable malasada producer can rebuild on
     # the operator host.
     install_go(data_dir)
+    install_garble(data_dir)
 
     # The install tree is root-owned and read-only to operators; buildable
     # modules are copied into their workspace before they are used.
@@ -1985,6 +2023,39 @@ _C_AGENT_IGNORE = shutil.ignore_patterns(
 )
 
 
+_GO_AGENT_IGNORE = shutil.ignore_patterns(
+    ".cache", "__pycache__", "*.o", "*.a", "*.so", "*.exe", "*.dll"
+)
+
+
+def prepare_go_agent_source(core_dir: pathlib.Path, temp_dir: pathlib.Path) -> None:
+    """Copy the Go module and the single-payload builder into the kit.
+
+    The installed tree is read-only; the operator mirrors this directory into
+    the workspace so the detection loop can inspect and edit it, and generate
+    can run build.py against the edited tree.
+    """
+    dst = temp_dir / "go_agent"
+    if IS_DRY_RUN:
+        log_warn("[DRY-RUN] would prepare go_agent source")
+        return
+    dst.mkdir(parents=True, exist_ok=True)
+    for name in ["go.mod", "go.sum", "build.py"]:
+        src = core_dir / name
+        if src.is_file():
+            copy2_atomic(src, dst / name)
+    for name in ["cmd/agent", "internal", "lib", "pkg", "vendor"]:
+        src = core_dir / name
+        if src.is_dir():
+            shutil.copytree(
+                src,
+                dst / name,
+                dirs_exist_ok=True,
+                copy_function=copy2_atomic,
+                ignore=_GO_AGENT_IGNORE,
+            )
+
+
 def prepare_misc_files(core_dir: pathlib.Path, temp_dir: pathlib.Path) -> None:
     log_info("Preparing misc files")
     for name in ["tmux", "modules", "c_agent", "emp3r0r"]:
@@ -2004,6 +2075,7 @@ def prepare_misc_files(core_dir: pathlib.Path, temp_dir: pathlib.Path) -> None:
     build_py = core_dir / "build.py"
     if build_py.exists():
         copy2_atomic(build_py, temp_dir / "build.py")
+    prepare_go_agent_source(core_dir, temp_dir)
 
 
 def create_tar(core_dir: pathlib.Path, temp_dir: pathlib.Path) -> None:
@@ -2259,6 +2331,16 @@ def parse_args() -> argparse.Namespace:
     )
 
     # ── Single payload ───────────────────────────────────────────────────────
+    parser.add_argument(
+        "--dynamic-agents",
+        action="store_true",
+        default=False,
+        help=(
+            "Skip prebuilt agent stubs; the kit ships go_agent plus build.py and "
+            "generate builds each payload on demand with its selected feature tags."
+        ),
+    )
+
     pay_group = parser.add_argument_group(
         "single payload",
         "Options for --build-payload. Builds exactly one agent artefact.",

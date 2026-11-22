@@ -117,8 +117,10 @@ same artifact loads `libcrypto`/`libcurl` on older and current glibc hosts. Both
 wrapper edits are part of the payload under test. `--agent-type` is always
 `linux_so`; the host fixes `format=executable`, and raw, packed, shared-object,
 `inject`, `smw`, and the Windows-specific guest-defense paths do not apply. The operator
-kit ships the pinned Go toolchain under
-`lib/emp3r0r/go` so malasada rebuilds on the operator host. The sandbox executes
+kit ships the pinned Go toolchain under `lib/emp3r0r/go` and the editable Go
+agent source under `lib/emp3r0r/go_agent` with its `build.py`, so malasada
+rebuilds and Windows Go agents are generated on demand. The workspace mirrors
+`go_agent` next to `c_agent`, making the Go source a writable loop root. The sandbox executes
 the ELF in a PenguinBox guest, and the loop imports Tracee syscall/LSM events and
 Falco alerts. The tests run on the operator host and never touch a target.
 

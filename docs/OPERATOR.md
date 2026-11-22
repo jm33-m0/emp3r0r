@@ -26,18 +26,19 @@ git clone --depth=1 https://github.com/jm33-m0/emp3r0r.git && cd emp3r0r
 ./install.py
 ```
 
-`./install.py` builds everything in a throwaway container and prepares the
-operator kit. The default kit is small and fast: linux/amd64 and windows/amd64
-targets, with an agent that does plain HTTP polling over `crypto/tls` and no
-optional subsystems.
+`./install.py` builds the C2 and operator tools in a throwaway container and
+prepares the operator kit. The kit ships the Go toolchain, garble, and the
+editable `go_agent` source plus `build.py`; it does not prebuild the agent
+matrix. `generate` compiles the requested agent on demand and enables only the
+optional feature tags selected by its options.
 
 Opt into more when you need it:
 
-- `--full` builds every target with every agent feature (slowest).
-- `--targets OS/ARCH,...` adds specific targets, for example
-  `--targets linux/amd64,linux/arm64,windows/amd64`.
-- `--agent-tags 'with_quic with_utls'` compiles in exactly those optional agent
-  features. `--list-agent-tags` prints the reference; see
+- `--full` and `--targets` still control any prebuilt fallback artifacts for a
+  release kit; on-demand generation follows the payload request instead.
+- `--agent-tags 'with_quic with_utls'` selects optional tags for prebuilt
+  release artifacts. `generate` derives tags from its selected features;
+  `--list-agent-tags` prints the reference; see
   [Choosing the C2 transport and agent features](#choosing-the-c2-transport-and-agent-features).
 - `--garble PATH` uses your own garble binary, for example a patched build with
   a different fingerprint, instead of the builder's vanilla garble.
@@ -141,7 +142,7 @@ value; there is no runtime configuration.
 ```bash
 ./install.py --magic-string '<value from an existing deployment>'
 # or, when running the builder directly:
-python3 core/build.py --install --magic-string '<value>'
+python3 core/build.py --install --dynamic-agents --magic-string '<value>'
 ```
 
 `~/.emp3r0r/magic_string` is a secret: treat it like `wg_config.json`, keep it
@@ -351,11 +352,12 @@ kcp/mtls work everywhere. KCP is mesh-only; it is not a C2 channel.
 
 ### Choosing the C2 transport and agent features
 
-Optional agent subsystems are opt-in with `with_*` Go build tags. By default the
-installer builds a slim agent (plain HTTP polling with `crypto/tls`, no optional
-subsystems) for linux/amd64 and windows/amd64 only. Select exactly what an agent
-needs with `--agent-tags`, or use `--full` for the full build (every target,
-every feature). `install.py --list-agent-tags` prints the reference.
+Optional agent subsystems are opt-in with `with_*` Go build tags. `generate`
+maps the selected features to tags and builds the agent on demand; an agent with
+no optional features is slim (plain HTTP polling with `crypto/tls`). The
+installer can still build prebuilt release artifacts for `--full`/`--targets`,
+where `--agent-tags` selects their exact feature set. `install.py
+--list-agent-tags` prints the reference.
 
 | Scenario                              | Build tags                                                                                                   |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -379,11 +381,11 @@ process; see [Custom transports](./CUSTOM_C2.md).
 Examples:
 
 ```bash
-# Minimal agent with only the QUIC channel and uTLS fingerprinting
-install.py --agent-tags 'with_quic with_utls'
+# Prebuild release artifacts with only the QUIC channel and uTLS
+install.py --prebuilt-agents --agent-tags 'with_quic with_utls'
 
-# A full mesh node that also speaks QUIC
-install.py --agent-tags 'with_mesh with_kcp with_quic with_utls'
+# Prebuild a full mesh node that also speaks QUIC
+install.py --prebuilt-agents --agent-tags 'with_mesh with_kcp with_quic with_utls'
 ```
 
 Each C2 transport is selected per agent with `generate --c2-channel-mode`:
