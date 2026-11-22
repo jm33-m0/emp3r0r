@@ -69,7 +69,8 @@ points at core/modules/stager_linux. The C agent source defaults to the sibling
 core/c_agent and is a writable source root. The Linux sandbox API is the
 LitterBox-compatible PenguinBox endpoint; point --sandbox at the SSH tunnel, for
 example 127.0.0.1:1338, and set --cc to an address the guest can reach
-(10.0.2.2 reaches the operator host through QEMU user networking). Linux always
+(use host.containers.internal, or its guest-visible address, for a C2 on the
+operator host; 10.0.2.2 is the PenguinBox container, not the host). Linux always
 uses the shipped malasada module; --producer paths are Windows-only. It does
 not use the Windows guest-SSH debugger.
 
@@ -129,7 +130,7 @@ Set the model through the environment:
   EMP3R0R_DETECTION_MODEL=<model>
   EMP3R0R_DETECTION_BASE_URL=<url>
   OPENAI_API_KEY=<key>`,
-		Example: "detect_loop --module loader_windows --module-dir /path/to/core/modules/loader_windows --iterations 3\n  detect_loop --module stager_linux --module-dir /path/to/core/modules/stager_linux --sandbox 127.0.0.1:1338 --cc 10.0.2.2",
+		Example: "detect_loop --module loader_windows --module-dir /path/to/core/modules/loader_windows --iterations 3\n  detect_loop --module stager_linux --module-dir /path/to/core/modules/stager_linux --sandbox 127.0.0.1:1338 --cc host.containers.internal",
 		Args:    cobra.NoArgs,
 		Run:     runDetectLoopCommand,
 	}
@@ -319,6 +320,9 @@ func detectLoopResumeCmd() *cobra.Command {
 			if opts.Platform == "linux" {
 				if opts.AgentSourceDir == "" {
 					opts.AgentSourceDir = detection.DefaultAgentSourceDir(opts.ModuleDir)
+				}
+				if abs, absErr := filepath.Abs(opts.AgentSourceDir); absErr == nil {
+					opts.AgentSourceDir = abs
 				}
 				opts.AgentType = "linux_so"
 			} else if opts.AgentType == "" || opts.AgentType == "auto" {
@@ -919,7 +923,7 @@ func generateLinuxAgentShellcode(opts detectLoopOptions, logf func(string, ...an
 		return "", "", "", "", "", err
 	}
 	if result == nil || strings.TrimSpace(result.OutputFile) == "" {
-		return "", "", "", "", "", fmt.Errorf("C agent build produced no artifact")
+		return "", "", "", "", "", fmt.Errorf("c agent build produced no artifact")
 	}
 	pic, err := buildMalasadaShellcode(opts, result.OutputFile, result.AgentUUID, logf)
 	if err != nil {

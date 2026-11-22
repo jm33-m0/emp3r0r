@@ -74,6 +74,8 @@ evidence and direct one of two workers:
 
 ` + linuxPayloadPrompt + `
 
+` + knowledgePrompt + `
+
 Decision rules:
 - Choose one mechanism and one falsifiable prediction. The available mechanisms
   are stager, agent, producer, build-flags, static-hygiene, and other. Use agent
@@ -110,6 +112,8 @@ source, rebuilding, and re-testing.
 ` + linuxDataPolicyPrompt + `
 
 ` + linuxPayloadPrompt + `
+
+` + knowledgePrompt + `
 
 Work loop:
 1. Read the planner brief and inspect the relevant root. stager_linux owns the
@@ -162,9 +166,10 @@ Debug discipline:
 - Check whether the agent process exists, whether its exec is under the
   container entrypoint, and whether it attempted a connect to the configured C2.
   A missing Falco alert is not proof of a clean run; confirm Tracee coverage.
-- Check the C2 address from the guest's perspective. PenguinBox uses QEMU user
-  networking; the host gateway is 10.0.2.2. A loopback address is not reachable
-  from inside the guest.
+- Check the C2 address from the guest's perspective. PenguinBox runs in a
+  Podman container, so reach the operator host with host.containers.internal
+  (or its guest-visible address), not 10.0.2.2; that address is the PenguinBox
+  container's QEMU gateway. A loopback address is not reachable from the guest.
 - After any remediation, call AgentStatus. A live status is sufficient; do not
   require a BOF. RunModule is not available on Linux. Do not claim a fix you did
   not observe.

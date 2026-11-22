@@ -242,6 +242,9 @@ func mechanismCatalogBriefFor(platform string) string {
 		if platform == platformLinux && !linuxMechanism(name) {
 			continue
 		}
+		if platform == platformWindows && linuxOnlyMechanism(name) {
+			continue
+		}
 		spec := mechanismSpecs[name]
 		fmt.Fprintf(&b, "- %s (%s)\n", spec.Name, spec.Layer)
 	}
@@ -255,6 +258,14 @@ func (e *evolver) mechanismCatalogBrief() string {
 func linuxMechanism(name string) bool {
 	switch name {
 	case "stager", "agent", "producer", "build-flags", "static-hygiene", "other":
+		return true
+	}
+	return false
+}
+
+func linuxOnlyMechanism(name string) bool {
+	switch name {
+	case "stager", "agent", "build-flags":
 		return true
 	}
 	return false

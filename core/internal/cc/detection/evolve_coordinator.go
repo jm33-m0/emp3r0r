@@ -440,7 +440,7 @@ func (c *coordinator) finalDiagnosis(ctx context.Context, final map[string]any) 
 	if c.debuggerPolicy() != debuggerPolicyFinal || c.finalDebugDone {
 		return
 	}
-	if c.e.guest == nil || c.debuggerRemaining() <= 0 {
+	if c.e.platform() != platformWindows || c.e.guest == nil || c.debuggerRemaining() <= 0 {
 		return
 	}
 	if c.e.last == nil || c.e.last.Execution == executionVerified || c.e.last.Execution == executionStatic {
@@ -500,7 +500,7 @@ func (c *coordinator) debuggerAvailable() bool {
 }
 
 func (c *coordinator) debuggerAvailableFor(cycle *Cycle) bool {
-	if c.e.guest == nil || c.debuggerRemaining() <= 0 {
+	if c.e.platform() != platformWindows || c.e.guest == nil || c.debuggerRemaining() <= 0 {
 		return false
 	}
 	if c.debuggerPolicy() != debuggerPolicyCycle {
@@ -521,6 +521,9 @@ func (c *coordinator) debuggerUnavailableReason() string {
 }
 
 func (c *coordinator) debuggerUnavailableFor(cycle *Cycle) string {
+	if c.e.platform() != platformWindows {
+		return "guest SSH is the Windows debugger; Linux uses sandbox telemetry"
+	}
 	if c.e.guest == nil {
 		return "guest SSH is not configured"
 	}
@@ -732,6 +735,9 @@ type debugRequest struct {
 }
 
 func (c *coordinator) debug(ctx context.Context, req debugRequest) (*debugDiagnosis, error) {
+	if c.e.platform() != platformWindows {
+		return nil, fmt.Errorf("guest SSH is the Windows debugger; Linux uses sandbox telemetry")
+	}
 	if c.e.guest == nil {
 		return nil, fmt.Errorf("guest SSH is not configured")
 	}
@@ -747,7 +753,7 @@ func (c *coordinator) debug(ctx context.Context, req debugRequest) (*debugDiagno
 		c.debugged.Store(req.Cycle.ID, true)
 	}
 	c.debuggerSessions++
-	exclusion := "not verified"
+	var exclusion string
 	status, exclusionErr := c.e.guest.EnsureExclusion(ctx)
 	if exclusionErr != nil {
 		exclusion = "verification failed: " + clip(exclusionErr.Error(), 400)
