@@ -176,11 +176,14 @@ The loop then runs:
    manually can re-check in, but the cycle stays `offline` with
    `recovered_by=guest-debugger`: a manual run does not turn an
    unattributed trace into a finding baseline, and the source is not kept. A
-   verified cycle that raises high findings, static signatures, or total
-   findings is recorded and reported to the planner instead of becoming the
-   new baseline; the host keeps its source edits so the next cycle can build
-   on the parts that worked and change only the part that raised the
-   regressed count. If no payload has ever checked in and the debugger cannot repair
+   verified cycle that raises a real verdict, high findings, static
+   signatures, or total findings is recorded and reported to the planner
+   instead of becoming the new baseline; the host keeps its source edits so
+   the next cycle can build on the parts that worked and change only the part
+   that raised the regressed count. A verdict change is compared before the
+   weighted finding score: losing a verdict is progress even when the medium
+   count rises, and gaining one is a regression even when the weighted score
+   improves. If no payload has ever checked in and the debugger cannot repair
    it, the loop stops and reports the execution failure instead of spending
    more cycles on a payload that never ran;
 8. write the final JSON and all cycles to the loop tables.
@@ -341,7 +344,7 @@ The Windows loop also exposes the editable Go agent tree as `go_agent`, next to
 string, anti-debug, or memory behavior; `GenerateAgent` rebuilds from that
 source with the selected feature tags.
 
-If a cycle regresses, `RevertToPayload` replays the inverse of every recorded edit made after the chosen payload and restores the module and producer source, producer options, and build options. `DetectionCycle` records a mechanism label, one falsifiable prediction, the observed result, and the stage set with each cycle. It rejects a cycle when the design key (source, build options, producer options, producer, and agent type) is unchanged; fresh shellcode from TOFU rotation alone is not a change. A verified cycle with a missing analyzer is not comparable: it does not replace the finding baseline, and the report marks its coverage incomplete. Detection findings and static hygiene are counted separately: the regression gate treats a new detection or hygiene high as a hard regression, then weights medium findings and static hygiene so a material static win can outweigh a medium increase, and excludes build-random stringnalyzer and coverage/attribution context from top findings and comparison. The host refuses a third cycle on a mechanism whose last two cycles made no high-finding, static-finding, or verdict progress. `producer-swap` is a distinct mechanism: the host rejects it unless the active shellcode producer changed. The resume dossier carries the recent mechanism, prediction result, tested note, and edit reasons so a fresh agent session does not lose the direction it already tried. The cycle budget spans all attempts of one logical loop; it and the active shellcode are shown in the prompt and in every `DetectionCycle` result. `--iterations` and `--turns` default to 3 and 60; an explicit value is used as-is. `--stages` accepts `static`, `dynamic`, and `edr`; the loop requires at least one executing stage. `EditSource` has no separate per-cycle edit cap; a redesign may use as many edits as the turn budget allows.
+If a cycle regresses, `RevertToPayload` replays the inverse of every recorded edit made after the chosen payload and restores the module and producer source, producer options, and build options. `DetectionCycle` records a mechanism label, one falsifiable prediction, the observed result, and the stage set with each cycle. It rejects a cycle when the design key (source, build options, producer options, producer, and agent type) is unchanged; fresh shellcode from TOFU rotation alone is not a change. A verified cycle with a missing analyzer is not comparable: it does not replace the finding baseline, and the report marks its coverage incomplete. Detection findings and static hygiene are counted separately: the regression gate treats a new detection or hygiene high as a hard regression, then compares real verdicts, then weighs medium findings and static hygiene so a material static win can outweigh a medium increase, and excludes build-random stringnalyzer and coverage/attribution context from top findings and comparison. The host refuses a third cycle on a mechanism whose last two cycles made no high-finding, static-finding, or verdict progress. `producer-swap` is a distinct mechanism: the host rejects it unless the active shellcode producer changed. The resume dossier carries the recent mechanism, prediction result, tested note, and edit reasons so a fresh agent session does not lose the direction it already tried. The cycle budget spans all attempts of one logical loop; it and the active shellcode are shown in the prompt and in every `DetectionCycle` result. `--iterations` and `--turns` default to 3 and 60; an explicit value is used as-is. `--stages` accepts `static`, `dynamic`, and `edr`; the loop requires at least one executing stage. `EditSource` has no separate per-cycle edit cap; a redesign may use as many edits as the turn budget allows.
 
 ### Reference cache
 

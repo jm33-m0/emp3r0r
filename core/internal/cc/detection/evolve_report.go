@@ -82,8 +82,15 @@ func RenderLoopSummary(answer map[string]any, cycles []Cycle, edits []EditRecord
 			}
 			fmt.Fprintf(&b, ". Telemetry findings that vanished with a removed source were not observed, not evaded.\n")
 		}
-		if finalIndex != len(cycles)-1 {
-			fmt.Fprintf(&b, "\n> The last attempted cycle was rejected or restored; the final counts are the last executing payload.\n")
+		if note := reportLastCycleNote(cycles, finalIndex); note != "" {
+			fmt.Fprintf(&b, "\n> %s\n", note)
+		}
+		if baselineIndex := reportBaselineIndex(cycles, answer); baselineIndex >= 0 && baselineIndex != finalIndex {
+			baseline := cycles[baselineIndex]
+			baselineCounts := cycleFindingCounts(&baseline)
+			fmt.Fprintf(&b, "\n> The host's finding baseline is cycle %d (`%s`, verdicts=%d, high=%d, medium=%d, total=%d); the final counts above are the last verified payload, which did not replace it.\n",
+				baseline.Iteration, shortPayloadKey(baseline.PayloadKey), baseline.Verdicts,
+				baselineCounts.High, baselineCounts.Medium, baselineCounts.Total)
 		}
 	}
 	if usage, ok := tokenUsageFromAnswer(answer); ok {
@@ -149,13 +156,17 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 	}
 	fmt.Fprintf(&b, "## Outcome\n\n%s\n\n", summary)
 
-	before := answerStrings(answer, "verdicts_before")
-	after := answerStrings(answer, "verdicts_after")
+	finalIndex := reportFinalIndex(cycles, answer)
+	var before, after []string
+	if len(cycles) > 0 && finalIndex >= 0 {
+		before = cycleVerdictNames(cycles[0])
+		after = cycleVerdictNames(cycles[finalIndex])
+	}
 	verdictLabel := "Real Defender verdicts"
 	if reportPlatform(cycles) == platformLinux {
 		verdictLabel = "High-confidence Falco alerts"
 	}
-	if len(before) > 0 || len(after) > 0 {
+	if len(cycles) > 0 {
 		fmt.Fprintf(&b, "| %s | Value |\n| --- | --- |\n", verdictLabel)
 		fmt.Fprintf(&b, "| Before | %s |\n", verdictCell(before))
 		fmt.Fprintf(&b, "| After | %s |\n\n", verdictCell(after))
@@ -164,7 +175,6 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 		fmt.Fprintf(&b, "> The agent's final text was not the requested JSON object: %s\n\n", parseErr)
 	}
 
-	finalIndex := reportFinalIndex(cycles, answer)
 	renderFindingObjective(&b, cycles, finalIndex)
 	renderFindingChangeMap(&b, cycles, finalIndex, edits)
 
@@ -206,8 +216,15 @@ func RenderLoopReport(answer map[string]any, cycles []Cycle, edits []EditRecord)
 					clipUTF8(sanitizeLine(strings.Join(finalSummary.CoverageMissing, "; ")), 500))
 			}
 		}
-		if finalIndex != len(cycles)-1 {
-			fmt.Fprintf(&b, "- The last attempted cycle (%d) was rejected or restored; the counts above are the last executing payload.\n", cycles[len(cycles)-1].Iteration)
+		if baselineIndex := reportBaselineIndex(cycles, answer); baselineIndex >= 0 && baselineIndex != finalIndex {
+			baseline := cycles[baselineIndex]
+			baselineCounts := cycleFindingCounts(&baseline)
+			fmt.Fprintf(&b, "- Finding baseline: cycle %d `%s` (verdicts=%d, high=%d, medium=%d, total=%d); the final payload above did not replace it.\n",
+				baseline.Iteration, shortPayloadKey(baseline.PayloadKey), baseline.Verdicts,
+				baselineCounts.High, baselineCounts.Medium, baselineCounts.Total)
+		}
+		if note := reportLastCycleNote(cycles, finalIndex); note != "" {
+			fmt.Fprintf(&b, "- %s\n", note)
 		}
 		achieved = true
 	}
@@ -550,15 +567,19 @@ func renderHygieneBacklog(b *strings.Builder, cycles []Cycle, finalIndex int) {
 // renderFindingObjective puts the loop's actual objective before the change
 // log: high findings, static findings, total findings, and real verdicts.
 // reportFinalIndex picks the payload whose findings the report should show.
-// A rejected cycle can still have run in the sandbox, so execution=verified
-// alone is not enough: answer.last_executing_payload is the payload the host
-// restored and the one the final check verified.
+// A cycle can have run in the sandbox without checking in, so execution is
+// required. last_verified_payload is the newest artifact whose agent checked
+// in; last_executing_payload is the host's finding baseline, which a held or
+// regressed cycle does not replace.
 func reportFinalIndex(cycles []Cycle, answer map[string]any) int {
 	if len(cycles) == 0 {
 		return -1
 	}
-	key := strings.TrimSpace(answerString(answer, "last_executing_payload"))
-	if key != "" {
+	for _, name := range []string{"last_verified_payload", "last_executing_payload"} {
+		key := strings.TrimSpace(answerString(answer, name))
+		if key == "" {
+			continue
+		}
 		for i := len(cycles) - 1; i >= 0; i-- {
 			if cycles[i].PayloadKey == key && cycles[i].Execution == executionVerified {
 				return i
@@ -571,6 +592,61 @@ func reportFinalIndex(cycles []Cycle, answer map[string]any) int {
 		}
 	}
 	return len(cycles) - 1
+}
+
+// reportBaselineIndex returns the cycle the host kept as the finding baseline.
+// It can differ from reportFinalIndex when a verified payload did not replace
+// the baseline, so the report names both instead of calling the baseline the
+// final artifact.
+func reportBaselineIndex(cycles []Cycle, answer map[string]any) int {
+	key := strings.TrimSpace(answerString(answer, "last_executing_payload"))
+	if key == "" {
+		return -1
+	}
+	for i := len(cycles) - 1; i >= 0; i-- {
+		if cycles[i].PayloadKey == key && cycles[i].Execution == executionVerified {
+			return i
+		}
+	}
+	return -1
+}
+
+// cycleVerdictNames returns the sandbox's named verdicts for one cycle. The
+// report derives the before/after table from the cycles, not from the model's
+// final text, so a mistaken summary cannot relabel a verdict-free payload as
+// one that still carries a verdict.
+func cycleVerdictNames(cycle Cycle) []string {
+	var summary cycleSummary
+	if json.Unmarshal([]byte(cycle.Summary), &summary) == nil {
+		if names := sanitizeStrings(summary.Verdicts); len(names) > 0 {
+			return names
+		}
+	}
+	if cycle.Verdicts > 0 {
+		return []string{fmt.Sprintf("%d verdict(s) recorded without a stored name", cycle.Verdicts)}
+	}
+	return nil
+}
+
+// reportLastCycleNote explains why the report's final payload is not the last
+// attempted cycle. A cycle can fail to check in, or it can check in without
+// replacing the finding baseline (a regression the host held). The two cases
+// need different wording: only the first one failed to execute.
+func reportLastCycleNote(cycles []Cycle, finalIndex int) string {
+	if len(cycles) == 0 || finalIndex == len(cycles)-1 {
+		return ""
+	}
+	last := cycles[len(cycles)-1]
+	if last.Execution != executionVerified {
+		return fmt.Sprintf("The last attempted cycle (%d) did not check in (execution=%s); the final column is the last verified payload.",
+			last.Iteration, headerOrNone(last.Execution))
+	}
+	if finalIndex >= 0 && cycles[finalIndex].Execution == executionVerified {
+		return fmt.Sprintf("The last attempted cycle (%d) checked in but did not replace the finding baseline; the final column is the finding baseline payload.",
+			last.Iteration)
+	}
+	return fmt.Sprintf("The last attempted cycle (%d) did not count as a verified payload; the final column is the last verified payload.",
+		last.Iteration)
 }
 
 func renderFindingObjective(b *strings.Builder, cycles []Cycle, finalIndex int) {
@@ -621,8 +697,8 @@ func renderFindingObjective(b *strings.Builder, cycles []Cycle, finalIndex int) 
 		fmt.Fprintf(b, " The final payload has incomplete coverage: %s; its counts are not a clean result.",
 			clipUTF8(sanitizeLine(strings.Join(finalSummary.CoverageMissing, "; ")), 400))
 	}
-	if finalIndex != len(cycles)-1 {
-		fmt.Fprintf(b, " The last attempted cycle (%d) was rejected or restored; the final column is the last executing payload.", cycles[len(cycles)-1].Iteration)
+	if note := reportLastCycleNote(cycles, finalIndex); note != "" {
+		fmt.Fprintf(b, " %s", note)
 	}
 	b.WriteString("\n\n")
 }

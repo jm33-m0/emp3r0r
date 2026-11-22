@@ -586,13 +586,15 @@ func (c *coordinator) afterCycle(ctx context.Context, cycle *Cycle) error {
 			retained = lastGoodRef(baseline)
 			previous = cycleFindingCounts(baseline)
 			c.e.logClass(logging.ClassWarning,
-				"cycle %d regressed (high %d -> %d, medium %d -> %d, static %d -> %d, total %d -> %d); source edits retained; finding baseline remains %s",
-				cycle.Iteration, previous.High, current.High, previous.Medium, current.Medium,
+				"cycle %d regressed (verdicts %d -> %d, high %d -> %d, medium %d -> %d, static %d -> %d, total %d -> %d); source edits retained; finding baseline remains %s",
+				cycle.Iteration, previous.Verdicts, current.Verdicts,
+				previous.High, current.High, previous.Medium, current.Medium,
 				previous.Static, current.Static, previous.Total, current.Total, retained)
 		}
 		quotedLoopID := strings.ReplaceAll(sanitizeLine(c.e.cfg.LoopID), "'", "''")
-		c.plannerNote = fmt.Sprintf("Cycle %d regressed (high findings %d -> %d, medium findings %d -> %d, static findings %d -> %d, total %d -> %d); the host kept the cycle's source edits and left the finding baseline at %s. The edits are recorded in loop_edits, iteration %d, with their old/new text: keep the part that removed a finding and change only the part that raised the regressed count (SELECT file, reason, old, new FROM loop_edits WHERE loop_id = '%s' AND iteration = %d). Do not repeat the exact change.",
-			cycle.Iteration, previous.High, current.High, previous.Medium, current.Medium,
+		c.plannerNote = fmt.Sprintf("Cycle %d regressed (verdicts %d -> %d, high findings %d -> %d, medium findings %d -> %d, static findings %d -> %d, total findings %d -> %d); the host kept the cycle's source edits and left the finding baseline at %s. A verdict is the primary objective: do not trade a removed verdict for a higher medium count, and do not accept a new verdict even when the weighted score improves. The edits are recorded in loop_edits, iteration %d, with their old/new text: keep the part that removed a finding and change only the part that raised the regressed count (SELECT file, reason, old, new FROM loop_edits WHERE loop_id = '%s' AND iteration = %d). Do not repeat the exact change.",
+			cycle.Iteration, previous.Verdicts, current.Verdicts,
+			previous.High, current.High, previous.Medium, current.Medium,
 			previous.Static, current.Static, previous.Total, current.Total, retained,
 			cycle.Iteration, quotedLoopID, cycle.Iteration)
 		return nil

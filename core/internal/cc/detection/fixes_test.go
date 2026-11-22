@@ -1190,7 +1190,7 @@ func TestReportUsesLastExecutingPayloadAfterRejectedCycle(t *testing.T) {
 	for _, want := range []string{
 		"| Total findings | 44 | 42 | -2 |",
 		"Final payload: `good` (high=1, medium=13, static=0, total=42",
-		"The last attempted cycle (3) was rejected or restored",
+		"The last attempted cycle (3) checked in but did not replace the finding baseline",
 	} {
 		if !strings.Contains(report, want) {
 			t.Fatalf("report missing %q:\n%s", want, report)

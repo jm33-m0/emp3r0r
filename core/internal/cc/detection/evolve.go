@@ -920,6 +920,9 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 	if lastGood != nil {
 		answer["last_executing_payload"] = lastGood.PayloadKey
 	}
+	if lastVerified := lastVerifiedCycle(e.recentCycles(0)); lastVerified != nil {
+		answer["last_verified_payload"] = lastVerified.PayloadKey
+	}
 	answer["cycles"] = e.cycles
 	if cfg.FinalVerify != nil {
 		if e.expectedAgentUUID == "" {
@@ -2152,14 +2155,18 @@ func (e *evolver) coverageHint() string {
 		cycle.Iteration, clip(strings.Join(summary.CoverageMissing, "; "), 600))
 }
 
-// findingCounts is the metric the loop optimizes: high-severity findings,
-// static signature hits, and the total for a secondary comparison. Sandbox
-// risk scores are not part of this tuple.
+// findingCounts is the metric the loop optimizes: real verdicts, high-severity
+// findings, static signature hits, and the total for a secondary comparison.
+// Sandbox risk scores are not part of this tuple.
 type findingCounts struct {
 	High   int
 	Medium int
 	Static int
 	Total  int
+	// Verdicts are the sandbox's named detections (Defender threat verdicts on
+	// Windows, high-confidence Falco alerts on Linux). They are the loop's
+	// primary objective and are compared before the weighted finding score.
+	Verdicts int
 	// Detection and hygiene are disjoint; context findings (build-random
 	// stringnalyzer output, coverage/attribution notes) are excluded from the
 	// stable comparison.
@@ -2212,12 +2219,19 @@ func countFindings(findings []Finding) findingCounts {
 
 // findingRegression reports whether current is worse than previous. A new
 // detection or hygiene high is always a regression. With the high counts
-// unchanged, the weighted finding score decides, so a material static or
-// hygiene win can outweigh a medium increase; an exact score tie falls back to
-// the stable total. Build-random context never decides a regression.
+// unchanged, a verdict change decides: a real detection is the loop's primary
+// objective, so losing one is progress even when the medium count rises, and
+// gaining one is a regression even when the weighted score improves. Only when
+// the verdict count is unchanged does the weighted finding score decide, so a
+// material static or hygiene win can outweigh a medium increase; an exact score
+// tie falls back to the stable total. Build-random context never decides a
+// regression.
 func findingRegression(previous, current findingCounts) bool {
 	if current.HygieneHigh > previous.HygieneHigh || current.DetectionHigh > previous.DetectionHigh {
 		return true
+	}
+	if current.Verdicts != previous.Verdicts {
+		return current.Verdicts > previous.Verdicts
 	}
 	if score := findingScore(previous, current); score != 0 {
 		return score < 0
@@ -2248,6 +2262,18 @@ func finalPayloadVerified(output string, err error, payloadSeen bool) bool {
 		return true
 	}
 	return payloadSeen
+}
+
+// lastVerifiedCycle returns the newest cycle whose payload checked in. The
+// finding baseline can lag behind it: a cycle that holds the baseline is still
+// the artifact that ran last and the one the final check verifies.
+func lastVerifiedCycle(cycles []Cycle) *Cycle {
+	for i := len(cycles) - 1; i >= 0; i-- {
+		if cycles[i].Execution == executionVerified {
+			return &cycles[i]
+		}
+	}
+	return nil
 }
 
 // shortPayloadKey abbreviates a payload key for logs and reports.
@@ -2368,7 +2394,13 @@ func cycleFindingCounts(cycle *Cycle) findingCounts {
 	if json.Unmarshal([]byte(cycle.Summary), &summary) != nil {
 		return counts
 	}
-	return countsFromSummary(summary, cycle.Findings)
+	counts = countsFromSummary(summary, cycle.Findings)
+	if cycle.Verdicts > counts.Verdicts {
+		// The column is persisted separately from the summary, so an older
+		// summary without the verdict list must not hide a real detection.
+		counts.Verdicts = cycle.Verdicts
+	}
+	return counts
 }
 
 func summaryFindingCounts(summary cycleSummary, total int) findingCounts {
@@ -2379,6 +2411,7 @@ func countsFromSummary(summary cycleSummary, total int) findingCounts {
 	counts := findingCounts{
 		High: summary.HighFindings, Medium: summary.MediumFindings,
 		Static: summary.StaticFindings, Total: total,
+		Verdicts: len(summary.Verdicts),
 	}
 	if summary.DetectionClassified {
 		counts.DetectionHigh = summary.DetectionHigh

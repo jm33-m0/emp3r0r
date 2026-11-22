@@ -47,6 +47,9 @@ func (e *evolver) persistPartial() {
 	} else if e.priorLastGood != nil {
 		answer["last_executing_payload"] = e.priorLastGood.PayloadKey
 	}
+	if lastVerified := lastVerifiedCycle(e.recentCycles(0)); lastVerified != nil {
+		answer["last_verified_payload"] = lastVerified.PayloadKey
+	}
 	encoded, err := json.Marshal(answer)
 	if err != nil {
 		return

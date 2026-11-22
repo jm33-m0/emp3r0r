@@ -215,8 +215,9 @@ func sortMemoryFindings(findings []memoryFinding) {
 
 // findingScore weights a verified change by the metric it improves. A removal
 // is positive; an addition is negative. High findings dominate hygiene, which
-// dominates static signatures. The regression gate uses the same weights, so a
-// material static win can outweigh a medium increase.
+// dominates static signatures. The regression gate uses these weights only
+// when the verdict count is unchanged, so a material static win can outweigh a
+// medium increase without overriding a real detection.
 func findingScore(previous, current findingCounts) float64 {
 	high := previous.DetectionHigh - current.DetectionHigh
 	hygieneHigh := previous.HygieneHigh - current.HygieneHigh

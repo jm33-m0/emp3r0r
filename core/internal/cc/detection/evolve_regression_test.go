@@ -282,6 +282,73 @@ func TestFindingRegressionPrefersMediumReduction(t *testing.T) {
 	}
 }
 
+func TestVerdictChangeDecidesRegression(t *testing.T) {
+	// The real loop-20261122-124851 shape: cycle 20 carried one Defender
+	// verdict (also counted as a detection high) with fewer mediums; cycle 21
+	// removed the verdict and gained six detection mediums.
+	withVerdict := findingCounts{
+		High: 1, Medium: 9, Static: 0, Total: 12,
+		DetectionHigh: 1, DetectionMedium: 6, HygieneMedium: 3, StableTotal: 11,
+		Verdicts: 1,
+	}
+	withoutVerdict := findingCounts{
+		High: 0, Medium: 16, Static: 0, Total: 18,
+		DetectionHigh: 0, DetectionMedium: 12, HygieneMedium: 3, StableTotal: 16,
+	}
+	if findingRegression(withVerdict, withoutVerdict) {
+		t.Fatal("removing a verdict was treated as a regression because the medium count rose")
+	}
+	if !findingsImproved(withVerdict, withoutVerdict) {
+		t.Fatal("removing a verdict was not counted as progress")
+	}
+	if !findingRegression(withoutVerdict, withVerdict) {
+		t.Fatal("gaining a verdict was not a regression")
+	}
+	// A new detection high still wins over a removed verdict.
+	newHigh := withoutVerdict
+	newHigh.High = 2
+	newHigh.DetectionHigh = 2
+	if !findingRegression(withVerdict, newHigh) {
+		t.Fatal("a new detection high was accepted because the verdict count fell")
+	}
+}
+
+func TestVerdictFreeCycleReplacesFindingBaseline(t *testing.T) {
+	baseline := Cycle{
+		ID: 20, LoopID: "loop", Iteration: 20, PayloadKey: "sha256:verdict", Findings: 12, Verdicts: 1,
+		Execution: executionVerified,
+		Summary: `{"execution":"verified","high_findings":1,"medium_findings":9,"static_findings":0,` +
+			`"detection_classified":true,"detection_high":1,"detection_medium":6,"hygiene_medium":3,` +
+			`"stable_total":11,"verdicts":["Defender: HIT (Cache CacheLookup)"]}`,
+	}
+	current := Cycle{
+		ID: 21, LoopID: "loop", Iteration: 21, PayloadKey: "sha256:clean", Findings: 18, Verdicts: 0,
+		Execution: executionVerified,
+		Summary: `{"execution":"verified","high_findings":0,"medium_findings":16,"static_findings":0,` +
+			`"detection_classified":true,"detection_high":0,"detection_medium":12,"hygiene_medium":3,` +
+			`"stable_total":16,"coverage_missing":["dynamic/pe_sieve: failed"]}`,
+	}
+	e := &evolver{logf: func(logging.Class, string, ...any) {}}
+	e.cycles = []Cycle{baseline, current}
+	e.lastExecuting = &e.cycles[0]
+	e.lastComparable = &e.cycles[0]
+
+	gate := e.recordExecution(&e.cycles[1], cycleSummary{
+		Execution: executionVerified, HighFindings: 0, MediumFindings: 16, StaticFindings: 0,
+		DetectionHigh: 0, DetectionMedium: 12, HygieneMedium: 3, StableTotal: 16,
+		CoverageMissing: []string{"dynamic/pe_sieve: failed"},
+	})
+	if gate != gateUnchanged {
+		t.Fatalf("gate = %v, want gateUnchanged for a verdict-free coverage gap", gate)
+	}
+	if e.lastExecuting == nil || e.lastExecuting.ID != 21 {
+		t.Fatalf("verdict-free payload did not become the executing baseline: %+v", e.lastExecuting)
+	}
+	if e.lastComparable == nil || e.lastComparable.ID != 20 {
+		t.Fatalf("incomplete-coverage cycle replaced the comparable baseline: %+v", e.lastComparable)
+	}
+}
+
 func TestStaticWinCountsAsProgress(t *testing.T) {
 	previous := findingCounts{
 		DetectionHigh: 2, DetectionMedium: 13, HygieneMedium: 8, Static: 24, StableTotal: 44,
