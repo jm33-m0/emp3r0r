@@ -17,7 +17,7 @@ import (
 // builds a Go EXE or DLL for a producer; a Linux loop builds the C agent PIC
 // that stager_linux embeds.
 func (e *evolver) generateAgentTool() tool.CoreTool {
-	description := "Build a fresh real Go agent with generator flags, without wrapping it in shellcode. " +
+	description := "Build a fresh Go agent from the editable go_agent source with generator flags, without wrapping it in shellcode. " +
 		"Every dynamic cycle needs this fresh UUID: the C2 rejects a repeated UUID with a new key as a TOFU key rotation. " +
 		"The previous test agent is forgotten automatically. " +
 		"agent_type selects windows_executable or windows_dll; arch is amd64. " +
@@ -28,7 +28,7 @@ func (e *evolver) generateAgentTool() tool.CoreTool {
 	agentDescription := "windows_executable (EXE) or windows_dll (DLL). The DLL can be wrapped by crystal_pack."
 	archDescription := "Agent architecture; loader_windows is x64."
 	if e.platform() == platformLinux {
-		description = "Build a fresh C agent shared object from the editable core/c_agent tree. " +
+		description = "Build a fresh C agent shared object from the editable c_agent tree. " +
 			"Every dynamic cycle needs this fresh UUID: the C2 rejects a repeated UUID with a new key as a TOFU key rotation. " +
 			"The previous test agent is forgotten automatically. " +
 			"agent_type is linux_so and arch is amd64. Call BuildShellcode producer=malasada " +

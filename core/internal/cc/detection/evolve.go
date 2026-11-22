@@ -3126,14 +3126,14 @@ func (e *evolver) editSourceTool() tool.CoreTool {
 	return tool.Build(tool.Spec{
 		Name: "EditSource",
 		Description: "Replace one exact string in a module source file. The old string must occur once. " +
-			"module selects the payload module (default) or a producer module (donut, crystal_pack). " +
+			"module selects the payload module (default), a producer module (donut, crystal_pack), or an agent source root (c_agent, go_agent). " +
 			"crystal_pack links postex-loader/src and rebuilds it on the next BuildShellcode; donut rebuilds src/. " +
 			"The edit is atomic, stored in SQLite with before/after text, and takes effect on the next DetectionCycle.",
 		Prompt: "Apply one source edit.",
 		Schema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"module":     map[string]any{"type": "string", "description": "Writable source root: the payload module (default), donut, or crystal_pack."},
+				"module":     map[string]any{"type": "string", "description": "Writable source root: the payload module (default), donut, crystal_pack, c_agent, or go_agent."},
 				"file":       map[string]any{"type": "string", "description": "Path relative to the module root."},
 				"old_string": map[string]any{"type": "string", "description": "Exact text to replace; must occur once."},
 				"new_string": map[string]any{"type": "string", "description": "Replacement text."},

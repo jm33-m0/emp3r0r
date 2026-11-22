@@ -283,12 +283,13 @@ func (s *sourceRoots) describe() string {
 }
 
 // moduleListTool lists one root. With no module argument it lists the payload
-// module; producer modules and read-only dependencies are addressed by name.
+// module; producers, agent sources, and read-only dependencies are addressed
+// by name.
 func moduleListTool(trees *sourceRoots) tool.CoreTool {
 	return tool.Build(tool.Spec{
 		Name: "SourceList",
 		Description: "List source files in one root. Defaults to the payload module. " +
-			"Set module to a producer module (donut, crystal_pack) or a configured read-only dependency.",
+			"Set module to a producer (donut, crystal_pack), an agent source (c_agent, go_agent), or a configured read-only dependency.",
 		Prompt: "List module source files.",
 		Schema: map[string]any{
 			"type": "object",
@@ -324,7 +325,7 @@ func moduleReadTool(trees *sourceRoots, tracker *evolver) tool.CoreTool {
 	return tool.Build(tool.Spec{
 		Name: "SourceRead",
 		Description: "Read one source file from a root, optionally a line range. " +
-			"Use module to read a producer module or a configured dependency; edits are still limited to writable roots.",
+			"Use module to read a producer, an agent source (c_agent, go_agent), or a configured dependency; edits are still limited to writable roots.",
 		Prompt: "Read a module source file.",
 		Schema: map[string]any{
 			"type": "object",
@@ -394,7 +395,7 @@ func moduleSearchTool(trees *sourceRoots) tool.CoreTool {
 	return tool.Build(tool.Spec{
 		Name: "SourceSearch",
 		Description: "Search one source root with a regular expression. Defaults to the payload module; " +
-			"use module for a producer module or a configured dependency.",
+			"use module for a producer, an agent source (c_agent, go_agent), or a configured dependency.",
 		Prompt: "Search module source.",
 		Schema: map[string]any{
 			"type": "object",
