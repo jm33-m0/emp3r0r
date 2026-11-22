@@ -136,6 +136,13 @@ validate_option "payload-port" "$PAYLOAD_PORT" '^[0-9]+$'
 validate_option "payload-path" "$PAYLOAD_PATH" '^[A-Za-z0-9._~/%:@+&=-]*$'
 validate_option "payload-key" "$PAYLOAD_KEY" '^[A-Za-z0-9+/=_-]*$'
 validate_option "ech-config" "$ECH_CONFIG" '^[A-Za-z0-9+/=_-]*$'
+validate_option "supervise-sleep-min" "$SUPERVISE_SLEEP_MIN" '^[0-9]+$'
+validate_option "supervise-sleep-max" "$SUPERVISE_SLEEP_MAX" '^[0-9]+$'
+validate_option "transport" "$TRANSPORT" '^[A-Za-z0-9_-]+$'
+validate_option "unpacker" "$UNPACKER" '^[A-Za-z0-9_-]+$'
+validate_option "mask" "$MASK" '^[A-Za-z0-9_-]+$'
+validate_option "dynload-mode" "$DYNLOAD_MODE" '^(auto|public|libc_dl)$'
+validate_option "hash-style" "$HASH_STYLE" '^(auto|sysv|gnu)$'
 
 if [[ -n "$AGENT_PIC" ]]; then
   PAYLOAD="local"

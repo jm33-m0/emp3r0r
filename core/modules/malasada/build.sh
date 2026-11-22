@@ -77,4 +77,4 @@ echo "[+] Building malasada converter from $SRC_DIR"
 
 args=(--call-export "$CALL_EXPORT" -o "$OUTPUT")
 [[ "$COMPRESS_BOOL" == true ]] && args+=(--compress)
-"$BUILDDIR/malasada" "${args[@]}" "$INPUT"
+"$BUILDDIR/malasada" "${args[@]}" -- "$INPUT"

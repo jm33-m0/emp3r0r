@@ -1074,7 +1074,7 @@ func (a *Actions) detectionLoop(ctx context.Context, raw json.RawMessage) (any, 
 	initialAgentArtifact := ""
 	if platform == "linux" {
 		candidate := strings.TrimSuffix(shellcode, ".bin") + ".so"
-		if info, statErr := os.Stat(candidate); statErr == nil && info.Mode().IsRegular() {
+		if info, statErr := os.Lstat(candidate); statErr == nil && info.Mode()&os.ModeSymlink == 0 && info.Mode().IsRegular() {
 			initialAgentArtifact = candidate
 		}
 	}
