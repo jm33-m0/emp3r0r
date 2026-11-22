@@ -50,3 +50,4 @@ core/modules/Remote-OPs/** linguist-vendored
 core/modules/SA/** linguist-vendored
 core/modules/SQL-BOF/** linguist-vendored
 core/modules/C2-Tool-Collection/** linguist-vendored
+core/modules/malasada/** linguist-vendored
