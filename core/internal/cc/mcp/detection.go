@@ -46,7 +46,7 @@ func (a *Actions) detectionTools() map[string]Tool {
 					Parameters: ObjectSchema(map[string]any{
 						"module":    StringProp("Module name: loader_windows or stager_linux"),
 						"artifact":  StringProp("Artifact path from a recorded build. Omit to use the newest recorded artifact."),
-						"agent_src": StringProp("C agent source for stager_linux; must equal the installed sibling c_agent tree."),
+						"agent_src": StringProp("Agent source for stager_linux (c_agent) or loader_windows (go_agent); must equal the default sibling source tree."),
 					}, "module"),
 				},
 			},
@@ -62,7 +62,7 @@ func (a *Actions) detectionTools() map[string]Tool {
 					Parameters: ObjectSchema(map[string]any{
 						"module":    StringProp("Module name: loader_windows or stager_linux"),
 						"artifact":  StringProp("Artifact path from a recorded build. Omit to use the newest recorded artifact."),
-						"agent_src": StringProp("C agent source for stager_linux; must equal the installed sibling c_agent tree."),
+						"agent_src": StringProp("Agent source for stager_linux (c_agent) or loader_windows (go_agent); must equal the default sibling source tree."),
 						"stages": map[string]any{
 							"type":        "array",
 							"items":       map[string]any{"type": "string", "enum": []string{"static", "dynamic", "edr"}},
@@ -149,7 +149,7 @@ func (a *Actions) detectionTools() map[string]Tool {
 					Parameters: ObjectSchema(map[string]any{
 						"module":               StringProp("Payload module: loader_windows (default) or stager_linux."),
 						"module_dir":           StringProp("Module source directory; defaults to the installed module path."),
-						"agent_src":            StringProp("C agent source for stager_linux; must equal the installed sibling c_agent tree."),
+						"agent_src":            StringProp("Agent source for stager_linux (c_agent) or loader_windows (go_agent); must equal the default sibling source tree."),
 						"shellcode":            StringProp("Windows agent shellcode, or the C agent PIC for stager_linux."),
 						"agent_uuid":           StringProp("UUID of the generated agent wrapped in the payload. Required for execution=verified checks and final verification."),
 						"agent_type":           StringProp("Agent payload type used for rotation: windows_executable (default), windows_dll, or linux_so."),
@@ -323,24 +323,24 @@ func sameSourcePath(a, b string) bool {
 // owns the default; an explicit path must be that default.
 func resolveDetectionAgentSourceDir(args detectionArgs, moduleDir, platform string) (string, error) {
 	requested := strings.TrimSpace(args.AgentSrc)
-	if platform != "linux" {
-		if requested != "" {
-			return "", fmt.Errorf("agent_src is only supported for stager_linux")
-		}
-		return "", nil
-	}
 	dir := detection.DefaultAgentSourceDir(moduleDir)
+	if platform == "windows" {
+		dir = detection.DefaultGoAgentSourceDir(moduleDir)
+	}
 	if requested != "" {
 		if len(requested) > maxDetectionArtifactPath {
 			return "", fmt.Errorf("agent_src is too long")
 		}
 		requested = detection.ExpandHomePath(requested)
 		if !sameSourcePath(requested, dir) {
-			return "", fmt.Errorf("agent_src must be the default C agent source")
+			return "", fmt.Errorf("agent_src must be the default %s agent source", platform)
 		}
 	}
 	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
-		return "", fmt.Errorf("c agent source directory %q is not readable", dir)
+		if platform == "windows" && requested == "" {
+			return "", nil
+		}
+		return "", fmt.Errorf("%s agent source directory %q is not readable", platform, dir)
 	}
 	return dir, nil
 }
@@ -1324,10 +1324,10 @@ func (a *Actions) buildDetectionAgent(opts detection.AgentBuildOptions) (*detect
 		a.rememberLoopAgent(built.AgentUUID)
 		return built, nil
 	}
-	res, err := builder.GenerateAgentArtifact(agentCfg, opts.Type, opts.Arch, client.SignAgent)
+	res, err := builder.GenerateAgentArtifactFromSource(agentCfg, opts.Type, opts.Arch, opts.SourceDir, client.SignAgent)
 	if err != nil {
 		logging.Warningf("detection_loop: signed agent generation failed (%v); building without a C2 signature", err)
-		res, err = builder.GenerateAgentArtifact(agentCfg, opts.Type, opts.Arch, nil)
+		res, err = builder.GenerateAgentArtifactFromSource(agentCfg, opts.Type, opts.Arch, opts.SourceDir, nil)
 	}
 	if err != nil {
 		return nil, err

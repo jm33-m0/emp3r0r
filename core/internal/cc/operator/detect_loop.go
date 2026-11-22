@@ -66,7 +66,9 @@ existing connection.
 
 Select the Linux payload with --module stager_linux and a --module-dir that
 points at core/modules/stager_linux. The C agent source defaults to the sibling
-core/c_agent and is a writable source root. The Linux sandbox API is the
+core/c_agent and is a writable source root. For loader_windows, the Go agent
+source defaults to the sibling go_agent; both are selected with
+--agent-source-dir and exposed to the loop for edits. The Linux sandbox API is the
 LitterBox-compatible PenguinBox endpoint; point --sandbox at the SSH tunnel, for
 example 127.0.0.1:1338, and set --cc to an address the guest can reach
 (use host.containers.internal, or its guest-visible address, for a C2 on the
@@ -151,7 +153,7 @@ Set the model through the environment:
 func addDetectLoopFlags(cmd *cobra.Command) {
 	cmd.Flags().String("module", "", "Payload module: loader_windows or stager_linux (default: derived from --module-dir, else loader_windows)")
 	cmd.Flags().String("module-dir", "", "Module source directory (default: the installed module path)")
-	cmd.Flags().String("agent-source-dir", "", "Editable C agent source for stager_linux (default: <repo>/c_agent)")
+	cmd.Flags().String("agent-source-dir", "", "Editable agent source: c_agent for stager_linux, go_agent for loader_windows (default: the platform sibling)")
 	cmd.Flags().String("shellcode", "", "Windows x64 PIC shellcode or the Linux C agent PIC; generated when omitted")
 	cmd.Flags().String("agent-type", "auto", "Agent payload type: auto, windows_executable, windows_dll, or linux_so")
 	cmd.Flags().String("arch", "amd64", "Agent architecture")
@@ -768,15 +770,24 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 		logging.Errorf("detect_loop: module directory %q is not readable", opts.ModuleDir)
 		return
 	}
-	if opts.Platform == "linux" {
-		if opts.AgentSourceDir == "" {
+	if opts.AgentSourceDir == "" {
+		if opts.Platform == "linux" {
 			opts.AgentSourceDir = detection.DefaultAgentSourceDir(opts.ModuleDir)
+		} else {
+			opts.AgentSourceDir = detection.DefaultGoAgentSourceDir(opts.ModuleDir)
 		}
-		opts.AgentSourceDir = detection.ExpandHomePath(opts.AgentSourceDir)
-		if info, err := os.Stat(opts.AgentSourceDir); err != nil || !info.IsDir() {
+	}
+	opts.AgentSourceDir = detection.ExpandHomePath(opts.AgentSourceDir)
+	if info, err := os.Stat(opts.AgentSourceDir); err != nil || !info.IsDir() {
+		if opts.Platform == "windows" {
+			logging.Warningf("detect_loop: Go agent source %q is not readable; using the installed source or prebuilt stub", opts.AgentSourceDir)
+			opts.AgentSourceDir = ""
+		} else {
 			logging.Errorf("detect_loop: C agent source directory %q is not readable", opts.AgentSourceDir)
 			return
 		}
+	}
+	if opts.Platform == "linux" {
 		if len(opts.Producers) > 0 {
 			logging.Errorf("detect_loop: stager_linux always uses the shipped malasada producer; remove --producer")
 			return
@@ -788,10 +799,6 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 		}
 		opts.Producers = []string{"malasada=" + malasadaDir}
 	} else {
-		if opts.AgentSourceDir != "" {
-			logging.Errorf("detect_loop: --agent-source-dir is only used by stager_linux")
-			return
-		}
 		if len(opts.Producers) == 0 {
 			for name, dir := range detection.DefaultProducerDirs() {
 				opts.Producers = append(opts.Producers, name+"="+dir)
@@ -941,10 +948,10 @@ func generateAgentShellcode(opts detectLoopOptions, logf func(string, ...any)) (
 	// The builder mutates shared runtime and on-disk config; serialize with
 	// the manual generate commands and the model's GenerateAgent tool.
 	generationMu.Lock()
-	result, err := builder.GenerateAgentArtifact(agentCfg, agentType, opts.Arch, client.SignAgent)
+	result, err := builder.GenerateAgentArtifactFromSource(agentCfg, agentType, opts.Arch, opts.AgentSourceDir, client.SignAgent)
 	if err != nil {
 		logf("signed generation failed (%v); building without a C2 signature", err)
-		result, err = builder.GenerateAgentArtifact(agentCfg, agentType, opts.Arch, nil)
+		result, err = builder.GenerateAgentArtifactFromSource(agentCfg, agentType, opts.Arch, opts.AgentSourceDir, nil)
 	}
 	generationMu.Unlock()
 	if err != nil {

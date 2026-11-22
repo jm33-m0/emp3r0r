@@ -513,7 +513,7 @@ func (e *evolver) sourceRoots() *sourceRoots {
 		roots = append(roots, sourceRoot{Name: name, Dir: dir, Writable: true})
 		used[name] = true
 	}
-	if e.platform() == platformWindows {
+	if e.platform() == platformWindows && strings.TrimSpace(e.cfg.AgentSourceDir) == "" {
 		if dir := DefaultGoAgentSourceDir(e.cfg.ModuleDir); strings.TrimSpace(dir) != "" {
 			if info, err := os.Stat(dir); err == nil && info.IsDir() {
 				name := dependencyRootName("go_agent", used)
@@ -596,11 +596,13 @@ func (e *evolver) agentSourceBrief() string {
 	if e.roots == nil {
 		return ""
 	}
-	expected := ""
-	if e.platform() == platformLinux {
-		expected = strings.TrimSpace(e.cfg.AgentSourceDir)
-	} else {
-		expected = DefaultGoAgentSourceDir(e.cfg.ModuleDir)
+	expected := strings.TrimSpace(e.cfg.AgentSourceDir)
+	if expected == "" {
+		if e.platform() == platformLinux {
+			expected = DefaultAgentSourceDir(e.cfg.ModuleDir)
+		} else {
+			expected = DefaultGoAgentSourceDir(e.cfg.ModuleDir)
+		}
 	}
 	if expected != "" {
 		for _, name := range e.roots.names {

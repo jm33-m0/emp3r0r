@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/google/uuid"
@@ -96,6 +97,7 @@ type AgentBuildConfig struct {
 	AgentUUID    string   // Provided by operator (generated locally)
 	AgentUUIDSig string   // Provided by operator (signed by server)
 	BuildTags    []string // Optional Go build tags selected from the agent config
+	SourceDir    string   // Editable Go agent source; empty uses GoAgentSourceDir
 }
 
 // GenerateFilePaths determines stub and output file paths. The output name is
@@ -185,9 +187,19 @@ func BuildAgent(cfg AgentBuildConfig, runtimeConfig *def.Config) (*BuildAgentRes
 	// 1. Generate file paths
 	stubFile, outFile := GenerateFilePaths(cfg, runtimeConfig)
 
-	// 2. Build the stub from the shipped source. The prebuilt stub is only a
-	// fallback for an operator kit that predates the dynamic builder.
-	if sourceDir, err := GoAgentSourceDir(); err == nil {
+	// 2. Build the stub from the selected editable source. The prebuilt stub is
+	// only a fallback for an operator kit that predates the dynamic builder.
+	sourceDir := strings.TrimSpace(cfg.SourceDir)
+	if sourceDir == "" {
+		resolved, err := GoAgentSourceDir()
+		if err == nil {
+			sourceDir = resolved
+		}
+	}
+	if sourceDir != "" {
+		if !util.IsFileExist(filepath.Join(sourceDir, "go.mod")) || !util.IsFileExist(filepath.Join(sourceDir, GoAgentBuildScript)) {
+			return nil, fmt.Errorf("invalid Go agent source directory: %s", sourceDir)
+		}
 		if err := BuildGoAgentStub(cfg, sourceDir, stubFile); err != nil {
 			return nil, fmt.Errorf("build Go agent: %w", err)
 		}
@@ -223,6 +235,12 @@ type GenerateAgentWorkflowResult struct {
 // conversion belongs to the donut and malasada producer modules so callers can
 // choose the wrapper explicitly.
 func GenerateAgentArtifact(opts AgentConfig, payloadType, archChoice string, signAgentFn func(uuid string) (string, error)) (*BuildAgentResult, error) {
+	return GenerateAgentArtifactFromSource(opts, payloadType, archChoice, "", signAgentFn)
+}
+
+// GenerateAgentArtifactFromSource builds an agent from the selected editable Go
+// source tree. An empty sourceDir uses the workspace/installed default.
+func GenerateAgentArtifactFromSource(opts AgentConfig, payloadType, archChoice, sourceDir string, signAgentFn func(uuid string) (string, error)) (*BuildAgentResult, error) {
 	if !IsArchValid(payloadType, archChoice) {
 		return nil, fmt.Errorf("invalid arch choice '%s' for payload type '%s'", archChoice, payloadType)
 	}
@@ -261,6 +279,7 @@ func GenerateAgentArtifact(opts AgentConfig, payloadType, archChoice string, sig
 		AgentUUID:    agentUUID,
 		AgentUUIDSig: sig,
 		BuildTags:    AgentBuildTags(live.RuntimeConfig),
+		SourceDir:    strings.TrimSpace(sourceDir),
 	}
 
 	result, err := BuildAgent(buildCfg, live.RuntimeConfig)

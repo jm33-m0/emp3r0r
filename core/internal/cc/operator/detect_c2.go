@@ -198,10 +198,10 @@ func generateDetectionAgentWithCC(ccAddress string, opts detection.AgentBuildOpt
 	if opts.Platform == "linux" {
 		return generateDetectionCAgent(agentCfg, opts)
 	}
-	res, err := builder.GenerateAgentArtifact(agentCfg, opts.Type, opts.Arch, client.SignAgent)
+	res, err := builder.GenerateAgentArtifactFromSource(agentCfg, opts.Type, opts.Arch, opts.SourceDir, client.SignAgent)
 	if err != nil {
 		logging.Warningf("detect_loop: signed agent generation failed (%v); building without a C2 signature", err)
-		res, err = builder.GenerateAgentArtifact(agentCfg, opts.Type, opts.Arch, nil)
+		res, err = builder.GenerateAgentArtifactFromSource(agentCfg, opts.Type, opts.Arch, opts.SourceDir, nil)
 	}
 	if err != nil {
 		return nil, err
