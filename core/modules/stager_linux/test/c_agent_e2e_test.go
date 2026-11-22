@@ -28,6 +28,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/builder"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/config"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/jobs"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/server"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/internal/live"
@@ -788,6 +789,17 @@ func buildCAgentResult(t *testing.T, tmpDir, format string, stager bool) *builde
 	)
 	if err != nil {
 		t.Fatalf("GenerateCAgentWorkflow(%s): %v", format, err)
+	}
+	if format == "shellcode" {
+		payloadPath := strings.TrimSuffix(res.OutputFile, ".so") + ".bin"
+		producerDir := filepath.Join("..", "..", "malasada")
+		buildLog, wrapErr := modules.BuildLocalModuleAt(producerDir, "malasada", map[string]string{
+			"input": res.OutputFile, "output": payloadPath, "call-export": "main", "compress": "on",
+		})
+		if wrapErr != nil {
+			t.Fatalf("malasada producer failed: %v\n%s", wrapErr, buildLog)
+		}
+		res.OutputFile = payloadPath
 	}
 	return res
 }

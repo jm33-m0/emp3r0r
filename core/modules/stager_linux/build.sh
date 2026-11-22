@@ -131,7 +131,7 @@ validate_option() {
     exit 1
   fi
 }
-validate_option "payload-host" "$PAYLOAD_HOST" '^[A-Za-z0-9._:\[\]-]*$'
+validate_option "payload-host" "$PAYLOAD_HOST" '^[]A-Za-z0-9._:[-]*$'
 validate_option "payload-port" "$PAYLOAD_PORT" '^[0-9]+$'
 validate_option "payload-path" "$PAYLOAD_PATH" '^[A-Za-z0-9._~/%:@+&=-]*$'
 validate_option "payload-key" "$PAYLOAD_KEY" '^[A-Za-z0-9+/=_-]*$'
