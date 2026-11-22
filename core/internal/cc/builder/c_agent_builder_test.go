@@ -349,3 +349,20 @@ func hasElfSymbol(syms []elf.Symbol, name string) bool {
 	}
 	return false
 }
+
+func TestCAgentBuildEnvFiltersCredentials(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "sk-test-secret")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "aws-test-secret")
+	t.Setenv("EMP3R0R_DETECTION_GUEST_SSH_KEY", "/tmp/secret-key")
+	t.Setenv("ZIG_GLOBAL_CACHE_DIR", "/tmp/zig-cache")
+
+	env := cAgentBuildEnv()
+	for _, forbidden := range []string{"OPENAI_API_KEY", "AWS_SECRET_ACCESS_KEY", "EMP3R0R_DETECTION_GUEST_SSH_KEY"} {
+		if _, ok := lookupEnv(env, forbidden); ok {
+			t.Fatalf("cAgentBuildEnv leaked %s", forbidden)
+		}
+	}
+	if got, ok := lookupEnv(env, "ZIG_GLOBAL_CACHE_DIR"); !ok || got != "/tmp/zig-cache" {
+		t.Fatalf("ZIG_GLOBAL_CACHE_DIR = %q (ok=%v), want /tmp/zig-cache", got, ok)
+	}
+}

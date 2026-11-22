@@ -236,6 +236,18 @@ func cAgentBuildArgs(srcDir, configSrc string, p CAgentProviders) []string {
 	return args
 }
 
+// cAgentBuildEnv keeps provider and operator credentials out of make and zig
+// invoked on an editable C agent source tree.
+func cAgentBuildEnv() []string {
+	env := minimalBuildEnv()
+	for _, key := range []string{"ZIG_GLOBAL_CACHE_DIR", "ZIG_LOCAL_CACHE_DIR", "XDG_CACHE_HOME"} {
+		if value, ok := os.LookupEnv(key); ok {
+			env = setEnv(env, key, value)
+		}
+	}
+	return env
+}
+
 // GenerateCAgentWorkflow builds core/c_agent's reference agent. It reuses the
 // Go generator's config plumbing (MakeConfig + EncryptAgentConfig), so the
 // embedded config is encrypted under the same MagicString the C2 is using and
@@ -313,6 +325,7 @@ func GenerateCAgentWorkflowAt(sourceDir string, opts AgentConfig, providers CAge
 	// Build with the pinned zig toolchain the kit ships (the Makefile default).
 	build := exec.Command("make", cAgentBuildArgs(buildSrc, configSrcPath, providers)...)
 	build.Dir = buildSrc
+	build.Env = cAgentBuildEnv()
 	if out, buildErr := build.CombinedOutput(); buildErr != nil {
 		return nil, fmt.Errorf("build C agent: %w\n%s", buildErr, out)
 	}
