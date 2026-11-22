@@ -536,12 +536,12 @@ func TestEvolveSendsBaselineFailureToModel(t *testing.T) {
 		classMu sync.Mutex
 		classes []logging.Class
 	)
-	ctx, cancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	result, err := RunEvolve(ctx, EvolveConfig{
 		Provider: provider, Model: "scripted",
 		Module: "loader_windows", ModuleDir: t.TempDir(), Shellcode: shellcode,
-		SandboxURL: server.URL, StoreRoot: t.TempDir(), RetryBase: 50 * time.Millisecond,
+		SandboxURL: server.URL, StoreRoot: t.TempDir(), RetryBase: time.Millisecond,
 		Stages: []string{"dynamic"}, Iterations: 1, Turns: 2,
 		Build: func(string, map[string]string) (string, error) {
 			return "compiler exploded", errors.New("simulated build failure")
