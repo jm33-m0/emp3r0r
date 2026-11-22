@@ -156,7 +156,7 @@ func addDetectLoopFlags(cmd *cobra.Command) {
 	cmd.Flags().String("agent-type", "auto", "Agent payload type: auto, windows_executable, windows_dll, or linux_so")
 	cmd.Flags().String("arch", "amd64", "Agent architecture")
 	cmd.Flags().String("cc", "", "C2 address for the generated agent; defaults to the configured address and is used verbatim")
-	cmd.Flags().String("sandbox", "", "LitterBox URL; defaults to EMP3R0R_DETECTION_SANDBOX or 127.0.0.1:1337")
+	cmd.Flags().String("sandbox", "", "LitterBox-compatible lab URL; defaults to EMP3R0R_DETECTION_SANDBOX or the platform local port (Linux 1338, Windows 1337)")
 	cmd.Flags().Int("iterations", 3, "Maximum detection cycles across attempts, including each baseline")
 	cmd.Flags().StringSlice("stages", []string{"static", "dynamic"}, "Stages to run: static, dynamic, edr")
 	cmd.Flags().String("process", "", "Override the sacrificial process; empty uses the module default")
@@ -652,6 +652,9 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 		return
 	}
 	opts.Platform = detection.PlatformForModule(opts.Module)
+	if strings.TrimSpace(opts.Sandbox) == "" {
+		opts.Sandbox = detection.DefaultSandboxURLForPlatform(opts.Platform)
+	}
 	if opts.AgentType = strings.ToLower(strings.TrimSpace(opts.AgentType)); opts.AgentType == "" {
 		opts.AgentType = "auto"
 	}

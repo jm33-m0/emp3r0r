@@ -21,6 +21,7 @@ import (
 	"github.com/Autumn-27/norma/permission"
 	"github.com/Autumn-27/norma/tool"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
@@ -235,7 +236,16 @@ const (
 // platformForModule maps the payload module to the runtime platform whose
 // sandbox executes it.
 func platformForModule(module string) string {
-	switch strings.ToLower(strings.TrimSpace(module)) {
+	module = strings.ToLower(strings.TrimSpace(module))
+	if mod, ok := def.GetModule(module); ok && mod != nil {
+		switch strings.ToLower(strings.TrimSpace(mod.Platform)) {
+		case platformLinux:
+			return platformLinux
+		case platformWindows:
+			return platformWindows
+		}
+	}
+	switch module {
 	case "stager_linux":
 		return platformLinux
 	default:
@@ -669,7 +679,7 @@ func RunEvolve(ctx context.Context, cfg EvolveConfig) (*EvolveResult, error) {
 	if model == "" {
 		model = "configured"
 	}
-	loop, err := NewLoop(LoopConfig{SandboxURL: cfg.SandboxURL, StoreRoot: cfg.StoreRoot})
+	loop, err := NewLoop(LoopConfig{SandboxURL: cfg.SandboxURL, Platform: cfg.Platform, StoreRoot: cfg.StoreRoot})
 	if err != nil {
 		return nil, err
 	}

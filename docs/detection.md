@@ -8,6 +8,8 @@ telemetry. The plan and run tools cover `loader_windows` and `stager_linux`
 artifacts, and the autonomous loop builds both. The tests run on the operator
 host and never detonate on a target.
 
+The lab API and the sensor-neutral `emp3r0r.telemetry/v1` envelope are specified in [detection_lab.md](detection_lab.md).
+
 ## Prerequisites
 
 - A reachable LitterBox API. The default is `http://127.0.0.1:1337`. Set

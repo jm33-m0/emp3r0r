@@ -13,6 +13,7 @@
       "loader_windows --shellcode /path/to/agent.exe.bin --inject ct --process notepad.exe"
     ],
     "is_local": true,
+    "detection": true,
     "platform": "Windows",
     "path": "",
     "parameters": [

@@ -1951,6 +1951,12 @@ func parseTelemetry(data []byte, sourceHint string) (parsedTelemetry, error) {
 	// partial first event and drop the rest.
 	if trimmed[0] == '{' || trimmed[0] == '[' {
 		if json.Valid(trimmed) {
+			if parsed, ok, err := parseLabTelemetryV1(trimmed); ok {
+				if err != nil {
+					return parsedTelemetry{}, err
+				}
+				return parsed, nil
+			}
 			if parsed, ok, err := parsePenguinBoxDynamic(trimmed); ok {
 				if err != nil {
 					return parsedTelemetry{}, err

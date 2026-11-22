@@ -26,6 +26,8 @@ import (
 const (
 	// DefaultSandboxURL is the local LitterBox HTTP API.
 	DefaultSandboxURL = "http://127.0.0.1:1337"
+	// DefaultLinuxSandboxURL is the local PenguinBox SSH-tunnel endpoint.
+	DefaultLinuxSandboxURL = "http://127.0.0.1:1338"
 
 	maxSandboxResponse = 64 << 20
 	maxUploadBytes     = 100 << 20
@@ -122,6 +124,19 @@ func NewClient(baseURL string) (*Client, error) {
 		baseURL: parsed.String(),
 		http:    &http.Client{Timeout: 15 * time.Minute},
 	}, nil
+}
+
+// DefaultSandboxURLForPlatform selects the local lab endpoint. An explicit
+// EMP3R0R_DETECTION_SANDBOX always wins; the platform-specific defaults keep
+// the common local setups working without flags.
+func DefaultSandboxURLForPlatform(platform string) string {
+	if value := strings.TrimSpace(os.Getenv("EMP3R0R_DETECTION_SANDBOX")); value != "" {
+		return value
+	}
+	if strings.EqualFold(strings.TrimSpace(platform), "linux") {
+		return DefaultLinuxSandboxURL
+	}
+	return DefaultSandboxURL
 }
 
 // URL returns the normalized sandbox base URL.

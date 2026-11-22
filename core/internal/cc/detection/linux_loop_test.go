@@ -164,6 +164,28 @@ func TestPenguinBoxPayloadIdentityUsesGuestPID(t *testing.T) {
 	}
 }
 
+func TestLabTelemetryV1UsesOneEnvelope(t *testing.T) {
+	payload := []byte(`{
+  "schema":"emp3r0r.telemetry/v1","lab":"lab-box","platform":"linux",
+  "run":{"id":"run-1","artifact":"/payload","payload_pid":42,"payload_image":"/payload"},
+  "coverage":{"delivered":["sensor-a"],"expected":["sensor-a"]},
+  "events":[
+    {"timestamp":"2026-11-22T04:00:00Z","sensor":"sensor-a","event":"exec","category":"process","operation":"create","pid":42,"ppid":1,"process":"payload","path":"/payload"},
+    {"timestamp":"2026-11-22T04:00:01Z","sensor":"sensor-a","event":"connect","category":"network","operation":"connect","pid":42,"dst_addr":"10.0.0.1","dst_port":443}
+  ]
+}`)
+	parsed, err := parseTelemetry(payload, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsed.Platform != platformLinux || parsed.Source != "lab-box" || parsed.PayloadPID != 42 || len(parsed.Events) != 2 {
+		t.Fatalf("parsed = platform %q source %q pid %d events %d", parsed.Platform, parsed.Source, parsed.PayloadPID, len(parsed.Events))
+	}
+	if parsed.Events[0].Category != "process" || parsed.Events[1].DstAddr != "10.0.0.1" || parsed.Events[1].DstPort != 443 {
+		t.Fatalf("events = %+v", parsed.Events)
+	}
+}
+
 func TestTraceeSocketClassification(t *testing.T) {
 	unixEvent := normalizeTraceeEvent(map[string]any{
 		"eventName": "security_socket_connect",

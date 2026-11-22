@@ -11,6 +11,7 @@ import (
 // LoopConfig configures one detection loop instance.
 type LoopConfig struct {
 	SandboxURL string
+	Platform   string
 	StoreRoot  string
 	// AnalystFactory builds an analyst rooted at one module directory. It may
 	// return (nil, nil) when no model is configured.
@@ -27,6 +28,9 @@ type Loop struct {
 
 // NewLoop validates the sandbox URL and prepares the store.
 func NewLoop(cfg LoopConfig) (*Loop, error) {
+	if strings.TrimSpace(cfg.SandboxURL) == "" {
+		cfg.SandboxURL = DefaultSandboxURLForPlatform(cfg.Platform)
+	}
 	client, err := NewClient(cfg.SandboxURL)
 	if err != nil {
 		return nil, err

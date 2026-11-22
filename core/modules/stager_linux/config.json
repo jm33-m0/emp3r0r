@@ -12,6 +12,7 @@
     "stager_linux --format packed --agent-pic /path/to/agent.bin --unpacker lzss"
   ],
   "is_local": true,
+    "detection": true,
   "platform": "Linux",
   "path": "",
   "parameters": [

@@ -324,6 +324,7 @@ func runMCPMode(opts *Options) {
 
 	detectionLoop, err := detection.NewLoop(detection.LoopConfig{
 		SandboxURL: os.Getenv("EMP3R0R_DETECTION_SANDBOX"),
+		Platform:   os.Getenv("EMP3R0R_DETECTION_PLATFORM"),
 		StoreRoot:  filepath.Join(live.EmpWorkSpace, "detection"),
 		AnalystFactory: func(workingDir string, telemetry *detection.TelemetryDB) (*detection.Analyst, error) {
 			return detection.ConfiguredAnalyst(workingDir, telemetry, func(line string) { logging.Infof("%s", line) })

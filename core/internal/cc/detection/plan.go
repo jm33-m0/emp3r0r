@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/jm33-m0/emp3r0r/core/internal/def"
 )
 
 // PlanVersion is the persisted plan schema version.
@@ -19,7 +21,13 @@ const PlanVersion = 1
 // Covered reports whether a local module emits a payload this loop tests.
 // The plan is built for these modules automatically after a successful build.
 func Covered(module string) bool {
-	switch strings.ToLower(strings.TrimSpace(module)) {
+	module = strings.ToLower(strings.TrimSpace(module))
+	if mod, ok := def.GetModule(module); ok && mod != nil && mod.Detection {
+		return true
+	}
+	// Keep source-checkout tests and partially loaded registries working until
+	// the module manifest is available.
+	switch module {
 	case "loader_windows", "stager_linux":
 		return true
 	}

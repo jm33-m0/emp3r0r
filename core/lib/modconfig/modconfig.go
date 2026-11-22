@@ -76,6 +76,7 @@ func ReadConfigs(file string) (configs []*def.ModuleConfig, err error) {
 		Comment      string          `json:"comment"`
 		IsLocal      bool            `json:"is_local"`
 		Platform     string          `json:"platform"`
+		Detection    bool            `json:"detection"`
 		Path         string          `json:"path"`
 		AgentConfig  agentConfigJSON `json:"agent_config"`
 		Parameters   []optionJSON    `json:"parameters"`
@@ -111,15 +112,16 @@ func ReadConfigs(file string) (configs []*def.ModuleConfig, err error) {
 
 	for _, raw := range rawList {
 		config := def.ModuleConfig{
-			Name:     raw.Name,
-			Build:    raw.Build,
-			Author:   raw.Author,
-			Date:     raw.Date,
-			Comment:  raw.Comment,
-			IsLocal:  raw.IsLocal,
-			Platform: raw.Platform,
-			Path:     raw.Path,
-			Options:  def.ModOptions{},
+			Name:      raw.Name,
+			Build:     raw.Build,
+			Author:    raw.Author,
+			Date:      raw.Date,
+			Comment:   raw.Comment,
+			IsLocal:   raw.IsLocal,
+			Platform:  raw.Platform,
+			Detection: raw.Detection,
+			Path:      raw.Path,
+			Options:   def.ModOptions{},
 			AgentConfig: def.AgentModuleConfig{
 				Exec:  raw.AgentConfig.Exec,
 				Files: raw.AgentConfig.Files,

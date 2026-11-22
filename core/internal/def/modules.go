@@ -214,6 +214,9 @@ type ModuleConfig struct {
 	// Opsec is optional operational-footprint metadata used by the
 	// deterministic reviewer for suggestions. It never changes execution.
 	Opsec *OpsecProfile `cbor:"18,keyasint"`
+	// Detection marks a local payload module whose builds the detection lab
+	// may detonate. It replaces a hardcoded module-name allowlist.
+	Detection bool `cbor:"19,keyasint"`
 }
 
 // Module help info and options
