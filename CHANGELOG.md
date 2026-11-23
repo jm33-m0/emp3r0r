@@ -13,6 +13,16 @@
 * detection loop: run `stager_linux` with an embedded C agent PIC, PenguinBox Tracee/Falco telemetry, Linux findings, and platform-tagged traces
 * malasada: move the Linux shellcode converter into an editable producer module and ship the Go toolchain in the operator kit
 
+## [5.12.1](https://github.com/jm33-m0/emp3r0r/compare/v5.12.0...v5.12.1) (2026-11-22)
+
+
+### Bug Fixes
+
+* **detection:** address codeql int conversion alert ([c03fa56](https://github.com/jm33-m0/emp3r0r/commit/c03fa56dd5fd4ac0bdb85d6b1c3ce3057e6ee554))
+* improve readability of `detect_loop` reports ([d4150ff](https://github.com/jm33-m0/emp3r0r/commit/d4150ff25c71b6576cdf9cf59a68ced39b756977))
+* **socks:** race in socks pivot ([cf2008a](https://github.com/jm33-m0/emp3r0r/commit/cf2008a8f109aaca5c507dda0670c0e532cfe6fa))
+* treat verdicts as critical ([6fd2073](https://github.com/jm33-m0/emp3r0r/commit/6fd2073f41e8cbce74fbc91d4fe3add5070bd883))
+
 ## [5.12.0](https://github.com/jm33-m0/emp3r0r/compare/v5.11.0...v5.12.0) (2026-11-22)
 
 
