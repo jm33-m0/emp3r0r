@@ -3458,6 +3458,9 @@ func (e *evolver) recordSourceEdit(ctx context.Context, root sourceRoot, file, o
 		return editResult{}, fmt.Errorf("save edit: %w", err)
 	}
 	e.logClass(logging.ClassEdit, "%s/%s:%d (%s): %s", root.Name, file, updated.Line, reason, clip(newText, 160))
+	if e.editTouchesAgentSource(root) {
+		e.agentSourceDirty.Store(true)
+	}
 	message := "edit applied; call DetectionCycle to rebuild and detonate"
 	if created {
 		message = "file created; call DetectionCycle to rebuild and detonate"

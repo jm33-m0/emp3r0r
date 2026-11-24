@@ -107,7 +107,7 @@ func (e *evolver) ensureFreshAgent(ctx context.Context) error {
 	uuid := strings.TrimSpace(e.expectedAgentUUID)
 	_, shellUsed := e.testedShellcodes.Load(shellcode)
 	_, uuidUsed := e.testedAgentUUIDs.Load(uuid)
-	if shellcode != "" && !shellUsed && !uuidUsed {
+	if shellcode != "" && !shellUsed && !uuidUsed && !e.agentSourceDirty.Load() {
 		return nil
 	}
 	return e.rotateAgent(ctx)
@@ -173,6 +173,7 @@ func (e *evolver) rotateAgent(ctx context.Context) error {
 	result, err := e.cfg.BuildAgent(AgentBuildOptions{
 		Type: agentType, Arch: arch, Platform: e.platform(), SourceDir: e.cfg.AgentSourceDir,
 		Glibc: e.agentGlibc, Dynload: e.agentDynload, Libc: e.agentLibc,
+		BuildTags: e.cfg.AgentTags,
 	})
 	if err != nil {
 		return fmt.Errorf("rotate agent: %w", err)
@@ -217,6 +218,7 @@ func (e *evolver) rotateAgent(ctx context.Context) error {
 		e.cleanupAgentArtifact(artifactPath)
 		return fmt.Errorf("rotate agent shellcode: %w", err)
 	}
+	e.agentSourceDirty.Store(false)
 	e.expectedAgentUUID = newUUID
 	e.payloadSeenOnline.Store(false)
 	e.cfg.AgentType = agentType
