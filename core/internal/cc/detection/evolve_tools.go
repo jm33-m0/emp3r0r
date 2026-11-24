@@ -616,14 +616,21 @@ func (e *evolver) applyRevertEdits(ctx context.Context, edits []revertEdit, payl
 			return 0, fmt.Errorf("source root %s is read-only", root.Name)
 		}
 		created := item.old == ""
+		removed := item.old != "" && item.new == ""
 		var write sourceWrite
-		if created {
+		switch {
+		case created:
 			path, err := removeCreatedSourceFile(root, item.file, item.new)
 			if err != nil {
 				return 0, fmt.Errorf("revert %s/%s: %w", root.Name, item.file, err)
 			}
 			write.Path = path
-		} else {
+		case removed:
+			write, err = createSourceFile(root, item.file, item.old)
+			if err != nil {
+				return 0, fmt.Errorf("revert %s/%s: %w", root.Name, item.file, err)
+			}
+		default:
 			write, err = writeSourceFile(root, item.file, item.new, item.old)
 			if err != nil {
 				return 0, fmt.Errorf("revert %s/%s: %w", root.Name, item.file, err)
@@ -634,12 +641,19 @@ func (e *evolver) applyRevertEdits(ctx context.Context, edits []revertEdit, payl
 			Module: root.Name, File: item.file, Old: item.new, New: item.old,
 			Reason: "revert to payload " + label, Kind: EditKindRestore,
 		}); err != nil {
-			if created {
+			switch {
+			case created:
 				if restoreErr := os.WriteFile(write.Path, []byte(item.new), 0o644); restoreErr != nil {
 					return 0, fmt.Errorf("save revert: %w (recreate %s failed: %v)", err, item.file, restoreErr)
 				}
-			} else if restoreErr := restoreSourceFile(write.Path, write.Original); restoreErr != nil {
-				return 0, fmt.Errorf("save revert: %w (restore %s failed: %v)", err, item.file, restoreErr)
+			case removed:
+				if removeErr := os.Remove(write.Path); removeErr != nil {
+					return 0, fmt.Errorf("save revert: %w (remove %s failed: %v)", err, item.file, removeErr)
+				}
+			default:
+				if restoreErr := restoreSourceFile(write.Path, write.Original); restoreErr != nil {
+					return 0, fmt.Errorf("save revert: %w (restore %s failed: %v)", err, item.file, restoreErr)
+				}
 			}
 			return 0, fmt.Errorf("save revert: %w", err)
 		}

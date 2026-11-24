@@ -28,6 +28,7 @@ const (
 // list no detection result is ever cleared and the session grows until the
 // provider rejects it.
 var compactableDetectionTools = map[string]bool{
+	"SourceTree":      true,
 	"SourceList":      true,
 	"SourceRead":      true,
 	"SourceSearch":    true,

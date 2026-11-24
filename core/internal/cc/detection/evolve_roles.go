@@ -85,6 +85,7 @@ type WorkerRun struct {
 // gets a source or build tool.
 func (e *evolver) toolsFor(role evolveRole) []tool.CoreTool {
 	tools := []tool.CoreTool{
+		sourceTreeTool(e.roots),
 		moduleListTool(e.roots),
 		moduleReadTool(e.roots, e),
 		moduleSearchTool(e.roots),
@@ -109,7 +110,8 @@ func (e *evolver) toolsFor(role evolveRole) []tool.CoreTool {
 			tools = append(tools, e.agentStatusTool())
 		}
 	case roleEditor:
-		tools = append(tools, e.editSourceTool(), e.buildOptionsTool(), e.buildShellcodeTool(), e.revertPayloadTool(), e.detectionCycleTool())
+		tools = append(tools, e.editSourceTool(), e.sourceWriteTool(), e.sourceMultiEditTool(), e.sourceDeleteTool(),
+			e.buildOptionsTool(), e.buildShellcodeTool(), e.revertPayloadTool(), e.detectionCycleTool())
 		if e.cfg.BuildAgent != nil {
 			tools = append(tools, e.generateAgentTool())
 		}
@@ -176,7 +178,7 @@ const (
 
 func readOnlyToolName(name string) bool {
 	switch name {
-	case "SourceList", "SourceRead", "SourceSearch", "TelemetryQuery",
+	case "SourceTree", "SourceList", "SourceRead", "SourceSearch", "TelemetryQuery",
 		"InspectFeedback", "Payloads", "ComparePayloads", "GitHistory",
 		"KnowledgeSearch", "KnowledgeRead", "KnowledgeStats", "KnowledgeList",
 		"AgentStatus":
@@ -189,7 +191,8 @@ func readOnlyToolName(name string) bool {
 // guest. A call to one of these ends the read-only streak.
 func mutatingToolName(name string) bool {
 	switch name {
-	case "EditSource", "BuildOptions", "BuildShellcode", "RevertToPayload", "DetectionCycle",
+	case "EditSource", "SourceWrite", "SourceMultiEdit", "SourceDelete",
+		"BuildOptions", "BuildShellcode", "RevertToPayload", "DetectionCycle",
 		"GenerateAgent", "RunModule", "CleanupAgent":
 		return true
 	}

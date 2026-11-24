@@ -609,14 +609,7 @@ func (e *evolver) agentSourceBrief() string {
 	if e.roots == nil {
 		return ""
 	}
-	expected := strings.TrimSpace(e.cfg.AgentSourceDir)
-	if expected == "" {
-		if e.platform() == platformLinux {
-			expected = DefaultAgentSourceDir(e.cfg.ModuleDir)
-		} else {
-			expected = DefaultGoAgentSourceDir(e.cfg.ModuleDir)
-		}
-	}
+	expected := e.expectedAgentSourceDir()
 	if expected != "" {
 		for _, name := range e.roots.names {
 			root := e.roots.roots[name]
@@ -642,6 +635,26 @@ func sameSourceDir(a, b string) bool {
 	realA, errA := filepath.EvalSymlinks(a)
 	realB, errB := filepath.EvalSymlinks(b)
 	return errA == nil && errB == nil && realA == realB
+}
+
+// expectedAgentSourceDir is the editable agent root for this platform. It
+// mirrors agentSourceBrief so edit tracking and the brief cannot disagree.
+func (e *evolver) expectedAgentSourceDir() string {
+	if dir := strings.TrimSpace(e.cfg.AgentSourceDir); dir != "" {
+		return dir
+	}
+	if e.platform() == platformLinux {
+		return DefaultAgentSourceDir(e.cfg.ModuleDir)
+	}
+	return DefaultGoAgentSourceDir(e.cfg.ModuleDir)
+}
+
+// editTouchesAgentSource reports whether one source root is the agent tree.
+// It is used to force a rebuild before a cycle can reuse a stale agent
+// artifact.
+func (e *evolver) editTouchesAgentSource(root sourceRoot) bool {
+	expected := e.expectedAgentSourceDir()
+	return expected != "" && sameSourceDir(root.Dir, expected)
 }
 
 func (e *evolver) producer(name string) (string, string, error) {
@@ -2632,6 +2645,9 @@ func (e *evolver) restoreExecutingStateTo(ctx context.Context, baseline *Cycle, 
 		}
 	}
 	e.restoreErr = errors.Join(errs...)
+	if e.restoreErr == nil {
+		e.agentSourceDirty.Store(false)
+	}
 	return e.restoreErr
 }
 
@@ -3261,17 +3277,19 @@ func (e *evolver) editSourceTool() tool.CoreTool {
 		Name: "EditSource",
 		Description: "Replace one exact string in a module source file, or create a new file by passing an empty old_string. " +
 			"module selects the payload module (default), a producer module (donut, crystal_pack), or an agent source root (c_agent, go_agent). " +
+			"Set replace_all to replace every occurrence. For whole-file writes, multi-edit patches, or deletion use SourceWrite, SourceMultiEdit, or SourceDelete. " +
 			"crystal_pack links postex-loader/src and rebuilds it on the next BuildShellcode; donut rebuilds src/. " +
 			"The edit is atomic, stored in SQLite with before/after text, and takes effect on the next DetectionCycle.",
 		Prompt: "Apply one source edit or create one source file.",
 		Schema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"module":     map[string]any{"type": "string", "description": "Writable source root: the payload module (default), donut, crystal_pack, c_agent, or go_agent."},
-				"file":       map[string]any{"type": "string", "description": "Path relative to the module root; its parent directory must already exist."},
-				"old_string": map[string]any{"type": "string", "description": "Exact text to replace; must occur once. Empty creates file and requires it not to exist."},
-				"new_string": map[string]any{"type": "string", "description": "Replacement text, or the full content when creating a file."},
-				"reason":     map[string]any{"type": "string", "description": "Why this edit removes the finding."},
+				"module":      map[string]any{"type": "string", "description": "Writable source root: the payload module (default), donut, crystal_pack, c_agent, or go_agent."},
+				"file":        map[string]any{"type": "string", "description": "Path relative to the module root; its parent directory must already exist."},
+				"old_string":  map[string]any{"type": "string", "description": "Exact text to replace; must occur once unless replace_all is set. Empty creates the file and requires it not to exist."},
+				"new_string":  map[string]any{"type": "string", "description": "Replacement text, or the full content when creating a file."},
+				"replace_all": map[string]any{"type": "boolean", "description": "Replace every occurrence instead of requiring a unique match."},
+				"reason":      map[string]any{"type": "string", "description": "Why this edit removes the finding."},
 			},
 			"required": []string{"file", "new_string"},
 		},
@@ -3280,11 +3298,12 @@ func (e *evolver) editSourceTool() tool.CoreTool {
 		},
 		Run: func(ctx context.Context, raw json.RawMessage, _ *tool.ToolContext) (tool.Result, error) {
 			var args struct {
-				Module    string `json:"module"`
-				File      string `json:"file"`
-				OldString string `json:"old_string"`
-				NewString string `json:"new_string"`
-				Reason    string `json:"reason"`
+				Module     string `json:"module"`
+				File       string `json:"file"`
+				OldString  string `json:"old_string"`
+				NewString  string `json:"new_string"`
+				ReplaceAll bool   `json:"replace_all"`
+				Reason     string `json:"reason"`
 			}
 			if err := json.Unmarshal(raw, &args); err != nil {
 				return tool.Errorf("invalid arguments"), nil
@@ -3302,7 +3321,7 @@ func (e *evolver) editSourceTool() tool.CoreTool {
 			if err := e.requireProducerContract(root.Name, args.File); err != nil {
 				return tool.Errorf(fmt.Sprintf("%v", err)), nil
 			}
-			result, err := e.applyEdit(ctx, root, args.File, args.OldString, args.NewString, args.Reason)
+			result, err := e.applyEdit(ctx, root, args.File, args.OldString, args.NewString, args.Reason, args.ReplaceAll)
 			if err != nil {
 				return tool.Errorf(fmt.Sprintf("%v", err)), nil
 			}
@@ -3384,7 +3403,7 @@ func introducesForbiddenLoaderMechanism(oldText, newText string) string {
 	return ""
 }
 
-func (e *evolver) applyEdit(ctx context.Context, root sourceRoot, file, oldText, newText, reason string) (editResult, error) {
+func (e *evolver) applyEdit(ctx context.Context, root sourceRoot, file, oldText, newText, reason string, replaceAll bool) (editResult, error) {
 	if newText == "" {
 		return editResult{}, fmt.Errorf("new_string is required")
 	}
@@ -3409,11 +3428,17 @@ func (e *evolver) applyEdit(ctx context.Context, root sourceRoot, file, oldText,
 	if creating {
 		updated, err = createSourceFile(root, file, newText)
 	} else {
-		updated, err = writeSourceFile(root, file, oldText, newText)
+		updated, err = writeSourceFileCount(root, file, oldText, newText, replaceAll)
 	}
 	if err != nil {
 		return editResult{}, err
 	}
+	return e.recordSourceEdit(ctx, root, file, oldText, newText, reason, creating, updated)
+}
+
+// recordSourceEdit persists one applied change and rolls the source back when
+// the database record fails, so the tree never diverges from loop history.
+func (e *evolver) recordSourceEdit(ctx context.Context, root sourceRoot, file, oldText, newText, reason string, created bool, updated sourceWrite) (editResult, error) {
 	payloadID := int64(0)
 	if e.last != nil {
 		payloadID = e.last.PayloadID
@@ -3423,7 +3448,7 @@ func (e *evolver) applyEdit(ctx context.Context, root sourceRoot, file, oldText,
 		LoopID: e.cfg.LoopID, Iteration: iteration, PayloadID: payloadID,
 		Module: root.Name, File: file, Old: oldText, New: newText, Reason: reason,
 	}); err != nil {
-		if creating {
+		if created {
 			if removeErr := os.Remove(updated.Path); removeErr != nil {
 				return editResult{}, fmt.Errorf("save edit: %w (remove %s failed: %v)", err, file, removeErr)
 			}
@@ -3434,12 +3459,12 @@ func (e *evolver) applyEdit(ctx context.Context, root sourceRoot, file, oldText,
 	}
 	e.logClass(logging.ClassEdit, "%s/%s:%d (%s): %s", root.Name, file, updated.Line, reason, clip(newText, 160))
 	message := "edit applied; call DetectionCycle to rebuild and detonate"
-	if creating {
+	if created {
 		message = "file created; call DetectionCycle to rebuild and detonate"
 	}
 	return editResult{
 		Module: root.Name, File: file, Line: updated.Line, Bytes: len(updated.Updated),
-		Created: creating, Reason: reason, Message: message,
+		Created: created, Reason: reason, Message: message,
 	}, nil
 }
 
@@ -3455,6 +3480,13 @@ type sourceWrite struct {
 // writeSourceFile replaces one exact string in a writable module file and
 // rejects edits that remove a documented module or option from config.json.
 func writeSourceFile(root sourceRoot, file, oldText, newText string) (sourceWrite, error) {
+	return writeSourceFileCount(root, file, oldText, newText, false)
+}
+
+// writeSourceFileCount is writeSourceFile with an optional replace-all mode.
+// Reverts always use the unique-match path, so a reverted write cannot spread
+// to unrelated text.
+func writeSourceFileCount(root sourceRoot, file, oldText, newText string, replaceAll bool) (sourceWrite, error) {
 	if !root.Writable {
 		return sourceWrite{}, fmt.Errorf("source root %s is read-only", root.Name)
 	}
@@ -3467,14 +3499,22 @@ func writeSourceFile(root sourceRoot, file, oldText, newText string) (sourceWrit
 	if err != nil {
 		return sourceWrite{}, fmt.Errorf("read %s: %w", file, err)
 	}
-	if strings.Count(string(data), oldText) != 1 {
-		return sourceWrite{}, fmt.Errorf("%s: old_string must occur exactly once", file)
+	content := string(data)
+	count := strings.Count(content, oldText)
+	if count == 0 {
+		return sourceWrite{}, fmt.Errorf("%s: old_string not found", file)
 	}
-	index := strings.Index(string(data), oldText)
-	line := strings.Count(string(data[:index]), "\n") + 1
-	updated := strings.Replace(string(data), oldText, newText, 1)
+	if count > 1 && !replaceAll {
+		return sourceWrite{}, fmt.Errorf("%s: old_string must occur exactly once (%d matches); add context or set replace_all", file, count)
+	}
+	index := strings.Index(content, oldText)
+	line := strings.Count(content[:index], "\n") + 1
+	updated := strings.Replace(content, oldText, newText, 1)
+	if replaceAll {
+		updated = strings.ReplaceAll(content, oldText, newText)
+	}
 	if strings.EqualFold(filepath.Base(path), "config.json") {
-		if err := guardModuleConfig(string(data), updated); err != nil {
+		if err := guardModuleConfig(content, updated); err != nil {
 			return sourceWrite{}, err
 		}
 	}

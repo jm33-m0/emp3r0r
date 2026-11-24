@@ -167,8 +167,14 @@ const goAgentPrompt = `Go agent source:
 - The Go agent is a separate writable go_agent root. Transport, syscalls,
   strings, anti-debug, and memory behavior that belong to the agent live there,
   not in loader_windows.
-- Use the writable agent source root named in the brief (default go_agent) with
-  EditSource, then GenerateAgent to rebuild the EXE or DLL from that source. The loader module still owns loading,
+- Use SourceTree to map the root before reading files. Use the writable agent
+  source root named in the brief (default go_agent) with EditSource,
+  SourceWrite, SourceMultiEdit, or SourceDelete, then GenerateAgent to rebuild
+  the EXE or DLL from that source. SourceTree hides vendor by default; set
+  include_vendor only when a dependency is the target.
+- GenerateAgent tags select the exact Go feature set, for example
+  ["with_mesh","with_kcp"] or [] for the slim agent. Omit tags to keep the
+  operator transport's derived set. The loader module still owns loading,
   injection, and the wrapper.`
 
 const plannerSystemPrompt = `You are the planner and coordinator of an autonomous detection loop for the
@@ -295,7 +301,11 @@ Work loop:
    analyzers before deciding a finding is resolved. When the finding has a
    rule, call LoopMemory with that rule and read the verified note and example
    edit before implementing a new variant.
-2. Apply every edit the change needs with EditSource. There is no edit limit:
+2. Apply every edit the change needs. Use EditSource for one exact replacement
+   (replace_all for repeated text), SourceMultiEdit for several replacements in
+   one file, SourceWrite to create or replace a whole file (missing parent
+   directories are created), and SourceDelete to remove a file. There is no
+   edit limit:
    a redesign that adds, removes, splits, merges, or replaces files is one
    change. Do not preserve a detected design just because it already exists,
    and do not settle for renaming, reordering, or hiding the same behavior.
