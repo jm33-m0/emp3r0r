@@ -1329,3 +1329,60 @@ func TestEditSourceCreatesNewFileAndRevertsIt(t *testing.T) {
 		t.Fatalf("revert did not delete the created file: %v", err)
 	}
 }
+
+func TestEditSourceRejectsMemfdLoader(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "stub.c"), []byte("int keep;\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "old.c"), []byte("long fd = syscall2(SYS_memfd_create, 0, 1);\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	db, err := OpenTelemetryDB(filepath.Join(t.TempDir(), "telemetry.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	roots, err := newSourceRoots("module", sourceRoot{Name: "module", Dir: dir, Writable: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := &evolver{
+		cfg:   EvolveConfig{LoopID: "loop", Module: "module", ModuleDir: dir, Iterations: 20},
+		db:    db,
+		roots: roots,
+		logf:  func(logging.Class, string, ...any) {},
+	}
+	add, err := json.Marshal(map[string]any{
+		"file": "stub.c", "old_string": "int keep;",
+		"new_string": "int keep;\nlong fd = syscall2(SYS_memfd_create, 0, 1);\n",
+		"reason":     "file-backed exec view",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := e.editSourceTool().Call(context.Background(), add, nil)
+	if err != nil || !result.IsError {
+		t.Fatalf("memfd edit was accepted: %v %s", err, result.Flatten())
+	}
+	if !strings.Contains(strings.ToLower(result.Flatten()), "memfd") {
+		t.Fatalf("rejection does not name memfd: %s", result.Flatten())
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "stub.c"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "int keep;\n" {
+		t.Fatalf("rejected edit changed the file: %q", data)
+	}
+	remove, err := json.Marshal(map[string]any{
+		"file": "old.c", "old_string": "long fd = syscall2(SYS_memfd_create, 0, 1);",
+		"new_string": "long fd = -1;", "reason": "restore anonymous loading",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result, err := e.editSourceTool().Call(context.Background(), remove, nil); err != nil || result.IsError {
+		t.Fatalf("removing memfd was rejected: %v %s", err, result.Flatten())
+	}
+}

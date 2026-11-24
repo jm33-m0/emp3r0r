@@ -60,7 +60,11 @@ const linuxPayloadPrompt = `Linux payload contract:
   libcrypto/libcurl at runtime. Keep it buildable on this host.
 - Do not remove the C2 check-in path, the module's config.json, its documented
   options, or its build entrypoint to hide a behavior. Internal file layout and
-  APIs may change.`
+  APIs may change.
+- Do not load the payload through memfd_create, a memfd-backed exec mapping, or
+  /proc/self/fd execution. A memfd is a named kernel object with its own sandbox
+  verdict (PenguinBox EDR - Memfd Created) and telemetry/memfd finding. The host
+  rejects an edit that introduces memfd_create.`
 
 const linuxCompatibilityPrompt = `Linux compatibility:
 - glibc ABI and dynload mode are build options, not incidental toolchain
@@ -124,7 +128,7 @@ Decision rules:
   execution gate or the budget.
 
 Return exactly one JSON object:
-{"action":"test","mechanism":"agent","prediction":"Falco no longer reports memfd_create","editor_brief":"what to change and why","reason":"why this is the next best move"}
+{"action":"test","mechanism":"agent","prediction":"Falco no longer reports the stager's /proc/self/maps read","editor_brief":"what to change and why","reason":"why this is the next best move"}
 or
 {"action":"debug","debug_focus":"the stager never reached the C agent","reason":"execution=offline on the baseline"}
 or

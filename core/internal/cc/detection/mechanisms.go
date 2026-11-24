@@ -41,6 +41,7 @@ var mechanismSpecs = map[string]mechanismSpec{
 		Constraints: []string{
 			"The loader must keep a valid backing image; a malformed PE or missing relocation makes the section map fail.",
 			"Fall back to the verified path when the image map fails; do not silently skip the payload.",
+			"Windows image-section semantics only. On Linux do not translate this to memfd_create: a memfd is a named kernel object and an explicit detection signal.",
 		},
 		Signals:      []string{"NtCreateSection/NtMapViewOfSection", "image-backed vs private memory", "network/check-in"},
 		Verification: "the payload runs from an image view, the private executable region disappears, and the agent checks in",

@@ -282,8 +282,21 @@ var methodologyEntries = []methodologyEntry{
 }
 
 func methodologyEntriesAll() []methodologyEntry {
+	return methodologyEntriesFor("")
+}
+
+// methodologyEntriesFor filters mechanism playbooks the active platform cannot
+// use. A Linux loop must not receive Windows loader mechanics that read as a
+// suggestion to translate them into a memfd.
+func methodologyEntriesFor(platform string) []methodologyEntry {
 	entries := append([]methodologyEntry{}, methodologyEntries...)
 	for _, name := range mechanismNames() {
+		if platform == platformLinux && !linuxMechanism(name) {
+			continue
+		}
+		if platform == platformWindows && linuxOnlyMechanism(name) {
+			continue
+		}
 		spec := mechanismSpecs[name]
 		entries = append(entries, methodologyEntry{
 			ID:           "mechanism-" + spec.Name,
@@ -307,6 +320,10 @@ func methodologyTerms(query string) []string {
 // methodologySearch ranks local scenario playbooks against a query. It runs
 // without the external knowledge DB, so the harness always has methodology.
 func methodologySearch(query string, limit int) []KnowledgeHit {
+	return methodologySearchFor(query, limit, "")
+}
+
+func methodologySearchFor(query string, limit int, platform string) []KnowledgeHit {
 	terms := methodologyTerms(query)
 	if len(terms) == 0 {
 		return nil
@@ -316,7 +333,7 @@ func methodologySearch(query string, limit int) []KnowledgeHit {
 		score int
 	}
 	var candidates []scored
-	for _, entry := range methodologyEntriesAll() {
+	for _, entry := range methodologyEntriesFor(platform) {
 		text := strings.ToLower(strings.Join([]string{
 			entry.ID, entry.Title, strings.Join(entry.Tags, " "), entry.Scenario,
 			strings.Join(entry.Steps, " "), strings.Join(entry.Constraints, " "),
@@ -355,8 +372,12 @@ func methodologySearch(query string, limit int) []KnowledgeHit {
 
 // methodologyDoc renders one local entry for KnowledgeRead.
 func methodologyDoc(ref string) (KnowledgeDoc, bool) {
+	return methodologyDocFor(ref, "")
+}
+
+func methodologyDocFor(ref, platform string) (KnowledgeDoc, bool) {
 	id := strings.TrimPrefix(strings.TrimSpace(ref), "methodology/")
-	for _, entry := range methodologyEntriesAll() {
+	for _, entry := range methodologyEntriesFor(platform) {
 		if entry.ID != id {
 			continue
 		}
@@ -398,7 +419,7 @@ func (e *evolver) searchKnowledge(ctx context.Context, query, notebook string, l
 	notebook = strings.ToLower(strings.TrimSpace(notebook))
 	var hits []KnowledgeHit
 	if notebook == "" || notebook == "methodology" {
-		hits = methodologySearch(query, limit)
+		hits = methodologySearchFor(query, limit, e.platform())
 	}
 	if e.knowledge != nil && notebook != "methodology" {
 		external, err := e.knowledge.Search(ctx, query, notebook, limit)

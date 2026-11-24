@@ -736,7 +736,7 @@ func (e *evolver) knowledgeReadTool() tool.CoreTool {
 			if err := json.Unmarshal(raw, &args); err != nil {
 				return tool.Errorf("invalid arguments"), nil
 			}
-			if doc, ok := methodologyDoc(args.DocumentRef); ok {
+			if doc, ok := methodologyDocFor(args.DocumentRef, e.platform()); ok {
 				data, _ := json.Marshal(doc)
 				return tool.Text(string(data)), nil
 			}

@@ -3326,6 +3326,23 @@ type editResult struct {
 	Message string `json:"message"`
 }
 
+// forbiddenLoaderMechanisms name mechanisms that add an explicit detection
+// surface instead of an anonymous mapping. A memfd is a named kernel object
+// with its own sandbox verdict, so the host rejects an edit that introduces
+// one even when the model's hypothesis says otherwise. Removal remains allowed.
+var forbiddenLoaderMechanisms = []string{"sys_memfd_create", "memfd_create(", "__nr_memfd_create"}
+
+func introducesForbiddenLoaderMechanism(oldText, newText string) string {
+	oldLower := strings.ToLower(oldText)
+	newLower := strings.ToLower(newText)
+	for _, token := range forbiddenLoaderMechanisms {
+		if strings.Contains(newLower, token) && !strings.Contains(oldLower, token) {
+			return token
+		}
+	}
+	return ""
+}
+
 func (e *evolver) applyEdit(ctx context.Context, root sourceRoot, file, oldText, newText, reason string) (editResult, error) {
 	if newText == "" {
 		return editResult{}, fmt.Errorf("new_string is required")
@@ -3342,6 +3359,9 @@ func (e *evolver) applyEdit(ctx context.Context, root sourceRoot, file, oldText,
 		if len(oldText) > 16<<10 || len(newText) > 16<<10 {
 			return editResult{}, fmt.Errorf("edit text exceeds 16 KiB")
 		}
+	}
+	if token := introducesForbiddenLoaderMechanism(oldText, newText); token != "" {
+		return editResult{}, fmt.Errorf("refusing to introduce %s: a memfd is a named kernel object and an explicit detection signal, not an evasion win", token)
 	}
 	var updated sourceWrite
 	var err error

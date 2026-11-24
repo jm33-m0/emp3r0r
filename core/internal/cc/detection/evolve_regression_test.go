@@ -126,6 +126,26 @@ func TestMethodologySearch(t *testing.T) {
 	}
 }
 
+func TestMethodologyFiltersMechanismsByPlatform(t *testing.T) {
+	for _, hit := range methodologySearchFor("section-map NtCreateSection file section", 10, platformLinux) {
+		if hit.DocRef == "methodology/mechanism-section-map" {
+			t.Fatalf("Linux search returned a Windows mechanism: %+v", hit)
+		}
+	}
+	if _, ok := methodologyDocFor("methodology/mechanism-section-map", platformLinux); ok {
+		t.Fatal("Linux read returned a Windows mechanism")
+	}
+	if _, ok := methodologyDocFor("methodology/mechanism-section-map", platformWindows); !ok {
+		t.Fatal("Windows read lost its section-map mechanism")
+	}
+	if _, ok := methodologyDocFor("methodology/mechanism-stager", platformLinux); !ok {
+		t.Fatal("Linux read lost its stager mechanism")
+	}
+	if _, ok := methodologyDocFor("methodology/mechanism-stager", platformWindows); ok {
+		t.Fatal("Windows read returned a Linux-only mechanism")
+	}
+}
+
 func TestMethodologyReadAndSearchWithoutCache(t *testing.T) {
 	e := &evolver{}
 	result, err := e.knowledgeSearchTool().Call(context.Background(), []byte(`{"query":"offline baseline"}`), nil)
