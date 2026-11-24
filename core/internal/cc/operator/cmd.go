@@ -675,13 +675,7 @@ Examples:
 	genAgentCmd.Flags().IntP("operator-idle-timeout", "", 1800, "Operator idle timeout in seconds before C2 refuses agent connections (0 disables idle timeout)")
 	addFlagToGroup("Stealth & Connectivity Options", "stager", "NCSI", "operator-idle-timeout")
 
-	// Force user to specify a C2 address unless they only list tags.
-	genAgentCmd.MarkFlagRequired("cc")
-	genAgentCmd.PreRun = func(cmd *cobra.Command, _ []string) {
-		if list, _ := cmd.Flags().GetBool("list-agent-tags"); list {
-			cmd.Flags().Lookup("cc").Changed = true
-		}
-	}
+	// CC is required for a build; --list-agent-tags is handled before it.
 
 	// Help Template for flag grouping
 	genAgentCmd.SetHelpTemplate(`{{.Short}}

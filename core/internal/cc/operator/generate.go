@@ -24,6 +24,10 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 		fmt.Fprint(cmd.OutOrStdout(), builder.AgentTagReference())
 		return
 	}
+	if !cmd.Flags().Changed("cc") {
+		logging.Errorf("required flag \"cc\" not set")
+		return
+	}
 	payloadType, _ := cmd.Flags().GetString("type")
 	archChoice, _ := cmd.Flags().GetString("arch")
 

@@ -1,6 +1,9 @@
 package builder
 
 import (
+	"os"
+	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -88,6 +91,34 @@ func TestValidateAgentTagsForConfig(t *testing.T) {
 		}
 		if !tc.ok && err == nil {
 			t.Fatalf("%s: expected an error", tc.name)
+		}
+	}
+}
+
+func TestAgentTagsMatchBuildScript(t *testing.T) {
+	path := filepath.Join("..", "..", "..", "build.py")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Skipf("build.py is not present: %v", err)
+	}
+	text := string(data)
+	for _, tag := range AllAgentTags() {
+		if !strings.Contains(text, `"`+tag+`"`) {
+			t.Fatalf("build.py does not define %s", tag)
+		}
+	}
+	start := strings.Index(text, "ALL_AGENT_TAGS = (")
+	if start < 0 {
+		t.Fatal("ALL_AGENT_TAGS not found in build.py")
+	}
+	end := strings.Index(text[start:], ")\n")
+	if end < 0 {
+		t.Fatal("ALL_AGENT_TAGS terminator not found in build.py")
+	}
+	block := text[start : start+end]
+	for _, match := range regexp.MustCompile(`"([a-z_]+)"`).FindAllStringSubmatch(block, -1) {
+		if !slices.Contains(AllAgentTags(), match[1]) {
+			t.Fatalf("build.py defines %s but the Go catalog does not", match[1])
 		}
 	}
 }

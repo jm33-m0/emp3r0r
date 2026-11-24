@@ -157,11 +157,12 @@ func (a *Actions) detectionTools() map[string]Tool {
 						"agent_glibc":          StringProp("Linux C agent oldest glibc ABI for rotation: 2.17 (default) or 2.34."),
 						"agent_dynload":        StringProp("Linux C agent dynload mode for rotation: auto (default), libc_dl, or public."),
 						"agent_libc":           StringProp("Linux C agent libc for rotation: glibc (default) or musl."),
+						"agent_tags":           map[string]any{"type": "array", "items": map[string]any{"type": "string", "enum": builder.AllAgentTags()}, "description": "Exact Go agent feature-tag set for rotation. Omit to derive from the operator transport; [] builds the slim agent."},
 						"planner_timeout":      IntegerProp("Planner decision window in seconds. Default 600."),
 						"editor_timeout":       IntegerProp("Editor decision window in seconds. Default 900."),
 						"cycle_timeout":        IntegerProp("Build/detonate/verify deadline in seconds. Default 3600."),
 						"planner_read_budget":  IntegerProp("Read-only calls before the planner must return a plan. Default 12; negative disables."),
-						"editor_read_budget":   IntegerProp("Read-only calls without an edit before the editor loses read tools. Default 12; negative disables."),
+						"editor_read_budget":   IntegerProp("Read-only calls without an edit before the editor loses read tools. Default 24; negative disables."),
 						"debugger_tool_budget": IntegerProp("Total calls per debugger pass. 0 means no cap; turn and time limits still apply."),
 						"debugger_policy":      map[string]any{"type": "string", "enum": []string{"final", "cycle", "off"}, "description": "When the guest debugger runs: final (one pass at the stop, default), cycle (after every non-executing cycle), or off."},
 						"input_price":          map[string]any{"type": "number", "description": "USD per 1M input tokens for the cost estimate; 0 leaves the rate unset."},
@@ -230,52 +231,53 @@ func (a *Actions) detectionTools() map[string]Tool {
 }
 
 type detectionArgs struct {
-	Module             string   `json:"module"`
-	Artifact           string   `json:"artifact"`
-	Stages             []string `json:"stages"`
-	EDRProfile         string   `json:"edr_profile"`
-	ApproveExecution   bool     `json:"approve_execution"`
-	RunID              string   `json:"run_id"`
-	Analyze            bool     `json:"analyze"`
-	Limit              int      `json:"limit"`
-	Path               string   `json:"path"`
-	URL                string   `json:"url"`
-	Source             string   `json:"source"`
-	SQL                string   `json:"sql"`
-	LoopID             string   `json:"loop_id"`
-	ModuleDir          string   `json:"module_dir"`
-	AgentSrc           string   `json:"agent_src"`
-	Shellcode          string   `json:"shellcode"`
-	AgentUUID          string   `json:"agent_uuid"`
-	AgentType          string   `json:"agent_type"`
-	Arch               string   `json:"arch"`
-	AgentGlibc         string   `json:"agent_glibc"`
-	AgentDynload       string   `json:"agent_dynload"`
-	AgentLibc          string   `json:"agent_libc"`
-	GuestSSH           string   `json:"guest_ssh"`
-	GuestSSHKey        string   `json:"guest_ssh_key"`
-	GuestSSHExclude    string   `json:"guest_ssh_exclude"`
-	PlannerTimeout     int      `json:"planner_timeout"`
-	EditorTimeout      int      `json:"editor_timeout"`
-	CycleTimeout       int      `json:"cycle_timeout"`
-	PlannerReadBudget  int      `json:"planner_read_budget"`
-	EditorReadBudget   int      `json:"editor_read_budget"`
-	DebuggerToolBudget int      `json:"debugger_tool_budget"`
-	DebuggerPolicy     string   `json:"debugger_policy"`
-	InputPrice         float64  `json:"input_price"`
-	OutputPrice        float64  `json:"output_price"`
-	CacheReadPrice     float64  `json:"cache_read_price"`
-	CacheWritePrice    float64  `json:"cache_write_price"`
-	Iterations         int      `json:"iterations"`
-	Process            string   `json:"process"`
-	Format             string   `json:"format"`
-	Inject             string   `json:"inject"`
-	SMW                string   `json:"smw"`
-	Producers          []string `json:"producers"`
-	ReadRoots          []string `json:"read_roots"`
-	Turns              int      `json:"turns"`
-	From               string   `json:"from"`
-	To                 string   `json:"to"`
+	Module             string    `json:"module"`
+	Artifact           string    `json:"artifact"`
+	Stages             []string  `json:"stages"`
+	EDRProfile         string    `json:"edr_profile"`
+	ApproveExecution   bool      `json:"approve_execution"`
+	RunID              string    `json:"run_id"`
+	Analyze            bool      `json:"analyze"`
+	Limit              int       `json:"limit"`
+	Path               string    `json:"path"`
+	URL                string    `json:"url"`
+	Source             string    `json:"source"`
+	SQL                string    `json:"sql"`
+	LoopID             string    `json:"loop_id"`
+	ModuleDir          string    `json:"module_dir"`
+	AgentSrc           string    `json:"agent_src"`
+	Shellcode          string    `json:"shellcode"`
+	AgentUUID          string    `json:"agent_uuid"`
+	AgentType          string    `json:"agent_type"`
+	Arch               string    `json:"arch"`
+	AgentGlibc         string    `json:"agent_glibc"`
+	AgentDynload       string    `json:"agent_dynload"`
+	AgentLibc          string    `json:"agent_libc"`
+	AgentTags          *[]string `json:"agent_tags"`
+	GuestSSH           string    `json:"guest_ssh"`
+	GuestSSHKey        string    `json:"guest_ssh_key"`
+	GuestSSHExclude    string    `json:"guest_ssh_exclude"`
+	PlannerTimeout     int       `json:"planner_timeout"`
+	EditorTimeout      int       `json:"editor_timeout"`
+	CycleTimeout       int       `json:"cycle_timeout"`
+	PlannerReadBudget  int       `json:"planner_read_budget"`
+	EditorReadBudget   int       `json:"editor_read_budget"`
+	DebuggerToolBudget int       `json:"debugger_tool_budget"`
+	DebuggerPolicy     string    `json:"debugger_policy"`
+	InputPrice         float64   `json:"input_price"`
+	OutputPrice        float64   `json:"output_price"`
+	CacheReadPrice     float64   `json:"cache_read_price"`
+	CacheWritePrice    float64   `json:"cache_write_price"`
+	Iterations         int       `json:"iterations"`
+	Process            string    `json:"process"`
+	Format             string    `json:"format"`
+	Inject             string    `json:"inject"`
+	SMW                string    `json:"smw"`
+	Producers          []string  `json:"producers"`
+	ReadRoots          []string  `json:"read_roots"`
+	Turns              int       `json:"turns"`
+	From               string    `json:"from"`
+	To                 string    `json:"to"`
 }
 
 // resolveMCPModuleDir binds the loop to the installed module path. The model
@@ -1078,6 +1080,10 @@ func (a *Actions) detectionLoop(ctx context.Context, raw json.RawMessage) (any, 
 			initialAgentArtifact = candidate
 		}
 	}
+	var agentTags []string
+	if args.AgentTags != nil {
+		agentTags = *args.AgentTags
+	}
 	cfg := detection.EvolveConfig{
 		Module: module, ModuleDir: moduleDir, Shellcode: shellcode,
 		InitialAgentArtifact: initialAgentArtifact,
@@ -1089,7 +1095,8 @@ func (a *Actions) detectionLoop(ctx context.Context, raw json.RawMessage) (any, 
 		ExpectedAgentUUID: strings.TrimSpace(args.AgentUUID),
 		AgentType:         agentType, AgentArch: arch, AgentCC: strings.TrimSpace(a.DefaultCC),
 		AgentGlibc: args.AgentGlibc, AgentDynload: args.AgentDynload, AgentLibc: args.AgentLibc,
-		Guest: guest, Verify: verify, DebuggerPolicy: args.DebuggerPolicy,
+		AgentTags: agentTags,
+		Guest:     guest, Verify: verify, DebuggerPolicy: args.DebuggerPolicy,
 		Pricing: detection.TokenPricing{
 			InputPerMillion: args.InputPrice, OutputPerMillion: args.OutputPrice,
 			CacheReadPerMillion: args.CacheReadPrice, CacheWritePerMillion: args.CacheWritePrice,
