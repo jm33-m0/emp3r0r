@@ -12,8 +12,8 @@ import (
 const maxOperatorPromptBytes = 4 << 10
 
 // OperatorPromptQueue holds instructions an operator appends while the loop is
-// running. The loop drains it before each model session and includes new
-// prompts in the DetectionCycle result.
+// running. The loop drains it at the next model turn or session start, so a
+// prompt queued mid-session is not held until the next worker session.
 type OperatorPromptQueue struct {
 	prompts chan string
 	count   atomic.Int64

@@ -216,7 +216,18 @@ func (e *evolver) hooksFor(role evolveRole) *hook.Registry {
 	}
 	debuggerTools := e.cfg.DebuggerToolBudget
 	var totalCalls, readOnlyCalls atomic.Int32
-	hooks := hook.NewRegistry().On(hook.PreToolUse, func(_ context.Context, event hook.Event) hook.Result {
+	hooks := hook.NewRegistry()
+	// A queued operator prompt must reach the model at the next turn, not only
+	// at the next worker session. UserPromptSubmit covers session starts and
+	// deadline/provider retries; the Stop hook covers a model that pauses in
+	// the middle of a session.
+	hooks.On(hook.UserPromptSubmit, func(_ context.Context, _ hook.Event) hook.Result {
+		if prompts := e.takeOperatorPrompts(); len(prompts) > 0 {
+			return hook.Result{AdditionalContext: FormatOperatorPrompts(prompts)}
+		}
+		return hook.Result{}
+	})
+	hooks.On(hook.PreToolUse, func(_ context.Context, event hook.Event) hook.Result {
 		decision := e.allowToolHookFor(role, event.ToolName)
 		if decision.Decision == "block" {
 			e.logClass(logging.ClassWarning, "%s worker blocked tool %s: %s", role.label(), event.ToolName, decision.Message)
@@ -284,31 +295,35 @@ func (e *evolver) hooksFor(role evolveRole) *hook.Registry {
 	})
 	hooks.On(hook.Stop, func(_ context.Context, event hook.Event) hook.Result {
 		text := lastAssistantText(event.Messages)
+		var required string
 		switch role {
 		case roleEditor:
 			if e.sessionCycles.Load() == 0 {
-				return hook.Result{
-					Decision: "block",
-					AdditionalContext: "You have not called DetectionCycle. Apply the remaining source edit with EditSource now, " +
-						"then call DetectionCycle exactly once. Do not end this session without it.",
-				}
+				required = "You have not called DetectionCycle. Apply the remaining source edit with EditSource now, " +
+					"then call DetectionCycle exactly once. Do not end this session without it."
 			}
 		case rolePlanner:
 			if _, err := parsePlannerPlan(text); err != nil {
-				return hook.Result{
-					Decision: "block",
-					AdditionalContext: "Your answer is not the required planner JSON object (" + err.Error() + "). " +
-						"Return exactly one JSON object now: action=test, action=debug only when the brief says the debugger is available, or action=stop. Do not call tools.",
-				}
+				required = "Your answer is not the required planner JSON object (" + err.Error() + "). " +
+					"Return exactly one JSON object now: action=test, action=debug only when the brief says the debugger is available, or action=stop. Do not call tools."
 			}
 		case roleDebugger:
 			if _, err := parseDebugDiagnosis(text); err != nil {
-				return hook.Result{
-					Decision: "block",
-					AdditionalContext: "Your answer is not the required debugger JSON object (" + err.Error() + "). " +
-						"Return exactly one JSON object now with cause, evidence, guest_actions, agent_online_after, source_fix_required, and confidence.",
-				}
+				required = "Your answer is not the required debugger JSON object (" + err.Error() + "). " +
+					"Return exactly one JSON object now with cause, evidence, guest_actions, agent_online_after, source_fix_required, and confidence."
 			}
+		}
+		promptContext := ""
+		if prompts := e.takeOperatorPrompts(); len(prompts) > 0 {
+			promptContext = FormatOperatorPrompts(prompts)
+		}
+		switch {
+		case required != "" && promptContext != "":
+			return hook.Result{Decision: "block", AdditionalContext: promptContext + "\n" + required}
+		case required != "":
+			return hook.Result{Decision: "block", AdditionalContext: required}
+		case promptContext != "":
+			return hook.Result{Decision: "block", AdditionalContext: promptContext}
 		}
 		return hook.Result{}
 	})

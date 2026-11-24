@@ -254,12 +254,12 @@ The operator console owns the detection loops it starts.
 | `detect_loop resume <loop-id>` | Resume a stopped, interrupted, or failed loop from its on-disk manifest. The resumed attempt keeps the base loop and prior cycles, uses the saved options and source state, and starts a fresh attempt with the remaining cycle budget. Verified and done loops are listed but cannot be resumed; older report-only loops have no saved options and cannot be resumed. |
 | `detect_loop stop <loop-id>` | Cancel the loop and wait up to five seconds for it to finish. Accepts the base ID or the current attempt ID. |
 | `detect_loop stop --all` | Cancel every running loop. |
-| `detect_loop prompt <loop-id> <instruction...>` | Append an instruction to the loop's prompt queue. The loop reads it before its next model session and includes it in the next `DetectionCycle` result. |
+| `detect_loop prompt <loop-id> <instruction...>` | Append an instruction to the loop's prompt queue. The loop reads it at the next model turn or session start. |
 | `detect_loop start [options]` | Explicit launch form; `detect_loop [options]` remains the shorthand. |
 
 The console cancels every loop when it exits. A module build already running finishes before the loop stops.
 
-`detect_loop prompt` cannot interrupt an in-flight model turn or sandbox run. Use `detect_loop stop` to cancel the loop, or wait for the next cycle result.
+`detect_loop prompt` cannot interrupt an in-flight model turn or sandbox run; it is injected when the current turn stops or the next session starts. Use `detect_loop stop` to cancel the loop.
 
 Each loop writes its resolved options and current attempt to `<detection store>/loops/<base-loop-id>.json` in a 0700 directory with file mode 0600; a resumed loop keeps its log under `<detection store>`. `detect_loop ls` merges those manifests with the in-memory registry and with report-only loops. `detect_loop resume <loop-id>` reads the manifest and starts the next attempt with the saved source state, shellcode/producer settings, and remaining cycle budget; the source history, prior cycles, pending edits, and last executing payload are loaded from the loop database. Report-only loops created before manifests existed remain visible but are not resumable because their original options were not saved.
 

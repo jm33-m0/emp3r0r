@@ -91,6 +91,35 @@ func TestStopHooksEnforceWorkerContracts(t *testing.T) {
 	}
 }
 
+func TestOperatorPromptsReachRunningSession(t *testing.T) {
+	queue := NewOperatorPromptQueue()
+	e := &evolver{operatorPrompts: queue, logf: func(logging.Class, string, ...any) {}}
+	ctx := context.Background()
+	if _, err := queue.Add("focus on the maps consumer"); err != nil {
+		t.Fatal(err)
+	}
+	extra := e.hooksFor(rolePlanner).FireUserPromptSubmit(ctx, "base prompt")
+	if !strings.Contains(extra, "focus on the maps consumer") {
+		t.Fatalf("session start did not receive the queued prompt: %q", extra)
+	}
+	if queue.Len() != 0 {
+		t.Fatalf("prompt was not drained at session start: %d", queue.Len())
+	}
+
+	if _, err := queue.Add("stop after this turn"); err != nil {
+		t.Fatal(err)
+	}
+	e.sessionCycles.Store(1)
+	answer := []llm.Message{{Role: llm.RoleAssistant, Content: []llm.ContentBlock{llm.TextBlock("done")}}}
+	prevent, blocking, _ := e.hooksFor(roleEditor).Stop(ctx, answer)
+	if prevent || len(blocking) != 1 || !strings.Contains(blocking[0], "stop after this turn") {
+		t.Fatalf("stop hook did not inject the queued prompt: prevent=%v blocking=%v", prevent, blocking)
+	}
+	if queue.Len() != 0 {
+		t.Fatalf("prompt was not drained at stop: %d", queue.Len())
+	}
+}
+
 func TestEditorReadBudgetBlocksFurtherReading(t *testing.T) {
 	moduleDir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(moduleDir, "selfload.c"), []byte("void f(void) {}\n"), 0o600); err != nil {

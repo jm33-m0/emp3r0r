@@ -500,9 +500,9 @@ func detectLoopPromptCmd() *cobra.Command {
 		Short: "Append an operator instruction to a detection loop",
 		Long: `Append an instruction to a loop's prompt queue.
 
-The loop reads new instructions before its next model session and includes them
-in the next DetectionCycle result. It cannot interrupt an in-flight model turn or
-sandbox run, so use detect_loop stop for immediate termination.`,
+The loop reads new instructions at the next model turn or session start. It
+cannot interrupt an in-flight model turn or sandbox run, so use detect_loop stop
+for immediate termination.`,
 		Args: cobra.MinimumNArgs(2),
 		Run: func(_ *cobra.Command, args []string) {
 			text := strings.Join(args[1:], " ")

@@ -121,8 +121,9 @@ type EvolveConfig struct {
 	// default is used; a missing cache only disables the knowledge tools.
 	KnowledgePath string
 	// Prompts is the operator instruction queue. The console appends
-	// instructions while the loop runs; the loop drains them before each model
-	// session and after each cycle.
+	// instructions while the loop runs; the loop drains them at the next model
+	// turn or session start. A prompt queued after a cycle stays for the next
+	// session.
 	Prompts *OperatorPromptQueue
 	// ExpectedAgentUUID is the UUID of the agent the active shellcode was
 	// built from. The verification tools use it to distinguish the payload
@@ -3078,9 +3079,6 @@ func (e *evolver) detectionCycleTool() tool.CoreTool {
 				"build_options":    e.buildOptionsSnapshot(),
 				"producer_options": e.activeProducerOptions(),
 				"message":          message,
-			}
-			if prompts := e.takeOperatorPrompts(); len(prompts) > 0 {
-				out["operator_prompts"] = prompts
 			}
 			data, _ := json.Marshal(out)
 			e.stopSessionAfterCycle()
