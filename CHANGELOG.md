@@ -13,6 +13,16 @@
 * detection loop: run `stager_linux` with an embedded C agent PIC, PenguinBox Tracee/Falco telemetry, Linux findings, and platform-tagged traces
 * malasada: move the Linux shellcode converter into an editable producer module and ship the Go toolchain in the operator kit
 
+## [5.12.3](https://github.com/jm33-m0/emp3r0r/compare/v5.12.2...v5.12.3) (2026-11-24)
+
+
+### Bug Fixes
+
+* **agent:** expose Go build tags to generate and detection ([4e5e0d0](https://github.com/jm33-m0/emp3r0r/commit/4e5e0d0fa2fa129483b462149f6d02d68fb44168))
+* **agent:** expose loop tags over MCP and tidy generate ([9011fd6](https://github.com/jm33-m0/emp3r0r/commit/9011fd604bbc6bed6974df8dbf58d5df8ac23651))
+* **detection:** close rebuild, search, and editing gaps ([4931df3](https://github.com/jm33-m0/emp3r0r/commit/4931df31789eab73333290d6d3453b2484b71391))
+* **detection:** rebuild agent after source edits ([3f53309](https://github.com/jm33-m0/emp3r0r/commit/3f5330985b35bc877b7d41326308778875b4406c))
+
 ## [5.12.2](https://github.com/jm33-m0/emp3r0r/compare/v5.12.1...v5.12.2) (2026-11-24)
 
 
