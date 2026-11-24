@@ -230,6 +230,9 @@ func (s *sourceRoots) rootHint(root sourceRoot) string {
 // treated as source text.
 const sourceSniffBytes = 8 << 10
 
+// maxSourceDirEntries bounds a directory listing returned by SourceRead.
+const maxSourceDirEntries = 200
+
 // readBoundedSource reads one source file without loading more than the
 // per-file budget. Any text file under the root is readable; a binary prefix
 // is rejected so a read cannot pull build artifacts into the model context.
@@ -239,6 +242,13 @@ func readBoundedSource(path string) ([]byte, error) {
 		return nil, err
 	}
 	defer func() { _ = file.Close() }()
+	info, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if info.IsDir() {
+		return nil, fmt.Errorf("%s is a directory", filepath.Base(path))
+	}
 	head := make([]byte, sourceSniffBytes)
 	n, err := io.ReadFull(file, head)
 	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
@@ -257,6 +267,36 @@ func readBoundedSource(path string) ([]byte, error) {
 		return nil, fmt.Errorf("%s exceeds the read bound", filepath.Base(path))
 	}
 	return data, nil
+}
+
+// listSourceDirectory returns a bounded entry list for a SourceRead directory.
+// The model gets the names it can descend into without the tool failing on a
+// path it already discovered with SourceList or a rejected guess.
+func listSourceDirectory(rootDir, path string) (string, error) {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return "", err
+	}
+	rel, err := filepath.Rel(rootDir, path)
+	if err != nil {
+		rel = "."
+	}
+	rel = filepath.ToSlash(rel)
+	var b strings.Builder
+	fmt.Fprintf(&b, "directory %s (%d entries)\n", rel, len(entries))
+	for i, entry := range entries {
+		if i >= maxSourceDirEntries {
+			fmt.Fprintf(&b, "... %d more entries; use SourceList to list the whole root\n", len(entries)-maxSourceDirEntries)
+			break
+		}
+		name := entry.Name()
+		if entry.IsDir() {
+			name += "/"
+		}
+		b.WriteString(name)
+		b.WriteByte('\n')
+	}
+	return b.String(), nil
 }
 
 func (s *sourceRoots) describe() string {
@@ -349,6 +389,20 @@ func moduleReadTool(trees *sourceRoots, tracker *evolver) tool.CoreTool {
 			if err != nil {
 				return tool.Errorf(fmt.Sprintf("%v", err)), nil
 			}
+			info, err := os.Stat(path)
+			if err != nil {
+				return tool.Errorf(fmt.Sprintf("read %s: %v", args.Path, err)), nil
+			}
+			if info.IsDir() {
+				listing, err := listSourceDirectory(root.Dir, path)
+				if err != nil {
+					return tool.Errorf(fmt.Sprintf("list %s: %v", args.Path, err)), nil
+				}
+				if root.Name != trees.def {
+					return tool.Text(fmt.Sprintf("# %s\n%s", root.Name, listing)), nil
+				}
+				return tool.Text(listing), nil
+			}
 			data, err := readBoundedSource(path)
 			if err != nil {
 				return tool.Errorf(fmt.Sprintf("read %s: %v", args.Path, err)), nil
@@ -430,12 +484,39 @@ func moduleSearchTool(trees *sourceRoots) tool.CoreTool {
 				if err != nil {
 					return tool.Errorf(fmt.Sprintf("%v", err)), nil
 				}
-				data, err := readBoundedSource(path)
+				info, err := os.Stat(path)
 				if err != nil {
 					return tool.Errorf(fmt.Sprintf("read %s: %v", args.Path, err)), nil
 				}
-				rel, _ := filepath.Rel(root.Dir, path)
-				files = []sourceFile{{rel: filepath.ToSlash(rel), lines: strings.Split(string(data), "\n")}}
+				if info.IsDir() {
+					rel, err := filepath.Rel(root.Dir, path)
+					if err != nil {
+						return tool.Errorf(fmt.Sprintf("resolve %s: %v", args.Path, err)), nil
+					}
+					prefix := filepath.ToSlash(rel)
+					if prefix == "." {
+						prefix = ""
+					} else {
+						prefix = strings.TrimSuffix(prefix, "/") + "/"
+					}
+					scoped := make([]sourceFile, 0, len(files))
+					for _, file := range files {
+						if prefix == "" || strings.HasPrefix(file.rel, prefix) {
+							scoped = append(scoped, file)
+						}
+					}
+					if len(scoped) == 0 {
+						return tool.Text(fmt.Sprintf("no source files under %s", args.Path)), nil
+					}
+					files = scoped
+				} else {
+					data, err := readBoundedSource(path)
+					if err != nil {
+						return tool.Errorf(fmt.Sprintf("read %s: %v", args.Path, err)), nil
+					}
+					rel, _ := filepath.Rel(root.Dir, path)
+					files = []sourceFile{{rel: filepath.ToSlash(rel), lines: strings.Split(string(data), "\n")}}
+				}
 			}
 			var b strings.Builder
 			hits := 0

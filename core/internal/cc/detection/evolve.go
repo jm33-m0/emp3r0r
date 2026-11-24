@@ -1481,7 +1481,7 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 	summary.Prediction = clip(prediction, 500)
 	summary.Stages = stageNames(e.cfg.Stages)
 	summary.Observed = observedFindings(feedback)
-	summary.PredictionResult = evaluatePrediction(prediction, feedback)
+	summary.PredictionResult = evaluatePredictionWithExecution(prediction, feedback, execution, online)
 	summary.DynamicRegions = dynamicRegionSummary(feedback, shellcode)
 	summary.GitCommits = gitCommits
 	summary.FailureLayer = failureLayer(&summary)
@@ -3218,21 +3218,21 @@ func (e *evolver) comparePayloadsTool() tool.CoreTool {
 func (e *evolver) editSourceTool() tool.CoreTool {
 	return tool.Build(tool.Spec{
 		Name: "EditSource",
-		Description: "Replace one exact string in a module source file. The old string must occur once. " +
+		Description: "Replace one exact string in a module source file, or create a new file by passing an empty old_string. " +
 			"module selects the payload module (default), a producer module (donut, crystal_pack), or an agent source root (c_agent, go_agent). " +
 			"crystal_pack links postex-loader/src and rebuilds it on the next BuildShellcode; donut rebuilds src/. " +
 			"The edit is atomic, stored in SQLite with before/after text, and takes effect on the next DetectionCycle.",
-		Prompt: "Apply one source edit.",
+		Prompt: "Apply one source edit or create one source file.",
 		Schema: map[string]any{
 			"type": "object",
 			"properties": map[string]any{
 				"module":     map[string]any{"type": "string", "description": "Writable source root: the payload module (default), donut, crystal_pack, c_agent, or go_agent."},
-				"file":       map[string]any{"type": "string", "description": "Path relative to the module root."},
-				"old_string": map[string]any{"type": "string", "description": "Exact text to replace; must occur once."},
-				"new_string": map[string]any{"type": "string", "description": "Replacement text."},
+				"file":       map[string]any{"type": "string", "description": "Path relative to the module root; its parent directory must already exist."},
+				"old_string": map[string]any{"type": "string", "description": "Exact text to replace; must occur once. Empty creates file and requires it not to exist."},
+				"new_string": map[string]any{"type": "string", "description": "Replacement text, or the full content when creating a file."},
 				"reason":     map[string]any{"type": "string", "description": "Why this edit removes the finding."},
 			},
-			"required": []string{"file", "old_string", "new_string"},
+			"required": []string{"file", "new_string"},
 		},
 		Permissions: func(context.Context, json.RawMessage, permission.Context) permission.Decision {
 			return permission.Allowed()
@@ -3321,21 +3321,35 @@ type editResult struct {
 	File    string `json:"file"`
 	Line    int    `json:"line"`
 	Bytes   int    `json:"bytes"`
+	Created bool   `json:"created,omitempty"`
 	Reason  string `json:"reason,omitempty"`
 	Message string `json:"message"`
 }
 
 func (e *evolver) applyEdit(ctx context.Context, root sourceRoot, file, oldText, newText, reason string) (editResult, error) {
-	if oldText == "" || newText == "" {
-		return editResult{}, fmt.Errorf("old_string and new_string are required")
+	if newText == "" {
+		return editResult{}, fmt.Errorf("new_string is required")
 	}
-	if oldText == newText {
-		return editResult{}, fmt.Errorf("old_string and new_string are identical")
+	creating := oldText == ""
+	if creating {
+		if len(newText) > maxSourceFileBytes {
+			return editResult{}, fmt.Errorf("new file exceeds the %d byte source bound", maxSourceFileBytes)
+		}
+	} else {
+		if oldText == newText {
+			return editResult{}, fmt.Errorf("old_string and new_string are identical")
+		}
+		if len(oldText) > 16<<10 || len(newText) > 16<<10 {
+			return editResult{}, fmt.Errorf("edit text exceeds 16 KiB")
+		}
 	}
-	if len(oldText) > 16<<10 || len(newText) > 16<<10 {
-		return editResult{}, fmt.Errorf("edit text exceeds 16 KiB")
+	var updated sourceWrite
+	var err error
+	if creating {
+		updated, err = createSourceFile(root, file, newText)
+	} else {
+		updated, err = writeSourceFile(root, file, oldText, newText)
 	}
-	updated, err := writeSourceFile(root, file, oldText, newText)
 	if err != nil {
 		return editResult{}, err
 	}
@@ -3348,15 +3362,23 @@ func (e *evolver) applyEdit(ctx context.Context, root sourceRoot, file, oldText,
 		LoopID: e.cfg.LoopID, Iteration: iteration, PayloadID: payloadID,
 		Module: root.Name, File: file, Old: oldText, New: newText, Reason: reason,
 	}); err != nil {
-		if restoreErr := restoreSourceFile(updated.Path, updated.Original); restoreErr != nil {
+		if creating {
+			if removeErr := os.Remove(updated.Path); removeErr != nil {
+				return editResult{}, fmt.Errorf("save edit: %w (remove %s failed: %v)", err, file, removeErr)
+			}
+		} else if restoreErr := restoreSourceFile(updated.Path, updated.Original); restoreErr != nil {
 			return editResult{}, fmt.Errorf("save edit: %w (restore %s failed: %v)", err, file, restoreErr)
 		}
 		return editResult{}, fmt.Errorf("save edit: %w", err)
 	}
 	e.logClass(logging.ClassEdit, "%s/%s:%d (%s): %s", root.Name, file, updated.Line, reason, clip(newText, 160))
+	message := "edit applied; call DetectionCycle to rebuild and detonate"
+	if creating {
+		message = "file created; call DetectionCycle to rebuild and detonate"
+	}
 	return editResult{
-		Module: root.Name, File: file, Line: updated.Line, Bytes: len(updated.Updated), Reason: reason,
-		Message: "edit applied; call DetectionCycle to rebuild and detonate",
+		Module: root.Name, File: file, Line: updated.Line, Bytes: len(updated.Updated),
+		Created: creating, Reason: reason, Message: message,
 	}, nil
 }
 
@@ -3375,10 +3397,7 @@ func writeSourceFile(root sourceRoot, file, oldText, newText string) (sourceWrit
 	if !root.Writable {
 		return sourceWrite{}, fmt.Errorf("source root %s is read-only", root.Name)
 	}
-	file = strings.TrimSpace(strings.ReplaceAll(file, "\\", "/"))
-	if prefix, rest, ok := strings.Cut(file, "/"); ok && strings.EqualFold(prefix, root.Name) {
-		file = rest
-	}
+	file = sourceRelativeFile(root, file)
 	path, err := analystPath(root.Dir, file)
 	if err != nil {
 		return sourceWrite{}, err
@@ -3406,6 +3425,108 @@ func writeSourceFile(root sourceRoot, file, oldText, newText string) (sourceWrit
 		return sourceWrite{}, fmt.Errorf("replace %s: %w", file, err)
 	}
 	return sourceWrite{Updated: updated, Line: line, Path: path, Original: data}, nil
+}
+
+func sourceRelativeFile(root sourceRoot, file string) string {
+	file = strings.TrimSpace(strings.ReplaceAll(file, "\\", "/"))
+	if prefix, rest, ok := strings.Cut(file, "/"); ok && strings.EqualFold(prefix, root.Name) {
+		file = rest
+	}
+	return file
+}
+
+// createSourceFile writes a new file inside a writable root. The file must not
+// exist and its parent directory must already exist, so a create can never
+// replace source.
+func createSourceFile(root sourceRoot, file, content string) (sourceWrite, error) {
+	if !root.Writable {
+		return sourceWrite{}, fmt.Errorf("source root %s is read-only", root.Name)
+	}
+	file = sourceRelativeFile(root, file)
+	path, err := newSourcePath(root, file)
+	if err != nil {
+		return sourceWrite{}, err
+	}
+	handle, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	if err != nil {
+		if os.IsExist(err) {
+			return sourceWrite{}, fmt.Errorf("%s already exists; edit it with old_string and new_string", file)
+		}
+		return sourceWrite{}, fmt.Errorf("create %s: %w", file, err)
+	}
+	removeOnError := func(cause error) (sourceWrite, error) {
+		_ = handle.Close()
+		_ = os.Remove(path)
+		return sourceWrite{}, cause
+	}
+	if _, err := handle.WriteString(content); err != nil {
+		return removeOnError(fmt.Errorf("write %s: %w", file, err))
+	}
+	if err := handle.Sync(); err != nil {
+		return removeOnError(fmt.Errorf("sync %s: %w", file, err))
+	}
+	if err := handle.Close(); err != nil {
+		_ = os.Remove(path)
+		return sourceWrite{}, fmt.Errorf("close %s: %w", file, err)
+	}
+	return sourceWrite{Updated: content, Line: 1, Path: path}, nil
+}
+
+// newSourcePath resolves a not-yet-existing file inside the root. The parent
+// directory is resolved through symlinks and checked against the root, so a
+// create cannot escape it.
+func newSourcePath(root sourceRoot, file string) (string, error) {
+	if file == "" || !analystSourcePath.MatchString(file) {
+		return "", fmt.Errorf("invalid source path")
+	}
+	rootReal, err := filepath.EvalSymlinks(root.Dir)
+	if err != nil {
+		return "", fmt.Errorf("resolve module directory: %w", err)
+	}
+	clean := filepath.Clean(filepath.FromSlash(file))
+	if clean == "." || clean == ".." || strings.HasPrefix(clean, ".."+string(os.PathSeparator)) {
+		return "", fmt.Errorf("source path escapes the module directory")
+	}
+	parent := filepath.Dir(clean)
+	parentReal, err := filepath.EvalSymlinks(filepath.Join(rootReal, parent))
+	if err != nil {
+		return "", fmt.Errorf("resolve source directory: %w", err)
+	}
+	rel, err := filepath.Rel(rootReal, parentReal)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return "", fmt.Errorf("source path escapes the module directory")
+	}
+	path := filepath.Join(parentReal, filepath.Base(clean))
+	if _, err := os.Lstat(path); err == nil {
+		return "", fmt.Errorf("%s already exists; edit it with old_string and new_string", file)
+	} else if !os.IsNotExist(err) {
+		return "", fmt.Errorf("stat %s: %w", file, err)
+	}
+	return path, nil
+}
+
+// removeCreatedSourceFile deletes a file this loop created. It refuses when
+// the file no longer matches the recorded content, so a hand edit is not lost.
+func removeCreatedSourceFile(root sourceRoot, file, expected string) (string, error) {
+	if !root.Writable {
+		return "", fmt.Errorf("source root %s is read-only", root.Name)
+	}
+	file = sourceRelativeFile(root, file)
+	path, err := analystPath(root.Dir, file)
+	if err != nil {
+		return "", err
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("read %s: %w", file, err)
+	}
+	if string(data) != expected {
+		return "", fmt.Errorf("%s changed since it was created; refusing to delete it", file)
+	}
+	if err := os.Remove(path); err != nil {
+		return "", fmt.Errorf("remove %s: %w", file, err)
+	}
+	return path, nil
 }
 
 // restoreSourceFile puts back the bytes a failed edit replaced.

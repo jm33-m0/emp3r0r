@@ -1204,3 +1204,128 @@ func TestReportUsesLastExecutingPayloadAfterRejectedCycle(t *testing.T) {
 		t.Fatalf("summary shows the rejected cycle as final:\n%s", summary)
 	}
 }
+
+func TestSourceReadListsDirectory(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "include", "util"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "include", "util.h"), []byte("int x;\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "include", "util", "bits.h"), []byte("int y;\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	roots, err := newSourceRoots("module", sourceRoot{Name: "module", Dir: dir, Writable: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(map[string]any{"path": "include"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := moduleReadTool(roots, nil).Call(context.Background(), raw, nil)
+	if err != nil || result.IsError {
+		t.Fatalf("directory read failed: %v %s", err, result.Flatten())
+	}
+	out := result.Flatten()
+	for _, want := range []string{"directory include (2 entries)", "util.h", "util/"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("directory listing missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestSourceSearchScopesDirectory(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "include"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "src"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "include", "util.h"), []byte("int needle;\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "src", "main.c"), []byte("int needle;\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	roots, err := newSourceRoots("module", sourceRoot{Name: "module", Dir: dir, Writable: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(map[string]any{"path": "include", "pattern": "needle"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := moduleSearchTool(roots).Call(context.Background(), raw, nil)
+	if err != nil || result.IsError {
+		t.Fatalf("directory search failed: %v %s", err, result.Flatten())
+	}
+	out := result.Flatten()
+	if !strings.Contains(out, "include/util.h:1:") {
+		t.Fatalf("directory search missed the include file:\n%s", out)
+	}
+	if strings.Contains(out, "src/main.c") {
+		t.Fatalf("directory search escaped into src:\n%s", out)
+	}
+}
+
+func TestEditSourceCreatesNewFileAndRevertsIt(t *testing.T) {
+	dir := t.TempDir()
+	db, err := OpenTelemetryDB(filepath.Join(t.TempDir(), "telemetry.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	roots, err := newSourceRoots("module", sourceRoot{Name: "module", Dir: dir, Writable: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := &evolver{
+		cfg:   EvolveConfig{LoopID: "loop", Module: "module", ModuleDir: dir, Iterations: 20},
+		db:    db,
+		roots: roots,
+		logf:  func(logging.Class, string, ...any) {},
+	}
+	content := "#pragma once\n"
+	raw, err := json.Marshal(map[string]any{
+		"file": "new.h", "new_string": content, "reason": "add a shared helper",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := e.editSourceTool().Call(context.Background(), raw, nil)
+	if err != nil || result.IsError {
+		t.Fatalf("create failed: %v %s", err, result.Flatten())
+	}
+	if !strings.Contains(result.Flatten(), `"created":true`) {
+		t.Fatalf("create result does not report the new file: %s", result.Flatten())
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "new.h"))
+	if err != nil || string(data) != content {
+		t.Fatalf("created file = %q, err = %v", data, err)
+	}
+	if second, err := e.editSourceTool().Call(context.Background(), raw, nil); err != nil || !second.IsError {
+		t.Fatalf("creating an existing file was accepted: %v %s", err, second.Flatten())
+	}
+	escape, err := json.Marshal(map[string]any{"file": "../escape.h", "new_string": content})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if escaped, err := e.editSourceTool().Call(context.Background(), escape, nil); err != nil || !escaped.IsError {
+		t.Fatalf("create escaped the root: %v %s", err, escaped.Flatten())
+	}
+	var id int64
+	if err := db.db.QueryRow(`SELECT id FROM loop_edits WHERE loop_id='loop' ORDER BY id DESC LIMIT 1`).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.applyRevertEdits(context.Background(), []revertEdit{{
+		id: id, module: "module", file: "new.h", old: "", new: content,
+	}}, 0, "test"); err != nil {
+		t.Fatalf("revert of a created file failed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "new.h")); !os.IsNotExist(err) {
+		t.Fatalf("revert did not delete the created file: %v", err)
+	}
+}

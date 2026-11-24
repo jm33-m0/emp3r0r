@@ -116,6 +116,68 @@ func TestCyclePreconditionsBlocksRepeatedMissedPrediction(t *testing.T) {
 	}
 }
 
+func TestEvaluatePredictionMixedClaims(t *testing.T) {
+	feedback := Feedback{Findings: []Finding{
+		{Rule: "telemetry/namespace", Indicator: "Change thread namespace", Severity: "high"},
+		{Rule: "falco/PenguinBox custom proc maps read", Indicator: "PenguinBox custom proc maps read", Severity: "medium"},
+		{Rule: "falco/PenguinBox proc maps read", Indicator: "PenguinBox proc maps read", Severity: "medium"},
+		{Rule: "elf/no-build-id", Indicator: "elf/no-build-id", Severity: "low"},
+	}}
+	prediction := "The high static findings elf/string indicator=/proc/self/maps and PenguinBox_ProcMaps (YARA $a) disappear from the static stage, so analyzer/static/elf and analyzer/static/yara no longer report high findings. " +
+		"Dynamic Falco 'PenguinBox proc maps read' and 'PenguinBox custom proc maps read' medium alerts persist because the payload still opens the real /proc/self/maps. " +
+		"Execution stays verified (agent checks in)."
+	online := true
+	if got := evaluatePredictionWithExecution(prediction, feedback, executionVerified, &online); got != predictionMatched {
+		t.Fatalf("mixed prediction = %q, want matched", got)
+	}
+}
+
+func TestEvaluatePredictionIgnoresRationaleNegation(t *testing.T) {
+	feedback := Feedback{Findings: []Finding{
+		{Rule: "falco/PenguinBox proc maps read", Indicator: "PenguinBox proc maps read", Severity: "medium"},
+		{Rule: "falco/PenguinBox custom proc maps read", Indicator: "PenguinBox custom proc maps read", Severity: "medium"},
+		{Rule: "elf/no-build-id", Indicator: "elf/no-build-id", Severity: "low"},
+		{Rule: "elf/stripped", Indicator: "elf/stripped", Severity: "low"},
+	}}
+	prediction := "The rebuilt stager ELF and embedded malasada PIC contain no '/proc/self/maps' literal, so YARA PenguinBox_ProcMaps and elf/string no longer match and the analyzer/static/yara and analyzer/static/elf high aggregates drop to zero; execution stays verified with the agent online. " +
+		"Dynamic Falco 'proc maps read' may still fire because the real path is opened at runtime (literal-only removal), which is expected and not a regression."
+	online := true
+	if got := evaluatePredictionWithExecution(prediction, feedback, executionVerified, &online); got != predictionMatched {
+		t.Fatalf("prediction with a rationale negation = %q, want matched", got)
+	}
+}
+
+func TestEvaluatePredictionRuleCountLimit(t *testing.T) {
+	prediction := "The Falco 'PenguinBox proc maps read' and 'PenguinBox custom proc maps read' alerts drop from 7 raw alerts per rule to at most 2, with execution still verified."
+	text := "falco/PenguinBox proc maps read PenguinBox proc maps read falco/PenguinBox custom proc maps read PenguinBox custom proc maps read execution=verified"
+	below := predictionEvidence{text: text, ruleCounts: map[string]int{
+		"falco/penguinbox proc maps read":        2,
+		"falco/penguinbox custom proc maps read": 2,
+	}}
+	if got := evaluatePredictionAgainst(prediction, below); got != predictionMatched {
+		t.Fatalf("rule count at the bound = %q, want matched", got)
+	}
+	above := predictionEvidence{text: text, ruleCounts: map[string]int{
+		"falco/penguinbox proc maps read":        3,
+		"falco/penguinbox custom proc maps read": 2,
+	}}
+	if got := evaluatePredictionAgainst(prediction, above); got != predictionNotObserved {
+		t.Fatalf("rule count above the bound = %q, want not-observed", got)
+	}
+}
+
+func TestEvaluatePredictionMixedClaimsFailsWhenTheRemovedClaimRemains(t *testing.T) {
+	feedback := Feedback{Findings: []Finding{
+		{Rule: "elf/string", Indicator: "/proc/self/maps", Severity: "high"},
+		{Rule: "falco/PenguinBox proc maps read", Indicator: "PenguinBox proc maps read", Severity: "medium"},
+	}}
+	prediction := "The high static findings elf/string and PenguinBox_ProcMaps disappear. " +
+		"The Falco proc maps read alerts persist."
+	if got := evaluatePrediction(prediction, feedback); got != predictionNotObserved {
+		t.Fatalf("mixed prediction with a surviving claim = %q, want not-observed", got)
+	}
+}
+
 func TestEvaluatePrediction(t *testing.T) {
 	feedback := Feedback{Findings: []Finding{{
 		Rule: "telemetry/child-process", Indicator: "CreateProcessW", Severity: "medium",
