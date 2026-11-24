@@ -36,9 +36,11 @@ Opt into more when you need it:
 
 - `--full` and `--targets` still control any prebuilt fallback artifacts for a
   release kit; on-demand generation follows the payload request instead.
-- `--agent-tags 'with_quic with_utls'` selects optional tags for prebuilt
-  release artifacts. `generate` derives tags from its selected features;
-  `--list-agent-tags` prints the reference; see
+- `--agent-tags 'with_quic with_utls'` selects an exact set of optional tags
+  for prebuilt release artifacts and for `generate`. `generate` derives tags
+  from its selected features when the flag is omitted; pass it to override the
+  set, or pass an empty value for the slim agent. `generate --list-agent-tags`
+  prints the reference; see
   [Choosing the C2 transport and agent features](#choosing-the-c2-transport-and-agent-features).
 - `--garble PATH` uses your own garble binary, for example a patched build with
   a different fingerprint, instead of the builder's vanilla garble.
@@ -276,6 +278,9 @@ generate --type linux_executable --arch amd64 --cc your.domain.com --p2p --p2p-t
 # AES-GCM framed like the other transports
 # (requires the Windows SMB stack / logon session to reach the peer)
 generate --type windows_executable --arch amd64 --cc your.domain.com --p2p --p2p-transport smb
+
+# Exact feature set instead of deriving it from the transport flags
+generate --type linux_executable --arch amd64 --cc your.domain.com --agent-tags 'with_quic with_utls'
 ```
 
 Generated payloads use feature-based names instead of timestamps, so the
@@ -354,10 +359,17 @@ kcp/mtls work everywhere. KCP is mesh-only; it is not a C2 channel.
 
 Optional agent subsystems are opt-in with `with_*` Go build tags. `generate`
 maps the selected features to tags and builds the agent on demand; an agent with
-no optional features is slim (plain HTTP polling with `crypto/tls`). The
-installer can still build prebuilt release artifacts for `--full`/`--targets`,
-where `--agent-tags` selects their exact feature set. `install.py
---list-agent-tags` prints the reference.
+no optional features is slim (plain HTTP polling with `crypto/tls`). Pass
+`--agent-tags` to set the exact feature set instead, or `generate
+--list-agent-tags` to print the reference. An explicit set must still satisfy
+the selected transport: `--c2-channel-mode quic` needs `with_quic`, `h2conn`
+needs `with_h2conn`, `tor` needs `with_transport_tor`, `--p2p` needs
+`with_mesh`, KCP needs `with_kcp` as well, and a DoH/ECH server needs the
+matching tags. The generator rejects a set that would compile without the
+configured dialer. The installer can still build
+prebuilt release artifacts for `--full`/`--targets`, where `--agent-tags`
+selects their exact feature set. `install.py --list-agent-tags` prints the same
+reference.
 
 | Scenario                              | Build tags                                                                                                   |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
