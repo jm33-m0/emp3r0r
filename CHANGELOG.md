@@ -13,6 +13,17 @@
 * detection loop: run `stager_linux` with an embedded C agent PIC, PenguinBox Tracee/Falco telemetry, Linux findings, and platform-tagged traces
 * malasada: move the Linux shellcode converter into an editable producer module and ship the Go toolchain in the operator kit
 
+## [5.12.2](https://github.com/jm33-m0/emp3r0r/compare/v5.12.1...v5.12.2) (2026-11-24)
+
+
+### Bug Fixes
+
+* add malasada stage0 source for model to edit ([de7b980](https://github.com/jm33-m0/emp3r0r/commit/de7b980f1780cebfd43ef92c6943c71a40a9b560))
+* classify linux telemetry from event data ([0bec82a](https://github.com/jm33-m0/emp3r0r/commit/0bec82ab7c934622fc9c73c35a3758b31092fc80))
+* grade mixed predictions; support file creation in source tool ([20199d1](https://github.com/jm33-m0/emp3r0r/commit/20199d1c40e4d5a8f592bb3df3a1a3d7a38260c9))
+* inject operator prompts to loop ([8d9f6d5](https://github.com/jm33-m0/emp3r0r/commit/8d9f6d5d0bb2a8f5de39754016c1a07fed6351e5))
+* reject `memfd` bullshit ([1b4efde](https://github.com/jm33-m0/emp3r0r/commit/1b4efde83773feeddb2b8eb5d00fb162ddb43846))
+
 ## [5.12.1](https://github.com/jm33-m0/emp3r0r/compare/v5.12.0...v5.12.1) (2026-11-22)
 
 
