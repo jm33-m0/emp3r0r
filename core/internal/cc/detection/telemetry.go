@@ -1624,6 +1624,7 @@ func (t *TelemetryDB) Findings(ctx context.Context, traceID int64) ([]Finding, e
 	// Defender traffic is excluded by payload_role.
 	network, err := t.rows(ctx, `SELECT event, proto, src_addr, src_port, dst_addr, dst_port, bytes
 		FROM events WHERE trace_pk = ? AND category = 'network' AND signal = 'signal'
+		AND provider <> 'falco'
 		AND payload_role IN ('payload', 'payload-child') ORDER BY id LIMIT 200`, traceID)
 	if err != nil {
 		return nil, err

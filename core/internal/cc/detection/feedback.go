@@ -208,6 +208,7 @@ func BuildFeedback(run Run) Feedback {
 	if len(fb.Pending) > 0 {
 		fb.Notes = append(fb.Notes, "feedback is partial; pending stages are listed")
 	}
+	fb.Findings = dedupeFindings(fb.Findings)
 	fb.SourceEdits = dedupeEdits(fb.SourceEdits)
 	sort.SliceStable(fb.Findings, func(i, j int) bool {
 		ri := severityRank(fb.Findings[i].Severity)
@@ -780,6 +781,28 @@ func parseRiskFactors(factors []string) []Finding {
 		}
 	}
 	return findings
+}
+
+// dedupeFindings collapses a sandbox-native Falco finding and the
+// telemetry-derived falco/<rule> finding for the same alert. The comparison
+// strips the source prefix; no rule name is special-cased.
+func dedupeFindings(findings []Finding) []Finding {
+	seen := make(map[string]int, len(findings))
+	out := make([]Finding, 0, len(findings))
+	for _, finding := range findings {
+		rule := strings.ToLower(strings.TrimSpace(finding.Rule))
+		rule = strings.TrimPrefix(rule, "falco/")
+		key := rule + "|" + strings.ToLower(strings.TrimSpace(finding.Indicator))
+		if index, ok := seen[key]; ok {
+			if severityRank(finding.Severity) < severityRank(out[index].Severity) {
+				out[index] = finding
+			}
+			continue
+		}
+		seen[key] = len(out)
+		out = append(out, finding)
+	}
+	return out
 }
 
 func hasFindingRule(findings []Finding, rule string) bool {

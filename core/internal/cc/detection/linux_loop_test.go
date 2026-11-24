@@ -350,3 +350,39 @@ func TestLinuxDebuggerAvailableWithGuest(t *testing.T) {
 		t.Fatal("Linux debugger was not available with a configured guest and cycle policy")
 	}
 }
+
+func TestFalcoCategoryUsesEventType(t *testing.T) {
+	cases := []struct {
+		rule, evtType, path string
+		category, operation string
+	}{
+		{"Example executable memory", "mprotect", "", "memory", "protect"},
+		{"Example connection from writable executable", "connect", "", "network", "connect"},
+		{"Example process memory write", "openat", "/proc/42/mem", "memory", "write"},
+		{"Example process map read", "openat", "/proc/self/maps", "memory", "map"},
+		{"Example bpf load", "bpf", "", "kernel", "module"},
+		{"Example namespace change", "unshare", "", "namespace", "change"},
+		{"Example shell", "execveat", "", "process", "create"},
+	}
+	for _, test := range cases {
+		category, operation := falcoCategory(test.rule, test.evtType, test.path)
+		if category != test.category || operation != test.operation {
+			t.Fatalf("%q %q: got %s/%s, want %s/%s", test.rule, test.evtType, category, operation, test.category, test.operation)
+		}
+	}
+}
+
+func TestDedupeFindingsMergesFalcoSources(t *testing.T) {
+	findings := []Finding{
+		{Rule: "Example EDR rule", Indicator: "Example EDR rule", Severity: "medium", Tool: "falco"},
+		{Rule: "falco/Example EDR rule", Indicator: "Example EDR rule", Severity: "high", Tool: "telemetry"},
+		{Rule: "telemetry/example", Indicator: "example", Severity: "medium", Tool: "telemetry"},
+	}
+	got := dedupeFindings(findings)
+	if len(got) != 2 {
+		t.Fatalf("deduped findings = %+v", got)
+	}
+	if got[0].Rule != "falco/Example EDR rule" || got[0].Severity != "high" {
+		t.Fatalf("kept finding = %+v, want the higher-severity falco source", got[0])
+	}
+}

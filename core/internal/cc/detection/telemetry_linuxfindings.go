@@ -45,6 +45,7 @@ func (t *TelemetryDB) addLinuxFindings(ctx context.Context, traceID int64, add f
 	// memory and cross-process injection.
 	memory, err := t.rows(ctx, `SELECT event, operation, pid, target_pid, protection, size, path, image
 		FROM events WHERE trace_pk = ? AND category = 'memory'
+		AND provider <> 'falco'
 		AND signal IN ('signal', 'unattributed')
 		AND payload_role IN ('payload', 'payload-child') ORDER BY id LIMIT 200`, traceID)
 	if err == nil {
@@ -92,7 +93,9 @@ func (t *TelemetryDB) addLinuxFindings(ctx context.Context, traceID int64, add f
 	}
 
 	kernel, err := t.rows(ctx, `SELECT event, operation, pid, path, image FROM events
-		WHERE trace_pk = ? AND category = 'kernel' ORDER BY id LIMIT 20`, traceID)
+		WHERE trace_pk = ? AND category = 'kernel' AND provider <> 'falco'
+		AND signal IN ('signal', 'unattributed')
+		AND payload_role IN ('payload', 'payload-child') ORDER BY id LIMIT 20`, traceID)
 	if err == nil {
 		for _, row := range kernel {
 			add("critical", "telemetry/kernel-module", "kernel module load",
@@ -101,7 +104,9 @@ func (t *TelemetryDB) addLinuxFindings(ctx context.Context, traceID int64, add f
 		}
 	}
 	namespace, err := t.rows(ctx, `SELECT event, operation, pid FROM events
-		WHERE trace_pk = ? AND category = 'namespace' ORDER BY id LIMIT 20`, traceID)
+		WHERE trace_pk = ? AND category = 'namespace' AND provider <> 'falco'
+		AND signal IN ('signal', 'unattributed')
+		AND payload_role IN ('payload', 'payload-child') ORDER BY id LIMIT 20`, traceID)
 	if err == nil {
 		for _, row := range namespace {
 			add("high", "telemetry/namespace", row.string("event"),
@@ -114,6 +119,7 @@ func (t *TelemetryDB) addLinuxFindings(ctx context.Context, traceID int64, add f
 	// which is a distinct finding from an ordinary child process.
 	execs, err := t.rows(ctx, `SELECT event, pid, image, path, command FROM events
 		WHERE trace_pk = ? AND category = 'process' AND operation = 'create'
+		AND provider <> 'falco'
 		AND payload_role IN ('payload', 'payload-child') ORDER BY id LIMIT 200`, traceID)
 	if err == nil {
 		seen := map[string]struct{}{}

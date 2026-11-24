@@ -451,24 +451,55 @@ func normalizeFalcoEvent(object map[string]any) []telemetryEvent {
 }
 
 func falcoCategory(rule, evtType, path string) (string, string) {
-	lower := strings.ToLower(rule + " " + evtType + " " + path)
+	evtType = strings.ToLower(strings.TrimSpace(evtType))
+	path = strings.ToLower(strings.TrimSpace(path))
+	switch evtType {
+	case "mmap", "mprotect", "mremap", "memfd_create", "process_vm_readv",
+		"process_vm_writev", "ptrace":
+		return "memory", traceeMemoryOperation(evtType)
+	case "open", "openat", "openat2", "creat", "unlink", "unlinkat",
+		"rename", "renameat", "renameat2", "truncate", "ftruncate",
+		"chmod", "fchmod", "fchmodat":
+		if strings.Contains(path, "/proc/") && strings.HasSuffix(path, "/mem") {
+			return "memory", "write"
+		}
+		if strings.Contains(path, "/proc/") && strings.HasSuffix(path, "/maps") {
+			return "memory", "map"
+		}
+		return "file", "open"
+	case "connect", "listen", "socket", "accept", "bind", "security_socket_connect":
+		return "network", "connect"
+	case "execve", "execveat", "sched_process_exec":
+		return "process", "create"
+	case "setns", "unshare", "mount", "umount2", "pivot_root":
+		return "namespace", "change"
+	case "init_module", "finit_module", "delete_module", "bpf", "kexec_load", "kexec_file_load":
+		return "kernel", "module"
+	}
+	// Fallback for alerts without evt.type. Use words that identify a behavior,
+	// not generic substrings: "executable" is not an exec event.
+	lower := strings.ToLower(rule)
 	switch {
 	case strings.Contains(lower, "memfd"), strings.Contains(lower, "ptrace"),
-		strings.Contains(lower, "maps"), strings.Contains(lower, "process_vm"):
-		op := "memory"
+		strings.Contains(lower, "proc maps"), strings.Contains(lower, "process_vm"),
+		strings.Contains(lower, "mmap"), strings.Contains(lower, "mprotect"):
+		op := "map"
 		if strings.Contains(lower, "memfd") {
 			op = "create"
 		} else if strings.Contains(lower, "ptrace") {
 			op = "ptrace"
+		} else if strings.Contains(lower, "mprotect") {
+			op = "protect"
 		}
 		return "memory", op
 	case strings.Contains(lower, "connect"), strings.Contains(lower, "network"),
 		strings.Contains(lower, "socket"):
 		return "network", "connect"
-	case strings.Contains(lower, "exec"), strings.Contains(lower, "shell"),
-		strings.Contains(lower, "process"), strings.Contains(lower, "writable"):
+	case strings.Contains(lower, "execve"), strings.Contains(lower, "shell"),
+		strings.Contains(lower, "spawned"), strings.Contains(lower, "writable"):
 		return "process", "create"
-	case strings.Contains(lower, "module"), strings.Contains(lower, "kernel"):
+	case strings.Contains(lower, "module"), strings.Contains(lower, "kernel"),
+		strings.Contains(lower, "bpf"), strings.Contains(lower, "kexec"):
 		return "kernel", "module"
 	case strings.Contains(lower, "namespace"), strings.Contains(lower, "mount"),
 		strings.Contains(lower, "unshare"), strings.Contains(lower, "setns"):
