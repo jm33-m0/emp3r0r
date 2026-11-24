@@ -3,6 +3,7 @@ package detection
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -47,6 +48,8 @@ func callTool(t *testing.T, e *evolver, name string, args any) toolResult {
 		coreTool = e.sourceMultiEditTool()
 	case "SourceDelete":
 		coreTool = e.sourceDeleteTool()
+	case "SourceMove":
+		coreTool = e.sourceMoveTool()
 	default:
 		t.Fatalf("unknown tool %s", name)
 	}
@@ -59,12 +62,12 @@ func callTool(t *testing.T, e *evolver, name string, args any) toolResult {
 
 func TestSourceTreeHidesVendorAndHonorsDepth(t *testing.T) {
 	e, dir := newSourceToolTestEvolver(t)
-	for _, path := range []string{"internal/agent", "vendor/dep"} {
+	for _, path := range []string{"internal/agent", "vendor/dep", "build"} {
 		if err := os.MkdirAll(filepath.Join(dir, path), 0o755); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for _, path := range []string{"internal/agent/main.go", "vendor/dep/dep.go", "README.md"} {
+	for _, path := range []string{"internal/agent/main.go", "vendor/dep/dep.go", "build/gen.go", "README.md"} {
 		if err := os.WriteFile(filepath.Join(dir, path), []byte("x"), 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -81,6 +84,9 @@ func TestSourceTreeHidesVendorAndHonorsDepth(t *testing.T) {
 	}
 	if strings.Contains(out, "dep.go") {
 		t.Fatalf("tree exposed vendor contents:\n%s", out)
+	}
+	if strings.Contains(out, "gen.go") {
+		t.Fatalf("tree exposed build output:\n%s", out)
 	}
 	result, err = sourceTreeTool(e.roots).Call(context.Background(), json.RawMessage(`{"include_vendor":true,"depth":2}`), nil)
 	if err != nil {
@@ -135,7 +141,7 @@ func TestSourceWriteCreatesDirsAndReverts(t *testing.T) {
 		t.Fatalf("written file = %q err=%v", data, err)
 	}
 	if _, err := e.applyRevertEdits(context.Background(), []revertEdit{{
-		id: 1, module: "module", file: "internal/newpkg/agent.go", old: "", new: content,
+		id: 1, module: "module", file: "internal/newpkg/agent.go", old: "", new: content, created: true,
 	}}, 1, "test"); err != nil {
 		t.Fatalf("revert create: %v", err)
 	}
@@ -232,5 +238,77 @@ func TestSourceDeleteReverts(t *testing.T) {
 	}
 	if data, err := os.ReadFile(path); err != nil || string(data) != content {
 		t.Fatalf("revert delete = %q err=%v", data, err)
+	}
+}
+
+func TestSourceMoveReverts(t *testing.T) {
+	e, dir := newSourceToolTestEvolver(t)
+	from := filepath.Join(dir, "old.go")
+	to := filepath.Join(dir, "pkg", "new.go")
+	content := "package pkg\n"
+	if err := os.WriteFile(from, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if got := callTool(t, e, "SourceMove", map[string]any{
+		"from": "old.go", "to": "pkg/new.go", "reason": "package split",
+	}); got.isError {
+		t.Fatalf("move failed: %s", got.text)
+	}
+	if data, err := os.ReadFile(to); err != nil || string(data) != content {
+		t.Fatalf("moved file = %q err=%v", data, err)
+	}
+	if _, err := os.Stat(from); !os.IsNotExist(err) {
+		t.Fatalf("move left the source: %v", err)
+	}
+	rows, err := e.db.db.Query(`SELECT id, COALESCE(module, ''), file, old, new, created FROM loop_edits WHERE loop_id='loop' ORDER BY id DESC`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	edits, err := scanRevertEdits(rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.applyRevertEdits(context.Background(), edits, 1, "test"); err != nil {
+		t.Fatalf("revert move: %v", err)
+	}
+	if data, err := os.ReadFile(from); err != nil || string(data) != content {
+		t.Fatalf("revert source = %q err=%v", data, err)
+	}
+	if _, err := os.Stat(to); !os.IsNotExist(err) {
+		t.Fatalf("revert left the destination: %v", err)
+	}
+}
+
+func TestSourceIndexSkipsDependenciesAndKeepsLargeTrees(t *testing.T) {
+	dir := t.TempDir()
+	for _, path := range []string{"vendor/dep/bad.go", "build/gen.go"} {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(dir, path)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, path), []byte("package dep\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "src"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for i := range 600 {
+		name := filepath.Join(dir, "src", fmt.Sprintf("file%03d.go", i))
+		if err := os.WriteFile(name, []byte("package src\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	index := newSourceIndex(dir)
+	var sawLast bool
+	for _, file := range index.files {
+		if strings.HasPrefix(file.rel, "vendor/") || strings.HasPrefix(file.rel, "build/") {
+			t.Fatalf("index included dependency file %s", file.rel)
+		}
+		if file.rel == "src/file599.go" {
+			sawLast = true
+		}
+	}
+	if !sawLast {
+		t.Fatalf("index stopped before the last source file (%d files)", len(index.files))
 	}
 }

@@ -176,7 +176,7 @@ func addDetectLoopFlags(cmd *cobra.Command) {
 	cmd.Flags().Int("planner-turns", 24, "Maximum planner turns per session")
 	cmd.Flags().Duration("planner-timeout", 10*time.Minute, "Hard decision window for one planner decision; the planner is forced to return its JSON plan when it expires")
 	cmd.Flags().Int("planner-read-budget", 12, "Read-only calls before the planner must return a plan; negative disables the cap")
-	cmd.Flags().Int("editor-read-budget", 12, "Read-only calls without an edit before the editor loses read tools; negative disables the cap")
+	cmd.Flags().Int("editor-read-budget", 24, "Read-only calls without an edit before the editor loses read tools; negative disables the cap")
 	cmd.Flags().Int("debugger-tool-budget", 0, "Total tool calls per debugger pass; 0 means no cap (turn and time limits still apply)")
 	cmd.Flags().Duration("editor-timeout", 15*time.Minute, "Decision window for one editor session; the editor is forced to apply the edit and call DetectionCycle when it expires")
 	cmd.Flags().Int("editor-turns", 60, "Maximum editor turns per session")

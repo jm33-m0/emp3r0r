@@ -200,6 +200,7 @@ CREATE TABLE IF NOT EXISTS loop_edits (
 	file TEXT NOT NULL,
 	old TEXT NOT NULL DEFAULT '',
 	new TEXT NOT NULL DEFAULT '',
+	created INTEGER NOT NULL DEFAULT 0,
 	reason TEXT NOT NULL DEFAULT '',
 	created_at INTEGER NOT NULL DEFAULT 0,
 	reverted INTEGER NOT NULL DEFAULT 0
@@ -404,6 +405,7 @@ func OpenTelemetryDB(path string) (*TelemetryDB, error) {
 		{"loop_edits", "module", "TEXT NOT NULL DEFAULT ''"},
 		{"loop_edits", "kind", "TEXT NOT NULL DEFAULT 'model'"},
 		{"loop_edits", "reverted", "INTEGER NOT NULL DEFAULT 0"},
+		{"loop_edits", "created", "INTEGER NOT NULL DEFAULT 0"},
 		{"loop_workers", "reason", "TEXT NOT NULL DEFAULT ''"},
 		{"loop_workers", "turns", "INTEGER NOT NULL DEFAULT 0"},
 		{"loop_workers", "tokens_in", "INTEGER NOT NULL DEFAULT 0"},

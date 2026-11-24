@@ -828,6 +828,9 @@ func TestGenerateAgentBuildsArtifactWithoutShellcode(t *testing.T) {
 	if e.agentSourceDirty.Load() {
 		t.Fatal("GenerateAgent did not clear the dirty agent source flag")
 	}
+	if !e.agentNeedsWrap.Load() {
+		t.Fatal("GenerateAgent did not mark the agent as needing a shellcode wrap")
+	}
 	if e.agentArtifact != artifact {
 		t.Fatalf("agent artifact = %q, want %q", e.agentArtifact, artifact)
 	}
@@ -1328,7 +1331,7 @@ func TestEditSourceCreatesNewFileAndRevertsIt(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := e.applyRevertEdits(context.Background(), []revertEdit{{
-		id: id, module: "module", file: "new.h", old: "", new: content,
+		id: id, module: "module", file: "new.h", old: "", new: content, created: true,
 	}}, 0, "test"); err != nil {
 		t.Fatalf("revert of a created file failed: %v", err)
 	}

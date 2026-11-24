@@ -91,9 +91,6 @@ func (e *evolver) applySourceWrite(ctx context.Context, root sourceRoot, file, c
 		if readErr != nil {
 			return editResult{}, fmt.Errorf("read %s: %w", file, readErr)
 		}
-		if len(original) == 0 {
-			return editResult{}, fmt.Errorf("%s exists and is empty; use EditSource to insert content", file)
-		}
 		if string(original) == content {
 			return editResult{}, fmt.Errorf("%s content is unchanged", file)
 		}
@@ -212,9 +209,6 @@ func (e *evolver) applyMultiEdit(ctx context.Context, root sourceRoot, file stri
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return editResult{}, fmt.Errorf("read %s: %w", file, err)
-	}
-	if len(data) == 0 {
-		return editResult{}, fmt.Errorf("%s is empty; use SourceWrite", file)
 	}
 	original := string(data)
 	content := original
@@ -350,7 +344,7 @@ func (e *evolver) applySourceDelete(ctx context.Context, root sourceRoot, file, 
 	}
 	if err := e.db.SaveEdit(ctx, EditRecord{
 		LoopID: e.cfg.LoopID, Iteration: e.iter + 1, PayloadID: payloadID,
-		Module: root.Name, File: file, Old: string(data), New: "", Reason: reason,
+		Module: root.Name, File: file, Old: string(data), New: "", Created: false, Reason: reason,
 	}); err != nil {
 		if restoreErr := os.WriteFile(path, data, info.Mode().Perm()); restoreErr != nil {
 			return editResult{}, fmt.Errorf("save delete: %w (restore %s failed: %v)", err, file, restoreErr)
@@ -456,4 +450,130 @@ func newSourcePathWithDirs(root sourceRoot, file string) (string, error) {
 		return "", fmt.Errorf("stat %s: %w", file, err)
 	}
 	return path, nil
+}
+
+// sourceMoveTool renames a file and records the create and delete as one
+// atomic pair, so a revert cannot leave a half-moved tree.
+func (e *evolver) sourceMoveTool() tool.CoreTool {
+	return tool.Build(tool.Spec{
+		Name: "SourceMove",
+		Description: "Move or rename one source file. Parent directories for the destination are created; the old path must exist and the new path must not. " +
+			"The create and delete are recorded atomically for rollback. Empty files cannot be moved.",
+		Prompt: "Move a file when a rename or package split is the change.",
+		Schema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"module": map[string]any{"type": "string", "description": "Writable source root; default: the payload module."},
+				"from":   map[string]any{"type": "string", "description": "Existing path relative to the root."},
+				"to":     map[string]any{"type": "string", "description": "New path relative to the root; must not exist."},
+				"reason": map[string]any{"type": "string", "description": "Why this move removes the finding."},
+			},
+			"required": []string{"from", "to"},
+		},
+		Permissions: func(context.Context, json.RawMessage, permission.Context) permission.Decision {
+			return permission.Allowed()
+		},
+		Run: func(ctx context.Context, raw json.RawMessage, _ *tool.ToolContext) (tool.Result, error) {
+			var args struct {
+				Module string `json:"module"`
+				From   string `json:"from"`
+				To     string `json:"to"`
+				Reason string `json:"reason"`
+			}
+			if err := json.Unmarshal(raw, &args); err != nil {
+				return tool.Errorf("invalid arguments"), nil
+			}
+			if e.usedCycles() >= e.cfg.Iterations {
+				return tool.Errorf("iteration limit reached; the move could not be built or tested"), nil
+			}
+			root, err := e.root(args.Module)
+			if err != nil {
+				return tool.Errorf(fmt.Sprintf("%v", err)), nil
+			}
+			if !root.Writable {
+				return tool.Errorf(fmt.Sprintf("source root %s is read-only", root.Name)), nil
+			}
+			for _, file := range []string{args.From, args.To} {
+				if err := e.requireProducerContract(root.Name, file); err != nil {
+					return tool.Errorf(fmt.Sprintf("%v", err)), nil
+				}
+			}
+			result, err := e.applySourceMove(ctx, root, args.From, args.To, args.Reason)
+			if err != nil {
+				return tool.Errorf(fmt.Sprintf("%v", err)), nil
+			}
+			data, _ := json.Marshal(result)
+			return tool.Text(string(data)), nil
+		},
+	})
+}
+
+func (e *evolver) applySourceMove(ctx context.Context, root sourceRoot, from, to, reason string) (editResult, error) {
+	from = sourceRelativeFile(root, from)
+	to = sourceRelativeFile(root, to)
+	if from == "" || to == "" {
+		return editResult{}, fmt.Errorf("from and to are required")
+	}
+	if from == to {
+		return editResult{}, fmt.Errorf("from and to are the same path")
+	}
+	if strings.EqualFold(filepath.Base(from), "config.json") || strings.EqualFold(filepath.Base(to), "config.json") {
+		return editResult{}, fmt.Errorf("config.json is the module contract; edit it instead of moving it")
+	}
+	fromPath, err := analystPath(root.Dir, from)
+	if err != nil {
+		return editResult{}, err
+	}
+	info, err := os.Stat(fromPath)
+	if err != nil {
+		return editResult{}, fmt.Errorf("stat %s: %w", from, err)
+	}
+	if !info.Mode().IsRegular() {
+		return editResult{}, fmt.Errorf("%s is not a regular file", from)
+	}
+	data, err := os.ReadFile(fromPath)
+	if err != nil {
+		return editResult{}, fmt.Errorf("read %s: %w", from, err)
+	}
+	if len(data) == 0 {
+		return editResult{}, fmt.Errorf("%s is empty; there is nothing to move", from)
+	}
+	if token := introducesForbiddenLoaderMechanism("", string(data)); token != "" {
+		return editResult{}, fmt.Errorf("refusing to move %s: it contains %s", from, token)
+	}
+	content := string(data)
+	updated, err := createSourceFileWithDirs(root, to, content)
+	if err != nil {
+		return editResult{}, err
+	}
+	if err := os.Remove(fromPath); err != nil {
+		_ = os.Remove(updated.Path)
+		return editResult{}, fmt.Errorf("remove %s: %w", from, err)
+	}
+	payloadID := int64(0)
+	if e.last != nil {
+		payloadID = e.last.PayloadID
+	}
+	iteration := e.iter + 1
+	create := EditRecord{
+		LoopID: e.cfg.LoopID, Iteration: iteration, PayloadID: payloadID,
+		Module: root.Name, File: to, Old: "", New: content, Created: true, Reason: reason,
+	}
+	remove := EditRecord{
+		LoopID: e.cfg.LoopID, Iteration: iteration, PayloadID: payloadID,
+		Module: root.Name, File: from, Old: content, New: "", Reason: reason,
+	}
+	if err := e.db.SaveEditPair(ctx, create, remove); err != nil {
+		restoreErr := os.WriteFile(fromPath, data, info.Mode().Perm())
+		removeErr := os.Remove(updated.Path)
+		return editResult{}, fmt.Errorf("save move: %w (restore %s: %v; remove %s: %v)", err, from, restoreErr, to, removeErr)
+	}
+	e.logClass(logging.ClassEdit, "%s/%s -> %s (%s)", root.Name, from, to, reason)
+	if e.editTouchesAgentSource(root) {
+		e.agentSourceDirty.Store(true)
+	}
+	return editResult{
+		Module: root.Name, File: to, From: from, Line: 1, Bytes: len(content), Reason: reason,
+		Message: "file moved; call DetectionCycle to rebuild and detonate",
+	}, nil
 }

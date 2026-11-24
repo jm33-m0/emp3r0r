@@ -362,6 +362,9 @@ func (e *evolver) buildShellcodeWithProducer(ctx context.Context, producerName s
 	e.shellcodeGenerated = true
 	e.cleanupShellcode(oldShellcode)
 	e.activeProducer = producer
+	if e.agentArtifact != "" && sameSourceDir(input, e.agentArtifact) {
+		e.agentNeedsWrap.Store(false)
+	}
 	return artifact, flags, buildLog, nil
 }
 
@@ -448,11 +451,12 @@ func (e *evolver) revertPayloadTool() tool.CoreTool {
 }
 
 type revertEdit struct {
-	id     int64
-	module string
-	file   string
-	old    string
-	new    string
+	id      int64
+	module  string
+	file    string
+	old     string
+	new     string
+	created bool
 }
 
 // revertLoopFilter selects every attempt of the logical loop. A resumed
@@ -480,7 +484,7 @@ func (e *evolver) revertToPayload(ctx context.Context, payloadKey string) (int, 
 	}
 	base, pattern := e.revertLoopFilter()
 	rows, err := e.db.db.QueryContext(ctx, `
-		SELECT id, COALESCE(module, ''), file, old, new FROM loop_edits
+		SELECT id, COALESCE(module, ''), file, old, new, created FROM loop_edits
 		WHERE (loop_id = ? OR loop_id LIKE ?) AND next_payload_id IS NOT NULL AND next_payload_id > ? AND reverted = 0
 		ORDER BY id DESC LIMIT ?`, base, pattern, id, maxRevertEdits+1)
 	if err != nil {
@@ -537,7 +541,7 @@ func (e *evolver) revertCycleEdits(ctx context.Context, payloadID int64, label s
 	}
 	base, pattern := e.revertLoopFilter()
 	rows, err := e.db.db.QueryContext(ctx, `
-		SELECT id, COALESCE(module, ''), file, old, new FROM loop_edits
+		SELECT id, COALESCE(module, ''), file, old, new, created FROM loop_edits
 		WHERE (loop_id = ? OR loop_id LIKE ?) AND next_payload_id = ? AND reverted = 0
 		ORDER BY id DESC LIMIT ?`, base, pattern, payloadID, maxRevertEdits+1)
 	if err != nil {
@@ -566,7 +570,7 @@ func (e *evolver) revertPendingEdits(ctx context.Context, baseline int64, afterI
 	}
 	base, pattern := e.revertLoopFilter()
 	rows, err := e.db.db.QueryContext(ctx, `
-		SELECT id, COALESCE(module, ''), file, old, new FROM loop_edits
+		SELECT id, COALESCE(module, ''), file, old, new, created FROM loop_edits
 		WHERE (loop_id = ? OR loop_id LIKE ?) AND payload_id IS NOT NULL AND payload_id >= ?
 			AND iteration > ? AND next_payload_id IS NULL AND reverted = 0 AND kind = ?
 		ORDER BY id DESC LIMIT ?`, base, pattern, baseline, afterIteration, EditKindModel, maxRevertEdits+1)
@@ -591,9 +595,11 @@ func scanRevertEdits(rows *sql.Rows) ([]revertEdit, error) {
 	var edits []revertEdit
 	for rows.Next() {
 		var item revertEdit
-		if err := rows.Scan(&item.id, &item.module, &item.file, &item.old, &item.new); err != nil {
+		var created int
+		if err := rows.Scan(&item.id, &item.module, &item.file, &item.old, &item.new, &created); err != nil {
 			return nil, err
 		}
+		item.created = created != 0
 		edits = append(edits, item)
 	}
 	return edits, rows.Err()
@@ -615,7 +621,7 @@ func (e *evolver) applyRevertEdits(ctx context.Context, edits []revertEdit, payl
 		if !root.Writable {
 			return 0, fmt.Errorf("source root %s is read-only", root.Name)
 		}
-		created := item.old == ""
+		created := item.created
 		removed := item.old != "" && item.new == ""
 		var write sourceWrite
 		switch {

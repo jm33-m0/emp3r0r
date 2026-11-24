@@ -14,7 +14,7 @@ import (
 
 const (
 	maxFeedbackFindings    = 100
-	maxSourceFiles         = 500
+	maxSourceFiles         = 5000
 	maxSourceFileBytes     = 2 << 20
 	maxSourceTotalBytes    = 16 << 20
 	maxSourceLocations     = 3
@@ -986,7 +986,7 @@ func (idx *sourceIndex) addRoot(prefix, dir string) {
 		}
 		name := info.Name()
 		if info.IsDir() {
-			if name == ".git" || name == "__pycache__" || name == "node_modules" {
+			if skipSourceDir(name) {
 				return filepath.SkipDir
 			}
 			return nil

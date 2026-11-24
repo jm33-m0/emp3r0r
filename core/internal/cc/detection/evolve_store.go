@@ -62,6 +62,7 @@ type EditRecord struct {
 	File      string `json:"file"`
 	Old       string `json:"old"`
 	New       string `json:"new"`
+	Created   bool   `json:"created,omitempty"`
 	Reason    string `json:"reason,omitempty"`
 	// Kind distinguishes a model edit from a host rollback. A restore must not
 	// be linked to the next payload or reported as the next cycle's change.
@@ -189,6 +190,37 @@ func (t *TelemetryDB) SaveBuild(ctx context.Context, record BuildRecord) error {
 // before the loop has a payload (a failed baseline) is kept with a NULL
 // payload_id and linked to the next payload by linkEdits.
 func (t *TelemetryDB) SaveEdit(ctx context.Context, record EditRecord) error {
+	if err := insertEdit(ctx, t.db, record); err != nil {
+		return fmt.Errorf("save edit: %w", err)
+	}
+	return nil
+}
+
+// SaveEditPair stores two related edits atomically. SourceMove uses it so a
+// rename cannot leave a create without its matching delete in the history.
+func (t *TelemetryDB) SaveEditPair(ctx context.Context, first, second EditRecord) error {
+	tx, err := t.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin edit pair: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := insertEdit(ctx, tx, first); err != nil {
+		return fmt.Errorf("save edit pair: %w", err)
+	}
+	if err := insertEdit(ctx, tx, second); err != nil {
+		return fmt.Errorf("save edit pair: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit edit pair: %w", err)
+	}
+	return nil
+}
+
+type editExecer interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}
+
+func insertEdit(ctx context.Context, execer editExecer, record EditRecord) error {
 	if record.CreatedAt.IsZero() {
 		record.CreatedAt = time.Now().UTC()
 	}
@@ -196,15 +228,13 @@ func (t *TelemetryDB) SaveEdit(ctx context.Context, record EditRecord) error {
 	if record.PayloadID != 0 {
 		payloadID = record.PayloadID
 	}
-	if _, err := t.db.ExecContext(ctx, `
-		INSERT INTO loop_edits(loop_id, iteration, payload_id, module, file, old, new, reason, kind, created_at)
-		VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+	_, err := execer.ExecContext(ctx, `
+		INSERT INTO loop_edits(loop_id, iteration, payload_id, module, file, old, new, created, reason, kind, created_at)
+		VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		record.LoopID, record.Iteration, payloadID, record.Module, record.File,
-		record.Old, record.New, clip(record.Reason, 1000),
-		editKind(record.Kind), record.CreatedAt.UnixMilli()); err != nil {
-		return fmt.Errorf("save edit: %w", err)
-	}
-	return nil
+		record.Old, record.New, boolInt(record.Created), clip(record.Reason, 1000),
+		editKind(record.Kind), record.CreatedAt.UnixMilli())
+	return err
 }
 
 func editKind(kind string) string {
@@ -214,22 +244,23 @@ func editKind(kind string) string {
 	return EditKindModel
 }
 
-const editColumns = `loop_id, iteration, COALESCE(payload_id, 0), module, file, old, new, reason, kind, reverted, created_at`
+const editColumns = `loop_id, iteration, COALESCE(payload_id, 0), module, file, old, new, created, reason, kind, reverted, created_at`
 
 func scanEdits(rows *sql.Rows) ([]EditRecord, error) {
 	defer rows.Close()
 	var out []EditRecord
 	for rows.Next() {
 		var record EditRecord
-		var created int64
-		var reverted int
+		var createdAt int64
+		var created, reverted int
 		if err := rows.Scan(&record.LoopID, &record.Iteration, &record.PayloadID,
-			&record.Module, &record.File, &record.Old, &record.New, &record.Reason,
-			&record.Kind, &reverted, &created); err != nil {
+			&record.Module, &record.File, &record.Old, &record.New, &created, &record.Reason,
+			&record.Kind, &reverted, &createdAt); err != nil {
 			return nil, fmt.Errorf("scan edit: %w", err)
 		}
+		record.Created = created != 0
 		record.Reverted = reverted != 0
-		record.CreatedAt = time.UnixMilli(created).UTC()
+		record.CreatedAt = time.UnixMilli(createdAt).UTC()
 		out = append(out, record)
 	}
 	return out, rows.Err()

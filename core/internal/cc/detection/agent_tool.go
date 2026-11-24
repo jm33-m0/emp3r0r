@@ -205,6 +205,7 @@ func (e *evolver) generateAgentTool() tool.CoreTool {
 				e.cfg.AgentTags = buildTags
 			}
 			e.agentSourceDirty.Store(false)
+			e.agentNeedsWrap.Store(true)
 			if e.platform() == platformLinux {
 				e.agentGlibc, e.agentDynload, e.agentLibc = glibc, dynload, libc
 				e.cfg.AgentGlibc, e.cfg.AgentDynload, e.cfg.AgentLibc = glibc, dynload, libc

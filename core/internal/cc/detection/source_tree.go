@@ -163,14 +163,10 @@ func listSourceTree(root sourceRoot, rel, dir string, depth, budget int, include
 }
 
 func skipSourceTreeDir(name string, includeVendor bool) bool {
-	if includeVendor {
+	if includeVendor && strings.EqualFold(name, "vendor") {
 		return false
 	}
-	switch strings.ToLower(name) {
-	case ".git", ".hg", ".svn", "node_modules", "vendor", "__pycache__", ".cache":
-		return true
-	}
-	return false
+	return skipSourceDir(name)
 }
 
 func countSourceTreeChildren(dir string) (dirs, files int) {

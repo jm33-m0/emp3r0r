@@ -167,11 +167,14 @@ const goAgentPrompt = `Go agent source:
 - The Go agent is a separate writable go_agent root. Transport, syscalls,
   strings, anti-debug, and memory behavior that belong to the agent live there,
   not in loader_windows.
+- Payload entrypoints are cmd/agent and internal/agent. internal/cc is C2 and
+  operator code and is not part of the agent build; read it only to understand
+  the host harness. build.py is the agent build script.
 - Use SourceTree to map the root before reading files. Use the writable agent
   source root named in the brief (default go_agent) with EditSource,
-  SourceWrite, SourceMultiEdit, or SourceDelete, then GenerateAgent to rebuild
-  the EXE or DLL from that source. SourceTree hides vendor by default; set
-  include_vendor only when a dependency is the target.
+  SourceWrite, SourceMultiEdit, SourceDelete, or SourceMove, then GenerateAgent
+  to rebuild the EXE or DLL from that source. SourceTree hides vendor by
+  default; set include_vendor only when a dependency is the target.
 - GenerateAgent tags select the exact Go feature set, for example
   ["with_mesh","with_kcp"] or [] for the slim agent. Omit tags to keep the
   operator transport's derived set. The loader module still owns loading,
@@ -304,7 +307,8 @@ Work loop:
 2. Apply every edit the change needs. Use EditSource for one exact replacement
    (replace_all for repeated text), SourceMultiEdit for several replacements in
    one file, SourceWrite to create or replace a whole file (missing parent
-   directories are created), and SourceDelete to remove a file. There is no
+   directories are created), SourceMove to rename or move a file, and
+   SourceDelete to remove a file. There is no
    edit limit:
    a redesign that adds, removes, splits, merges, or replaces files is one
    change. Do not preserve a detected design just because it already exists,

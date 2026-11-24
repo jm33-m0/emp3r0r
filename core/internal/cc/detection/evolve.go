@@ -23,6 +23,7 @@ import (
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/builder"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
+	"github.com/jm33-m0/emp3r0r/core/internal/live"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
 )
 
@@ -429,8 +430,12 @@ type evolver struct {
 	// and cleared by GenerateAgent or rotation. A cycle must not reuse an
 	// agent artifact built before the edit.
 	agentSourceDirty atomic.Bool
-	lastExecution    atomic.Value
-	lastAgent        atomic.Value
+	// agentNeedsWrap is set when GenerateAgent builds a new artifact that is
+	// not yet wrapped into the active shellcode. A cycle must not reuse the
+	// previous shellcode while this is set.
+	agentNeedsWrap atomic.Bool
+	lastExecution  atomic.Value
+	lastAgent      atomic.Value
 	// guest is the debugger's sandbox surface. Nil when SSH is not configured.
 	guest GuestRunner
 	// git records source commits in shadow repositories. Nil when disabled.
@@ -1071,6 +1076,9 @@ func normalizeEvolveConfig(cfg *EvolveConfig) error {
 	if cfg.AgentTags != nil {
 		tags, err := builder.NormalizeAgentTags(cfg.AgentTags)
 		if err != nil {
+			return err
+		}
+		if err := builder.ValidateAgentTagsForConfig(tags, live.RuntimeConfig); err != nil {
 			return err
 		}
 		cfg.AgentTags = tags
@@ -2647,6 +2655,7 @@ func (e *evolver) restoreExecutingStateTo(ctx context.Context, baseline *Cycle, 
 	e.restoreErr = errors.Join(errs...)
 	if e.restoreErr == nil {
 		e.agentSourceDirty.Store(false)
+		e.agentNeedsWrap.Store(false)
 	}
 	return e.restoreErr
 }
@@ -3379,6 +3388,7 @@ func crystalPalaceQuery(query string) bool {
 type editResult struct {
 	Module  string `json:"module"`
 	File    string `json:"file"`
+	From    string `json:"from,omitempty"`
 	Line    int    `json:"line"`
 	Bytes   int    `json:"bytes"`
 	Created bool   `json:"created,omitempty"`
@@ -3446,7 +3456,7 @@ func (e *evolver) recordSourceEdit(ctx context.Context, root sourceRoot, file, o
 	iteration := e.iter + 1
 	if err := e.db.SaveEdit(ctx, EditRecord{
 		LoopID: e.cfg.LoopID, Iteration: iteration, PayloadID: payloadID,
-		Module: root.Name, File: file, Old: oldText, New: newText, Reason: reason,
+		Module: root.Name, File: file, Old: oldText, New: newText, Created: created, Reason: reason,
 	}); err != nil {
 		if created {
 			if removeErr := os.Remove(updated.Path); removeErr != nil {

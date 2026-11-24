@@ -107,7 +107,7 @@ func (e *evolver) ensureFreshAgent(ctx context.Context) error {
 	uuid := strings.TrimSpace(e.expectedAgentUUID)
 	_, shellUsed := e.testedShellcodes.Load(shellcode)
 	_, uuidUsed := e.testedAgentUUIDs.Load(uuid)
-	if shellcode != "" && !shellUsed && !uuidUsed && !e.agentSourceDirty.Load() {
+	if shellcode != "" && !shellUsed && !uuidUsed && !e.agentSourceDirty.Load() && !e.agentNeedsWrap.Load() {
 		return nil
 	}
 	return e.rotateAgent(ctx)

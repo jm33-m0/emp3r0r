@@ -110,7 +110,7 @@ func (e *evolver) toolsFor(role evolveRole) []tool.CoreTool {
 			tools = append(tools, e.agentStatusTool())
 		}
 	case roleEditor:
-		tools = append(tools, e.editSourceTool(), e.sourceWriteTool(), e.sourceMultiEditTool(), e.sourceDeleteTool(),
+		tools = append(tools, e.editSourceTool(), e.sourceWriteTool(), e.sourceMultiEditTool(), e.sourceDeleteTool(), e.sourceMoveTool(),
 			e.buildOptionsTool(), e.buildShellcodeTool(), e.revertPayloadTool(), e.detectionCycleTool())
 		if e.cfg.BuildAgent != nil {
 			tools = append(tools, e.generateAgentTool())
@@ -173,7 +173,7 @@ const (
 	plannerReadBudget = 12
 	// editorReadBudget is how many read-only calls the editor gets without a
 	// mutation. The host then blocks reading and requires an action.
-	editorReadBudget = 12
+	editorReadBudget = 24
 )
 
 func readOnlyToolName(name string) bool {
@@ -191,7 +191,7 @@ func readOnlyToolName(name string) bool {
 // guest. A call to one of these ends the read-only streak.
 func mutatingToolName(name string) bool {
 	switch name {
-	case "EditSource", "SourceWrite", "SourceMultiEdit", "SourceDelete",
+	case "EditSource", "SourceWrite", "SourceMultiEdit", "SourceDelete", "SourceMove",
 		"BuildOptions", "BuildShellcode", "RevertToPayload", "DetectionCycle",
 		"GenerateAgent", "RunModule", "CleanupAgent":
 		return true

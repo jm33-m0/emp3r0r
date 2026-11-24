@@ -1,6 +1,8 @@
 package detection
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -56,5 +58,38 @@ func TestAgentSourceEditMarksDirty(t *testing.T) {
 	}
 	if e.agentSourceDirty.Load() {
 		t.Fatal("module edit marked the agent dirty")
+	}
+}
+
+func TestPendingAgentStateForcesRotation(t *testing.T) {
+	cases := []struct {
+		name  string
+		setup func(*evolver)
+	}{
+		{name: "dirty source", setup: func(e *evolver) { e.agentSourceDirty.Store(true) }},
+		{name: "unwrapped agent", setup: func(e *evolver) { e.agentNeedsWrap.Store(true) }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			called := false
+			e := &evolver{
+				shellcode: "fresh.bin",
+				cfg: EvolveConfig{
+					LoopID: "loop", Module: "loader_windows",
+					BuildAgent: func(AgentBuildOptions) (*AgentBuildResult, error) {
+						called = true
+						return nil, errors.New("stop after rotation")
+					},
+				},
+				logf: func(logging.Class, string, ...any) {},
+			}
+			tc.setup(e)
+			if err := e.ensureFreshAgent(context.Background()); err == nil {
+				t.Fatal("ensureFreshAgent returned nil instead of attempting rotation")
+			}
+			if !called {
+				t.Fatal("ensureFreshAgent did not attempt an agent rebuild")
+			}
+		})
 	}
 }
