@@ -87,6 +87,44 @@ A box may run Tracee, Falco, RedEdr, ETW, Defender, or another sensor. Sensors n
 
 Sensors should put native fields the common model cannot represent in `attrs`. The detection pipeline keeps them and exposes them through `detection_query` using `json_extract`.
 
+
+## Sensor requirements
+
+- `/health` is authoritative for which static, dynamic, and EDR sensors exist. Do not build a plan from a hardcoded sensor list.
+- `/api/rules` returns the static and behavioral rule inventory as file names. The rule names carried in events are the stable vocabulary; tuning must not rename a rule to change its behavior.
+- Each event must carry a normalized `category` and `operation`. For syscall and LSM sensors, derive them from the native event type (`evt.type`, syscall name, or hook name), not from the rule name. A rule called “Anonymous Executable Memory” is still a memory/protect event because its native event is `mprotect`.
+- `signal` separates actionable detections from context. A box should use `verdict` for a named high-confidence detection, `signal` for a named rule or behavioral detection, `baseline` for expected startup traffic, and `noise` for control-plane or runtime activity. `baseline` and `noise` are never counted as findings.
+- Control-plane events must stay attributed to the runtime. A container runtime creating or entering namespaces is not a payload namespace change unless the event is attributed to the payload process.
+- A missing or failed sensor is a coverage gap, not a clean result. It must appear in `coverage.missing` or `coverage.analyzers` with a failing status.
+- A rule engine that is disabled or absent is also a coverage gap. `coverage.expected` must list the sensors the plan relies on, and `coverage.delivered` must list the sensors that produced at least one event.
+
+### Severity normalization
+
+Sensors normalize native priorities to `critical`, `high`, `medium`, `low`, or `info` before the event reaches the pipeline. The Falco mapping is:
+
+| Falco priority | Normalized severity |
+| --- | --- |
+| `emergency`, `alert`, `critical` | `critical` |
+| `error`, `warning` | `high` |
+| `notice` | `medium` |
+| `informational`, `info`, `debug` | `info` |
+
+### Named rules and behavioral findings
+
+A named rule engine such as Falco is the stable detection vocabulary. Its events use the rule name as `event` and carry the native event type in `attrs` (`evt.type`) for classification. A raw syscall sensor such as Tracee is the behavioral layer; generic findings derived from it must not be duplicated from named rule alerts. A box that returns both forms should keep them distinct in `provider` so the consumer can separate them without matching rule names.
+
+Static analyzers follow the same model. A YARA match is one finding per matching rule, the rule name is the indicator, and `meta.severity` supplies the severity. `attrs` carries the matched strings and offsets.
+
+## Reference Linux lab
+
+PenguinBox is the reference Linux lab. Its dynamic result is the legacy LitterBox document; the `emp3r0r.telemetry/v1` adapter normalizes `findings.events` as follows:
+
+- `collector=falco` carries `rule`, `priority`, `output_fields`, and the native `evt.type`. The rule name is the stable detection vocabulary.
+- `collector=tracee` carries `eventName`, process identity, container identity, and syscall/LSM arguments.
+- `coverage` lists `tracee` and `falco` as expected sensors; a run with no events from either source is incomplete.
+
+The Linux rule profile is maintained by the lab, not by the loop. PenguinBox loads the stable Falco ruleset, the upstream incubating and sandbox rulesets, a curated container EDR profile, and a local tuning file. The tuning file disables only rules that describe the sandbox harness or duplicate another rule; it does not rename rules. The Tracee collector's default event set covers exec, file mutation, memory, network, mount and namespace, BPF, kexec, and kernel-module operations. Operators can add rule files without rebuilding the guest; the next analysis picks them up.
+
 ## Defaults and configuration
 
 - `<workspace>/detection/labs.json` holds the Windows and Linux lab entries; missing fields use `http://127.0.0.1:1337` and `http://127.0.0.1:1338`.

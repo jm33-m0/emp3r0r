@@ -8,7 +8,7 @@ telemetry. The plan and run tools cover `loader_windows` and `stager_linux`
 artifacts, and the autonomous loop builds both. The tests run on the operator
 host and never detonate on a target.
 
-The lab API and the sensor-neutral `emp3r0r.telemetry/v1` envelope are specified in [detection_lab.md](detection_lab.md).
+The lab API and the sensor-neutral `emp3r0r.telemetry/v1` envelope are specified in [detection_lab.md](detection_lab.md). The protocol also defines severity normalization, coverage gaps, rule-inventory behavior, and the separation between named rule alerts and raw-sensor findings. The loop treats `/health` and `/api/rules` as authoritative and classifies events from their native event type; it does not assume a fixed rule set or a fixed rule name.
 
 ## Prerequisites
 
