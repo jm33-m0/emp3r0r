@@ -637,6 +637,11 @@ Examples:
 	genAgentCmd.Flags().StringP("arch", "a", "amd64", fmt.Sprintf("Target architecture, available: %v+", builder.ArchListAll))
 	addFlagToGroup("Payload & Target Options", "type", "arch")
 
+	// Agent feature tags: an exact opt-in set for the Go build.
+	genAgentCmd.Flags().StringSlice("agent-tags", nil, "Exact Go agent feature-tag set; omit to derive from the selected transport, empty for the slim agent. See --list-agent-tags")
+	genAgentCmd.Flags().Bool("list-agent-tags", false, "List the available Go agent feature tags and exit")
+	addFlagToGroup("Agent Build Options", "agent-tags", "list-agent-tags")
+
 	// Group 2: C2 Connectivity & Transport
 	genAgentCmd.Flags().StringP("cc", "", defaultC2Address(), "C2 hostname, or an explicit http(s) URL for a TLS front proxy (Required)")
 	genAgentCmd.Flags().StringP("c2-channel-mode", "", def.C2ChannelModeDefault, fmt.Sprintf("Agent C2 channel wrapper mode; the server listens on every compiled transport. Available: %s", strings.Join(transport.AllC2ChannelModesDetailed(), ";")))
@@ -670,8 +675,13 @@ Examples:
 	genAgentCmd.Flags().IntP("operator-idle-timeout", "", 1800, "Operator idle timeout in seconds before C2 refuses agent connections (0 disables idle timeout)")
 	addFlagToGroup("Stealth & Connectivity Options", "stager", "NCSI", "operator-idle-timeout")
 
-	// Force user to specify CC address
+	// Force user to specify a C2 address unless they only list tags.
 	genAgentCmd.MarkFlagRequired("cc")
+	genAgentCmd.PreRun = func(cmd *cobra.Command, _ []string) {
+		if list, _ := cmd.Flags().GetBool("list-agent-tags"); list {
+			cmd.Flags().Lookup("cc").Changed = true
+		}
+	}
 
 	// Help Template for flag grouping
 	genAgentCmd.SetHelpTemplate(`{{.Short}}
@@ -691,6 +701,7 @@ Example:
 	// help / usage categories
 	groups := []string{
 		"Payload & Target Options",
+		"Agent Build Options",
 		"C2 Transport Options",
 		"Beaconing Options (HTTP Mode)",
 		"Mesh networking (P2P) Options",
@@ -763,9 +774,11 @@ Example:
 	})
 
 	// completers
+	_ = genAgentCmd.RegisterFlagCompletionFunc("agent-tags", completeFlagValues(builder.AllAgentTags()...))
 	carapace.Gen(genAgentCmd).FlagCompletion(carapace.ActionMap{
 		"type":            carapace.ActionValues(builder.PayloadTypeList...),
 		"arch":            carapace.ActionValues(builder.ArchListAll...),
+		"agent-tags":      carapace.ActionValues(builder.AllAgentTags()...),
 		"cc":              carapace.ActionValues(c2AddressCompletions()...),
 		"cc-http-port":    carapace.ActionValues(c2PortCompletions()...),
 		"cdn":             carapace.ActionValues("wss://", "ws://"),

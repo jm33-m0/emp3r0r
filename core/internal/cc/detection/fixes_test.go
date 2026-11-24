@@ -803,6 +803,9 @@ func TestGenerateAgentBuildsArtifactWithoutShellcode(t *testing.T) {
 				if opts.Type != "windows_dll" || opts.Arch != "amd64" {
 					return nil, fmt.Errorf("unexpected options: %+v", opts)
 				}
+				if len(opts.BuildTags) != 2 || opts.BuildTags[0] != "with_mesh" || opts.BuildTags[1] != "with_kcp" {
+					return nil, fmt.Errorf("unexpected build tags: %+v", opts.BuildTags)
+				}
 				if err := os.WriteFile(artifact, []byte(strings.Repeat("M", 40000)), 0o600); err != nil {
 					return nil, err
 				}
@@ -812,14 +815,18 @@ func TestGenerateAgentBuildsArtifactWithoutShellcode(t *testing.T) {
 		logf: func(logging.Class, string, ...any) {},
 	}
 	e.roots = e.sourceRoots()
+	e.agentSourceDirty.Store(true)
 
 	result, err := e.generateAgentTool().Call(context.Background(),
-		json.RawMessage(`{"agent_type":"windows_dll","note":"crystal input"}`), nil)
+		json.RawMessage(`{"agent_type":"windows_dll","tags":["with_mesh","with_kcp"],"note":"crystal input"}`), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if result.IsError {
 		t.Fatalf("tool error: %+v", result)
+	}
+	if e.agentSourceDirty.Load() {
+		t.Fatal("GenerateAgent did not clear the dirty agent source flag")
 	}
 	if e.agentArtifact != artifact {
 		t.Fatalf("agent artifact = %q, want %q", e.agentArtifact, artifact)

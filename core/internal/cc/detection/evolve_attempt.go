@@ -203,27 +203,49 @@ func (e *evolver) computeSourceTreeHash() string {
 
 // designKey identifies the payload design independently of the shellcode.
 // Shellcode rotation is required by TOFU, so it is deliberately excluded; a
-// cycle must change source, build options, producer options, producer, or
-// agent type to be a new hypothesis.
-func designKey(sourceHash string, buildOpts, producerOpts map[string]string, producer, agentType string) string {
+// cycle must change source, build options, producer options, producer, agent
+// type, or agent tags to be a new hypothesis.
+func designKey(sourceHash string, buildOpts, producerOpts map[string]string, producer, agentType string, agentTags []string) string {
 	payload, err := json.Marshal(struct {
 		SourceTreeHash  string            `json:"source_tree_hash"`
 		BuildOptions    map[string]string `json:"build_options"`
 		ProducerOptions map[string]string `json:"producer_options"`
 		Producer        string            `json:"producer"`
 		AgentType       string            `json:"agent_type"`
+		AgentTags       []string          `json:"agent_tags"`
 	}{
 		SourceTreeHash:  sourceHash,
 		BuildOptions:    canonicalStringMap(buildOpts),
 		ProducerOptions: canonicalStringMap(producerOpts),
 		Producer:        strings.ToLower(strings.TrimSpace(producer)),
 		AgentType:       strings.ToLower(strings.TrimSpace(agentType)),
+		AgentTags:       agentTags,
 	})
 	if err != nil {
 		return ""
 	}
 	sum := sha256.Sum256(payload)
 	return "sha256:" + hex.EncodeToString(sum[:])
+}
+
+// cloneAgentTags preserves the nil-versus-empty distinction: nil means derive
+// the tag set from the operator transport, while an empty non-nil slice means
+// build the slim agent.
+func cloneAgentTags(tags []string) []string {
+	if tags == nil {
+		return nil
+	}
+	return append([]string{}, tags...)
+}
+
+// summaryAgentTags returns the tag set recorded with a cycle. A nil pointer is
+// an older summary that predates tag tracking; nil tags in a new summary mean
+// the derived set.
+func summaryAgentTags(summary cycleSummary) []string {
+	if summary.AgentTags == nil {
+		return nil
+	}
+	return cloneAgentTags(*summary.AgentTags)
 }
 
 func canonicalStringMap(in map[string]string) map[string]string {
@@ -236,7 +258,7 @@ func canonicalStringMap(in map[string]string) map[string]string {
 
 func (e *evolver) designKey() string {
 	return designKey(e.computeSourceTreeHash(), e.buildOptionsSnapshot(),
-		e.activeProducerOptions(), e.activeProducer, e.cfg.AgentType)
+		e.activeProducerOptions(), e.activeProducer, e.cfg.AgentType, e.cfg.AgentTags)
 }
 
 // walkSourceFiles visits source-like regular files under dir. The source hash

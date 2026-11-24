@@ -435,7 +435,8 @@ func runDetectLoop(run *detectRun, opts detectLoopOptions, shellcode, baseID str
 			Goal:            currentOpts.Goal, AgentType: currentOpts.AgentType,
 			AgentArch: currentOpts.Arch, AgentCC: currentOpts.CC,
 			AgentGlibc: currentOpts.AgentGlibc, AgentDynload: currentOpts.AgentDynload, AgentLibc: currentOpts.AgentLibc,
-			Prompts: run.prompts,
+			AgentTags: currentOpts.AgentTags,
+			Prompts:   run.prompts,
 			BuildAgent: func(buildOpts detection.AgentBuildOptions) (*detection.AgentBuildResult, error) {
 				return backend.GenerateAgent(currentOpts.CC, buildOpts)
 			},

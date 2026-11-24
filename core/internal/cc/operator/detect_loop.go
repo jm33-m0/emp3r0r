@@ -160,6 +160,7 @@ func addDetectLoopFlags(cmd *cobra.Command) {
 	cmd.Flags().String("agent-glibc", "2.17", "Linux C agent oldest glibc ABI: 2.17 or 2.34")
 	cmd.Flags().String("agent-dynload", "auto", "Linux C agent dynload mode: auto, libc_dl, or public")
 	cmd.Flags().String("agent-libc", "glibc", "Linux C agent libc: glibc or musl")
+	cmd.Flags().StringSlice("agent-tags", nil, "Exact Windows Go agent feature-tag set; omit to derive from the operator transport, empty for the slim agent")
 	cmd.Flags().String("cc", "", "C2 address for the generated agent; defaults to the configured address and is used verbatim")
 	cmd.Flags().String("sandbox", "", "LitterBox-compatible lab URL; defaults to the platform entry in labs.json")
 	cmd.Flags().Int("iterations", 3, "Maximum detection cycles across attempts, including each baseline")
@@ -205,6 +206,7 @@ func addDetectLoopFlags(cmd *cobra.Command) {
 	_ = cmd.RegisterFlagCompletionFunc("inject", completeFlagValues("apc", "ct", "self"))
 	_ = cmd.RegisterFlagCompletionFunc("format", completeFlagValues("exe", "service", "dll"))
 	_ = cmd.RegisterFlagCompletionFunc("agent-type", completeFlagValues("auto", builder.PayloadTypeWindowsExecutable, builder.PayloadTypeWindowsDLL, "linux_so"))
+	_ = cmd.RegisterFlagCompletionFunc("agent-tags", completeFlagValues(builder.AllAgentTags()...))
 	_ = cmd.RegisterFlagCompletionFunc("arch", completeFlagValues("amd64"))
 	_ = cmd.RegisterFlagCompletionFunc("smw", completeFlagValues("on", "off"))
 	_ = cmd.RegisterFlagCompletionFunc("stages", completeFlagValues("static", "dynamic"))
@@ -541,6 +543,7 @@ type detectLoopOptions struct {
 	AgentGlibc          string
 	AgentDynload        string
 	AgentLibc           string
+	AgentTags           []string
 	CC                  string
 	Sandbox             string
 	Iterations          int
@@ -659,6 +662,15 @@ func runDetectLoopCommand(cmd *cobra.Command, _ []string) {
 	opts.AgentGlibc, _ = cmd.Flags().GetString("agent-glibc")
 	opts.AgentDynload, _ = cmd.Flags().GetString("agent-dynload")
 	opts.AgentLibc, _ = cmd.Flags().GetString("agent-libc")
+	if cmd.Flags().Changed("agent-tags") {
+		rawTags, _ := cmd.Flags().GetStringSlice("agent-tags")
+		tags, tagErr := builder.NormalizeAgentTags(rawTags)
+		if tagErr != nil {
+			logging.Errorf("detect_loop: %v", tagErr)
+			return
+		}
+		opts.AgentTags = tags
+	}
 	opts.CC, _ = cmd.Flags().GetString("cc")
 	opts.Sandbox, _ = cmd.Flags().GetString("sandbox")
 	opts.Iterations, _ = cmd.Flags().GetInt("iterations")
@@ -944,6 +956,7 @@ func generateAgentShellcode(opts detectLoopOptions, logf func(string, ...any)) (
 		cc := strings.TrimSpace(opts.CC)
 		agentCfg.CCAddress = &cc
 	}
+	agentCfg.BuildTags = opts.AgentTags
 	logf("agent type: %s; producer: %s", agentType, producer)
 	// The builder mutates shared runtime and on-disk config; serialize with
 	// the manual generate commands and the model's GenerateAgent tool.

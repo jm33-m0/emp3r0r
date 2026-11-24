@@ -244,10 +244,25 @@ func GenerateAgentArtifactFromSource(opts AgentConfig, payloadType, archChoice, 
 	if !IsArchValid(payloadType, archChoice) {
 		return nil, fmt.Errorf("invalid arch choice '%s' for payload type '%s'", archChoice, payloadType)
 	}
+	explicitTags := opts.BuildTags
+	if explicitTags != nil {
+		normalized, err := NormalizeAgentTags(explicitTags)
+		if err != nil {
+			return nil, err
+		}
+		explicitTags = normalized
+	}
 
 	// 1. Pass config to controller
 	if err := MakeConfig(opts); err != nil {
 		return nil, fmt.Errorf("configure agent: %w", err)
+	}
+	tags := AgentBuildTags(live.RuntimeConfig)
+	if explicitTags != nil {
+		if err := ValidateAgentTagsForConfig(explicitTags, live.RuntimeConfig); err != nil {
+			return nil, err
+		}
+		tags = explicitTags
 	}
 
 	// Reject transport/target-OS combinations that can never work (e.g. SMB on a
@@ -278,7 +293,7 @@ func GenerateAgentArtifactFromSource(opts AgentConfig, payloadType, archChoice, 
 		WorkSpace:    live.EmpWorkSpace,
 		AgentUUID:    agentUUID,
 		AgentUUIDSig: sig,
-		BuildTags:    AgentBuildTags(live.RuntimeConfig),
+		BuildTags:    tags,
 		SourceDir:    strings.TrimSpace(sourceDir),
 	}
 

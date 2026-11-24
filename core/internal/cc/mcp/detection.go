@@ -1282,6 +1282,7 @@ func (a *Actions) buildDetectionAgent(opts detection.AgentBuildOptions) (*detect
 	if cc := strings.TrimSpace(a.DefaultCC); cc != "" {
 		agentCfg.CCAddress = &cc
 	}
+	agentCfg.BuildTags = opts.BuildTags
 	if opts.Platform == "linux" {
 		libc := strings.TrimSpace(opts.Libc)
 		if libc == "" {

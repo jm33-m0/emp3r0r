@@ -45,6 +45,11 @@ func (a *Actions) generateTools() map[string]Tool {
 							"enum":        builder.ArchListAll,
 							"description": "Target architecture. Default amd64; the valid subset depends on type.",
 						},
+						"agent_tags": map[string]any{
+							"type":        "array",
+							"items":       map[string]any{"type": "string", "enum": builder.AllAgentTags()},
+							"description": "Exact Go agent feature-tag set. Omit to derive from the selected features; [] builds the slim agent. with_ech requires with_doh.",
+						},
 						"cc":                     StringProp("C2 hostname, or an explicit http(s) URL for TLS. Omit to use the C2 address already configured on this operator; never guess or substitute 127.0.0.1."),
 						"c2_channel_mode":        StringProp("C2 channel mode. Default http_poll."),
 						"allow_custom_transport": BooleanProp("Allow a c2_channel_mode that is not built into this C2. The agent build must include the matching dialer."),
@@ -131,6 +136,7 @@ func (a *Actions) generateTools() map[string]Tool {
 type goGenerateArgs struct {
 	Type                 string            `json:"type"`
 	Arch                 string            `json:"arch"`
+	AgentTags            *[]string         `json:"agent_tags"`
 	CC                   *string           `json:"cc"`
 	C2ChannelMode        *string           `json:"c2_channel_mode"`
 	AllowCustomTransport bool              `json:"allow_custom_transport"`
@@ -186,6 +192,14 @@ func newGoBuildSpecWithCC(args goGenerateArgs, defaultCC string) (*goBuildSpec, 
 	if !builder.IsArchValid(payloadType, arch) {
 		return nil, fmt.Errorf("invalid arch %q for payload type %q (available: %v)", arch, payloadType, builder.ArchListAll)
 	}
+	var buildTags []string
+	if args.AgentTags != nil {
+		normalized, err := builder.NormalizeAgentTags(*args.AgentTags)
+		if err != nil {
+			return nil, err
+		}
+		buildTags = normalized
+	}
 	cc, err := resolveCCAddress(args.CC, defaultCC)
 	if err != nil {
 		return nil, err
@@ -227,6 +241,7 @@ func newGoBuildSpecWithCC(args goGenerateArgs, defaultCC string) (*goBuildSpec, 
 		PersistentRouter:     args.PersistentRouter,
 		IsNCSIEnabled:        args.NCSI,
 		IsStager:             args.Stager,
+		BuildTags:            buildTags,
 	}
 	return &goBuildSpec{
 		PayloadType: payloadType,
@@ -236,9 +251,10 @@ func newGoBuildSpecWithCC(args goGenerateArgs, defaultCC string) (*goBuildSpec, 
 		IdleTimeout: idleTimeout,
 		SetIdle:     args.OperatorIdleTimeout != nil,
 		Flags: map[string]string{
-			"type": payloadType,
-			"arch": arch,
-			"cc":   cc,
+			"type":       payloadType,
+			"arch":       arch,
+			"cc":         cc,
+			"agent_tags": strings.Join(buildTags, " "),
 		},
 	}, nil
 }
@@ -277,13 +293,14 @@ func (a *Actions) runGoBuild(spec *goBuildSpec) map[string]any {
 	res, err := builder.GenerateAgentWorkflow(spec.Config, spec.PayloadType, spec.Arch, client.SignAgent)
 
 	result := map[string]any{
-		"executed":  err == nil,
-		"type":      spec.PayloadType,
-		"arch":      spec.Arch,
-		"cc":        spec.CC,
-		"opsec":     review,
-		"decision":  decision,
-		"transport": builder.DescribeGoAgentTransport(),
+		"executed":   err == nil,
+		"type":       spec.PayloadType,
+		"arch":       spec.Arch,
+		"agent_tags": spec.Config.BuildTags,
+		"cc":         spec.CC,
+		"opsec":      review,
+		"decision":   decision,
+		"transport":  builder.DescribeGoAgentTransport(),
 	}
 	if len(decision.Warnings) > 0 {
 		result["warnings"] = decision.Warnings

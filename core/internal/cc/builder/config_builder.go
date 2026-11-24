@@ -62,6 +62,10 @@ type AgentConfig struct {
 	OfflineGrace         *int
 	Jitter               *int
 	OperatorIdleTimeout  *int
+	// BuildTags is an explicit Go agent build-tag set. Nil derives the tags
+	// from the selected transport and features; a non-nil empty slice builds
+	// the slim agent.
+	BuildTags []string
 }
 
 // MakeConfig takes the generalized AgentConfig options and orchestrates the

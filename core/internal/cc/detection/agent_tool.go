@@ -71,6 +71,11 @@ func (e *evolver) generateAgentTool() tool.CoreTool {
 					"enum":        builder.CAgentLibcs,
 					"description": "Linux C agent libc ABI. musl forces public dynload.",
 				},
+				"tags": map[string]any{
+					"type":        "array",
+					"items":       map[string]any{"type": "string", "enum": builder.AllAgentTags()},
+					"description": "Windows Go agent: exact opt-in feature-tag set. Omit to derive from the operator transport; [] builds the slim agent.",
+				},
 				"note": map[string]any{"type": "string", "description": "What this agent build is testing."},
 			},
 		},
@@ -79,12 +84,13 @@ func (e *evolver) generateAgentTool() tool.CoreTool {
 		},
 		Run: func(ctx context.Context, raw json.RawMessage, _ *tool.ToolContext) (tool.Result, error) {
 			var args struct {
-				AgentType    string `json:"agent_type"`
-				Arch         string `json:"arch"`
-				GlibcVersion string `json:"glibc_version"`
-				Dynload      string `json:"dynload"`
-				Libc         string `json:"libc"`
-				Note         string `json:"note"`
+				AgentType    string    `json:"agent_type"`
+				Arch         string    `json:"arch"`
+				GlibcVersion string    `json:"glibc_version"`
+				Dynload      string    `json:"dynload"`
+				Libc         string    `json:"libc"`
+				Tags         *[]string `json:"tags"`
+				Note         string    `json:"note"`
 			}
 			if err := json.Unmarshal(raw, &args); err != nil {
 				return tool.Errorf("invalid arguments"), nil
@@ -150,10 +156,22 @@ func (e *evolver) generateAgentTool() tool.CoreTool {
 					return tool.Errorf("invalid glibc_version, dynload, or libc"), nil
 				}
 			}
+			buildTags := e.cfg.AgentTags
+			if args.Tags != nil {
+				if e.platform() == platformLinux {
+					return tool.Errorf("tags apply to the Windows Go agent only"), nil
+				}
+				normalized, err := builder.NormalizeAgentTags(*args.Tags)
+				if err != nil {
+					return tool.Errorf(fmt.Sprintf("%v", err)), nil
+				}
+				buildTags = normalized
+			}
 			e.logClass(logging.ClassBuild, "GenerateAgent: %s/%s", agentType, arch)
 			result, err := e.cfg.BuildAgent(AgentBuildOptions{
 				Type: agentType, Arch: arch, Platform: e.platform(), SourceDir: e.cfg.AgentSourceDir,
 				Glibc: glibc, Dynload: dynload, Libc: libc,
+				BuildTags: buildTags,
 			})
 			if err != nil {
 				return tool.Errorf(fmt.Sprintf("generate agent: %v", err)), nil
@@ -183,6 +201,10 @@ func (e *evolver) generateAgentTool() tool.CoreTool {
 			e.agentArtifact = artifact
 			e.cfg.AgentType = agentType
 			e.cfg.AgentArch = arch
+			if args.Tags != nil {
+				e.cfg.AgentTags = buildTags
+			}
+			e.agentSourceDirty.Store(false)
 			if e.platform() == platformLinux {
 				e.agentGlibc, e.agentDynload, e.agentLibc = glibc, dynload, libc
 				e.cfg.AgentGlibc, e.cfg.AgentDynload, e.cfg.AgentLibc = glibc, dynload, libc
@@ -204,10 +226,11 @@ func (e *evolver) generateAgentTool() tool.CoreTool {
 				e.expectedAgentUUID = result.AgentUUID
 			}
 			e.audit("generate_agent", result.AgentUUID,
-				fmt.Sprintf("type=%s arch=%s artifact=%s", agentType, arch, artifact))
+				fmt.Sprintf("type=%s arch=%s tags=%s artifact=%s", agentType, arch, strings.Join(e.cfg.AgentTags, " "), artifact))
 			out := map[string]any{
 				"agent_type":    agentType,
 				"arch":          arch,
+				"build_tags":    e.cfg.AgentTags,
 				"agent_uuid":    result.AgentUUID,
 				"artifact_path": artifact,
 				"sha256":        inspect.SHA256,

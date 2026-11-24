@@ -195,6 +195,7 @@ func generateDetectionAgentWithCC(ccAddress string, opts detection.AgentBuildOpt
 	if cc := strings.TrimSpace(ccAddress); cc != "" {
 		agentCfg.CCAddress = &cc
 	}
+	agentCfg.BuildTags = opts.BuildTags
 	if opts.Platform == "linux" {
 		return generateDetectionCAgent(agentCfg, opts)
 	}

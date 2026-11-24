@@ -23,8 +23,12 @@ func (e *evolver) cyclePreconditions(mechanism string) error {
 	var last cycleSummary
 	if json.Unmarshal([]byte(e.last.Summary), &last) == nil && last.SourceTreeHash != "" {
 		lastKey := last.DesignKey
-		if lastKey == "" {
-			lastKey = designKey(last.SourceTreeHash, last.BuildOptions, last.ProducerOptions, last.Producer, e.cfg.AgentType)
+		if lastKey == "" || last.AgentTags == nil {
+			agentType := last.AgentType
+			if agentType == "" {
+				agentType = e.cfg.AgentType
+			}
+			lastKey = designKey(last.SourceTreeHash, last.BuildOptions, last.ProducerOptions, last.Producer, agentType, summaryAgentTags(last))
 		}
 		currentKey := e.designKey()
 		if lastKey != "" && currentKey != "" && lastKey == currentKey {

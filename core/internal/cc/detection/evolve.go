@@ -20,6 +20,7 @@ import (
 	"github.com/Autumn-27/norma/llm"
 	"github.com/Autumn-27/norma/permission"
 	"github.com/Autumn-27/norma/tool"
+	"github.com/jm33-m0/emp3r0r/core/internal/cc/builder"
 	"github.com/jm33-m0/emp3r0r/core/internal/cc/modules"
 	"github.com/jm33-m0/emp3r0r/core/internal/def"
 	"github.com/jm33-m0/emp3r0r/core/lib/logging"
@@ -225,6 +226,10 @@ type EvolveConfig struct {
 	AgentGlibc   string
 	AgentDynload string
 	AgentLibc    string
+	// AgentTags is the exact Go agent build-tag set used by GenerateAgent and
+	// automatic rotation. Nil derives it from the operator runtime config; a
+	// non-nil empty slice builds the slim agent.
+	AgentTags []string
 	// Platform selects the payload model. Empty derives it from Module:
 	// loader_windows is Windows, stager_linux is Linux.
 	Platform string
@@ -278,6 +283,9 @@ type AgentBuildOptions struct {
 	Arch      string
 	Platform  string
 	SourceDir string
+	// BuildTags is an exact Go agent build-tag set. Nil derives it from the
+	// operator runtime config; a non-nil empty slice builds the slim agent.
+	BuildTags []string
 	// Glibc, Dynload, and Libc select the Linux C agent compatibility build.
 	// Empty values keep the builder defaults: glibc, 2.17, and auto.
 	Glibc   string
@@ -417,8 +425,12 @@ type evolver struct {
 	// start of every cycle and on agent rotation, so a baseline or debugger
 	// relaunch cannot make a later failed payload look verified.
 	payloadSeenOnline atomic.Bool
-	lastExecution     atomic.Value
-	lastAgent         atomic.Value
+	// agentSourceDirty is set by a successful edit to the agent source root
+	// and cleared by GenerateAgent or rotation. A cycle must not reuse an
+	// agent artifact built before the edit.
+	agentSourceDirty atomic.Bool
+	lastExecution    atomic.Value
+	lastAgent        atomic.Value
 	// guest is the debugger's sandbox surface. Nil when SSH is not configured.
 	guest GuestRunner
 	// git records source commits in shadow repositories. Nil when disabled.
@@ -1043,6 +1055,13 @@ func normalizeEvolveConfig(cfg *EvolveConfig) error {
 			return fmt.Errorf("guest SSH: %w", err)
 		}
 	}
+	if cfg.AgentTags != nil {
+		tags, err := builder.NormalizeAgentTags(cfg.AgentTags)
+		if err != nil {
+			return err
+		}
+		cfg.AgentTags = tags
+	}
 	if platform == platformLinux {
 		cfg.AgentSourceDir = strings.TrimSpace(cfg.AgentSourceDir)
 		if cfg.AgentSourceDir == "" {
@@ -1245,6 +1264,11 @@ type cycleSummary struct {
 	Shellcode           string           `json:"shellcode,omitempty"`
 	Producer            string           `json:"producer,omitempty"`
 	ShellcodeGenerated  bool             `json:"shellcode_generated,omitempty"`
+	// AgentType and AgentTags record the agent selection that produced the
+	// shellcode. They are restored with the last executing payload so a bad
+	// tag change does not survive an execution-gate rollback.
+	AgentType string    `json:"agent_type,omitempty"`
+	AgentTags *[]string `json:"agent_tags,omitempty"`
 	// BuildOptions and ProducerOptions are the effective build state for the
 	// cycle. They are restored with the last executing payload, so a build
 	// option that regressed cannot leak into a later cycle.
@@ -1477,6 +1501,9 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 	summary := summarizeCycle(e.cfg.LoopID, iteration, run, feedback, buildLog, note, mechanism, shellcode, e.activeProducer, execution, online, networkEvents, e.shellcodeGenerated)
 	summary.BuildOptions = buildOptions
 	summary.ProducerOptions = e.activeProducerOptions()
+	summary.AgentType = e.cfg.AgentType
+	agentTags := cloneAgentTags(e.cfg.AgentTags)
+	summary.AgentTags = &agentTags
 	summary.Attempt = e.attempt
 	summary.GlobalIteration = e.globalUsed + iteration
 	summary.Prediction = clip(prediction, 500)
@@ -1510,7 +1537,7 @@ func (e *evolver) runCycle(ctx context.Context, note, mechanism, prediction stri
 	e.lastAgent.Store(e.expectedAgentUUID)
 	e.sourceTreeHash = e.computeSourceTreeHash()
 	summary.SourceTreeHash = e.sourceTreeHash
-	summary.DesignKey = designKey(e.sourceTreeHash, summary.BuildOptions, summary.ProducerOptions, summary.Producer, e.cfg.AgentType)
+	summary.DesignKey = designKey(e.sourceTreeHash, summary.BuildOptions, summary.ProducerOptions, summary.Producer, e.cfg.AgentType, e.cfg.AgentTags)
 	if edits, err := e.db.LoopEdits(cycleCtx, e.cfg.LoopID); err != nil {
 		e.logClass(logging.ClassError, "read edits for cycle summary: %v", err)
 	} else {
@@ -2581,6 +2608,7 @@ func (e *evolver) restoreExecutingStateTo(ctx context.Context, baseline *Cycle, 
 		errs = append(errs, fmt.Errorf("baseline summary: %w", err))
 	} else {
 		e.summaryBuildOptions(&summary)
+		e.restoreAgentSelection(&summary)
 		path := strings.TrimSpace(summary.Shellcode)
 		switch {
 		case path == "":
@@ -2605,6 +2633,21 @@ func (e *evolver) restoreExecutingStateTo(ctx context.Context, baseline *Cycle, 
 	}
 	e.restoreErr = errors.Join(errs...)
 	return e.restoreErr
+}
+
+// restoreAgentSelection reapplies the agent type and tag set recorded with a
+// baseline. A nil AgentTags pointer is an older summary and leaves the current
+// selection alone; a pointer to nil explicitly restores the derived set.
+func (e *evolver) restoreAgentSelection(summary *cycleSummary) {
+	if summary == nil {
+		return
+	}
+	if summary.AgentType != "" {
+		e.cfg.AgentType = summary.AgentType
+	}
+	if summary.AgentTags != nil {
+		e.cfg.AgentTags = cloneAgentTags(*summary.AgentTags)
+	}
 }
 
 func (e *evolver) linkEdits(ctx context.Context, iteration int, payloadID int64) error {

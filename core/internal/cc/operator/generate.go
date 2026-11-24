@@ -20,12 +20,26 @@ var generationMu sync.Mutex
 
 // CmdGenerateAgent builds a Go agent from console flags.
 func CmdGenerateAgent(cmd *cobra.Command, args []string) {
+	if list, _ := cmd.Flags().GetBool("list-agent-tags"); list {
+		fmt.Fprint(cmd.OutOrStdout(), builder.AgentTagReference())
+		return
+	}
 	payloadType, _ := cmd.Flags().GetString("type")
 	archChoice, _ := cmd.Flags().GetString("arch")
 
 	if !builder.IsArchValid(payloadType, archChoice) {
 		logging.Errorf("Invalid arch choice")
 		return
+	}
+	var buildTags []string
+	if cmd.Flags().Changed("agent-tags") {
+		rawTags, _ := cmd.Flags().GetStringSlice("agent-tags")
+		normalized, err := builder.NormalizeAgentTags(rawTags)
+		if err != nil {
+			logging.Errorf("Invalid agent tags: %v", err)
+			return
+		}
+		buildTags = normalized
 	}
 
 	p2p, _ := cmd.Flags().GetBool("p2p")
@@ -64,6 +78,7 @@ func CmdGenerateAgent(cmd *cobra.Command, args []string) {
 		PersistentRouter:     persistentRouter,
 		IsNCSIEnabled:        ncsi,
 		IsStager:             isStager,
+		BuildTags:            buildTags,
 	}
 
 	logging.Infof("Generating agent in the background; output follows")
